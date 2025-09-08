@@ -225,14 +225,14 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         <CardContent>
           {/* Filters */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            <Select value={filters.action} onValueChange={(value) => 
-              setFilters(prev => ({ ...prev, action: value }))
+            <Select value={filters.action || '__all__'} onValueChange={(value) => 
+              setFilters(prev => ({ ...prev, action: value === '__all__' ? '' : value }))
             }>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by action" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Actions</SelectItem>
+                <SelectItem value="__all__">All Actions</SelectItem>
                 <SelectItem value="INSERT">Created</SelectItem>
                 <SelectItem value="UPDATE">Updated</SelectItem>
                 <SelectItem value="DELETE">Deleted</SelectItem>

@@ -5,10 +5,10 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Track 404s for analytics - removed console.error for production
-    if (import.meta.env.DEV) {
-      // Track 404s for analytics in development
-    }
+      // In development, track failed navigation attempts for debugging
+      if (import.meta.env.DEV) {
+        console.warn(`404: ${location.pathname}`);
+      }
   }, [location.pathname]);
 
   return (

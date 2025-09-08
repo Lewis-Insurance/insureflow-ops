@@ -373,14 +373,14 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
                       </p>
                     </div>
                     <Select
-                      value={fieldMapping[header] || ''}
-                      onValueChange={(value) => handleFieldMapping(header, value)}
+                      value={fieldMapping[header] || '__skip__'}
+                      onValueChange={(value) => handleFieldMapping(header, value === '__skip__' ? '' : value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select field..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">-- Skip this column --</SelectItem>
+                        <SelectItem value="__skip__">-- Skip this column --</SelectItem>
                         {availableFields.map((field) => (
                           <SelectItem key={field.key} value={field.key}>
                             {field.label}

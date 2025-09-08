@@ -26,15 +26,16 @@ import { SearchResult } from '@/hooks/useGlobalSearch';
 import type { 
   CRMFilters, 
   SavedView, 
-  BulkAction
+  BulkAction,
+  Account,
+  CreateAccountData
 } from '@/types/crm-enhanced-clean';
-import type { AccountCompat, CreateAccountDataCompat } from '@/types/crm-compat';
 
 // Memoized stats calculation
 const calculateStats = memoize((accounts: any[]) => ({
   totalAccounts: accounts.length,
-  householdAccounts: accounts.filter(a => (a.account_type || a.type) === 'household').length,
-  businessAccounts: accounts.filter(a => (a.account_type || a.type) === 'business').length,
+  householdAccounts: accounts.filter(a => a.account_type === 'household').length,
+  businessAccounts: accounts.filter(a => a.account_type === 'business').length,
 }));
 
 // Memoized stats cards component
@@ -103,9 +104,9 @@ const CRMContent = memo(() => {
 
   const [filters, setFilters] = useState<CRMFilters>({});
   const [showAccountForm, setShowAccountForm] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<AccountCompat | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-  const [selectedAccounts, setSelectedAccounts] = useState<AccountCompat[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   // Debounced search handler for better performance
@@ -116,7 +117,7 @@ const CRMContent = memo(() => {
   );
 
   // Memoized handlers with proper dependencies
-  const handleCreateAccount = useCallback(async (data: CreateAccountDataCompat) => {
+  const handleCreateAccount = useCallback(async (data: CreateAccountData) => {
     setFormLoading(true);
     try {
       await createAccount(data as any);
@@ -138,7 +139,7 @@ const CRMContent = memo(() => {
     }
   }, [editingAccount, updateAccount]);
 
-  const handleEdit = useCallback((account: AccountCompat) => {
+  const handleEdit = useCallback((account: Account) => {
     setEditingAccount(account);
   }, []);
 
@@ -174,7 +175,7 @@ const CRMContent = memo(() => {
     }
   }, []);
 
-  const handleAccountSelection = useCallback((account: AccountCompat, selected: boolean) => {
+  const handleAccountSelection = useCallback((account: Account, selected: boolean) => {
     setSelectedAccounts(prev => 
       selected 
         ? [...prev, account]
@@ -191,9 +192,11 @@ const CRMContent = memo(() => {
   }, [fetchAccounts]);
 
   const handleGlobalSearchSelect = useCallback((result: SearchResult) => {
-    // Navigate to the selected entity
-    console.log('Selected:', result);
-    // TODO: Implement navigation to selected entity
+    // TODO: Implement navigation to selected entity based on result type
+    // For now, just show the result in dev mode for debugging
+    if (import.meta.env.DEV) {
+      console.log('Search result selected:', result);
+    }
   }, []);
 
   return (

@@ -145,13 +145,13 @@ export default function AccountDetail() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{account.name}</h1>
               <div className="flex items-center space-x-2 mt-1">
-                {account.type === 'business' ? (
+                {account.account_type === 'business' ? (
                   <Building2 className="h-4 w-4 text-primary" />
                 ) : (
                   <Users className="h-4 w-4 text-primary" />
                 )}
                 <Badge variant="outline" className="capitalize">
-                  {account.type}
+                  {account.account_type}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
                   Customer since {format(new Date(account.created_at), 'MMM yyyy')}
