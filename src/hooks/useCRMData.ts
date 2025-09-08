@@ -267,14 +267,25 @@ export function useCRMData() {
         throw new Error('Authentication required');
       }
 
+      // Check if user has membership for this account
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('role')
+        .eq('account_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      console.log('useCRMData: User membership:', membership);
+
       console.log('useCRMData: User authenticated, updating account...');
-      const { error } = await supabase
+      const result = await supabase
         .from('accounts')
         .update(data)
-        .eq('id', id);
+        .eq('id', id)
+        .select(); // Add select to see what was actually updated
 
-      console.log('useCRMData: Update response:', { error });
-      if (error) throw error;
+      console.log('useCRMData: Update result:', { result, error: result.error, data: result.data });
+      if (result.error) throw result.error;
 
       // Log account update event (fire-and-forget)
       supabase
