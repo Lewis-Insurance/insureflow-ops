@@ -28,6 +28,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ActivityTimeline } from '@/components/crm/ActivityTimeline';
 import { MembershipManager } from '@/components/crm/MembershipManager';
 import { useCRMData } from '@/hooks/useCRMData';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { addToRecentlyAccessed, updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
@@ -80,8 +82,8 @@ export default function AccountDetail() {
     
     setFormLoading(true);
     try {
-      // Transform form data with proper type mapping
-      const changes = {
+      // Prepare payload with proper type mapping
+      const payload = {
         name: data.name,
         phone: data.phone,
         email: data.email,
@@ -92,25 +94,56 @@ export default function AccountDetail() {
         zip_code: data.zip_code,
         tin_last4: data.tin_last4,
         source: data.source,
-        // Send both type fields for proper mapping
         type: data.type,
         account_type: data.account_type,
       };
 
-      const updatedAccount = await updateAccount(account.id, changes);
-      
-      // Refresh the detail view with fresh data
-      const refreshedAccount = await fetchAccountDetails(account.id);
-      if (refreshedAccount) {
-        setAccount(refreshedAccount);
-        
-        // Update Recently Viewed with fresh data
-        updateRecentlyAccessedAccount(refreshedAccount);
+      // Derive the pair if only one was provided
+      if (payload.type && !payload.account_type) {
+        payload.account_type = payload.type === 'business' ? 'business' : 'individual';
       }
+      if (payload.account_type && !payload.type) {
+        payload.type = payload.account_type === 'business' ? 'business' : 'household';
+      }
+
+      // Call the RPC directly and use its return value
+      const { data: updatedData, error } = await supabase.rpc('update_account_secure', {
+        account_id: account.id,
+        account_data: payload,
+      });
+
+      if (error) throw error;
+
+      // Type the response data
+      const updatedAccount = updatedData as AccountWithDetails;
+
+      // Update local state immediately with RPC return
+      setAccount(updatedAccount);
+      
+      // Update Recently Viewed immediately with fresh data
+      updateRecentlyAccessedAccount({
+        id: updatedAccount.id,
+        name: updatedAccount.name,
+        email: updatedAccount.email,
+        phone: updatedAccount.phone,
+        account_type: updatedAccount.account_type as 'business' | 'individual',
+        type: updatedAccount.type,
+        updated_at: updatedAccount.updated_at
+      });
       
       setShowEditForm(false);
-    } catch (error) {
+      
+      toast({
+        title: "Account updated",
+        description: "Account information has been saved successfully.",
+      });
+    } catch (error: any) {
       console.error('Failed to update account:', error);
+      toast({
+        title: "Error updating account",
+        description: error.message || "Failed to update account information.",
+        variant: "destructive",
+      });
     } finally {
       setFormLoading(false);
     }
