@@ -100,24 +100,37 @@ export function AccountList({
                         }
                       />
                     )}
-                     {(account.account_type === 'business' || 
-                       account.name?.includes('LLC') || 
-                       account.name?.includes('Inc') ||
-                       account.name?.includes('Corp') ||
-                       account.name?.includes('Manufacturing')) ? (
-                       <Building2 className="h-5 w-5 text-primary" />
-                     ) : (
-                       <Users className="h-5 w-5 text-primary" />
-                     )}
+                     {(() => {
+                       const isBusinessByName = account.name?.includes('LLC') || 
+                         account.name?.includes('Inc') ||
+                         account.name?.includes('Corp') ||
+                         account.name?.includes('Manufacturing');
+                       const isBusiness = account.account_type === 'business' || isBusinessByName;
+                       
+                       return isBusiness ? (
+                         <Building2 className="h-5 w-5 text-primary" />
+                       ) : (
+                         <Users className="h-5 w-5 text-primary" />
+                       );
+                     })()}
                      <div>
                        <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
                        <div className="flex items-center gap-2">
                          <Badge variant="outline" className="text-xs capitalize">
-                           {(account.name?.includes('LLC') || 
-                             account.name?.includes('Inc') ||
-                             account.name?.includes('Corp') ||
-                             account.name?.includes('Manufacturing')) ? 'business' :
-                            account.account_type || 'individual'}
+                           {(() => {
+                             const isBusinessByName = account.name?.includes('LLC') || 
+                               account.name?.includes('Inc') ||
+                               account.name?.includes('Corp') ||
+                               account.name?.includes('Manufacturing');
+                             
+                             console.log('Account:', account.name, {
+                               isBusinessByName,
+                               account_type: account.account_type,
+                               name: account.name
+                             });
+                             
+                             return isBusinessByName ? 'business' : (account.account_type || 'individual');
+                           })()}
                          </Badge>
                         {account.source && (
                           <Badge variant="outline" className="text-xs">
