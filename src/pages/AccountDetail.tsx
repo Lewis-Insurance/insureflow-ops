@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { QuickActions } from '@/components/crm/QuickActions';
+import { ConsentEvidence } from '@/components/crm/ConsentEvidence';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -268,12 +270,14 @@ export default function AccountDetail() {
           </TabsList>
 
           <TabsContent value="timeline" className="space-y-4">
-            <ActivityTimeline 
-              events={account.events}
-              calls={account.calls}
-              messages={account.messages}
-              tasks={account.tasks}
-            />
+            <div className="space-y-6">
+              <ActivityTimeline
+                events={account.events}
+                calls={account.calls}
+                messages={account.messages}
+                tasks={account.tasks}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="contacts" className="space-y-4">

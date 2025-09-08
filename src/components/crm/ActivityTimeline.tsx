@@ -14,6 +14,9 @@ import {
   Calendar
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { CallTimelineItem } from './CallTimelineItem';
+import { SMSTimelineItem } from './SMSTimelineItem';
+import { ConsentEvidence } from './ConsentEvidence';
 import type { ActivityEvent, CallSession, SMSMessage, Task } from '@/types/crm';
 
 interface ActivityTimelineProps {
@@ -58,7 +61,7 @@ export function ActivityTimeline({ events = [], calls = [], messages = [], tasks
       title: call.direction === 'inbound' ? 'Inbound Call' : 'Outbound Call',
       description: `${call.from_number} → ${call.to_number}${call.duration_seconds ? ` (${Math.round(call.duration_seconds / 60)}m)` : ''}`,
       icon: Phone,
-      iconColor: 'text-blue-500',
+      iconColor: call.direction === 'inbound' ? 'text-green-500' : 'text-blue-500',
       status: call.disposition,
       metadata: call
     })),
@@ -136,29 +139,38 @@ export function ActivityTimeline({ events = [], calls = [], messages = [], tasks
                   
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium">{item.title}</h4>
-                      <div className="flex items-center space-x-2">
-                        {item.status && (
-                          <Badge variant="outline" className="text-xs">
-                            {item.status}
-                          </Badge>
+                    {/* Render specialized components for calls and SMS */}
+                    {item.type === 'call' ? (
+                      <CallTimelineItem call={item.metadata} compact />
+                    ) : item.type === 'sms' ? (
+                      <SMSTimelineItem message={item.metadata} compact maskContent />
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">{item.title}</h4>
+                          <div className="flex items-center space-x-2">
+                            {item.status && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.status}
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {item.description}
+                          </p>
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {item.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {item.description}
-                      </p>
+                        
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(item.timestamp), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </>
                     )}
-                    
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(item.timestamp), 'MMM d, yyyy h:mm a')}
-                    </p>
                   </div>
                 </div>
               </div>
