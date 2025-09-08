@@ -24,11 +24,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex min-h-screen w-full">
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center justify-center px-4 py-3">
+            <div className="flex items-center justify-start px-4 py-3">
               <img 
                 src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png" 
                 alt="Lewis Insurance"
-                className="h-8 w-auto"
+                className="h-24 w-auto"
               />
             </div>
           </SidebarHeader>
