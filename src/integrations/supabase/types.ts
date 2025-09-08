@@ -1794,11 +1794,11 @@ export type Database = {
         Returns: boolean
       }
       is_admin: {
-        Args: { uid: string }
+        Args: Record<PropertyKey, never> | { uid: string }
         Returns: boolean
       }
       is_staff: {
-        Args: { uid: string }
+        Args: Record<PropertyKey, never> | { uid: string }
         Returns: boolean
       }
       log_profile_access: {
@@ -1850,7 +1850,14 @@ export type Database = {
       sms_direction: "in" | "out"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
-      user_role: "customer" | "staff" | "admin"
+      user_role:
+        | "customer"
+        | "staff"
+        | "admin"
+        | "owner"
+        | "csr"
+        | "producer"
+        | "accounting"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1986,7 +1993,15 @@ export const Constants = {
       sms_direction: ["in", "out"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
-      user_role: ["customer", "staff", "admin"],
+      user_role: [
+        "customer",
+        "staff",
+        "admin",
+        "owner",
+        "csr",
+        "producer",
+        "accounting",
+      ],
     },
   },
 } as const
