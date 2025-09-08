@@ -14,6 +14,8 @@ import { CSVImport } from '@/components/crm/CSVImport';
 import { SecurityStatus } from '@/components/crm/SecurityStatus';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { AuditLogViewer } from '@/components/crm/AuditLogViewer';
+import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
+import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -260,10 +262,15 @@ const CRMContent = memo(() => {
           </ErrorBoundary>
         </div>
 
-        {/* Audit Logs for Staff/Admin */}
+        {/* Advanced Import/Export System */}
+        <ErrorBoundary level="component">
+          <AdvancedImportSystem onImportComplete={handleRefreshAccounts} />
+        </ErrorBoundary>
+
+        {/* Enhanced Audit System for Staff/Admin */}
         {canViewAuditLogs && (
           <ErrorBoundary level="component">
-            <AuditLogViewer />
+            <EnhancedAuditViewer />
           </ErrorBoundary>
         )}
 
