@@ -11,6 +11,7 @@ import { SavedViewsManager } from '@/components/crm/SavedViewsManager';
 import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
 import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
 import { CSVImport } from '@/components/crm/CSVImport';
+import { SecurityStatus } from '@/components/crm/SecurityStatus';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -221,12 +222,15 @@ const CRMContent = memo(() => {
         </ErrorBoundary>
 
         {/* Data Quality Tools */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           <ErrorBoundary level="component">
             <DuplicateDetection onMergeComplete={handleRefreshAccounts} />
           </ErrorBoundary>
           <ErrorBoundary level="component">
             <CSVImport onImportComplete={handleRefreshAccounts} />
+          </ErrorBoundary>
+          <ErrorBoundary level="component">
+            <SecurityStatus />
           </ErrorBoundary>
         </div>
 

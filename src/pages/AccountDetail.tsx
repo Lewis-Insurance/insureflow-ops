@@ -20,10 +20,12 @@ import {
   DollarSign,
   AlertTriangle,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Shield
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ActivityTimeline } from '@/components/crm/ActivityTimeline';
+import { MembershipManager } from '@/components/crm/MembershipManager';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
@@ -267,6 +269,7 @@ export default function AccountDetail() {
             <TabsTrigger value="policies">Policies ({activePolicies.length})</TabsTrigger>
             <TabsTrigger value="claims">Claims ({account.claims?.length || 0})</TabsTrigger>
             <TabsTrigger value="communications">Communications</TabsTrigger>
+            <TabsTrigger value="access">Access Management</TabsTrigger>
           </TabsList>
 
           <TabsContent value="timeline" className="space-y-4">
@@ -296,6 +299,13 @@ export default function AccountDetail() {
             <CommunicationsTab 
               calls={account.calls || []}
               messages={account.messages || []}
+            />
+          </TabsContent>
+
+          <TabsContent value="access" className="space-y-4">
+            <MembershipManager 
+              accountId={account.id}
+              accountName={account.name}
             />
           </TabsContent>
         </Tabs>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage, handleSupabaseError } from '@/lib/errors';
+import { useAccountMemberships } from './useAccountMemberships';
 import type { Database } from '@/integrations/supabase/types';
 import type {
   Account, 
@@ -24,6 +25,7 @@ export function useCRMData() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { createOwnerMembership } = useAccountMemberships();
 
   const fetchAccounts = useCallback(async (filters?: CRMFilters) => {
     try {
@@ -167,6 +169,12 @@ export function useCRMData() {
 
   const createAccount = useCallback(async (data: CreateAccountData): Promise<Account | null> => {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data: account, error } = await supabase
         .from('accounts')
         .insert(data)
@@ -176,6 +184,18 @@ export function useCRMData() {
       const errorResult = handleSupabaseError(error);
       if (errorResult.shouldThrow) {
         throw new Error(errorResult.message);
+      }
+
+      if (!account) {
+        throw new Error('Account creation failed - no account returned');
+      }
+
+      // Create owner membership for the current user
+      const membershipCreated = await createOwnerMembership(account.id, user.id);
+      if (!membershipCreated) {
+        // If membership creation fails, we should clean up the account
+        await supabase.from('accounts').delete().eq('id', account.id);
+        throw new Error('Failed to create account membership');
       }
 
       // Log account creation event
@@ -206,7 +226,7 @@ export function useCRMData() {
       });
       return null;
     }
-  }, [fetchAccounts]);
+  }, [fetchAccounts, createOwnerMembership]);
 
   const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {
