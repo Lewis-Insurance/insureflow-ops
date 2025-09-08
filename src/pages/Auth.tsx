@@ -16,7 +16,7 @@ const REQUIRE_PHONE_VERIFICATION = import.meta.env.VITE_REQUIRE_PHONE === 'true'
 const MIN_PASSWORD_LENGTH = Number(import.meta.env.VITE_MIN_PW_LEN ?? 12);
 
 export default function Auth() {
-  const { signIn, signUp, loading, isAuthenticated, user, profile } = useAuth();
+  const { signIn, signUp, loading, isAuthenticated, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
   // Error states for inline validation
@@ -107,9 +107,9 @@ export default function Auth() {
     setSignInErrors({});
     
     try {
-      // Normalize and trim input before submit
+      // Normalize and trim input before submit (don't trim passwords)
       const email = signInData.email.trim().toLowerCase();
-      const password = signInData.password.trim();
+      const password = signInData.password; // Don't trim passwords
       
       const result = await signIn(email, password);
       
@@ -132,9 +132,9 @@ export default function Auth() {
     setSignUpErrors({});
     
     try {
-      // Normalize and trim input before submit
+      // Normalize and trim input before submit (don't trim passwords)
       const email = signUpData.email.trim().toLowerCase();
-      const password = signUpData.password.trim();
+      const password = signUpData.password; // Don't trim passwords
       const fullName = signUpData.fullName.trim();
       
       const result = await signUp(email, password, fullName);
@@ -160,8 +160,8 @@ export default function Auth() {
             src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png" 
             alt="Lewis Insurance"
             className="h-48 w-auto"
-            width="192"
-            height="192"
+            width={192}
+            height={192}
           />
           <p className="text-muted-foreground text-center">
             Agency Management System
@@ -200,13 +200,17 @@ export default function Auth() {
                         id="signin-email"
                         type="email"
                         inputMode="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
                         placeholder="Enter your email"
                         autoComplete="email"
                         value={signInData.email}
                         onChange={(e) => {
                           setSignInData({ ...signInData, email: e.target.value });
                           if (signInErrors.email) {
-                            setSignInErrors({ ...signInErrors, email: '' });
+                            const newErrors = { ...signInErrors };
+                            delete newErrors.email;
+                            setSignInErrors(newErrors);
                           }
                         }}
                         aria-invalid={!!signInErrors.email}
@@ -228,12 +232,14 @@ export default function Auth() {
                       placeholder="Enter your password"
                       autoComplete="current-password"
                       value={signInData.password}
-                      onChange={(e) => {
-                        setSignInData({ ...signInData, password: e.target.value });
-                        if (signInErrors.password) {
-                          setSignInErrors({ ...signInErrors, password: '' });
-                        }
-                      }}
+                        onChange={(e) => {
+                          setSignInData({ ...signInData, password: e.target.value });
+                          if (signInErrors.password) {
+                            const newErrors = { ...signInErrors };
+                            delete newErrors.password;
+                            setSignInErrors(newErrors);
+                          }
+                        }}
                       aria-invalid={!!signInErrors.password}
                       aria-describedby={signInErrors.password ? "signin-password-error" : undefined}
                       required
@@ -277,7 +283,9 @@ export default function Auth() {
                         onChange={(e) => {
                           setSignUpData({ ...signUpData, fullName: e.target.value });
                           if (signUpErrors.fullName) {
-                            setSignUpErrors({ ...signUpErrors, fullName: '' });
+                            const newErrors = { ...signUpErrors };
+                            delete newErrors.fullName;
+                            setSignUpErrors(newErrors);
                           }
                         }}
                         aria-invalid={!!signUpErrors.fullName}
@@ -297,13 +305,17 @@ export default function Auth() {
                         id="signup-email"
                         type="email"
                         inputMode="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
                         placeholder="Enter your email"
                         autoComplete="email"
                         value={signUpData.email}
                         onChange={(e) => {
                           setSignUpData({ ...signUpData, email: e.target.value });
                           if (signUpErrors.email) {
-                            setSignUpErrors({ ...signUpErrors, email: '' });
+                            const newErrors = { ...signUpErrors };
+                            delete newErrors.email;
+                            setSignUpErrors(newErrors);
                           }
                         }}
                         aria-invalid={!!signUpErrors.email}
@@ -329,7 +341,9 @@ export default function Auth() {
                         onChange={(e) => {
                           setSignUpData({ ...signUpData, password: e.target.value });
                           if (signUpErrors.password) {
-                            setSignUpErrors({ ...signUpErrors, password: '' });
+                            const newErrors = { ...signUpErrors };
+                            delete newErrors.password;
+                            setSignUpErrors(newErrors);
                           }
                         }}
                         aria-invalid={!!signUpErrors.password}
