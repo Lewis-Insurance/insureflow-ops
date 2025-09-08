@@ -4,8 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 export default function Dashboard() {
   const { profile, loading: authLoading } = useAuth();
 
-  console.log('Dashboard render - authLoading:', authLoading, 'profile:', profile);
-
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8">
       <div className="flex items-center justify-between space-y-2">

@@ -6,12 +6,7 @@ import Dashboard from './Dashboard';
 const Index = () => {
   const { isAuthenticated, loading, profile } = useAuth();
 
-  console.log('Index component - isAuthenticated:', isAuthenticated, 'loading:', loading, 'profile:', profile);
-
-  console.log('Index component - checking loading state...');
-
   if (loading) {
-    console.log('Index component - showing loading spinner');
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -22,13 +17,9 @@ const Index = () => {
     );
   }
 
-  console.log('Index component - checking authentication...');
   if (!isAuthenticated) {
-    console.log('Index component - not authenticated, redirecting to /auth');
     return <Navigate to="/auth" replace />;
   }
-
-  console.log('Index component - rendering AppLayout with Dashboard');
 
   return (
     <AppLayout>

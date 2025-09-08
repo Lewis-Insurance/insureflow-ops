@@ -1627,6 +1627,54 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
+      get_my_claims: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount_estimate: number | null
+          claim_number: string
+          created_at: string
+          description: string | null
+          id: string
+          loss_date: string | null
+          policy_id: string
+          status: Database["public"]["Enums"]["claim_status"]
+          updated_at: string
+        }[]
+      }
+      get_my_policies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          account_id: string | null
+          carrier: string
+          carrier_id: string | null
+          created_at: string
+          effective_date: string
+          expiration_date: string
+          id: string
+          insured_user_id: string
+          line_of_business: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"] | null
+          policy_number: string
+          premium: number
+          status: string | null
+        }[]
+      }
+      get_policies_with_claims: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount_estimate: number
+          carrier: string
+          claim_id: string
+          claim_number: string
+          effective_date: string
+          expiration_date: string
+          insured_user_id: string
+          policy_id: string
+          policy_number: string
+          premium: number
+          status: Database["public"]["Enums"]["claim_status"]
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]

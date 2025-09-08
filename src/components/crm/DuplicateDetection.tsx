@@ -149,7 +149,7 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         });
         
         if (error) throw error;
-        console.log('Records merged:', data);
+        // Records merged successfully
       }
       
       // Update the group status

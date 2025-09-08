@@ -154,7 +154,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
         });
         
         if (error) throw error;
-        console.log('CSV batch processed:', data);
+        // Process successful - data contains batch results
       }
       
       // Mock validation results
