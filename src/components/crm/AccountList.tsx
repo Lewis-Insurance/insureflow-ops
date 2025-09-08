@@ -100,7 +100,11 @@ export function AccountList({
                         }
                       />
                     )}
-                     {((account as any).type === 'commercial_business' || account.account_type === 'business') ? (
+                     {(account.account_type === 'business' || 
+                       account.name?.includes('LLC') || 
+                       account.name?.includes('Inc') ||
+                       account.name?.includes('Corp') ||
+                       account.name?.includes('Manufacturing')) ? (
                        <Building2 className="h-5 w-5 text-primary" />
                      ) : (
                        <Users className="h-5 w-5 text-primary" />
@@ -109,8 +113,10 @@ export function AccountList({
                        <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
                        <div className="flex items-center gap-2">
                          <Badge variant="outline" className="text-xs capitalize">
-                           {(account as any).type === 'commercial_business' ? 'business' : 
-                            (account as any).type === 'household' ? 'household' : 
+                           {(account.name?.includes('LLC') || 
+                             account.name?.includes('Inc') ||
+                             account.name?.includes('Corp') ||
+                             account.name?.includes('Manufacturing')) ? 'business' :
                             account.account_type || 'individual'}
                          </Badge>
                         {account.source && (

@@ -42,6 +42,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "account_memberships_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -80,6 +87,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "account_tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       accounts: {
@@ -105,7 +119,8 @@ export type Database = {
           state: string | null
           team_id: string | null
           tin_last4: string | null
-          type_old: Database["public"]["Enums"]["account_type"]
+          type: Database["public"]["Enums"]["account_type_v2"]
+          type_old: Database["public"]["Enums"]["account_type"] | null
           updated_at: string
           zip_code: string | null
         }
@@ -131,7 +146,8 @@ export type Database = {
           state?: string | null
           team_id?: string | null
           tin_last4?: string | null
-          type_old: Database["public"]["Enums"]["account_type"]
+          type?: Database["public"]["Enums"]["account_type_v2"]
+          type_old?: Database["public"]["Enums"]["account_type"] | null
           updated_at?: string
           zip_code?: string | null
         }
@@ -157,7 +173,8 @@ export type Database = {
           state?: string | null
           team_id?: string | null
           tin_last4?: string | null
-          type_old?: Database["public"]["Enums"]["account_type"]
+          type?: Database["public"]["Enums"]["account_type_v2"]
+          type_old?: Database["public"]["Enums"]["account_type"] | null
           updated_at?: string
           zip_code?: string | null
         }
@@ -174,6 +191,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -217,29 +241,47 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
+          actor_role: string | null
+          changed_at: string | null
+          changed_by: string | null
           created_at: string
           details: Json | null
+          diff: Json | null
           entity: string
           entity_id: string | null
           id: number
+          row_id: string | null
+          table_name: string | null
           user_id: string | null
         }
         Insert: {
           action: string
+          actor_role?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
           created_at?: string
           details?: Json | null
+          diff?: Json | null
           entity: string
           entity_id?: string | null
           id?: number
+          row_id?: string | null
+          table_name?: string | null
           user_id?: string | null
         }
         Update: {
           action?: string
+          actor_role?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
           created_at?: string
           details?: Json | null
+          diff?: Json | null
           entity?: string
           entity_id?: string | null
           id?: number
+          row_id?: string | null
+          table_name?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -385,6 +427,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "businesses_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       call_sessions: {
@@ -445,10 +494,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "call_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "call_sessions_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -570,6 +633,80 @@ export type Database = {
           },
         ]
       }
+      commercial_business_accounts: {
+        Row: {
+          account_id: string
+          annual_revenue: number | null
+          created_at: string | null
+          dba_name: string | null
+          employees_count: number | null
+          fein: string | null
+          legal_name: string | null
+          naics_code: string | null
+          notes: string | null
+          primary_contact_id: string | null
+          updated_at: string | null
+          years_in_business: number | null
+        }
+        Insert: {
+          account_id: string
+          annual_revenue?: number | null
+          created_at?: string | null
+          dba_name?: string | null
+          employees_count?: number | null
+          fein?: string | null
+          legal_name?: string | null
+          naics_code?: string | null
+          notes?: string | null
+          primary_contact_id?: string | null
+          updated_at?: string | null
+          years_in_business?: number | null
+        }
+        Update: {
+          account_id?: string
+          annual_revenue?: number | null
+          created_at?: string | null
+          dba_name?: string | null
+          employees_count?: number | null
+          fein?: string | null
+          legal_name?: string | null
+          naics_code?: string | null
+          notes?: string | null
+          primary_contact_id?: string | null
+          updated_at?: string | null
+          years_in_business?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_business_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communications: {
         Row: {
           account_id: string | null
@@ -625,6 +762,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -689,6 +833,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "consent_evidence_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       consents: {
@@ -736,6 +887,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "consents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contact_tags: {
@@ -766,6 +924,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -903,6 +1068,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -1069,6 +1241,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -1290,6 +1469,82 @@ export type Database = {
         }
         Relationships: []
       }
+      household_accounts: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          head_contact_id: string | null
+          household_name: string | null
+          notes: string | null
+          num_dependents: number | null
+          spouse_contact_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          head_contact_id?: string | null
+          household_name?: string | null
+          notes?: string | null
+          num_dependents?: number | null
+          spouse_contact_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          head_contact_id?: string | null
+          household_name?: string | null
+          notes?: string | null
+          num_dependents?: number | null
+          spouse_contact_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_head_contact_id_fkey"
+            columns: ["head_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_head_contact_id_fkey"
+            columns: ["head_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_spouse_contact_id_fkey"
+            columns: ["spouse_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_spouse_contact_id_fkey"
+            columns: ["spouse_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       impersonation_logs: {
         Row: {
           actions_taken: Json | null
@@ -1491,6 +1746,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -1706,6 +1968,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policies_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -1886,6 +2155,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quotes_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -2048,10 +2324,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sms_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sms_messages_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -2111,6 +2401,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -2200,6 +2497,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "twilio_consents_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_sessions: {
@@ -2254,6 +2558,253 @@ export type Database = {
       }
     }
     Views: {
+      v_accounts: {
+        Row: {
+          account_status: Database["public"]["Enums"]["account_status"] | null
+          account_type: Database["public"]["Enums"]["account_type_new"] | null
+          address_line1: string | null
+          address_line2: string | null
+          business_id: string | null
+          city: string | null
+          contact_id: string | null
+          created_at: string | null
+          custom: Json | null
+          deleted_at: string | null
+          email: string | null
+          id: string | null
+          lead_source_detail: string | null
+          name: string | null
+          notes: string | null
+          owner_agent_id: string | null
+          phone: string | null
+          source: string | null
+          state: string | null
+          team_id: string | null
+          tin_last4: string | null
+          type_old: Database["public"]["Enums"]["account_type"] | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          account_status?: Database["public"]["Enums"]["account_status"] | null
+          account_type?: Database["public"]["Enums"]["account_type_new"] | null
+          address_line1?: string | null
+          address_line2?: string | null
+          business_id?: string | null
+          city?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          custom?: Json | null
+          deleted_at?: string | null
+          email?: string | null
+          id?: string | null
+          lead_source_detail?: string | null
+          name?: string | null
+          notes?: string | null
+          owner_agent_id?: string | null
+          phone?: string | null
+          source?: string | null
+          state?: string | null
+          team_id?: string | null
+          tin_last4?: string | null
+          type_old?: Database["public"]["Enums"]["account_type"] | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          account_status?: Database["public"]["Enums"]["account_status"] | null
+          account_type?: Database["public"]["Enums"]["account_type_new"] | null
+          address_line1?: string | null
+          address_line2?: string | null
+          business_id?: string | null
+          city?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          custom?: Json | null
+          deleted_at?: string | null
+          email?: string | null
+          id?: string | null
+          lead_source_detail?: string | null
+          name?: string | null
+          notes?: string | null
+          owner_agent_id?: string | null
+          phone?: string | null
+          source?: string | null
+          state?: string | null
+          team_id?: string | null
+          tin_last4?: string | null
+          type_old?: Database["public"]["Enums"]["account_type"] | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_contacts: {
+        Row: {
+          account_id: string | null
+          address_mailing: Json | null
+          address_residential: Json | null
+          best_call_time: string | null
+          consent_sms: boolean | null
+          consent_sms_at: string | null
+          consent_voice: boolean | null
+          consent_voice_at: string | null
+          created_at: string | null
+          created_by: string | null
+          date_of_birth: string | null
+          deleted_at: string | null
+          email: string | null
+          email_other: string[] | null
+          email_primary: string | null
+          first_name: string | null
+          gender: Database["public"]["Enums"]["gender_type"] | null
+          id: string | null
+          last_name: string | null
+          lead_score: number | null
+          marital_status:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name: string | null
+          phone: string | null
+          phone_home: string | null
+          phone_mobile: string | null
+          phone_work: string | null
+          preferred_contact_method:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability: number | null
+          risk_score: number | null
+          role: string | null
+          source: string | null
+          ssn_encrypted: string | null
+          ssn_last4: string | null
+          tags: string[] | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          address_mailing?: Json | null
+          address_residential?: Json | null
+          best_call_time?: string | null
+          consent_sms?: boolean | null
+          consent_sms_at?: string | null
+          consent_voice?: boolean | null
+          consent_voice_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          email_other?: string[] | null
+          email_primary?: string | null
+          first_name?: string | null
+          gender?: Database["public"]["Enums"]["gender_type"] | null
+          id?: string | null
+          last_name?: string | null
+          lead_score?: number | null
+          marital_status?:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name?: string | null
+          phone?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
+          phone_work?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability?: number | null
+          risk_score?: number | null
+          role?: string | null
+          source?: string | null
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          address_mailing?: Json | null
+          address_residential?: Json | null
+          best_call_time?: string | null
+          consent_sms?: boolean | null
+          consent_sms_at?: string | null
+          consent_voice?: boolean | null
+          consent_voice_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          email_other?: string[] | null
+          email_primary?: string | null
+          first_name?: string | null
+          gender?: Database["public"]["Enums"]["gender_type"] | null
+          id?: string | null
+          last_name?: string | null
+          lead_score?: number | null
+          marital_status?:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name?: string | null
+          phone?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
+          phone_work?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability?: number | null
+          risk_score?: number | null
+          role?: string | null
+          source?: string | null
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_user_accounts: {
         Row: {
           account_id: string | null
@@ -2267,6 +2818,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -2311,6 +2869,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policies_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -2333,6 +2898,14 @@ export type Database = {
           p_entity_type: string
           p_metadata?: Json
         }
+        Returns: string
+      }
+      decrypt_ssn: {
+        Args: { enc: string }
+        Returns: string
+      }
+      encrypt_ssn: {
+        Args: { ssn: string }
         Returns: string
       }
       generate_backup_codes: {
@@ -2490,7 +3063,7 @@ export type Database = {
         Returns: boolean
       }
       is_staff: {
-        Args: Record<PropertyKey, never> | { uid: string }
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       log_profile_access: {
@@ -2513,6 +3086,26 @@ export type Database = {
         Args: { entity_type?: string; similarity_threshold?: number }
         Returns: Json
       }
+      search_customers: {
+        Args: { q: string }
+        Returns: {
+          email: string
+          entity_type: string
+          id: string
+          label: string
+          phone: string
+        }[]
+      }
+      search_customers_ft: {
+        Args: { q: string }
+        Returns: {
+          email: string
+          entity_type: string
+          id: string
+          label: string
+          phone: string
+        }[]
+      }
       set_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["user_role"]
@@ -2528,10 +3121,14 @@ export type Database = {
     Enums: {
       account_status: "lead" | "active" | "churned"
       account_type: "household" | "business"
+      account_type_enum: "individual" | "business" | "household"
       account_type_new: "individual" | "business" | "household"
+      account_type_v2: "household" | "commercial_business"
       agent_role: "staff" | "admin" | "producer"
+      billing_freq_enum: "monthly" | "quarterly" | "semiannual" | "annual"
       billing_frequency: "monthly" | "quarterly" | "semiannual" | "annual"
       billing_method: "direct_bill" | "agency_bill"
+      billing_method_enum: "direct_bill" | "agency_bill"
       business_type_enum:
         | "corporation"
         | "llc"
@@ -2540,12 +3137,19 @@ export type Database = {
         | "nonprofit"
         | "other"
       claim_status: "open" | "in_review" | "approved" | "denied" | "closed"
+      comm_direction_enum: "inbound" | "outbound"
+      comm_type_enum: "email" | "sms" | "call" | "meeting" | "note"
       communication_direction: "inbound" | "outbound"
       communication_type: "email" | "sms" | "call" | "meeting" | "note"
       consent_method: "verbal" | "web" | "sms_keyword" | "paper"
       consent_method_crm: "verbal" | "written" | "checkbox"
       consent_type: "sms" | "voice" | "email"
       consent_type_crm:
+        | "marketing_opt_in"
+        | "recording_consent"
+        | "sms_consent"
+        | "email_consent"
+      consent_type_enum:
         | "marketing_opt_in"
         | "recording_consent"
         | "sms_consent"
@@ -2559,7 +3163,21 @@ export type Database = {
         | "other"
       gender_type: "male" | "female" | "other" | "prefer_not_to_say"
       invoice_status: "open" | "paid" | "overdue" | "void"
+      invoice_status_enum: "open" | "paid" | "overdue" | "void"
       line_of_business:
+        | "auto"
+        | "home"
+        | "renters"
+        | "umbrella"
+        | "life"
+        | "health"
+        | "commercial_auto"
+        | "bop"
+        | "gl"
+        | "workers_comp"
+        | "property"
+        | "other"
+      lob_enum:
         | "auto"
         | "home"
         | "renters"
@@ -2587,11 +3205,21 @@ export type Database = {
         | "wire"
         | "other"
       payment_type: "direct" | "agency"
+      policy_status_enum:
+        | "quoted"
+        | "bound"
+        | "active"
+        | "pending_cancel"
+        | "cancelled"
+        | "expired"
       preferred_contact_method: "email" | "phone" | "sms" | "mail"
+      priority_enum: "low" | "med" | "high"
       quote_status: "open" | "won" | "lost" | "expired"
+      quote_status_enum: "open" | "won" | "lost" | "expired"
       sms_direction: "in" | "out"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
+      task_status_enum: "open" | "done" | "cancelled"
       user_role:
         | "customer"
         | "staff"
@@ -2729,10 +3357,14 @@ export const Constants = {
     Enums: {
       account_status: ["lead", "active", "churned"],
       account_type: ["household", "business"],
+      account_type_enum: ["individual", "business", "household"],
       account_type_new: ["individual", "business", "household"],
+      account_type_v2: ["household", "commercial_business"],
       agent_role: ["staff", "admin", "producer"],
+      billing_freq_enum: ["monthly", "quarterly", "semiannual", "annual"],
       billing_frequency: ["monthly", "quarterly", "semiannual", "annual"],
       billing_method: ["direct_bill", "agency_bill"],
+      billing_method_enum: ["direct_bill", "agency_bill"],
       business_type_enum: [
         "corporation",
         "llc",
@@ -2742,12 +3374,20 @@ export const Constants = {
         "other",
       ],
       claim_status: ["open", "in_review", "approved", "denied", "closed"],
+      comm_direction_enum: ["inbound", "outbound"],
+      comm_type_enum: ["email", "sms", "call", "meeting", "note"],
       communication_direction: ["inbound", "outbound"],
       communication_type: ["email", "sms", "call", "meeting", "note"],
       consent_method: ["verbal", "web", "sms_keyword", "paper"],
       consent_method_crm: ["verbal", "written", "checkbox"],
       consent_type: ["sms", "voice", "email"],
       consent_type_crm: [
+        "marketing_opt_in",
+        "recording_consent",
+        "sms_consent",
+        "email_consent",
+      ],
+      consent_type_enum: [
         "marketing_opt_in",
         "recording_consent",
         "sms_consent",
@@ -2763,7 +3403,22 @@ export const Constants = {
       ],
       gender_type: ["male", "female", "other", "prefer_not_to_say"],
       invoice_status: ["open", "paid", "overdue", "void"],
+      invoice_status_enum: ["open", "paid", "overdue", "void"],
       line_of_business: [
+        "auto",
+        "home",
+        "renters",
+        "umbrella",
+        "life",
+        "health",
+        "commercial_auto",
+        "bop",
+        "gl",
+        "workers_comp",
+        "property",
+        "other",
+      ],
+      lob_enum: [
         "auto",
         "home",
         "renters",
@@ -2794,11 +3449,22 @@ export const Constants = {
         "other",
       ],
       payment_type: ["direct", "agency"],
+      policy_status_enum: [
+        "quoted",
+        "bound",
+        "active",
+        "pending_cancel",
+        "cancelled",
+        "expired",
+      ],
       preferred_contact_method: ["email", "phone", "sms", "mail"],
+      priority_enum: ["low", "med", "high"],
       quote_status: ["open", "won", "lost", "expired"],
+      quote_status_enum: ["open", "won", "lost", "expired"],
       sms_direction: ["in", "out"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
+      task_status_enum: ["open", "done", "cancelled"],
       user_role: [
         "customer",
         "staff",

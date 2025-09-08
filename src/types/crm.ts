@@ -2,6 +2,7 @@
 export interface Account {
   id: string;
   account_type: 'individual' | 'business' | 'household' | null;
+  type?: 'household' | 'commercial_business' | 'individual' | null; // Legacy field
   account_status: 'lead' | 'prospect' | 'customer' | 'inactive' | null;
   name: string;
   tin_last4?: string | null;
