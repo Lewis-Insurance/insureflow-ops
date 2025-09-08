@@ -101,12 +101,15 @@ export function AccountList({
                       />
                     )}
                      {(() => {
-                       const isBusinessByName = account.name?.includes('LLC') || 
-                         account.name?.includes('Inc') ||
-                         account.name?.includes('Corp') ||
-                         account.name?.includes('Manufacturing');
+                       // Unified business detection logic
+                       const isBusinessByName = /\b(llc|inc|inc\.|corp|co\.?|company|manufacturing|llp|plc)\b/i.test(account.name ?? '');
                        const isBusiness = account.account_type === 'business' || isBusinessByName;
                        
+                       // Choose display label, preferring DB type when present
+                       const displayType = account.account_type 
+                         ? account.account_type 
+                         : (isBusiness ? 'business' : 'individual');
+
                        return isBusiness ? (
                          <Building2 className="h-5 w-5 text-primary" />
                        ) : (
@@ -118,18 +121,12 @@ export function AccountList({
                        <div className="flex items-center gap-2">
                          <Badge variant="outline" className="text-xs capitalize">
                            {(() => {
-                             const isBusinessByName = account.name?.includes('LLC') || 
-                               account.name?.includes('Inc') ||
-                               account.name?.includes('Corp') ||
-                               account.name?.includes('Manufacturing');
-                             
-                             console.log('Account:', account.name, {
-                               isBusinessByName,
-                               account_type: account.account_type,
-                               name: account.name
-                             });
-                             
-                             return isBusinessByName ? 'business' : (account.account_type || 'individual');
+                             // Reuse the same business detection logic
+                             const isBusinessByName = /\b(llc|inc|inc\.|corp|co\.?|company|manufacturing|llp|plc)\b/i.test(account.name ?? '');
+                             const displayType = account.account_type 
+                               ? account.account_type 
+                               : (isBusinessByName ? 'business' : 'individual');
+                             return displayType;
                            })()}
                          </Badge>
                         {account.source && (
