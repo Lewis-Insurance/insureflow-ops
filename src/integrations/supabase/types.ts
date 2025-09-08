@@ -319,22 +319,8 @@ export type Database = {
             foreignKeyName: "claims_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
-            referencedRelation: "my_policies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
-            referencedRelation: "policies_with_claims"
-            referencedColumns: ["policy_id"]
           },
         ]
       }
@@ -688,22 +674,8 @@ export type Database = {
             foreignKeyName: "documents_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
-            referencedRelation: "my_policies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
-            referencedRelation: "policies_with_claims"
-            referencedColumns: ["policy_id"]
           },
         ]
       }
@@ -1612,91 +1584,7 @@ export type Database = {
       }
     }
     Views: {
-      my_claims: {
-        Row: {
-          amount_estimate: number | null
-          claim_number: string | null
-          created_at: string | null
-          description: string | null
-          id: string | null
-          policy_id: string | null
-          status: Database["public"]["Enums"]["claim_status"] | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "claims_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
-            referencedRelation: "my_policies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
-            referencedRelation: "policies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_policy_id_fkey"
-            columns: ["policy_id"]
-            isOneToOne: false
-            referencedRelation: "policies_with_claims"
-            referencedColumns: ["policy_id"]
-          },
-        ]
-      }
-      my_policies: {
-        Row: {
-          carrier: string | null
-          created_at: string | null
-          effective_date: string | null
-          expiration_date: string | null
-          id: string | null
-          insured_user_id: string | null
-          policy_number: string | null
-          premium: number | null
-        }
-        Insert: {
-          carrier?: string | null
-          created_at?: string | null
-          effective_date?: string | null
-          expiration_date?: string | null
-          id?: string | null
-          insured_user_id?: string | null
-          policy_number?: string | null
-          premium?: number | null
-        }
-        Update: {
-          carrier?: string | null
-          created_at?: string | null
-          effective_date?: string | null
-          expiration_date?: string | null
-          id?: string | null
-          insured_user_id?: string | null
-          policy_number?: string | null
-          premium?: number | null
-        }
-        Relationships: []
-      }
-      policies_with_claims: {
-        Row: {
-          amount_estimate: number | null
-          carrier: string | null
-          claim_id: string | null
-          claim_number: string | null
-          effective_date: string | null
-          expiration_date: string | null
-          insured_user_id: string | null
-          policy_id: string | null
-          policy_number: string | null
-          premium: number | null
-          status: Database["public"]["Enums"]["claim_status"] | null
-          updated_at: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       create_detailed_audit_log: {
@@ -1761,29 +1649,57 @@ export type Database = {
           status: Database["public"]["Enums"]["claim_status"]
         }[]
       }
+      get_policies_with_claims_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount_estimate: number
+          carrier: string
+          claim_id: string
+          claim_number: string
+          effective_date: string
+          expiration_date: string
+          insured_user_id: string
+          policy_id: string
+          policy_number: string
+          premium: number
+          status: Database["public"]["Enums"]["claim_status"]
+        }[]
+      }
+      get_user_claims: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          amount_estimate: number | null
+          claim_number: string
+          created_at: string
+          description: string | null
+          id: string
+          loss_date: string | null
+          policy_id: string
+          status: Database["public"]["Enums"]["claim_status"]
+          updated_at: string
+        }[]
+      }
+      get_user_policies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          account_id: string | null
+          carrier: string
+          carrier_id: string | null
+          created_at: string
+          effective_date: string
+          expiration_date: string
+          id: string
+          insured_user_id: string
+          line_of_business: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"] | null
+          policy_number: string
+          premium: number
+          status: string | null
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
-      }
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
       }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
@@ -1821,24 +1737,12 @@ export type Database = {
         Args: { entity_type?: string; similarity_threshold?: number }
         Returns: Json
       }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
       set_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["user_role"]
           target_user_id: string
         }
         Returns: undefined
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
       }
     }
     Enums: {
