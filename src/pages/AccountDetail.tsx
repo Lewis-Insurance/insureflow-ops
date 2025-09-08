@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 // import { QuickActions } from '@/components/crm/QuickActions';
 import { ConsentEvidence } from '@/components/crm/ConsentEvidence';
+import { AccountForm } from '@/components/crm/AccountForm';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -35,11 +36,13 @@ import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessag
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const { fetchAccountDetails } = useCRMData();
+  const { fetchAccountDetails, updateAccount } = useCRMData();
   
   const [account, setAccount] = useState<AccountWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
     const loadAccount = async () => {
@@ -71,6 +74,23 @@ export default function AccountDetail() {
       loadAccount();
     }
   }, [accountId, isAuthenticated, fetchAccountDetails]);
+
+  const handleEditAccount = async (data: any) => {
+    if (!account) return;
+    
+    setFormLoading(true);
+    try {
+      await updateAccount(account.id, data);
+      // Reload account data to see changes
+      const updatedAccount = await fetchAccountDetails(account.id);
+      setAccount(updatedAccount);
+      setShowEditForm(false);
+    } catch (error) {
+      console.error('Failed to update account:', error);
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -169,7 +189,10 @@ export default function AccountDetail() {
               </div>
             </div>
           </div>
-          <Button>
+          <Button onClick={() => {
+            console.log('AccountDetail: Edit button clicked');
+            setShowEditForm(true);
+          }}>
             <Edit className="h-4 w-4 mr-2" />
             Edit Account
           </Button>
@@ -319,6 +342,15 @@ export default function AccountDetail() {
             />
           </TabsContent>
         </Tabs>
+
+        {/* Account Edit Form Dialog */}
+        <AccountForm
+          open={showEditForm}
+          onOpenChange={setShowEditForm}
+          onSubmit={handleEditAccount}
+          account={account as any}
+          loading={formLoading}
+        />
       </div>
     </AppLayout>
   );
