@@ -196,27 +196,35 @@ export function useCRMData() {
         throw new Error('Authentication required to create accounts');
       }
 
-      // CRITICAL FIX: Create account and membership atomically
+      // CRITICAL FIX: Create account first, then membership in transaction-like fashion
       const { data: account, error } = await supabase
         .from('accounts')
         .insert(data)
         .select()
         .maybeSingle();
 
-      if (error) {
-        throw new Error(`Account creation failed: ${error.message}`);
+      const errorResult = handleSupabaseError(error);
+      if (errorResult.shouldThrow) {
+        throw new Error(errorResult.message);
       }
 
       if (!account) {
         throw new Error('Account creation failed - no account returned');
       }
 
-      // Create membership using the existing upsert function
-      const membershipSuccess = await createOwnerMembership(account.id, user.id);
-      if (!membershipSuccess) {
-        // Clean up account if membership creation fails
-        await supabase.from('accounts').delete().eq('id', account.id);
-        throw new Error('Failed to create account membership');
+      // Immediately create owner membership - this is critical for RLS
+      const membershipCreated = await createOwnerMembership(account.id, user.id);
+      if (!membershipCreated) {
+        // If membership creation fails, we should clean up the account
+        try {
+          await supabase.from('accounts').delete().eq('id', account.id);
+        } catch (cleanupError) {
+          // Log cleanup failure but don't throw
+          if (import.meta.env.DEV) {
+            console.error('Failed to cleanup account after membership failure:', cleanupError);
+          }
+        }
+        throw new Error('Failed to create account membership - account creation aborted');
       }
 
       // Log account creation event (fire-and-forget)
@@ -228,7 +236,11 @@ export function useCRMData() {
           entity_id: account.id,
           payload: { name: data.name, type: data.type }
         })
-        .then(); // Don't await - let it run async
+        .then(({ error }) => {
+          if (error && import.meta.env.DEV) {
+            console.warn('Failed to log account creation event:', error);
+          }
+        });
 
       toast({
         title: "Account created",
@@ -252,6 +264,12 @@ export function useCRMData() {
 
   const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {
+      // SECURITY FIX: Check authentication first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
       const { error } = await supabase
         .from('accounts')
         .update(data)
@@ -259,14 +277,19 @@ export function useCRMData() {
 
       if (error) throw error;
 
-      // Log account update event
-      await supabase
+      // Log account update event (fire-and-forget)
+      supabase
         .from('events')
         .insert({
           type: 'account_updated',
           entity_type: 'account',
           entity_id: id,
           payload: data
+        })
+        .then(({ error }) => {
+          if (error && import.meta.env.DEV) {
+            console.warn('Failed to log account update event:', error);
+          }
         });
 
       toast({
@@ -275,7 +298,7 @@ export function useCRMData() {
       });
 
       // Refresh accounts list
-      fetchAccounts();
+      await fetchAccounts();
 
       return true;
     } catch (err: unknown) {
@@ -291,6 +314,12 @@ export function useCRMData() {
 
   const createContact = useCallback(async (data: CreateContactData): Promise<Contact | null> => {
     try {
+      // SECURITY FIX: Check authentication first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
       const { data: contact, error } = await supabase
         .from('contacts')
         .insert(data)
@@ -299,8 +328,8 @@ export function useCRMData() {
 
       if (error) throw error;
 
-      // Log contact creation event
-      await supabase
+      // Log contact creation event (fire-and-forget)
+      supabase
         .from('events')
         .insert({
           type: 'contact_created',
@@ -309,6 +338,11 @@ export function useCRMData() {
           payload: { 
             contact_name: `${data.first_name} ${data.last_name}`,
             role: data.role 
+          }
+        })
+        .then(({ error }) => {
+          if (error && import.meta.env.DEV) {
+            console.warn('Failed to log contact creation event:', error);
           }
         });
 
@@ -357,6 +391,12 @@ export function useCRMData() {
 
   const deleteAccount = useCallback(async (id: string): Promise<boolean> => {
     try {
+      // SECURITY FIX: Check authentication first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
       const { error } = await supabase
         .from('accounts')
         .update({ deleted_at: new Date().toISOString() })
@@ -364,14 +404,19 @@ export function useCRMData() {
 
       if (error) throw error;
 
-      // Log account deletion event
-      await supabase
+      // Log account deletion event (fire-and-forget)
+      supabase
         .from('events')
         .insert({
           type: 'account_deleted',
           entity_type: 'account',
           entity_id: id,
           payload: { deleted_at: new Date().toISOString() }
+        })
+        .then(({ error }) => {
+          if (error && import.meta.env.DEV) {
+            console.warn('Failed to log account deletion event:', error);
+          }
         });
 
       toast({
@@ -380,7 +425,7 @@ export function useCRMData() {
       });
 
       // Refresh accounts list
-      fetchAccounts();
+      await fetchAccounts();
 
       return true;
     } catch (err: unknown) {

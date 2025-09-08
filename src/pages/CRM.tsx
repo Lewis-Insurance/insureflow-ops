@@ -164,7 +164,7 @@ const CRMContent = memo(() => {
   const handleBulkAction = useCallback(async (action: Omit<BulkAction, 'id' | 'created_at' | 'created_by' | 'status' | 'progress' | 'success_count' | 'error_count' | 'errors'>) => {
     // TODO: Implement bulk action processing via edge function or RPC
     if (import.meta.env.DEV) {
-      console.warn('Bulk action in development mode:', action);
+      // TODO: Implement bulk action processing via edge function or RPC
     }
   }, []);
 

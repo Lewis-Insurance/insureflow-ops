@@ -7,7 +7,7 @@ const NotFound = () => {
   useEffect(() => {
     // Track 404s for analytics - removed console.error for production
     if (import.meta.env.DEV) {
-      console.warn("404 Error: User attempted to access non-existent route:", location.pathname);
+      // Track 404s for analytics in development
     }
   }, [location.pathname]);
 

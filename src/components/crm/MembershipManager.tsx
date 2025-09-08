@@ -46,7 +46,7 @@ export function MembershipManager({ accountId, accountName }: MembershipManagerP
       setNewUserEmail('');
       setNewUserRole('member');
     } catch (error) {
-      console.error('Error adding member:', error);
+      // Error handling is done via toast in membership hook
     } finally {
       setLoading(false);
     }
