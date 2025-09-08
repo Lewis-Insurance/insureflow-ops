@@ -17,7 +17,7 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalAccounts: 0,
     activePolicies: 0,
@@ -29,18 +29,26 @@ export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  console.log('Dashboard render - authLoading:', authLoading, 'profile:', profile, 'loading:', loading);
+
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (!authLoading) {
+      console.log('Auth loaded, fetching dashboard data...');
+      fetchDashboardData();
+    }
+  }, [authLoading]);
 
   const fetchDashboardData = async () => {
     try {
+      console.log('Starting dashboard data fetch...');
       const today = new Date();
       const startOfDay = new Date(today.setHours(0, 0, 0, 0));
       const next30Days = new Date();
       next30Days.setDate(next30Days.getDate() + 30);
 
-      // Fetch various stats
+      console.log('Fetching dashboard stats...');
+      
+      // Fetch various stats with better error handling
       const [
         accountsResult,
         policiesResult,
@@ -49,7 +57,7 @@ export default function Dashboard() {
         smsResult,
         tasksResult,
         eventsResult
-      ] = await Promise.all([
+      ] = await Promise.allSettled([
         supabase.from('accounts').select('id', { count: 'exact' }),
         supabase.from('policies').select('id', { count: 'exact' }).eq('status', 'active'),
         supabase.from('policies').select('id', { count: 'exact' }).lte('expiration_date', next30Days.toISOString()),
@@ -59,16 +67,44 @@ export default function Dashboard() {
         supabase.from('events').select('*').order('occurred_at', { ascending: false }).limit(10)
       ]);
 
-      setStats({
-        totalAccounts: accountsResult.count || 0,
-        activePolicies: policiesResult.count || 0,
-        renewalsDue: renewalsResult.count || 0,
-        callsToday: callsResult.count || 0,
-        smsToday: smsResult.count || 0,
-        openTasks: tasksResult.count || 0
+      console.log('Dashboard query results:', {
+        accounts: accountsResult,
+        policies: policiesResult,
+        renewals: renewalsResult,
+        calls: callsResult,
+        sms: smsResult,
+        tasks: tasksResult,
+        events: eventsResult
       });
 
-      setRecentActivity(eventsResult.data || []);
+      // Handle results with proper error checking
+      const getCount = (result: PromiseSettledResult<any>) => {
+        if (result.status === 'fulfilled' && !result.value.error) {
+          return result.value.count || 0;
+        }
+        console.error('Query failed:', result);
+        return 0;
+      };
+
+      const getEvents = (result: PromiseSettledResult<any>) => {
+        if (result.status === 'fulfilled' && !result.value.error) {
+          return result.value.data || [];
+        }
+        console.error('Events query failed:', result);
+        return [];
+      };
+
+      setStats({
+        totalAccounts: getCount(accountsResult),
+        activePolicies: getCount(policiesResult),
+        renewalsDue: getCount(renewalsResult),
+        callsToday: getCount(callsResult),
+        smsToday: getCount(smsResult),
+        openTasks: getCount(tasksResult)
+      });
+
+      setRecentActivity(getEvents(eventsResult));
+      console.log('Dashboard data loaded successfully');
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -76,7 +112,8 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) {
+  // Show loading while auth is loading or data is being fetched
+  if (authLoading || loading) {
     return (
       <div className="flex-1 space-y-4 p-4 md:p-8">
         <div className="flex items-center justify-between space-y-2">
@@ -94,6 +131,9 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+        <div className="text-center text-muted-foreground mt-4">
+          Loading dashboard data...
         </div>
       </div>
     );
