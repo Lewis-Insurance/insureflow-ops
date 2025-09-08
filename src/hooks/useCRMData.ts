@@ -160,7 +160,7 @@ export function useCRMData() {
       const extractData = (result: PromiseSettledResult<any>) => 
         result.status === 'fulfilled' ? result.value?.data || [] : [];
 
-      const account: AccountWithDetails = {
+      const account = {
         ...accountData,
         contacts: extractData(contactsResult),
         policies: extractData(policiesResult) as Policy[],
@@ -169,7 +169,7 @@ export function useCRMData() {
         messages: extractData(messagesResult),
         tasks: extractData(tasksResult),
         events: extractData(eventsResult)
-      };
+      } as AccountWithDetails;
 
       return account;
     } catch (err: unknown) {
