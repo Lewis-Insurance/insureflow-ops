@@ -5,7 +5,15 @@ import { asMessage, handleSupabaseError } from '@/lib/errors';
 import { useAccountMemberships } from './useAccountMemberships';
 import type { Database } from '@/integrations/supabase/types';
 import type {
-  CRMFilters
+  CRMFilters,
+  Account,
+  AccountWithDetails,
+  Contact,
+  Policy,
+  Claim,
+  CreateAccountData,
+  UpdateAccountData,
+  CreateContactData
 } from '@/types/crm-enhanced';
 
 export function useCRMData() {
@@ -39,7 +47,7 @@ export function useCRMData() {
       }
 
       if (filters?.type && filters.type !== 'all') {
-        query = query.eq('type', filters.type);
+        query = query.eq('account_type', filters.type);
       }
 
       if (filters?.state) {

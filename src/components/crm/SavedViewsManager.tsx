@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge';
 import { Bookmark, Share2, Star, Settings, Filter } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import type { SavedView, CRMFilters } from '@/types/crm';
+import type { SavedView, CRMFilters } from '@/types/crm-enhanced';
 
 interface SavedViewsManagerProps {
   currentFilters: CRMFilters;

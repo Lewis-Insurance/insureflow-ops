@@ -38,7 +38,7 @@ export type AccountWithDetails = Database['public']['Tables']['accounts']['Row']
 // CRM Filter types (fixing type compatibility)
 export interface CRMFilters {
   search?: string;
-  type?: 'household' | 'business' | 'all';
+  type?: 'individual' | 'business' | 'household' | 'all';
   state?: string;
   tags?: string[];
   hasActivePolicies?: boolean;
