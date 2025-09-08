@@ -238,3 +238,66 @@ export const COMMON_CONTACT_SOURCES = [
   'email',
   'existing_contact'
 ];
+
+// Enhanced data quality types
+export interface DuplicateGroup {
+  id: string;
+  entity_type: 'account' | 'contact';
+  entity_ids: string[];
+  match_score: number;
+  status: 'pending' | 'reviewed' | 'merged' | 'dismissed';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at: string;
+}
+
+export interface ImportBatch {
+  id: string;
+  import_type: 'accounts' | 'contacts';
+  filename: string;
+  total_rows: number;
+  processed_rows: number;
+  successful_rows: number;
+  error_rows: number;
+  status: 'staging' | 'processing' | 'completed' | 'failed';
+  field_mapping?: Record<string, string>;
+  validation_errors: any[];
+  imported_by: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+}
+
+export interface ConsentRecord {
+  id: string;
+  contact_id: string;
+  consent_type: 'sms' | 'voice' | 'email' | 'data_processing';
+  method: 'verbal' | 'written' | 'web_form' | 'sms_keyword' | 'api';
+  status: 'granted' | 'revoked';
+  evidence_ref?: string;
+  ip_address?: string;
+  user_agent?: string;
+  location_data?: any;
+  notes?: string;
+  granted_at: string;
+  expires_at?: string;
+  revoked_at?: string;
+  created_by?: string;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  user_id?: string;
+  user_name?: string;
+  session_id?: string;
+  ip_address?: string;
+  user_agent?: string;
+  changed_fields?: Record<string, { old: any; new: any }>;
+  metadata?: Record<string, any>;
+  occurred_at: string;
+  created_at: string;
+}

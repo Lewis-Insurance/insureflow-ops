@@ -335,6 +335,68 @@ export type Database = {
           },
         ]
       }
+      consent_evidence: {
+        Row: {
+          consent_type: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          evidence_ref: string | null
+          expires_at: string | null
+          granted_at: string
+          id: string
+          ip_address: unknown | null
+          location_data: Json | null
+          method: string
+          notes: string | null
+          revoked_at: string | null
+          status: string
+          user_agent: string | null
+        }
+        Insert: {
+          consent_type: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          expires_at?: string | null
+          granted_at?: string
+          id?: string
+          ip_address?: unknown | null
+          location_data?: Json | null
+          method: string
+          notes?: string | null
+          revoked_at?: string | null
+          status: string
+          user_agent?: string | null
+        }
+        Update: {
+          consent_type?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          expires_at?: string | null
+          granted_at?: string
+          id?: string
+          ip_address?: unknown | null
+          location_data?: Json | null
+          method?: string
+          notes?: string | null
+          revoked_at?: string | null
+          status?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consent_evidence_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consents: {
         Row: {
           contact_id: string
@@ -473,6 +535,54 @@ export type Database = {
           },
         ]
       }
+      detailed_audit_logs: {
+        Row: {
+          action: string
+          changed_fields: Json | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          occurred_at: string
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          changed_fields?: Json | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          occurred_at?: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          changed_fields?: Json | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          occurred_at?: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           account_id: string | null
@@ -547,6 +657,83 @@ export type Database = {
           },
         ]
       }
+      duplicate_detection_rules: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          is_active: boolean | null
+          match_fields: Json
+          rule_name: string
+          threshold: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          is_active?: boolean | null
+          match_fields: Json
+          rule_name: string
+          threshold?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean | null
+          match_fields?: Json
+          rule_name?: string
+          threshold?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      duplicate_groups: {
+        Row: {
+          created_at: string
+          entity_ids: string[]
+          entity_type: string
+          id: string
+          match_score: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          rule_id: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_ids: string[]
+          entity_type: string
+          id?: string
+          match_score: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rule_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_ids?: string[]
+          entity_type?: string
+          id?: string
+          match_score?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rule_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_groups_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "duplicate_detection_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string
@@ -574,6 +761,131 @@ export type Database = {
           occurred_at?: string
           payload?: Json | null
           type?: string
+        }
+        Relationships: []
+      }
+      import_batches: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_rows: number | null
+          field_mapping: Json | null
+          filename: string
+          id: string
+          import_type: string
+          imported_by: string
+          processed_rows: number | null
+          started_at: string | null
+          status: string | null
+          successful_rows: number | null
+          total_rows: number
+          validation_errors: Json | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_rows?: number | null
+          field_mapping?: Json | null
+          filename: string
+          id?: string
+          import_type: string
+          imported_by: string
+          processed_rows?: number | null
+          started_at?: string | null
+          status?: string | null
+          successful_rows?: number | null
+          total_rows: number
+          validation_errors?: Json | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_rows?: number | null
+          field_mapping?: Json | null
+          filename?: string
+          id?: string
+          import_type?: string
+          imported_by?: string
+          processed_rows?: number | null
+          started_at?: string | null
+          status?: string | null
+          successful_rows?: number | null
+          total_rows?: number
+          validation_errors?: Json | null
+        }
+        Relationships: []
+      }
+      import_staging: {
+        Row: {
+          batch_id: string
+          created_at: string
+          entity_id: string | null
+          id: string
+          mapped_data: Json | null
+          raw_data: Json
+          row_number: number
+          validation_errors: Json | null
+          validation_status: string | null
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          mapped_data?: Json | null
+          raw_data: Json
+          row_number: number
+          validation_errors?: Json | null
+          validation_status?: string | null
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          mapped_data?: Json | null
+          raw_data?: Json
+          row_number?: number
+          validation_errors?: Json | null
+          validation_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_staging_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merge_history: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          merge_data: Json
+          merged_by: string
+          merged_ids: string[]
+          survivor_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          merge_data: Json
+          merged_by: string
+          merged_ids: string[]
+          survivor_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          merge_data?: Json
+          merged_by?: string
+          merged_ids?: string[]
+          survivor_id?: string
         }
         Relationships: []
       }
@@ -908,6 +1220,16 @@ export type Database = {
       }
     }
     Functions: {
+      create_detailed_audit_log: {
+        Args: {
+          p_action: string
+          p_changed_fields?: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
         Returns: boolean

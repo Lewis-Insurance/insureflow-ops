@@ -9,6 +9,8 @@ import { AccountList } from '@/components/crm/AccountList';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { SavedViewsManager } from '@/components/crm/SavedViewsManager';
 import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
+import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
+import { CSVImport } from '@/components/crm/CSVImport';
 import { useCRMData } from '@/hooks/useCRMData';
 import type { CRMFilters, Account, SavedView, BulkAction } from '@/types/crm';
 
@@ -115,7 +117,7 @@ export default function CRM() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Customer Relationship Management</h2>
             <p className="text-muted-foreground">
-              Manage customer accounts, contacts, and relationships
+              Manage customer accounts, contacts, and relationships with advanced data quality tools
             </p>
           </div>
           <Button onClick={() => setShowAccountForm(true)}>
@@ -178,6 +180,12 @@ export default function CRM() {
             />
           </CardContent>
         </Card>
+
+        {/* Data Quality Tools */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <DuplicateDetection onMergeComplete={() => fetchAccounts()} />
+          <CSVImport onImportComplete={() => fetchAccounts()} />
+        </div>
 
         {/* Search and Filters */}
         <Card>
