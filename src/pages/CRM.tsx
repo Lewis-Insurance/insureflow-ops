@@ -12,11 +12,15 @@ import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
 import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
 import { CSVImport } from '@/components/crm/CSVImport';
 import { SecurityStatus } from '@/components/crm/SecurityStatus';
+import { GlobalSearch } from '@/components/crm/GlobalSearch';
+import { AuditLogViewer } from '@/components/crm/AuditLogViewer';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
 import { memoize } from '@/lib/performance';
+import { usePermissions } from '@/hooks/usePermissions';
+import { SearchResult } from '@/hooks/useGlobalSearch';
 import type { 
   CRMFilters, 
   Account, 
@@ -94,6 +98,8 @@ const CRMContent = memo(() => {
     updateAccount,
     deleteAccount
   } = useCRMData();
+  
+  const { canEdit, canViewAuditLogs } = usePermissions();
 
   const [filters, setFilters] = useState<CRMFilters>({});
   const [showAccountForm, setShowAccountForm] = useState(false);
@@ -184,6 +190,12 @@ const CRMContent = memo(() => {
     fetchAccounts();
   }, [fetchAccounts]);
 
+  const handleGlobalSearchSelect = useCallback((result: SearchResult) => {
+    // Navigate to the selected entity
+    console.log('Selected:', result);
+    // TODO: Implement navigation to selected entity
+  }, []);
+
   return (
     <AppLayout>
       <div className="flex-1 space-y-6 p-4 md:p-8">
@@ -195,11 +207,27 @@ const CRMContent = memo(() => {
               Manage customer accounts, contacts, and relationships with advanced data quality tools
             </p>
           </div>
-          <Button onClick={() => setShowAccountForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Account
-          </Button>
+          <div className="flex items-center space-x-2">
+            {canEdit && (
+              <Button onClick={() => setShowAccountForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Account
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Global Search */}
+        <ErrorBoundary level="component">
+          <Card>
+            <CardContent className="pt-6">
+              <GlobalSearch 
+                onResultSelect={handleGlobalSearchSelect}
+                placeholder="Search customers, accounts, businesses..."
+              />
+            </CardContent>
+          </Card>
+        </ErrorBoundary>
 
         {/* Stats Cards */}
         <ErrorBoundary level="component">
@@ -233,6 +261,13 @@ const CRMContent = memo(() => {
             <SecurityStatus />
           </ErrorBoundary>
         </div>
+
+        {/* Audit Logs for Staff/Admin */}
+        {canViewAuditLogs && (
+          <ErrorBoundary level="component">
+            <AuditLogViewer />
+          </ErrorBoundary>
+        )}
 
         {/* Search and Filters */}
         <ErrorBoundary level="component">
