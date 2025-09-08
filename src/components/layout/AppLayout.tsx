@@ -24,15 +24,12 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex min-h-screen w-full">
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center space-x-2 px-4 py-3">
-              <div className="relative">
-                <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-                  <div className="w-5 h-5 bg-accent rounded transform rotate-45 absolute"></div>
-                  <div className="w-3 h-3 bg-primary rounded z-10 relative"></div>
-                </div>
+            <div className="flex items-center space-x-3 px-4 py-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-lg">L</span>
               </div>
               <div>
-                <span className="font-bold text-primary text-lg">LEWIS</span>
+                <span className="font-bold text-sidebar-foreground text-lg">LEWIS</span>
                 <span className="text-xs text-accent font-medium block">INSURANCE</span>
               </div>
             </div>

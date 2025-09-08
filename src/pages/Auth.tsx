@@ -47,15 +47,12 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <div className="w-8 h-8 bg-accent rounded transform rotate-45 absolute"></div>
-                <div className="w-6 h-6 bg-primary rounded z-10 relative"></div>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">L</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-primary">LEWIS</h1>
+              <h1 className="text-3xl font-bold text-primary">LEWIS</h1>
               <p className="text-sm text-accent font-medium">INSURANCE</p>
             </div>
           </div>
