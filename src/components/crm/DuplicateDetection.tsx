@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, Users, Building2, ArrowRight, Merge, X, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import type { Account, Contact } from '@/types/crm';
 
@@ -62,9 +63,16 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
   const scanForDuplicates = async () => {
     setLoading(true);
     try {
-      // In a real implementation, this would call an API to scan for duplicates
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setDuplicateGroups(mockDuplicateGroups);
+      // In development, simulate duplicate scanning
+      if (import.meta.env.DEV) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setDuplicateGroups(mockDuplicateGroups);
+      } else {
+        // TODO: Replace with real duplicate detection API - create scan_for_duplicates RPC
+        // For now, fallback to mock data until RPC is implemented
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setDuplicateGroups(mockDuplicateGroups);
+      }
       
       toast({
         title: "Duplicate scan completed",
@@ -125,8 +133,14 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
     
     setMergeInProgress(true);
     try {
-      // In a real implementation, this would call the merge API
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // In development, simulate merge processing
+      if (import.meta.env.DEV) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        // TODO: Replace with real merge API - create merge_duplicate_records RPC
+        // For now, fallback to updating state directly
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       
       // Update the group status
       setDuplicateGroups(prev => 

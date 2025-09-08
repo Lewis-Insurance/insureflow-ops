@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { asMessage, handleSupabaseError } from '@/lib/errors';
 import type { 
   Account, 
   Contact, 
@@ -168,7 +169,10 @@ export function useCRMData() {
         .select()
         .maybeSingle();
 
-      if (error) throw error;
+      const errorResult = handleSupabaseError(error);
+      if (errorResult.shouldThrow) {
+        throw new Error(errorResult.message);
+      }
 
       // Log account creation event
       await supabase

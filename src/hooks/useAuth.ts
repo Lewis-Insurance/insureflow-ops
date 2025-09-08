@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { asMessage } from '@/lib/errors';
 
 interface UserProfile {
   id: string;
@@ -127,8 +128,8 @@ export function useAuth() {
       });
 
       return { data, error: null };
-    } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during sign up';
+    } catch (error) {
+      const errorMessage = asMessage(error, 'An error occurred during sign up');
       toast({
         title: "Sign up failed",
         description: errorMessage,
@@ -153,8 +154,8 @@ export function useAuth() {
       });
 
       return { data, error: null };
-    } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during sign in';
+    } catch (error) {
+      const errorMessage = asMessage(error, 'An error occurred during sign in');
       toast({
         title: "Sign in failed",
         description: errorMessage,
@@ -173,10 +174,11 @@ export function useAuth() {
         title: "Signed out",
         description: "You have been signed out successfully.",
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = asMessage(error, 'Error signing out');
       toast({
         title: "Error signing out",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

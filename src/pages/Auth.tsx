@@ -9,10 +9,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Shield, AlertCircle } from 'lucide-react';
 
-// Feature flags via environment variables
-const ENABLE_SIGNUP = import.meta.env.VITE_ENABLE_SIGNUP === 'true';
-const REQUIRE_MFA = import.meta.env.VITE_REQUIRE_MFA === 'true';
-const REQUIRE_PHONE_VERIFICATION = import.meta.env.VITE_REQUIRE_PHONE === 'true';
+// Feature flags via environment variables with safe defaults
+const ENABLE_SIGNUP = (import.meta.env.VITE_ENABLE_SIGNUP ?? 'false') === 'true';
+const REQUIRE_MFA = (import.meta.env.VITE_REQUIRE_MFA ?? 'false') === 'true';
+const REQUIRE_PHONE_VERIFICATION = (import.meta.env.VITE_REQUIRE_PHONE ?? 'false') === 'true';
 const MIN_PASSWORD_LENGTH = Number(import.meta.env.VITE_MIN_PW_LEN ?? 12);
 
 export default function Auth() {

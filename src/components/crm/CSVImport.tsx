@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Upload, FileText, AlertCircle, CheckCircle2, X, Download, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 interface ImportBatch {
@@ -141,8 +142,14 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
         return;
       }
 
-      // Simulate dry run processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate dry run processing (only in development)
+      if (import.meta.env.DEV) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        // TODO: Replace with real CSV processing API - create process_csv_batch RPC
+        // For now, fallback to mock processing
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       
       // Mock validation results
       const mockRows: ImportRow[] = csvData.slice(0, 10).map((row, index) => ({
@@ -194,8 +201,14 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
     setStep('processing');
     
     try {
-      // Simulate import processing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Simulate import processing (only in development)
+      if (import.meta.env.DEV) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } else {
+        // TODO: Replace with real import execution API - create execute_csv_import RPC
+        // For now, fallback to mock processing
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       
       setCurrentBatch(prev => prev ? {
         ...prev,
@@ -520,8 +533,8 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        {row.validation_errors.map((error, index) => (
-                          <Badge key={index} variant="destructive" className="text-xs">
+                        {row.validation_errors.map((error, errorIndex) => (
+                          <Badge key={`${row.id}-error-${errorIndex}`} variant="destructive" className="text-xs">
                             {error}
                           </Badge>
                         ))}

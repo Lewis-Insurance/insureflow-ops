@@ -182,18 +182,18 @@ export function MFASetup({ isStaff }: MFASetupProps) {
                     Save these codes in a secure location. Each can only be used once.
                   </p>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    {backupCodes.map((code, index) => (
-                      <div key={index} className="flex items-center gap-2">
+                    {backupCodes.map((code, codeIndex) => (
+                      <div key={`backup-code-${codeIndex}`} className="flex items-center gap-2">
                         <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                           {code}
                         </code>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => copyToClipboard(code, `backup-${index}`)}
+                          onClick={() => copyToClipboard(code, `backup-${codeIndex}`)}
                           className="h-6 w-6 p-0"
                         >
-                          {copiedCodes[`backup-${index}`] ? (
+                          {copiedCodes[`backup-${codeIndex}`] ? (
                             <Check className="h-3 w-3" />
                           ) : (
                             <Copy className="h-3 w-3" />

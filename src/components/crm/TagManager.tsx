@@ -100,9 +100,9 @@ export function TagManager({
       
       {/* Display existing tags */}
       <div className="flex flex-wrap gap-2">
-        {tags.map((tag, index) => (
+        {tags.map((tag) => (
           <Badge
-            key={tag.id || index}
+            key={tag.id || `${tag.tag_name}-${Date.now()}`}
             variant="secondary"
             className="flex items-center gap-1 hover:bg-secondary/80 transition-colors"
           >
