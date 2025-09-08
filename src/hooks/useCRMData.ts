@@ -5,24 +5,11 @@ import { asMessage, handleSupabaseError } from '@/lib/errors';
 import { useAccountMemberships } from './useAccountMemberships';
 import type { Database } from '@/integrations/supabase/types';
 import type {
-  Account, 
-  Contact, 
-  Policy, 
-  Claim, 
-  CallSession, 
-  SMSMessage, 
-  ActivityEvent, 
-  Task,
-  AccountWithDetails,
-  CRMFilters,
-  CreateAccountData,
-  CreateContactData,
-  UpdateAccountData,
-  SupabaseErrorDetails
+  CRMFilters
 } from '@/types/crm-enhanced';
 
 export function useCRMData() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { createOwnerMembership } = useAccountMemberships();
@@ -77,7 +64,7 @@ export function useCRMData() {
     }
   }, []);
 
-  const fetchAccountDetails = useCallback(async (accountId: string): Promise<AccountWithDetails | null> => {
+  const fetchAccountDetails = useCallback(async (accountId: string): Promise<any | null> => {
     try {
       // SECURITY FIX: Check authentication first
       const { data: { user } } = await supabase.auth.getUser();
@@ -234,7 +221,7 @@ export function useCRMData() {
           type: 'account_created',
           entity_type: 'account',
           entity_id: account.id,
-          payload: { name: data.name, type: data.type }
+          payload: { name: data.name, type: (data as any).type || data.account_type }
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {

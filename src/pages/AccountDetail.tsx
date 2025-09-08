@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { QuickActions } from '@/components/crm/QuickActions';
+// import { QuickActions } from '@/components/crm/QuickActions';
 import { ConsentEvidence } from '@/components/crm/ConsentEvidence';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

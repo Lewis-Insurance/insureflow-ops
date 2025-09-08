@@ -22,8 +22,8 @@ export type UpdateAccountData = Database['public']['Tables']['accounts']['Update
 export type CreateContactData = Database['public']['Tables']['contacts']['Insert'];
 export type UpdateContactData = Database['public']['Tables']['contacts']['Update'];
 
-// Extended account interface with related data
-export interface AccountWithDetails extends Account {
+// Extended account interface with related data - using intersection type for compatibility
+export type AccountWithDetails = Database['public']['Tables']['accounts']['Row'] & {
   contacts?: Contact[];
   policies?: Policy[];
   claims?: Claim[];
@@ -31,7 +31,9 @@ export interface AccountWithDetails extends Account {
   messages?: SMSMessage[];
   tasks?: Task[];
   events?: Event[];
-}
+  // Add type alias for backward compatibility
+  type?: Database['public']['Tables']['accounts']['Row']['account_type'];
+};
 
 // CRM Filter types (fixing type compatibility)
 export interface CRMFilters {

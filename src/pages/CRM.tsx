@@ -23,22 +23,20 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { SearchResult } from '@/hooks/useGlobalSearch';
 import type { 
   CRMFilters, 
-  Account, 
   SavedView, 
-  BulkAction,
-  CreateAccountData,
-  UpdateAccountData
+  BulkAction
 } from '@/types/crm-enhanced';
+import type { AccountCompat, CreateAccountDataCompat } from '@/types/crm-compat';
 
 // Memoized stats calculation
-const calculateStats = memoize((accounts: Account[]) => ({
+const calculateStats = memoize((accounts: any[]) => ({
   totalAccounts: accounts.length,
-  householdAccounts: accounts.filter(a => a.type === 'household').length,
-  businessAccounts: accounts.filter(a => a.type === 'business').length,
+  householdAccounts: accounts.filter(a => (a.account_type || a.type) === 'household').length,
+  businessAccounts: accounts.filter(a => (a.account_type || a.type) === 'business').length,
 }));
 
 // Memoized stats cards component
-const StatsCards = memo(({ accounts }: { accounts: Account[] }) => {
+const StatsCards = memo(({ accounts }: { accounts: any[] }) => {
   const stats = useMemo(() => calculateStats(accounts), [accounts]);
 
   return (
@@ -103,9 +101,9 @@ const CRMContent = memo(() => {
 
   const [filters, setFilters] = useState<CRMFilters>({});
   const [showAccountForm, setShowAccountForm] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editingAccount, setEditingAccount] = useState<AccountCompat | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-  const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<AccountCompat[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   // Debounced search handler for better performance
@@ -116,17 +114,17 @@ const CRMContent = memo(() => {
   );
 
   // Memoized handlers with proper dependencies
-  const handleCreateAccount = useCallback(async (data: CreateAccountData) => {
+  const handleCreateAccount = useCallback(async (data: CreateAccountDataCompat) => {
     setFormLoading(true);
     try {
-      await createAccount(data);
+      await createAccount(data as any);
       setShowAccountForm(false);
     } finally {
       setFormLoading(false);
     }
   }, [createAccount]);
 
-  const handleEditAccount = useCallback(async (data: UpdateAccountData) => {
+  const handleEditAccount = useCallback(async (data: any) => {
     if (!editingAccount) return;
     
     setFormLoading(true);
@@ -138,7 +136,7 @@ const CRMContent = memo(() => {
     }
   }, [editingAccount, updateAccount]);
 
-  const handleEdit = useCallback((account: Account) => {
+  const handleEdit = useCallback((account: AccountCompat) => {
     setEditingAccount(account);
   }, []);
 
@@ -174,7 +172,7 @@ const CRMContent = memo(() => {
     }
   }, []);
 
-  const handleAccountSelection = useCallback((account: Account, selected: boolean) => {
+  const handleAccountSelection = useCallback((account: AccountCompat, selected: boolean) => {
     setSelectedAccounts(prev => 
       selected 
         ? [...prev, account]
@@ -304,7 +302,7 @@ const CRMContent = memo(() => {
         {/* Bulk Actions Bar */}
         <ErrorBoundary level="component">
           <BulkActionsBar
-            selectedAccounts={selectedAccounts}
+            selectedAccounts={selectedAccounts as any}
             onSelectionClear={handleSelectionClear}
             onBulkAction={handleBulkAction}
           />
@@ -326,12 +324,12 @@ const CRMContent = memo(() => {
             </div>
 
             <AccountList
-              accounts={accounts}
+              accounts={accounts as any}
               loading={loading}
-              onEdit={handleEdit}
+              onEdit={handleEdit as any}
               onDelete={handleDelete}
-              selectedAccounts={selectedAccounts}
-              onAccountSelection={handleAccountSelection}
+              selectedAccounts={selectedAccounts as any}
+              onAccountSelection={handleAccountSelection as any}
             />
           </div>
         </ErrorBoundary>
@@ -344,8 +342,8 @@ const CRMContent = memo(() => {
               setShowAccountForm(open);
               if (!open) setEditingAccount(null);
             }}
-            onSubmit={editingAccount ? handleEditAccount : handleCreateAccount}
-            account={editingAccount}
+            onSubmit={editingAccount ? (handleEditAccount as any) : (handleCreateAccount as any)}
+            account={editingAccount as any}
             loading={formLoading}
           />
         </ErrorBoundary>

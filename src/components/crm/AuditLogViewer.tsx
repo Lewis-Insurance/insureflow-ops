@@ -12,14 +12,13 @@ import { toast } from '@/hooks/use-toast';
 import { PermissionGuard } from '@/components/common/PermissionGuard';
 
 interface AuditLogEntry {
-  id: string;
-  table_name: string;
-  row_id: string;
-  action: 'INSERT' | 'UPDATE' | 'DELETE';
-  changed_by: string | null;
-  changed_at: string;
-  diff: any;
-  actor_role: string | null;
+  id: number;
+  entity: string;
+  entity_id: string | null;
+  action: string;
+  user_id: string | null;
+  created_at: string;
+  details: any;
 }
 
 export function AuditLogViewer() {
@@ -40,11 +39,11 @@ export function AuditLogViewer() {
         .order('changed_at', { ascending: false })
         .limit(100);
 
-      if (tableFilter) {
-        query = query.eq('table_name', tableFilter);
+      if (tableFilter && tableFilter !== 'all') {
+        query = query.eq('entity', tableFilter);
       }
       
-      if (actionFilter) {
+      if (actionFilter && actionFilter !== 'all') {
         query = query.eq('action', actionFilter);
       }
 
@@ -58,9 +57,8 @@ export function AuditLogViewer() {
       
       if (searchTerm) {
         filteredData = filteredData.filter(log => 
-          log.table_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.row_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.actor_role?.toLowerCase().includes(searchTerm.toLowerCase())
+          log.entity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.entity_id?.toLowerCase().includes(searchTerm.toLowerCase())
         );
       }
 
@@ -99,9 +97,7 @@ export function AuditLogViewer() {
       return 'No changes recorded';
     }
 
-    return Object.entries(diff)
-      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-      .join(', ');
+    return JSON.stringify(diff, null, 2);
   };
 
   return (
@@ -142,7 +138,7 @@ export function AuditLogViewer() {
                 <SelectValue placeholder="All tables" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All tables</SelectItem>
+                <SelectItem value="all">All tables</SelectItem>
                 <SelectItem value="accounts">Accounts</SelectItem>
                 <SelectItem value="contacts">Contacts</SelectItem>
                 <SelectItem value="policies">Policies</SelectItem>
@@ -157,7 +153,7 @@ export function AuditLogViewer() {
                 <SelectValue placeholder="All actions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All actions</SelectItem>
+                <SelectItem value="all">All actions</SelectItem>
                 <SelectItem value="INSERT">Create</SelectItem>
                 <SelectItem value="UPDATE">Update</SelectItem>
                 <SelectItem value="DELETE">Delete</SelectItem>
@@ -193,8 +189,8 @@ export function AuditLogViewer() {
                     </Badge>
                     
                     <div>
-                      <div className="font-medium">{log.table_name}</div>
-                      <div className="text-xs text-muted-foreground">ID: {log.row_id}</div>
+                      <div className="font-medium">{log.entity}</div>
+                      <div className="text-xs text-muted-foreground">ID: {log.entity_id}</div>
                     </div>
                   </div>
 
@@ -202,12 +198,12 @@ export function AuditLogViewer() {
                     <div className="text-right text-sm">
                       <div className="flex items-center space-x-1">
                         <Clock className="h-3 w-3" />
-                        <span>{formatTimestamp(log.changed_at)}</span>
+                        <span>{formatTimestamp(log.created_at)}</span>
                       </div>
-                      {log.actor_role && (
+                      {log.user_id && (
                         <div className="flex items-center space-x-1 text-muted-foreground">
                           <User className="h-3 w-3" />
-                          <span>{log.actor_role}</span>
+                          <span>{log.user_id}</span>
                         </div>
                       )}
                     </div>
@@ -231,11 +227,11 @@ export function AuditLogViewer() {
                             <div>
                               <h4 className="font-medium mb-2">Basic Info</h4>
                               <div className="space-y-1 text-sm">
-                                <div><strong>Table:</strong> {log.table_name}</div>
+                                <div><strong>Entity:</strong> {log.entity}</div>
                                 <div><strong>Action:</strong> <Badge variant={getActionBadgeVariant(log.action)}>{log.action}</Badge></div>
-                                <div><strong>Record ID:</strong> {log.row_id}</div>
-                                <div><strong>Timestamp:</strong> {formatTimestamp(log.changed_at)}</div>
-                                {log.actor_role && <div><strong>Role:</strong> {log.actor_role}</div>}
+                                <div><strong>Record ID:</strong> {log.entity_id}</div>
+                                <div><strong>Timestamp:</strong> {formatTimestamp(log.created_at)}</div>
+                                {log.user_id && <div><strong>User ID:</strong> {log.user_id}</div>}
                               </div>
                             </div>
                           </div>
@@ -244,7 +240,7 @@ export function AuditLogViewer() {
                             <h4 className="font-medium mb-2">Changes</h4>
                             <ScrollArea className="h-48 w-full border rounded p-3">
                               <pre className="text-xs whitespace-pre-wrap">
-                                {JSON.stringify(log.diff, null, 2)}
+                                {formatDiff(log.details)}
                               </pre>
                             </ScrollArea>
                           </div>

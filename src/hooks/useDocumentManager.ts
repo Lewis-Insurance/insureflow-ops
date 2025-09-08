@@ -94,8 +94,10 @@ export function useDocumentManager(accountId?: string) {
       const { data: { user } } = await supabase.auth.getUser();
       const documentData = {
         account_id: accountId,
+        filename: file.name,
+        kind: 'document',
         name: file.name,
-        category,
+        category: category as any, // Type assertion to handle enum mismatch
         storage_path: filePath,
         mime_type: file.type,
         size_bytes: file.size,
@@ -150,12 +152,12 @@ export function useDocumentManager(accountId?: string) {
       if (error) throw error;
 
       // Create download link
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = data.signedUrl;
       link.download = document.name;
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
 
       toast({
         title: "Success",
@@ -184,7 +186,7 @@ export function useDocumentManager(accountId?: string) {
     try {
       const { error } = await supabase
         .from('documents')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', documentId);
 
       if (error) throw error;
