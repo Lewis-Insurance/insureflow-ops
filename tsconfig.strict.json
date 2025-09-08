@@ -9,7 +9,8 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitThis": true,
-    "alwaysStrict": true
+    "alwaysStrict": true,
+    "useUnknownInCatchVariables": true
   },
   "include": [
     "src/**/*"
