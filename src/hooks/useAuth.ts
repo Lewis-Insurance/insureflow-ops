@@ -36,15 +36,37 @@ export function useAuth() {
           // Fetch user profile after authentication
           setTimeout(async () => {
             try {
-              const { data: profileData } = await supabase
+              const { data: profileData, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
               
-              setProfile(profileData);
+              if (error) {
+                console.error('Error fetching profile:', error);
+                // Set a minimal profile to prevent infinite loading
+                setProfile({
+                  id: session.user.id,
+                  full_name: session.user.email?.split('@')[0] || 'User',
+                  role: 'customer',
+                  phone: null,
+                  is_staff: false,
+                  created_at: new Date().toISOString()
+                });
+              } else {
+                setProfile(profileData);
+              }
             } catch (error) {
               console.error('Error fetching profile:', error);
+              // Set a minimal profile to prevent infinite loading
+              setProfile({
+                id: session.user.id,
+                full_name: session.user.email?.split('@')[0] || 'User',
+                role: 'customer',
+                phone: null,
+                is_staff: false,
+                created_at: new Date().toISOString()
+              });
             }
           }, 0);
         } else {
@@ -63,15 +85,37 @@ export function useAuth() {
       if (session?.user) {
         // Fetch user profile for existing session
         try {
-          const { data: profileData } = await supabase
+          const { data: profileData, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
           
-          setProfile(profileData);
+          if (error) {
+            console.error('Error fetching profile:', error);
+            // Set a minimal profile to prevent infinite loading
+            setProfile({
+              id: session.user.id,
+              full_name: session.user.email?.split('@')[0] || 'User',
+              role: 'customer',
+              phone: null,
+              is_staff: false,
+              created_at: new Date().toISOString()
+            });
+          } else {
+            setProfile(profileData);
+          }
         } catch (error) {
           console.error('Error fetching profile:', error);
+          // Set a minimal profile to prevent infinite loading
+          setProfile({
+            id: session.user.id,
+            full_name: session.user.email?.split('@')[0] || 'User',
+            role: 'customer',
+            phone: null,
+            is_staff: false,
+            created_at: new Date().toISOString()
+          });
         }
       }
       
