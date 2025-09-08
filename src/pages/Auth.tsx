@@ -50,7 +50,7 @@ export default function Auth() {
           <img 
             src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png" 
             alt="Lewis Insurance"
-            className="h-16 w-auto"
+            className="h-48 w-auto"
           />
           <p className="text-muted-foreground text-center">
             Agency Management System
