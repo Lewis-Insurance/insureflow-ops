@@ -25,7 +25,7 @@ import { ActivityTimeline } from '@/components/crm/ActivityTimeline';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
-import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm';
+import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm-enhanced';
 
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
@@ -405,7 +405,7 @@ function PoliciesTab({ policies }: { policies: Policy[] }) {
               <div>
                 <p className="text-sm font-medium">Carrier</p>
                 <p className="text-sm text-muted-foreground">
-                  {policy.carrier?.name || 'Unknown'}
+                  {policy.carrier || 'Unknown'}
                 </p>
               </div>
               <div>
