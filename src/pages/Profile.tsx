@@ -6,13 +6,23 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { User, Phone, Mail, Shield, Calendar, Save, Eye, EyeOff } from 'lucide-react';
+import { User, Phone, Mail, Shield, Calendar, Save, Settings, Lock, Bell, Eye, UserCog } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+
+// Import hardening components
+import { MFASetup } from '@/components/profile/MFASetup';
+import { PhoneVerification } from '@/components/profile/PhoneVerification';
+import { SessionManager } from '@/components/profile/SessionManager';
+import { AccessLogTab } from '@/components/profile/AccessLogTab';
+import { DataExport } from '@/components/profile/DataExport';
+import { NotificationSettings } from '@/components/profile/NotificationSettings';
+import { AvatarUpload } from '@/components/profile/AvatarUpload';
 
 interface ProfileFormData {
   full_name: string;
@@ -21,14 +31,14 @@ interface ProfileFormData {
 }
 
 export default function Profile() {
-  const { user, profile } = useAuth();
+  const { user, profile, isStaff } = useAuth();
   const [formData, setFormData] = useState<ProfileFormData>({
     full_name: '',
     phone: '',
     role: '',
   });
   const [loading, setLoading] = useState(false);
-  const [showEmailSection, setShowEmailSection] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (profile) {
@@ -40,6 +50,17 @@ export default function Profile() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    // Log profile access
+    if (user && profile) {
+      supabase.rpc('log_profile_access', {
+        target_id: user.id,
+        action_type: 'view',
+        details_json: { tab: activeTab }
+      });
+    }
+  }, [user, profile, activeTab]);
+
   const handleInputChange = (field: keyof ProfileFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -50,6 +71,15 @@ export default function Profile() {
 
     setLoading(true);
     try {
+      const changes: string[] = [];
+      const originalData = {
+        full_name: profile?.full_name || '',
+        phone: profile?.phone || ''
+      };
+
+      if (formData.full_name !== originalData.full_name) changes.push('full_name');
+      if (formData.phone !== originalData.phone) changes.push('phone');
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -59,6 +89,15 @@ export default function Profile() {
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Log the profile update
+      if (changes.length > 0) {
+        await supabase.rpc('log_profile_access', {
+          target_id: user.id,
+          action_type: 'edit',
+          details_json: { fields_changed: changes }
+        });
+      }
 
       toast({
         title: "Profile updated",
@@ -88,7 +127,6 @@ export default function Profile() {
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
-      case 'owner':
         return 'default';
       case 'producer':
       case 'staff':
@@ -121,226 +159,246 @@ export default function Profile() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Profile Settings</h2>
             <p className="text-muted-foreground">
-              Manage your account information and preferences
+              Manage your account information, security, and preferences
             </p>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Profile Overview */}
-          <Card className="md:col-span-1">
-            <CardHeader>
-              <CardTitle className="text-lg">Profile Overview</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarFallback className="text-lg font-semibold">
-                    {getInitials(profile.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    {profile.full_name || 'Unnamed User'}
-                  </h3>
-                  <Badge variant={getRoleBadgeVariant(profile.role)} className="mt-2 capitalize">
-                    {profile.role}
-                  </Badge>
-                </div>
-              </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Security</span>
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              <span className="hidden sm:inline">Notifications</span>
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">Privacy</span>
+            </TabsTrigger>
+            {isStaff && (
+              <TabsTrigger value="admin" className="flex items-center gap-2">
+                <UserCog className="h-4 w-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                  </div>
-                </div>
-
-                {profile.phone && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Profile Overview */}
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg">Profile Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={profile.avatar_url || undefined} />
+                      <AvatarFallback className="text-lg font-semibold">
+                        {getInitials(profile.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    
                     <div>
-                      <p className="text-sm font-medium">Phone</p>
-                      <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                      <h3 className="text-xl font-semibold">
+                        {profile.full_name || 'Unnamed User'}
+                      </h3>
+                      <Badge variant={getRoleBadgeVariant(profile.role)} className="mt-2 capitalize">
+                        {profile.role}
+                      </Badge>
                     </div>
                   </div>
-                )}
 
-                <div className="flex items-center space-x-3">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Role</p>
-                    <p className="text-sm text-muted-foreground capitalize">{profile.role}</p>
-                  </div>
-                </div>
+                  <Separator />
 
-                <div className="flex items-center space-x-3">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Member Since</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(profile.created_at), 'MMMM yyyy')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Email</p>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </div>
+                    </div>
 
-          {/* Edit Profile Form */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-lg">Edit Profile</CardTitle>
-              <CardDescription>
-                Update your personal information and contact details
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="full_name">Full Name</Label>
-                    <Input
-                      id="full_name"
-                      value={formData.full_name}
-                      onChange={(e) => handleInputChange('full_name', e.target.value)}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      id="email"
-                      value={user.email || ''}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowEmailSection(!showEmailSection)}
-                    >
-                      {showEmailSection ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Email changes require administrator approval
-                  </p>
-                </div>
-
-                {showEmailSection && (
-                  <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
-                    <CardContent className="pt-4">
-                      <div className="flex items-start space-x-3">
-                        <Shield className="h-5 w-5 text-orange-600 mt-0.5" />
+                    {profile.phone && (
+                      <div className="flex items-center space-x-3">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <h4 className="font-medium text-orange-800 dark:text-orange-200">
-                            Email Change Request
-                          </h4>
-                          <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
-                            To change your email address, please contact your system administrator. 
-                            This security measure helps protect your account and maintain data integrity.
-                          </p>
+                          <p className="text-sm font-medium">Phone</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                            {profile.phone_verified && (
+                              <Badge variant="default" className="bg-success text-success-foreground text-xs">
+                                Verified
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <div>
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={formData.role} disabled>
-                    <SelectTrigger className="bg-muted">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="producer">Producer</SelectItem>
-                      <SelectItem value="csr">CSR</SelectItem>
-                      <SelectItem value="accounting">Accounting</SelectItem>
-                      <SelectItem value="owner">Owner</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Role changes require administrator approval
-                  </p>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
                     )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Account Security Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Account Security</CardTitle>
-            <CardDescription>
-              Manage your account security settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <h4 className="font-medium">Password</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Last updated: Not available
-                  </p>
-                </div>
-                <Button variant="outline" disabled>
-                  Change Password
-                </Button>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <h4 className="font-medium">Two-Factor Authentication</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Add an extra layer of security to your account
-                  </p>
-                </div>
-                <Badge variant="secondary">Coming Soon</Badge>
-              </div>
+                    <div className="flex items-center space-x-3">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Security</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground capitalize">{profile.role}</p>
+                          {profile.mfa_enabled && (
+                            <Badge variant="default" className="bg-success text-success-foreground text-xs">
+                              MFA
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Member Since</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(profile.created_at), 'MMMM yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Edit Profile Form */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Edit Profile</CardTitle>
+                  <CardDescription>
+                    Update your personal information and contact details
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="full_name">Full Name</Label>
+                        <Input
+                          id="full_name"
+                          value={formData.full_name}
+                          onChange={(e) => handleInputChange('full_name', e.target.value)}
+                          placeholder="Enter your full name"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        value={user.email || ''}
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Email changes require administrator approval
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="role">Role</Label>
+                      <Select value={formData.role} disabled>
+                        <SelectTrigger className="bg-muted">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="customer">Customer</SelectItem>
+                          <SelectItem value="staff">Staff</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Role changes require administrator approval
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={loading}>
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Avatar Upload */}
+            <AvatarUpload />
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security" className="space-y-6">
+            <MFASetup isStaff={isStaff} />
+            <PhoneVerification />
+            <SessionManager />
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-6">
+            <NotificationSettings />
+          </TabsContent>
+
+          {/* Privacy Tab */}
+          <TabsContent value="privacy" className="space-y-6">
+            <AccessLogTab />
+            <DataExport />
+          </TabsContent>
+
+          {/* Admin Tab (Staff only) */}
+          {isStaff && (
+            <TabsContent value="admin" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Admin Functions</CardTitle>
+                  <CardDescription>
+                    Administrative functions and approval queues
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Settings className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">
+                      Admin approval queues and impersonation features coming soon
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </AppLayout>
   );
