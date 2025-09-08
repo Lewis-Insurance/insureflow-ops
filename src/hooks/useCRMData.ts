@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage, handleSupabaseError } from '@/lib/errors';
 import { useAccountMemberships } from './useAccountMemberships';
+import { updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
 import type { Database } from '@/integrations/supabase/types';
 import type {
   CRMFilters,
@@ -47,7 +48,9 @@ export function useCRMData() {
       }
 
       if (filters?.type && filters.type !== 'all') {
-        query = query.eq('account_type', filters.type);
+        // Map UI 'household' to DB 'individual'
+        const dbType = filters.type === 'household' ? 'individual' : 'business';
+        query = query.eq('account_type', dbType);
       }
 
       if (filters?.state) {
@@ -257,26 +260,59 @@ export function useCRMData() {
     }
   }, [fetchAccounts, createOwnerMembership]);
 
-  const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
-    try {
-      console.log('useCRMData: updateAccount called with:', { id, data });
-      
-      // Check authentication - RPC will handle permissions
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('Authentication required');
-      }
+  // Type definitions for save changes
+  type SaveChanges = {
+    name?: string;
+    address_line1?: string;
+    address_line2?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    phone?: string;
+    email?: string;
+    source?: string;
+    tin_last4?: string;
+    type?: 'business' | 'household';
+    account_type?: 'business' | 'individual';
+  };
 
-      console.log('useCRMData: User authenticated, updating account...');
-      
-      // Use the new secure update RPC that handles staff permissions
-      const { data: updateResult, error } = await supabase.rpc('update_account_secure', {
-        account_id: id,
-        account_data: data
+  // Normalize type fields for RPC call
+  const normalizeTypeForRPC = (changes: SaveChanges): SaveChanges => {
+    const out: SaveChanges = { ...changes };
+
+    // If only one of the fields is provided, derive the other
+    if (out.type && !out.account_type) {
+      out.account_type = out.type === 'business' ? 'business' : 'individual';
+    }
+    if (out.account_type && !out.type) {
+      out.type = out.account_type === 'business' ? 'business' : 'household';
+    }
+    return out;
+  };
+
+  const updateAccount = useCallback(async (accountId: string, changes: SaveChanges): Promise<any> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      const payload = normalizeTypeForRPC(changes);
+
+      const { data, error } = await supabase.rpc('update_account_secure', {
+        account_id: accountId,
+        account_data: payload,
       });
 
-      console.log('useCRMData: Update result:', { updateResult, error });
       if (error) throw error;
+
+      // Update local list if present
+      setAccounts(prev =>
+        (prev || []).map(a => (a.id === accountId ? (data as any) : a))
+      );
+
+      // Update Recently Viewed snapshot
+      try {
+        updateRecentlyAccessedAccount(data as any);
+      } catch { /* no-op if not available */ }
 
       // Log account update event (fire-and-forget)
       supabase
@@ -284,8 +320,8 @@ export function useCRMData() {
         .insert({
           type: 'account_updated',
           entity_type: 'account',
-          entity_id: id,
-          payload: data
+          entity_id: accountId,
+          payload: payload
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
@@ -298,10 +334,10 @@ export function useCRMData() {
         description: "Account information has been updated successfully.",
       });
 
-      // Refresh accounts list and clear any cached data
+      // Refresh accounts list to ensure consistency
       await fetchAccounts();
 
-      return true;
+      return data;
     } catch (err: unknown) {
       const errorMessage = asMessage(err, 'Failed to update account');
       toast({
@@ -309,7 +345,7 @@ export function useCRMData() {
         description: errorMessage,
         variant: "destructive",
       });
-      return false;
+      throw err;
     }
   }, [fetchAccounts]);
 
@@ -442,6 +478,25 @@ export function useCRMData() {
 
   useEffect(() => {
     fetchAccounts();
+
+    // Set up realtime subscription for accounts
+    const channel = supabase
+      .channel('realtime:accounts')
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'accounts' },
+        (payload) => {
+          const updatedAccount = payload.new as any;
+          setAccounts(prev => 
+            (prev || []).map(a => (a.id === updatedAccount.id ? updatedAccount : a))
+          );
+          updateRecentlyAccessedAccount(updatedAccount);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchAccounts]);
 
   return {

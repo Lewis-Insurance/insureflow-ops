@@ -186,3 +186,43 @@ export const addToRecentlyAccessed = (item: Omit<RecentlyAccessedItem, 'accessed
     console.error('Failed to save recent item:', error);
   }
 };
+
+// Update Recently Accessed Account after save
+export const updateRecentlyAccessedAccount = (updated: {
+  id: string;
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  account_type?: 'business' | 'individual' | null;
+  type?: string | null;
+  updated_at?: string;
+}) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const items = JSON.parse(raw) as RecentlyAccessedItem[];
+
+    const idx = items.findIndex(
+      (i) => i.id === updated.id && i.type === 'account'
+    );
+    if (idx === -1) return;
+
+    const computedAccountType =
+      updated.account_type ??
+      (updated.type && String(updated.type).toLowerCase() === 'business'
+        ? 'business'
+        : 'individual');
+
+    items[idx] = {
+      ...items[idx],
+      name: updated.name ?? items[idx].name,
+      accountType: computedAccountType,
+      email: updated.email ?? items[idx].email,
+      phone: updated.phone ?? items[idx].phone,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore storage issues
+  }
+};

@@ -30,7 +30,7 @@ import { MembershipManager } from '@/components/crm/MembershipManager';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
-import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
+import { addToRecentlyAccessed, updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
 import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm-enhanced';
 
 export default function AccountDetail() {
@@ -78,42 +78,39 @@ export default function AccountDetail() {
   const handleEditAccount = async (data: any) => {
     if (!account) return;
     
-    console.log('AccountDetail: handleEditAccount called with data:', data);
-    console.log('AccountDetail: Current account:', account);
-    
-    // Transform form data to match database expectations
-    const updateData = {
-      name: data.name,
-      type: data.type || data.account_type, // Use either type or account_type from form
-      account_type: data.account_type, // Also send account_type for backward compatibility
-      tin_last4: data.tin_last4 || null,
-      address_line1: data.address_line1 || null,
-      address_line2: data.address_line2 || null,
-      city: data.city || null,
-      state: data.state || null,
-      zip_code: data.zip_code || null,
-      phone: data.phone || null,
-      email: data.email || null,
-      source: data.source || null
-    };
-    
-    console.log('AccountDetail: Transformed updateData:', updateData);
-    
     setFormLoading(true);
     try {
-      console.log('AccountDetail: Calling updateAccount...');
-      const result = await updateAccount(account.id, updateData);
-      console.log('AccountDetail: updateAccount result:', result);
+      // Transform form data with proper type mapping
+      const changes = {
+        name: data.name,
+        phone: data.phone,
+        email: data.email,
+        address_line1: data.address_line1,
+        address_line2: data.address_line2,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zip_code,
+        tin_last4: data.tin_last4,
+        source: data.source,
+        // Send both type fields for proper mapping
+        type: data.type,
+        account_type: data.account_type,
+      };
+
+      const updatedAccount = await updateAccount(account.id, changes);
       
-      // Reload account data to see changes
-      console.log('AccountDetail: Reloading account details...');
-      const updatedAccount = await fetchAccountDetails(account.id);
-      console.log('AccountDetail: Updated account data:', updatedAccount);
-      setAccount(updatedAccount);
+      // Refresh the detail view with fresh data
+      const refreshedAccount = await fetchAccountDetails(account.id);
+      if (refreshedAccount) {
+        setAccount(refreshedAccount);
+        
+        // Update Recently Viewed with fresh data
+        updateRecentlyAccessedAccount(refreshedAccount);
+      }
+      
       setShowEditForm(false);
-      console.log('AccountDetail: Edit completed successfully');
     } catch (error) {
-      console.error('AccountDetail: Failed to update account:', error);
+      console.error('Failed to update account:', error);
     } finally {
       setFormLoading(false);
     }
