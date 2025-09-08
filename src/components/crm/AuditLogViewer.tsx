@@ -36,7 +36,7 @@ export function AuditLogViewer() {
       let query = supabase
         .from('audit_logs')
         .select('*')
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (tableFilter && tableFilter !== 'all') {
