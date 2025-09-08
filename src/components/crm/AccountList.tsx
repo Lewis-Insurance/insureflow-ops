@@ -100,17 +100,19 @@ export function AccountList({
                         }
                       />
                     )}
-                    {account.account_type === 'business' ? (
-                      <Building2 className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Users className="h-5 w-5 text-primary" />
-                    )}
-                    <div>
-                      <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {account.account_type || 'individual'}
-                        </Badge>
+                     {((account as any).type === 'commercial_business' || account.account_type === 'business') ? (
+                       <Building2 className="h-5 w-5 text-primary" />
+                     ) : (
+                       <Users className="h-5 w-5 text-primary" />
+                     )}
+                     <div>
+                       <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
+                       <div className="flex items-center gap-2">
+                         <Badge variant="outline" className="text-xs capitalize">
+                           {(account as any).type === 'commercial_business' ? 'business' : 
+                            (account as any).type === 'household' ? 'household' : 
+                            account.account_type || 'individual'}
+                         </Badge>
                         {account.source && (
                           <Badge variant="outline" className="text-xs">
                             {account.source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
