@@ -188,10 +188,10 @@ export function BulkActionsBar({
             {selectedAccounts.length} account{selectedAccounts.length === 1 ? '' : 's'} selected
           </span>
           <Badge variant="secondary">
-            {selectedAccounts.filter(a => a.type === 'household').length} Household
+            {selectedAccounts.filter(a => a.account_type === 'household').length} Household
           </Badge>
           <Badge variant="secondary">
-            {selectedAccounts.filter(a => a.type === 'business').length} Business
+            {selectedAccounts.filter(a => a.account_type === 'business').length} Business
           </Badge>
         </div>
 

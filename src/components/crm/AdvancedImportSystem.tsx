@@ -11,7 +11,7 @@ import { Upload, FileText, CheckCircle2, AlertCircle, Clock, Download, Trash2, E
 import { useDropzone } from 'react-dropzone';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { ImportBatch, ImportStaging, DataExportRequest } from '@/types/crm';
+import type { ImportBatch, ImportStaging, DataExportRequest } from '@/types/crm-enhanced-clean';
 
 interface AdvancedImportSystemProps {
   onImportComplete?: () => void;
@@ -49,8 +49,8 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (exportError) throw exportError;
 
-      setImportBatches(batchData || []);
-      setExportRequests(exportData || []);
+      setImportBatches(batchData as any || []);
+      setExportRequests(exportData as any || []);
     } catch (error) {
       console.error('Error fetching import data:', error);
       toast({
@@ -175,7 +175,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       toast({
         title: "Batch processed successfully",
-        description: `Processed ${data.processed_rows} rows with ${data.successful_rows} successes.`,
+        description: `Processed ${(data as any).processed_rows} rows with ${(data as any).successful_rows} successes.`,
       });
 
       fetchImportData();
@@ -203,7 +203,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (error) throw error;
 
-      setStagingData(data || []);
+      setStagingData(data as any || []);
       setSelectedBatch(batch);
       setShowStagingPreview(true);
     } catch (error) {

@@ -72,7 +72,7 @@ const US_STATES = [
 
 export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: AccountFormProps) {
   const [formData, setFormData] = useState<CreateAccountData>({
-    type: account?.type || 'household',
+    account_type: account?.account_type || 'individual',
     name: account?.name || '',
     tin_last4: account?.tin_last4 || '',
     address_line1: account?.address_line1 || '',
@@ -126,7 +126,7 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
       onOpenChange(false);
       // Reset form
       setFormData({
-        type: 'household',
+        account_type: 'individual',
         name: '',
         tin_last4: '',
         address_line1: '',
@@ -180,18 +180,18 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
               <div className="grid grid-cols-2 gap-4">
                 <Button
                   type="button"
-                  variant={formData.type === 'household' ? 'default' : 'outline'}
+                  variant={formData.account_type === 'household' ? 'default' : 'outline'}
                   className="h-20 flex-col"
-                  onClick={() => updateField('type', 'household')}
+                  onClick={() => updateField('account_type', 'household')}
                 >
                   <Users className="h-6 w-6 mb-2" />
                   Household
                 </Button>
                 <Button
                   type="button"
-                  variant={formData.type === 'business' ? 'default' : 'outline'}
+                  variant={formData.account_type === 'business' ? 'default' : 'outline'}
                   className="h-20 flex-col"
-                  onClick={() => updateField('type', 'business')}
+                  onClick={() => updateField('account_type', 'business')}
                 >
                   <Building2 className="h-6 w-6 mb-2" />
                   Business
@@ -209,13 +209,13 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">
-                    {formData.type === 'business' ? 'Business Name' : 'Household Name'} *
+                    {formData.account_type === 'business' ? 'Business Name' : 'Household Name'} *
                   </Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => updateField('name', e.target.value)}
-                    placeholder={formData.type === 'business' ? 'ABC Company Inc.' : 'Smith Family'}
+                    placeholder={formData.account_type === 'business' ? 'ABC Company Inc.' : 'Smith Family'}
                     className={errors.name ? 'border-destructive' : ''}
                   />
                   {errors.name && (
@@ -223,7 +223,7 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
                   )}
                 </div>
 
-                {formData.type === 'business' && (
+                {formData.account_type === 'business' && (
                   <div>
                     <Label htmlFor="tin_last4">Tax ID (Last 4 digits)</Label>
                     <Input

@@ -99,7 +99,7 @@ export function AccountList({
                         }
                       />
                     )}
-                    {account.type === 'business' ? (
+                    {account.account_type === 'business' ? (
                       <Building2 className="h-5 w-5 text-primary" />
                     ) : (
                       <Users className="h-5 w-5 text-primary" />
@@ -108,7 +108,7 @@ export function AccountList({
                       <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs capitalize">
-                          {account.type}
+                          {account.account_type || 'individual'}
                         </Badge>
                         {account.source && (
                           <Badge variant="outline" className="text-xs">

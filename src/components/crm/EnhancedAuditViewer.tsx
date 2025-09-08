@@ -11,7 +11,7 @@ import { FileText, User, Calendar, Activity, Eye, Shield, UserCheck, Database } 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
-import type { AuditLog, DetailedAuditLog, ImpersonationLog, ProfileAccessLog } from '@/types/crm';
+import type { AuditLog, DetailedAuditLog, ImpersonationLog, ProfileAccessLog } from '@/types/crm-enhanced-clean';
 
 interface EnhancedAuditViewerProps {
   entityId?: string;
@@ -91,8 +91,8 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
 
       if (detailedError) throw detailedError;
 
-      setAuditLogs(auditData || []);
-      setDetailedLogs(detailedData || []);
+      setAuditLogs(auditData as any || []);
+      setDetailedLogs(detailedData as any || []);
 
       // Fetch impersonation logs if admin
       if (isAdmin) {
@@ -105,7 +105,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         if (impersonationError) {
           console.error('Error fetching impersonation logs:', impersonationError);
         } else {
-          setImpersonationLogs(impersonationData || []);
+          setImpersonationLogs(impersonationData as any || []);
         }
 
         // Fetch profile access logs
@@ -118,7 +118,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         if (accessError) {
           console.error('Error fetching access logs:', accessError);
         } else {
-          setAccessLogs(accessData || []);
+          setAccessLogs(accessData as any || []);
         }
       }
 

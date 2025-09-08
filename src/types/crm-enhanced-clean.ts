@@ -1,3 +1,6 @@
+// Clean enhanced CRM types aligned with database schema
+import type { Database } from '@/integrations/supabase/types';
+
 // Core CRM entities aligned with actual database schema
 export interface Account {
   id: string;
@@ -167,7 +170,7 @@ export interface AccountWithDetails extends Account {
 
 export interface CRMFilters {
   search?: string;
-  type?: 'household' | 'business' | 'all';
+  type?: 'individual' | 'household' | 'business' | 'all';
   state?: string;
   hasActivePolicies?: boolean;
   hasOpenClaims?: boolean;
@@ -279,42 +282,50 @@ export interface DuplicateGroup {
   created_at: string;
 }
 
+// Import/Export with flexible typing for Supabase compatibility
 export interface ImportBatch {
   id: string;
-  import_type: 'accounts' | 'contacts';
+  import_type: string;
   filename: string;
   total_rows: number;
   processed_rows: number;
   successful_rows: number;
   error_rows: number;
-  status: 'staging' | 'processing' | 'completed' | 'failed';
-  field_mapping?: Record<string, string>;
-  validation_errors: any[];
+  status: string;
+  field_mapping?: any | null;
+  validation_errors?: any[] | null;
   imported_by: string;
-  started_at?: string;
-  completed_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
 }
 
-export interface ConsentRecord {
+export interface ImportStaging {
   id: string;
-  contact_id: string;
-  consent_type: 'sms' | 'voice' | 'email' | 'data_processing';
-  method: 'verbal' | 'written' | 'web_form' | 'sms_keyword' | 'api';
-  status: 'granted' | 'revoked';
-  evidence_ref?: string;
-  ip_address?: string;
-  user_agent?: string;
-  location_data?: any;
-  notes?: string;
-  granted_at: string;
-  expires_at?: string;
-  revoked_at?: string;
-  created_by?: string;
+  batch_id: string;
+  row_number: number;
+  raw_data: any;
+  mapped_data?: any | null;
+  validation_status: string;
+  validation_errors?: any[] | null;
+  entity_id?: string | null;
   created_at: string;
 }
 
-// Enhanced audit system with flexible typing
+export interface DataExportRequest {
+  id: string;
+  user_id: string;
+  request_type: string;
+  status: string;
+  export_url?: string | null;
+  download_count: number;
+  requested_at: string;
+  completed_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+}
+
+// Audit system with flexible typing
 export interface AuditLog {
   id: string;
   entity_type: string;
@@ -325,8 +336,8 @@ export interface AuditLog {
   session_id?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;
-  changed_fields?: any | null; // Using any to match Json type
-  metadata?: any | null; // Using any to match Json type
+  changed_fields?: any | null;
+  metadata?: any | null;
   occurred_at: string;
   created_at: string;
 }
@@ -341,20 +352,20 @@ export interface DetailedAuditLog {
   session_id?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;
-  changed_fields?: any | null; // Using any to match Json type
-  metadata?: any | null; // Using any to match Json type
+  changed_fields?: any | null;
+  metadata?: any | null;
   occurred_at: string;
   created_at: string;
 }
 
-// TCPA Compliance with flexible typing
+// TCPA Compliance
 export interface TwilioConsent {
   id: string;
   contact_id: string;
   channel: 'sms' | 'voice';
   event: 'consent_granted' | 'consent_revoked';
   method?: string | null;
-  evidence?: any | null; // Using any to match Json type
+  evidence?: any | null;
   created_at: string;
 }
 
@@ -370,21 +381,21 @@ export interface ConsentEvidence {
   evidence_ref?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;
-  location_data?: any | null; // Using any to match Json type
+  location_data?: any | null;
   notes?: string | null;
   created_by?: string | null;
   created_at: string;
 }
 
-// User Management  
+// User Management
 export interface UserSession {
   id: string;
   user_id: string;
   session_token: string;
-  device_info?: Record<string, any> | null;
+  device_info?: any | null;
   ip_address?: string | null;
   user_agent?: string | null;
-  location_data?: Record<string, any> | null;
+  location_data?: any | null;
   last_active: string;
   expires_at: string;
   created_at: string;
@@ -400,7 +411,7 @@ export interface ImpersonationLog {
   ended_at?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;
-  actions_taken?: Record<string, any>[] | null;
+  actions_taken?: any[] | null;
   created_at: string;
 }
 
@@ -418,49 +429,6 @@ export interface RoleChangeRequest {
   created_at: string;
 }
 
-// Enhanced Import/Export System with proper typing
-export interface ImportBatch {
-  id: string;
-  import_type: string; // Changed from strict union to string for flexibility
-  filename: string;
-  total_rows: number;
-  processed_rows: number;
-  successful_rows: number;
-  error_rows: number;
-  status: string; // Changed from strict union to string for flexibility  
-  field_mapping?: any | null; // Using any to match Json type
-  validation_errors?: any[] | null; // Using any to match Json type
-  imported_by: string;
-  started_at?: string | null;
-  completed_at?: string | null;
-  created_at: string;
-}
-
-export interface ImportStaging {
-  id: string;
-  batch_id: string;
-  row_number: number;
-  raw_data: any; // Using any to match Json type
-  mapped_data?: any | null; // Using any to match Json type
-  validation_status: string; // More flexible than strict union
-  validation_errors?: any[] | null; // Using any to match Json type
-  entity_id?: string | null;
-  created_at: string;
-}
-
-export interface DataExportRequest {
-  id: string;
-  user_id: string;  
-  request_type: string;
-  status: string; // More flexible than strict union
-  export_url?: string | null;
-  download_count: number;
-  requested_at: string;
-  completed_at?: string | null;
-  expires_at?: string | null;
-  created_at: string;
-}
-
 // Enhanced Duplicate Detection
 export interface DuplicateDetectionRule {
   id: string;
@@ -471,18 +439,6 @@ export interface DuplicateDetectionRule {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface DuplicateGroup {
-  id: string;
-  entity_type: string;
-  entity_ids: string[];
-  match_score: number;
-  status: 'pending' | 'reviewed' | 'merged' | 'dismissed';
-  rule_id?: string | null;
-  reviewed_by?: string | null;
-  reviewed_at?: string | null;
-  created_at: string;
 }
 
 export interface MergeHistory {
@@ -551,7 +507,7 @@ export interface ProfileAccessLog {
   target_user_id: string;
   accessor_user_id?: string | null;
   action: string;
-  details?: Record<string, any> | null;
+  details?: any | null;
   ip_address?: string | null;
   user_agent?: string | null;
   created_at: string;

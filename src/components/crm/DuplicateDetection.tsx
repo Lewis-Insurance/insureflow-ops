@@ -103,7 +103,8 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         id: 'acc1',
         data: {
           id: 'acc1',
-          type: 'household',
+                account_type: 'individual' as const,
+                account_status: 'lead' as const,
           name: 'John Smith Family',
           email: 'john.smith@email.com',
           phone: '(555) 123-4567',
@@ -117,7 +118,8 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         id: 'acc2', 
         data: {
           id: 'acc2',
-          type: 'household',
+                account_type: 'individual' as const,
+                account_status: 'lead' as const,
           name: 'Smith, John',
           email: 'j.smith@email.com',
           phone: '555-123-4567',

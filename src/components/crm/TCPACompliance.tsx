@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Shield, Phone, MessageSquare, Mail, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { ConsentEvidence, TwilioConsent } from '@/types/crm';
+import type { ConsentEvidence, TwilioConsent } from '@/types/crm-enhanced-clean';
 
 interface TCPAComplianceProps {
   contactId: string;
@@ -53,8 +53,8 @@ export function TCPACompliance({ contactId, contactName }: TCPAComplianceProps) 
 
       if (twilioError) throw twilioError;
 
-      setConsents(consentData || []);
-      setTwilioConsents(twilioData || []);
+      setConsents(consentData as any || []);
+      setTwilioConsents(twilioData as any || []);
     } catch (error) {
       console.error('Error fetching consents:', error);
       toast({

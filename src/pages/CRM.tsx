@@ -27,7 +27,7 @@ import type {
   CRMFilters, 
   SavedView, 
   BulkAction
-} from '@/types/crm-enhanced';
+} from '@/types/crm-enhanced-clean';
 import type { AccountCompat, CreateAccountDataCompat } from '@/types/crm-compat';
 
 // Memoized stats calculation
