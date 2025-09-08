@@ -25,23 +25,42 @@ export function useGlobalSearch() {
       setLoading(true);
       setError(null);
 
-      // For now, use regular table queries since search_customers RPC may not exist
-      const { data: accountData } = await supabase
-        .from('accounts')
-        .select('id, name, email, phone')
-        .ilike('name', `%${query.trim()}%`)
-        .limit(10);
+      const trimmedQuery = query.trim();
+      console.log('Searching for:', trimmedQuery);
 
-      const { data: contactData } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name, email_primary, phone_mobile')
-        .or(`first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,email_primary.ilike.%${query.trim()}%`)
-        .limit(10);
+      // Fallback to manual search with broader criteria
+      const [accountResponse, contactResponse, businessResponse] = await Promise.allSettled([
+        // Search accounts by name, email, phone, address
+        supabase
+          .from('accounts')
+          .select('id, name, email, phone, city, state')
+          .or(`name.ilike.%${trimmedQuery}%,email.ilike.%${trimmedQuery}%,phone.ilike.%${trimmedQuery}%,city.ilike.%${trimmedQuery}%,state.ilike.%${trimmedQuery}%`)
+          .is('deleted_at', null)
+          .limit(10),
+
+        // Search contacts by name, email, phone
+        supabase
+          .from('contacts')
+          .select('id, first_name, last_name, email_primary, phone_mobile, phone_home, phone_work')
+          .or(`first_name.ilike.%${trimmedQuery}%,last_name.ilike.%${trimmedQuery}%,email_primary.ilike.%${trimmedQuery}%,phone_mobile.ilike.%${trimmedQuery}%,phone_home.ilike.%${trimmedQuery}%,phone_work.ilike.%${trimmedQuery}%`)
+          .is('deleted_at', null)
+          .limit(10),
+
+        // Search businesses by legal name and DBA
+        supabase
+          .from('businesses')
+          .select('id, legal_name, dba')
+          .or(`legal_name.ilike.%${trimmedQuery}%,dba.ilike.%${trimmedQuery}%`)
+          .is('deleted_at', null)
+          .limit(10)
+      ]);
 
       const results: SearchResult[] = [];
       
-      if (accountData) {
-        results.push(...accountData.map(account => ({
+      // Process account results
+      if (accountResponse.status === 'fulfilled' && accountResponse.value.data) {
+        console.log('Account results:', accountResponse.value.data);
+        results.push(...accountResponse.value.data.map(account => ({
           entity_type: 'account' as const,
           id: account.id,
           label: account.name || 'Unnamed Account',
@@ -50,19 +69,33 @@ export function useGlobalSearch() {
         })));
       }
 
-      if (contactData) {
-        results.push(...contactData.map(contact => ({
+      // Process contact results
+      if (contactResponse.status === 'fulfilled' && contactResponse.value.data) {
+        console.log('Contact results:', contactResponse.value.data);
+        results.push(...contactResponse.value.data.map(contact => ({
           entity_type: 'contact' as const,
           id: contact.id,
-          label: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+          label: `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact',
           email: contact.email_primary,
-          phone: contact.phone_mobile
+          phone: contact.phone_mobile || contact.phone_home || contact.phone_work
         })));
       }
 
-      const data = results;
+      // Process business results
+      if (businessResponse.status === 'fulfilled' && businessResponse.value.data) {
+        console.log('Business results:', businessResponse.value.data);
+        results.push(...businessResponse.value.data.map(business => ({
+          entity_type: 'business' as const,
+          id: business.id,
+          label: business.legal_name || business.dba || 'Unnamed Business',
+          email: null,
+          phone: null
+        })));
+      }
 
-      setResults(data || []);
+      console.log('Final search results:', results);
+      setResults(results);
+
     } catch (err: any) {
       console.error('Global search error:', err);
       setError(err.message || 'Search failed');
