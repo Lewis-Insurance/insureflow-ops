@@ -267,16 +267,6 @@ export function useCRMData() {
         throw new Error('Authentication required');
       }
 
-      // Check if user has membership for this account
-      const { data: membership } = await supabase
-        .from('account_memberships')
-        .select('role')
-        .eq('account_id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      console.log('useCRMData: User membership:', membership);
-
       console.log('useCRMData: User authenticated, updating account...');
       const result = await supabase
         .from('accounts')
