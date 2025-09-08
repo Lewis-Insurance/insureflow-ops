@@ -196,19 +196,27 @@ export function useCRMData() {
         throw new Error('Authentication required to create accounts');
       }
 
-      // CRITICAL FIX: Use database transaction for account + membership creation
-      const { data: result, error } = await supabase.rpc('create_account_with_membership', {
-        account_data: data,
-        owner_user_id: user.id
-      });
+      // CRITICAL FIX: Create account and membership atomically
+      const { data: account, error } = await supabase
+        .from('accounts')
+        .insert(data)
+        .select()
+        .maybeSingle();
 
       if (error) {
         throw new Error(`Account creation failed: ${error.message}`);
       }
 
-      const account = result?.account;
       if (!account) {
         throw new Error('Account creation failed - no account returned');
+      }
+
+      // Create membership using the existing upsert function
+      const membershipSuccess = await createOwnerMembership(account.id, user.id);
+      if (!membershipSuccess) {
+        // Clean up account if membership creation fails
+        await supabase.from('accounts').delete().eq('id', account.id);
+        throw new Error('Failed to create account membership');
       }
 
       // Log account creation event (fire-and-forget)
@@ -240,7 +248,7 @@ export function useCRMData() {
       });
       return null;
     }
-  }, [fetchAccounts]);
+  }, [fetchAccounts, createOwnerMembership]);
 
   const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {

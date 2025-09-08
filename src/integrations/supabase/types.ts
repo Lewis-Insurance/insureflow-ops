@@ -1701,6 +1701,10 @@ export type Database = {
       }
     }
     Functions: {
+      create_account_with_membership: {
+        Args: { account_data: Json; owner_user_id: string }
+        Returns: Json
+      }
       create_detailed_audit_log: {
         Args: {
           p_action: string
