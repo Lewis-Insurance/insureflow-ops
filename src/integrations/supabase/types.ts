@@ -3066,6 +3066,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      jsonb_diff_vals: {
+        Args: { a: Json; b: Json }
+        Returns: Json
+      }
       log_profile_access: {
         Args: { action_type: string; details_json?: Json; target_id: string }
         Returns: undefined
@@ -3076,6 +3080,10 @@ export type Database = {
       }
       normalize_phone_number: {
         Args: { phone_input: string }
+        Returns: string
+      }
+      pick_enum_label: {
+        Args: { candidates: string[]; enum_type: unknown }
         Returns: string
       }
       process_csv_batch: {
