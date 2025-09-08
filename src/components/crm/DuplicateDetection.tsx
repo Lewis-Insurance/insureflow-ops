@@ -352,7 +352,7 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
                           <div>
                             <span className="text-muted-foreground">Type:</span>
                             <span className="ml-2 capitalize">
-                              {'type' in candidate.data ? candidate.data.type : 'contact'}
+                              {candidate.data && typeof candidate.data === 'object' && 'type' in candidate.data ? String(candidate.data.type) : 'contact'}
                             </span>
                           </div>
                         </div>

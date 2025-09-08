@@ -47,9 +47,9 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
     try {
       setLoading(true);
       
-      // Build base query
-      let auditQuery = supabase.from('audit_logs').select('*');
-      let detailedQuery = supabase.from('detailed_audit_logs').select('*');
+      // Build base query with explicit typing to prevent circular type inference
+      let auditQuery = supabase.from('audit_logs').select('*') as any;
+      let detailedQuery = supabase.from('detailed_audit_logs').select('*') as any;
       
       if (entityId && entityType) {
         auditQuery = auditQuery.eq('entity_id', entityId).eq('entity', entityType);

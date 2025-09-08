@@ -288,11 +288,11 @@ export interface ImportBatch {
   successful_rows: number;
   error_rows: number;
   status: 'staging' | 'processing' | 'completed' | 'failed';
-  field_mapping?: Record<string, string>;
-  validation_errors: any[];
+  field_mapping?: Record<string, string> | null;
+  validation_errors: any[] | null;
   imported_by: string;
-  started_at?: string;
-  completed_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
 }
 
@@ -418,23 +418,7 @@ export interface RoleChangeRequest {
   created_at: string;
 }
 
-// Enhanced Import/Export System with proper typing
-export interface ImportBatch {
-  id: string;
-  import_type: string; // Changed from strict union to string for flexibility
-  filename: string;
-  total_rows: number;
-  processed_rows: number;
-  successful_rows: number;
-  error_rows: number;
-  status: string; // Changed from strict union to string for flexibility  
-  field_mapping?: any | null; // Using any to match Json type
-  validation_errors?: any[] | null; // Using any to match Json type
-  imported_by: string;
-  started_at?: string | null;
-  completed_at?: string | null;
-  created_at: string;
-}
+// Enhanced Import/Export System uses the ImportBatch interface defined above
 
 export interface ImportStaging {
   id: string;
@@ -473,17 +457,7 @@ export interface DuplicateDetectionRule {
   updated_at: string;
 }
 
-export interface DuplicateGroup {
-  id: string;
-  entity_type: string;
-  entity_ids: string[];
-  match_score: number;
-  status: 'pending' | 'reviewed' | 'merged' | 'dismissed';
-  rule_id?: string | null;
-  reviewed_by?: string | null;
-  reviewed_at?: string | null;
-  created_at: string;
-}
+// DuplicateGroup interface is defined above at line ~271
 
 export interface MergeHistory {
   id: string;
