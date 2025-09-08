@@ -535,6 +535,53 @@ export type Database = {
           },
         ]
       }
+      data_export_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          download_count: number | null
+          expires_at: string | null
+          export_url: string | null
+          id: string
+          request_type: string
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          download_count?: number | null
+          expires_at?: string | null
+          export_url?: string | null
+          id?: string
+          request_type: string
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          download_count?: number | null
+          expires_at?: string | null
+          export_url?: string | null
+          id?: string
+          request_type?: string
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_export_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       detailed_audit_logs: {
         Row: {
           action: string
@@ -734,6 +781,66 @@ export type Database = {
           },
         ]
       }
+      email_change_requests: {
+        Row: {
+          created_at: string
+          current_email: string
+          expires_at: string
+          id: string
+          reason: string | null
+          requested_at: string
+          requested_email: string
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_email: string
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_email: string
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_email?: string
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_email?: string
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_change_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string
@@ -763,6 +870,63 @@ export type Database = {
           type?: string
         }
         Relationships: []
+      }
+      impersonation_logs: {
+        Row: {
+          actions_taken: Json | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          impersonator_id: string
+          ip_address: unknown | null
+          reason: string | null
+          session_id: string
+          started_at: string
+          target_user_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          actions_taken?: Json | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          impersonator_id: string
+          ip_address?: unknown | null
+          reason?: string | null
+          session_id: string
+          started_at?: string
+          target_user_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          actions_taken?: Json | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          impersonator_id?: string
+          ip_address?: unknown | null
+          reason?: string | null
+          session_id?: string
+          started_at?: string
+          target_user_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_logs_impersonator_id_fkey"
+            columns: ["impersonator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "impersonation_logs_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       import_batches: {
         Row: {
@@ -889,6 +1053,47 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_verification_codes: {
+        Row: {
+          attempts: number | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone_number: string
+          user_id: string
+          verification_code: string
+          verified: boolean | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number: string
+          user_id: string
+          verification_code: string
+          verified?: boolean | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number?: string
+          user_id?: string
+          verification_code?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_verification_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       policies: {
         Row: {
           account_id: string | null
@@ -952,32 +1157,170 @@ export type Database = {
           },
         ]
       }
+      profile_access_logs: {
+        Row: {
+          accessor_user_id: string | null
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          target_user_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          accessor_user_id?: string | null
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          target_user_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          accessor_user_id?: string | null
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          target_user_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_access_logs_accessor_user_id_fkey"
+            columns: ["accessor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_access_logs_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          avatar_url: string | null
+          backup_codes: string[] | null
           created_at: string
           full_name: string | null
           id: string
           is_staff: boolean
+          locale: string | null
+          mfa_enabled: boolean | null
+          mfa_secret: string | null
+          notification_email: boolean | null
+          notification_sms: boolean | null
           phone: string | null
+          phone_verification_sent_at: string | null
+          phone_verified: boolean | null
           role: Database["public"]["Enums"]["user_role"]
+          timezone: string | null
         }
         Insert: {
+          avatar_url?: string | null
+          backup_codes?: string[] | null
           created_at?: string
           full_name?: string | null
           id: string
           is_staff?: boolean
+          locale?: string | null
+          mfa_enabled?: boolean | null
+          mfa_secret?: string | null
+          notification_email?: boolean | null
+          notification_sms?: boolean | null
           phone?: string | null
+          phone_verification_sent_at?: string | null
+          phone_verified?: boolean | null
           role?: Database["public"]["Enums"]["user_role"]
+          timezone?: string | null
         }
         Update: {
+          avatar_url?: string | null
+          backup_codes?: string[] | null
           created_at?: string
           full_name?: string | null
           id?: string
           is_staff?: boolean
+          locale?: string | null
+          mfa_enabled?: boolean | null
+          mfa_secret?: string | null
+          notification_email?: boolean | null
+          notification_sms?: boolean | null
           phone?: string | null
+          phone_verification_sent_at?: string | null
+          phone_verified?: boolean | null
           role?: Database["public"]["Enums"]["user_role"]
+          timezone?: string | null
         }
         Relationships: []
+      }
+      role_change_requests: {
+        Row: {
+          created_at: string
+          current_user_role: Database["public"]["Enums"]["user_role"]
+          expires_at: string
+          id: string
+          reason: string | null
+          requested_at: string
+          requested_role: Database["public"]["Enums"]["user_role"]
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_user_role: Database["public"]["Enums"]["user_role"]
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_role: Database["public"]["Enums"]["user_role"]
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_user_role?: Database["public"]["Enums"]["user_role"]
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_role?: Database["public"]["Enums"]["user_role"]
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_change_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_views: {
         Row: {
@@ -1125,6 +1468,56 @@ export type Database = {
           {
             foreignKeyName: "tasks_assignee_id_fkey"
             columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sessions: {
+        Row: {
+          created_at: string
+          device_info: Json | null
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          last_active: string
+          location_data: Json | null
+          revoked_at: string | null
+          session_token: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_info?: Json | null
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          last_active?: string
+          location_data?: Json | null
+          revoked_at?: string | null
+          session_token?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_info?: Json | null
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          last_active?: string
+          location_data?: Json | null
+          revoked_at?: string | null
+          session_token?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
