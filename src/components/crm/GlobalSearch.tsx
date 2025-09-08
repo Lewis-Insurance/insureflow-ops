@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGlobalSearch, SearchResult } from '@/hooks/useGlobalSearch';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useDebouncedCallback } from '@/hooks/useDebounce';
 
 interface GlobalSearchProps {
   onResultSelect?: (result: SearchResult) => void;
@@ -23,7 +23,7 @@ export function GlobalSearch({
   const { results, loading, search, clearResults } = useGlobalSearch();
 
   // Debounce search to avoid too many API calls
-  const debouncedSearch = useDebounce(search, 300);
+  const debouncedSearch = useDebouncedCallback(search, 300, [search]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);

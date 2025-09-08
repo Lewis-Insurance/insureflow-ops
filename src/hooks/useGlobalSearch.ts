@@ -30,19 +30,19 @@ export function useGlobalSearch() {
 
       // Fallback to manual search with broader criteria
       const [accountResponse, contactResponse, businessResponse] = await Promise.allSettled([
-        // Search accounts by name, email, phone, address
+        // Search accounts by name, email, phone, address, tin_last4
         supabase
           .from('accounts')
-          .select('id, name, email, phone, city, state')
-          .or(`name.ilike.%${trimmedQuery}%,email.ilike.%${trimmedQuery}%,phone.ilike.%${trimmedQuery}%,city.ilike.%${trimmedQuery}%,state.ilike.%${trimmedQuery}%`)
+          .select('id, name, email, phone, city, state, tin_last4')
+          .or(`name.ilike.%${trimmedQuery}%,email.ilike.%${trimmedQuery}%,phone.ilike.%${trimmedQuery}%,city.ilike.%${trimmedQuery}%,state.ilike.%${trimmedQuery}%,tin_last4.ilike.%${trimmedQuery}%`)
           .is('deleted_at', null)
           .limit(10),
 
-        // Search contacts by name, email, phone
+        // Search contacts by name, email, phone, SSN last 4
         supabase
           .from('contacts')
-          .select('id, first_name, last_name, email_primary, phone_mobile, phone_home, phone_work')
-          .or(`first_name.ilike.%${trimmedQuery}%,last_name.ilike.%${trimmedQuery}%,email_primary.ilike.%${trimmedQuery}%,phone_mobile.ilike.%${trimmedQuery}%,phone_home.ilike.%${trimmedQuery}%,phone_work.ilike.%${trimmedQuery}%`)
+          .select('id, first_name, last_name, email_primary, phone_mobile, phone_home, phone_work, ssn_last4')
+          .or(`first_name.ilike.%${trimmedQuery}%,last_name.ilike.%${trimmedQuery}%,email_primary.ilike.%${trimmedQuery}%,phone_mobile.ilike.%${trimmedQuery}%,phone_home.ilike.%${trimmedQuery}%,phone_work.ilike.%${trimmedQuery}%,ssn_last4.ilike.%${trimmedQuery}%`)
           .is('deleted_at', null)
           .limit(10),
 
