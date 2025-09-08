@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, Shield } from 'lucide-react';
 
@@ -21,8 +21,7 @@ export default function Auth() {
   const [signUpData, setSignUpData] = useState({
     email: '',
     password: '',
-    fullName: '',
-    role: 'csr'
+    fullName: ''
   });
 
   if (isAuthenticated) {
@@ -39,7 +38,7 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await signUp(signUpData.email, signUpData.password, signUpData.fullName, signUpData.role);
+    await signUp(signUpData.email, signUpData.password, signUpData.fullName);
     setIsLoading(false);
   };
 
@@ -143,20 +142,11 @@ export default function Auth() {
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Role</Label>
-                    <Select value={signUpData.role} onValueChange={(value) => setSignUpData({ ...signUpData, role: value })}>
-                      <SelectTrigger id="signup-role">
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="csr">Customer Service Rep</SelectItem>
-                        <SelectItem value="producer">Producer</SelectItem>
-                        <SelectItem value="accounting">Accounting</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="owner">Owner</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> New accounts will be created with customer role. 
+                      Contact an administrator to request role changes if needed.
+                    </p>
                   </div>
                   <Button 
                     type="submit" 
