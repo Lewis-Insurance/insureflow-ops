@@ -29,16 +29,54 @@ import { ActivityTimeline } from '@/components/crm/ActivityTimeline';
 import { MembershipManager } from '@/components/crm/MembershipManager';
 import { useCRMData } from '@/hooks/useCRMData';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { addToRecentlyAccessed, updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
 import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm-enhanced';
 
+// Type utilities
+type TypePayload = {
+  type?: 'business' | 'household';
+  account_type?: 'business' | 'individual';
+  [k: string]: any;
+};
+
+function normalizeTypeForRPC(input: TypePayload): TypePayload {
+  const out = { ...input };
+  // Derive the pair if only one is present
+  if (out.type && !out.account_type) {
+    out.account_type = out.type === 'business' ? 'business' : 'individual';
+  }
+  if (out.account_type && !out.type) {
+    out.type = out.account_type === 'business' ? 'business' : 'household';
+  }
+  return out;
+}
+
 export default function AccountDetail() {
-  const { accountId } = useParams<{ accountId: string }>();
+  const { toast } = useToast();
+  const { id: routeId } = useParams<{ id: string }>();
+  
+  // Defensive: strip any query string and validate UUID
+  const accountId = (routeId ?? '').split('?')[0];
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId);
+
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const { fetchAccountDetails, updateAccount } = useCRMData();
+  const { fetchAccountDetails, fetchAccounts } = useCRMData();
+  
+  // Guard for invalid UUID
+  if (!isUuid) {
+    return (
+      <AppLayout>
+        <Card className="p-6">
+          <CardContent>
+            <p className="text-destructive">Invalid account ID</p>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    );
+  }
   
   const [account, setAccount] = useState<AccountWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,77 +115,76 @@ export default function AccountDetail() {
     }
   }, [accountId, isAuthenticated, fetchAccountDetails]);
 
-  const handleEditAccount = async (data: any) => {
-    if (!account) return;
-    
+  const handleEditAccount = async (formValues: any) => {
     setFormLoading(true);
     try {
-      // Prepare payload with proper type mapping
-      const payload = {
-        name: data.name,
-        phone: data.phone,
-        email: data.email,
-        address_line1: data.address_line1,
-        address_line2: data.address_line2,
-        city: data.city,
-        state: data.state,
-        zip_code: data.zip_code,
-        tin_last4: data.tin_last4,
-        source: data.source,
-        type: data.type,
-        account_type: data.account_type,
-      };
+      if (!isUuid) throw new Error('No account id');
 
-      // Derive the pair if only one was provided
-      if (payload.type && !payload.account_type) {
-        payload.account_type = payload.type === 'business' ? 'business' : 'individual';
-      }
-      if (payload.account_type && !payload.type) {
-        payload.type = payload.account_type === 'business' ? 'business' : 'household';
-      }
+      const payload = normalizeTypeForRPC(formValues);
 
-      // Call the RPC directly and use its return value
-      const { data: updatedData, error } = await supabase.rpc('update_account_secure', {
-        account_id: account.id,
+      // Optional debug
+      console.debug('Saving account', { accountId, payload });
+
+      const { data, error } = await supabase.rpc('update_account_secure', {
+        account_id: accountId,
         account_data: payload,
       });
 
       if (error) throw error;
 
-      // Type the response data
-      const updatedAccount = updatedData as AccountWithDetails;
+      // Update local state
+      setAccount(data as AccountWithDetails);
 
-      // Update local state immediately with RPC return
-      setAccount(updatedAccount);
-      
-      // Update Recently Viewed immediately with fresh data
+      // Refresh accounts list to ensure consistency
+      await fetchAccounts();
+
+      // Keep Recently Viewed in sync
       updateRecentlyAccessedAccount({
-        id: updatedAccount.id,
-        name: updatedAccount.name,
-        email: updatedAccount.email,
-        phone: updatedAccount.phone,
-        account_type: updatedAccount.account_type as 'business' | 'individual',
-        type: updatedAccount.type,
-        updated_at: updatedAccount.updated_at
+        id: (data as any).id,
+        name: (data as any).name,
+        email: (data as any).email,
+        phone: (data as any).phone,
+        account_type: (data as any).account_type,
+        type: (data as any).type,
+        updated_at: (data as any).updated_at
       });
-      
+
       setShowEditForm(false);
       
-      toast({
-        title: "Account updated",
-        description: "Account information has been saved successfully.",
+      toast({ 
+        title: 'Saved', 
+        description: 'Account updated successfully.' 
       });
-    } catch (error: any) {
-      console.error('Failed to update account:', error);
-      toast({
-        title: "Error updating account",
-        description: error.message || "Failed to update account information.",
-        variant: "destructive",
+    } catch (e: any) {
+      toast({ 
+        title: 'Error saving', 
+        description: e.message ?? String(e), 
+        variant: 'destructive' 
       });
     } finally {
       setFormLoading(false);
     }
   };
+
+  // Realtime subscription to keep UI in sync
+  useEffect(() => {
+    const ch = supabase
+      .channel('realtime:accounts')
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'accounts' },
+        (payload) => {
+          const row = payload.new as any;
+          if (row.id === accountId) {
+            setAccount(row);
+          }
+          updateRecentlyAccessedAccount(row);
+        }
+      ).subscribe();
+    
+    return () => { 
+      supabase.removeChannel(ch); 
+    };
+  }, [accountId]);
 
   if (authLoading) {
     return (
