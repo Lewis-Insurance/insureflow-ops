@@ -1623,6 +1623,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_backup_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
         Returns: boolean
@@ -1634,6 +1638,14 @@ export type Database = {
       is_staff: {
         Args: { uid: string }
         Returns: boolean
+      }
+      log_profile_access: {
+        Args: { action_type: string; details_json?: Json; target_id: string }
+        Returns: undefined
+      }
+      normalize_phone_number: {
+        Args: { phone_input: string }
+        Returns: string
       }
       set_user_role: {
         Args: {

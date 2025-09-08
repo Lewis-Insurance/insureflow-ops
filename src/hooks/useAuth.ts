@@ -10,6 +10,13 @@ interface UserProfile {
   phone: string | null;
   is_staff: boolean;
   created_at: string;
+  mfa_enabled?: boolean;
+  phone_verified?: boolean;
+  notification_email?: boolean;
+  notification_sms?: boolean;
+  timezone?: string;
+  locale?: string;
+  avatar_url?: string | null;
 }
 
 export function useAuth() {
@@ -31,7 +38,7 @@ export function useAuth() {
             try {
               const { data: profileData } = await supabase
                 .from('profiles')
-                .select('id, full_name, role, phone, is_staff, created_at')
+                .select('*')
                 .eq('id', session.user.id)
                 .single();
               
