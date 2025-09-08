@@ -43,7 +43,9 @@ export default function AccountDetail() {
       setLoading(true);
       try {
         const accountData = await fetchAccountDetails(accountId);
-        setAccount(accountData);
+        if (accountData) {
+          setAccount(accountData);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -532,8 +534,8 @@ function CommunicationsTab({ calls, messages }: { calls: CallSession[]; messages
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   {comm.type === 'call' 
-                    ? `${comm.from_number} → ${comm.to_number}${(comm as any).duration_seconds ? ` (${Math.round((comm as any).duration_seconds / 60)}m)` : ''}`
-                    : `${(comm as any).direction === 'in' ? 'Received' : 'Sent'}: ${(comm as any).body || 'No content'}`
+                    ? `${comm.from_number} → ${comm.to_number}${(comm as CallSession).duration_seconds ? ` (${Math.round((comm as CallSession).duration_seconds / 60)}m)` : ''}`
+                    : `${(comm as SMSMessage).direction === 'in' ? 'Received' : 'Sent'}: ${(comm as SMSMessage).body || 'No content'}`
                   }
                 </p>
               </div>

@@ -26,7 +26,7 @@ export function BulkActionsBar({
 }: BulkActionsBarProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string>('');
-  const [actionParams, setActionParams] = useState<Record<string, any>>({});
+  const [actionParams, setActionParams] = useState<Record<string, string | number>>({});
 
   if (selectedAccounts.length === 0) return null;
 

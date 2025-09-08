@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, X } from 'lucide-react';
-import type { CRMFilters } from '@/types/crm';
+import type { CRMFilters, FilterUpdateFunction } from '@/types/crm-enhanced';
 
 interface AccountSearchProps {
   filters: CRMFilters;
@@ -24,7 +24,7 @@ const US_STATES = [
 export function AccountSearch({ filters, onFiltersChange, onSearch, loading }: AccountSearchProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const updateFilter = (key: keyof CRMFilters, value: any) => {
+  const updateFilter: FilterUpdateFunction = (key, value) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
@@ -80,7 +80,7 @@ export function AccountSearch({ filters, onFiltersChange, onSearch, loading }: A
             <label className="text-sm font-medium mb-2 block">Account Type</label>
             <Select 
               value={filters.type || 'all'} 
-              onValueChange={(value) => updateFilter('type', value === 'all' ? undefined : value)}
+              onValueChange={(value: string) => updateFilter('type', value === 'all' ? undefined : value as 'household' | 'business' | 'all')}
             >
               <SelectTrigger>
                 <SelectValue placeholder="All types" />

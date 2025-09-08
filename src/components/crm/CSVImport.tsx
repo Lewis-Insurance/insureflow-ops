@@ -102,7 +102,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
       const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
       const data = lines.slice(1).map((line, index) => {
         const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        const row: any = { _row_number: index + 2 };
+        const row: Record<string, string | number | boolean | null> = { _row_number: index + 2 };
         headers.forEach((header, i) => {
           row[header] = values[i] || '';
         });
@@ -147,7 +147,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
         // Real CSV processing using Supabase RPC
-        const { data, error } = await supabase.rpc('process_csv_batch' as any, { 
+        const { data, error } = await supabase.rpc('process_csv_batch', { 
           batch_id: 'temp-batch-id',
           import_type: 'accounts',
           field_mapping: fieldMapping

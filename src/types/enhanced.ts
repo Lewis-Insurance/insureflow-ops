@@ -10,6 +10,9 @@ export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Account = Database['public']['Tables']['accounts']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
 export type Policy = Database['public']['Tables']['policies']['Row'];
+export type Claim = Database['public']['Tables']['claims']['Row'];
+export type CallSession = Database['public']['Tables']['call_sessions']['Row'];
+export type SMSMessage = Database['public']['Tables']['sms_messages']['Row'];
 export type Task = Database['public']['Tables']['tasks']['Row'];
 export type Event = Database['public']['Tables']['events']['Row'];
 
@@ -206,34 +209,43 @@ export type FilterUpdateFunction = <K extends keyof CRMFilters>(
   value: CRMFilters[K]
 ) => void;
 
-// CRM Filter types
+// CRM Filter types - compatible with original CRM types
 export interface CRMFilters {
   search?: string;
-  type?: string;
+  type?: 'household' | 'business' | 'all';
   state?: string;
   tags?: string[];
+  hasActivePolicies?: boolean;
+  hasOpenClaims?: boolean;
   dateRange?: {
     start: string;
     end: string;
   };
 }
 
-// Hook return types
-export interface CRMDataHook {
-  account: Account | null;
-  contacts: Contact[];
-  policies: Policy[];
-  claims: Database['public']['Tables']['claims']['Row'][];
-  calls: Database['public']['Tables']['call_sessions']['Row'][];
-  messages: Database['public']['Tables']['sms_messages']['Row'][];
-  tasks: Task[];
-  events: Event[];
-  loading: boolean;
-  fetchAccountData: (accountId: string) => Promise<void>;
-  createAccount: (data: CreateAccountData) => Promise<Account | null>;
-  updateAccount: (id: string, data: UpdateAccountData) => Promise<Account | null>;
-  deleteAccount: (id: string) => Promise<boolean>;
-  createContact: (data: CreateContactData) => Promise<Contact | null>;
+// Extended account interface with related data
+export interface AccountWithDetails extends Account {
+  contacts?: Contact[];
+  policies?: Policy[];
+  claims?: Claim[];
+  calls?: CallSession[];
+  messages?: SMSMessage[];
+  tasks?: Task[];
+  events?: Event[];
+}
+
+// Saved view interface - compatible with original CRM types
+export interface SavedView {
+  id: string;
+  name: string;
+  description?: string;
+  filters: CRMFilters;
+  view_type: string;
+  created_by: string;
+  organization_shared: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // Event payload types (replacing payload?: any)

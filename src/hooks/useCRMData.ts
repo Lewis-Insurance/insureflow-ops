@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage, handleSupabaseError } from '@/lib/errors';
+import type { Database } from '@/integrations/supabase/types';
 import type {
   Account, 
   Contact, 
@@ -14,8 +15,10 @@ import type {
   AccountWithDetails,
   CRMFilters,
   CreateAccountData,
-  CreateContactData
-} from '@/types/crm';
+  CreateContactData,
+  UpdateAccountData,
+  SupabaseErrorDetails
+} from '@/types/crm-enhanced';
 
 export function useCRMData() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -142,8 +145,8 @@ export function useCRMData() {
       const account: AccountWithDetails = {
         ...accountResult.data,
         contacts: contactsResult.data || [],
-        policies: (policiesResult.data || []) as any[],
-        claims: (claimsResult.data || []) as any[],
+        policies: (policiesResult.data || []) as Policy[],
+        claims: (claimsResult.data || []) as Claim[],
         calls: callsResult.data || [],
         messages: messagesResult.data || [],
         tasks: tasksResult.data || [],
@@ -151,11 +154,11 @@ export function useCRMData() {
       };
 
       return account;
-    } catch (err) {
-      const errorMessage = asMessage(err, 'Failed to fetch accounts');
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to fetch account details');
       toast({
         title: "Error loading account details",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return null;
@@ -194,17 +197,18 @@ export function useCRMData() {
       fetchAccounts();
 
       return account;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to create account');
       toast({
         title: "Error creating account",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return null;
     }
   }, [fetchAccounts]);
 
-  const updateAccount = useCallback(async (id: string, data: Partial<CreateAccountData>): Promise<boolean> => {
+  const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('accounts')
@@ -232,10 +236,11 @@ export function useCRMData() {
       fetchAccounts();
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to update account');
       toast({
         title: "Error updating account",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return false;
@@ -271,10 +276,11 @@ export function useCRMData() {
       });
 
       return contact;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to create contact');
       toast({
         title: "Error creating contact",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return null;
@@ -296,10 +302,11 @@ export function useCRMData() {
       });
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to update contact');
       toast({
         title: "Error updating contact",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return false;
@@ -334,10 +341,11 @@ export function useCRMData() {
       fetchAccounts();
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = asMessage(err, 'Failed to delete account');
       toast({
         title: "Error deleting account",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return false;

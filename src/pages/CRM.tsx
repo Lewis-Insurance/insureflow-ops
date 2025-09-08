@@ -16,7 +16,14 @@ import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
 import { memoize } from '@/lib/performance';
-import type { CRMFilters, Account, SavedView, BulkAction } from '@/types/crm';
+import type { 
+  CRMFilters, 
+  Account, 
+  SavedView, 
+  BulkAction,
+  CreateAccountData,
+  UpdateAccountData
+} from '@/types/crm-enhanced';
 
 // Memoized stats calculation
 const calculateStats = memoize((accounts: Account[]) => ({
@@ -102,7 +109,7 @@ const CRMContent = memo(() => {
   );
 
   // Memoized handlers with proper dependencies
-  const handleCreateAccount = useCallback(async (data: any) => {
+  const handleCreateAccount = useCallback(async (data: CreateAccountData) => {
     setFormLoading(true);
     try {
       await createAccount(data);
@@ -112,7 +119,7 @@ const CRMContent = memo(() => {
     }
   }, [createAccount]);
 
-  const handleEditAccount = useCallback(async (data: any) => {
+  const handleEditAccount = useCallback(async (data: UpdateAccountData) => {
     if (!editingAccount) return;
     
     setFormLoading(true);

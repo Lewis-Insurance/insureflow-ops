@@ -60,7 +60,7 @@ export function NotificationSettings() {
     }
   }, [profile]);
 
-  const updatePreference = (key: keyof NotificationPreferences, value: any) => {
+  const updatePreference = (key: keyof NotificationPreferences, value: boolean | string) => {
     setPreferences(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
@@ -152,7 +152,7 @@ export function NotificationSettings() {
               </div>
               <Switch
                 checked={preferences.notification_email}
-                onCheckedChange={(checked) => updatePreference('notification_email', checked)}
+                  onCheckedChange={(checked) => updatePreference('notification_email', checked === true)}
               />
             </div>
 
@@ -188,7 +188,7 @@ export function NotificationSettings() {
               </div>
               <Switch
                 checked={preferences.notification_sms}
-                onCheckedChange={(checked) => updatePreference('notification_sms', checked)}
+                onCheckedChange={(checked) => updatePreference('notification_sms', checked === true)}
                 disabled={!profile?.phone_verified}
               />
             </div>
