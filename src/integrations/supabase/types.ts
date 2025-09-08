@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_tags: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          tag_name: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_name: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           address_line1: string | null
@@ -25,6 +57,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          source: string | null
           state: string | null
           tin_last4: string | null
           type: Database["public"]["Enums"]["account_type"]
@@ -41,6 +74,7 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          source?: string | null
           state?: string | null
           tin_last4?: string | null
           type: Database["public"]["Enums"]["account_type"]
@@ -57,6 +91,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          source?: string | null
           state?: string | null
           tin_last4?: string | null
           type?: Database["public"]["Enums"]["account_type"]
@@ -92,6 +127,60 @@ export type Database = {
           entity_id?: string | null
           id?: number
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      bulk_actions: {
+        Row: {
+          action_type: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          entity_ids: string[]
+          entity_type: string
+          error_count: number | null
+          errors: Json | null
+          id: string
+          parameters: Json
+          progress: number | null
+          started_at: string | null
+          status: string
+          success_count: number | null
+          total_count: number
+        }
+        Insert: {
+          action_type: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          entity_ids: string[]
+          entity_type: string
+          error_count?: number | null
+          errors?: Json | null
+          id?: string
+          parameters?: Json
+          progress?: number | null
+          started_at?: string | null
+          status?: string
+          success_count?: number | null
+          total_count: number
+        }
+        Update: {
+          action_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          entity_ids?: string[]
+          entity_type?: string
+          error_count?: number | null
+          errors?: Json | null
+          id?: string
+          parameters?: Json
+          progress?: number | null
+          started_at?: string | null
+          status?: string
+          success_count?: number | null
+          total_count?: number
         }
         Relationships: []
       }
@@ -287,6 +376,38 @@ export type Database = {
           },
         ]
       }
+      contact_tags: {
+        Row: {
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          tag_name: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_name: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           account_id: string
@@ -303,6 +424,7 @@ export type Database = {
           last_name: string
           phone: string | null
           role: string | null
+          source: string | null
           updated_at: string
         }
         Insert: {
@@ -320,6 +442,7 @@ export type Database = {
           last_name: string
           phone?: string | null
           role?: string | null
+          source?: string | null
           updated_at?: string
         }
         Update: {
@@ -337,6 +460,7 @@ export type Database = {
           last_name?: string
           phone?: string | null
           role?: string | null
+          source?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -540,6 +664,45 @@ export type Database = {
           is_staff?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      saved_views: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          filters: Json
+          id: string
+          is_default: boolean
+          name: string
+          organization_shared: boolean
+          updated_at: string
+          view_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          filters?: Json
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_shared?: boolean
+          updated_at?: string
+          view_type?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          filters?: Json
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_shared?: boolean
+          updated_at?: string
+          view_type?: string
         }
         Relationships: []
       }

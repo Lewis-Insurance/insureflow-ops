@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, Users } from 'lucide-react';
 import type { Account, CreateAccountData } from '@/types/crm';
+import { COMMON_ACCOUNT_SOURCES } from '@/types/crm';
 
 interface AccountFormProps {
   open: boolean;
@@ -80,7 +81,8 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
     state: account?.state || '',
     zip_code: account?.zip_code || '',
     phone: account?.phone || '',
-    email: account?.email || ''
+    email: account?.email || '',
+    source: account?.source || ''
   });
 
   const [errors, setErrors] = useState<Partial<CreateAccountData>>({});
@@ -133,7 +135,8 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
         state: '',
         zip_code: '',
         phone: '',
-        email: ''
+        email: '',
+        source: ''
       });
       setErrors({});
     } catch (error) {
@@ -267,6 +270,22 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
                     <p className="text-sm text-destructive mt-1">{errors.email}</p>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="source">Source</Label>
+                <Select value={formData.source} onValueChange={(value) => updateField('source', value)}>
+                  <SelectTrigger id="source">
+                    <SelectValue placeholder="How did they find you?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_ACCOUNT_SOURCES.map((source) => (
+                      <SelectItem key={source} value={source}>
+                        {source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

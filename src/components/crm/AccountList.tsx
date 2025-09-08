@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, Users, Phone, Mail, MapPin, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -14,9 +15,18 @@ interface AccountListProps {
   loading?: boolean;
   onEdit?: (account: Account) => void;
   onDelete?: (accountId: string) => void;
+  selectedAccounts?: Account[];
+  onAccountSelection?: (account: Account, selected: boolean) => void;
 }
 
-export function AccountList({ accounts, loading, onEdit, onDelete }: AccountListProps) {
+export function AccountList({ 
+  accounts, 
+  loading, 
+  onEdit, 
+  onDelete,
+  selectedAccounts = [],
+  onAccountSelection
+}: AccountListProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
@@ -73,23 +83,41 @@ export function AccountList({ accounts, loading, onEdit, onDelete }: AccountList
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {accounts.map((account) => (
-          <Card key={account.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2">
-                  {account.type === 'business' ? (
-                    <Building2 className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Users className="h-5 w-5 text-primary" />
-                  )}
-                  <div>
-                    <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {account.type}
-                    </Badge>
+        {accounts.map((account) => {
+          const isSelected = selectedAccounts?.some(selected => selected.id === account.id) || false;
+          
+          return (
+            <Card key={account.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2">
+                    {onAccountSelection && (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => 
+                          onAccountSelection(account, checked as boolean)
+                        }
+                      />
+                    )}
+                    {account.type === 'business' ? (
+                      <Building2 className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Users className="h-5 w-5 text-primary" />
+                    )}
+                    <div>
+                      <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {account.type}
+                        </Badge>
+                        {account.source && (
+                          <Badge variant="outline" className="text-xs">
+                            {account.source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
@@ -161,7 +189,8 @@ export function AccountList({ accounts, loading, onEdit, onDelete }: AccountList
               </div>
             </CardContent>
           </Card>
-        ))}
+        );
+      })}
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

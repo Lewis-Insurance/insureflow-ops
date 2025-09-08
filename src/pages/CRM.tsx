@@ -7,8 +7,10 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountSearch } from '@/components/crm/AccountSearch';
 import { AccountList } from '@/components/crm/AccountList';
 import { AccountForm } from '@/components/crm/AccountForm';
+import { SavedViewsManager } from '@/components/crm/SavedViewsManager';
+import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
 import { useCRMData } from '@/hooks/useCRMData';
-import type { CRMFilters, Account } from '@/types/crm';
+import type { CRMFilters, Account, SavedView, BulkAction } from '@/types/crm';
 
 export default function CRM() {
   const {
@@ -25,6 +27,8 @@ export default function CRM() {
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   const handleSearch = () => {
     fetchAccounts(filters);
@@ -58,6 +62,44 @@ export default function CRM() {
 
   const handleDelete = async (accountId: string) => {
     await deleteAccount(accountId);
+  };
+
+  const handleViewSave = async (view: Omit<SavedView, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+    // In a real implementation, this would make an API call
+    const newView: SavedView = {
+      ...view,
+      id: `view-${Date.now()}`,
+      created_by: 'current-user-id',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setSavedViews(prev => [...prev, newView]);
+  };
+
+  const handleViewSelect = (view: SavedView) => {
+    setFilters(view.filters as CRMFilters);
+    fetchAccounts(view.filters as CRMFilters);
+  };
+
+  const handleViewDelete = (viewId: string) => {
+    setSavedViews(prev => prev.filter(v => v.id !== viewId));
+  };
+
+  const handleBulkAction = async (action: Omit<BulkAction, 'id' | 'created_at' | 'created_by' | 'status' | 'progress' | 'success_count' | 'error_count' | 'errors'>) => {
+    // In a real implementation, this would start a background job
+    console.log('Bulk action:', action);
+  };
+
+  const handleAccountSelection = (account: Account, selected: boolean) => {
+    setSelectedAccounts(prev => 
+      selected 
+        ? [...prev, account]
+        : prev.filter(a => a.id !== account.id)
+    );
+  };
+
+  const handleSelectionClear = () => {
+    setSelectedAccounts([]);
   };
 
   // Calculate stats
@@ -124,6 +166,19 @@ export default function CRM() {
           </Card>
         </div>
 
+        {/* Saved Views */}
+        <Card>
+          <CardContent className="pt-6">
+            <SavedViewsManager
+              currentFilters={filters}
+              savedViews={savedViews}
+              onViewSelect={handleViewSelect}
+              onViewSave={handleViewSave}
+              onViewDelete={handleViewDelete}
+            />
+          </CardContent>
+        </Card>
+
         {/* Search and Filters */}
         <Card>
           <CardHeader>
@@ -154,6 +209,13 @@ export default function CRM() {
           </Card>
         )}
 
+        {/* Bulk Actions Bar */}
+        <BulkActionsBar
+          selectedAccounts={selectedAccounts}
+          onSelectionClear={handleSelectionClear}
+          onBulkAction={handleBulkAction}
+        />
+
         {/* Results */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -173,6 +235,8 @@ export default function CRM() {
             loading={loading}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            selectedAccounts={selectedAccounts}
+            onAccountSelection={handleAccountSelection}
           />
         </div>
 

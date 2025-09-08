@@ -10,6 +10,8 @@ export interface Account {
   zip_code?: string;
   phone?: string;
   email?: string;
+  source?: string;
+  tags?: AccountTag[];
   created_at: string;
   updated_at: string;
   deleted_at?: string;
@@ -24,6 +26,8 @@ export interface Contact {
   phone?: string;
   date_of_birth?: string;
   role?: string;
+  source?: string;
+  tags?: ContactTag[];
   consent_sms: boolean;
   consent_voice: boolean;
   consent_sms_at?: string;
@@ -152,6 +156,7 @@ export interface CreateAccountData {
   zip_code?: string;
   phone?: string;
   email?: string;
+  source?: string;
 }
 
 export interface CreateContactData {
@@ -162,6 +167,74 @@ export interface CreateContactData {
   phone?: string;
   date_of_birth?: string;
   role?: string;
+  source?: string;
   consent_sms?: boolean;
   consent_voice?: boolean;
 }
+
+// Tags and other enhancements
+export interface AccountTag {
+  id: string;
+  account_id: string;
+  tag_name: string;
+  created_at: string;
+  created_by?: string;
+}
+
+export interface ContactTag {
+  id: string;
+  contact_id: string;
+  tag_name: string;
+  created_at: string;
+  created_by?: string;
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  description?: string;
+  filters: Record<string, any>;
+  view_type: string;
+  created_by: string;
+  organization_shared: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BulkAction {
+  id: string;
+  action_type: string;
+  entity_type: string;
+  entity_ids: string[];
+  parameters: Record<string, any>;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  progress: number;
+  total_count: number;
+  success_count: number;
+  error_count: number;
+  errors: any[];
+  created_by: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+}
+
+export const COMMON_ACCOUNT_SOURCES = [
+  'web_form',
+  'referral', 
+  'walk_in',
+  'phone_call',
+  'email',
+  'marketing_campaign',
+  'existing_client'
+];
+
+export const COMMON_CONTACT_SOURCES = [
+  'primary_account',
+  'referral',
+  'walk_in', 
+  'phone_call',
+  'email',
+  'existing_contact'
+];
