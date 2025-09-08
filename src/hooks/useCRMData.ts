@@ -261,7 +261,7 @@ export function useCRMData() {
     try {
       console.log('useCRMData: updateAccount called with:', { id, data });
       
-      // SECURITY FIX: Check authentication first
+      // Check authentication - RPC will handle permissions
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('Authentication required');
@@ -269,11 +269,7 @@ export function useCRMData() {
 
       console.log('useCRMData: User authenticated, updating account...');
       
-      // Test auth context
-      const { data: authTest } = await supabase.rpc('test_auth_context');
-      console.log('useCRMData: Auth context test:', authTest);
-      
-      // Use secure update function that maintains auth context
+      // Use the new secure update RPC that handles staff permissions
       const { data: updateResult, error } = await supabase.rpc('update_account_secure', {
         account_id: id,
         account_data: data
