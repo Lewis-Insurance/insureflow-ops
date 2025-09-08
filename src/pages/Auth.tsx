@@ -9,11 +9,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Shield, AlertCircle } from 'lucide-react';
 
-// Feature flags
-const ENABLE_SIGNUP = true; // Set to false for invite-only organizations
-const REQUIRE_MFA = false; // Set to true if MFA is mandatory
-const REQUIRE_PHONE_VERIFICATION = false; // Set to true if phone verification is mandatory
-const MIN_PASSWORD_LENGTH = 8;
+// Feature flags via environment variables
+const ENABLE_SIGNUP = import.meta.env.VITE_ENABLE_SIGNUP === 'true';
+const REQUIRE_MFA = import.meta.env.VITE_REQUIRE_MFA === 'true';
+const REQUIRE_PHONE_VERIFICATION = import.meta.env.VITE_REQUIRE_PHONE === 'true';
+const MIN_PASSWORD_LENGTH = Number(import.meta.env.VITE_MIN_PW_LEN ?? 12);
 
 export default function Auth() {
   const { signIn, signUp, loading, isAuthenticated, user, profile } = useAuth();
@@ -34,10 +34,22 @@ export default function Auth() {
     fullName: ''
   });
 
-  // Check if authenticated user needs additional setup
-  if (isAuthenticated && user && profile) {
-    const needsMfaSetup = REQUIRE_MFA && !profile.mfa_enabled;
-    const needsPhoneVerification = REQUIRE_PHONE_VERIFICATION && !profile.phone_verified;
+  // Prevent redirect flicker while auth is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if authenticated user needs additional setup - enforce security setup
+  if (isAuthenticated && !loading) {
+    const needsMfaSetup = REQUIRE_MFA && !profile?.mfa_enabled;
+    const needsPhoneVerification = REQUIRE_PHONE_VERIFICATION && !profile?.phone_verified;
     
     if (needsMfaSetup || needsPhoneVerification) {
       return <Navigate to="/profile?tab=security" replace />;
@@ -94,13 +106,21 @@ export default function Auth() {
     setIsLoading(true);
     setSignInErrors({});
     
-    const result = await signIn(signInData.email, signInData.password);
-    
-    if (result.error) {
-      setSignInErrors({ general: result.error.message });
+    try {
+      // Normalize and trim input before submit
+      const email = signInData.email.trim().toLowerCase();
+      const password = signInData.password.trim();
+      
+      const result = await signIn(email, password);
+      
+      if (result.error) {
+        // Reduce auth error leakage - use generic message
+        setSignInErrors({ general: 'Invalid email or password.' });
+      }
+    } finally {
+      // Always clear loading with finally
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -111,13 +131,25 @@ export default function Auth() {
     setIsLoading(true);
     setSignUpErrors({});
     
-    const result = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-    
-    if (result.error) {
-      setSignUpErrors({ general: result.error.message });
+    try {
+      // Normalize and trim input before submit
+      const email = signUpData.email.trim().toLowerCase();
+      const password = signUpData.password.trim();
+      const fullName = signUpData.fullName.trim();
+      
+      const result = await signUp(email, password, fullName);
+      
+      if (result.error) {
+        // Reduce auth error leakage - use generic message for most errors
+        const errorMessage = result.error.message.includes('already registered') 
+          ? 'An account with this email already exists.'
+          : 'Unable to create account. Please try again.';
+        setSignUpErrors({ general: errorMessage });
+      }
+    } finally {
+      // Always clear loading with finally
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
@@ -156,7 +188,7 @@ export default function Auth() {
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   {signInErrors.general && (
-                    <Alert variant="destructive">
+                    <Alert variant="destructive" role="alert">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>{signInErrors.general}</AlertDescription>
                     </Alert>
@@ -164,22 +196,23 @@ export default function Auth() {
                   
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                      value={signInData.email}
-                      onChange={(e) => {
-                        setSignInData({ ...signInData, email: e.target.value });
-                        if (signInErrors.email) {
-                          setSignInErrors({ ...signInErrors, email: '' });
-                        }
-                      }}
-                      aria-invalid={!!signInErrors.email}
-                      aria-describedby={signInErrors.email ? "signin-email-error" : undefined}
-                      required
-                    />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        inputMode="email"
+                        placeholder="Enter your email"
+                        autoComplete="email"
+                        value={signInData.email}
+                        onChange={(e) => {
+                          setSignInData({ ...signInData, email: e.target.value });
+                          if (signInErrors.email) {
+                            setSignInErrors({ ...signInErrors, email: '' });
+                          }
+                        }}
+                        aria-invalid={!!signInErrors.email}
+                        aria-describedby={signInErrors.email ? "signin-email-error" : undefined}
+                        required
+                      />
                     {signInErrors.email && (
                       <p id="signin-email-error" className="text-sm text-destructive">
                         {signInErrors.email}
@@ -227,7 +260,7 @@ export default function Auth() {
                 <TabsContent value="signup">
                   <form onSubmit={handleSignUp} className="space-y-4">
                     {signUpErrors.general && (
-                      <Alert variant="destructive">
+                      <Alert variant="destructive" role="alert">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>{signUpErrors.general}</AlertDescription>
                       </Alert>
@@ -263,6 +296,7 @@ export default function Auth() {
                       <Input
                         id="signup-email"
                         type="email"
+                        inputMode="email"
                         placeholder="Enter your email"
                         autoComplete="email"
                         value={signUpData.email}
