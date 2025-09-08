@@ -24,6 +24,7 @@ import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
 import { memoize } from '@/lib/performance';
 import { usePermissions } from '@/hooks/usePermissions';
 import { SearchResult } from '@/hooks/useGlobalSearch';
+import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
 import type { 
   CRMFilters, 
   SavedView, 
@@ -193,11 +194,33 @@ const CRMContent = memo(() => {
   }, [fetchAccounts]);
 
   const handleGlobalSearchSelect = useCallback((result: SearchResult) => {
-    // TODO: Implement navigation to selected entity based on result type
-    // For now, just show the result in dev mode for debugging
-    if (import.meta.env.DEV) {
-      console.log('Search result selected:', result);
+    // Navigate to the appropriate detail page based on result type
+    if (result.entity_type === 'account') {
+      // Navigate to account detail page
+      window.location.href = `/crm/accounts/${result.id}`;
+    } else if (result.entity_type === 'contact') {
+      // For contacts, navigate to their account's detail page if available
+      // For now, we'll add the contact to recently accessed
+      addToRecentlyAccessed({
+        id: result.id,
+        name: result.label,
+        type: 'contact',
+        email: result.email || undefined,
+        phone: result.phone || undefined
+      });
+    } else if (result.entity_type === 'business') {
+      // Add business to recently accessed
+      addToRecentlyAccessed({
+        id: result.id,
+        name: result.label,
+        type: 'account',
+        accountType: 'business',
+        email: result.email || undefined,
+        phone: result.phone || undefined
+      });
     }
+    
+    console.log('Navigating to:', result);
   }, []);
 
   return (
