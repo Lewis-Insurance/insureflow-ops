@@ -48,7 +48,17 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-4">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
+            <img 
+              src="/lovable-uploads/60657486-5dba-4be4-9825-d2c9f4b8630e.png" 
+              alt="Lewis Insurance"
+              className="h-12 w-12"
+              onError={(e) => {
+                // Fallback if image fails to load
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl items-center justify-center shadow-lg hidden">
               <span className="text-white font-bold text-2xl">L</span>
             </div>
             <div>
