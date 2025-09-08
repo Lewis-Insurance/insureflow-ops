@@ -47,8 +47,11 @@ export function useCRMData() {
         query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
       }
 
+      // Debug logging
+      console.debug('fetchAccounts filters ->', filters);
+
       if (filters?.type && filters.type !== 'all') {
-        // Map UI 'household' to DB 'individual'
+        // UI says 'household' | 'business' ; DB stores 'individual' | 'business'
         const dbType = filters.type === 'household' ? 'individual' : 'business';
         query = query.eq('account_type', dbType);
       }

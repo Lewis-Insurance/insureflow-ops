@@ -39,12 +39,19 @@ import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessag
 type TypePayload = {
   type?: 'business' | 'household';
   account_type?: 'business' | 'individual';
+  accountCategory?: 'business' | 'household'; // form field alias
   [k: string]: any;
 };
 
 function normalizeTypeForRPC(input: TypePayload): TypePayload {
   const out = { ...input };
-  // Derive the pair if only one is present
+  
+  // Map any UI aliases to canonical keys FIRST
+  if (out.accountCategory && !out.type && !out.account_type) {
+    out.type = out.accountCategory; // 'business' | 'household'
+  }
+  
+  // Derive the pair (RPC will also map, but sending both is safest)
   if (out.type && !out.account_type) {
     out.account_type = out.type === 'business' ? 'business' : 'individual';
   }
@@ -65,20 +72,27 @@ export default function AccountDetail() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { fetchAccountDetails, fetchAccounts } = useCRMData();
   
-  // Guard for invalid UUID
-  if (!isUuid) {
+  const [account, setAccount] = useState<AccountWithDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+
+  // Show soft warning if no candidate ID, but don't block the page
+  if (!hasCandidateId) {
     return (
       <AppLayout>
         <Card className="p-6">
           <CardContent>
-            <p className="text-destructive">Invalid account ID</p>
+            <p className="text-muted-foreground">No account ID provided in URL</p>
+            <Button asChild className="mt-4">
+              <Link to="/crm">Back to CRM</Link>
+            </Button>
           </CardContent>
         </Card>
       </AppLayout>
     );
   }
-  
-  const [account, setAccount] = useState<AccountWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -118,16 +132,16 @@ export default function AccountDetail() {
   const handleEditAccount = async (formValues: any) => {
     setFormLoading(true);
     try {
-      if (!isUuid) throw new Error('No account id');
+      if (!hasCandidateId) throw new Error('No account id');
 
-      const payload = normalizeTypeForRPC(formValues);
+      const account_data = normalizeTypeForRPC(formValues);
 
-      // Optional debug
-      console.debug('Saving account', { accountId, payload });
+      // Debug logging
+      console.debug('Saving account', { accountId, account_data });
 
       const { data, error } = await supabase.rpc('update_account_secure', {
         account_id: accountId,
-        account_data: payload,
+        account_data,
       });
 
       if (error) throw error;
