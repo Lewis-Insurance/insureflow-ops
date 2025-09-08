@@ -1,0 +1,358 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import type { 
+  Account, 
+  Contact, 
+  Policy, 
+  Claim, 
+  CallSession, 
+  SMSMessage, 
+  ActivityEvent, 
+  Task,
+  AccountWithDetails,
+  CRMFilters,
+  CreateAccountData,
+  CreateContactData
+} from '@/types/crm';
+
+export function useCRMData() {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAccounts = useCallback(async (filters?: CRMFilters) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let query = supabase
+        .from('accounts')
+        .select('*')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (filters?.search) {
+        query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+      }
+
+      if (filters?.type && filters.type !== 'all') {
+        query = query.eq('type', filters.type);
+      }
+
+      if (filters?.state) {
+        query = query.eq('state', filters.state);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setAccounts(data || []);
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: "Error loading accounts",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchAccountDetails = useCallback(async (accountId: string): Promise<AccountWithDetails | null> => {
+    try {
+      // Fetch account with all related data
+      const [
+        accountResult,
+        contactsResult,
+        policiesResult,
+        claimsResult,
+        callsResult,
+        messagesResult,
+        tasksResult,
+        eventsResult
+      ] = await Promise.all([
+        supabase
+          .from('accounts')
+          .select('*')
+          .eq('id', accountId)
+          .single(),
+        supabase
+          .from('contacts')
+          .select('*')
+          .eq('account_id', accountId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('policies')
+          .select(`
+            *,
+            carrier:carriers(id, name)
+          `)
+          .eq('account_id', accountId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('claims')
+          .select(`
+            *,
+            policy:policies!inner(
+              id,
+              policy_number,
+              line_of_business,
+              account_id,
+              carrier:carriers(name)
+            )
+          `)
+          .eq('policy.account_id', accountId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('call_sessions')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('started_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('sms_messages')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('tasks')
+          .select('*')
+          .eq('entity_id', accountId)
+          .eq('entity_type', 'account')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('events')
+          .select('*')
+          .eq('entity_id', accountId)
+          .eq('entity_type', 'account')
+          .order('occurred_at', { ascending: false })
+          .limit(50)
+      ]);
+
+      if (accountResult.error) throw accountResult.error;
+      if (!accountResult.data) return null;
+
+      const account: AccountWithDetails = {
+        ...accountResult.data,
+        contacts: contactsResult.data || [],
+        policies: (policiesResult.data || []) as any[],
+        claims: (claimsResult.data || []) as any[],
+        calls: callsResult.data || [],
+        messages: messagesResult.data || [],
+        tasks: tasksResult.data || [],
+        events: eventsResult.data || []
+      };
+
+      return account;
+    } catch (err: any) {
+      toast({
+        title: "Error loading account details",
+        description: err.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, []);
+
+  const createAccount = useCallback(async (data: CreateAccountData): Promise<Account | null> => {
+    try {
+      const { data: account, error } = await supabase
+        .from('accounts')
+        .insert(data)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log account creation event
+      await supabase
+        .from('events')
+        .insert({
+          type: 'account_created',
+          entity_type: 'account',
+          entity_id: account.id,
+          payload: { name: data.name, type: data.type }
+        });
+
+      toast({
+        title: "Account created",
+        description: `${data.name} has been added successfully.`,
+      });
+
+      // Refresh accounts list
+      fetchAccounts();
+
+      return account;
+    } catch (err: any) {
+      toast({
+        title: "Error creating account",
+        description: err.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, [fetchAccounts]);
+
+  const updateAccount = useCallback(async (id: string, data: Partial<CreateAccountData>): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('accounts')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Log account update event
+      await supabase
+        .from('events')
+        .insert({
+          type: 'account_updated',
+          entity_type: 'account',
+          entity_id: id,
+          payload: data
+        });
+
+      toast({
+        title: "Account updated",
+        description: "Account information has been updated successfully.",
+      });
+
+      // Refresh accounts list
+      fetchAccounts();
+
+      return true;
+    } catch (err: any) {
+      toast({
+        title: "Error updating account",
+        description: err.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [fetchAccounts]);
+
+  const createContact = useCallback(async (data: CreateContactData): Promise<Contact | null> => {
+    try {
+      const { data: contact, error } = await supabase
+        .from('contacts')
+        .insert(data)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log contact creation event
+      await supabase
+        .from('events')
+        .insert({
+          type: 'contact_created',
+          entity_type: 'account',
+          entity_id: data.account_id,
+          payload: { 
+            contact_name: `${data.first_name} ${data.last_name}`,
+            role: data.role 
+          }
+        });
+
+      toast({
+        title: "Contact added",
+        description: `${data.first_name} ${data.last_name} has been added successfully.`,
+      });
+
+      return contact;
+    } catch (err: any) {
+      toast({
+        title: "Error creating contact",
+        description: err.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, []);
+
+  const updateContact = useCallback(async (id: string, data: Partial<CreateContactData>): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Contact updated",
+        description: "Contact information has been updated successfully.",
+      });
+
+      return true;
+    } catch (err: any) {
+      toast({
+        title: "Error updating contact",
+        description: err.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, []);
+
+  const deleteAccount = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('accounts')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Log account deletion event
+      await supabase
+        .from('events')
+        .insert({
+          type: 'account_deleted',
+          entity_type: 'account',
+          entity_id: id,
+          payload: { deleted_at: new Date().toISOString() }
+        });
+
+      toast({
+        title: "Account deleted",
+        description: "Account has been moved to trash.",
+      });
+
+      // Refresh accounts list
+      fetchAccounts();
+
+      return true;
+    } catch (err: any) {
+      toast({
+        title: "Error deleting account",
+        description: err.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [fetchAccounts]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  return {
+    accounts,
+    loading,
+    error,
+    fetchAccounts,
+    fetchAccountDetails,
+    createAccount,
+    updateAccount,
+    createContact,
+    updateContact,
+    deleteAccount
+  };
+}
