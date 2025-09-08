@@ -30,23 +30,23 @@ export function useGlobalSearch() {
 
       // Fallback to manual search with broader criteria
       const [accountResponse, contactResponse, businessResponse] = await Promise.allSettled([
-        // Search accounts by name, email, phone, address, tin_last4
+        // Search accounts by name, email, phone, address, notes, zip, tin_last4
         supabase
           .from('accounts')
-          .select('id, name, email, phone, city, state, tin_last4')
-          .or(`name.ilike.%${trimmedQuery}%,email.ilike.%${trimmedQuery}%,phone.ilike.%${trimmedQuery}%,city.ilike.%${trimmedQuery}%,state.ilike.%${trimmedQuery}%,tin_last4.ilike.%${trimmedQuery}%`)
+          .select('id, name, email, phone, city, state, tin_last4, address_line1, address_line2, zip_code, notes')
+          .or(`name.ilike.%${trimmedQuery}%,email.ilike.%${trimmedQuery}%,phone.ilike.%${trimmedQuery}%,city.ilike.%${trimmedQuery}%,state.ilike.%${trimmedQuery}%,tin_last4.ilike.%${trimmedQuery}%,address_line1.ilike.%${trimmedQuery}%,address_line2.ilike.%${trimmedQuery}%,zip_code.ilike.%${trimmedQuery}%,notes.ilike.%${trimmedQuery}%`)
           .is('deleted_at', null)
           .limit(10),
 
-        // Search contacts by name, email, phone, SSN last 4
+        // Search contacts by name, email, phone, SSN, date of birth, address data
         supabase
           .from('contacts')
-          .select('id, first_name, last_name, email_primary, phone_mobile, phone_home, phone_work, ssn_last4')
-          .or(`first_name.ilike.%${trimmedQuery}%,last_name.ilike.%${trimmedQuery}%,email_primary.ilike.%${trimmedQuery}%,phone_mobile.ilike.%${trimmedQuery}%,phone_home.ilike.%${trimmedQuery}%,phone_work.ilike.%${trimmedQuery}%,ssn_last4.ilike.%${trimmedQuery}%`)
+          .select('id, first_name, last_name, email_primary, phone_mobile, phone_home, phone_work, ssn_last4, date_of_birth')
+          .or(`first_name.ilike.%${trimmedQuery}%,last_name.ilike.%${trimmedQuery}%,email_primary.ilike.%${trimmedQuery}%,phone_mobile.ilike.%${trimmedQuery}%,phone_home.ilike.%${trimmedQuery}%,phone_work.ilike.%${trimmedQuery}%,ssn_last4.ilike.%${trimmedQuery}%,date_of_birth::text.ilike.%${trimmedQuery}%`)
           .is('deleted_at', null)
           .limit(10),
 
-        // Search businesses by legal name and DBA
+        // Search businesses by legal name, DBA, and addresses if available
         supabase
           .from('businesses')
           .select('id, legal_name, dba')
