@@ -17,8 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Insurance industry blue theme */
-    --primary: 212 100% 47%; /* Professional insurance blue */
+    /* Lewis Insurance brand colors */
+    --primary: 213 94% 54%; /* Lewis Insurance blue */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -27,22 +27,24 @@ All colors MUST be HSL.
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 212 100% 95%; /* Light blue accent */
-    --accent-foreground: 212 100% 20%;
+    --accent: 22 100% 58%; /* Lewis Insurance orange accent */
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 212 100% 47%;
+    --ring: 213 94% 54%;
 
-    /* Insurance-specific colors */
+    /* Lewis brand specific colors */
+    --lewis-blue: 213 94% 54%;
+    --lewis-orange: 22 100% 58%;
     --success: 142 76% 36%;
     --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
+    --warning: 22 100% 58%; /* Using Lewis orange for warnings */
     --warning-foreground: 0 0% 98%;
-    --info: 212 100% 47%;
+    --info: 213 94% 54%;
     --info-foreground: 0 0% 98%;
 
     --radius: 0.5rem;
