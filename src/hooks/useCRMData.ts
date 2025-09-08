@@ -298,7 +298,7 @@ export function useCRMData() {
         description: "Account information has been updated successfully.",
       });
 
-      // Refresh accounts list
+      // Refresh accounts list and clear any cached data
       await fetchAccounts();
 
       return true;

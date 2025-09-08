@@ -84,7 +84,8 @@ export default function AccountDetail() {
     // Transform form data to match database expectations
     const updateData = {
       name: data.name,
-      type: data.account_type, // Map account_type to type field
+      type: data.type || data.account_type, // Use either type or account_type from form
+      account_type: data.account_type, // Also send account_type for backward compatibility
       tin_last4: data.tin_last4 || null,
       address_line1: data.address_line1 || null,
       address_line2: data.address_line2 || null,
