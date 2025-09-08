@@ -47,25 +47,11 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center space-x-3">
-            <img 
-              src="/lovable-uploads/60657486-5dba-4be4-9825-d2c9f4b8630e.png" 
-              alt="Lewis Insurance"
-              className="h-12 w-12"
-              onError={(e) => {
-                // Fallback if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl items-center justify-center shadow-lg hidden">
-              <span className="text-white font-bold text-2xl">L</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-primary">LEWIS</h1>
-              <p className="text-sm text-accent font-medium">INSURANCE</p>
-            </div>
-          </div>
+          <img 
+            src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png" 
+            alt="Lewis Insurance"
+            className="h-16 w-auto"
+          />
           <p className="text-muted-foreground text-center">
             Agency Management System
           </p>
