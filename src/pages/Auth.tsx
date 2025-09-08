@@ -19,9 +19,9 @@ export default function Auth() {
   const { signIn, signUp, loading, isAuthenticated, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
-  // Error states for inline validation
-  const [signInErrors, setSignInErrors] = useState<{[key: string]: string}>({});
-  const [signUpErrors, setSignUpErrors] = useState<{[key: string]: string}>({});
+  // Error states for inline validation with proper typing
+  const [signInErrors, setSignInErrors] = useState<Record<string, string>>({});
+  const [signUpErrors, setSignUpErrors] = useState<Record<string, string>>({});
 
   const [signInData, setSignInData] = useState({
     email: '',
@@ -47,7 +47,7 @@ export default function Auth() {
   }
 
   // Check if authenticated user needs additional setup - enforce security setup
-  if (isAuthenticated && !loading) {
+  if (isAuthenticated) {
     const needsMfaSetup = REQUIRE_MFA && !profile?.mfa_enabled;
     const needsPhoneVerification = REQUIRE_PHONE_VERIFICATION && !profile?.phone_verified;
     
@@ -59,7 +59,7 @@ export default function Auth() {
   }
 
   const validateSignInForm = () => {
-    const errors: {[key: string]: string} = {};
+    const errors: Record<string, string> = {};
     
     if (!signInData.email) {
       errors.email = 'Email is required';
@@ -76,7 +76,7 @@ export default function Auth() {
   };
 
   const validateSignUpForm = () => {
-    const errors: {[key: string]: string} = {};
+    const errors: Record<string, string> = {};
     
     if (!signUpData.fullName.trim()) {
       errors.fullName = 'Full name is required';
@@ -140,8 +140,8 @@ export default function Auth() {
       const result = await signUp(email, password, fullName);
       
       if (result.error) {
-        // Reduce auth error leakage - use generic message for most errors
-        const errorMessage = result.error.message.includes('already registered') 
+        // Reduce auth error leakage - use generic message and case-insensitive check
+        const errorMessage = result.error.message.toLowerCase().includes('already registered') 
           ? 'An account with this email already exists.'
           : 'Unable to create account. Please try again.';
         setSignUpErrors({ general: errorMessage });
@@ -200,6 +200,7 @@ export default function Auth() {
                         id="signin-email"
                         type="email"
                         inputMode="email"
+                        enterKeyHint="go"
                         autoCapitalize="none"
                         autoCorrect="off"
                         placeholder="Enter your email"
@@ -305,6 +306,7 @@ export default function Auth() {
                         id="signup-email"
                         type="email"
                         inputMode="email"
+                        enterKeyHint="go"
                         autoCapitalize="none"
                         autoCorrect="off"
                         placeholder="Enter your email"
