@@ -1,0 +1,252 @@
+/**
+ * Enhanced type definitions with Supabase integration
+ * Replaces 'any' usage with proper typed interfaces
+ */
+
+import type { Database } from '@/integrations/supabase/types';
+
+// Supabase table types
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Account = Database['public']['Tables']['accounts']['Row'];
+export type Contact = Database['public']['Tables']['contacts']['Row'];
+export type Policy = Database['public']['Tables']['policies']['Row'];
+export type Task = Database['public']['Tables']['tasks']['Row'];
+export type Event = Database['public']['Tables']['events']['Row'];
+
+// Form data types for creates/updates
+export type CreateAccountData = Database['public']['Tables']['accounts']['Insert'];
+export type UpdateAccountData = Database['public']['Tables']['accounts']['Update'];
+export type CreateContactData = Database['public']['Tables']['contacts']['Insert'];
+export type UpdateContactData = Database['public']['Tables']['contacts']['Update'];
+
+// API Response types (replacing any[])
+export interface CRMDataResponse {
+  accounts: Account[];
+  contacts: Contact[];
+  policies: Policy[];
+  claims: Database['public']['Tables']['claims']['Row'][];
+  calls: Database['public']['Tables']['call_sessions']['Row'][];
+  messages: Database['public']['Tables']['sms_messages']['Row'][];
+  tasks: Task[];
+  events: Event[];
+}
+
+// Error handling types (replacing error: any)
+export interface SupabaseErrorDetails {
+  message: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+}
+
+export interface AsyncOperationResult<T> {
+  data: T | null;
+  error: SupabaseErrorDetails | null;
+  loading: boolean;
+}
+
+// CSV Import types (replacing any[] and validation_errors: any[])
+export interface CSVRowData {
+  [columnName: string]: string | number | boolean | null;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code?: string;
+}
+
+export interface ImportRow {
+  id: string;
+  row_number: number;
+  raw_data: CSVRowData;
+  mapped_data?: CSVRowData;
+  validation_status: 'pending' | 'valid' | 'invalid';
+  validation_errors: ValidationError[];
+}
+
+export interface ImportBatch {
+  id: string;
+  import_type: 'accounts' | 'contacts';
+  filename: string;
+  total_rows: number;
+  processed_rows: number;
+  successful_rows: number;
+  error_rows: number;
+  status: 'staging' | 'processing' | 'completed' | 'failed';
+  field_mapping: Record<string, string>;
+  validation_errors: ValidationError[];
+  started_at?: string;
+  completed_at?: string;
+}
+
+// Device and session types (replacing any)
+export interface DeviceInfo {
+  browser?: string;
+  browserVersion?: string;
+  os?: string;
+  osVersion?: string;
+  device?: string;
+  deviceType?: 'mobile' | 'tablet' | 'desktop';
+}
+
+export interface LocationData {
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
+  timezone?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface UserSession {
+  id: string;
+  user_id: string;
+  session_token?: string;
+  ip_address?: string;
+  user_agent?: string;
+  device_info?: DeviceInfo;
+  location_data?: LocationData;
+  created_at: string;
+  last_active: string;
+  expires_at: string;
+  revoked_at?: string;
+}
+
+// Audit trail types (replacing any)
+export interface FieldChange {
+  old: string | number | boolean | null;
+  new: string | number | boolean | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  user_id?: string;
+  user_name?: string;
+  changed_fields?: Record<string, FieldChange>;
+  metadata?: Record<string, string | number | boolean>;
+  ip_address?: string;
+  user_agent?: string;
+  session_id?: string;
+  occurred_at: string;
+  created_at: string;
+}
+
+// Notification preferences (replacing any)
+export interface NotificationPreferences {
+  notification_email: boolean;
+  notification_sms: boolean;
+  marketing_emails?: boolean;
+  security_alerts?: boolean;
+  policy_reminders?: boolean;
+  claim_updates?: boolean;
+}
+
+// Access log types (replacing details: any)
+export interface AccessLogDetails {
+  action_type: 'view' | 'edit' | 'export' | 'login' | 'logout';
+  resource?: string;
+  changes?: Record<string, FieldChange>;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface AccessLog {
+  id: string;
+  target_user_id: string;
+  accessor_user_id?: string;
+  action: string;
+  details: AccessLogDetails;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+  accessor_profile?: {
+    full_name?: string;
+    role?: string;
+  };
+}
+
+// Bulk action types (replacing errors: any[])
+export interface BulkActionError {
+  entity_id: string;
+  entity_type: string;
+  error_message: string;
+  error_code?: string;
+}
+
+export interface BulkAction {
+  id: string;
+  action_type: string;
+  entity_type: string;
+  entity_ids: string[];
+  parameters: Record<string, string | number | boolean>;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  total_count: number;
+  success_count: number;
+  error_count: number;
+  errors: BulkActionError[];
+  created_by: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+// Function parameter types for hooks
+export type UpdatePreferenceFunction = (
+  key: keyof NotificationPreferences, 
+  value: boolean
+) => void;
+
+export type FilterUpdateFunction = <K extends keyof CRMFilters>(
+  key: K, 
+  value: CRMFilters[K]
+) => void;
+
+// CRM Filter types
+export interface CRMFilters {
+  search?: string;
+  type?: string;
+  state?: string;
+  tags?: string[];
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+}
+
+// Hook return types
+export interface CRMDataHook {
+  account: Account | null;
+  contacts: Contact[];
+  policies: Policy[];
+  claims: Database['public']['Tables']['claims']['Row'][];
+  calls: Database['public']['Tables']['call_sessions']['Row'][];
+  messages: Database['public']['Tables']['sms_messages']['Row'][];
+  tasks: Task[];
+  events: Event[];
+  loading: boolean;
+  fetchAccountData: (accountId: string) => Promise<void>;
+  createAccount: (data: CreateAccountData) => Promise<Account | null>;
+  updateAccount: (id: string, data: UpdateAccountData) => Promise<Account | null>;
+  deleteAccount: (id: string) => Promise<boolean>;
+  createContact: (data: CreateContactData) => Promise<Contact | null>;
+}
+
+// Event payload types (replacing payload?: any)
+export interface EventPayload {
+  [key: string]: string | number | boolean | null | EventPayload | EventPayload[];
+}
+
+export interface ActivityEvent {
+  id: string;
+  type: string;
+  entity_type?: string;
+  entity_id?: string;
+  payload?: EventPayload;
+  occurred_at: string;
+  created_at: string;
+}

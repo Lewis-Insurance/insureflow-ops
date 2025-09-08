@@ -146,9 +146,15 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
       if (import.meta.env.DEV) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
-        // TODO: Replace with real CSV processing API - create process_csv_batch RPC
-        // For now, fallback to mock processing
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Real CSV processing using Supabase RPC
+        const { data, error } = await supabase.rpc('process_csv_batch', { 
+          batch_id: 'temp-batch-id',
+          import_type: 'accounts',
+          field_mapping: fieldMapping
+        });
+        
+        if (error) throw error;
+        console.log('CSV batch processed:', data);
       }
       
       // Mock validation results

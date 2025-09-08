@@ -13,11 +13,11 @@ export function asMessage(err: unknown, fallback = 'Unexpected error'): string {
 /**
  * Handle Supabase PGRST errors specifically
  */
-export function handleSupabaseError(error: any): { message: string; shouldThrow: boolean } {
+export function handleSupabaseError(error: unknown): { message: string; shouldThrow: boolean } {
   if (!error) return { message: '', shouldThrow: false };
   
   // PGRST116 = No rows found, not really an error
-  if (error.code === 'PGRST116') {
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') {
     return { message: '', shouldThrow: false };
   }
   

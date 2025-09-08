@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage, handleSupabaseError } from '@/lib/errors';
-import type { 
+import type {
   Account, 
   Contact, 
   Policy, 
@@ -151,7 +151,8 @@ export function useCRMData() {
       };
 
       return account;
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage = asMessage(err, 'Failed to fetch accounts');
       toast({
         title: "Error loading account details",
         description: err.message,

@@ -68,10 +68,14 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         await new Promise(resolve => setTimeout(resolve, 2000));
         setDuplicateGroups(mockDuplicateGroups);
       } else {
-        // TODO: Replace with real duplicate detection API - create scan_for_duplicates RPC
-        // For now, fallback to mock data until RPC is implemented
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setDuplicateGroups(mockDuplicateGroups);
+        // Real duplicate detection using Supabase RPC
+        const { data, error } = await supabase.rpc('scan_for_duplicates', { 
+          entity_type: 'accounts',
+          similarity_threshold: 0.8
+        });
+        
+        if (error) throw error;
+        setDuplicateGroups(data?.groups || []);
       }
       
       toast({
@@ -137,9 +141,14 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
       if (import.meta.env.DEV) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
-        // TODO: Replace with real merge API - create merge_duplicate_records RPC
-        // For now, fallback to updating state directly
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Real merge using Supabase RPC
+        const { data, error } = await supabase.rpc('merge_duplicate_records', { 
+          group_id: selectedGroup.id,
+          survivor_id: selectedGroup.entity_ids[0]
+        });
+        
+        if (error) throw error;
+        console.log('Records merged:', data);
       }
       
       // Update the group status
