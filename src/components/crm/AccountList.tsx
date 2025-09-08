@@ -87,6 +87,19 @@ export function AccountList({
         {accounts.map((account) => {
           const isSelected = selectedAccounts?.some(selected => selected.id === account.id) || false;
           
+          // Defensive field reading and normalization
+          const rawType = (account as any).account_type ?? (account as any).type ?? '';
+          const normalizedType = String(rawType).trim().toLowerCase();
+          
+          const isBusinessByName = /\b(llc|inc\.?|corp\.?|co\.?|company|plc|llp|manufacturing|industries|partners?)\b/i
+            .test(account.name ?? '');
+          
+          const isBusiness = normalizedType === 'business' || isBusinessByName;
+          
+          const displayType = normalizedType
+            ? (normalizedType === 'business' ? 'business' : normalizedType)
+            : (isBusiness ? 'business' : 'individual');
+          
           return (
             <Card key={account.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
@@ -100,34 +113,16 @@ export function AccountList({
                         }
                       />
                     )}
-                     {(() => {
-                       // Unified business detection logic
-                       const isBusinessByName = /\b(llc|inc|inc\.|corp|co\.?|company|manufacturing|llp|plc)\b/i.test(account.name ?? '');
-                       const isBusiness = account.account_type === 'business' || isBusinessByName;
-                       
-                       // Choose display label, preferring DB type when present
-                       const displayType = account.account_type 
-                         ? account.account_type 
-                         : (isBusiness ? 'business' : 'individual');
-
-                       return isBusiness ? (
-                         <Building2 className="h-5 w-5 text-primary" />
-                       ) : (
-                         <Users className="h-5 w-5 text-primary" />
-                       );
-                     })()}
+                     {isBusiness ? (
+                       <Building2 className="h-5 w-5 text-primary" />
+                     ) : (
+                       <Users className="h-5 w-5 text-primary" />
+                     )}
                      <div>
                        <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
                        <div className="flex items-center gap-2">
                          <Badge variant="outline" className="text-xs capitalize">
-                           {(() => {
-                             // Reuse the same business detection logic
-                             const isBusinessByName = /\b(llc|inc|inc\.|corp|co\.?|company|manufacturing|llp|plc)\b/i.test(account.name ?? '');
-                             const displayType = account.account_type 
-                               ? account.account_type 
-                               : (isBusinessByName ? 'business' : 'individual');
-                             return displayType;
-                           })()}
+                           {displayType}
                          </Badge>
                         {account.source && (
                           <Badge variant="outline" className="text-xs">
