@@ -142,7 +142,9 @@ const CRMContent = memo(() => {
   }, [editingAccount, updateAccount]);
 
   const handleEdit = useCallback((account: Account) => {
+    console.log('Edit button clicked for account:', account);
     setEditingAccount(account);
+    console.log('editingAccount state set to:', account);
   }, []);
 
   const handleDelete = useCallback(async (accountId: string) => {
