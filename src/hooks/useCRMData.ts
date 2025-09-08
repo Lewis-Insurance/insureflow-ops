@@ -259,17 +259,21 @@ export function useCRMData() {
 
   const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {
+      console.log('useCRMData: updateAccount called with:', { id, data });
+      
       // SECURITY FIX: Check authentication first
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('Authentication required');
       }
 
+      console.log('useCRMData: User authenticated, updating account...');
       const { error } = await supabase
         .from('accounts')
         .update(data)
         .eq('id', id);
 
+      console.log('useCRMData: Update response:', { error });
       if (error) throw error;
 
       // Log account update event (fire-and-forget)
