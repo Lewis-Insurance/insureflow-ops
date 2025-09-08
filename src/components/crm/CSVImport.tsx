@@ -83,10 +83,18 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
+    // Check file extension (case-insensitive) and MIME type
+    const fileName = file.name.toLowerCase();
+    const validExtensions = ['.csv'];
+    const validMimeTypes = ['text/csv', 'application/csv', 'text/plain'];
+    
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+    const hasValidMimeType = validMimeTypes.includes(file.type);
+    
+    if (!hasValidExtension && !hasValidMimeType) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a CSV file.",
+        description: "Please upload a CSV file (.csv extension or text/csv MIME type).",
         variant: "destructive",
       });
       return;
