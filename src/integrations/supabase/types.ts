@@ -1827,6 +1827,10 @@ export type Database = {
         Args: { target_contact_id: string }
         Returns: boolean
       }
+      is_account_member: {
+        Args: { a_id: string }
+        Returns: boolean
+      }
       is_admin: {
         Args: Record<PropertyKey, never> | { uid: string }
         Returns: boolean
