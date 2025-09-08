@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { asMessage } from '@/lib/asMessage';
 import { format } from 'date-fns';
 
 interface TelephonyStats {
@@ -84,10 +85,9 @@ export function TelephonyDashboard() {
         webhook_status: 'unknown'
       });
     } catch (error) {
-      console.error('Error fetching telephony data:', error);
       toast({
         title: "Error loading telephony data",
-        description: "Failed to load telephony dashboard data",
+        description: asMessage(error, "Failed to load telephony dashboard data"),
         variant: "destructive",
       });
     } finally {

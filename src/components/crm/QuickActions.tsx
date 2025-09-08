@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Phone, MessageSquare, AlertTriangle, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { asMessage } from '@/lib/asMessage';
 import { supabase } from '@/integrations/supabase/client';
 import type { Account } from '@/types/crm-enhanced';
 
@@ -40,7 +41,7 @@ export function QuickActions({ account, onActionComplete }: QuickActionsProps) {
 
       setHasOptOut(false); // Simplified for now
     } catch (error) {
-      console.error('Error checking opt-out status:', error);
+      // Silently handle opt-out check errors - assume no opt-out
     }
   };
 
@@ -135,10 +136,9 @@ export function QuickActions({ account, onActionComplete }: QuickActionsProps) {
       setSmsOpen(false);
       onActionComplete?.();
     } catch (error) {
-      console.error('Error sending SMS:', error);
       toast({
         title: "Failed to send SMS",
-        description: "There was an error sending the message",
+        description: asMessage(error, "There was an error sending the message"),
         variant: "destructive",
       });
     } finally {

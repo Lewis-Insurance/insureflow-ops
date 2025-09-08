@@ -195,6 +195,7 @@ export type Database = {
           ended_at: string | null
           from_number: string
           id: string
+          metadata: Json | null
           recording_url: string | null
           started_at: string
           to_number: string
@@ -210,6 +211,7 @@ export type Database = {
           ended_at?: string | null
           from_number: string
           id?: string
+          metadata?: Json | null
           recording_url?: string | null
           started_at?: string
           to_number: string
@@ -225,6 +227,7 @@ export type Database = {
           ended_at?: string | null
           from_number?: string
           id?: string
+          metadata?: Json | null
           recording_url?: string | null
           started_at?: string
           to_number?: string
@@ -1372,6 +1375,7 @@ export type Database = {
           error_code: string | null
           from_number: string
           id: string
+          metadata: Json | null
           status: string | null
           to_number: string
           twilio_message_sid: string | null
@@ -1386,6 +1390,7 @@ export type Database = {
           error_code?: string | null
           from_number: string
           id?: string
+          metadata?: Json | null
           status?: string | null
           to_number: string
           twilio_message_sid?: string | null
@@ -1400,6 +1405,7 @@ export type Database = {
           error_code?: string | null
           from_number?: string
           id?: string
+          metadata?: Json | null
           status?: string | null
           to_number?: string
           twilio_message_sid?: string | null
@@ -1470,6 +1476,86 @@ export type Database = {
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telephony_settings: {
+        Row: {
+          created_at: string | null
+          forward_number: string
+          id: string
+          last_error_at: string | null
+          last_webhook_error: string | null
+          recording_enabled: boolean | null
+          twilio_phone_number: string
+          updated_at: string | null
+          webhook_status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          forward_number: string
+          id?: string
+          last_error_at?: string | null
+          last_webhook_error?: string | null
+          recording_enabled?: boolean | null
+          twilio_phone_number: string
+          updated_at?: string | null
+          webhook_status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          forward_number?: string
+          id?: string
+          last_error_at?: string | null
+          last_webhook_error?: string | null
+          recording_enabled?: boolean | null
+          twilio_phone_number?: string
+          updated_at?: string | null
+          webhook_status?: string | null
+        }
+        Relationships: []
+      }
+      twilio_consents: {
+        Row: {
+          channel: string
+          contact_id: string
+          created_at: string | null
+          event: string
+          id: string
+          method: string
+          notes: string | null
+          reference_id: string | null
+          source: string | null
+        }
+        Insert: {
+          channel: string
+          contact_id: string
+          created_at?: string | null
+          event: string
+          id?: string
+          method: string
+          notes?: string | null
+          reference_id?: string | null
+          source?: string | null
+        }
+        Update: {
+          channel?: string
+          contact_id?: string
+          created_at?: string | null
+          event?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          reference_id?: string | null
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twilio_consents_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -1701,6 +1787,10 @@ export type Database = {
       }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
+        Returns: boolean
+      }
+      has_sms_consent: {
+        Args: { target_contact_id: string }
         Returns: boolean
       }
       is_admin: {

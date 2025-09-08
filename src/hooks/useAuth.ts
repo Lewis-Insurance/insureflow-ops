@@ -35,8 +35,7 @@ export function useAuth() {
       .maybeSingle();
     
     if (error) {
-      console.error('Error fetching profile:', error);
-      // Create minimal profile to prevent infinite loading
+      // Create minimal profile to prevent infinite loading - don't show toast for profile fetch failures
       const fallbackProfile: UserProfile = {
         id: userId,
         full_name: user?.email?.split('@')[0] || 'User',
@@ -80,7 +79,7 @@ export function useAuth() {
       if (!mounted) return;
 
       if (error) {
-        console.error('Error getting session:', error);
+        // Silently handle session errors - user will be prompted to sign in
         setLoading(false);
         return;
       }

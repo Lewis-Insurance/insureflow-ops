@@ -122,8 +122,8 @@ export function AvatarUpload() {
         .remove([filePath]);
 
       if (deleteError) {
-        console.warn('Failed to delete file from storage:', deleteError);
         // Continue with profile update even if storage deletion fails
+        // Storage cleanup failures are non-critical
       }
 
       // Update profile to remove avatar URL
