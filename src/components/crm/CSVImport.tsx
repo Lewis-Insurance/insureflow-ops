@@ -147,7 +147,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
         // Real CSV processing using Supabase RPC
-        const { data, error } = await supabase.rpc('process_csv_batch', { 
+        const { data, error } = await supabase.rpc('process_csv_batch' as any, { 
           batch_id: 'temp-batch-id',
           import_type: 'accounts',
           field_mapping: fieldMapping

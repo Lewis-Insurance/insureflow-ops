@@ -69,13 +69,14 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         setDuplicateGroups(mockDuplicateGroups);
       } else {
         // Real duplicate detection using Supabase RPC
-        const { data, error } = await supabase.rpc('scan_for_duplicates', { 
+        const { data, error } = await supabase.rpc('scan_for_duplicates' as any, { 
           entity_type: 'accounts',
           similarity_threshold: 0.8
         });
         
         if (error) throw error;
-        setDuplicateGroups(data?.groups || []);
+        const response = data as { groups?: DuplicateGroup[] } | null;
+        setDuplicateGroups(response?.groups || []);
       }
       
       toast({
@@ -142,7 +143,7 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
         // Real merge using Supabase RPC
-        const { data, error } = await supabase.rpc('merge_duplicate_records', { 
+        const { data, error } = await supabase.rpc('merge_duplicate_records' as any, { 
           group_id: selectedGroup.id,
           survivor_id: selectedGroup.entity_ids[0]
         });

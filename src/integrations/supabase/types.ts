@@ -1631,6 +1631,26 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      gtrgm_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
         Returns: boolean
@@ -1647,9 +1667,25 @@ export type Database = {
         Args: { action_type: string; details_json?: Json; target_id: string }
         Returns: undefined
       }
+      merge_duplicate_records: {
+        Args: { group_id: string; merged_data?: Json; survivor_id: string }
+        Returns: Json
+      }
       normalize_phone_number: {
         Args: { phone_input: string }
         Returns: string
+      }
+      process_csv_batch: {
+        Args: { batch_id: string; field_mapping?: Json; import_type?: string }
+        Returns: Json
+      }
+      scan_for_duplicates: {
+        Args: { entity_type?: string; similarity_threshold?: number }
+        Returns: Json
+      }
+      set_limit: {
+        Args: { "": number }
+        Returns: number
       }
       set_user_role: {
         Args: {
@@ -1657,6 +1693,14 @@ export type Database = {
           target_user_id: string
         }
         Returns: undefined
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: { "": string }
+        Returns: string[]
       }
     }
     Enums: {
