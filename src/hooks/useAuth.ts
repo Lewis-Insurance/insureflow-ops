@@ -9,6 +9,7 @@ interface UserProfile {
   role: 'customer' | 'staff' | 'admin' | 'producer' | 'csr' | 'accounting' | 'owner';
   phone: string | null;
   is_staff: boolean;
+  created_at: string;
 }
 
 export function useAuth() {
@@ -30,7 +31,7 @@ export function useAuth() {
             try {
               const { data: profileData } = await supabase
                 .from('profiles')
-                .select('id, full_name, role, phone, is_staff')
+                .select('id, full_name, role, phone, is_staff, created_at')
                 .eq('id', session.user.id)
                 .single();
               
