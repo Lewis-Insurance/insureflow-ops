@@ -78,7 +78,7 @@ export function useCRMData() {
           .from('accounts')
           .select('*')
           .eq('id', accountId)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('contacts')
           .select('*')
@@ -166,7 +166,7 @@ export function useCRMData() {
         .from('accounts')
         .insert(data)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -243,7 +243,7 @@ export function useCRMData() {
         .from('contacts')
         .insert(data)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
