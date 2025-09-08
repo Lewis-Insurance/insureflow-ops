@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          state: string | null
+          tin_last4: string | null
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          state?: string | null
+          tin_last4?: string | null
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          state?: string | null
+          tin_last4?: string | null
+          type?: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -44,6 +95,99 @@ export type Database = {
         }
         Relationships: []
       }
+      call_sessions: {
+        Row: {
+          account_id: string | null
+          consent_played: boolean
+          contact_id: string | null
+          created_at: string
+          disposition: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          from_number: string
+          id: string
+          recording_url: string | null
+          started_at: string
+          to_number: string
+          twilio_call_sid: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          consent_played?: boolean
+          contact_id?: string | null
+          created_at?: string
+          disposition?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          from_number: string
+          id?: string
+          recording_url?: string | null
+          started_at?: string
+          to_number: string
+          twilio_call_sid?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          consent_played?: boolean
+          contact_id?: string | null
+          created_at?: string
+          disposition?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          from_number?: string
+          id?: string
+          recording_url?: string | null
+          started_at?: string
+          to_number?: string
+          twilio_call_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carriers: {
+        Row: {
+          billing_portal_url: string | null
+          claims_phone: string | null
+          created_at: string
+          id: string
+          naic: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          billing_portal_url?: string | null
+          claims_phone?: string | null
+          created_at?: string
+          id?: string
+          naic?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          billing_portal_url?: string | null
+          claims_phone?: string | null
+          created_at?: string
+          id?: string
+          naic?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       claims: {
         Row: {
           amount_estimate: number | null
@@ -51,6 +195,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          loss_date: string | null
           policy_id: string
           status: Database["public"]["Enums"]["claim_status"]
           updated_at: string
@@ -61,6 +206,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          loss_date?: string | null
           policy_id: string
           status?: Database["public"]["Enums"]["claim_status"]
           updated_at?: string
@@ -71,6 +217,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          loss_date?: string | null
           policy_id?: string
           status?: Database["public"]["Enums"]["claim_status"]
           updated_at?: string
@@ -99,38 +246,275 @@ export type Database = {
           },
         ]
       }
+      consents: {
+        Row: {
+          contact_id: string
+          created_at: string
+          granted_at: string
+          id: string
+          method: Database["public"]["Enums"]["consent_method"]
+          proof_ref: string | null
+          revoked_at: string | null
+          type: Database["public"]["Enums"]["consent_type"]
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          granted_at?: string
+          id?: string
+          method: Database["public"]["Enums"]["consent_method"]
+          proof_ref?: string | null
+          revoked_at?: string | null
+          type: Database["public"]["Enums"]["consent_type"]
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          granted_at?: string
+          id?: string
+          method?: Database["public"]["Enums"]["consent_method"]
+          proof_ref?: string | null
+          revoked_at?: string | null
+          type?: Database["public"]["Enums"]["consent_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consents_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          account_id: string
+          consent_sms: boolean
+          consent_sms_at: string | null
+          consent_voice: boolean
+          consent_voice_at: string | null
+          created_at: string
+          date_of_birth: string | null
+          deleted_at: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          consent_sms?: boolean
+          consent_sms_at?: string | null
+          consent_voice?: boolean
+          consent_voice_at?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          consent_sms?: boolean
+          consent_sms_at?: string | null
+          consent_voice?: boolean
+          consent_voice_at?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          file_size: number | null
+          filename: string
+          id: string
+          kind: string
+          mime_type: string | null
+          pii_level: string | null
+          policy_id: string | null
+          signature_request_id: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          file_size?: number | null
+          filename: string
+          id?: string
+          kind: string
+          mime_type?: string | null
+          pii_level?: string | null
+          policy_id?: string | null
+          signature_request_id?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          file_size?: number | null
+          filename?: string
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          pii_level?: string | null
+          policy_id?: string | null
+          signature_request_id?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "my_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies_with_claims"
+            referencedColumns: ["policy_id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          occurred_at: string
+          payload: Json | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          occurred_at?: string
+          payload?: Json | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          occurred_at?: string
+          payload?: Json | null
+          type?: string
+        }
+        Relationships: []
+      }
       policies: {
         Row: {
+          account_id: string | null
           carrier: string
+          carrier_id: string | null
           created_at: string
           effective_date: string
           expiration_date: string
           id: string
           insured_user_id: string
+          line_of_business: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           premium: number
+          status: string | null
         }
         Insert: {
+          account_id?: string | null
           carrier: string
+          carrier_id?: string | null
           created_at?: string
           effective_date: string
           expiration_date: string
           id?: string
           insured_user_id: string
+          line_of_business?: string | null
+          payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           premium: number
+          status?: string | null
         }
         Update: {
+          account_id?: string | null
           carrier?: string
+          carrier_id?: string | null
           created_at?: string
           effective_date?: string
           expiration_date?: string
           id?: string
           insured_user_id?: string
+          line_of_business?: string | null
+          payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number?: string
           premium?: number
+          status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -158,6 +542,119 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
+      }
+      sms_messages: {
+        Row: {
+          account_id: string | null
+          body: string | null
+          campaign_id: string | null
+          contact_id: string | null
+          created_at: string
+          direction: Database["public"]["Enums"]["sms_direction"]
+          error_code: string | null
+          from_number: string
+          id: string
+          status: string | null
+          to_number: string
+          twilio_message_sid: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          body?: string | null
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          direction: Database["public"]["Enums"]["sms_direction"]
+          error_code?: string | null
+          from_number: string
+          id?: string
+          status?: string | null
+          to_number: string
+          twilio_message_sid?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          body?: string | null
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          direction?: Database["public"]["Enums"]["sms_direction"]
+          error_code?: string | null
+          from_number?: string
+          id?: string
+          status?: string | null
+          to_number?: string
+          twilio_message_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee_id: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -269,7 +766,14 @@ export type Database = {
       }
     }
     Enums: {
+      account_type: "household" | "business"
       claim_status: "open" | "in_review" | "approved" | "denied" | "closed"
+      consent_method: "verbal" | "web" | "sms_keyword" | "paper"
+      consent_type: "sms" | "voice" | "email"
+      payment_type: "direct" | "agency"
+      sms_direction: "in" | "out"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_status: "pending" | "in_progress" | "completed" | "cancelled"
       user_role: "customer" | "staff" | "admin"
     }
     CompositeTypes: {
@@ -398,7 +902,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_type: ["household", "business"],
       claim_status: ["open", "in_review", "approved", "denied", "closed"],
+      consent_method: ["verbal", "web", "sms_keyword", "paper"],
+      consent_type: ["sms", "voice", "email"],
+      payment_type: ["direct", "agency"],
+      sms_direction: ["in", "out"],
+      task_priority: ["low", "medium", "high", "urgent"],
+      task_status: ["pending", "in_progress", "completed", "cancelled"],
       user_role: ["customer", "staff", "admin"],
     },
   },
