@@ -156,7 +156,13 @@ export function AccountList({
                       </Link>
                     </DropdownMenuItem>
                     {onEdit && (
-                      <DropdownMenuItem onClick={() => onEdit(account)}>
+                      <DropdownMenuItem 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          console.log('AccountList: Edit button clicked for account:', account);
+                          onEdit(account);
+                        }}
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Account
                       </DropdownMenuItem>

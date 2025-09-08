@@ -39,8 +39,10 @@ export function RecentlyAccessed() {
   };
 
   const handleItemClick = (item: RecentlyAccessedItem) => {
+    console.log('RecentlyAccessed: Clicking item:', item);
     if (item.type === 'account') {
-      navigate(`/accounts/${item.id}`);
+      console.log('RecentlyAccessed: Navigating to:', `/crm/accounts/${item.id}`);
+      navigate(`/crm/accounts/${item.id}`);
     }
     // Update access time
     addToRecentlyAccessed(item);
