@@ -268,6 +268,11 @@ export function useCRMData() {
       }
 
       console.log('useCRMData: User authenticated, updating account...');
+      
+      // Test auth context
+      const { data: authTest } = await supabase.rpc('test_auth_context');
+      console.log('useCRMData: Auth context test:', authTest);
+      
       const result = await supabase
         .from('accounts')
         .update(data)

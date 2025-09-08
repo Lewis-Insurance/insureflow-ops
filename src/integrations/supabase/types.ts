@@ -3113,6 +3113,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      test_auth_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       upsert_membership: {
         Args: { p_account: string; p_role?: string; p_user: string }
         Returns: undefined
