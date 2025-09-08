@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, Users, Phone, Mail, MapPin, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
 import type { Account } from '@/types/crm';
 
 interface AccountListProps {
@@ -126,7 +127,17 @@ export function AccountList({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                      <Link to={`/crm/accounts/${account.id}`}>
+                      <Link 
+                        to={`/crm/accounts/${account.id}`}
+                        onClick={() => addToRecentlyAccessed({
+                          id: account.id,
+                          name: account.name,
+                          type: 'account',
+                          accountType: account.account_type || 'individual',
+                          email: account.email || undefined,
+                          phone: account.phone || undefined
+                        })}
+                      >
                         <Eye className="h-4 w-4 mr-2" />
                         View Details
                       </Link>

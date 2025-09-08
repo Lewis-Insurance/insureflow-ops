@@ -16,6 +16,7 @@ import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { AuditLogViewer } from '@/components/crm/AuditLogViewer';
 import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
 import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
+import { RecentlyAccessed } from '@/components/crm/RecentlyAccessed';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -230,6 +231,11 @@ const CRMContent = memo(() => {
               />
             </CardContent>
           </Card>
+        </ErrorBoundary>
+
+        {/* Recently Accessed */}
+        <ErrorBoundary level="component">
+          <RecentlyAccessed />
         </ErrorBoundary>
 
         {/* Stats Cards */}

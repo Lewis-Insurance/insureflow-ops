@@ -29,6 +29,7 @@ import { MembershipManager } from '@/components/crm/MembershipManager';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
 import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm-enhanced';
 
 export default function AccountDetail() {
@@ -48,6 +49,15 @@ export default function AccountDetail() {
       try {
         const accountData = await fetchAccountDetails(accountId);
         if (accountData) {
+          // Track this account as recently accessed
+          addToRecentlyAccessed({
+            id: accountData.id,
+            name: accountData.name,
+            type: 'account',
+            accountType: accountData.account_type || accountData.type,
+            email: accountData.email || undefined,
+            phone: accountData.phone || undefined
+          });
           setAccount(accountData);
         }
       } catch (err: any) {
