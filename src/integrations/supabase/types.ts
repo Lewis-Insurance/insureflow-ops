@@ -84,55 +84,133 @@ export type Database = {
       }
       accounts: {
         Row: {
+          account_status: Database["public"]["Enums"]["account_status"] | null
+          account_type: Database["public"]["Enums"]["account_type_new"] | null
           address_line1: string | null
           address_line2: string | null
+          business_id: string | null
           city: string | null
+          contact_id: string | null
           created_at: string
+          custom: Json | null
           deleted_at: string | null
           email: string | null
           id: string
+          lead_source_detail: string | null
           name: string
+          notes: string | null
+          owner_agent_id: string | null
           phone: string | null
           source: string | null
           state: string | null
+          team_id: string | null
           tin_last4: string | null
-          type: Database["public"]["Enums"]["account_type"]
+          type_old: Database["public"]["Enums"]["account_type"]
           updated_at: string
           zip_code: string | null
         }
         Insert: {
+          account_status?: Database["public"]["Enums"]["account_status"] | null
+          account_type?: Database["public"]["Enums"]["account_type_new"] | null
           address_line1?: string | null
           address_line2?: string | null
+          business_id?: string | null
           city?: string | null
+          contact_id?: string | null
           created_at?: string
+          custom?: Json | null
           deleted_at?: string | null
           email?: string | null
           id?: string
+          lead_source_detail?: string | null
           name: string
+          notes?: string | null
+          owner_agent_id?: string | null
           phone?: string | null
           source?: string | null
           state?: string | null
+          team_id?: string | null
           tin_last4?: string | null
-          type: Database["public"]["Enums"]["account_type"]
+          type_old: Database["public"]["Enums"]["account_type"]
           updated_at?: string
           zip_code?: string | null
         }
         Update: {
+          account_status?: Database["public"]["Enums"]["account_status"] | null
+          account_type?: Database["public"]["Enums"]["account_type_new"] | null
           address_line1?: string | null
           address_line2?: string | null
+          business_id?: string | null
           city?: string | null
+          contact_id?: string | null
           created_at?: string
+          custom?: Json | null
           deleted_at?: string | null
           email?: string | null
           id?: string
+          lead_source_detail?: string | null
           name?: string
+          notes?: string | null
+          owner_agent_id?: string | null
           phone?: string | null
           source?: string | null
           state?: string | null
+          team_id?: string | null
           tin_last4?: string | null
-          type?: Database["public"]["Enums"]["account_type"]
+          type_old?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
           zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          created_at: string | null
+          deleted_at: string | null
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          role: Database["public"]["Enums"]["agent_role"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_at?: string | null
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["agent_role"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["agent_role"] | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -220,6 +298,95 @@ export type Database = {
         }
         Relationships: []
       }
+      businesses: {
+        Row: {
+          address_legal: Json | null
+          address_mailing: Json | null
+          annual_revenue: number | null
+          business_type:
+            | Database["public"]["Enums"]["business_type_enum"]
+            | null
+          created_at: string | null
+          created_by: string | null
+          dba: string | null
+          deleted_at: string | null
+          ein: string | null
+          emails: Json | null
+          id: string
+          legal_name: string
+          naics_code: string | null
+          num_employees: number | null
+          phones: Json | null
+          primary_contact_id: string | null
+          risk_score: number | null
+          tags: string[] | null
+          updated_at: string | null
+          updated_by: string | null
+          website: string | null
+          years_in_business: number | null
+        }
+        Insert: {
+          address_legal?: Json | null
+          address_mailing?: Json | null
+          annual_revenue?: number | null
+          business_type?:
+            | Database["public"]["Enums"]["business_type_enum"]
+            | null
+          created_at?: string | null
+          created_by?: string | null
+          dba?: string | null
+          deleted_at?: string | null
+          ein?: string | null
+          emails?: Json | null
+          id?: string
+          legal_name: string
+          naics_code?: string | null
+          num_employees?: number | null
+          phones?: Json | null
+          primary_contact_id?: string | null
+          risk_score?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+          website?: string | null
+          years_in_business?: number | null
+        }
+        Update: {
+          address_legal?: Json | null
+          address_mailing?: Json | null
+          annual_revenue?: number | null
+          business_type?:
+            | Database["public"]["Enums"]["business_type_enum"]
+            | null
+          created_at?: string | null
+          created_by?: string | null
+          dba?: string | null
+          deleted_at?: string | null
+          ein?: string | null
+          emails?: Json | null
+          id?: string
+          legal_name?: string
+          naics_code?: string | null
+          num_employees?: number | null
+          phones?: Json | null
+          primary_contact_id?: string | null
+          risk_score?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+          website?: string | null
+          years_in_business?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "businesses_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_sessions: {
         Row: {
           account_id: string | null
@@ -290,64 +457,100 @@ export type Database = {
         Row: {
           billing_portal_url: string | null
           claims_phone: string | null
+          contact_info: Json | null
           created_at: string
           id: string
           naic: string | null
           name: string
+          portals: Json | null
           updated_at: string
         }
         Insert: {
           billing_portal_url?: string | null
           claims_phone?: string | null
+          contact_info?: Json | null
           created_at?: string
           id?: string
           naic?: string | null
           name: string
+          portals?: Json | null
           updated_at?: string
         }
         Update: {
           billing_portal_url?: string | null
           claims_phone?: string | null
+          contact_info?: Json | null
           created_at?: string
           id?: string
           naic?: string | null
           name?: string
+          portals?: Json | null
           updated_at?: string
         }
         Relationships: []
       }
       claims: {
         Row: {
+          adjuster_contact: string | null
+          adjuster_name: string | null
+          amount_claimed: number | null
           amount_estimate: number | null
+          amount_paid: number | null
           claim_number: string
           created_at: string
+          date_of_loss: string | null
           description: string | null
+          documents: Json | null
           id: string
           loss_date: string | null
+          notes: string | null
           policy_id: string
+          reported_at: string | null
+          settlement_date: string | null
           status: Database["public"]["Enums"]["claim_status"]
+          type_of_loss: string | null
           updated_at: string
         }
         Insert: {
+          adjuster_contact?: string | null
+          adjuster_name?: string | null
+          amount_claimed?: number | null
           amount_estimate?: number | null
+          amount_paid?: number | null
           claim_number: string
           created_at?: string
+          date_of_loss?: string | null
           description?: string | null
+          documents?: Json | null
           id?: string
           loss_date?: string | null
+          notes?: string | null
           policy_id: string
+          reported_at?: string | null
+          settlement_date?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          type_of_loss?: string | null
           updated_at?: string
         }
         Update: {
+          adjuster_contact?: string | null
+          adjuster_name?: string | null
+          amount_claimed?: number | null
           amount_estimate?: number | null
+          amount_paid?: number | null
           claim_number?: string
           created_at?: string
+          date_of_loss?: string | null
           description?: string | null
+          documents?: Json | null
           id?: string
           loss_date?: string | null
+          notes?: string | null
           policy_id?: string
+          reported_at?: string | null
+          settlement_date?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          type_of_loss?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -363,6 +566,65 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "v_user_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communications: {
+        Row: {
+          account_id: string | null
+          agent_id: string | null
+          body: string | null
+          created_at: string | null
+          deleted_at: string | null
+          direction:
+            | Database["public"]["Enums"]["communication_direction"]
+            | null
+          id: string
+          meta: Json | null
+          occurred_at: string | null
+          subject: string | null
+          type: Database["public"]["Enums"]["communication_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          agent_id?: string | null
+          body?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          direction?:
+            | Database["public"]["Enums"]["communication_direction"]
+            | null
+          id?: string
+          meta?: Json | null
+          occurred_at?: string | null
+          subject?: string | null
+          type: Database["public"]["Enums"]["communication_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          agent_id?: string | null
+          body?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          direction?:
+            | Database["public"]["Enums"]["communication_direction"]
+            | null
+          id?: string
+          meta?: Json | null
+          occurred_at?: string | null
+          subject?: string | null
+          type?: Database["public"]["Enums"]["communication_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -431,41 +693,47 @@ export type Database = {
       }
       consents: {
         Row: {
-          contact_id: string
-          created_at: string
-          granted_at: string
+          account_id: string
+          captured_at: string | null
+          created_at: string | null
+          deleted_at: string | null
+          evidence_url: string | null
+          granted: boolean | null
           id: string
-          method: Database["public"]["Enums"]["consent_method"]
-          proof_ref: string | null
-          revoked_at: string | null
-          type: Database["public"]["Enums"]["consent_type"]
+          method: Database["public"]["Enums"]["consent_method_crm"] | null
+          type: Database["public"]["Enums"]["consent_type_crm"]
+          updated_at: string | null
         }
         Insert: {
-          contact_id: string
-          created_at?: string
-          granted_at?: string
+          account_id: string
+          captured_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          evidence_url?: string | null
+          granted?: boolean | null
           id?: string
-          method: Database["public"]["Enums"]["consent_method"]
-          proof_ref?: string | null
-          revoked_at?: string | null
-          type: Database["public"]["Enums"]["consent_type"]
+          method?: Database["public"]["Enums"]["consent_method_crm"] | null
+          type: Database["public"]["Enums"]["consent_type_crm"]
+          updated_at?: string | null
         }
         Update: {
-          contact_id?: string
-          created_at?: string
-          granted_at?: string
+          account_id?: string
+          captured_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          evidence_url?: string | null
+          granted?: boolean | null
           id?: string
-          method?: Database["public"]["Enums"]["consent_method"]
-          proof_ref?: string | null
-          revoked_at?: string | null
-          type?: Database["public"]["Enums"]["consent_type"]
+          method?: Database["public"]["Enums"]["consent_method_crm"] | null
+          type?: Database["public"]["Enums"]["consent_type_crm"]
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "consents_contact_id_fkey"
-            columns: ["contact_id"]
+            foreignKeyName: "consents_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -505,57 +773,129 @@ export type Database = {
       contacts: {
         Row: {
           account_id: string
+          address_mailing: Json | null
+          address_residential: Json | null
+          best_call_time: string | null
           consent_sms: boolean
           consent_sms_at: string | null
           consent_voice: boolean
           consent_voice_at: string | null
           created_at: string
+          created_by: string | null
           date_of_birth: string | null
           deleted_at: string | null
           email: string | null
+          email_other: string[] | null
+          email_primary: string | null
           first_name: string
+          gender: Database["public"]["Enums"]["gender_type"] | null
           id: string
           last_name: string
+          lead_score: number | null
+          marital_status:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name: string | null
           phone: string | null
+          phone_home: string | null
+          phone_mobile: string | null
+          phone_work: string | null
+          preferred_contact_method:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability: number | null
+          risk_score: number | null
           role: string | null
           source: string | null
+          ssn_encrypted: string | null
+          ssn_last4: string | null
+          tags: string[] | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           account_id: string
+          address_mailing?: Json | null
+          address_residential?: Json | null
+          best_call_time?: string | null
           consent_sms?: boolean
           consent_sms_at?: string | null
           consent_voice?: boolean
           consent_voice_at?: string | null
           created_at?: string
+          created_by?: string | null
           date_of_birth?: string | null
           deleted_at?: string | null
           email?: string | null
+          email_other?: string[] | null
+          email_primary?: string | null
           first_name: string
+          gender?: Database["public"]["Enums"]["gender_type"] | null
           id?: string
           last_name: string
+          lead_score?: number | null
+          marital_status?:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name?: string | null
           phone?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
+          phone_work?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability?: number | null
+          risk_score?: number | null
           role?: string | null
           source?: string | null
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          tags?: string[] | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           account_id?: string
+          address_mailing?: Json | null
+          address_residential?: Json | null
+          best_call_time?: string | null
           consent_sms?: boolean
           consent_sms_at?: string | null
           consent_voice?: boolean
           consent_voice_at?: string | null
           created_at?: string
+          created_by?: string | null
           date_of_birth?: string | null
           deleted_at?: string | null
           email?: string | null
+          email_other?: string[] | null
+          email_primary?: string | null
           first_name?: string
+          gender?: Database["public"]["Enums"]["gender_type"] | null
           id?: string
           last_name?: string
+          lead_score?: number | null
+          marital_status?:
+            | Database["public"]["Enums"]["marital_status_type"]
+            | null
+          middle_name?: string | null
           phone?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
+          phone_work?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["preferred_contact_method"]
+            | null
+          renewal_probability?: number | null
+          risk_score?: number | null
           role?: string | null
           source?: string | null
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          tags?: string[] | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -665,45 +1005,63 @@ export type Database = {
       documents: {
         Row: {
           account_id: string | null
+          category: Database["public"]["Enums"]["document_category"] | null
           created_at: string
           file_size: number | null
           filename: string
           id: string
           kind: string
           mime_type: string | null
+          name: string | null
           pii_level: string | null
           policy_id: string | null
+          sha256: string | null
           signature_request_id: string | null
+          size_bytes: number | null
           storage_path: string
           updated_at: string
+          uploaded_at: string | null
+          uploaded_by: string | null
         }
         Insert: {
           account_id?: string | null
+          category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
           file_size?: number | null
           filename: string
           id?: string
           kind: string
           mime_type?: string | null
+          name?: string | null
           pii_level?: string | null
           policy_id?: string | null
+          sha256?: string | null
           signature_request_id?: string | null
+          size_bytes?: number | null
           storage_path: string
           updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
         }
         Update: {
           account_id?: string | null
+          category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
           file_size?: number | null
           filename?: string
           id?: string
           kind?: string
           mime_type?: string | null
+          name?: string | null
           pii_level?: string | null
           policy_id?: string | null
+          sha256?: string | null
           signature_request_id?: string | null
+          size_bytes?: number | null
           storage_path?: string
           updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
         }
         Relationships: [
           {
@@ -865,6 +1223,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      enhanced_audit_logs: {
+        Row: {
+          action: string
+          actor_role: string | null
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string | null
+          diff: Json | null
+          id: string
+          row_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_role?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          diff?: Json | null
+          id?: string
+          row_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_role?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          diff?: Json | null
+          id?: string
+          row_id?: string
+          table_name?: string
+        }
+        Relationships: []
       }
       events: {
         Row: {
@@ -1048,6 +1442,73 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          account_id: string
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          deleted_at: string | null
+          due_at: string | null
+          id: string
+          invoice_number: string
+          policy_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"] | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          due_at?: string | null
+          id?: string
+          invoice_number: string
+          policy_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          due_at?: string | null
+          id?: string
+          invoice_number?: string
+          policy_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merge_history: {
         Row: {
           created_at: string
@@ -1077,6 +1538,56 @@ export type Database = {
           survivor_id?: string
         }
         Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          invoice_id: string
+          method: Database["public"]["Enums"]["payment_method_crm"] | null
+          paid_at: string | null
+          processor_ref: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          invoice_id: string
+          method?: Database["public"]["Enums"]["payment_method_crm"] | null
+          paid_at?: string | null
+          processor_ref?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          invoice_id?: string
+          method?: Database["public"]["Enums"]["payment_method_crm"] | null
+          paid_at?: string | null
+          processor_ref?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       phone_verification_codes: {
         Row: {
@@ -1122,12 +1633,19 @@ export type Database = {
       policies: {
         Row: {
           account_id: string | null
+          billing_frequency:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method: Database["public"]["Enums"]["billing_method"] | null
           carrier: string
           carrier_id: string | null
+          coverage: Json | null
           created_at: string
+          custom: Json | null
           effective_date: string
           expiration_date: string
           id: string
+          insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -1137,12 +1655,19 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          billing_frequency?:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method?: Database["public"]["Enums"]["billing_method"] | null
           carrier: string
           carrier_id?: string | null
+          coverage?: Json | null
           created_at?: string
+          custom?: Json | null
           effective_date: string
           expiration_date: string
           id?: string
+          insured_items?: Json | null
           insured_user_id: string
           line_of_business?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -1152,12 +1677,19 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          billing_frequency?:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method?: Database["public"]["Enums"]["billing_method"] | null
           carrier?: string
           carrier_id?: string | null
+          coverage?: Json | null
           created_at?: string
+          custom?: Json | null
           effective_date?: string
           expiration_date?: string
           id?: string
+          insured_items?: Json | null
           insured_user_id?: string
           line_of_business?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -1286,6 +1818,81 @@ export type Database = {
           timezone?: string | null
         }
         Relationships: []
+      }
+      quotes: {
+        Row: {
+          account_id: string
+          carrier_id: string | null
+          competitor_carrier: string | null
+          created_at: string | null
+          created_by: string | null
+          deleted_at: string | null
+          expires_at: string | null
+          id: string
+          line_of_business: Database["public"]["Enums"]["line_of_business"]
+          options: Json | null
+          quote_ref: string | null
+          quoted_at: string | null
+          reason_loss: string | null
+          reason_win: string | null
+          status: Database["public"]["Enums"]["quote_status"] | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          account_id: string
+          carrier_id?: string | null
+          competitor_carrier?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          expires_at?: string | null
+          id?: string
+          line_of_business: Database["public"]["Enums"]["line_of_business"]
+          options?: Json | null
+          quote_ref?: string | null
+          quoted_at?: string | null
+          reason_loss?: string | null
+          reason_win?: string | null
+          status?: Database["public"]["Enums"]["quote_status"] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          carrier_id?: string | null
+          competitor_carrier?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          expires_at?: string | null
+          id?: string
+          line_of_business?: Database["public"]["Enums"]["line_of_business"]
+          options?: Json | null
+          quote_ref?: string | null
+          quoted_at?: string | null
+          reason_loss?: string | null
+          reason_win?: string | null
+          status?: Database["public"]["Enums"]["quote_status"] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       role_change_requests: {
         Row: {
@@ -1451,6 +2058,8 @@ export type Database = {
       }
       tasks: {
         Row: {
+          account_id: string | null
+          assignee_agent_id: string | null
           assignee_id: string | null
           completed_at: string | null
           created_at: string
@@ -1465,6 +2074,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
+          assignee_agent_id?: string | null
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -1479,6 +2090,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
+          assignee_agent_id?: string | null
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -1493,6 +2106,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_assignee_id_fkey"
             columns: ["assignee_id"]
@@ -1722,14 +2342,24 @@ export type Database = {
       get_my_claims: {
         Args: Record<PropertyKey, never>
         Returns: {
+          adjuster_contact: string | null
+          adjuster_name: string | null
+          amount_claimed: number | null
           amount_estimate: number | null
+          amount_paid: number | null
           claim_number: string
           created_at: string
+          date_of_loss: string | null
           description: string | null
+          documents: Json | null
           id: string
           loss_date: string | null
+          notes: string | null
           policy_id: string
+          reported_at: string | null
+          settlement_date: string | null
           status: Database["public"]["Enums"]["claim_status"]
+          type_of_loss: string | null
           updated_at: string
         }[]
       }
@@ -1737,12 +2367,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           account_id: string | null
+          billing_frequency:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method: Database["public"]["Enums"]["billing_method"] | null
           carrier: string
           carrier_id: string | null
+          coverage: Json | null
           created_at: string
+          custom: Json | null
           effective_date: string
           expiration_date: string
           id: string
+          insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -1786,14 +2423,24 @@ export type Database = {
       get_user_claims: {
         Args: Record<PropertyKey, never>
         Returns: {
+          adjuster_contact: string | null
+          adjuster_name: string | null
+          amount_claimed: number | null
           amount_estimate: number | null
+          amount_paid: number | null
           claim_number: string
           created_at: string
+          date_of_loss: string | null
           description: string | null
+          documents: Json | null
           id: string
           loss_date: string | null
+          notes: string | null
           policy_id: string
+          reported_at: string | null
+          settlement_date: string | null
           status: Database["public"]["Enums"]["claim_status"]
+          type_of_loss: string | null
           updated_at: string
         }[]
       }
@@ -1801,12 +2448,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           account_id: string | null
+          billing_frequency:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method: Database["public"]["Enums"]["billing_method"] | null
           carrier: string
           carrier_id: string | null
+          coverage: Json | null
           created_at: string
+          custom: Json | null
           effective_date: string
           expiration_date: string
           id: string
+          insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -1872,11 +2526,69 @@ export type Database = {
       }
     }
     Enums: {
+      account_status: "lead" | "active" | "churned"
       account_type: "household" | "business"
+      account_type_new: "individual" | "business" | "household"
+      agent_role: "staff" | "admin" | "producer"
+      billing_frequency: "monthly" | "quarterly" | "semiannual" | "annual"
+      billing_method: "direct_bill" | "agency_bill"
+      business_type_enum:
+        | "corporation"
+        | "llc"
+        | "partnership"
+        | "sole_proprietorship"
+        | "nonprofit"
+        | "other"
       claim_status: "open" | "in_review" | "approved" | "denied" | "closed"
+      communication_direction: "inbound" | "outbound"
+      communication_type: "email" | "sms" | "call" | "meeting" | "note"
       consent_method: "verbal" | "web" | "sms_keyword" | "paper"
+      consent_method_crm: "verbal" | "written" | "checkbox"
       consent_type: "sms" | "voice" | "email"
+      consent_type_crm:
+        | "marketing_opt_in"
+        | "recording_consent"
+        | "sms_consent"
+        | "email_consent"
+      document_category:
+        | "id"
+        | "proof_of_address"
+        | "dec_page"
+        | "quote"
+        | "claim"
+        | "other"
+      gender_type: "male" | "female" | "other" | "prefer_not_to_say"
+      invoice_status: "open" | "paid" | "overdue" | "void"
+      line_of_business:
+        | "auto"
+        | "home"
+        | "renters"
+        | "umbrella"
+        | "life"
+        | "health"
+        | "commercial_auto"
+        | "bop"
+        | "gl"
+        | "workers_comp"
+        | "property"
+        | "other"
+      marital_status_type:
+        | "single"
+        | "married"
+        | "divorced"
+        | "widowed"
+        | "separated"
+      payment_method_crm:
+        | "cash"
+        | "check"
+        | "credit_card"
+        | "debit_card"
+        | "ach"
+        | "wire"
+        | "other"
       payment_type: "direct" | "agency"
+      preferred_contact_method: "email" | "phone" | "sms" | "mail"
+      quote_status: "open" | "won" | "lost" | "expired"
       sms_direction: "in" | "out"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
@@ -2015,11 +2727,75 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status: ["lead", "active", "churned"],
       account_type: ["household", "business"],
+      account_type_new: ["individual", "business", "household"],
+      agent_role: ["staff", "admin", "producer"],
+      billing_frequency: ["monthly", "quarterly", "semiannual", "annual"],
+      billing_method: ["direct_bill", "agency_bill"],
+      business_type_enum: [
+        "corporation",
+        "llc",
+        "partnership",
+        "sole_proprietorship",
+        "nonprofit",
+        "other",
+      ],
       claim_status: ["open", "in_review", "approved", "denied", "closed"],
+      communication_direction: ["inbound", "outbound"],
+      communication_type: ["email", "sms", "call", "meeting", "note"],
       consent_method: ["verbal", "web", "sms_keyword", "paper"],
+      consent_method_crm: ["verbal", "written", "checkbox"],
       consent_type: ["sms", "voice", "email"],
+      consent_type_crm: [
+        "marketing_opt_in",
+        "recording_consent",
+        "sms_consent",
+        "email_consent",
+      ],
+      document_category: [
+        "id",
+        "proof_of_address",
+        "dec_page",
+        "quote",
+        "claim",
+        "other",
+      ],
+      gender_type: ["male", "female", "other", "prefer_not_to_say"],
+      invoice_status: ["open", "paid", "overdue", "void"],
+      line_of_business: [
+        "auto",
+        "home",
+        "renters",
+        "umbrella",
+        "life",
+        "health",
+        "commercial_auto",
+        "bop",
+        "gl",
+        "workers_comp",
+        "property",
+        "other",
+      ],
+      marital_status_type: [
+        "single",
+        "married",
+        "divorced",
+        "widowed",
+        "separated",
+      ],
+      payment_method_crm: [
+        "cash",
+        "check",
+        "credit_card",
+        "debit_card",
+        "ach",
+        "wire",
+        "other",
+      ],
       payment_type: ["direct", "agency"],
+      preferred_contact_method: ["email", "phone", "sms", "mail"],
+      quote_status: ["open", "won", "lost", "expired"],
       sms_direction: ["in", "out"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
