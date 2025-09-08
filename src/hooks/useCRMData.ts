@@ -32,11 +32,20 @@ export function useCRMData() {
       setLoading(true);
       setError(null);
 
+      // SECURITY FIX: Check authentication first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
       let query = supabase
         .from('accounts')
         .select('*')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
+
+      // PERFORMANCE: Limit results to prevent large data loads
+      query = query.limit(100);
 
       if (filters?.search) {
         query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
@@ -56,10 +65,11 @@ export function useCRMData() {
 
       setAccounts(data || []);
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = asMessage(err, 'Failed to load accounts');
+      setError(errorMessage);
       toast({
         title: "Error loading accounts",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -69,9 +79,24 @@ export function useCRMData() {
 
   const fetchAccountDetails = useCallback(async (accountId: string): Promise<AccountWithDetails | null> => {
     try {
-      // Fetch account with all related data
+      // SECURITY FIX: Check authentication first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
+      // PERFORMANCE: Fetch core account data first, then related data
+      const { data: accountData, error: accountError } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', accountId)
+        .maybeSingle();
+
+      if (accountError) throw accountError;
+      if (!accountData) return null;
+
+      // RESILIENCE: Fetch related data with individual error handling
       const [
-        accountResult,
         contactsResult,
         policiesResult,
         claimsResult,
@@ -79,12 +104,7 @@ export function useCRMData() {
         messagesResult,
         tasksResult,
         eventsResult
-      ] = await Promise.all([
-        supabase
-          .from('accounts')
-          .select('*')
-          .eq('id', accountId)
-          .maybeSingle(),
+      ] = await Promise.allSettled([
         supabase
           .from('contacts')
           .select('*')
@@ -141,18 +161,19 @@ export function useCRMData() {
           .limit(50)
       ]);
 
-      if (accountResult.error) throw accountResult.error;
-      if (!accountResult.data) return null;
+      // RESILIENCE: Extract data from settled promises, handling failures gracefully
+      const extractData = (result: PromiseSettledResult<any>) => 
+        result.status === 'fulfilled' ? result.value?.data || [] : [];
 
       const account: AccountWithDetails = {
-        ...accountResult.data,
-        contacts: contactsResult.data || [],
-        policies: (policiesResult.data || []) as Policy[],
-        claims: (claimsResult.data || []) as Claim[],
-        calls: callsResult.data || [],
-        messages: messagesResult.data || [],
-        tasks: tasksResult.data || [],
-        events: eventsResult.data || []
+        ...accountData,
+        contacts: extractData(contactsResult),
+        policies: extractData(policiesResult) as Policy[],
+        claims: extractData(claimsResult) as Claim[],
+        calls: extractData(callsResult),
+        messages: extractData(messagesResult),
+        tasks: extractData(tasksResult),
+        events: extractData(eventsResult)
       };
 
       return account;
@@ -169,44 +190,37 @@ export function useCRMData() {
 
   const createAccount = useCallback(async (data: CreateAccountData): Promise<Account | null> => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
+      // Get current user first
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Authentication required to create accounts');
       }
 
-      const { data: account, error } = await supabase
-        .from('accounts')
-        .insert(data)
-        .select()
-        .maybeSingle();
+      // CRITICAL FIX: Use database transaction for account + membership creation
+      const { data: result, error } = await supabase.rpc('create_account_with_membership', {
+        account_data: data,
+        owner_user_id: user.id
+      });
 
-      const errorResult = handleSupabaseError(error);
-      if (errorResult.shouldThrow) {
-        throw new Error(errorResult.message);
+      if (error) {
+        throw new Error(`Account creation failed: ${error.message}`);
       }
 
+      const account = result?.account;
       if (!account) {
         throw new Error('Account creation failed - no account returned');
       }
 
-      // Create owner membership for the current user
-      const membershipCreated = await createOwnerMembership(account.id, user.id);
-      if (!membershipCreated) {
-        // If membership creation fails, we should clean up the account
-        await supabase.from('accounts').delete().eq('id', account.id);
-        throw new Error('Failed to create account membership');
-      }
-
-      // Log account creation event
-      await supabase
+      // Log account creation event (fire-and-forget)
+      supabase
         .from('events')
         .insert({
           type: 'account_created',
           entity_type: 'account',
           entity_id: account.id,
           payload: { name: data.name, type: data.type }
-        });
+        })
+        .then(); // Don't await - let it run async
 
       toast({
         title: "Account created",
@@ -214,19 +228,19 @@ export function useCRMData() {
       });
 
       // Refresh accounts list
-      fetchAccounts();
+      await fetchAccounts();
 
       return account;
     } catch (err: unknown) {
       const errorMessage = asMessage(err, 'Failed to create account');
       toast({
-        title: "Error creating account",
+        title: "Error creating account", 
         description: errorMessage,
         variant: "destructive",
       });
       return null;
     }
-  }, [fetchAccounts, createOwnerMembership]);
+  }, [fetchAccounts]);
 
   const updateAccount = useCallback(async (id: string, data: UpdateAccountData): Promise<boolean> => {
     try {
