@@ -31,9 +31,8 @@ import { useCRMData } from '@/hooks/useCRMData';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
-import { addToRecentlyAccessed, updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
-import type { AccountWithDetails, Contact, Policy, Claim, CallSession, SMSMessage } from '@/types/crm-enhanced';
+import { updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
+import type { AccountWithDetails, Contact } from '@/types/crm-enhanced';
 
 // Type utilities
 type TypePayload = {
@@ -61,13 +60,17 @@ function normalizeTypeForRPC(input: TypePayload): TypePayload {
   return out;
 }
 
-export default function AccountDetail() {
+export function AccountDetail() {
   const { toast } = useToast();
-  const { id: routeId } = useParams<{ id: string }>();
+  const params = useParams();
   
-  // Defensive: strip any query string and validate UUID
-  const accountId = (routeId ?? '').split('?')[0];
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId);
+  // Accept either :id or :accountId (works with both route shapes)
+  const rawId = String(params.id ?? params.accountId ?? '').trim();
+  // Strip ?query or #hash if present
+  const accountId = rawId.split(/[?#]/)[0];
+  
+  // Only soft-check; don't block the page if it doesn't "look" like a UUID
+  const hasCandidateId = accountId.length > 0;
 
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { fetchAccountDetails, fetchAccounts } = useCRMData();
@@ -93,24 +96,20 @@ export default function AccountDetail() {
       </AppLayout>
     );
   }
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
     const loadAccount = async () => {
-      if (!accountId) return;
+      if (!accountId || !isAuthenticated) return;
       
-      setLoading(true);
       try {
+        setLoading(true);
+        setError(null);
+        
         const accountData = await fetchAccountDetails(accountId);
         if (accountData) {
-          // Track this account as recently accessed
-          addToRecentlyAccessed({
+          // Update Recently Accessed when viewing
+          updateRecentlyAccessedAccount({
             id: accountData.id,
-            name: accountData.name,
-            type: 'account',
             accountType: accountData.account_type || accountData.type,
             email: accountData.email || undefined,
             phone: accountData.phone || undefined
@@ -203,8 +202,8 @@ export default function AccountDetail() {
   if (authLoading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading...</div>
         </div>
       </AppLayout>
     );
@@ -217,168 +216,116 @@ export default function AccountDetail() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex-1 space-y-6 p-4 md:p-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
-            <div className="h-64 bg-muted rounded"></div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="h-32 bg-muted rounded"></div>
-              <div className="h-32 bg-muted rounded"></div>
-              <div className="h-32 bg-muted rounded"></div>
-            </div>
-          </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading account...</div>
         </div>
       </AppLayout>
     );
   }
 
-  if (error || !account) {
+  if (error) {
     return (
       <AppLayout>
-        <div className="flex-1 space-y-6 p-4 md:p-8">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/crm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to CRM
-              </Link>
+        <Card className="p-6">
+          <CardContent>
+            <p className="text-destructive">{error}</p>
+            <Button asChild className="mt-4">
+              <Link to="/crm">Back to CRM</Link>
             </Button>
-          </div>
-          <Card className="border-destructive">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Account Not Found</h3>
-                <p className="text-muted-foreground">
-                  {error || "The account you're looking for doesn't exist or you don't have permission to view it."}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       </AppLayout>
     );
   }
 
-  // Calculate key metrics
+  if (!account) {
+    return (
+      <AppLayout>
+        <Card className="p-6">
+          <CardContent>
+            <p>Account not found</p>
+            <Button asChild className="mt-4">
+              <Link to="/crm">Back to CRM</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    );
+  }
+
+  // Calculate active policies for display
   const activePolicies = account.policies?.filter(p => p.status === 'active') || [];
-  const openClaims = account.claims?.filter(c => c.status === 'open') || [];
-  const renewalsDue = activePolicies.filter(p => 
-    isAfter(addDays(new Date(), 30), new Date(p.expiration_date))
-  );
-  const totalPremium = activePolicies.reduce((sum, p) => sum + (p.premium || 0), 0);
 
   return (
     <AppLayout>
-      <div className="flex-1 space-y-6 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/crm">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/crm" className="flex items-center">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to CRM
               </Link>
             </Button>
+            <Separator orientation="vertical" className="h-6" />
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{account.name}</h1>
+              <h1 className="text-3xl font-bold">{account.name}</h1>
               <div className="flex items-center space-x-2 mt-1">
-                {account.account_type === 'business' ? (
-                  <Building2 className="h-4 w-4 text-primary" />
-                ) : (
-                  <Users className="h-4 w-4 text-primary" />
-                )}
-                <Badge variant="outline" className="capitalize">
-                  {account.account_type}
+                <Badge variant={account.type === 'business' ? 'default' : 'secondary'}>
+                  {account.type === 'business' ? (
+                    <>
+                      <Building2 className="h-3 w-3 mr-1" />
+                      Business
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3 w-3 mr-1" />
+                      Household
+                    </>
+                  )}
                 </Badge>
-                <span className="text-sm text-muted-foreground">
-                  Customer since {format(new Date(account.created_at), 'MMM yyyy')}
-                </span>
+                <Badge variant="outline">
+                  {activePolicies.length} Active Policies
+                </Badge>
               </div>
             </div>
           </div>
-          <Button onClick={() => {
-            console.log('AccountDetail: Edit button clicked');
-            setShowEditForm(true);
-          }}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Account
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEditForm(true)}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Account
+            </Button>
+          </div>
         </div>
 
-        {/* Key Metrics */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Policies</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activePolicies.length}</div>
-              <p className="text-xs text-muted-foreground">
-                ${totalPremium.toLocaleString()} total premium
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open Claims</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{openClaims.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Active insurance claims
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Renewals Due</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{renewalsDue.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Next 30 days
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Contacts</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{account.contacts?.length || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Associated people
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Contact Information */}
+        {/* Quick Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Shield className="h-5 w-5" />
+              <span>Account Overview</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
                 {account.phone && (
                   <div className="flex items-center space-x-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{account.phone}</span>
+                    <span className="text-sm">{account.phone}</span>
                   </div>
                 )}
+              </div>
+              <div>
                 {account.email && (
                   <div className="flex items-center space-x-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{account.email}</span>
+                    <span className="text-sm">{account.email}</span>
                   </div>
                 )}
               </div>
@@ -487,39 +434,37 @@ function ContactsTab({ contacts, accountId }: { contacts: Contact[]; accountId: 
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="space-y-4">
       {contacts.map((contact) => (
         <Card key={contact.id}>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              {contact.first_name} {contact.last_name}
-            </CardTitle>
-            {contact.role && (
-              <Badge variant="outline" className="w-fit capitalize">
-                {contact.role}
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {contact.email && (
-              <div className="flex items-center space-x-2 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{contact.email}</span>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-semibold">
+                  {contact.first_name} {contact.last_name}
+                </h3>
+                {contact.role && (
+                  <p className="text-sm text-muted-foreground">{contact.role}</p>
+                )}
+                <div className="mt-2 space-y-1">
+                  {contact.email && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <Mail className="h-3 w-3" />
+                      <span>{contact.email}</span>
+                    </div>
+                  )}
+                  {contact.phone && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <Phone className="h-3 w-3" />
+                      <span>{contact.phone}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-            {contact.phone && (
-              <div className="flex items-center space-x-2 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{contact.phone}</span>
-              </div>
-            )}
-            <div className="flex space-x-2 pt-2">
-              <Badge variant={contact.consent_sms ? 'default' : 'secondary'}>
-                SMS: {contact.consent_sms ? 'Allowed' : 'Denied'}
-              </Badge>
-              <Badge variant={contact.consent_voice ? 'default' : 'secondary'}>
-                Voice: {contact.consent_voice ? 'Allowed' : 'Denied'}
-              </Badge>
+              <Button variant="outline" size="sm">
+                <Edit className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -528,7 +473,7 @@ function ContactsTab({ contacts, accountId }: { contacts: Contact[]; accountId: 
   );
 }
 
-function PoliciesTab({ policies }: { policies: Policy[] }) {
+function PoliciesTab({ policies }: { policies: any[] }) {
   if (policies.length === 0) {
     return (
       <Card>
@@ -537,7 +482,7 @@ function PoliciesTab({ policies }: { policies: Policy[] }) {
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No Policies</h3>
             <p className="text-muted-foreground mb-4">
-              Add insurance policies to this account.
+              This account doesn't have any policies yet.
             </p>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -553,37 +498,27 @@ function PoliciesTab({ policies }: { policies: Policy[] }) {
     <div className="space-y-4">
       {policies.map((policy) => (
         <Card key={policy.id}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-lg">{policy.policy_number}</CardTitle>
-                <CardDescription>{policy.line_of_business}</CardDescription>
+                <h3 className="font-semibold">{policy.policy_number}</h3>
+                <p className="text-sm text-muted-foreground">{policy.line_of_business}</p>
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center space-x-2 text-sm">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {new Date(policy.effective_date).toLocaleDateString()} - {new Date(policy.expiration_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <DollarSign className="h-3 w-3" />
+                    <span>${policy.premium}</span>
+                  </div>
+                </div>
               </div>
               <Badge variant={policy.status === 'active' ? 'default' : 'secondary'}>
                 {policy.status}
               </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 md:grid-cols-3">
-              <div>
-                <p className="text-sm font-medium">Carrier</p>
-                <p className="text-sm text-muted-foreground">
-                  {policy.carrier || 'Unknown'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Premium</p>
-                <p className="text-sm text-muted-foreground">
-                  ${policy.premium?.toLocaleString() || 'N/A'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Expires</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(policy.expiration_date), 'MMM d, yyyy')}
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -592,7 +527,7 @@ function PoliciesTab({ policies }: { policies: Policy[] }) {
   );
 }
 
-function ClaimsTab({ claims }: { claims: Claim[] }) {
+function ClaimsTab({ claims }: { claims: any[] }) {
   if (claims.length === 0) {
     return (
       <Card>
@@ -600,8 +535,8 @@ function ClaimsTab({ claims }: { claims: Claim[] }) {
           <div className="text-center">
             <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No Claims</h3>
-            <p className="text-muted-foreground">
-              No insurance claims have been filed for this account.
+            <p className="text-muted-foreground mb-4">
+              This account doesn't have any claims.
             </p>
           </div>
         </CardContent>
@@ -613,37 +548,29 @@ function ClaimsTab({ claims }: { claims: Claim[] }) {
     <div className="space-y-4">
       {claims.map((claim) => (
         <Card key={claim.id}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-lg">{claim.claim_number}</CardTitle>
-                <CardDescription>{claim.description}</CardDescription>
+                <h3 className="font-semibold">{claim.claim_number}</h3>
+                <p className="text-sm text-muted-foreground">{claim.description}</p>
+                <div className="mt-2 space-y-1">
+                  {claim.loss_date && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <Calendar className="h-3 w-3" />
+                      <span>Loss Date: {new Date(claim.loss_date).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {claim.amount_estimate && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <DollarSign className="h-3 w-3" />
+                      <span>Estimate: ${claim.amount_estimate}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <Badge variant={claim.status === 'open' ? 'destructive' : 'default'}>
                 {claim.status}
               </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 md:grid-cols-3">
-              <div>
-                <p className="text-sm font-medium">Loss Date</p>
-                <p className="text-sm text-muted-foreground">
-                  {claim.loss_date ? format(new Date(claim.loss_date), 'MMM d, yyyy') : 'N/A'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Estimate</p>
-                <p className="text-sm text-muted-foreground">
-                  ${claim.amount_estimate?.toLocaleString() || 'Pending'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Filed</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(claim.created_at), 'MMM d, yyyy')}
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -652,21 +579,21 @@ function ClaimsTab({ claims }: { claims: Claim[] }) {
   );
 }
 
-function CommunicationsTab({ calls, messages }: { calls: CallSession[]; messages: SMSMessage[] }) {
+function CommunicationsTab({ calls, messages }: { calls: any[]; messages: any[] }) {
   const allCommunications = [
-    ...calls.map(call => ({ ...call, type: 'call' as const, timestamp: call.started_at })),
-    ...messages.map(msg => ({ ...msg, type: 'sms' as const, timestamp: msg.created_at }))
-  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    ...calls.map(call => ({ ...call, type: 'call' })),
+    ...messages.map(msg => ({ ...msg, type: 'sms' }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   if (allCommunications.length === 0) {
     return (
       <Card>
         <CardContent className="pt-6">
           <div className="text-center">
-            <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No Communications</h3>
-            <p className="text-muted-foreground">
-              No calls or messages have been exchanged with this account.
+            <p className="text-muted-foreground mb-4">
+              No calls or messages recorded for this account.
             </p>
           </div>
         </CardContent>
@@ -676,33 +603,34 @@ function CommunicationsTab({ calls, messages }: { calls: CallSession[]; messages
 
   return (
     <div className="space-y-4">
-      {allCommunications.map((comm, index) => (
-        <Card key={`${comm.type}-${comm.id}`}>
-          <CardContent className="pt-4">
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                {comm.type === 'call' ? (
-                  <Phone className="h-4 w-4 text-primary" />
-                ) : (
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">
+      {allCommunications.map((comm) => (
+        <Card key={comm.id}>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center space-x-2">
+                  {comm.type === 'call' ? (
+                    <Phone className="h-4 w-4" />
+                  ) : (
+                    <MessageSquare className="h-4 w-4" />
+                  )}
+                  <h3 className="font-semibold">
                     {comm.type === 'call' ? 'Phone Call' : 'SMS Message'}
-                  </h4>
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(comm.timestamp), 'MMM d, h:mm a')}
-                  </span>
+                  </h3>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   {comm.type === 'call' 
-                    ? `${comm.from_number} → ${comm.to_number}${(comm as CallSession).duration_seconds ? ` (${Math.round((comm as CallSession).duration_seconds / 60)}m)` : ''}`
-                    : `${(comm as SMSMessage).direction === 'in' ? 'Received' : 'Sent'}: ${(comm as SMSMessage).body || 'No content'}`
+                    ? `${comm.from_number} → ${comm.to_number}`
+                    : comm.message_body || 'SMS message'
                   }
                 </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {new Date(comm.created_at).toLocaleString()}
+                </p>
               </div>
+              <Badge variant="outline">
+                {comm.type === 'call' ? comm.disposition || 'Call' : 'SMS'}
+              </Badge>
             </div>
           </CardContent>
         </Card>
