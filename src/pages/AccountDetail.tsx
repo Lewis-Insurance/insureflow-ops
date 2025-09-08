@@ -78,15 +78,41 @@ export default function AccountDetail() {
   const handleEditAccount = async (data: any) => {
     if (!account) return;
     
+    console.log('AccountDetail: handleEditAccount called with data:', data);
+    console.log('AccountDetail: Current account:', account);
+    
+    // Transform form data to match database expectations
+    const updateData = {
+      name: data.name,
+      account_type: data.account_type,
+      tin_last4: data.tin_last4,
+      address_line1: data.address_line1,
+      address_line2: data.address_line2,
+      city: data.city,
+      state: data.state,
+      zip_code: data.zip_code,
+      phone: data.phone,
+      email: data.email,
+      source: data.source
+    };
+    
+    console.log('AccountDetail: Transformed updateData:', updateData);
+    
     setFormLoading(true);
     try {
-      await updateAccount(account.id, data);
+      console.log('AccountDetail: Calling updateAccount...');
+      const result = await updateAccount(account.id, updateData);
+      console.log('AccountDetail: updateAccount result:', result);
+      
       // Reload account data to see changes
+      console.log('AccountDetail: Reloading account details...');
       const updatedAccount = await fetchAccountDetails(account.id);
+      console.log('AccountDetail: Updated account data:', updatedAccount);
       setAccount(updatedAccount);
       setShowEditForm(false);
+      console.log('AccountDetail: Edit completed successfully');
     } catch (error) {
-      console.error('Failed to update account:', error);
+      console.error('AccountDetail: Failed to update account:', error);
     } finally {
       setFormLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -87,6 +87,41 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
 
   const [errors, setErrors] = useState<Partial<CreateAccountData>>({});
 
+  // Update form data when account prop changes
+  useEffect(() => {
+    if (account) {
+      console.log('AccountForm: Setting form data from account:', account);
+      setFormData({
+        account_type: account.account_type || 'individual',
+        name: account.name || '',
+        tin_last4: account.tin_last4 || '',
+        address_line1: account.address_line1 || '',
+        address_line2: account.address_line2 || '',
+        city: account.city || '',
+        state: account.state || '',
+        zip_code: account.zip_code || '',
+        phone: account.phone || '',
+        email: account.email || '',
+        source: account.source || ''
+      });
+    } else {
+      // Reset for new account
+      setFormData({
+        account_type: 'individual',
+        name: '',
+        tin_last4: '',
+        address_line1: '',
+        address_line2: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        phone: '',
+        email: '',
+        source: ''
+      });
+    }
+  }, [account]);
+
   const validateForm = (): boolean => {
     const newErrors: Partial<CreateAccountData> = {};
 
@@ -117,30 +152,39 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('AccountForm: handleSubmit called');
+    console.log('AccountForm: Current formData:', formData);
+    console.log('AccountForm: Is editing account:', !!account);
+    
     if (!validateForm()) {
+      console.log('AccountForm: Form validation failed');
       return;
     }
 
     try {
+      console.log('AccountForm: Calling onSubmit with formData:', formData);
       await onSubmit(formData);
+      console.log('AccountForm: onSubmit completed successfully');
       onOpenChange(false);
-      // Reset form
-      setFormData({
-        account_type: 'individual',
-        name: '',
-        tin_last4: '',
-        address_line1: '',
-        address_line2: '',
-        city: '',
-        state: '',
-        zip_code: '',
-        phone: '',
-        email: '',
-        source: ''
-      });
+      // Reset form only if creating new account (not editing)
+      if (!account) {
+        setFormData({
+          account_type: 'individual',
+          name: '',
+          tin_last4: '',
+          address_line1: '',
+          address_line2: '',
+          city: '',
+          state: '',
+          zip_code: '',
+          phone: '',
+          email: '',
+          source: ''
+        });
+      }
       setErrors({});
     } catch (error) {
-      // Error handling is done in the hook
+      console.error('AccountForm: onSubmit failed:', error);
     }
   };
 
