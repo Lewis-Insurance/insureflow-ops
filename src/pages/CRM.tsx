@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useMemo, useCallback, memo, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,71 @@ import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
 import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
 import { CSVImport } from '@/components/crm/CSVImport';
 import { useCRMData } from '@/hooks/useCRMData';
+import { useDebouncedCallback } from '@/hooks/useDebounce';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
+import { memoize } from '@/lib/performance';
 import type { CRMFilters, Account, SavedView, BulkAction } from '@/types/crm';
 
-export default function CRM() {
+// Memoized stats calculation
+const calculateStats = memoize((accounts: Account[]) => ({
+  totalAccounts: accounts.length,
+  householdAccounts: accounts.filter(a => a.type === 'household').length,
+  businessAccounts: accounts.filter(a => a.type === 'business').length,
+}));
+
+// Memoized stats cards component
+const StatsCards = memo(({ accounts }: { accounts: Account[] }) => {
+  const stats = useMemo(() => calculateStats(accounts), [accounts]);
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
+          <Users className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.totalAccounts}</div>
+          <p className="text-xs text-muted-foreground">
+            Active customer accounts
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Households</CardTitle>
+          <Users className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.householdAccounts}</div>
+          <p className="text-xs text-muted-foreground">
+            Personal/family accounts
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Businesses</CardTitle>
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.businessAccounts}</div>
+          <p className="text-xs text-muted-foreground">
+            Commercial accounts
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+});
+
+StatsCards.displayName = 'StatsCards';
+
+// Main CRM content component
+const CRMContent = memo(() => {
   const {
     accounts,
     loading,
@@ -32,11 +94,15 @@ export default function CRM() {
   const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
-  const handleSearch = () => {
-    fetchAccounts(filters);
-  };
+  // Debounced search handler for better performance
+  const debouncedSearch = useDebouncedCallback(
+    () => fetchAccounts(filters),
+    300,
+    [filters]
+  );
 
-  const handleCreateAccount = async (data: any) => {
+  // Memoized handlers with proper dependencies
+  const handleCreateAccount = useCallback(async (data: any) => {
     setFormLoading(true);
     try {
       await createAccount(data);
@@ -44,9 +110,9 @@ export default function CRM() {
     } finally {
       setFormLoading(false);
     }
-  };
+  }, [createAccount]);
 
-  const handleEditAccount = async (data: any) => {
+  const handleEditAccount = useCallback(async (data: any) => {
     if (!editingAccount) return;
     
     setFormLoading(true);
@@ -56,17 +122,17 @@ export default function CRM() {
     } finally {
       setFormLoading(false);
     }
-  };
+  }, [editingAccount, updateAccount]);
 
-  const handleEdit = (account: Account) => {
+  const handleEdit = useCallback((account: Account) => {
     setEditingAccount(account);
-  };
+  }, []);
 
-  const handleDelete = async (accountId: string) => {
+  const handleDelete = useCallback(async (accountId: string) => {
     await deleteAccount(accountId);
-  };
+  }, [deleteAccount]);
 
-  const handleViewSave = async (view: Omit<SavedView, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+  const handleViewSave = useCallback(async (view: Omit<SavedView, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
     // In a real implementation, this would make an API call
     const newView: SavedView = {
       ...view,
@@ -76,40 +142,39 @@ export default function CRM() {
       updated_at: new Date().toISOString(),
     };
     setSavedViews(prev => [...prev, newView]);
-  };
+  }, []);
 
-  const handleViewSelect = (view: SavedView) => {
+  const handleViewSelect = useCallback((view: SavedView) => {
     setFilters(view.filters as CRMFilters);
     fetchAccounts(view.filters as CRMFilters);
-  };
+  }, [fetchAccounts]);
 
-  const handleViewDelete = (viewId: string) => {
+  const handleViewDelete = useCallback((viewId: string) => {
     setSavedViews(prev => prev.filter(v => v.id !== viewId));
-  };
+  }, []);
 
-  const handleBulkAction = async (action: Omit<BulkAction, 'id' | 'created_at' | 'created_by' | 'status' | 'progress' | 'success_count' | 'error_count' | 'errors'>) => {
+  const handleBulkAction = useCallback(async (action: Omit<BulkAction, 'id' | 'created_at' | 'created_by' | 'status' | 'progress' | 'success_count' | 'error_count' | 'errors'>) => {
     // TODO: Implement bulk action processing via edge function or RPC
     if (import.meta.env.DEV) {
       console.warn('Bulk action in development mode:', action);
     }
-  };
+  }, []);
 
-  const handleAccountSelection = (account: Account, selected: boolean) => {
+  const handleAccountSelection = useCallback((account: Account, selected: boolean) => {
     setSelectedAccounts(prev => 
       selected 
         ? [...prev, account]
         : prev.filter(a => a.id !== account.id)
     );
-  };
+  }, []);
 
-  const handleSelectionClear = () => {
+  const handleSelectionClear = useCallback(() => {
     setSelectedAccounts([]);
-  };
+  }, []);
 
-  // Calculate stats
-  const totalAccounts = accounts.length;
-  const householdAccounts = accounts.filter(a => a.type === 'household').length;
-  const businessAccounts = accounts.filter(a => a.type === 'business').length;
+  const handleRefreshAccounts = useCallback(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   return (
     <AppLayout>
@@ -129,83 +194,54 @@ export default function CRM() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalAccounts}</div>
-              <p className="text-xs text-muted-foreground">
-                Active customer accounts
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Households</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{householdAccounts}</div>
-              <p className="text-xs text-muted-foreground">
-                Personal/family accounts
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Businesses</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{businessAccounts}</div>
-              <p className="text-xs text-muted-foreground">
-                Commercial accounts
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <ErrorBoundary level="component">
+          <StatsCards accounts={accounts} />
+        </ErrorBoundary>
 
         {/* Saved Views */}
-        <Card>
-          <CardContent className="pt-6">
-            <SavedViewsManager
-              currentFilters={filters}
-              savedViews={savedViews}
-              onViewSelect={handleViewSelect}
-              onViewSave={handleViewSave}
-              onViewDelete={handleViewDelete}
-            />
-          </CardContent>
-        </Card>
+        <ErrorBoundary level="component">
+          <Card>
+            <CardContent className="pt-6">
+              <SavedViewsManager
+                currentFilters={filters}
+                savedViews={savedViews}
+                onViewSelect={handleViewSelect}
+                onViewSave={handleViewSave}
+                onViewDelete={handleViewDelete}
+              />
+            </CardContent>
+          </Card>
+        </ErrorBoundary>
 
         {/* Data Quality Tools */}
         <div className="grid gap-6 md:grid-cols-2">
-          <DuplicateDetection onMergeComplete={() => fetchAccounts()} />
-          <CSVImport onImportComplete={() => fetchAccounts()} />
+          <ErrorBoundary level="component">
+            <DuplicateDetection onMergeComplete={handleRefreshAccounts} />
+          </ErrorBoundary>
+          <ErrorBoundary level="component">
+            <CSVImport onImportComplete={handleRefreshAccounts} />
+          </ErrorBoundary>
         </div>
 
         {/* Search and Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Search Accounts</CardTitle>
-            <CardDescription>
-              Find customer accounts by name, phone, email, or other criteria
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AccountSearch
-              filters={filters}
-              onFiltersChange={setFilters}
-              onSearch={handleSearch}
-              loading={loading}
-            />
-          </CardContent>
-        </Card>
+        <ErrorBoundary level="component">
+          <Card>
+            <CardHeader>
+              <CardTitle>Search Accounts</CardTitle>
+              <CardDescription>
+                Find customer accounts by name, phone, email, or other criteria
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AccountSearch
+                filters={filters}
+                onFiltersChange={setFilters}
+                onSearch={debouncedSearch}
+                loading={loading}
+              />
+            </CardContent>
+          </Card>
+        </ErrorBoundary>
 
         {/* Error State */}
         {error && (
@@ -220,48 +256,66 @@ export default function CRM() {
         )}
 
         {/* Bulk Actions Bar */}
-        <BulkActionsBar
-          selectedAccounts={selectedAccounts}
-          onSelectionClear={handleSelectionClear}
-          onBulkAction={handleBulkAction}
-        />
+        <ErrorBoundary level="component">
+          <BulkActionsBar
+            selectedAccounts={selectedAccounts}
+            onSelectionClear={handleSelectionClear}
+            onBulkAction={handleBulkAction}
+          />
+        </ErrorBoundary>
 
         {/* Results */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium">
-              Accounts ({totalAccounts})
-            </h3>
-            {totalAccounts > 0 && (
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <TrendingUp className="h-4 w-4" />
-                <span>Showing {accounts.length} of {totalAccounts} accounts</span>
-              </div>
-            )}
-          </div>
+        <ErrorBoundary level="component">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">
+                Accounts ({accounts.length})
+              </h3>
+              {accounts.length > 0 && (
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Showing {accounts.length} accounts</span>
+                </div>
+              )}
+            </div>
 
-          <AccountList
-            accounts={accounts}
-            loading={loading}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            selectedAccounts={selectedAccounts}
-            onAccountSelection={handleAccountSelection}
-          />
-        </div>
+            <AccountList
+              accounts={accounts}
+              loading={loading}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              selectedAccounts={selectedAccounts}
+              onAccountSelection={handleAccountSelection}
+            />
+          </div>
+        </ErrorBoundary>
 
         {/* Account Form Dialog */}
-        <AccountForm
-          open={showAccountForm || !!editingAccount}
-          onOpenChange={(open) => {
-            setShowAccountForm(open);
-            if (!open) setEditingAccount(null);
-          }}
-          onSubmit={editingAccount ? handleEditAccount : handleCreateAccount}
-          account={editingAccount}
-          loading={formLoading}
-        />
+        <ErrorBoundary level="component">
+          <AccountForm
+            open={showAccountForm || !!editingAccount}
+            onOpenChange={(open) => {
+              setShowAccountForm(open);
+              if (!open) setEditingAccount(null);
+            }}
+            onSubmit={editingAccount ? handleEditAccount : handleCreateAccount}
+            account={editingAccount}
+            loading={formLoading}
+          />
+        </ErrorBoundary>
       </div>
     </AppLayout>
+  );
+});
+
+CRMContent.displayName = 'CRMContent';
+
+export default function CRM() {
+  return (
+    <ErrorBoundary level="page" resetOnPropsChange>
+      <Suspense fallback={<CRMPageSkeleton />}>
+        <CRMContent />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
