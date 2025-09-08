@@ -110,9 +110,12 @@ export function AccountDetail() {
           // Update Recently Accessed when viewing
           updateRecentlyAccessedAccount({
             id: accountData.id,
-            accountType: accountData.account_type || accountData.type,
+            name: accountData.name,
             email: accountData.email || undefined,
-            phone: accountData.phone || undefined
+            phone: accountData.phone || undefined,
+            account_type: accountData.account_type,
+            type: accountData.type,
+            updated_at: accountData.updated_at
           });
           setAccount(accountData);
         }
@@ -272,8 +275,8 @@ export function AccountDetail() {
             <div>
               <h1 className="text-3xl font-bold">{account.name}</h1>
               <div className="flex items-center space-x-2 mt-1">
-                <Badge variant={account.type === 'business' ? 'default' : 'secondary'}>
-                  {account.type === 'business' ? (
+                <Badge variant={account.account_type === 'business' ? 'default' : 'secondary'}>
+                  {account.account_type === 'business' ? (
                     <>
                       <Building2 className="h-3 w-3 mr-1" />
                       Business
@@ -638,3 +641,5 @@ function CommunicationsTab({ calls, messages }: { calls: any[]; messages: any[] 
     </div>
   );
 }
+
+export default AccountDetail;
