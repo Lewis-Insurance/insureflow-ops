@@ -273,14 +273,14 @@ export function useCRMData() {
       const { data: authTest } = await supabase.rpc('test_auth_context');
       console.log('useCRMData: Auth context test:', authTest);
       
-      const result = await supabase
-        .from('accounts')
-        .update(data)
-        .eq('id', id)
-        .select(); // Add select to see what was actually updated
+      // Use secure update function that maintains auth context
+      const { data: updateResult, error } = await supabase.rpc('update_account_secure', {
+        account_id: id,
+        account_data: data
+      });
 
-      console.log('useCRMData: Update result:', { result, error: result.error, data: result.data });
-      if (result.error) throw result.error;
+      console.log('useCRMData: Update result:', { updateResult, error });
+      if (error) throw error;
 
       // Log account update event (fire-and-forget)
       supabase
