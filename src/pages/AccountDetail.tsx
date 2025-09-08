@@ -84,16 +84,16 @@ export default function AccountDetail() {
     // Transform form data to match database expectations
     const updateData = {
       name: data.name,
-      account_type: data.account_type,
-      tin_last4: data.tin_last4,
-      address_line1: data.address_line1,
-      address_line2: data.address_line2,
-      city: data.city,
-      state: data.state,
-      zip_code: data.zip_code,
-      phone: data.phone,
-      email: data.email,
-      source: data.source
+      type: data.account_type, // Map account_type to type field
+      tin_last4: data.tin_last4 || null,
+      address_line1: data.address_line1 || null,
+      address_line2: data.address_line2 || null,
+      city: data.city || null,
+      state: data.state || null,
+      zip_code: data.zip_code || null,
+      phone: data.phone || null,
+      email: data.email || null,
+      source: data.source || null
     };
     
     console.log('AccountDetail: Transformed updateData:', updateData);
