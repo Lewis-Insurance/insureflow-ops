@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_memberships: {
+        Row: {
+          account_id: string
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_tags: {
         Row: {
           account_id: string
@@ -320,6 +356,13 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_policies"
             referencedColumns: ["id"]
           },
         ]
@@ -675,6 +718,13 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_policies"
             referencedColumns: ["id"]
           },
         ]
@@ -1584,7 +1634,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_user_accounts: {
+        Row: {
+          account_id: string | null
+          name: string | null
+          role: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_user_policies: {
+        Row: {
+          account_id: string | null
+          carrier: string | null
+          carrier_id: string | null
+          created_at: string | null
+          effective_date: string | null
+          expiration_date: string | null
+          id: string | null
+          insured_user_id: string | null
+          line_of_business: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"] | null
+          policy_number: string | null
+          premium: number | null
+          status: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_detailed_audit_log: {
@@ -1742,6 +1856,10 @@ export type Database = {
           new_role: Database["public"]["Enums"]["user_role"]
           target_user_id: string
         }
+        Returns: undefined
+      }
+      upsert_membership: {
+        Args: { p_account: string; p_role?: string; p_user: string }
         Returns: undefined
       }
     }
