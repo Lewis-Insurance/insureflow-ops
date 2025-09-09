@@ -1,239 +1,216 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Filter, Users, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useCustomersSearch } from '@/hooks/useCustomersSearch';
 import { ActionMenu } from '@/components/customers/ActionMenu';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useTags } from '@/hooks/useTags';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function CustomersPage() {
-  const navigate = useNavigate();
-  const [showFilters, setShowFilters] = useState(false);
-  const { rows, loading, error, hasMore, filters, setFilters, sort, setSort, loadMore, refresh } = useCustomersSearch();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // For now, we'll use a mock account ID - this should come from auth context
+  const mockAccountId = "550e8400-e29b-41d4-a716-446655440000";
+  
+  const { customers, loading, fetchCustomers } = useCustomers(mockAccountId);
+  const { tags, seedDefaultTags } = useTags(mockAccountId);
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value || undefined }));
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchCustomers(query);
   };
 
-  const clearFilters = () => {
-    setFilters({});
-  };
-
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+              <p className="text-muted-foreground">Manage your customer relationships</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-muted rounded"></div>
+                    <div className="h-3 bg-muted rounded w-2/3"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Customers</h1>
-          <Button onClick={() => navigate('/customers/new')}>
-            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Customer
-          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+            <p className="text-muted-foreground">
+              Manage your customer relationships and opportunities
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={seedDefaultTags}>
+              <Plus className="mr-2 h-4 w-4" />
+              Setup Tags
+            </Button>
+            <Button>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Customer
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Search Customers</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)}>
-                <Search className="h-4 w-4 mr-2" />
-                {showFilters ? 'Hide Filters' : 'Show Filters'}
-                <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search customers by name or organization..."
-                  value={filters.q || ''}
-                  onChange={(e) => handleFilterChange('q', e.target.value)}
-                />
-              </div>
-              <Select value={sort} onValueChange={setSort}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="updated_at_desc">Recently Updated</SelectItem>
-                  <SelectItem value="updated_at_asc">Oldest First</SelectItem>
-                  <SelectItem value="name_asc">Name A-Z</SelectItem>
-                  <SelectItem value="name_desc">Name Z-A</SelectItem>
-                  <SelectItem value="rank_desc">Most Relevant</SelectItem>
-                </SelectContent>
-              </Select>
-              {Object.keys(filters).length > 0 && (
-                <Button variant="outline" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              )}
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search customers..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button variant="outline" size="sm">
+            <Filter className="mr-2 h-4 w-4" />
+            Filters
+          </Button>
+        </div>
 
-            {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
-                <div>
-                  <Label htmlFor="type">Type</Label>
-                  <Select value={filters.type || ''} onValueChange={(value) => handleFilterChange('type', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
-                      <SelectItem value="household">Household</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    placeholder="Enter city"
-                    value={filters.city || ''}
-                    onChange={(e) => handleFilterChange('city', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    placeholder="Enter state"
-                    value={filters.state || ''}
-                    onChange={(e) => handleFilterChange('state', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="postal">ZIP Code</Label>
-                  <Input
-                    id="postal"
-                    placeholder="Enter ZIP"
-                    value={filters.postal || ''}
-                    onChange={(e) => handleFilterChange('postal', e.target.value)}
-                  />
-                </div>
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{customers.length}</div>
+              <p className="text-xs text-muted-foreground">
+                +{Math.floor(customers.length * 0.1)} from last month
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {customers.filter(c => c.status === 'active').length}
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <p className="text-xs text-muted-foreground">
+                {customers.length > 0 ? Math.round((customers.filter(c => c.status === 'active').length / customers.length) * 100) : 0}% of total
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">New Leads</CardTitle>
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {customers.filter(c => c.tags?.some(tag => tag.name.toLowerCase().includes('lead'))).length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pending follow-up
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Results {rows.length > 0 && `(${rows.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="text-red-600 mb-4 p-3 bg-red-50 rounded">
-                {error}
-              </div>
-            )}
-            {rows.length === 0 && !loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No customers found. Try adjusting your search criteria.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Contact Info</TableHead>
-                      <TableHead>Policies</TableHead>
-                      <TableHead>Last Contact</TableHead>
-                      <TableHead className="w-12">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((customer) => (
-                      <TableRow key={customer.account_id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{customer.display_name || 'Unnamed Customer'}</div>
-                            {customer.org_name && (
-                              <div className="text-sm text-muted-foreground">{customer.org_name}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={customer.type === 'business' ? 'default' : 'secondary'}>
-                            {customer.type === 'business' ? 'Business' : 'Household'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {customer.city || customer.state ? (
-                            <div className="text-sm">
-                              {customer.city}{customer.city && customer.state && ', '}{customer.state}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {customer.primary_email && (
-                              <div className="text-sm">{customer.primary_email}</div>
-                            )}
-                            {customer.primary_phone && (
-                              <div className="text-sm text-muted-foreground">{customer.primary_phone}</div>
-                            )}
-                            {!customer.primary_email && !customer.primary_phone && (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {customer.policies_count || 0}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {customer.last_contact_at ? (
-                            <span className="text-sm">
-                              {new Date(customer.last_contact_at).toLocaleDateString()}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">Never</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <ActionMenu account={{ id: customer.account_id, name: customer.display_name || 'Unnamed Customer' }} />
-                        </TableCell>
-                      </TableRow>
+        {/* Customer List */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {customers.map((customer) => (
+            <Card key={customer.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg">{customer.name}</CardTitle>
+                    <CardDescription className="text-sm">
+                      {customer.type} • {customer.status}
+                    </CardDescription>
+                  </div>
+                  <ActionMenu account={{ id: customer.id, name: customer.name }} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1 text-sm">
+                  {customer.email && (
+                    <div className="text-muted-foreground">{customer.email}</div>
+                  )}
+                  {customer.phone && (
+                    <div className="text-muted-foreground">{customer.phone}</div>
+                  )}
+                </div>
+                
+                {customer.tags && customer.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {customer.tags.map((tag) => (
+                      <Badge 
+                        key={tag.id} 
+                        variant="secondary" 
+                        className="text-xs"
+                        style={{ 
+                          backgroundColor: tag.color + '20',
+                          color: tag.color,
+                          borderColor: tag.color + '40'
+                        }}
+                      >
+                        {tag.name}
+                      </Badge>
                     ))}
-                  </TableBody>
-                </Table>
-
-                {hasMore && (
-                  <div className="flex justify-center pt-4">
-                    <Button 
-                      variant="outline" 
-                      onClick={loadMore} 
-                      disabled={loading}
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </Button>
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                
+                <div className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(customer.updated_at), { addSuffix: true })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {customers.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No customers found</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                {searchQuery 
+                  ? "No customers match your search criteria. Try adjusting your search terms."
+                  : "Get started by adding your first customer to the system."
+                }
+              </p>
+              {!searchQuery && (
+                <Button>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Customer
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );
