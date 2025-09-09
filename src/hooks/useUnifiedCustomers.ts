@@ -75,7 +75,7 @@ export function useUnifiedCustomers() {
           phone: customerData.phone,
           city: customerData.city,
           state: customerData.state,
-          type: (customerData.type || 'household') as any,
+          type: (customerData.type === 'business' ? 'commercial_business' : 'household') as any,
           account_status: (customerData.status || 'lead') as any
         }])
         .select()
