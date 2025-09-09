@@ -4,6 +4,9 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+// Import the custom rule
+const noDeprecatedDomainTerms = require('./eslint-rules/no-deprecated-domain-terms.js');
+
 export default tseslint.config(
   { ignores: ["dist"] },
   {
@@ -16,12 +19,18 @@ export default tseslint.config(
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      "local": {
+        rules: {
+          'no-deprecated-domain-terms': noDeprecatedDomainTerms
+        }
+      }
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
       "no-console": ["error", { "allow": ["warn", "error"] }],
+      "local/no-deprecated-domain-terms": "error",
     },
   },
 );
