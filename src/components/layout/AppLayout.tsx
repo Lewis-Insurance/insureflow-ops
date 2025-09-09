@@ -52,11 +52,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                 to="/customers" 
               />
               <NavItem 
-                icon={Building2} 
-                label="Insureds (Legacy)" 
-                to="/insureds" 
-              />
-              <NavItem 
                 icon={FileText} 
                 label="Policies" 
                 to="/policies" 
