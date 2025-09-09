@@ -1869,6 +1869,7 @@ export type Database = {
           search_vector: unknown | null
           status: string | null
           tags: string[] | null
+          type: string | null
           updated_at: string
         }
         Insert: {
@@ -1886,6 +1887,7 @@ export type Database = {
           search_vector?: unknown | null
           status?: string | null
           tags?: string[] | null
+          type?: string | null
           updated_at?: string
         }
         Update: {
@@ -1903,6 +1905,7 @@ export type Database = {
           search_vector?: unknown | null
           status?: string | null
           tags?: string[] | null
+          type?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3291,7 +3294,7 @@ export type Database = {
         Args: {
           p_after_id?: string
           p_after_updated_at?: string
-          p_filters: Json
+          p_filters?: Json
           p_limit?: number
           p_sort?: string
         }
