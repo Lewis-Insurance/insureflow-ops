@@ -3,27 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export interface Customer {
-  account_id: string;
-  display_name: string | null;
-  org_name: string | null;
-  type: string | null;
-  city: string | null;
-  state: string | null;
-  primary_email: string | null;
-  primary_phone: string | null;
-  policies_count: number | null;
-  balance: number | null;
-  last_contact_at: string | null;
-  created_at: string;
-  updated_at: string;
-  rank?: number;
-  // Computed fields for compatibility
   id: string;
+  account_id: string;
   name: string;
   email?: string;
   phone?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
   status: string;
+  type: string;
   notes_summary?: string;
+  created_at: string;
+  updated_at: string;
   tags?: Array<{
     id: string;
     name: string;
@@ -39,28 +34,17 @@ export function useCustomers(accountId?: string) {
   const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('customers_search_v1', {
-        p_filters: { q: searchQuery },
-        p_limit: limit,
-        p_offset: offset,
-        p_sort: 'updated_at_desc'
+      const { data, error } = await supabase.rpc('customers_search', {
+        q: searchQuery || null,
+        p_account_id: accountId,
+        limit_count: limit,
+        offset_count: offset
       });
 
       if (error) throw error;
       
-      // Transform the data to match our Customer interface
-      const transformedData = (data || []).map((row: any) => ({
-        ...row,
-        id: row.account_id,
-        name: row.display_name || row.org_name || 'Unknown',
-        email: row.primary_email,
-        phone: row.primary_phone,
-        status: 'active', // Default status since it's not in the RPC response
-        notes_summary: null,
-        tags: []
-      }));
-      
-      setCustomers(transformedData);
+      // Data comes directly from customers table with correct field names
+      setCustomers(data || []);
       setError(null);
     } catch (err: any) {
       setError(err.message);
