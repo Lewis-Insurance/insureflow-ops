@@ -157,7 +157,7 @@ export default function CustomerEdit() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="household">Household</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="commercial_business">Commercial Business</SelectItem>
                 </SelectContent>
               </Select>
             </div>
