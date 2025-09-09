@@ -2260,6 +2260,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           id: string
+          title: string | null
         }
         Insert: {
           account_id: string
@@ -2268,6 +2269,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          title?: string | null
         }
         Update: {
           account_id?: string
@@ -2276,6 +2278,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          title?: string | null
         }
         Relationships: [
           {
@@ -2941,6 +2944,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           description: string | null
+          details: string | null
           due_at: string | null
           entity_id: string | null
           entity_type: string | null
@@ -2958,13 +2962,14 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           description?: string | null
+          details?: string | null
           due_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: Database["public"]["Enums"]["task_status"]
-          title: string
+          title?: string
           updated_at?: string
         }
         Update: {
@@ -2975,6 +2980,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           description?: string | null
+          details?: string | null
           due_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
