@@ -14,6 +14,11 @@ const CRM = React.lazy(() => import("./pages/CRM"));
 const AccountDetail = React.lazy(() => import("./pages/AccountDetail"));
 const InsuredsPage = React.lazy(() => import("./pages/InsuredsPage"));
 const CustomersPage = React.lazy(() => import("./pages/CustomersPage"));
+const CustomerDetail = React.lazy(() => import("./pages/CustomerDetail"));
+const CustomerEdit = React.lazy(() => import("./pages/CustomerEdit"));
+const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
+const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
+const MessageNew = React.lazy(() => import("./pages/MessageNew"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
@@ -64,6 +69,46 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CustomersPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/customers/:id" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CustomerDetail />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/customers/:id/edit" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CustomerEdit />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/quotes/new" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <QuoteNew />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/claims/new" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ClaimNew />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/messages/new" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <MessageNew />
                   </ErrorBoundary>
                 } 
               />

@@ -10,7 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useCustomersSearch } from '@/hooks/useCustomersSearch';
-import { ChevronDown, Search, X, MoreVertical, Eye, Edit, FileText, Plus, Upload, FileUp, Send, Flag } from 'lucide-react';
+import { ActionMenu } from '@/components/customers/ActionMenu';
+import { ChevronDown, Search, X } from 'lucide-react';
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -25,17 +26,6 @@ export default function CustomersPage() {
     setFilters({});
   };
 
-  const addNote = (accountId: string) => {
-    alert(`Add note for customer ${accountId}`);
-  };
-
-  const addTask = (accountId: string) => {
-    alert(`Add task for customer ${accountId}`);
-  };
-
-  const flagDup = (accountId: string) => {
-    alert(`Flag duplicate for customer ${accountId}`);
-  };
 
   return (
     <AppLayout>
@@ -43,7 +33,9 @@ export default function CustomersPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Customers</h1>
           <Button onClick={() => navigate('/customers/new')}>
-            <Plus className="h-4 w-4 mr-2" />
+            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
             Add Customer
           </Button>
         </div>
@@ -220,51 +212,7 @@ export default function CustomersPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(`/accounts/${customer.account_id}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/accounts/${customer.account_id}/edit`)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Customer
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => addNote(customer.account_id)}>
-                                <FileText className="h-4 w-4 mr-2" />
-                                Add Note
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => addTask(customer.account_id)}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Task
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/quotes/new?account=${customer.account_id}`)}>
-                                <FileText className="h-4 w-4 mr-2" />
-                                Create Quote
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/documents/upload?account=${customer.account_id}`)}>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Document
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/claims/new?account=${customer.account_id}`)}>
-                                <FileUp className="h-4 w-4 mr-2" />
-                                Start Claim
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/communications/new?account=${customer.account_id}`)}>
-                                <Send className="h-4 w-4 mr-2" />
-                                Send Message
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => flagDup(customer.account_id)}>
-                                <Flag className="h-4 w-4 mr-2" />
-                                Flag Duplicate
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <ActionMenu account={{ id: customer.account_id, name: customer.display_name || 'Unnamed Customer' }} />
                         </TableCell>
                       </TableRow>
                     ))}
