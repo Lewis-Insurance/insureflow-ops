@@ -1343,6 +1343,52 @@ export type Database = {
         }
         Relationships: []
       }
+      duplicate_flags: {
+        Row: {
+          account_id: string
+          created_at: string
+          flagged_by: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          flagged_by: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          flagged_by?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_flags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_flags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_flags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       duplicate_groups: {
         Row: {
           created_at: string
@@ -2084,6 +2130,52 @@ export type Database = {
           survivor_id?: string
         }
         Relationships: []
+      }
+      notes: {
+        Row: {
+          account_id: string
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          account_id: string
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          account_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
