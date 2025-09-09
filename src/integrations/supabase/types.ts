@@ -1124,6 +1124,127 @@ export type Database = {
           },
         ]
       }
+      customer_tags: {
+        Row: {
+          created_at: string
+          customer_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_tags_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          account_id: string
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          email: string | null
+          external_ref: string | null
+          id: string
+          name: string
+          notes_summary: string | null
+          phone: string | null
+          postal_code: string | null
+          search_vector: unknown | null
+          state: string | null
+          status: string | null
+          type: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          external_ref?: string | null
+          id?: string
+          name: string
+          notes_summary?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          search_vector?: unknown | null
+          state?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          external_ref?: string | null
+          id?: string
+          name?: string
+          notes_summary?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          search_vector?: unknown | null
+          state?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_export_requests: {
         Row: {
           completed_at: string | null
@@ -2137,6 +2258,7 @@ export type Database = {
           author_id: string
           body: string
           created_at: string
+          customer_id: string | null
           id: string
         }
         Insert: {
@@ -2144,6 +2266,7 @@ export type Database = {
           author_id: string
           body: string
           created_at?: string
+          customer_id?: string | null
           id?: string
         }
         Update: {
@@ -2151,6 +2274,7 @@ export type Database = {
           author_id?: string
           body?: string
           created_at?: string
+          customer_id?: string | null
           id?: string
         }
         Relationships: [
@@ -2173,6 +2297,81 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunities: {
+        Row: {
+          account_id: string
+          close_date: string | null
+          created_at: string
+          customer_id: string | null
+          expected_value: number | null
+          id: string
+          name: string
+          source: string | null
+          stage: Database["public"]["Enums"]["opportunity_stage"]
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          close_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          expected_value?: number | null
+          id?: string
+          name: string
+          source?: string | null
+          stage?: Database["public"]["Enums"]["opportunity_stage"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          close_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          expected_value?: number | null
+          id?: string
+          name?: string
+          source?: string | null
+          stage?: Database["public"]["Enums"]["opportunity_stage"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -2684,6 +2883,55 @@ export type Database = {
           },
         ]
       }
+      tags: {
+        Row: {
+          account_id: string
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           account_id: string | null
@@ -2691,6 +2939,7 @@ export type Database = {
           assignee_id: string | null
           completed_at: string | null
           created_at: string
+          customer_id: string | null
           description: string | null
           due_at: string | null
           entity_id: string | null
@@ -2707,6 +2956,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
+          customer_id?: string | null
           description?: string | null
           due_at?: string | null
           entity_id?: string | null
@@ -2723,6 +2973,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
+          customer_id?: string | null
           description?: string | null
           due_at?: string | null
           entity_id?: string | null
@@ -2753,6 +3004,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -3236,6 +3494,15 @@ export type Database = {
       }
     }
     Functions: {
+      add_tag_to_customer: {
+        Args: {
+          p_account_id: string
+          p_color?: string
+          p_customer_id: string
+          p_tag_name: string
+        }
+        Returns: undefined
+      }
       compute_insured_search_vector: {
         Args: { p_account_id: string }
         Returns: unknown
@@ -3253,6 +3520,35 @@ export type Database = {
           p_metadata?: Json
         }
         Returns: string
+      }
+      customers_search: {
+        Args: {
+          limit_count?: number
+          offset_count?: number
+          p_account_id: string
+          q: string
+        }
+        Returns: {
+          account_id: string
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          email: string | null
+          external_ref: string | null
+          id: string
+          name: string
+          notes_summary: string | null
+          phone: string | null
+          postal_code: string | null
+          search_vector: unknown | null
+          state: string | null
+          status: string | null
+          type: string | null
+          updated_at: string
+          website: string | null
+        }[]
       }
       customers_search_v1: {
         Args: {
@@ -3468,6 +3764,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { uid: string }
         Returns: boolean
       }
+      is_member: {
+        Args: { account: string; roles?: string[] }
+        Returns: boolean
+      }
       is_staff: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -3519,6 +3819,10 @@ export type Database = {
           label: string
           phone: string
         }[]
+      }
+      seed_default_tags: {
+        Args: { p_account_id: string }
+        Returns: undefined
       }
       set_user_role: {
         Args: {
@@ -3618,6 +3922,14 @@ export type Database = {
         | "divorced"
         | "widowed"
         | "separated"
+      note_type: "general" | "call" | "email" | "meeting" | "system"
+      opportunity_stage:
+        | "new"
+        | "qualified"
+        | "proposal"
+        | "negotiation"
+        | "won"
+        | "lost"
       payment_method_crm:
         | "cash"
         | "check"
@@ -3860,6 +4172,15 @@ export const Constants = {
         "divorced",
         "widowed",
         "separated",
+      ],
+      note_type: ["general", "call", "email", "meeting", "system"],
+      opportunity_stage: [
+        "new",
+        "qualified",
+        "proposal",
+        "negotiation",
+        "won",
+        "lost",
       ],
       payment_method_crm: [
         "cash",
