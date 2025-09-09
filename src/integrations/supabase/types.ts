@@ -45,14 +45,14 @@ export type Database = {
             foreignKeyName: "account_memberships_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "v_accounts"
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "account_memberships_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -85,6 +85,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -194,6 +201,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -434,6 +448,13 @@ export type Database = {
             foreignKeyName: "businesses_primary_contact_id_fkey"
             columns: ["primary_contact_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "businesses_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
             referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
@@ -500,6 +521,13 @@ export type Database = {
             foreignKeyName: "call_sessions_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -508,6 +536,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -691,6 +726,13 @@ export type Database = {
             foreignKeyName: "commercial_business_accounts_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: true
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -699,6 +741,13 @@ export type Database = {
             columns: ["primary_contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -765,6 +814,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -840,6 +896,13 @@ export type Database = {
             foreignKeyName: "consent_evidence_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_evidence_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
@@ -894,6 +957,13 @@ export type Database = {
             foreignKeyName: "consents_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -927,6 +997,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1077,6 +1154,13 @@ export type Database = {
             foreignKeyName: "contacts_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -1119,15 +1203,7 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "data_export_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       detailed_audit_logs: {
         Row: {
@@ -1244,6 +1320,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -1389,22 +1472,7 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "email_change_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_change_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       enhanced_audit_logs: {
         Row: {
@@ -1515,6 +1583,13 @@ export type Database = {
             foreignKeyName: "household_accounts_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: true
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -1529,6 +1604,13 @@ export type Database = {
             foreignKeyName: "household_accounts_head_contact_id_fkey"
             columns: ["head_contact_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_head_contact_id_fkey"
+            columns: ["head_contact_id"]
+            isOneToOne: false
             referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
@@ -1537,6 +1619,13 @@ export type Database = {
             columns: ["spouse_contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_spouse_contact_id_fkey"
+            columns: ["spouse_contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1588,22 +1677,7 @@ export type Database = {
           target_user_id?: string
           user_agent?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "impersonation_logs_impersonator_id_fkey"
-            columns: ["impersonator_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "impersonation_logs_target_user_id_fkey"
-            columns: ["target_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       import_batches: {
         Row: {
@@ -1758,6 +1832,13 @@ export type Database = {
             foreignKeyName: "insured_addresses_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_addresses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -1797,6 +1878,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -1845,6 +1933,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_phones_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -1923,6 +2018,13 @@ export type Database = {
             foreignKeyName: "insured_profiles_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: true
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -1977,6 +2079,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
@@ -2113,15 +2222,7 @@ export type Database = {
           verification_code?: string
           verified?: boolean | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "phone_verification_codes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       policies: {
         Row: {
@@ -2202,6 +2303,13 @@ export type Database = {
             foreignKeyName: "policies_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -2244,78 +2352,6 @@ export type Database = {
           ip_address?: unknown | null
           target_user_id?: string
           user_agent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_access_logs_accessor_user_id_fkey"
-            columns: ["accessor_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_access_logs_target_user_id_fkey"
-            columns: ["target_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          backup_codes: string[] | null
-          created_at: string
-          full_name: string | null
-          id: string
-          is_staff: boolean
-          locale: string | null
-          mfa_enabled: boolean | null
-          mfa_secret: string | null
-          notification_email: boolean | null
-          notification_sms: boolean | null
-          phone: string | null
-          phone_verification_sent_at: string | null
-          phone_verified: boolean | null
-          role: Database["public"]["Enums"]["user_role"]
-          timezone: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          backup_codes?: string[] | null
-          created_at?: string
-          full_name?: string | null
-          id: string
-          is_staff?: boolean
-          locale?: string | null
-          mfa_enabled?: boolean | null
-          mfa_secret?: string | null
-          notification_email?: boolean | null
-          notification_sms?: boolean | null
-          phone?: string | null
-          phone_verification_sent_at?: string | null
-          phone_verified?: boolean | null
-          role?: Database["public"]["Enums"]["user_role"]
-          timezone?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          backup_codes?: string[] | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          is_staff?: boolean
-          locale?: string | null
-          mfa_enabled?: boolean | null
-          mfa_secret?: string | null
-          notification_email?: boolean | null
-          notification_sms?: boolean | null
-          phone?: string | null
-          phone_verification_sent_at?: string | null
-          phone_verified?: boolean | null
-          role?: Database["public"]["Enums"]["user_role"]
-          timezone?: string | null
         }
         Relationships: []
       }
@@ -2389,6 +2425,13 @@ export type Database = {
             foreignKeyName: "quotes_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -2444,22 +2487,7 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "role_change_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_change_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       saved_views: {
         Row: {
@@ -2558,6 +2586,13 @@ export type Database = {
             foreignKeyName: "sms_messages_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -2566,6 +2601,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2638,14 +2680,14 @@ export type Database = {
             foreignKeyName: "tasks_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "v_accounts"
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_assignee_id_fkey"
-            columns: ["assignee_id"]
+            foreignKeyName: "tasks_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -2732,6 +2774,13 @@ export type Database = {
             foreignKeyName: "twilio_consents_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twilio_consents_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
@@ -2777,18 +2826,78 @@ export type Database = {
           user_agent?: string | null
           user_id?: string
         }
+        Relationships: []
+      }
+    }
+    Views: {
+      insureds: {
+        Row: {
+          email: string | null
+          id: string | null
+          name: string | null
+          phone: string | null
+          primary_contact_email: string | null
+          search_vector: unknown | null
+          type: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          last_name: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string | null
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string | null
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "user_sessions_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
       }
-    }
-    Views: {
       v_accounts: {
         Row: {
           account_status: Database["public"]["Enums"]["account_status"] | null
@@ -2881,6 +2990,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -3031,6 +3147,13 @@ export type Database = {
             foreignKeyName: "contacts_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "insureds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
@@ -3055,14 +3178,14 @@ export type Database = {
             foreignKeyName: "account_memberships_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "v_accounts"
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "account_memberships_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "v_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -3086,17 +3209,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "account_memberships_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "policies_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "accounts"
+            referencedRelation: "insureds"
             referencedColumns: ["id"]
           },
           {
