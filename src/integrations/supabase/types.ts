@@ -1697,6 +1697,231 @@ export type Database = {
           },
         ]
       }
+      insured_addresses: {
+        Row: {
+          account_id: string
+          city: string
+          country: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          kind: string | null
+          line1: string
+          line2: string | null
+          postal_code: string
+          state: string
+          updated_at: string
+          verified_status: string | null
+        }
+        Insert: {
+          account_id: string
+          city: string
+          country?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          kind?: string | null
+          line1: string
+          line2?: string | null
+          postal_code: string
+          state: string
+          updated_at?: string
+          verified_status?: string | null
+        }
+        Update: {
+          account_id?: string
+          city?: string
+          country?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          kind?: string | null
+          line1?: string
+          line2?: string | null
+          postal_code?: string
+          state?: string
+          updated_at?: string
+          verified_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insured_addresses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_addresses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insured_emails: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          id: string
+          is_primary: boolean
+          is_verified: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          id?: string
+          is_primary?: boolean
+          is_verified?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_primary?: boolean
+          is_verified?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insured_emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insured_phones: {
+        Row: {
+          account_id: string
+          created_at: string
+          do_not_call: boolean
+          e164: string
+          id: string
+          is_primary: boolean
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          do_not_call?: boolean
+          e164: string
+          id?: string
+          is_primary?: boolean
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          do_not_call?: boolean
+          e164?: string
+          id?: string
+          is_primary?: boolean
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insured_phones_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_phones_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insured_profiles: {
+        Row: {
+          account_id: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          first_name: string | null
+          last_contact_at: string | null
+          last_name: string | null
+          org_name: string | null
+          primary_address_id: string | null
+          primary_email_id: string | null
+          primary_phone_id: string | null
+          search_vector: unknown | null
+          status: string | null
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          first_name?: string | null
+          last_contact_at?: string | null
+          last_name?: string | null
+          org_name?: string | null
+          primary_address_id?: string | null
+          primary_email_id?: string | null
+          primary_phone_id?: string | null
+          search_vector?: unknown | null
+          status?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          first_name?: string | null
+          last_contact_at?: string | null
+          last_name?: string | null
+          org_name?: string | null
+          primary_address_id?: string | null
+          primary_email_id?: string | null
+          primary_phone_id?: string | null
+          search_vector?: unknown | null
+          status?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insured_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           account_id: string
@@ -2886,6 +3111,10 @@ export type Database = {
       }
     }
     Functions: {
+      compute_insured_search_vector: {
+        Args: { p_account_id: string }
+        Returns: unknown
+      }
       create_account_with_membership: {
         Args: { account_data: Json; owner_user_id: string }
         Returns: Json
@@ -2902,6 +3131,10 @@ export type Database = {
       }
       decrypt_ssn: {
         Args: { enc: string }
+        Returns: string
+      }
+      digits_only: {
+        Args: { "": string }
         Returns: string
       }
       encrypt_ssn: {
@@ -3053,6 +3286,30 @@ export type Database = {
       has_sms_consent: {
         Args: { target_contact_id: string }
         Returns: boolean
+      }
+      insureds_search_v1: {
+        Args: {
+          p_after_id?: string
+          p_after_updated_at?: string
+          p_filters: Json
+          p_limit?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          balance: number
+          city: string
+          created_at: string
+          display_name: string
+          last_contact_at: string
+          org_name: string
+          policies_count: number
+          primary_email: string
+          primary_phone: string
+          state: string
+          type: string
+          updated_at: string
+        }[]
       }
       is_account_member: {
         Args: { a_id: string }
