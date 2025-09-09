@@ -6,18 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ActionMenu } from '@/components/customers/ActionMenu';
-import { useCustomers } from '@/hooks/useCustomers';
+import { useUnifiedCustomers } from '@/hooks/useUnifiedCustomers';
 import { useTags } from '@/hooks/useTags';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   
-  // For now, we'll use a mock account ID - this should come from auth context
-  const mockAccountId = "550e8400-e29b-41d4-a716-446655440000";
-  
-  const { customers, loading, fetchCustomers } = useCustomers(mockAccountId);
-  const { tags, seedDefaultTags } = useTags(mockAccountId);
+  // Use unified customers hook that works with the accounts table
+  const { customers, loading, fetchCustomers } = useUnifiedCustomers();
+  const { tags, seedDefaultTags } = useTags();  // Remove mock account ID for now
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -67,7 +65,7 @@ export default function CustomersPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={seedDefaultTags}>
+            <Button variant="outline" onClick={() => seedDefaultTags()}>
               <Plus className="mr-2 h-4 w-4" />
               Setup Tags
             </Button>
@@ -130,7 +128,7 @@ export default function CustomersPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {customers.filter(c => c.tags?.some(tag => tag.name.toLowerCase().includes('lead'))).length}
+                {customers.filter(c => c.status?.toLowerCase().includes('lead')).length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Pending follow-up
@@ -146,42 +144,25 @@ export default function CustomersPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">{customer.name}</CardTitle>
+                    <CardTitle className="text-lg">{customer.display_name || customer.name}</CardTitle>
                     <CardDescription className="text-sm">
                       {customer.type} • {customer.status}
                     </CardDescription>
                   </div>
-                  <ActionMenu account={{ id: customer.id, name: customer.name }} />
+                  <ActionMenu account={{ id: customer.id, name: customer.display_name || customer.name }} />
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1 text-sm">
-                  {customer.email && (
-                    <div className="text-muted-foreground">{customer.email}</div>
+                  {(customer.email || customer.primary_email) && (
+                    <div className="text-muted-foreground">{customer.email || customer.primary_email}</div>
                   )}
-                  {customer.phone && (
-                    <div className="text-muted-foreground">{customer.phone}</div>
+                  {(customer.phone || customer.primary_phone) && (
+                    <div className="text-muted-foreground">{customer.phone || customer.primary_phone}</div>
                   )}
                 </div>
                 
-                {customer.tags && customer.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {customer.tags.map((tag) => (
-                      <Badge 
-                        key={tag.id} 
-                        variant="secondary" 
-                        className="text-xs"
-                        style={{ 
-                          backgroundColor: tag.color + '20',
-                          color: tag.color,
-                          borderColor: tag.color + '40'
-                        }}
-                      >
-                        {tag.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                {/* Remove tags display for now since we're working with unified data */}
                 
                 <div className="text-xs text-muted-foreground">
                   Updated {formatDistanceToNow(new Date(customer.updated_at), { addSuffix: true })}

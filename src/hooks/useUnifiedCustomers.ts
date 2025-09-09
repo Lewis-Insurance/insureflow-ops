@@ -2,48 +2,47 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-export interface Customer {
+export interface UnifiedCustomer {
   id: string;
   account_id: string;
   name: string;
+  display_name: string;
+  org_name?: string;
+  type: string;
   email?: string;
   phone?: string;
-  address_line1?: string;
-  address_line2?: string;
+  primary_email?: string;
+  primary_phone?: string;
   city?: string;
   state?: string;
   postal_code?: string;
-  country?: string;
   status: string;
-  type: string;
   notes_summary?: string;
+  policies_count: number;
+  balance?: number;
+  last_contact_at?: string;
   created_at: string;
   updated_at: string;
-  tags?: Array<{
-    id: string;
-    name: string;
-    color: string;
-  }>;
+  rank?: number;
 }
 
-export function useCustomers(accountId?: string) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+export function useUnifiedCustomers() {
+  const [customers, setCustomers] = useState<UnifiedCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0) => {
+  const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0, sort = 'updated_at_desc') => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('customers_search', {
-        q: searchQuery || null,
-        p_account_id: null, // Remove account filtering for now to get all unified customers
-        limit_count: limit,
-        offset_count: offset
+      const { data, error } = await supabase.rpc('unified_customer_search', {
+        p_filters: { q: searchQuery },
+        p_limit: limit,
+        p_offset: offset,
+        p_sort: sort
       });
 
       if (error) throw error;
       
-      // Data comes directly from the unified view with correct field names
       setCustomers(data || []);
       setError(null);
     } catch (err: any) {
@@ -58,7 +57,15 @@ export function useCustomers(accountId?: string) {
     }
   };
 
-  const createCustomer = async (customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'tags'>) => {
+  const createCustomer = async (customerData: {
+    name: string;
+    email?: string;
+    phone?: string;
+    city?: string;
+    state?: string;
+    type?: string;
+    status?: string;
+  }) => {
     try {
       const { data, error } = await supabase
         .from('accounts')
@@ -66,14 +73,10 @@ export function useCustomers(accountId?: string) {
           name: customerData.name,
           email: customerData.email,
           phone: customerData.phone,
-          address_line1: customerData.address_line1,
-          address_line2: customerData.address_line2,
           city: customerData.city,
           state: customerData.state,
-          zip_code: customerData.postal_code,
-          type: customerData.type as any,
-          account_status: customerData.status as any,
-          notes: customerData.notes_summary
+          type: (customerData.type || 'household') as any,
+          account_status: (customerData.status || 'lead') as any
         }])
         .select()
         .single();
@@ -98,23 +101,29 @@ export function useCustomers(accountId?: string) {
     }
   };
 
-  const updateCustomer = async (id: string, updates: Partial<Customer>) => {
+  const updateCustomer = async (id: string, updates: Partial<{
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+    state: string;
+    type: string;
+    status: string;
+  }>) => {
     try {
+      const accountUpdates: any = {};
+      
+      if (updates.name) accountUpdates.name = updates.name;
+      if (updates.email) accountUpdates.email = updates.email;
+      if (updates.phone) accountUpdates.phone = updates.phone;
+      if (updates.city) accountUpdates.city = updates.city;
+      if (updates.state) accountUpdates.state = updates.state;
+      if (updates.type) accountUpdates.type = updates.type;
+      if (updates.status) accountUpdates.account_status = updates.status;
+
       const { data, error } = await supabase
         .from('accounts')
-        .update({
-          name: updates.name,
-          email: updates.email,
-          phone: updates.phone,
-          address_line1: updates.address_line1,
-          address_line2: updates.address_line2,
-          city: updates.city,
-          state: updates.state,
-          zip_code: updates.postal_code,
-          type: updates.type as any,
-          account_status: updates.status as any,
-          notes: updates.notes_summary
-        })
+        .update(accountUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -166,10 +175,8 @@ export function useCustomers(accountId?: string) {
   };
 
   useEffect(() => {
-    if (accountId) {
-      fetchCustomers();
-    }
-  }, [accountId]);
+    fetchCustomers();
+  }, []);
 
   return {
     customers,
