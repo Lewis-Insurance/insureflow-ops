@@ -252,7 +252,7 @@ const CRMContent = memo(() => {
             <CardContent className="pt-6">
               <GlobalSearch 
                 onResultSelect={handleGlobalSearchSelect}
-                placeholder="Search customers, accounts, businesses..."
+                placeholder="Search customers, insureds, accounts, businesses..."
               />
             </CardContent>
           </Card>

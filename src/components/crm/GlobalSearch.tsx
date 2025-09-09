@@ -15,7 +15,7 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ 
   onResultSelect, 
-  placeholder = "Search customers, accounts, businesses...",
+  placeholder = "Search customers, insureds, accounts, businesses...",
   className = ""
 }: GlobalSearchProps) {
   const [query, setQuery] = useState('');
@@ -141,7 +141,7 @@ export function GlobalSearch({
                         </div>
                       </div>
                       <Badge variant={getEntityBadgeVariant(result.entity_type)}>
-                        {result.entity_type}
+                        {result.entity_type === 'account' ? 'customer' : result.entity_type}
                       </Badge>
                     </div>
                   </button>
