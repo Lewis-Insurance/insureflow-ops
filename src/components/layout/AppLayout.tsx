@@ -47,6 +47,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 to="/crm" 
               />
               <NavItem 
+                icon={Building2} 
+                label="Insureds" 
+                to="/insureds" 
+              />
+              <NavItem 
                 icon={FileText} 
                 label="Policies" 
                 to="/policies" 
