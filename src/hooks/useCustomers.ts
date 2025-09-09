@@ -61,8 +61,20 @@ export function useCustomers(accountId?: string) {
   const createCustomer = async (customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'tags'>) => {
     try {
       const { data, error } = await supabase
-        .from('customers')
-        .insert([customerData])
+        .from('accounts')
+        .insert([{
+          name: customerData.name,
+          email: customerData.email,
+          phone: customerData.phone,
+          address_line1: customerData.address_line1,
+          address_line2: customerData.address_line2,
+          city: customerData.city,
+          state: customerData.state,
+          zip_code: customerData.postal_code,
+          type: customerData.type as any,
+          account_status: customerData.status as any,
+          notes: customerData.notes_summary
+        }])
         .select()
         .single();
 
@@ -89,8 +101,20 @@ export function useCustomers(accountId?: string) {
   const updateCustomer = async (id: string, updates: Partial<Customer>) => {
     try {
       const { data, error } = await supabase
-        .from('customers')
-        .update(updates)
+        .from('accounts')
+        .update({
+          name: updates.name,
+          email: updates.email,
+          phone: updates.phone,
+          address_line1: updates.address_line1,
+          address_line2: updates.address_line2,
+          city: updates.city,
+          state: updates.state,
+          zip_code: updates.postal_code,
+          type: updates.type as any,
+          account_status: updates.status as any,
+          notes: updates.notes_summary
+        })
         .eq('id', id)
         .select()
         .single();
@@ -118,8 +142,8 @@ export function useCustomers(accountId?: string) {
   const deleteCustomer = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('customers')
-        .delete()
+        .from('accounts')
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
