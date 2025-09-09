@@ -52,8 +52,12 @@ export function NotificationSettings() {
   useEffect(() => {
     if (profile) {
       setPreferences({
-        notification_email: profile.notification_email ?? true,
-        notification_sms: profile.notification_sms ?? false,
+        notification_email: typeof profile.notification_email === 'boolean' 
+          ? profile.notification_email 
+          : profile.notification_email === 'true',
+        notification_sms: typeof profile.notification_sms === 'boolean' 
+          ? profile.notification_sms 
+          : profile.notification_sms === 'true',
         timezone: profile.timezone ?? 'UTC',
         locale: profile.locale ?? 'en',
       });
@@ -73,8 +77,8 @@ export function NotificationSettings() {
       const { error } = await supabase
         .from('profiles')
         .update({
-          notification_email: preferences.notification_email,
-          notification_sms: preferences.notification_sms,
+          notification_email: preferences.notification_email.toString(),
+          notification_sms: preferences.notification_sms.toString(),
           timezone: preferences.timezone,
           locale: preferences.locale,
         })
@@ -101,8 +105,12 @@ export function NotificationSettings() {
   const resetPreferences = () => {
     if (profile) {
       setPreferences({
-        notification_email: profile.notification_email ?? true,
-        notification_sms: profile.notification_sms ?? false,
+        notification_email: typeof profile.notification_email === 'boolean' 
+          ? profile.notification_email 
+          : profile.notification_email === 'true',
+        notification_sms: typeof profile.notification_sms === 'boolean' 
+          ? profile.notification_sms 
+          : profile.notification_sms === 'true',
         timezone: profile.timezone ?? 'UTC',
         locale: profile.locale ?? 'en',
       });

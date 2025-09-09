@@ -16,12 +16,12 @@ interface AccessLog {
   action: string;
   details: any;
   ip_address: string | null;
-  user_agent: string;
+  user_agent: string | null;
   created_at: string;
   accessor_profile?: {
-    full_name: string;
+    full_name: string | null;
     role: string;
-  };
+  } | null;
 }
 
 export function AccessLogTab() {
@@ -42,8 +42,14 @@ export function AccessLogTab() {
       const { data, error } = await supabase
         .from('profile_access_logs')
         .select(`
-          *,
-          accessor_profile:profiles!accessor_user_id(full_name, role)
+          id,
+          accessor_user_id,
+          action,
+          details,
+          ip_address,
+          user_agent,
+          created_at,
+          target_user_id
         `)
         .eq('target_user_id', user.id)
         .order('created_at', { ascending: false })
@@ -51,10 +57,18 @@ export function AccessLogTab() {
 
       if (error) throw error;
 
-      setLogs((data || []).map(log => ({
+      // Transform the data to match our interface
+      const transformedLogs: AccessLog[] = (data || []).map(log => ({
         ...log,
-        ip_address: log.ip_address as string || 'Unknown'
-      })));
+        ip_address: (log.ip_address as string) || 'Unknown',
+        user_agent: log.user_agent || 'Unknown',
+        accessor_profile: log.accessor_user_id ? { 
+          full_name: 'Unknown User',
+          role: 'staff'
+        } : null
+      }));
+
+      setLogs(transformedLogs);
     } catch (error: any) {
       toast({
         title: "Error loading access logs",

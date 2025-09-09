@@ -13,8 +13,8 @@ interface UserProfile {
   created_at: string;
   mfa_enabled?: boolean;
   phone_verified?: boolean;
-  notification_email?: boolean;
-  notification_sms?: boolean;
+  notification_email?: string | boolean;
+  notification_sms?: string | boolean;
   timezone?: string;
   locale?: string;
   avatar_url?: string | null;
@@ -48,7 +48,16 @@ export function useAuth() {
       return;
     }
 
-    setProfile(profileData);
+    if (profileData) {
+      setProfile({
+        ...profileData,
+        role: (profileData.role as UserProfile['role']) || 'customer',
+        notification_email: typeof profileData.notification_email === 'string' 
+          ? profileData.notification_email === 'true' 
+          : Boolean(profileData.notification_email),
+        notification_sms: false // Default since field doesn't exist in database yet
+      });
+    }
   }, [user?.email]);
 
   useEffect(() => {
