@@ -40,25 +40,25 @@ export default function InsuredsPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Insureds</h1>
+          <h1 className="text-3xl font-bold">Customers</h1>
         </div>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl">Search</CardTitle>
+            <CardTitle className="text-xl">Search Customers</CardTitle>
             <Button variant="ghost" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'}</Button>
           </CardHeader>
           {open && (
             <CardContent className="grid grid-cols-1 md:grid-cols-6 gap-3">
-              <Input placeholder="Name / phone / email / city / policy…" value={filters.q ?? ''} onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} className="md:col-span-3" />
+              <Input placeholder="Search customers..." value={filters.q ?? ''} onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} className="md:col-span-3" />
               <Input placeholder="City" value={filters.city ?? ''} onChange={e => setFilters(f => ({ ...f, city: e.target.value }))} />
               <Input placeholder="State" value={filters.state ?? ''} onChange={e => setFilters(f => ({ ...f, state: e.target.value }))} />
               <Input placeholder="ZIP" value={filters.postal ?? ''} onChange={e => setFilters(f => ({ ...f, postal: e.target.value }))} />
               <select className="border rounded px-3 py-2" value={filters.type ?? ''} onChange={e => setFilters(f => ({ ...f, type: e.target.value || undefined }))}>
-                <option value="">All types</option>
-                <option value="individual">Individual</option>
-                <option value="business">Business</option>
-                <option value="household">Household</option>
+                <option value="">All Types</option>
+                <option value="individual">Individuals</option>
+                <option value="business">Businesses</option>
+                <option value="household">Households</option>
               </select>
               <select className="border rounded px-3 py-2" value={sort} onChange={e => setSort(e.target.value as any)}>
                 <option value="updated_at_desc">Updated ↓</option>
@@ -78,7 +78,7 @@ export default function InsuredsPage() {
           </CardHeader>
           <CardContent>
             {rows.length === 0 && !loading ? (
-              <div className="text-sm text-muted-foreground">No insureds match your filters.</div>
+              <div className="text-sm text-muted-foreground">No customers match your filters.</div>
             ) : (
               <div className="w-full overflow-auto">
                 <table className="w-full text-sm">
