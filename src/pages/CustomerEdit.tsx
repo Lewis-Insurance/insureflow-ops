@@ -51,7 +51,7 @@ export default function CustomerEdit() {
 
         setData({
           name: account.name || '',
-          type: account.type || 'household',
+          type: account.type === 'commercial_business' ? 'business' : (account.type || 'household'),
           email: account.email || '',
           phone: account.phone || '',
         });
@@ -79,7 +79,7 @@ export default function CustomerEdit() {
           .from('accounts')
           .update({
             name: data.name.trim(),
-            type: data.type as any,
+            type: data.type === 'business' ? 'commercial_business' : data.type as any,
             email: data.email?.trim() || null,
             phone: data.phone?.trim() || null,
           })
@@ -157,7 +157,7 @@ export default function CustomerEdit() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="household">Household</SelectItem>
-                  <SelectItem value="commercial_business">Commercial Business</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
                 </SelectContent>
               </Select>
             </div>
