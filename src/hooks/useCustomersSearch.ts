@@ -15,7 +15,7 @@ export type CustomerRow = {
   last_contact_at: string | null;
   created_at: string;
   updated_at: string;
-  rank: number | null;
+  rank?: number;
 };
 
 export type CustomerFilters = {
@@ -38,6 +38,7 @@ export function useCustomersSearch(initial: CustomerFilters = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string|null>(null);
   const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const debRef = useRef<number | undefined>(undefined);
 
   const run = async (reset = false) => {
@@ -51,21 +52,21 @@ export function useCustomersSearch(initial: CustomerFilters = {}) {
       p_offset: currentOffset,
       p_sort: sort,
     };
-    
-    const { data, error } = await supabase.rpc('customers_search_v1', payload);
-    if (error) { 
-      setError(error.message); 
-      setLoading(false); 
-      return; 
-    }
-    
-    const list = (data ?? []) as CustomerRow[];
-    setRows(reset ? list : [...rows, ...list]);
-    
-    if (reset) {
-      setOffset(list.length);
-    } else {
-      setOffset(currentOffset + list.length);
+
+    try {
+      const { data, error } = await supabase.rpc('customers_search_v1', payload);
+      if (error) { 
+        setError(error.message); 
+        setLoading(false); 
+        return; 
+      }
+      
+      const list = (data ?? []) as CustomerRow[];
+      setRows(reset ? list : [...rows, ...list]);
+      setHasMore(list.length === 25);
+      setOffset(reset ? 25 : currentOffset + 25);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
     }
     
     setLoading(false);
@@ -80,15 +81,23 @@ export function useCustomersSearch(initial: CustomerFilters = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filters), sort]);
 
+  const setSortTyped = (value: string) => {
+    setSort(value as typeof sort);
+  };
+
   return {
     rows, 
     loading, 
     error,
+    hasMore,
     filters, 
     setFilters,
     sort, 
-    setSort,
+    setSort: setSortTyped,
     loadMore: () => run(false),
-    refresh: () => run(true),
+    refresh: () => {
+      setOffset(0);
+      run(true);
+    },
   };
 }

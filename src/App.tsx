@@ -13,6 +13,7 @@ const Auth = React.lazy(() => import("./pages/Auth"));
 const CRM = React.lazy(() => import("./pages/CRM"));
 const AccountDetail = React.lazy(() => import("./pages/AccountDetail"));
 const InsuredsPage = React.lazy(() => import("./pages/InsuredsPage"));
+const CustomersPage = React.lazy(() => import("./pages/CustomersPage"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
@@ -55,6 +56,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AccountDetail />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/customers" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CustomersPage />
                   </ErrorBoundary>
                 } 
               />
