@@ -115,6 +115,7 @@ export type Database = {
           notes: string | null
           owner_agent_id: string | null
           phone: string | null
+          search_vector: unknown | null
           source: string | null
           state: string | null
           team_id: string | null
@@ -142,6 +143,7 @@ export type Database = {
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
+          search_vector?: unknown | null
           source?: string | null
           state?: string | null
           team_id?: string | null
@@ -169,6 +171,7 @@ export type Database = {
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
+          search_vector?: unknown | null
           source?: string | null
           state?: string | null
           team_id?: string | null
@@ -3131,6 +3134,30 @@ export type Database = {
           p_metadata?: Json
         }
         Returns: string
+      }
+      customers_search_v1: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          balance: number
+          city: string
+          created_at: string
+          display_name: string
+          last_contact_at: string
+          org_name: string
+          policies_count: number
+          primary_email: string
+          primary_phone: string
+          rank: number
+          state: string
+          type: string
+          updated_at: string
+        }[]
       }
       decrypt_ssn: {
         Args: { enc: string }
