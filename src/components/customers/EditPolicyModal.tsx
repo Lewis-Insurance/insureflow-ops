@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { z } from 'zod';
 
 const policySchema = z.object({
@@ -55,6 +56,10 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  
+  // Fetch carriers and lines of business
+  const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
+  const { data: linesOfBusiness = [], isLoading: lobLoading } = useLinesOfBusiness();
 
   useEffect(() => {
     if (policy) {
@@ -170,13 +175,20 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
             </div>
             <div>
               <Label htmlFor="carrier">Carrier *</Label>
-              <Input
-                id="carrier"
-                value={formData.carrier}
-                onChange={(e) => handleInputChange('carrier', e.target.value)}
-                placeholder="State Farm"
-                className={errors.carrier ? 'border-destructive' : ''}
-              />
+              <Select value={formData.carrier} onValueChange={(value) => handleInputChange('carrier', value)}>
+                <SelectTrigger className={errors.carrier ? 'border-destructive' : ''}>
+                  <SelectValue placeholder="Select carrier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carriersLoading ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : (
+                    carriers.map(carrier => (
+                      <SelectItem key={carrier.id} value={carrier.name}>{carrier.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
               {errors.carrier && (
                 <p className="text-sm text-destructive mt-1">{errors.carrier}</p>
               )}
@@ -185,13 +197,20 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
 
           <div>
             <Label htmlFor="line_of_business">Line of Business *</Label>
-            <Input
-              id="line_of_business"
-              value={formData.line_of_business}
-              onChange={(e) => handleInputChange('line_of_business', e.target.value)}
-              placeholder="Auto Insurance"
-              className={errors.line_of_business ? 'border-destructive' : ''}
-            />
+            <Select value={formData.line_of_business} onValueChange={(value) => handleInputChange('line_of_business', value)}>
+              <SelectTrigger className={errors.line_of_business ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Select line of business" />
+              </SelectTrigger>
+              <SelectContent>
+                {lobLoading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  linesOfBusiness.map(lob => (
+                    <SelectItem key={lob.id} value={lob.name}>{lob.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
             {errors.line_of_business && (
               <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
             )}
