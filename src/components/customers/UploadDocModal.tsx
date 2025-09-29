@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,8 +34,8 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
   const { data: policies, isLoading: policiesLoading } = usePoliciesByAccount(accountId);
   const { data: quotes, isLoading: quotesLoading } = useQuotesByAccount(accountId);
 
-  // Reset form when modal opens/closes
-  useState(() => {
+  // Reset form when modal closes
+  React.useEffect(() => {
     if (!open) {
       setFile(null);
       setDocumentName('');
@@ -48,7 +48,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
       setTaskDescription('');
       setTaskDueDate('');
     }
-  });
+  }, [open]);
 
   async function handleUpload() {
     if (!file) return;
