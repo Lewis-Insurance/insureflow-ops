@@ -26,11 +26,7 @@ export default function PoliciesPage() {
   };
 
   const handlePolicySelect = (policy: PolicyWithAccount) => {
-    // Navigate to policy detail page when implemented
-    toast({
-      title: "Policy Selected",
-      description: `Selected policy ${policy.policy_number}`,
-    });
+    navigate(`/policies/${policy.id}`);
   };
 
   const handleRefresh = () => {
