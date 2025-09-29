@@ -604,37 +604,70 @@ export type Database = {
       }
       carriers: {
         Row: {
+          address_line1: string | null
+          address_line2: string | null
+          agency_code: string | null
           billing_portal_url: string | null
+          city: string | null
           claims_phone: string | null
+          contact_email: string | null
           contact_info: Json | null
+          contact_name: string | null
+          contact_phone: string | null
+          country: string | null
           created_at: string
           id: string
+          main_phone: string | null
           naic: string | null
           name: string
           portals: Json | null
+          state: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          agency_code?: string | null
           billing_portal_url?: string | null
+          city?: string | null
           claims_phone?: string | null
+          contact_email?: string | null
           contact_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
           created_at?: string
           id?: string
+          main_phone?: string | null
           naic?: string | null
           name: string
           portals?: Json | null
+          state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          agency_code?: string | null
           billing_portal_url?: string | null
+          city?: string | null
           claims_phone?: string | null
+          contact_email?: string | null
           contact_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
           created_at?: string
           id?: string
+          main_phone?: string | null
           naic?: string | null
           name?: string
           portals?: Json | null
+          state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -2535,31 +2568,61 @@ export type Database = {
       }
       mgas: {
         Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
           code: string | null
+          contact_email: string | null
           contact_info: Json | null
+          contact_name: string | null
+          contact_phone: string | null
+          country: string | null
           created_at: string
           id: string
           is_active: boolean
+          main_phone: string | null
           name: string
+          state: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
           code?: string | null
+          contact_email?: string | null
           contact_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          main_phone?: string | null
           name: string
+          state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
           code?: string | null
+          contact_email?: string | null
           contact_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          main_phone?: string | null
           name?: string
+          state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
