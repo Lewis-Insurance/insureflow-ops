@@ -1,62 +1,59 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { DashboardSkeleton } from '@/components/ui/skeleton-components';
+import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
+import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<'book-of-business' | 'policies-quotes'>('book-of-business');
 
   if (authLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8">
+    <div className="flex-1 space-y-6 p-4 md:p-8">
       <div className="flex items-center justify-between space-y-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground">
-            Welcome back, {profile?.full_name || 'User'}! Dashboard is now working.
+            Welcome back, {profile?.full_name || 'User'}! Here's your business overview.
           </p>
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <ErrorBoundary level="component">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-green-600 font-semibold">✓ Dashboard component is rendering successfully!</p>
-              <div className="mt-4 space-y-2">
-                <p className="text-sm">
-                  <strong>Profile:</strong> {profile?.role || 'Loading...'}
-                </p>
-                <p className="text-sm">
-                  <strong>Auth Loading:</strong> {authLoading ? 'Yes' : 'No'}
-                </p>
-                <p className="text-sm">
-                  <strong>Full Name:</strong> {profile?.full_name || 'Loading...'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </ErrorBoundary>
+      {/* Tab Navigation */}
+      <div className="flex space-x-4 border-b border-border">
+        <Button
+          variant={activeTab === 'book-of-business' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('book-of-business')}
+          className="rounded-b-none border-b-2 border-transparent data-[active=true]:border-primary"
+          data-active={activeTab === 'book-of-business'}
+        >
+          Book of Business
+        </Button>
+        <Button
+          variant={activeTab === 'policies-quotes' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('policies-quotes')}
+          className="rounded-b-none border-b-2 border-transparent data-[active=true]:border-primary"
+          data-active={activeTab === 'policies-quotes'}
+        >
+          Policies / Quotes
+        </Button>
+      </div>
 
+      {/* Tab Content */}
+      <div className="mt-6">
         <ErrorBoundary level="component">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                The dashboard has been simplified to debug loading issues. 
-                Once confirmed working, we can restore the full dashboard functionality.
-              </p>
-            </CardContent>
-          </Card>
+          {activeTab === 'book-of-business' ? (
+            <BookOfBusinessTab />
+          ) : (
+            <PoliciesQuotesTab />
+          )}
         </ErrorBoundary>
       </div>
     </div>
