@@ -71,12 +71,22 @@ export default function CustomerDetail() {
         .from('accounts')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (accountError) {
+        console.error('Account fetch error:', accountError);
         toast({
           title: 'Error',
-          description: 'Failed to load customer details',
+          description: 'Failed to load customer details: ' + accountError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!accountData) {
+        toast({
+          title: 'Error',
+          description: 'Customer not found',
           variant: 'destructive',
         });
         return;
