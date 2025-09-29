@@ -2893,6 +2893,7 @@ export type Database = {
           policy_term: string | null
           premium: number
           status: string | null
+          updated_at: string
         }
         Insert: {
           account_id?: string | null
@@ -2916,6 +2917,7 @@ export type Database = {
           policy_term?: string | null
           premium: number
           status?: string | null
+          updated_at?: string
         }
         Update: {
           account_id?: string | null
@@ -2939,6 +2941,7 @@ export type Database = {
           policy_term?: string | null
           premium?: number
           status?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -4229,6 +4232,7 @@ export type Database = {
           policy_term: string | null
           premium: number
           status: string | null
+          updated_at: string
         }[]
       }
       get_policies_with_claims: {
@@ -4311,6 +4315,7 @@ export type Database = {
           policy_term: string | null
           premium: number
           status: string | null
+          updated_at: string
         }[]
       }
       get_user_role: {
