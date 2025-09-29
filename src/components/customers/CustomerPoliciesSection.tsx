@@ -180,7 +180,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                  {/* Actions */}
                 <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" asChild>
-                    <Link to={`/policies/${policy.id}`}>
+                    <Link to="/policies">
                       View Policy
                     </Link>
                   </Button>
@@ -204,10 +204,13 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                   }}>
                     Add Task
                   </Button>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link to={`/documents?policy=${policy.id}`}>
-                      Documents
-                    </Link>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    toast({
+                      title: "Policy Documents",
+                      description: "View this policy's documents in the Documents section below."
+                    });
+                  }}>
+                    Documents
                   </Button>
                 </div>
 
