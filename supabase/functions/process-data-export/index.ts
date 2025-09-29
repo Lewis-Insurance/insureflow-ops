@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,8 +70,8 @@ serve(async (req) => {
       })
     }
 
-    // Process export in background
-    EdgeRuntime.waitUntil(processExport(supabaseClient, user.id, exportRequest.id, request_type))
+    // Process export in background - Deno will handle this asynchronously
+    processExport(supabaseClient, user.id, exportRequest.id, request_type).catch(console.error)
 
     return new Response(JSON.stringify({ success: true, request_id: exportRequest.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

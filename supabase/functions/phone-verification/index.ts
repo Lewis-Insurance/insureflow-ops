@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,10 +126,19 @@ serve(async (req) => {
           .maybeSingle()
 
         if (verifyError || !verification) {
-          // Increment attempts
+          // Get current attempts count and increment
+          const { data: currentCode } = await supabaseClient
+            .from('phone_verification_codes')
+            .select('attempts')
+            .eq('user_id', user.id)
+            .eq('phone_number', phone_number)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
           await supabaseClient
             .from('phone_verification_codes')
-            .update({ attempts: supabaseClient.raw('attempts + 1') })
+            .update({ attempts: (currentCode?.attempts || 0) + 1 })
             .eq('user_id', user.id)
             .eq('phone_number', phone_number)
 
