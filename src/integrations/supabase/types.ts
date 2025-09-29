@@ -2890,6 +2890,7 @@ export type Database = {
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
+          policy_term: string | null
           premium: number
           status: string | null
         }
@@ -2912,6 +2913,7 @@ export type Database = {
           line_of_business?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
+          policy_term?: string | null
           premium: number
           status?: string | null
         }
@@ -2934,6 +2936,7 @@ export type Database = {
           line_of_business?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number?: string
+          policy_term?: string | null
           premium?: number
           status?: string | null
         }
@@ -4223,6 +4226,7 @@ export type Database = {
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
+          policy_term: string | null
           premium: number
           status: string | null
         }[]
@@ -4304,6 +4308,7 @@ export type Database = {
           line_of_business: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
+          policy_term: string | null
           premium: number
           status: string | null
         }[]

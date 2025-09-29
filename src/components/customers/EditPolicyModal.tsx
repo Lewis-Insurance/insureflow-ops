@@ -17,6 +17,7 @@ const policySchema = z.object({
   effective_date: z.string().min(1, 'Effective date is required'),
   expiration_date: z.string().min(1, 'Expiration date is required'),
   billing_frequency: z.string().optional(),
+  policy_term: z.string().optional(),
   status: z.string().min(1, 'Status is required'),
   payment_type: z.string().optional(),
 });
@@ -30,6 +31,7 @@ interface Policy {
   effective_date: string;
   expiration_date: string;
   billing_frequency: string | null;
+  policy_term: string | null;
   status: string;
   payment_type: string | null;
 }
@@ -50,6 +52,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
     effective_date: '',
     expiration_date: '',
     billing_frequency: 'annual',
+    policy_term: '',
     status: 'active',
     payment_type: 'direct',
   });
@@ -71,6 +74,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         effective_date: policy.effective_date || '',
         expiration_date: policy.expiration_date || '',
         billing_frequency: policy.billing_frequency || 'annual',
+        policy_term: policy.policy_term || '',
         status: policy.status || 'active',
         payment_type: policy.payment_type || 'direct',
       });
@@ -109,6 +113,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         effective_date: formData.effective_date,
         expiration_date: formData.expiration_date,
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
+        policy_term: formData.policy_term || null,
         status: formData.status,
         payment_type: formData.payment_type as 'direct' | 'agency',
       };
@@ -243,6 +248,22 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="policy_term">Policy Term</Label>
+              <Select value={formData.policy_term} onValueChange={(value) => handleInputChange('policy_term', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semiannual">Semi-Annual</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div></div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

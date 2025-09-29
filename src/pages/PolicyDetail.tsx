@@ -349,6 +349,7 @@ export default function PolicyDetail() {
               effective_date: policy.effective_date,
               expiration_date: policy.expiration_date,
               billing_frequency: policy.billing_frequency,
+              policy_term: policy.policy_term,
               status: policy.status,
               payment_type: policy.payment_type
             } : null}
