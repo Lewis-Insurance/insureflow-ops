@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, Users, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,7 +145,11 @@ export default function CustomersPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">{customer.display_name || customer.name}</CardTitle>
+                    <Link to={`/customers/${customer.id}`}>
+                      <CardTitle className="text-lg hover:text-primary transition-colors cursor-pointer">
+                        {customer.display_name || customer.name}
+                      </CardTitle>
+                    </Link>
                     <CardDescription className="text-sm">
                       {customer.type} • {customer.status}
                     </CardDescription>
