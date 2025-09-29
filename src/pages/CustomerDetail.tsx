@@ -4,16 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ActionMenu } from '@/components/customers/ActionMenu';
+import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
+import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
+import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare } from 'lucide-react';
 
 interface Account {
   id: string;
   name: string;
   type: string;
+  account_type?: string;
+  account_status?: string;
   email?: string;
   phone?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  tin_last4?: string;
+  source?: string;
+  lead_source_detail?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -141,35 +155,18 @@ export default function CustomerDetail() {
           <ActionMenu account={{ id: account.id, name: account.name }} />
         </div>
 
-        {/* Customer Info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {account.email && (
-                <div>
-                  <span className="text-sm font-medium">Email:</span>
-                  <p className="text-sm">{account.email}</p>
-                </div>
-              )}
-              {account.phone && (
-                <div>
-                  <span className="text-sm font-medium">Phone:</span>
-                  <p className="text-sm">{account.phone}</p>
-                </div>
-              )}
-              <div>
-                <span className="text-sm font-medium">Created:</span>
-                <p className="text-sm">{new Date(account.created_at).toLocaleDateString()}</p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Customer Information Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Comprehensive Contact Information */}
+          <CustomerContactInfo account={account} />
 
+          {/* Recent Notes */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Notes ({notes.length})</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Recent Notes ({notes.length})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {notes.length === 0 ? (
@@ -193,34 +190,51 @@ export default function CustomerDetail() {
               )}
             </CardContent>
           </Card>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Tasks ({tasks.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {tasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tasks yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {tasks.slice(0, 3).map((task) => (
-                    <div key={task.id}>
-                      <p className="text-sm font-medium">{task.title}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {task.status} • {new Date(task.created_at).toLocaleDateString()}
+        {/* Tasks Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckSquare className="h-5 w-5" />
+              Tasks ({tasks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {tasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tasks yet</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tasks.map((task) => (
+                  <div key={task.id} className="border rounded-lg p-3">
+                    <p className="text-sm font-medium">{task.title}</p>
+                    {task.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        task.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {task.status}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(task.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                  ))}
-                  {tasks.length > 3 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{tasks.length - 3} more tasks
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Policies & Quotes Section */}
+        <CustomerPoliciesSection accountId={account.id} />
+
+        {/* Documents Section */}
+        <CustomerDocumentsSection accountId={account.id} />
       </div>
     </AppLayout>
   );
