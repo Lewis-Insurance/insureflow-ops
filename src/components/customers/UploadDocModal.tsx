@@ -14,9 +14,10 @@ interface UploadDocModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string;
+  onSuccess?: () => void;
 }
 
-export function UploadDocModal({ open, onOpenChange, accountId }: UploadDocModalProps) {
+export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: UploadDocModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [associationType, setAssociationType] = useState<'none' | 'policy' | 'quote'>('none');
@@ -147,6 +148,7 @@ export function UploadDocModal({ open, onOpenChange, accountId }: UploadDocModal
         description: 'Document uploaded successfully',
       });
       
+      onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       toast({

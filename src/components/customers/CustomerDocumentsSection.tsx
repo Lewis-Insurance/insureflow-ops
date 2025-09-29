@@ -2,8 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentManager } from '@/hooks/useDocumentManager';
+import { UploadDocModal } from './UploadDocModal';
 import { FileText, Download, Trash2, Upload, Calendar, FileType } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useState } from 'react';
 
 interface CustomerDocumentsSectionProps {
   accountId: string;
@@ -13,12 +15,19 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   const {
     documents,
     loading,
-    uploading,
-    uploadDocument,
     downloadDocument,
     deleteDocument,
-    canManageDocuments
+    canManageDocuments,
+    refetch: fetchDocuments
   } = useDocumentManager(accountId);
+  
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  
+  const handleUploadSuccess = () => {
+    // Refresh the documents list after successful upload
+    fetchDocuments();
+    setUploadModalOpen(false);
+  };
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'Unknown size';
@@ -50,13 +59,6 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await uploadDocument(file, 'other');
-      event.target.value = ''; // Reset input
-    }
-  };
 
   if (loading) {
     return (
@@ -82,23 +84,13 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
           Documents ({documents.length})
         </CardTitle>
         {canManageDocuments && (
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              id="file-upload"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
-            <Button
-              size="sm"
-              disabled={uploading}
-              onClick={() => document.getElementById('file-upload')?.click()}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {uploading ? 'Uploading...' : 'Upload Document'}
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            onClick={() => setUploadModalOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Document
+          </Button>
         )}
       </CardHeader>
       <CardContent>
@@ -110,7 +102,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
               No documents have been uploaded for this customer yet.
             </p>
             {canManageDocuments && (
-              <Button onClick={() => document.getElementById('file-upload')?.click()}>
+              <Button onClick={() => setUploadModalOpen(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Upload First Document
               </Button>
@@ -177,6 +169,14 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
           </div>
         )}
       </CardContent>
+      
+      {/* Enhanced Upload Modal */}
+      <UploadDocModal
+        open={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        accountId={accountId}
+        onSuccess={handleUploadSuccess}
+      />
     </Card>
   );
 }
