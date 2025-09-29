@@ -51,12 +51,12 @@ export function useBookOfBusinessData() {
                ['individual', 'personal'].includes(accountType);
       };
 
-      const isCommercial = (account: any) => {
-        const type = account.type?.toLowerCase() || '';
-        const accountType = account.account_type?.toLowerCase() || '';
-        return ['business', 'commercial', 'corporate'].includes(type) || 
-               ['business', 'commercial', 'corporate'].includes(accountType);
-      };
+  const isCommercial = (account: any) => {
+    const type = account.type?.toLowerCase() || '';
+    const accountType = account.account_type?.toLowerCase() || '';
+    return ['business', 'commercial', 'commercial_business', 'corporate'].includes(type) || 
+           ['business', 'commercial', 'corporate'].includes(accountType);
+  };
 
       // Count by type for insureds
       const insuredsCount = {
