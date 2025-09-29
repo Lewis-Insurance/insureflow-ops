@@ -84,15 +84,15 @@ export default function PoliciesPage() {
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <PolicyStats stats={stats} loading={statsLoading} />
-
         {/* Search and Filters */}
         <PolicySearch
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={handleClearFilters}
         />
+
+        {/* Stats Overview */}
+        <PolicyStats stats={stats} loading={statsLoading} />
 
         {/* Policy List */}
         <PolicyList
