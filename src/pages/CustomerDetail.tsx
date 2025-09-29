@@ -9,6 +9,7 @@ import { CustomerPoliciesSection } from '@/components/customers/CustomerPolicies
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
+import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, CheckSquare, Plus } from 'lucide-react';
@@ -43,11 +44,14 @@ interface Note {
 
 interface Task {
   id: string;
+  account_id: string;
   title: string;
   description?: string;
-  status: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
   due_at?: string;
   created_at: string;
+  updated_at: string;
 }
 
 export default function CustomerDetail() {
@@ -60,6 +64,18 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [editTaskOpen, setEditTaskOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const refetchTasks = async () => {
+    if (!id) return;
+    const { data: tasksData } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('account_id', id)
+      .order('created_at', { ascending: false });
+    setTasks(tasksData || []);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -240,15 +256,30 @@ export default function CustomerDetail() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-3">
-                    <p className="text-sm font-medium">{task.title}</p>
+                  <div key={task.id} className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="text-sm font-medium flex-1">{task.title}</p>
+                      <div className="flex gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedTask(task);
+                            setEditTaskOpen(true);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <FileText className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
                     {task.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 mb-2">{task.description}</p>
                     )}
-                    <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center justify-between">
                       <span className={`text-xs px-2 py-1 rounded ${
                         task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                        task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
                         {task.status}
@@ -282,6 +313,17 @@ export default function CustomerDetail() {
         onOpenChange={setAddTaskOpen}
         accountId={account.id}
       />
+      {selectedTask && (
+        <TaskEditModal
+          open={editTaskOpen}
+          onOpenChange={setEditTaskOpen}
+          task={selectedTask}
+          onTaskUpdate={() => {
+            refetchTasks();
+            setEditTaskOpen(false);
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

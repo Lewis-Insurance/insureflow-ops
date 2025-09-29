@@ -6,7 +6,10 @@ import { Shield, Calendar, DollarSign, Building, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
+import { AddNoteModal } from './AddNoteModal';
+import { AddTaskModal } from './AddTaskModal';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CustomerPoliciesSectionProps {
   accountId: string;
@@ -16,6 +19,10 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   const { data: allPolicies = [], isLoading, refetch } = usePolicies();
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
@@ -177,17 +184,30 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                       View Policy
                     </Link>
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Policy editing functionality will be available soon."
+                    });
+                  }}>
                     Edit Policy
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setSelectedPolicyId(policy.id);
+                    setAddNoteOpen(true);
+                  }}>
                     Add Note
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setSelectedPolicyId(policy.id);
+                    setAddTaskOpen(true);
+                  }}>
                     Add Task
                   </Button>
-                  <Button size="sm" variant="outline">
-                    Documents
+                  <Button size="sm" variant="outline" asChild>
+                    <Link to={`/documents?policy=${policy.id}`}>
+                      Documents
+                    </Link>
                   </Button>
                 </div>
 
@@ -214,6 +234,16 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
         onOpenChange={setAddQuoteOpen}
         accountId={accountId}
         onSuccess={refetch}
+      />
+      <AddNoteModal
+        open={addNoteOpen}
+        onOpenChange={setAddNoteOpen}
+        accountId={accountId}
+      />
+      <AddTaskModal
+        open={addTaskOpen}
+        onOpenChange={setAddTaskOpen}
+        accountId={accountId}
       />
     </Card>
   );

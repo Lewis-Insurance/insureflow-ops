@@ -144,24 +144,34 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                     </div>
                   </div>
 
-                  {canManageDocuments && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadDocument(document)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => downloadDocument(document)}
+                      title="Download document"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(`/documents/${document.id}`, '_blank')}
+                      title="View document"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                    {canManageDocuments && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => deleteDocument(document.id)}
+                        title="Delete document"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
               </div>
