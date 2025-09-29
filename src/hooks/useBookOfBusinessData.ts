@@ -19,7 +19,7 @@ export function useBookOfBusinessData() {
       // Get all active accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('id, type, account_status')
+        .select('id, type, account_type, account_status')
         .is('deleted_at', null);
 
       if (accountsError) {
@@ -43,16 +43,31 @@ export function useBookOfBusinessData() {
       const insureds = accounts.filter(account => policyAccountIds.has(account.id));
       const prospects = accounts.filter(account => !policyAccountIds.has(account.id));
 
+      // Helper function to categorize account type
+      const isPersonal = (account: any) => {
+        const type = account.type?.toLowerCase() || '';
+        const accountType = account.account_type?.toLowerCase() || '';
+        return ['household', 'individual', 'personal'].includes(type) || 
+               ['individual', 'personal'].includes(accountType);
+      };
+
+      const isCommercial = (account: any) => {
+        const type = account.type?.toLowerCase() || '';
+        const accountType = account.account_type?.toLowerCase() || '';
+        return ['business', 'commercial', 'corporate'].includes(type) || 
+               ['business', 'commercial', 'corporate'].includes(accountType);
+      };
+
       // Count by type for insureds
       const insuredsCount = {
-        commercial: insureds.filter(a => a.type && ['business', 'commercial', 'corporate'].includes(a.type.toLowerCase())).length,
-        personal: insureds.filter(a => a.type && ['household', 'individual', 'personal'].includes(a.type.toLowerCase())).length,
+        commercial: insureds.filter(isCommercial).length,
+        personal: insureds.filter(isPersonal).length,
       };
 
       // Count by type for prospects
       const prospectsCount = {
-        commercial: prospects.filter(a => a.type && ['business', 'commercial', 'corporate'].includes(a.type.toLowerCase())).length,
-        personal: prospects.filter(a => a.type && ['household', 'individual', 'personal'].includes(a.type.toLowerCase())).length,
+        commercial: prospects.filter(isCommercial).length,
+        personal: prospects.filter(isPersonal).length,
       };
 
       return {
