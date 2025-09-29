@@ -8,6 +8,7 @@ import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
 import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
+import { UploadDocModal } from './UploadDocModal';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,6 +22,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
   const { toast } = useToast();
   
@@ -180,14 +182,14 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                  {/* Actions */}
                 <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" asChild>
-                    <Link to="/policies">
+                    <Link to={`/policies/${policy.id}`}>
                       View Policy
                     </Link>
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     toast({
-                      title: "Coming Soon",
-                      description: "Policy editing functionality will be available soon."
+                      title: "Edit Policy",
+                      description: "Policy editing functionality will be available soon.",
                     });
                   }}>
                     Edit Policy
@@ -205,10 +207,8 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                     Add Task
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
-                    toast({
-                      title: "Policy Documents",
-                      description: "View this policy's documents in the Documents section below."
-                    });
+                    setSelectedPolicyId(policy.id);
+                    setUploadDocOpen(true);
                   }}>
                     Documents
                   </Button>
@@ -247,6 +247,17 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
         open={addTaskOpen}
         onOpenChange={setAddTaskOpen}
         accountId={accountId}
+      />
+      <UploadDocModal
+        open={uploadDocOpen}
+        onOpenChange={setUploadDocOpen}
+        accountId={accountId}
+        onSuccess={() => {
+          toast({
+            title: "Document Uploaded",
+            description: "Document has been successfully uploaded for this policy.",
+          });
+        }}
       />
     </Card>
   );

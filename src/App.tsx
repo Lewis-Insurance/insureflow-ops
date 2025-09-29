@@ -13,6 +13,7 @@ const Auth = React.lazy(() => import("./pages/Auth"));
 const CRM = React.lazy(() => import("./pages/CRM"));
 const AccountDetail = React.lazy(() => import("./pages/AccountDetail"));
 
+const PolicyDetail = React.lazy(() => import("./pages/PolicyDetail"));
 const CustomersPage = React.lazy(() => import("./pages/CustomersPage"));
 const CustomerDetail = React.lazy(() => import("./pages/CustomerDetail"));
 const CustomerEdit = React.lazy(() => import("./pages/CustomerEdit"));
@@ -95,6 +96,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <PoliciesPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/policies/:policyId" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PolicyDetail />
                   </ErrorBoundary>
                 } 
               />
