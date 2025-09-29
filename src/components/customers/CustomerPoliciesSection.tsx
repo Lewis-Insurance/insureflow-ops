@@ -170,6 +170,27 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                   </div>
                 </div>
 
+                 {/* Actions */}
+                <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <Link to={`/policies/${policy.id}`}>
+                      View Policy
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    Edit Policy
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    Add Note
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    Add Task
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    Documents
+                  </Button>
+                </div>
+
                 {/* Additional Info */}
                 {policy.coverage && (
                   <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
