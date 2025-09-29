@@ -44,7 +44,11 @@ const calculateStats = memoize((accounts: any[]) => {
   const isBusiness = (a: any) => {
     const type = a.type?.toLowerCase() || '';
     const accountType = a.account_type?.toLowerCase() || '';
-    return accountType === 'business' || type === 'business' || type === 'commercial' || type === 'corporate';
+    return accountType === 'business' || 
+           type === 'business' || 
+           type === 'commercial' || 
+           type === 'commercial_business' ||
+           type === 'corporate';
   };
 
   return {
