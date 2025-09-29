@@ -118,12 +118,12 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
             <label className="text-sm font-medium text-muted-foreground mb-1 block">
               Carrier/Company
             </label>
-            <Select value={filters.carrier || ''} onValueChange={(value) => updateFilter('carrier', value)}>
+            <Select value={filters.carrier || 'all'} onValueChange={(value) => updateFilter('carrier', value === 'all' ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select carrier" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Carriers</SelectItem>
+                <SelectItem value="all">All Carriers</SelectItem>
                 {CARRIERS.map(carrier => (
                   <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>
                 ))}
@@ -135,12 +135,12 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
             <label className="text-sm font-medium text-muted-foreground mb-1 block">
               Line of Business
             </label>
-            <Select value={filters.lineOfBusiness || ''} onValueChange={(value) => updateFilter('lineOfBusiness', value)}>
+            <Select value={filters.lineOfBusiness || 'all'} onValueChange={(value) => updateFilter('lineOfBusiness', value === 'all' ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select LOB" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Lines</SelectItem>
+                <SelectItem value="all">All Lines</SelectItem>
                 {LINES_OF_BUSINESS.map(lob => (
                   <SelectItem key={lob} value={lob}>{lob}</SelectItem>
                 ))}
@@ -152,12 +152,12 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
             <label className="text-sm font-medium text-muted-foreground mb-1 block">
               Status
             </label>
-            <Select value={filters.status || ''} onValueChange={(value) => updateFilter('status', value)}>
+            <Select value={filters.status || 'all'} onValueChange={(value) => updateFilter('status', value === 'all' ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 {POLICY_STATUSES.map(status => (
                   <SelectItem key={status} value={status}>{status}</SelectItem>
                 ))}
@@ -236,12 +236,12 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
                     <Building2 className="h-3 w-3 inline mr-1" />
                     Business Type
                   </label>
-                  <Select value={filters.businessType || ''} onValueChange={(value) => updateFilter('businessType', value)}>
+                  <Select value={filters.businessType || 'all'} onValueChange={(value) => updateFilter('businessType', value === 'all' ? '' : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
+                      <SelectItem value="all">All Types</SelectItem>
                       {BUSINESS_TYPES.map(type => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                       ))}
