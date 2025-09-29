@@ -9,6 +9,7 @@ import { AddQuoteModal } from './AddQuoteModal';
 import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
 import { UploadDocModal } from './UploadDocModal';
+import { EditPolicyModal } from './EditPolicyModal';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,7 +24,9 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
+  const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
   const { toast } = useToast();
   
   // Filter policies for this specific customer
@@ -187,10 +190,8 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                     </Link>
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
-                    toast({
-                      title: "Edit Policy",
-                      description: "Policy editing functionality will be available soon.",
-                    });
+                    setSelectedPolicy(policy);
+                    setEditPolicyOpen(true);
                   }}>
                     Edit Policy
                   </Button>
@@ -256,6 +257,18 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           toast({
             title: "Document Uploaded",
             description: "Document has been successfully uploaded for this policy.",
+          });
+        }}
+      />
+      <EditPolicyModal
+        open={editPolicyOpen}
+        onOpenChange={setEditPolicyOpen}
+        policy={selectedPolicy}
+        onSuccess={() => {
+          refetch();
+          toast({
+            title: "Policy Updated",
+            description: "Policy has been successfully updated.",
           });
         }}
       />
