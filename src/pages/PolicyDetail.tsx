@@ -11,6 +11,7 @@ import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, User
 import { useToast } from '@/hooks/use-toast';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
+import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
 
 export default function PolicyDetail() {
@@ -20,9 +21,10 @@ export default function PolicyDetail() {
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
+  const [editPolicyOpen, setEditPolicyOpen] = useState(false);
 
   // Fetch policy with account and carrier info
-  const { data: policy, isLoading, error } = useQuery({
+  const { data: policy, isLoading, error, refetch } = useQuery({
     queryKey: ['policy', policyId],
     queryFn: async () => {
       if (!policyId) throw new Error('Policy ID is required');
@@ -80,10 +82,7 @@ export default function PolicyDetail() {
   };
 
   const handleEdit = () => {
-    toast({
-      title: "Edit Policy",
-      description: "Policy editing functionality will be available soon.",
-    });
+    setEditPolicyOpen(true);
   };
 
   if (isLoading) {
@@ -315,7 +314,7 @@ export default function PolicyDetail() {
       </div>
 
       {/* Modals */}
-      {policy.account && (
+      {policy?.account && (
         <>
           <AddNoteModal
             open={addNoteOpen}
@@ -337,6 +336,23 @@ export default function PolicyDetail() {
                 description: "Document has been successfully uploaded to this policy.",
               });
             }}
+          />
+          <EditPolicyModal
+            open={editPolicyOpen}
+            onOpenChange={setEditPolicyOpen}
+            policy={policy ? {
+              id: policy.id,
+              policy_number: policy.policy_number,
+              carrier: policy.carrier,
+              line_of_business: policy.line_of_business,
+              premium: policy.premium,
+              effective_date: policy.effective_date,
+              expiration_date: policy.expiration_date,
+              billing_frequency: policy.billing_frequency,
+              status: policy.status,
+              payment_type: policy.payment_type
+            } : null}
+            onSuccess={refetch}
           />
         </>
       )}
