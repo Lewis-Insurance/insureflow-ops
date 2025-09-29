@@ -16,26 +16,32 @@ export function useBookOfBusinessData() {
   return useQuery({
     queryKey: ['book-of-business'],
     queryFn: async (): Promise<BookOfBusinessData> => {
-      // Get insureds (accounts with policies)
+      // Get all active accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('type, account_status')
-        .not('deleted_at', 'is', null);
+        .select('id, type, account_status')
+        .is('deleted_at', null);
 
       if (accountsError) {
         throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
       }
 
-      const accounts = accountsData || [];
+      // Get accounts that have policies (these are insureds)
+      const { data: accountsWithPolicies, error: policiesError } = await supabase
+        .from('policies')
+        .select('account_id')
+        .not('account_id', 'is', null);
 
-      // Separate insureds (customers with policies) from prospects (leads without policies)
-      const insureds = accounts.filter(account => 
-        account.account_status && !['lead', 'prospect'].includes(account.account_status.toLowerCase())
-      );
-      
-      const prospects = accounts.filter(account => 
-        account.account_status && ['lead', 'prospect'].includes(account.account_status.toLowerCase())
-      );
+      if (policiesError) {
+        throw new Error(`Failed to fetch policies: ${policiesError.message}`);
+      }
+
+      const accounts = accountsData || [];
+      const policyAccountIds = new Set((accountsWithPolicies || []).map(p => p.account_id));
+
+      // Separate insureds (accounts with policies) from prospects (accounts without policies)
+      const insureds = accounts.filter(account => policyAccountIds.has(account.id));
+      const prospects = accounts.filter(account => !policyAccountIds.has(account.id));
 
       // Count by type for insureds
       const insuredsCount = {
