@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, MapPin, Building, Calendar, FileText, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Mail, Phone, MapPin, Building, Calendar, FileText, User, Edit } from 'lucide-react';
+import { EditContactInfoModal } from './EditContactInfoModal';
+import { useState } from 'react';
 
 interface CustomerAccount {
   id: string;
@@ -28,6 +31,7 @@ interface CustomerContactInfoProps {
 }
 
 export function CustomerContactInfo({ account }: CustomerContactInfoProps) {
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const formatAddress = () => {
     const parts = [
       account.address_line1,
@@ -41,11 +45,15 @@ export function CustomerContactInfo({ account }: CustomerContactInfoProps) {
 
   return (
     <Card className="col-span-2">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <User className="h-5 w-5" />
           Customer Information
         </CardTitle>
+        <Button size="sm" variant="outline" onClick={() => setEditModalOpen(true)}>
+          <Edit className="h-4 w-4 mr-2" />
+          Edit
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Basic Information */}
@@ -159,6 +167,13 @@ export function CustomerContactInfo({ account }: CustomerContactInfoProps) {
           </div>
         </div>
       </CardContent>
+      
+      <EditContactInfoModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        account={account}
+        onSuccess={() => window.location.reload()}
+      />
     </Card>
   );
 }
