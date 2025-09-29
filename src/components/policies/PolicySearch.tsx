@@ -8,48 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import type { PolicyFilters } from '@/hooks/usePolicies';
+import { useCarriers, useMGAs, useLinesOfBusiness, useBusinessTypes } from '@/hooks/useLookupData';
 
 interface PolicySearchProps {
   filters: PolicyFilters;
   onFiltersChange: (filters: PolicyFilters) => void;
   onClearFilters: () => void;
 }
-
-const BUSINESS_TYPES = [
-  'Individual',
-  'Business', 
-  'Commercial',
-  'Corporate',
-  'LLC',
-  'Partnership',
-  'Sole Proprietorship'
-];
-
-const CARRIERS = [
-  'State Farm',
-  'Allstate', 
-  'GEICO',
-  'Progressive',
-  'Liberty Mutual',
-  'Farmers',
-  'USAA',
-  'Nationwide',
-  'Travelers',
-  'American Family'
-];
-
-const LINES_OF_BUSINESS = [
-  'Auto',
-  'Home',
-  'Life',
-  'Commercial Auto',
-  'General Liability',
-  'Professional Liability',
-  'Workers Compensation',
-  'Property',
-  'Umbrella',
-  'Cyber Liability'
-];
 
 const POLICY_STATUSES = [
   'Active',
@@ -60,6 +25,10 @@ const POLICY_STATUSES = [
 ];
 
 export function PolicySearch({ filters, onFiltersChange, onClearFilters }: PolicySearchProps) {
+  const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
+  const { data: mgas = [], isLoading: mgasLoading } = useMGAs();
+  const { data: linesOfBusiness = [], isLoading: lobLoading } = useLinesOfBusiness();
+  const { data: businessTypes = [], isLoading: businessTypesLoading } = useBusinessTypes();
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
   const updateFilter = (key: keyof PolicyFilters, value: string) => {
@@ -124,9 +93,13 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Carriers</SelectItem>
-                {CARRIERS.map(carrier => (
-                  <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>
-                ))}
+                {carriersLoading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  carriers.map(carrier => (
+                    <SelectItem key={carrier.id} value={carrier.name}>{carrier.name}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -141,9 +114,13 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Lines</SelectItem>
-                {LINES_OF_BUSINESS.map(lob => (
-                  <SelectItem key={lob} value={lob}>{lob}</SelectItem>
-                ))}
+                {lobLoading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  linesOfBusiness.map(lob => (
+                    <SelectItem key={lob.id} value={lob.name}>{lob.name}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -242,9 +219,13 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
-                      {BUSINESS_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
+                      {businessTypesLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        businessTypes.map(type => (
+                          <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -267,11 +248,21 @@ export function PolicySearch({ filters, onFiltersChange, onClearFilters }: Polic
                   <FileText className="h-3 w-3 inline mr-1" />
                   MGA
                 </label>
-                <Input
-                  placeholder="MGA name"
-                  value={filters.mga || ''}
-                  onChange={(e) => updateFilter('mga', e.target.value)}
-                />
+                <Select value={filters.mga || 'all'} onValueChange={(value) => updateFilter('mga', value === 'all' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select MGA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All MGAs</SelectItem>
+                    {mgasLoading ? (
+                      <SelectItem value="loading" disabled>Loading...</SelectItem>
+                    ) : (
+                      mgas.map(mga => (
+                        <SelectItem key={mga.id} value={mga.name}>{mga.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </PopoverContent>

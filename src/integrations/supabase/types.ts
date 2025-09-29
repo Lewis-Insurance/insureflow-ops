@@ -378,6 +378,33 @@ export type Database = {
         }
         Relationships: []
       }
+      business_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       businesses: {
         Row: {
           address_legal: Json | null
@@ -2446,6 +2473,36 @@ export type Database = {
           },
         ]
       }
+      lines_of_business: {
+        Row: {
+          category: string | null
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       merge_history: {
         Row: {
           created_at: string
@@ -2473,6 +2530,36 @@ export type Database = {
           merged_by?: string
           merged_ids?: string[]
           survivor_id?: string
+        }
+        Relationships: []
+      }
+      mgas: {
+        Row: {
+          code: string | null
+          contact_info: Json | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
