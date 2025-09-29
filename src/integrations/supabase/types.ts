@@ -607,6 +607,7 @@ export type Database = {
           address_line1: string | null
           address_line2: string | null
           agency_code: string | null
+          agency_login_url: string | null
           billing_portal_url: string | null
           city: string | null
           claims_phone: string | null
@@ -629,6 +630,7 @@ export type Database = {
           address_line1?: string | null
           address_line2?: string | null
           agency_code?: string | null
+          agency_login_url?: string | null
           billing_portal_url?: string | null
           city?: string | null
           claims_phone?: string | null
@@ -651,6 +653,7 @@ export type Database = {
           address_line1?: string | null
           address_line2?: string | null
           agency_code?: string | null
+          agency_login_url?: string | null
           billing_portal_url?: string | null
           city?: string | null
           claims_phone?: string | null
@@ -2570,6 +2573,7 @@ export type Database = {
         Row: {
           address_line1: string | null
           address_line2: string | null
+          agency_login_url: string | null
           city: string | null
           code: string | null
           contact_email: string | null
@@ -2589,6 +2593,7 @@ export type Database = {
         Insert: {
           address_line1?: string | null
           address_line2?: string | null
+          agency_login_url?: string | null
           city?: string | null
           code?: string | null
           contact_email?: string | null
@@ -2608,6 +2613,7 @@ export type Database = {
         Update: {
           address_line1?: string | null
           address_line2?: string | null
+          agency_login_url?: string | null
           city?: string | null
           code?: string | null
           contact_email?: string | null
