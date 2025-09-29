@@ -7,9 +7,11 @@ import { ActionMenu } from '@/components/customers/ActionMenu';
 import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
+import { AddNoteModal } from '@/components/customers/AddNoteModal';
+import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, FileText, CheckSquare } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare, Plus } from 'lucide-react';
 
 interface Account {
   id: string;
@@ -56,57 +58,59 @@ export default function CustomerDetail() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     
-    async function fetchData() {
-      try {
-        // Fetch account details
-        const { data: accountData, error: accountError } = await supabase
-          .from('accounts')
-          .select('*')
-          .eq('id', id)
-          .single();
+  const fetchData = async () => {
+    try {
+      // Fetch account details
+      const { data: accountData, error: accountError } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-        if (accountError) {
-          toast({
-            title: 'Error',
-            description: 'Failed to load customer details',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        setAccount(accountData);
-
-        // Fetch notes
-        const { data: notesData } = await supabase
-          .from('notes')
-          .select('*')
-          .eq('account_id', id)
-          .order('created_at', { ascending: false });
-
-        setNotes(notesData || []);
-
-        // Fetch tasks
-        const { data: tasksData } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('account_id', id)
-          .order('created_at', { ascending: false });
-
-        setTasks(tasksData || []);
-      } catch (error) {
+      if (accountError) {
         toast({
           title: 'Error',
-          description: 'Failed to load customer data',
+          description: 'Failed to load customer details',
           variant: 'destructive',
         });
-      } finally {
-        setLoading(false);
+        return;
       }
+
+      setAccount(accountData);
+
+      // Fetch notes
+      const { data: notesData } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('account_id', id)
+        .order('created_at', { ascending: false });
+
+      setNotes(notesData || []);
+
+      // Fetch tasks
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('account_id', id)
+        .order('created_at', { ascending: false });
+
+      setTasks(tasksData || []);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load customer data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
+  };
 
     fetchData();
   }, [id, toast]);
@@ -162,15 +166,25 @@ export default function CustomerDetail() {
 
           {/* Recent Notes */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Recent Notes ({notes.length})
               </CardTitle>
+              <Button size="sm" onClick={() => setAddNoteOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Note
+              </Button>
             </CardHeader>
             <CardContent>
               {notes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No notes yet</p>
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground mb-3">No notes yet</p>
+                  <Button size="sm" onClick={() => setAddNoteOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Note
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {notes.slice(0, 3).map((note) => (
@@ -194,15 +208,25 @@ export default function CustomerDetail() {
 
         {/* Tasks Section */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CheckSquare className="h-5 w-5" />
               Tasks ({tasks.length})
             </CardTitle>
+            <Button size="sm" onClick={() => setAddTaskOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
           </CardHeader>
           <CardContent>
             {tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks yet</p>
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-3">No tasks yet</p>
+                <Button size="sm" onClick={() => setAddTaskOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Task
+                </Button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tasks.map((task) => (
@@ -236,6 +260,18 @@ export default function CustomerDetail() {
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
       </div>
+      
+      {/* Modals */}
+      <AddNoteModal
+        open={addNoteOpen}
+        onOpenChange={setAddNoteOpen}
+        accountId={account.id}
+      />
+      <AddTaskModal
+        open={addTaskOpen}
+        onOpenChange={setAddTaskOpen}
+        accountId={account.id}
+      />
     </AppLayout>
   );
 }

@@ -78,13 +78,14 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
 
       const policyData = {
         account_id: accountId,
+        insured_user_id: user.id, // Set to current user creating the policy
         policy_number: formData.policy_number.trim(),
         carrier: formData.carrier.trim(),
         line_of_business: formData.line_of_business.trim(),
         premium: formData.premium ? parseFloat(formData.premium) : null,
         effective_date: formData.effective_date,
         expiration_date: formData.expiration_date,
-        billing_frequency: formData.billing_frequency,
+        billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
         status: formData.status,
       };
 
@@ -208,7 +209,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
                 <SelectContent>
                   <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semi-annual">Semi-Annual</SelectItem>
+                  <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
                 </SelectContent>
               </Select>

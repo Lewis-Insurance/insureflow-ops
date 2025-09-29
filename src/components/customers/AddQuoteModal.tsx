@@ -78,13 +78,14 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
       // Create a "quote" as a policy with quote status
       const quoteData = {
         account_id: accountId,
+        insured_user_id: user.id, // Set to current user creating the quote
         policy_number: formData.quote_number.trim(), // Store quote number as policy number
         carrier: formData.carrier.trim(),
         line_of_business: formData.line_of_business.trim(),
         premium: formData.premium ? parseFloat(formData.premium) : null,
         effective_date: formData.effective_date,
         expiration_date: formData.expiration_date,
-        billing_frequency: formData.billing_frequency,
+        billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
         status: 'quoted', // Mark as quote
         notes: formData.notes.trim() || null,
       };
@@ -209,7 +210,7 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
                 <SelectContent>
                   <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semi-annual">Semi-Annual</SelectItem>
+                  <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
                 </SelectContent>
               </Select>

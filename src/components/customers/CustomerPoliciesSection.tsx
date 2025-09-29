@@ -4,13 +4,18 @@ import { Button } from '@/components/ui/button';
 import { usePolicies } from '@/hooks/usePolicies';
 import { Shield, Calendar, DollarSign, Building, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AddPolicyModal } from './AddPolicyModal';
+import { AddQuoteModal } from './AddQuoteModal';
+import { useState } from 'react';
 
 interface CustomerPoliciesSectionProps {
   accountId: string;
 }
 
 export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionProps) {
-  const { data: allPolicies = [], isLoading } = usePolicies();
+  const { data: allPolicies = [], isLoading, refetch } = usePolicies();
+  const [addPolicyOpen, setAddPolicyOpen] = useState(false);
+  const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
@@ -62,12 +67,16 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           <Shield className="h-5 w-5" />
           Policies & Quotes ({policies.length})
         </CardTitle>
-        <Button size="sm" asChild>
-          <Link to="/quotes/new">
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAddQuoteOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Quote
-          </Link>
-        </Button>
+          </Button>
+          <Button size="sm" onClick={() => setAddPolicyOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Policy
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {policies.length === 0 ? (
@@ -77,12 +86,16 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
             <p className="text-muted-foreground mb-4">
               This customer doesn't have any policies or quotes yet.
             </p>
-            <Button asChild>
-              <Link to="/quotes/new">
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setAddQuoteOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create First Quote
-              </Link>
-            </Button>
+              </Button>
+              <Button onClick={() => setAddPolicyOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Policy
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -168,6 +181,19 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           </div>
         )}
       </CardContent>
+      
+      <AddPolicyModal
+        open={addPolicyOpen}
+        onOpenChange={setAddPolicyOpen}
+        accountId={accountId}
+        onSuccess={refetch}
+      />
+      <AddQuoteModal
+        open={addQuoteOpen}
+        onOpenChange={setAddQuoteOpen}
+        accountId={accountId}
+        onSuccess={refetch}
+      />
     </Card>
   );
 }
