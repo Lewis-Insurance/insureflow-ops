@@ -81,7 +81,7 @@ export function useDocumentManager(accountId?: string) {
 
       // Upload file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
+        .from('customer-docs')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -145,7 +145,7 @@ export function useDocumentManager(accountId?: string) {
 
     try {
       const { data, error } = await supabase.storage
-        .from('documents')
+        .from('customer-docs')
         .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
 
       if (error) throw error;
