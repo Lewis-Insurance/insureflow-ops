@@ -74,7 +74,7 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
         priority: task.priority,
         status: task.status,
         due_at: task.due_at ? task.due_at.split('T')[0] : '',
-        assignee_id: task.assignee_id || ''
+        assignee_id: task.assignee_id || 'unassigned'
       });
     }
   }, [task]);
@@ -128,7 +128,7 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
       const updateData = {
         ...formData,
         due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
-        assignee_id: formData.assignee_id || null,
+        assignee_id: formData.assignee_id === 'unassigned' ? null : formData.assignee_id || null,
         updated_at: new Date().toISOString()
       };
 
@@ -319,7 +319,7 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {staffMembers.map((staff) => (
                       <SelectItem key={staff.id} value={staff.id}>
                         {staff.full_name}
