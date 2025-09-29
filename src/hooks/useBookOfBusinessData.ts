@@ -5,16 +5,10 @@ interface BookOfBusinessData {
   insureds: {
     commercial: number;
     personal: number;
-    lifeHealthGroup: number;
-    lifeHealthIndividual: number;
-    medicare: number;
   };
   prospects: {
     commercial: number;
     personal: number;
-    lifeHealthGroup: number;
-    lifeHealthIndividual: number;
-    medicare: number;
   };
 }
 
@@ -47,18 +41,12 @@ export function useBookOfBusinessData() {
       const insuredsCount = {
         commercial: insureds.filter(a => a.type && ['business', 'commercial', 'corporate'].includes(a.type.toLowerCase())).length,
         personal: insureds.filter(a => a.type && ['household', 'individual', 'personal'].includes(a.type.toLowerCase())).length,
-        lifeHealthGroup: 0, // Placeholder - would need specific classification
-        lifeHealthIndividual: 0, // Placeholder - would need specific classification  
-        medicare: 0, // Placeholder - would need specific classification
       };
 
       // Count by type for prospects
       const prospectsCount = {
         commercial: prospects.filter(a => a.type && ['business', 'commercial', 'corporate'].includes(a.type.toLowerCase())).length,
         personal: prospects.filter(a => a.type && ['household', 'individual', 'personal'].includes(a.type.toLowerCase())).length,
-        lifeHealthGroup: 0, // Placeholder - would need specific classification
-        lifeHealthIndividual: 0, // Placeholder - would need specific classification
-        medicare: 0, // Placeholder - would need specific classification
       };
 
       return {

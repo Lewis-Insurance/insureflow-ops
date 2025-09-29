@@ -18,7 +18,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, data, isLoading }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
+            {[1, 2].map((i) => (
               <div key={i} className="flex justify-between items-center">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-6 w-16" />
@@ -38,7 +38,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, data, isLoading }) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-5 gap-6 text-center">
+        <div className="grid grid-cols-2 gap-6 text-center">
           {data.map((item, index) => (
             <div key={index} className="space-y-2">
               <div className={`text-4xl font-bold ${item.color || 'text-foreground'}`}>
@@ -61,17 +61,11 @@ export function BookOfBusinessTab() {
   const insuredsData = [
     { label: 'Commercial', count: data?.insureds?.commercial || 0, color: 'text-orange-500' },
     { label: 'Personal', count: data?.insureds?.personal || 0, color: 'text-blue-500' },
-    { label: 'Life-Health Group', count: data?.insureds?.lifeHealthGroup || 0, color: 'text-gray-400' },
-    { label: 'Life-Health Individual', count: data?.insureds?.lifeHealthIndividual || 0, color: 'text-green-500' },
-    { label: 'Medicare', count: data?.insureds?.medicare || 0, color: 'text-gray-400' },
   ];
 
   const prospectsData = [
     { label: 'Commercial', count: data?.prospects?.commercial || 0, color: 'text-orange-500' },
     { label: 'Personal', count: data?.prospects?.personal || 0, color: 'text-blue-500' },
-    { label: 'Life-Health Group', count: data?.prospects?.lifeHealthGroup || 0, color: 'text-gray-400' },
-    { label: 'Life-Health Individual', count: data?.prospects?.lifeHealthIndividual || 0, color: 'text-green-500' },
-    { label: 'Medicare', count: data?.prospects?.medicare || 0, color: 'text-gray-400' },
   ];
 
   return (
