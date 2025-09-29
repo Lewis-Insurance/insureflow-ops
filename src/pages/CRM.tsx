@@ -34,11 +34,25 @@ import type {
 } from '@/types/crm-enhanced-clean';
 
 // Memoized stats calculation
-const calculateStats = memoize((accounts: any[]) => ({
-  totalAccounts: accounts.length,
-  householdAccounts: accounts.filter(a => a.account_type === 'household').length,
-  businessAccounts: accounts.filter(a => a.account_type === 'business').length,
-}));
+const calculateStats = memoize((accounts: any[]) => {
+  const isHousehold = (a: any) => {
+    const type = a.type?.toLowerCase() || '';
+    const accountType = a.account_type?.toLowerCase() || '';
+    return accountType === 'individual' || type === 'household' || type === 'individual' || type === 'personal';
+  };
+
+  const isBusiness = (a: any) => {
+    const type = a.type?.toLowerCase() || '';
+    const accountType = a.account_type?.toLowerCase() || '';
+    return accountType === 'business' || type === 'business' || type === 'commercial' || type === 'corporate';
+  };
+
+  return {
+    totalAccounts: accounts.length,
+    householdAccounts: accounts.filter(isHousehold).length,
+    businessAccounts: accounts.filter(isBusiness).length,
+  };
+});
 
 // Memoized stats cards component
 const StatsCards = memo(({ accounts }: { accounts: any[] }) => {
