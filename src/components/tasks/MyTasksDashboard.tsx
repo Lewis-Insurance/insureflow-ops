@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export function MyTasksDashboard() {
   const { tasks, loading, fetchTasks } = useTasks();
-  const [activeTab, setActiveTab] = useState('today');
+  const [activeTab, setActiveTab] = useState('all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -60,6 +60,10 @@ export function MyTasksDashboard() {
 
   const getCompletedTasks = () => {
     return tasks.filter(task => task.status === 'completed');
+  };
+
+  const getAllAssignedTasks = () => {
+    return tasks.filter(task => task.status !== 'completed');
   };
 
   const getPriorityColor = (priority: string) => {
@@ -142,6 +146,7 @@ export function MyTasksDashboard() {
   const weekTasks = getThisWeekTasks();
   const overdueTasks = getOverdueTasks();
   const completedTasks = getCompletedTasks();
+  const allTasks = getAllAssignedTasks();
 
   return (
     <div className="space-y-6">
@@ -199,12 +204,25 @@ export function MyTasksDashboard() {
       {/* Task Lists */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="tomorrow">Tomorrow</TabsTrigger>
           <TabsTrigger value="week">This Week</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="all" className="space-y-3">
+          {allTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                No assigned tasks
+              </CardContent>
+            </Card>
+          ) : (
+            allTasks.map(renderTaskCard)
+          )}
+        </TabsContent>
 
         <TabsContent value="today" className="space-y-3">
           {todayTasks.length === 0 ? (
