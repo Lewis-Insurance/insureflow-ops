@@ -22,6 +22,7 @@ export function useDocumentManager(accountId?: string) {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const { canManageDocuments } = usePermissions();
 
   const fetchDocuments = useCallback(async () => {
@@ -317,6 +318,38 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [canManageDocuments, fetchDocuments]);
 
+  const checkIntegrity = useCallback(async () => {
+    if (!accountId) return;
+    
+    try {
+      setChecking(true);
+      const { data, error } = await supabase.functions.invoke('check-document-integrity', {
+        body: { account_id: accountId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Integrity Check Complete',
+        description: `Checked ${data.checked} documents. ${data.missing} files missing.`,
+      });
+
+      // Refresh document list to show updated status
+      await fetchDocuments();
+      
+      return data;
+    } catch (err: any) {
+      console.error('Error checking integrity:', err);
+      toast({
+        title: 'Check Failed',
+        description: err.message || 'Failed to check document integrity',
+        variant: 'destructive',
+      });
+    } finally {
+      setChecking(false);
+    }
+  }, [accountId, fetchDocuments]);
+
   useEffect(() => {
     if (accountId) {
       fetchDocuments();
@@ -327,11 +360,13 @@ export function useDocumentManager(accountId?: string) {
     documents,
     loading,
     uploading,
+    checking,
     uploadDocument,
     viewDocument,
     downloadDocument,
     deleteDocument,
     replaceDocumentFile,
+    checkIntegrity,
     refetch: fetchDocuments,
     canManageDocuments
   };

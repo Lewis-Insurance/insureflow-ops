@@ -15,12 +15,14 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   const {
     documents,
     loading,
+    checking,
     viewDocument,
     downloadDocument,
     deleteDocument,
     canManageDocuments,
     refetch: fetchDocuments,
-    replaceDocumentFile
+    replaceDocumentFile,
+    checkIntegrity
   } = useDocumentManager(accountId);
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -97,15 +99,27 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
           <FileText className="h-5 w-5" />
           Documents ({documents.length})
         </CardTitle>
-        {canManageDocuments && (
-          <Button
-            size="sm"
-            onClick={() => setUploadModalOpen(true)}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Document
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canManageDocuments && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={checkIntegrity}
+                disabled={checking}
+              >
+                {checking ? 'Checking...' : 'Check Integrity'}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setUploadModalOpen(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Document
+              </Button>
+            </>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {documents.length === 0 ? (

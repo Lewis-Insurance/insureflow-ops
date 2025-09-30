@@ -1242,10 +1242,12 @@ export type Database = {
           account_id: string | null
           category: Database["public"]["Enums"]["document_category"] | null
           created_at: string
+          file_missing: boolean
           file_size: number | null
           filename: string
           id: string
           kind: string
+          last_checked_at: string | null
           mime_type: string | null
           name: string | null
           pii_level: string | null
@@ -1253,6 +1255,7 @@ export type Database = {
           sha256: string | null
           signature_request_id: string | null
           size_bytes: number | null
+          storage_bucket: string | null
           storage_path: string
           updated_at: string
           uploaded_at: string | null
@@ -1262,10 +1265,12 @@ export type Database = {
           account_id?: string | null
           category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
+          file_missing?: boolean
           file_size?: number | null
           filename: string
           id?: string
           kind: string
+          last_checked_at?: string | null
           mime_type?: string | null
           name?: string | null
           pii_level?: string | null
@@ -1273,6 +1278,7 @@ export type Database = {
           sha256?: string | null
           signature_request_id?: string | null
           size_bytes?: number | null
+          storage_bucket?: string | null
           storage_path: string
           updated_at?: string
           uploaded_at?: string | null
@@ -1282,10 +1288,12 @@ export type Database = {
           account_id?: string | null
           category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
+          file_missing?: boolean
           file_size?: number | null
           filename?: string
           id?: string
           kind?: string
+          last_checked_at?: string | null
           mime_type?: string | null
           name?: string | null
           pii_level?: string | null
@@ -1293,6 +1301,7 @@ export type Database = {
           sha256?: string | null
           signature_request_id?: string | null
           size_bytes?: number | null
+          storage_bucket?: string | null
           storage_path?: string
           updated_at?: string
           uploaded_at?: string | null
