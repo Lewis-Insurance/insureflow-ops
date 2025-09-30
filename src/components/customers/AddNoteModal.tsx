@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AddNoteModalProps {
   open: boolean;
@@ -15,6 +16,7 @@ export function AddNoteModal({ open, onOpenChange, accountId }: AddNoteModalProp
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   async function handleSave() {
     if (!body.trim()) return;
@@ -50,6 +52,11 @@ export function AddNoteModal({ open, onOpenChange, accountId }: AddNoteModalProp
         title: 'Success',
         description: 'Note added successfully',
       });
+
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['notes', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['account', accountId] });
       
       setBody('');
       onOpenChange(false);

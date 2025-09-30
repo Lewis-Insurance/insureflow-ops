@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AddTaskModalProps {
   open: boolean;
@@ -19,6 +20,7 @@ export function AddTaskModal({ open, onOpenChange, accountId }: AddTaskModalProp
   const [dueAt, setDueAt] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   async function handleSave() {
     if (!title.trim()) return;
@@ -56,6 +58,11 @@ export function AddTaskModal({ open, onOpenChange, accountId }: AddTaskModalProp
         title: 'Success',
         description: 'Task created successfully',
       });
+
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['tasks', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['account', accountId] });
       
       setTitle('');
       setDescription('');
