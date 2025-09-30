@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage } from '@/lib/asMessage';
 import { format } from 'date-fns';
+import { CallClientConnection } from './CallClientConnection';
 
 interface TelephonyStats {
   totalCalls: number;
@@ -63,7 +64,7 @@ export function TelephonyDashboard() {
       const [callsResult, smsResult, settingsResult] = await Promise.all([
         supabase.from('call_sessions').select('id').limit(1000),
         supabase.from('sms_messages').select('id').limit(1000),
-        supabase.from('telephony_settings').select('*').single()
+        supabase.from('telephony_settings').select('*').maybeSingle()
       ]);
 
       // Check for consent opt-outs
@@ -83,9 +84,25 @@ export function TelephonyDashboard() {
         lastErrorAt: settingsResult.data?.last_error_at
       });
 
-      // Use actual settings from database
+      // Use actual settings from database or create default entry
       if (settingsResult.data) {
         setSettings(settingsResult.data);
+      } else {
+        // No settings exist, create default entry with user's Twilio number
+        const { data: newSettings, error: insertError } = await supabase
+          .from('telephony_settings')
+          .insert({
+            twilio_phone_number: '+13864879494',
+            forward_number: null,
+            recording_enabled: true,
+            webhook_status: 'unknown'
+          })
+          .select()
+          .single();
+
+        if (!insertError && newSettings) {
+          setSettings(newSettings);
+        }
       }
     } catch (error) {
       toast({
@@ -347,28 +364,32 @@ export function TelephonyDashboard() {
       </Card>
 
       {/* Recent Activity Summary */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Calls</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Call activity timeline will appear here when integrated with the main CRM timeline.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-1">
+        <CallClientConnection />
+        
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Calls</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Call activity timeline will appear here when integrated with the main CRM timeline.
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent SMS</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              SMS message timeline will appear here when integrated with the main CRM timeline.
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent SMS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                SMS message timeline will appear here when integrated with the main CRM timeline.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
