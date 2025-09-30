@@ -2783,7 +2783,7 @@ export type Database = {
       telephony_settings: {
         Row: {
           created_at: string | null
-          forward_number: string
+          forward_number: string | null
           id: string
           last_error_at: string | null
           last_webhook_error: string | null
@@ -2794,7 +2794,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          forward_number: string
+          forward_number?: string | null
           id?: string
           last_error_at?: string | null
           last_webhook_error?: string | null
@@ -2805,7 +2805,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          forward_number?: string
+          forward_number?: string | null
           id?: string
           last_error_at?: string | null
           last_webhook_error?: string | null
