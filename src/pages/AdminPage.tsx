@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Plus, Building2, Users, Shield } from 'lucide-react';
 import { CompanyManagement } from '@/components/admin/CompanyManagement';
 import { CarrierManagement } from '@/components/admin/CarrierManagement';
+import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
+import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
@@ -25,23 +27,23 @@ export default function AdminPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Admin Settings</h1>
             <p className="text-muted-foreground">
-              Manage companies, carriers, and system configuration
+              Manage carriers, MGAs, business types, and system configuration
             </p>
           </div>
         </div>
 
-        <Tabs defaultValue="companies" className="space-y-6">
+        <Tabs defaultValue="carriers" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="companies" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Companies
-            </TabsTrigger>
             <TabsTrigger value="carriers" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Carriers
             </TabsTrigger>
-            <TabsTrigger value="business-types" className="flex items-center gap-2">
+            <TabsTrigger value="mgas" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
+              MGAs
+            </TabsTrigger>
+            <TabsTrigger value="business-types" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
               Business Types
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center gap-2">
@@ -50,45 +52,19 @@ export default function AdminPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="companies" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Management
-                </CardTitle>
-                <CardDescription>
-                  Manage companies, MGAs, brokers, and other business entities
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CompanyManagement />
-              </CardContent>
-            </Card>
+          <TabsContent value="carriers" className="space-y-6">
+            <CarrierManagementTab />
           </TabsContent>
 
-          <TabsContent value="carriers" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Carrier Management
-                </CardTitle>
-                <CardDescription>
-                  Manage insurance carriers and their information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CarrierManagement />
-              </CardContent>
-            </Card>
+          <TabsContent value="mgas" className="space-y-6">
+            <MGAManagementTab />
           </TabsContent>
 
           <TabsContent value="business-types" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Building2 className="h-5 w-5" />
                   Business Type Management
                 </CardTitle>
                 <CardDescription>
