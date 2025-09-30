@@ -199,19 +199,34 @@ export function useDocumentManager(accountId?: string) {
         );
       }
 
-      const popup = window.open('', '_blank');
+      const popup = window.open('about:blank', '_blank', 'noopener,noreferrer');
+      try {
+        if (popup && popup.document) {
+          popup.document.title = 'Opening document...';
+          popup.document.body.innerHTML = '<div style="font-family:system-ui;padding:16px">Opening document…</div>';
+        }
+      } catch (e) {}
       for (const c of candidates) {
         const { data } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
         if (data?.signedUrl) {
           if (popup && !popup.closed) {
-            popup.location.href = data.signedUrl;
+            try {
+              popup.location.replace(data.signedUrl);
+            } catch (e) {
+              window.open(data.signedUrl, '_blank');
+            }
           } else {
-            window.open(data.signedUrl, '_blank');
+            const a = window.document.createElement('a');
+            a.href = data.signedUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            window.document.body.appendChild(a);
+            a.click();
+            window.document.body.removeChild(a);
           }
           return true;
         }
       }
-
       if (popup && !popup.closed) popup.close();
 
       throw new Error('File not found in storage');
