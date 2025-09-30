@@ -189,7 +189,11 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                       size="sm"
                       onClick={async () => {
                         const ok = await viewDocument(document as any);
-                        if (!ok) setRepairDocId(document.id);
+                        if (ok) {
+                          setRepairDocId(null); // Clear repair state on success
+                        } else {
+                          setRepairDocId(document.id);
+                        }
                       }}
                       title="View document"
                     >
