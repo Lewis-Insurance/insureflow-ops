@@ -75,6 +75,8 @@ export function useGlobalSearch() {
       // Process account results
       if (accountResponse.status === 'fulfilled' && accountResponse.value.data) {
         console.log('Account results:', accountResponse.value.data);
+        console.log('Account response status:', accountResponse.value.status);
+        console.log('Account response error:', accountResponse.value.error);
         results.push(...accountResponse.value.data.map(account => ({
           entity_type: 'account' as const,
           id: account.id,
@@ -82,6 +84,8 @@ export function useGlobalSearch() {
           email: account.email,
           phone: account.phone
         })));
+      } else if (accountResponse.status === 'rejected') {
+        console.error('Account search failed:', accountResponse.reason);
       }
 
       // Process contact results
@@ -94,6 +98,8 @@ export function useGlobalSearch() {
           email: contact.email_primary,
           phone: contact.phone_mobile || contact.phone_home || contact.phone_work
         })));
+      } else if (contactResponse.status === 'rejected') {
+        console.error('Contact search failed:', contactResponse.reason);
       }
 
       // Process business results
@@ -106,6 +112,8 @@ export function useGlobalSearch() {
           email: null,
           phone: null
         })));
+      } else if (businessResponse.status === 'rejected') {
+        console.error('Business search failed:', businessResponse.reason);
       }
 
       // Process policy results
@@ -119,6 +127,8 @@ export function useGlobalSearch() {
           phone: null,
           subtitle: `${policy.carrier_info?.name || policy.carrier || 'Unknown Carrier'} - ${policy.line_of_business || 'Unknown Line'} ${policy.account?.name ? `(${policy.account.name})` : ''}`
         })));
+      } else if (policyResponse.status === 'rejected') {
+        console.error('Policy search failed:', policyResponse.reason);
       }
 
       console.log('Final search results:', results);
@@ -126,6 +136,7 @@ export function useGlobalSearch() {
 
     } catch (err: any) {
       console.error('Global search error:', err);
+      console.error('Full error object:', err);
       setError(err.message || 'Search failed');
       toast({
         title: "Search Error",
