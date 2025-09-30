@@ -16,6 +16,10 @@ export interface DocumentRecord {
   uploaded_at: string;
   created_at: string;
   updated_at: string;
+  // Optional fields present in DB but not always selected
+  filename?: string;
+  storage_bucket?: string;
+  file_missing?: boolean;
 }
 
 export function useDocumentManager(accountId?: string) {
@@ -99,6 +103,8 @@ export function useDocumentManager(accountId?: string) {
         name: file.name,
         category: category as any, // Type assertion to handle enum mismatch
         storage_path: filePath,
+        storage_bucket: 'customer-docs',
+        file_missing: false,
         mime_type: file.type,
         size_bytes: file.size,
         uploaded_by: user?.id
@@ -153,14 +159,24 @@ export function useDocumentManager(accountId?: string) {
 
     try {
       const filename = (document as any).filename as string | undefined;
+      const preferredBucket = (document as any).storage_bucket as string | undefined;
       const normalizedPath = normalizePath(document.storage_path);
-      const candidates: Array<{ bucket: string; path: string }> = [
+      const candidates: Array<{ bucket: string; path: string }> = [];
+
+      // Prefer the recorded storage_bucket when present
+      if (preferredBucket) {
+        candidates.push({ bucket: preferredBucket, path: normalizedPath });
+      }
+
+      // Always try our known buckets as fallback
+      candidates.push(
         { bucket: 'customer-docs', path: normalizedPath },
         { bucket: 'documents', path: normalizedPath },
-      ];
+      );
 
       // Also try the raw storage_path if it differs from normalized (for older records)
       if (normalizedPath !== document.storage_path) {
+        if (preferredBucket) candidates.push({ bucket: preferredBucket, path: document.storage_path });
         candidates.push(
           { bucket: 'customer-docs', path: document.storage_path },
           { bucket: 'documents', path: document.storage_path },
@@ -168,9 +184,16 @@ export function useDocumentManager(accountId?: string) {
       }
 
       if (filename) {
+        const accountScoped = `${document.account_id}/${filename}`;
+        if (preferredBucket) {
+          candidates.push(
+            { bucket: preferredBucket, path: accountScoped },
+            { bucket: preferredBucket, path: filename },
+          );
+        }
         candidates.push(
-          { bucket: 'customer-docs', path: `${document.account_id}/${filename}` },
-          { bucket: 'documents', path: `${document.account_id}/${filename}` },
+          { bucket: 'customer-docs', path: accountScoped },
+          { bucket: 'documents', path: accountScoped },
           { bucket: 'customer-docs', path: filename },
           { bucket: 'documents', path: filename },
         );
@@ -215,13 +238,21 @@ export function useDocumentManager(accountId?: string) {
 
     try {
       const filename = (document as any).filename as string | undefined;
+      const preferredBucket = (document as any).storage_bucket as string | undefined;
       const normalizedPath = normalizePath(document.storage_path);
-      const candidates: Array<{ bucket: string; path: string }> = [
+      const candidates: Array<{ bucket: string; path: string }> = [];
+
+      if (preferredBucket) {
+        candidates.push({ bucket: preferredBucket, path: normalizedPath });
+      }
+
+      candidates.push(
         { bucket: 'customer-docs', path: normalizedPath },
         { bucket: 'documents', path: normalizedPath },
-      ];
+      );
 
       if (normalizedPath !== document.storage_path) {
+        if (preferredBucket) candidates.push({ bucket: preferredBucket, path: document.storage_path });
         candidates.push(
           { bucket: 'customer-docs', path: document.storage_path },
           { bucket: 'documents', path: document.storage_path },
@@ -229,9 +260,16 @@ export function useDocumentManager(accountId?: string) {
       }
 
       if (filename) {
+        const accountScoped = `${document.account_id}/${filename}`;
+        if (preferredBucket) {
+          candidates.push(
+            { bucket: preferredBucket, path: accountScoped },
+            { bucket: preferredBucket, path: filename },
+          );
+        }
         candidates.push(
-          { bucket: 'customer-docs', path: `${document.account_id}/${filename}` },
-          { bucket: 'documents', path: `${document.account_id}/${filename}` },
+          { bucket: 'customer-docs', path: accountScoped },
+          { bucket: 'documents', path: accountScoped },
           { bucket: 'customer-docs', path: filename },
           { bucket: 'documents', path: filename },
         );
@@ -289,6 +327,8 @@ export function useDocumentManager(accountId?: string) {
         .from('documents')
         .update({
           storage_path: newPath,
+          storage_bucket: 'customer-docs',
+          file_missing: false,
           filename: file.name,
           mime_type: file.type,
           size_bytes: file.size,
