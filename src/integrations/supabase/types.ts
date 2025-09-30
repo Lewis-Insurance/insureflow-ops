@@ -2712,6 +2712,7 @@ export type Database = {
           assignee_id: string | null
           completed_at: string | null
           created_at: string
+          created_by: string | null
           customer_id: string | null
           description: string | null
           details: string | null
@@ -2730,6 +2731,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           description?: string | null
           details?: string | null
@@ -2748,6 +2750,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           description?: string | null
           details?: string | null
