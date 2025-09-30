@@ -10,6 +10,8 @@ import { TaskChecklist } from './TaskChecklist';
 import { TaskTimeTracker } from './TaskTimeTracker';
 import { TaskActivityFeed } from './TaskActivityFeed';
 import { TaskDependencyVisualizer } from './TaskDependencyVisualizer';
+import { TaskReminderManager } from './TaskReminderManager';
+import { TaskRecurrenceForm } from './TaskRecurrenceForm';
 import {
   Calendar,
   User,
@@ -267,6 +269,16 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
 
               {/* Dependencies */}
               <TaskDependencyVisualizer taskId={task.id} accountId={task.account_id} />
+
+              <Separator />
+
+              {/* Reminders */}
+              <TaskReminderManager taskId={task.id} />
+
+              <Separator />
+
+              {/* Recurrence */}
+              <TaskRecurrenceForm taskId={task.id} />
 
               <Separator />
 

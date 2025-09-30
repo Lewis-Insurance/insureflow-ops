@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
+import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -137,8 +138,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         
         <div className="flex-1 flex flex-col">
           <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 items-center px-4">
+            <div className="flex h-14 items-center justify-between px-4">
               <SidebarTrigger />
+              <NotificationCenter />
             </div>
           </header>
           <main className="flex-1 overflow-auto">

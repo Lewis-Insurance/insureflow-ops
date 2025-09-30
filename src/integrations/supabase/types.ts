@@ -2164,6 +2164,51 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       opportunities: {
         Row: {
           account_id: string
@@ -3016,6 +3061,50 @@ export type Database = {
           },
         ]
       }
+      task_reminders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          remind_at: string
+          reminder_type: string
+          sent_at: string | null
+          status: string
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remind_at: string
+          reminder_type: string
+          sent_at?: string | null
+          status?: string
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          remind_at?: string
+          reminder_type?: string
+          sent_at?: string | null
+          status?: string
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reminders_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           category: Database["public"]["Enums"]["task_category"]
@@ -3424,6 +3513,10 @@ export type Database = {
       generate_backup_codes: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      generate_recurring_task_instance: {
+        Args: { p_due_date: string; p_template_task_id: string }
+        Returns: string
       }
       generate_tasks_from_templates: {
         Args: {

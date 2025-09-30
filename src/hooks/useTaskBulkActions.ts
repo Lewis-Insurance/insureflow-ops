@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { TaskStatus, TaskPriority } from './useTasks';
 
+export type { TaskStatus, TaskPriority };
+
 export function useTaskBulkActions() {
   const [processing, setProcessing] = useState(false);
 
