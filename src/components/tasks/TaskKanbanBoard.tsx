@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTasks, Task, TaskStatus } from '@/hooks/useTasks';
 import { Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { TaskEditModal } from './TaskEditModal';
 
 interface TaskKanbanBoardProps {
   accountId?: string;
@@ -19,7 +20,8 @@ const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
 export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
   const { tasks, loading, fetchTasks, updateTask } = useTasks(accountId);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
@@ -45,6 +47,10 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
     setDraggedTask(null);
   };
 
+  const handleTaskClick = (task: Task) => {
+    setEditingTask(task);
+    setEditModalOpen(true);
+  };
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'destructive';
@@ -60,7 +66,8 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {statusColumns.map(({ status, label, color }) => (
         <div
           key={status}
@@ -85,7 +92,8 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                 key={task.id}
                 draggable
                 onDragStart={() => handleDragStart(task)}
-                className="cursor-move hover:shadow-md transition-shadow"
+                onClick={() => handleTaskClick(task)}
+                className="cursor-pointer cursor-move hover:shadow-md transition-shadow"
               >
                 <CardContent className="p-3">
                   <div className="space-y-2">
@@ -136,5 +144,16 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
         </div>
       ))}
     </div>
+
+      <TaskEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        task={editingTask as any}
+        onTaskUpdate={() => {
+          fetchTasks();
+          setEditModalOpen(false);
+        }}
+      />
+    </>
   );
 }
