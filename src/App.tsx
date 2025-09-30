@@ -24,6 +24,7 @@ const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
 const MessageNew = React.lazy(() => import("./pages/MessageNew"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const TasksPage = React.lazy(() => import("./pages/TasksPage"));
+const TaskTemplatesPage = React.lazy(() => import("./pages/TaskTemplatesPage"));
 const AdminPage = React.lazy(() => import("./pages/AdminPage"));
 const TelephonyDashboard = React.lazy(() => import("./pages/TelephonyDashboard"));
 const ReportsPage = React.lazy(() => import("./pages/ReportsPage"));
@@ -161,6 +162,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <TasksPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/task-templates" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <TaskTemplatesPage />
                   </ErrorBoundary>
                 } 
               />

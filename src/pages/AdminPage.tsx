@@ -10,6 +10,7 @@ import { Plus, Building2, Users, Shield } from 'lucide-react';
 import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
 import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
+import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
@@ -49,7 +50,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="carriers" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="carriers" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Carriers
@@ -61,6 +62,10 @@ export default function AdminPage() {
             <TabsTrigger value="business-types" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Business Types
+            </TabsTrigger>
+            <TabsTrigger value="task-templates" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Task Templates
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -91,6 +96,10 @@ export default function AdminPage() {
                 <BusinessTypeManagement />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="task-templates" className="space-y-6">
+            <TaskTemplateManager />
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6">

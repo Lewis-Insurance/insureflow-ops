@@ -2791,6 +2791,105 @@ export type Database = {
           },
         ]
       }
+      task_generation_log: {
+        Row: {
+          entity_id: string | null
+          entity_type: string | null
+          generated_at: string
+          id: string
+          metadata: Json | null
+          task_id: string | null
+          template_id: string | null
+          trigger_event: Database["public"]["Enums"]["task_trigger_event"]
+        }
+        Insert: {
+          entity_id?: string | null
+          entity_type?: string | null
+          generated_at?: string
+          id?: string
+          metadata?: Json | null
+          task_id?: string | null
+          template_id?: string | null
+          trigger_event: Database["public"]["Enums"]["task_trigger_event"]
+        }
+        Update: {
+          entity_id?: string | null
+          entity_type?: string | null
+          generated_at?: string
+          id?: string
+          metadata?: Json | null
+          task_id?: string | null
+          template_id?: string | null
+          trigger_event?: Database["public"]["Enums"]["task_trigger_event"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_generation_log_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_generation_log_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_templates: {
+        Row: {
+          category: Database["public"]["Enums"]["task_category"]
+          created_at: string
+          default_assignee_role: string | null
+          dependencies: Json | null
+          description: string | null
+          estimated_duration_hours: number | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          name: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          task_order: number | null
+          trigger_event: Database["public"]["Enums"]["task_trigger_event"]
+          updated_at: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["task_category"]
+          created_at?: string
+          default_assignee_role?: string | null
+          dependencies?: Json | null
+          description?: string | null
+          estimated_duration_hours?: number | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          task_order?: number | null
+          trigger_event: Database["public"]["Enums"]["task_trigger_event"]
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["task_category"]
+          created_at?: string
+          default_assignee_role?: string | null
+          dependencies?: Json | null
+          description?: string | null
+          estimated_duration_hours?: number | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          task_order?: number | null
+          trigger_event?: Database["public"]["Enums"]["task_trigger_event"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           account_id: string | null
@@ -3104,6 +3203,15 @@ export type Database = {
       generate_backup_codes: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      generate_tasks_from_templates: {
+        Args: {
+          p_account_id: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_trigger_event: Database["public"]["Enums"]["task_trigger_event"]
+        }
+        Returns: Json
       }
       get_policies_claims_secure: {
         Args: Record<PropertyKey, never>
@@ -3511,6 +3619,15 @@ export type Database = {
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
       task_status_enum: "open" | "done" | "cancelled"
+      task_trigger_event:
+        | "quote_requested"
+        | "quote_accepted"
+        | "policy_issued"
+        | "policy_renewal_due"
+        | "claim_filed"
+        | "payment_overdue"
+        | "service_request"
+        | "manual"
       user_role:
         | "customer"
         | "staff"
@@ -3773,6 +3890,16 @@ export const Constants = {
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
       task_status_enum: ["open", "done", "cancelled"],
+      task_trigger_event: [
+        "quote_requested",
+        "quote_accepted",
+        "policy_issued",
+        "policy_renewal_due",
+        "claim_filed",
+        "payment_overdue",
+        "service_request",
+        "manual",
+      ],
       user_role: [
         "customer",
         "staff",
