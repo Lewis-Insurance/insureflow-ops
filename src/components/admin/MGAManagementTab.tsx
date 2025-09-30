@@ -75,7 +75,7 @@ export function MGAManagementTab() {
         .select('*')
         .order('name');
       if (error) throw error;
-      return data as MGA[];
+      return data as unknown as MGA[];
     }
   });
 
