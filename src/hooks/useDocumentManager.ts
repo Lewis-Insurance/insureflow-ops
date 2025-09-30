@@ -202,16 +202,13 @@ export function useDocumentManager(accountId?: string) {
       for (const c of candidates) {
         const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
         if (!error && data?.signedUrl) {
-          const w = window.open(data.signedUrl, '_blank', 'noopener');
-          if (!w) {
-            const a = window.document.createElement('a');
-            a.href = data.signedUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            window.document.body.appendChild(a);
-            a.click();
-            window.document.body.removeChild(a);
-          }
+          const a = window.document.createElement('a');
+          a.href = data.signedUrl;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          window.document.body.appendChild(a);
+          a.click();
+          window.document.body.removeChild(a);
           return true;
         }
       }
