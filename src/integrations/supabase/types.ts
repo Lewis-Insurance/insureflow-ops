@@ -512,6 +512,7 @@ export type Database = {
           contact_phone: string | null
           country: string | null
           created_at: string
+          default_commission_rate: number | null
           id: string
           main_phone: string | null
           naic: string | null
@@ -535,6 +536,7 @@ export type Database = {
           contact_phone?: string | null
           country?: string | null
           created_at?: string
+          default_commission_rate?: number | null
           id?: string
           main_phone?: string | null
           naic?: string | null
@@ -558,6 +560,7 @@ export type Database = {
           contact_phone?: string | null
           country?: string | null
           created_at?: string
+          default_commission_rate?: number | null
           id?: string
           main_phone?: string | null
           naic?: string | null
