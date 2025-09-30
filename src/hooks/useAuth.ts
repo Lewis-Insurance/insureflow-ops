@@ -28,14 +28,39 @@ export function useAuth() {
 
   // Centralized profile fetching with proper error handling
   const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<void> => {
-    const { data: profileData, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    
-    if (error) {
-      // Create minimal profile to prevent infinite loading - don't show toast for profile fetch failures
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        // Create minimal profile to prevent infinite loading - don't show toast for profile fetch failures
+        const fallbackProfile: UserProfile = {
+          id: userId,
+          full_name: userEmail?.split('@')[0] || 'User',
+          role: 'customer',
+          phone: null,
+          is_staff: false,
+          created_at: new Date().toISOString()
+        };
+        setProfile(fallbackProfile);
+        return;
+      }
+
+      if (profileData) {
+        setProfile({
+          ...profileData,
+          role: (profileData.role as UserProfile['role']) || 'customer',
+          notification_email: typeof profileData.notification_email === 'string' 
+            ? profileData.notification_email === 'true' 
+            : Boolean(profileData.notification_email),
+          notification_sms: false // Default since field doesn't exist in database yet
+        });
+      }
+    } catch (error) {
+      // Fallback profile on any error to prevent infinite loading
       const fallbackProfile: UserProfile = {
         id: userId,
         full_name: userEmail?.split('@')[0] || 'User',
@@ -45,18 +70,6 @@ export function useAuth() {
         created_at: new Date().toISOString()
       };
       setProfile(fallbackProfile);
-      return;
-    }
-
-    if (profileData) {
-      setProfile({
-        ...profileData,
-        role: (profileData.role as UserProfile['role']) || 'customer',
-        notification_email: typeof profileData.notification_email === 'string' 
-          ? profileData.notification_email === 'true' 
-          : Boolean(profileData.notification_email),
-        notification_sms: false // Default since field doesn't exist in database yet
-      });
     }
   }, []);
 
@@ -81,26 +94,41 @@ export function useAuth() {
       }
     );
 
-    // Check for existing session
+    // Check for existing session with timeout
     const initializeAuth = async () => {
-      const { data: { session: existingSession }, error } = await supabase.auth.getSession();
-      
-      if (!mounted) return;
+      try {
+        // Add timeout to prevent hanging on slow connections
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 10000)
+        );
+        
+        const { data: { session: existingSession }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
+        
+        if (!mounted) return;
 
-      if (error) {
-        // Silently handle session errors - user will be prompted to sign in
+        if (error) {
+          // Silently handle session errors - user will be prompted to sign in
+          setLoading(false);
+          return;
+        }
+
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
+        
+        if (existingSession?.user) {
+          await fetchProfile(existingSession.user.id, existingSession.user.email);
+        }
+        
         setLoading(false);
-        return;
+      } catch (error) {
+        // Handle timeout or other errors
+        if (!mounted) return;
+        setLoading(false);
       }
-
-      setSession(existingSession);
-      setUser(existingSession?.user ?? null);
-      
-      if (existingSession?.user) {
-        await fetchProfile(existingSession.user.id, existingSession.user.email);
-      }
-      
-      setLoading(false);
     };
 
     initializeAuth();

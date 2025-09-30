@@ -187,9 +187,11 @@ export const useMemoryMonitor = (componentName: string) => {
       
       logMemory();
       
-      // Log memory usage every 5 seconds while component is mounted
-      const interval = setInterval(logMemory, 5000);
-      return () => clearInterval(interval);
+      // Only log memory in development to avoid performance impact in production
+      if (import.meta.env.DEV) {
+        const interval = setInterval(logMemory, 10000); // Reduce frequency to 10 seconds
+        return () => clearInterval(interval);
+      }
     }
   }, [componentName]);
 };

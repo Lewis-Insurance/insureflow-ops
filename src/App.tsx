@@ -33,13 +33,18 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (was cacheTime)
       retry: (failureCount, error) => {
         // Don't retry on 404s or auth errors
         if (error instanceof Error && (error.message.includes('404') || error.message.includes('auth'))) {
           return false;
         }
-        return failureCount < 3;
+        return failureCount < 2; // Reduce retries from 3 to 2
       },
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    },
+    mutations: {
+      retry: 1, // Reduce mutation retries
     },
   },
 });
