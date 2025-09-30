@@ -21,11 +21,8 @@ const Index = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return (
-    <AppLayout>
-      <Dashboard />
-    </AppLayout>
-  );
+  // Redirect authenticated users to CRM as the default landing page
+  return <Navigate to="/crm" replace />;
 };
 
 export default Index;
