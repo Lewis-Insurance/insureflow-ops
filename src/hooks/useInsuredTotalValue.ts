@@ -52,16 +52,31 @@ export function useInsuredTotalValue() {
       // Calculate total value per customer and segment them
       const customerValues = accounts.map(account => {
         const totalPolicies = account.policies?.length || 0;
-        const totalValue = account.policies?.reduce((sum, policy) => sum + (policy.premium || 0), 0) || 0;
         
-        // Estimate total insured value (using premium as a proxy - multiply by typical coverage ratio)
-        const estimatedInsuredValue = totalValue * 50; // Rough estimate: premium is ~2% of coverage
+        // Calculate total insured value from coverage amounts or use premium as fallback
+        const totalInsuredValue = account.policies?.reduce((sum, policy: any) => {
+          // Try to extract coverage amount from coverage jsonb field
+          const coverage = policy.coverage;
+          let coverageAmount = 0;
+          
+          if (coverage && typeof coverage === 'object') {
+            // Look for common coverage field names
+            coverageAmount = coverage.total_coverage || 
+                           coverage.total_limit || 
+                           coverage.coverage_amount || 
+                           coverage.limit || 
+                           0;
+          }
+          
+          // If no coverage found, use premium as the insured value directly
+          return sum + (coverageAmount || policy.premium || 0);
+        }, 0) || 0;
         
         return {
           name: account.name,
-          value: estimatedInsuredValue,
+          value: totalInsuredValue,
           policies: totalPolicies,
-          risk: estimatedInsuredValue > 200000 ? 'High' : estimatedInsuredValue > 100000 ? 'Medium' : 'Low'
+          risk: totalInsuredValue > 200000 ? 'High' : totalInsuredValue > 100000 ? 'Medium' : 'Low'
         };
       });
 
