@@ -29,23 +29,24 @@ export function useInsuredTotalValue() {
     queryKey: ['insured-total-value'],
     queryFn: async (): Promise<InsuredTotalValueData> => {
       // Fetch accounts and policies separately to respect RLS policies
-      const [accountsResult, policiesResult] = await Promise.all([
+      const [accountsResult, policiesRpc] = await Promise.all([
         supabase
           .from('accounts')
           .select('id, name')
           .is('deleted_at', null),
         supabase
-          .from('policies')
-          .select('id, premium, line_of_business, account_id')
+          .rpc('get_user_policies_secure')
       ]);
 
       if (accountsResult.error) throw accountsResult.error;
-      if (policiesResult.error) throw policiesResult.error;
+      if (policiesRpc.error) throw policiesRpc.error;
+
+      const policies = policiesRpc.data ?? [];
 
       // Combine accounts with their policies
       const accounts = accountsResult.data?.map(account => ({
         ...account,
-        policies: policiesResult.data?.filter(policy => policy.account_id === account.id) || []
+        policies: policies.filter((policy: any) => policy.account_id === account.id)
       })) || [];
 
       // Calculate total value per customer and segment them
