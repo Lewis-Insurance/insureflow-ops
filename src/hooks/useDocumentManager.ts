@@ -135,21 +135,32 @@ export function useDocumentManager(accountId?: string) {
 
   const viewDocument = useCallback(async (document: DocumentRecord) => {
     try {
-      const tryCreate = async (bucket: string) =>
-        await supabase.storage.from(bucket).createSignedUrl(document.storage_path, 3600);
+      const filename = (document as any).filename as string | undefined;
+      const candidates: Array<{ bucket: string; path: string }> = [
+        { bucket: 'customer-docs', path: document.storage_path },
+        { bucket: 'documents', path: document.storage_path },
+      ];
 
-      let { data, error } = await tryCreate('customer-docs');
-
-      if (error && /Object not found/i.test(error.message)) {
-        const alt = await tryCreate('documents');
-        data = alt.data;
-        error = alt.error;
+      if (filename) {
+        candidates.push(
+          { bucket: 'customer-docs', path: `${document.account_id}/${filename}` },
+          { bucket: 'documents', path: `${document.account_id}/${filename}` },
+          { bucket: 'customer-docs', path: filename },
+          { bucket: 'documents', path: filename },
+        );
       }
 
-      if (error) throw error;
-      if (!data?.signedUrl) throw new Error('File not available');
+      let lastError: any = null;
+      for (const c of candidates) {
+        const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
+        if (!error && data?.signedUrl) {
+          window.open(data.signedUrl, '_blank');
+          return;
+        }
+        lastError = error;
+      }
 
-      window.open(data.signedUrl, '_blank');
+      throw lastError || new Error('File not found in storage');
     } catch (err: any) {
       console.error('Error viewing document:', err);
       toast({
@@ -162,31 +173,39 @@ export function useDocumentManager(accountId?: string) {
 
   const downloadDocument = useCallback(async (document: DocumentRecord) => {
     try {
-      const tryCreate = async (bucket: string) =>
-        await supabase.storage.from(bucket).createSignedUrl(document.storage_path, 3600);
+      const filename = (document as any).filename as string | undefined;
+      const candidates: Array<{ bucket: string; path: string }> = [
+        { bucket: 'customer-docs', path: document.storage_path },
+        { bucket: 'documents', path: document.storage_path },
+      ];
 
-      let { data, error } = await tryCreate('customer-docs');
-
-      if (error && /Object not found/i.test(error.message)) {
-        const alt = await tryCreate('documents');
-        data = alt.data;
-        error = alt.error;
+      if (filename) {
+        candidates.push(
+          { bucket: 'customer-docs', path: `${document.account_id}/${filename}` },
+          { bucket: 'documents', path: `${document.account_id}/${filename}` },
+          { bucket: 'customer-docs', path: filename },
+          { bucket: 'documents', path: filename },
+        );
       }
 
-      if (error) throw error;
-      if (!data?.signedUrl) throw new Error('File not available');
+      let lastError: any = null;
+      for (const c of candidates) {
+        const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
+        if (!error && data?.signedUrl) {
+          const link = window.document.createElement('a');
+          link.href = data.signedUrl;
+          link.download = document.name;
+          window.document.body.appendChild(link);
+          link.click();
+          window.document.body.removeChild(link);
 
-      const link = window.document.createElement('a');
-      link.href = data.signedUrl;
-      link.download = document.name;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
+          toast({ title: "Success", description: "Document download started" });
+          return;
+        }
+        lastError = error;
+      }
 
-      toast({
-        title: "Success",
-        description: "Document download started",
-      });
+      throw lastError || new Error('File not found in storage');
     } catch (err: any) {
       console.error('Error downloading document:', err);
       toast({
