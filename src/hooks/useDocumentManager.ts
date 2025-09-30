@@ -199,23 +199,11 @@ export function useDocumentManager(accountId?: string) {
         );
       }
 
-      const popup = window.open('about:blank', '_blank', 'noopener,noreferrer');
-      try {
-        if (popup && popup.document) {
-          popup.document.title = 'Opening document...';
-          popup.document.body.innerHTML = '<div style="font-family:system-ui;padding:16px">Opening document…</div>';
-        }
-      } catch (e) {}
       for (const c of candidates) {
-        const { data } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
-        if (data?.signedUrl) {
-          if (popup && !popup.closed) {
-            try {
-              popup.location.replace(data.signedUrl);
-            } catch (e) {
-              window.open(data.signedUrl, '_blank');
-            }
-          } else {
+        const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
+        if (!error && data?.signedUrl) {
+          const w = window.open(data.signedUrl, '_blank', 'noopener');
+          if (!w) {
             const a = window.document.createElement('a');
             a.href = data.signedUrl;
             a.target = '_blank';
@@ -227,7 +215,6 @@ export function useDocumentManager(accountId?: string) {
           return true;
         }
       }
-      if (popup && !popup.closed) popup.close();
 
       throw new Error('File not found in storage');
     } catch (err: any) {
