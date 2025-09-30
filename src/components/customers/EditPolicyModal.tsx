@@ -9,6 +9,26 @@ import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { z } from 'zod';
 
+// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
+const formatDateForDisplay = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+
+// Helper function to convert MM/DD/YYYY to YYYY-MM-DD for storage
+const formatDateForStorage = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 10) return dateStr;
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+  }
+  return dateStr;
+};
+
 const policySchema = z.object({
   policy_number: z.string().min(1, 'Policy number is required').max(50, 'Policy number too long'),
   carrier: z.string().min(1, 'Carrier is required').max(100, 'Carrier name too long'),
@@ -71,8 +91,8 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         carrier: policy.carrier || '',
         line_of_business: policy.line_of_business || '',
         premium: policy.premium ? policy.premium.toString() : '',
-        effective_date: policy.effective_date || '',
-        expiration_date: policy.expiration_date || '',
+        effective_date: policy.effective_date ? formatDateForDisplay(policy.effective_date) : '',
+        expiration_date: policy.expiration_date ? formatDateForDisplay(policy.expiration_date) : '',
         billing_frequency: policy.billing_frequency || 'annual',
         policy_term: policy.policy_term || '',
         status: policy.status || 'active',
@@ -110,8 +130,8 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         carrier: formData.carrier.trim(),
         line_of_business: formData.line_of_business.trim(),
         premium: formData.premium ? parseFloat(formData.premium) : null,
-        effective_date: formData.effective_date,
-        expiration_date: formData.expiration_date,
+        effective_date: formatDateForStorage(formData.effective_date),
+        expiration_date: formatDateForStorage(formData.expiration_date),
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
         policy_term: formData.policy_term || null,
         status: formData.status,
@@ -154,6 +174,31 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Auto-calculate expiration date when effective date or policy term changes
+    if (field === 'effective_date' || field === 'policy_term') {
+      const effectiveDate = field === 'effective_date' ? value : formData.effective_date;
+      const policyTerm = field === 'policy_term' ? value : formData.policy_term;
+      
+      if (effectiveDate && policyTerm) {
+        const startDate = new Date(effectiveDate);
+        let expirationDate: Date;
+        
+        if (policyTerm === 'semiannual') {
+          expirationDate = new Date(startDate);
+          expirationDate.setMonth(startDate.getMonth() + 6);
+        } else if (policyTerm === 'annual') {
+          expirationDate = new Date(startDate);
+          expirationDate.setFullYear(startDate.getFullYear() + 1);
+        } else {
+          return; // Unknown term, don't auto-calculate
+        }
+        
+        // Format as YYYY-MM-DD for date input
+        const formattedDate = expirationDate.toISOString().split('T')[0];
+        setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
+      }
     }
   };
 
@@ -271,9 +316,60 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
               <Label htmlFor="effective_date">Effective Date *</Label>
               <Input
                 id="effective_date"
-                type="date"
+                type="text"
+                placeholder="MM/DD/YYYY"
                 value={formData.effective_date}
-                onChange={(e) => handleInputChange('effective_date', e.target.value)}
+                onChange={(e) => {
+                  let value = e.target.value;
+                  // Auto-format as user types MM/DD/YYYY
+                  value = value.replace(/\D/g, ''); // Remove non-digits
+                  if (value.length >= 3) {
+                    value = value.substring(0, 2) + '/' + value.substring(2);
+                  }
+                  if (value.length >= 6) {
+                    value = value.substring(0, 5) + '/' + value.substring(5, 9);
+                  }
+                  
+                  // Convert MM/DD/YYYY to YYYY-MM-DD for validation and storage
+                  let formattedForStorage = value;
+                  if (value.length === 10) {
+                    const parts = value.split('/');
+                    if (parts.length === 3) {
+                      formattedForStorage = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                    }
+                  }
+                  
+                  setFormData(prev => ({ ...prev, effective_date: value }));
+                  if (errors.effective_date) {
+                    setErrors(prev => ({ ...prev, effective_date: '' }));
+                  }
+                  
+                  // Auto-calculate expiration if we have a complete date and policy term
+                  if (value.length === 10 && formData.policy_term) {
+                    const parts = value.split('/');
+                    if (parts.length === 3) {
+                      const startDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                      let expirationDate: Date;
+                      
+                      if (formData.policy_term === 'semiannual') {
+                        expirationDate = new Date(startDate);
+                        expirationDate.setMonth(startDate.getMonth() + 6);
+                      } else if (formData.policy_term === 'annual') {
+                        expirationDate = new Date(startDate);
+                        expirationDate.setFullYear(startDate.getFullYear() + 1);
+                      } else {
+                        return;
+                      }
+                      
+                      const expMonth = (expirationDate.getMonth() + 1).toString().padStart(2, '0');
+                      const expDay = expirationDate.getDate().toString().padStart(2, '0');
+                      const expYear = expirationDate.getFullYear();
+                      const formattedExpDate = `${expMonth}/${expDay}/${expYear}`;
+                      
+                      setFormData(prev => ({ ...prev, effective_date: value, expiration_date: formattedExpDate }));
+                    }
+                  }
+                }}
                 className={errors.effective_date ? 'border-destructive' : ''}
               />
               {errors.effective_date && (
@@ -284,9 +380,21 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
               <Label htmlFor="expiration_date">Expiration Date *</Label>
               <Input
                 id="expiration_date"
-                type="date"
+                type="text"
+                placeholder="MM/DD/YYYY"
                 value={formData.expiration_date}
-                onChange={(e) => handleInputChange('expiration_date', e.target.value)}
+                onChange={(e) => {
+                  let value = e.target.value;
+                  // Auto-format as user types MM/DD/YYYY
+                  value = value.replace(/\D/g, ''); // Remove non-digits
+                  if (value.length >= 3) {
+                    value = value.substring(0, 2) + '/' + value.substring(2);
+                  }
+                  if (value.length >= 6) {
+                    value = value.substring(0, 5) + '/' + value.substring(5, 9);
+                  }
+                  handleInputChange('expiration_date', value);
+                }}
                 className={errors.expiration_date ? 'border-destructive' : ''}
               />
               {errors.expiration_date && (
