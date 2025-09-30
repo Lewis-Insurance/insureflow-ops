@@ -367,6 +367,18 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [accountId, fetchDocuments]);
 
+  const getDocumentUrl = useCallback(async (document: DocumentRecord): Promise<string | null> => {
+    try {
+      const bucket = document.storage_bucket || 'customer-docs';
+      const path = document.storage_path;
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) return null;
+      return data.signedUrl;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return {
     documents,
     loading,
@@ -379,6 +391,7 @@ export function useDocumentManager(accountId?: string) {
     replaceDocumentFile,
     checkIntegrity,
     refetch: fetchDocuments,
-    canManageDocuments
+    canManageDocuments,
+    getDocumentUrl,
   };
 }

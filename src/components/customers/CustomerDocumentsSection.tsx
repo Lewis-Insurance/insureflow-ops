@@ -22,7 +22,8 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     canManageDocuments,
     refetch: fetchDocuments,
     replaceDocumentFile,
-    checkIntegrity
+    checkIntegrity,
+    getDocumentUrl
   } = useDocumentManager(accountId);
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -188,10 +189,14 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                       variant="ghost"
                       size="sm"
                       onClick={async () => {
-                        const ok = await viewDocument(document as any);
-                        if (ok) {
-                          setRepairDocId(null); // Clear repair state on success
+                        const tab = window.open('about:blank', '_blank', 'noopener');
+                        const url = await getDocumentUrl(document as any);
+                        if (url) {
+                          if (tab) tab.location.replace(url);
+                          else window.open(url, '_blank');
+                          setRepairDocId(null);
                         } else {
+                          if (tab && !tab.closed) tab.close();
                           setRepairDocId(document.id);
                         }
                       }}
