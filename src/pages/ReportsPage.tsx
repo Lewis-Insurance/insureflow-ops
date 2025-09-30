@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useNavigate } from 'react-router-dom';
-import { FileText, Users, TrendingUp, DollarSign } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FileText, Users, TrendingUp, DollarSign, ArrowLeft } from 'lucide-react';
+import { RenewalsByLineOfBusiness } from '@/components/reports/RenewalsByLineOfBusiness';
+import { AgentCommissionsReport } from '@/components/reports/AgentCommissionsReport';
+import { RevenueReport } from '@/components/reports/RevenueReport';
 
 interface Report {
   id: string;
@@ -211,17 +215,39 @@ const getCategoryColor = (category: Report['category']) => {
 };
 
 export default function ReportsPage() {
-  const navigate = useNavigate();
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   const handleViewReport = (report: Report) => {
-    // Navigate to related entities or show report data
-    if (report.linkedEntity === 'customers') {
-      navigate('/customers');
-    } else if (report.linkedEntity === 'policies') {
-      navigate('/policies');
-    } else {
-      // For now, show a placeholder or future report implementation
-      console.log(`Viewing report: ${report.title}`);
+    setSelectedReport(report);
+  };
+
+  const closeReport = () => {
+    setSelectedReport(null);
+  };
+
+  const renderReportContent = (report: Report) => {
+    switch (report.id) {
+      case 'renewals-lob':
+        return <RenewalsByLineOfBusiness />;
+      case 'agents-commissions':
+      case 'agents-commissions-endorsements':
+      case 'agents-commissions-policies':
+        return <AgentCommissionsReport />;
+      case 'revenue':
+        return <RevenueReport />;
+      default:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>{report.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                This report is not yet implemented. Coming soon!
+              </p>
+            </CardContent>
+          </Card>
+        );
     }
   };
 
@@ -230,95 +256,122 @@ export default function ReportsPage() {
   const rightColumnReports = reports.slice(Math.ceil(reports.length / 2));
 
   return (
-    <AppLayout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-            <p className="text-muted-foreground">
-              Comprehensive reports for renewals, commissions, production, and financial data
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
-          <div className="space-y-4">
-            {leftColumnReports.map((report) => (
-              <Card key={report.id} className="transition-all hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium flex items-center gap-2">
-                      {getCategoryIcon(report.category)}
-                      {report.title}
-                    </CardTitle>
-                    <Badge 
-                      variant="outline" 
-                      className={getCategoryColor(report.category)}
-                    >
-                      {report.category}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    {report.linkedEntity && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                        Links to {report.linkedEntity}
-                      </div>
-                    )}
-                    <Button 
-                      onClick={() => handleViewReport(report)}
-                      className="ml-auto"
-                    >
-                      View Report
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+    <>
+      <AppLayout>
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+              <p className="text-muted-foreground">
+                Comprehensive reports for renewals, commissions, production, and financial data
+              </p>
+            </div>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-4">
-            {rightColumnReports.map((report) => (
-              <Card key={report.id} className="transition-all hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium flex items-center gap-2">
-                      {getCategoryIcon(report.category)}
-                      {report.title}
-                    </CardTitle>
-                    <Badge 
-                      variant="outline" 
-                      className={getCategoryColor(report.category)}
-                    >
-                      {report.category}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    {report.linkedEntity && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                        Links to {report.linkedEntity}
-                      </div>
-                    )}
-                    <Button 
-                      onClick={() => handleViewReport(report)}
-                      className="ml-auto"
-                    >
-                      View Report
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-4">
+              {leftColumnReports.map((report) => (
+                <Card key={report.id} className="transition-all hover:shadow-md">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-medium flex items-center gap-2">
+                        {getCategoryIcon(report.category)}
+                        {report.title}
+                      </CardTitle>
+                      <Badge 
+                        variant="outline" 
+                        className={getCategoryColor(report.category)}
+                      >
+                        {report.category}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      {report.linkedEntity && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Users className="h-3 w-3" />
+                          Links to {report.linkedEntity}
+                        </div>
+                      )}
+                      <Button 
+                        onClick={() => handleViewReport(report)}
+                        className="ml-auto"
+                      >
+                        View Report
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-4">
+              {rightColumnReports.map((report) => (
+                <Card key={report.id} className="transition-all hover:shadow-md">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-medium flex items-center gap-2">
+                        {getCategoryIcon(report.category)}
+                        {report.title}
+                      </CardTitle>
+                      <Badge 
+                        variant="outline" 
+                        className={getCategoryColor(report.category)}
+                      >
+                        {report.category}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      {report.linkedEntity && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Users className="h-3 w-3" />
+                          Links to {report.linkedEntity}
+                        </div>
+                      )}
+                      <Button 
+                        onClick={() => handleViewReport(report)}
+                        className="ml-auto"
+                      >
+                        View Report
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </AppLayout>
+      </AppLayout>
+
+      {/* Report Dialog */}
+      <Dialog open={!!selectedReport} onOpenChange={closeReport}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={closeReport}
+                className="p-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedReport && getCategoryIcon(selectedReport.category)}
+                {selectedReport?.title}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          <div className="mt-4">
+            {selectedReport && renderReportContent(selectedReport)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
