@@ -135,7 +135,7 @@ serve(async (req) => {
         twiml = xml`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Hello! Thank you for calling. Please hold while we connect you.</Say>
-  <Dial callerId="${twilioNumber ?? ''}" timeout="30" record="record-from-answer">
+  <Dial callerId="${From || twilioNumber || ''}" timeout="30" record="record-from-answer-dual" recordingStatusCallback="${supabaseUrl}/functions/v1/twilio-recording-webhook" answerOnBridge="true">
     <Number>${forwardNumber}</Number>
   </Dial>
   <Say voice="alice">Sorry, no one is available to take your call right now. Please leave a message after the beep.</Say>
