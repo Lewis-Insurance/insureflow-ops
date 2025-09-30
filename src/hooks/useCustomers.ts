@@ -34,17 +34,33 @@ export function useCustomers(accountId?: string) {
   const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('customers_search', {
-        q: searchQuery || null,
-        p_account_id: null, // Remove account filtering for now to get all unified customers
-        limit_count: limit,
-        offset_count: offset
+      const { data, error } = await supabase.rpc('customers_search_v1', {
+        p_filters: searchQuery ? { q: searchQuery } : {},
+        p_limit: limit,
+        p_offset: offset,
+        p_sort: 'updated_at_desc'
       });
 
       if (error) throw error;
       
-      // Data comes directly from the unified view with correct field names
-      setCustomers(data || []);
+      // Map the data from customers_search_v1 to Customer interface
+      const mappedCustomers: Customer[] = (data || []).map((item: any) => ({
+        id: item.account_id,
+        account_id: item.account_id,
+        name: item.display_name || 'Unnamed Customer',
+        email: item.primary_email,
+        phone: item.primary_phone,
+        city: item.city,
+        state: item.state,
+        postal_code: item.postal_code,
+        status: item.status || 'active',
+        type: item.type || 'individual',
+        notes_summary: item.notes_summary,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+      
+      setCustomers(mappedCustomers);
       setError(null);
     } catch (err: any) {
       setError(err.message);
