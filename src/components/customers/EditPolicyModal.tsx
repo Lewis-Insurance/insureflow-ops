@@ -286,10 +286,12 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="monthly_bill">Monthly Bill</SelectItem>
+                  <SelectItem value="monthly_ach">Monthly ACH</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
                   <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
+                  <SelectItem value="escrow">Escrow</SelectItem>
                 </SelectContent>
               </Select>
             </div>
