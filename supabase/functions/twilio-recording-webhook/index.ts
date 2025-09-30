@@ -59,7 +59,7 @@ serve(async (req) => {
     return new Response(twimlResponse, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/xml',
+        'Content-Type': 'text/xml',
       },
     });
 

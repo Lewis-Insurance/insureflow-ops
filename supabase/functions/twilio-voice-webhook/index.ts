@@ -25,10 +25,18 @@ serve(async (req) => {
   }
 
   try {
-    // Parse form-encoded webhook from Twilio
-    const formData = await req.formData();
-    const data: Record<string, string> = {};
-    for (const [k, v] of formData.entries()) data[k] = v.toString();
+    // Parse webhook params (support POST form and GET query)
+    let data: Record<string, string> = {};
+    try {
+      const formData = await req.formData();
+      for (const [k, v] of formData.entries()) data[k] = v.toString();
+    } catch (_) {
+      // ignore
+    }
+    if (Object.keys(data).length === 0) {
+      const url = new URL(req.url);
+      url.searchParams.forEach((v, k) => (data[k] = v));
+    }
 
     const CallSid = data['CallSid'] || '';
     const From = data['From'] || '';
@@ -147,11 +155,11 @@ serve(async (req) => {
     }
 
     return new Response(twiml, {
-      headers: { ...corsHeaders, 'Content-Type': 'application/xml' },
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
     });
   } catch (err) {
     console.error('Twilio voice webhook error:', err);
     const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="alice">We are experiencing technical difficulties. Please try again later.</Say>\n</Response>`;
-    return new Response(errorTwiml, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/xml' } });
+    return new Response(errorTwiml, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/xml' } });
   }
 });
