@@ -199,13 +199,20 @@ export function useDocumentManager(accountId?: string) {
         );
       }
 
+      const popup = window.open('', '_blank');
       for (const c of candidates) {
         const { data } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
         if (data?.signedUrl) {
-          window.open(data.signedUrl, '_blank');
+          if (popup && !popup.closed) {
+            popup.location.href = data.signedUrl;
+          } else {
+            window.open(data.signedUrl, '_blank');
+          }
           return true;
         }
       }
+
+      if (popup && !popup.closed) popup.close();
 
       throw new Error('File not found in storage');
     } catch (err: any) {
