@@ -33,6 +33,16 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
   });
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -47,6 +57,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         notes: task.notes || '',
       });
     } else {
+      // For new tasks, default to assigning to current user
       setFormData({
         title: '',
         description: '',
@@ -54,11 +65,11 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         priority: 'medium' as TaskPriority,
         status: 'pending' as TaskStatus,
         due_at: undefined,
-        assigned_to: undefined,
+        assigned_to: currentUserId || undefined,
         notes: '',
       });
     }
-  }, [task, open]);
+  }, [task, open, currentUserId]);
 
   useEffect(() => {
     if (open) {
