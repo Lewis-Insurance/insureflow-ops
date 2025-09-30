@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { TaskChecklist } from './TaskChecklist';
 import {
   Calendar,
   User,
@@ -248,6 +249,11 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
                   <div className="text-sm text-muted-foreground">No attachments</div>
                 )}
               </div>
+
+              <Separator />
+
+              {/* Checklist Section */}
+              <TaskChecklist taskId={task.id} />
 
               <Separator />
 

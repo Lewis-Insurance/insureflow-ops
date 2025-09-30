@@ -157,7 +157,7 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
-                <Route 
+              <Route 
                 path="/tasks" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
@@ -165,7 +165,7 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
-              <Route 
+              <Route
                 path="/task-templates" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
