@@ -8,6 +8,7 @@ import { TaskBulkActionsBar } from './TaskBulkActionsBar';
 import { TaskEditModal } from './TaskEditModal';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast, isThisWeek } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 export function MyTasksDashboard() {
   const { tasks, loading, fetchTasks } = useTasks();
@@ -15,11 +16,23 @@ export function MyTasksDashboard() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
-    // Fetch all tasks (filtering by current user would need to be added to the hook)
-    fetchTasks();
-  }, [fetchTasks]);
+    // Fetch tasks assigned to the current user
+    if (currentUserId) {
+      fetchTasks({ assignedTo: currentUserId });
+    }
+  }, [fetchTasks, currentUserId]);
 
   const getTodayTasks = () => {
     return tasks.filter(task => 
