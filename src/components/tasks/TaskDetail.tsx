@@ -22,10 +22,13 @@ import {
   FileText,
   Trash2,
 } from 'lucide-react';
-import { Task, TaskComment, TaskAttachment, useTasks } from '@/hooks/useTasks';
+import { Task, TaskComment, TaskAttachment, useTasks, TaskStatus } from '@/hooks/useTasks';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useDocumentManager } from '@/hooks/useDocumentManager';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface TaskDetailProps {
   open: boolean;
@@ -42,6 +45,7 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
   const {
     fetchComments,
@@ -51,54 +55,158 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
     updateTask,
   } = useTasks();
 
+  const { viewDocument } = useDocumentManager(task?.account_id || '');
+
   useEffect(() => {
     if (task?.id && open) {
-      loadComments();
-      loadAttachments();
+      Promise.all([loadComments(), loadAttachments(), fetchStaffMembers()]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, open]);
+
+  const fetchStaffMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('role', ['staff', 'admin'])
+        .order('full_name');
+
+      if (error) throw error;
+      setStaffMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching staff members:', error);
+    }
+  };
 
   const loadComments = async () => {
     if (!task?.id) return;
-    setLoadingComments(true);
-    const data = await fetchComments(task.id);
-    setComments(data);
-    setLoadingComments(false);
+    try {
+      setLoadingComments(true);
+      const data = await fetchComments(task.id);
+      setComments(data);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load comments',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingComments(false);
+    }
   };
 
   const loadAttachments = async () => {
     if (!task?.id) return;
-    setLoadingAttachments(true);
-    const data = await fetchAttachments(task.id);
-    setAttachments(data);
-    setLoadingAttachments(false);
+    try {
+      setLoadingAttachments(true);
+      const data = await fetchAttachments(task.id);
+      setAttachments(data);
+    } catch (error) {
+      console.error('Error loading attachments:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load attachments',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingAttachments(false);
+    }
   };
 
   const handleAddComment = async () => {
     if (!task?.id || !newComment.trim()) return;
     
-    const success = await addComment(task.id, newComment);
-    if (success) {
-      setNewComment('');
-      await loadComments();
+    try {
+      const success = await addComment(task.id, newComment);
+      if (success) {
+        setNewComment('');
+        await loadComments();
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add comment',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleRemoveAttachment = async (attachmentId: string) => {
-    const success = await removeAttachment(attachmentId);
-    if (success) {
-      await loadAttachments();
+    try {
+      const success = await removeAttachment(attachmentId);
+      if (success) {
+        await loadAttachments();
+      }
+    } catch (error) {
+      console.error('Error removing attachment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove attachment',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleViewAttachment = async (document: TaskAttachment['document']) => {
+    if (!document) return;
+    
+    try {
+      await viewDocument(document as any);
+    } catch (error) {
+      console.error('Error viewing attachment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to open attachment',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!task?.id) return;
-    const success = await updateTask(task.id, { 
-      status: newStatus as any,
-      completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
-    });
-    if (success) {
-      onUpdate();
+    
+    try {
+      const success = await updateTask(task.id, { 
+        status: newStatus as TaskStatus,
+        completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
+      });
+      if (success) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update task status',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAssigneeChange = async (assigneeId: string) => {
+    if (!task?.id) return;
+    
+    try {
+      const success = await updateTask(task.id, {
+        assignee_id: assigneeId === 'unassigned' ? null : assigneeId,
+      });
+      if (success) {
+        onUpdate();
+        toast({
+          title: 'Success',
+          description: 'Task assignment updated',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating assignee:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update task assignment',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -189,21 +297,43 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
                 </div>
               </div>
 
-              {/* Status Changer */}
+              {/* Status & Assignment */}
               {canEdit && (
-                <div>
-                  <h4 className="font-medium mb-2">Change Status</h4>
-                  <Select value={task.status} onValueChange={handleStatusChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Status</h4>
+                    <Select value={task.status} onValueChange={handleStatusChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Assigned To</h4>
+                    <Select 
+                      value={task.assignee_id || 'unassigned'} 
+                      onValueChange={handleAssigneeChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {staffMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
 
@@ -220,7 +350,11 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
                 ) : attachments.length > 0 ? (
                   <div className="space-y-2">
                     {attachments.map((attachment) => (
-                      <Card key={attachment.id}>
+                      <Card 
+                        key={attachment.id}
+                        className="cursor-pointer hover:bg-accent transition-colors"
+                        onClick={() => handleViewAttachment(attachment.document)}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -240,7 +374,10 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleRemoveAttachment(attachment.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveAttachment(attachment.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
