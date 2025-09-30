@@ -4184,67 +4184,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
-      get_my_claims: {
+      get_policies_claims_secure: {
         Args: Record<PropertyKey, never>
         Returns: {
-          adjuster_contact: string | null
-          adjuster_name: string | null
-          amount_claimed: number | null
-          amount_estimate: number | null
-          amount_paid: number | null
-          claim_number: string
-          created_at: string
-          date_of_loss: string | null
-          description: string | null
-          documents: Json | null
-          id: string
-          loss_date: string | null
-          notes: string | null
-          policy_id: string
-          reported_at: string | null
-          settlement_date: string | null
-          status: Database["public"]["Enums"]["claim_status"]
-          type_of_loss: string | null
-          updated_at: string
-        }[]
-      }
-      get_my_policies: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          account_id: string | null
-          billing_frequency:
-            | Database["public"]["Enums"]["billing_frequency"]
-            | null
-          billing_method: Database["public"]["Enums"]["billing_method"] | null
-          carrier: string
-          carrier_id: string | null
-          coverage: Json | null
-          created_at: string
-          custom: Json | null
-          effective_date: string
-          expiration_date: string
-          id: string
-          insured_items: Json | null
-          insured_user_id: string
-          line_of_business: string | null
-          payment_type: Database["public"]["Enums"]["payment_type"] | null
-          policy_number: string
-          policy_term: string | null
-          premium: number
-          status: string | null
-          updated_at: string
-        }[]
-      }
-      get_policies_with_claims: {
-        Args: Record<PropertyKey, never>
-        Returns: {
+          account_id: string
           amount_estimate: number
           carrier: string
           claim_id: string
           claim_number: string
           effective_date: string
           expiration_date: string
-          insured_user_id: string
           policy_id: string
           policy_number: string
           premium: number
@@ -4291,7 +4240,58 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_user_claims_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          adjuster_contact: string | null
+          adjuster_name: string | null
+          amount_claimed: number | null
+          amount_estimate: number | null
+          amount_paid: number | null
+          claim_number: string
+          created_at: string
+          date_of_loss: string | null
+          description: string | null
+          documents: Json | null
+          id: string
+          loss_date: string | null
+          notes: string | null
+          policy_id: string
+          reported_at: string | null
+          settlement_date: string | null
+          status: Database["public"]["Enums"]["claim_status"]
+          type_of_loss: string | null
+          updated_at: string
+        }[]
+      }
       get_user_policies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          account_id: string | null
+          billing_frequency:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          billing_method: Database["public"]["Enums"]["billing_method"] | null
+          carrier: string
+          carrier_id: string | null
+          coverage: Json | null
+          created_at: string
+          custom: Json | null
+          effective_date: string
+          expiration_date: string
+          id: string
+          insured_items: Json | null
+          insured_user_id: string
+          line_of_business: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"] | null
+          policy_number: string
+          policy_term: string | null
+          premium: number
+          status: string | null
+          updated_at: string
+        }[]
+      }
+      get_user_policies_secure: {
         Args: Record<PropertyKey, never>
         Returns: {
           account_id: string | null
