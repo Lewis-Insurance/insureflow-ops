@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Plus, Building2, Users, Shield } from 'lucide-react';
-import { CompanyManagement } from '@/components/admin/CompanyManagement';
-import { CarrierManagement } from '@/components/admin/CarrierManagement';
+// Temporarily comment out potentially problematic imports
+// import { CompanyManagement } from '@/components/admin/CompanyManagement';
+// import { CarrierManagement } from '@/components/admin/CarrierManagement';
 import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
 import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
@@ -13,11 +14,26 @@ import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
 export default function AdminPage() {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, loading } = useAuth();
+
+  // Show loading while auth is being determined
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Debug: Log the profile role for troubleshooting
+  console.log('AdminPage - Profile:', profile, 'isAdmin:', isAdmin);
 
   // Redirect non-admin users
   if (!isAdmin && profile?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/crm" replace />;
   }
 
   return (
