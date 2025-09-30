@@ -134,23 +134,21 @@ export function useDocumentManager(accountId?: string) {
   }, [accountId, canManageDocuments, fetchDocuments]);
 
   const viewDocument = useCallback(async (document: DocumentRecord) => {
-    if (!canManageDocuments) {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to view documents",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.storage
-        .from('customer-docs')
-        .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
+      const tryCreate = async (bucket: string) =>
+        await supabase.storage.from(bucket).createSignedUrl(document.storage_path, 3600);
+
+      let { data, error } = await tryCreate('customer-docs');
+
+      if (error && /Object not found/i.test(error.message)) {
+        const alt = await tryCreate('documents');
+        data = alt.data;
+        error = alt.error;
+      }
 
       if (error) throw error;
+      if (!data?.signedUrl) throw new Error('File not available');
 
-      // Open in new tab
       window.open(data.signedUrl, '_blank');
     } catch (err: any) {
       console.error('Error viewing document:', err);
@@ -160,26 +158,24 @@ export function useDocumentManager(accountId?: string) {
         variant: "destructive",
       });
     }
-  }, [canManageDocuments]);
+  }, []);
 
   const downloadDocument = useCallback(async (document: DocumentRecord) => {
-    if (!canManageDocuments) {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to download documents",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.storage
-        .from('customer-docs')
-        .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
+      const tryCreate = async (bucket: string) =>
+        await supabase.storage.from(bucket).createSignedUrl(document.storage_path, 3600);
+
+      let { data, error } = await tryCreate('customer-docs');
+
+      if (error && /Object not found/i.test(error.message)) {
+        const alt = await tryCreate('documents');
+        data = alt.data;
+        error = alt.error;
+      }
 
       if (error) throw error;
+      if (!data?.signedUrl) throw new Error('File not available');
 
-      // Create download link
       const link = window.document.createElement('a');
       link.href = data.signedUrl;
       link.download = document.name;
@@ -199,7 +195,7 @@ export function useDocumentManager(accountId?: string) {
         variant: "destructive",
       });
     }
-  }, [canManageDocuments]);
+  }, []);
 
   const deleteDocument = useCallback(async (documentId: string) => {
     if (!canManageDocuments) {
