@@ -234,6 +234,55 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [canManageDocuments]);
 
+  const replaceDocumentFile = useCallback(async (document: DocumentRecord, file: File) => {
+    if (!canManageDocuments) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to replace documents",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      const ext = file.name.split('.').pop();
+      const newName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const newPath = `${document.account_id}/${newName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('customer-docs')
+        .upload(newPath, file, { cacheControl: '3600', upsert: false });
+      if (uploadErr) throw uploadErr;
+
+      const { data: updated, error: updErr } = await supabase
+        .from('documents')
+        .update({
+          storage_path: newPath,
+          filename: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+          uploaded_at: new Date().toISOString(),
+        })
+        .eq('id', document.id)
+        .select('*')
+        .single();
+
+      if (updErr) throw updErr;
+
+      toast({ title: 'Replaced', description: 'Document file updated' });
+      await fetchDocuments();
+      return updated;
+    } catch (err: any) {
+      console.error('Error replacing document file:', err);
+      toast({
+        title: 'Replace Failed',
+        description: err.message || 'Failed to replace document file',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }, [canManageDocuments, fetchDocuments]);
+
   const deleteDocument = useCallback(async (documentId: string) => {
     if (!canManageDocuments) {
       toast({
@@ -282,6 +331,7 @@ export function useDocumentManager(accountId?: string) {
     viewDocument,
     downloadDocument,
     deleteDocument,
+    replaceDocumentFile,
     refetch: fetchDocuments,
     canManageDocuments
   };

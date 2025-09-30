@@ -19,7 +19,8 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     downloadDocument,
     deleteDocument,
     canManageDocuments,
-    refetch: fetchDocuments
+    refetch: fetchDocuments,
+    replaceDocumentFile
   } = useDocumentManager(accountId);
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -30,6 +31,18 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     setUploadModalOpen(false);
   };
 
+  const handleReplace = (doc: any) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,image/*,.doc,.docx,.txt';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await replaceDocumentFile(doc, file);
+      }
+    };
+    input.click();
+  };
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'Unknown size';
     const units = ['B', 'KB', 'MB', 'GB'];
@@ -163,14 +176,24 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                       <FileText className="h-4 w-4" />
                     </Button>
                     {canManageDocuments && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteDocument(document.id)}
-                        title="Delete document"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReplace(document)}
+                          title="Replace file"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteDocument(document.id)}
+                          title="Delete document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
