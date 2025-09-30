@@ -2422,6 +2422,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_staff: boolean | null
+          locale: string | null
           notification_email: string | null
           phone: string | null
           role: string | null
@@ -2433,6 +2434,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_staff?: boolean | null
+          locale?: string | null
           notification_email?: string | null
           phone?: string | null
           role?: string | null
@@ -2444,6 +2446,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_staff?: boolean | null
+          locale?: string | null
           notification_email?: string | null
           phone?: string | null
           role?: string | null
