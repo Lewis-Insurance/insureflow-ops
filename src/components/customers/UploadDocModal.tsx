@@ -89,6 +89,8 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
         account_id: accountId,
         uploaded_by: user.id,
         storage_path: filePath,
+        storage_bucket: 'customer-docs',
+        file_missing: false,
         filename: file.name,
         name: documentName || file.name,
         mime_type: file.type,
