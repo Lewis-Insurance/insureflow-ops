@@ -144,12 +144,28 @@ export function useDocumentManager(accountId?: string) {
       return;
     }
 
+    // Normalize legacy paths that accidentally included bucket names
+    const normalizePath = (p?: string) =>
+      (p || '')
+        .replace(/^customer-docs\//, '')
+        .replace(/^documents\//, '')
+        .replace(/^\/+/, '');
+
     try {
       const filename = (document as any).filename as string | undefined;
+      const normalizedPath = normalizePath(document.storage_path);
       const candidates: Array<{ bucket: string; path: string }> = [
-        { bucket: 'customer-docs', path: document.storage_path },
-        { bucket: 'documents', path: document.storage_path },
+        { bucket: 'customer-docs', path: normalizedPath },
+        { bucket: 'documents', path: normalizedPath },
       ];
+
+      // Also try the raw storage_path if it differs from normalized (for older records)
+      if (normalizedPath !== document.storage_path) {
+        candidates.push(
+          { bucket: 'customer-docs', path: document.storage_path },
+          { bucket: 'documents', path: document.storage_path },
+        );
+      }
 
       if (filename) {
         candidates.push(
@@ -175,9 +191,60 @@ export function useDocumentManager(accountId?: string) {
       console.error('Error viewing document:', err);
       toast({
         title: "View Failed",
-        description: err.message || "Failed to view document",
+        description: err?.message || "Failed to view document",
         variant: "destructive",
       });
+
+      // Offer quick repair by letting user replace the missing file now
+      try {
+        const input = window.document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/pdf,image/*,.doc,.docx,.txt';
+        const filePromise: Promise<File | null> = new Promise((resolve) => {
+          input.onchange = (e: any) => resolve(e.target.files?.[0] || null);
+          // Auto-cancel after 60s to avoid dangling promises
+          setTimeout(() => resolve(null), 60000);
+        });
+        input.click();
+        const file = await filePromise;
+        if (file) {
+          // Perform inline replace (avoids dependency ordering issues)
+          const ext = file.name.split('.').pop();
+          const newName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const newPath = `${document.account_id}/${newName}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from('customer-docs')
+            .upload(newPath, file, { cacheControl: '3600', upsert: false });
+          if (uploadErr) throw uploadErr;
+
+          const { data: updated, error: updErr } = await supabase
+            .from('documents')
+            .update({
+              storage_path: newPath,
+              filename: file.name,
+              mime_type: file.type,
+              size_bytes: file.size,
+              uploaded_at: new Date().toISOString(),
+            })
+            .eq('id', document.id)
+            .select('*')
+            .single();
+
+          if (updErr) throw updErr;
+
+          const { data, error } = await supabase.storage
+            .from('customer-docs')
+            .createSignedUrl(updated.storage_path, 3600);
+          if (!error && data?.signedUrl) {
+            window.open(data.signedUrl, '_blank');
+            toast({ title: 'Replaced', description: 'Document file updated' });
+            return;
+          }
+        }
+      } catch (repairErr) {
+        console.warn('Repair attempt failed:', repairErr);
+      }
     }
   }, [canManageDocuments]);
 
