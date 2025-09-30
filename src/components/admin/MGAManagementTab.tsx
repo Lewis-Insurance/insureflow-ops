@@ -10,55 +10,63 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Pencil, Plus, Users, Building } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MGA {
   id: string;
   name: string;
-  license_number?: string;
+  code?: string;
+  contact_info?: any;
+  is_active: boolean;
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
+  main_phone?: string;
   address_line1?: string;
+  address_line2?: string;
   city?: string;
   state?: string;
   zip_code?: string;
-  commission_rate?: number;
-  status: 'active' | 'inactive';
-  appointed_carriers?: string[];
+  country?: string;
+  agency_login_url?: string;
   created_at: string;
   updated_at: string;
 }
 
 interface MGAFormData {
   name: string;
-  license_number: string;
+  code: string;
   contact_name: string;
   contact_email: string;
   contact_phone: string;
+  main_phone: string;
   address_line1: string;
+  address_line2: string;
   city: string;
   state: string;
   zip_code: string;
-  commission_rate: number;
-  status: 'active' | 'inactive';
-  notes: string;
+  country: string;
+  is_active: boolean;
+  agency_login_url: string;
 }
 
 const initialFormData: MGAFormData = {
   name: '',
-  license_number: '',
+  code: '',
   contact_name: '',
   contact_email: '',
   contact_phone: '',
+  main_phone: '',
   address_line1: '',
+  address_line2: '',
   city: '',
   state: '',
   zip_code: '',
-  commission_rate: 0.05,
-  status: 'active',
-  notes: ''
+  country: 'US',
+  is_active: true,
+  agency_login_url: ''
 };
 
 export function MGAManagementTab() {
@@ -75,7 +83,7 @@ export function MGAManagementTab() {
         .select('*')
         .order('name');
       if (error) throw error;
-      return data as unknown as MGA[];
+      return data as MGA[];
     }
   });
 
@@ -121,17 +129,19 @@ export function MGAManagementTab() {
     setEditingMGA(mga);
     setFormData({
       name: mga.name || '',
-      license_number: mga.license_number || '',
+      code: mga.code || '',
       contact_name: mga.contact_name || '',
       contact_email: mga.contact_email || '',
       contact_phone: mga.contact_phone || '',
+      main_phone: mga.main_phone || '',
       address_line1: mga.address_line1 || '',
+      address_line2: mga.address_line2 || '',
       city: mga.city || '',
       state: mga.state || '',
       zip_code: mga.zip_code || '',
-      commission_rate: mga.commission_rate || 0.05,
-      status: mga.status,
-      notes: ''
+      country: mga.country || 'US',
+      is_active: mga.is_active,
+      agency_login_url: mga.agency_login_url || ''
     });
     setIsDialogOpen(true);
   };
@@ -161,7 +171,7 @@ export function MGAManagementTab() {
         <div>
           <h2 className="text-2xl font-bold">MGA Management</h2>
           <p className="text-muted-foreground">
-            Manage Managing General Agents and their commission structures
+            Manage Managing General Agents and their information
           </p>
         </div>
         <Button onClick={handleNewMGA}>
@@ -188,22 +198,19 @@ export function MGAManagementTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mgas?.filter(mga => mga.status === 'active').length || 0}
+              {mgas?.filter(mga => mga.is_active).length || 0}
             </div>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Commission</CardTitle>
+            <CardTitle className="text-sm font-medium">Inactive MGAs</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mgas && mgas.length > 0 
-                ? ((mgas.reduce((sum, mga) => sum + (mga.commission_rate || 0), 0) / mgas.length) * 100).toFixed(1) + '%'
-                : '0%'
-              }
+              {mgas?.filter(mga => !mga.is_active).length || 0}
             </div>
           </CardContent>
         </Card>
@@ -221,10 +228,10 @@ export function MGAManagementTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>License Number</TableHead>
-                <TableHead>Commission Rate</TableHead>
+                <TableHead>Code</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -232,21 +239,21 @@ export function MGAManagementTab() {
               {mgas?.map((mga) => (
                 <TableRow key={mga.id}>
                   <TableCell className="font-medium">{mga.name}</TableCell>
-                  <TableCell>{mga.license_number || 'N/A'}</TableCell>
+                  <TableCell>{mga.code || 'N/A'}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">
-                      {((mga.commission_rate || 0) * 100).toFixed(1)}%
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={mga.status === 'active' ? 'default' : 'secondary'}>
-                      {mga.status}
+                    <Badge variant={mga.is_active ? 'default' : 'secondary'}>
+                      {mga.is_active ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
                       <div>{mga.contact_name || 'N/A'}</div>
                       <div className="text-muted-foreground">{mga.contact_email || 'N/A'}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>{mga.main_phone || mga.contact_phone || 'N/A'}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -284,40 +291,12 @@ export function MGAManagementTab() {
                 />
               </div>
               <div>
-                <Label htmlFor="license_number">License Number</Label>
+                <Label htmlFor="code">MGA Code</Label>
                 <Input
-                  id="license_number"
-                  value={formData.license_number}
-                  onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
+                  id="code"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="commission_rate">Commission Rate</Label>
-                <Input
-                  id="commission_rate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={formData.commission_rate}
-                  onChange={(e) => setFormData({ ...formData, commission_rate: parseFloat(e.target.value) || 0 })}
-                />
-                <p className="text-sm text-muted-foreground">Enter as decimal (0.05 = 5%)</p>
-              </div>
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({ ...formData, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -341,17 +320,38 @@ export function MGAManagementTab() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contact_phone">Contact Phone</Label>
+                <Input
+                  id="contact_phone"
+                  value={formData.contact_phone}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="main_phone">Main Phone</Label>
+                <Input
+                  id="main_phone"
+                  value={formData.main_phone}
+                  onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
+                />
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="contact_phone">Contact Phone</Label>
+              <Label htmlFor="agency_login_url">Agency Login URL</Label>
               <Input
-                id="contact_phone"
-                value={formData.contact_phone}
-                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                id="agency_login_url"
+                type="url"
+                value={formData.agency_login_url}
+                onChange={(e) => setFormData({ ...formData, agency_login_url: e.target.value })}
+                placeholder="https://..."
               />
             </div>
 
             <div>
-              <Label htmlFor="address_line1">Address</Label>
+              <Label htmlFor="address_line1">Address Line 1</Label>
               <Input
                 id="address_line1"
                 value={formData.address_line1}
@@ -360,7 +360,17 @@ export function MGAManagementTab() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="address_line2">Address Line 2</Label>
+              <Input
+                id="address_line2"
+                value={formData.address_line2}
+                onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
+                placeholder="Apt, suite, etc. (optional)"
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -387,16 +397,23 @@ export function MGAManagementTab() {
                   onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
                 />
               </div>
+              <div>
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes about this MGA..."
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
               />
+              <Label htmlFor="is_active">Active</Label>
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
