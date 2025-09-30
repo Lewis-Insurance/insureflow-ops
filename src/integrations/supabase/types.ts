@@ -2720,60 +2720,155 @@ export type Database = {
           },
         ]
       }
+      task_attachments: {
+        Row: {
+          attached_at: string
+          attached_by: string | null
+          document_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          attached_at?: string
+          attached_by?: string | null
+          document_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          attached_at?: string
+          attached_by?: string | null
+          document_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           account_id: string | null
+          assigned_by: string | null
           assignee_agent_id: string | null
           assignee_id: string | null
+          category: Database["public"]["Enums"]["task_category"] | null
           completed_at: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
+          dependencies: Json | null
           description: string | null
           details: string | null
           due_at: string | null
           entity_id: string | null
           entity_type: string | null
           id: string
+          metadata: Json | null
+          notes: string | null
+          parent_task_id: string | null
+          policy_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          quote_id: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
         }
         Insert: {
           account_id?: string | null
+          assigned_by?: string | null
           assignee_agent_id?: string | null
           assignee_id?: string | null
+          category?: Database["public"]["Enums"]["task_category"] | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          dependencies?: Json | null
           description?: string | null
           details?: string | null
           due_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
+          metadata?: Json | null
+          notes?: string | null
+          parent_task_id?: string | null
+          policy_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          quote_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
         }
         Update: {
           account_id?: string | null
+          assigned_by?: string | null
           assignee_agent_id?: string | null
           assignee_id?: string | null
+          category?: Database["public"]["Enums"]["task_category"] | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          dependencies?: Json | null
           description?: string | null
           details?: string | null
           due_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
+          metadata?: Json | null
+          notes?: string | null
+          parent_task_id?: string | null
+          policy_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          quote_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
@@ -2791,6 +2886,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]
@@ -3385,6 +3501,13 @@ export type Database = {
       quote_status: "open" | "won" | "lost" | "expired"
       quote_status_enum: "open" | "won" | "lost" | "expired"
       sms_direction: "in" | "out"
+      task_category:
+        | "quote"
+        | "policy"
+        | "claim"
+        | "renewal"
+        | "service"
+        | "general"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
       task_status_enum: "open" | "done" | "cancelled"
@@ -3639,6 +3762,14 @@ export const Constants = {
       quote_status: ["open", "won", "lost", "expired"],
       quote_status_enum: ["open", "won", "lost", "expired"],
       sms_direction: ["in", "out"],
+      task_category: [
+        "quote",
+        "policy",
+        "claim",
+        "renewal",
+        "service",
+        "general",
+      ],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
       task_status_enum: ["open", "done", "cancelled"],

@@ -7,6 +7,7 @@ import { ActionMenu } from '@/components/customers/ActionMenu';
 import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
+import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
@@ -233,67 +234,7 @@ export default function CustomerDetail() {
         </div>
 
         {/* Tasks Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CheckSquare className="h-5 w-5" />
-              Tasks ({tasks.length})
-            </CardTitle>
-            <Button size="sm" onClick={() => setAddTaskOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {tasks.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-muted-foreground mb-3">No tasks yet</p>
-                <Button size="sm" onClick={() => setAddTaskOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Task
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-start justify-between mb-2">
-                      <p className="text-sm font-medium flex-1">{task.title}</p>
-                      <div className="flex gap-1 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTask(task);
-                            setEditTaskOpen(true);
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <FileText className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    {task.description && (
-                      <p className="text-xs text-muted-foreground mt-1 mb-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {task.status}
-                      </span>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(task.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <CustomerTasksSection accountId={account.id} />
 
         {/* Policies & Quotes Section */}
         <CustomerPoliciesSection accountId={account.id} />
