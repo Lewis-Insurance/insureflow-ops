@@ -15,6 +15,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   const {
     documents,
     loading,
+    viewDocument,
     downloadDocument,
     deleteDocument,
     canManageDocuments,
@@ -156,7 +157,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => window.open(`/documents/${document.id}`, '_blank')}
+                      onClick={() => viewDocument(document)}
                       title="View document"
                     >
                       <FileText className="h-4 w-4" />

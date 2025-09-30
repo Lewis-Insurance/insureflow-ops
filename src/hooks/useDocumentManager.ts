@@ -133,6 +133,35 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [accountId, canManageDocuments, fetchDocuments]);
 
+  const viewDocument = useCallback(async (document: DocumentRecord) => {
+    if (!canManageDocuments) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to view documents",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('customer-docs')
+        .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
+
+      if (error) throw error;
+
+      // Open in new tab
+      window.open(data.signedUrl, '_blank');
+    } catch (err: any) {
+      console.error('Error viewing document:', err);
+      toast({
+        title: "View Failed",
+        description: err.message || "Failed to view document",
+        variant: "destructive",
+      });
+    }
+  }, [canManageDocuments]);
+
   const downloadDocument = useCallback(async (document: DocumentRecord) => {
     if (!canManageDocuments) {
       toast({
@@ -217,6 +246,7 @@ export function useDocumentManager(accountId?: string) {
     loading,
     uploading,
     uploadDocument,
+    viewDocument,
     downloadDocument,
     deleteDocument,
     refetch: fetchDocuments,
