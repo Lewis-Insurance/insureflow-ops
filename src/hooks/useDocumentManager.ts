@@ -134,6 +134,15 @@ export function useDocumentManager(accountId?: string) {
   }, [accountId, canManageDocuments, fetchDocuments]);
 
   const viewDocument = useCallback(async (document: DocumentRecord) => {
+    if (!canManageDocuments) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to view documents",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const filename = (document as any).filename as string | undefined;
       const candidates: Array<{ bucket: string; path: string }> = [
@@ -169,9 +178,18 @@ export function useDocumentManager(accountId?: string) {
         variant: "destructive",
       });
     }
-  }, []);
+  }, [canManageDocuments]);
 
   const downloadDocument = useCallback(async (document: DocumentRecord) => {
+    if (!canManageDocuments) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to download documents",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const filename = (document as any).filename as string | undefined;
       const candidates: Array<{ bucket: string; path: string }> = [
@@ -214,7 +232,7 @@ export function useDocumentManager(accountId?: string) {
         variant: "destructive",
       });
     }
-  }, []);
+  }, [canManageDocuments]);
 
   const deleteDocument = useCallback(async (documentId: string) => {
     if (!canManageDocuments) {
