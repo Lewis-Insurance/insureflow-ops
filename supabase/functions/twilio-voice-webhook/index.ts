@@ -42,6 +42,7 @@ serve(async (req) => {
     const From = data['From'] || '';
     const To = data['To'] || '';
     const CallStatus = data['CallStatus'] || '';
+    const DirectionParam = (data['Direction'] || data['CallDirection'] || '').toLowerCase();
 
     // Load telephony settings (first row)
     const { data: settings, error: settingsError } = await supabase
@@ -56,9 +57,13 @@ serve(async (req) => {
     const forwardNumber: string | undefined = settings?.forward_number || undefined;
 
     // Determine direction: if call is to our Twilio number → inbound
-    const direction = twilioNumber && To && To.replace(/\s/g, '') === twilioNumber.replace(/\s/g, '')
-      ? 'inbound'
-      : 'outbound';
+    // Determine direction robustly: prefer Twilio Direction param, then phone match, default inbound
+    let direction: 'inbound' | 'outbound' = 'inbound';
+    if (DirectionParam.includes('inbound')) direction = 'inbound';
+    else if (DirectionParam.includes('outbound')) direction = 'outbound';
+    else if (twilioNumber && To && To.replace(/\s/g, '') === twilioNumber.replace(/\s/g, '')) direction = 'inbound';
+    else direction = 'inbound';
+    console.log('Twilio webhook received', { CallSid, From, To, CallStatus, DirectionParam, direction });
 
     // Try to find linked contact/account
     let accountId: string | null = null;
