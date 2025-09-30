@@ -70,9 +70,21 @@ const US_STATES = [
   { value: 'WY', label: 'Wyoming' }
 ];
 
+// Helper function to map database account_type to UI values
+function mapAccountTypeForUI(dbAccountType: string | null | undefined): 'household' | 'business' {
+  if (dbAccountType === 'business') return 'business';
+  return 'household'; // Map 'individual' and null/undefined to 'household'
+}
+
+// Helper function to map UI values back to database account_type
+function mapAccountTypeForDB(uiAccountType: 'household' | 'business'): 'individual' | 'business' {
+  if (uiAccountType === 'business') return 'business';
+  return 'individual'; // Map 'household' back to 'individual' for database
+}
+
 export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: AccountFormProps) {
   const [formData, setFormData] = useState<CreateAccountData>({
-    account_type: account?.account_type || 'individual',
+    account_type: mapAccountTypeForUI(account?.account_type) || 'household',
     name: account?.name || '',
     tin_last4: account?.tin_last4 || '',
     address_line1: account?.address_line1 || '',
@@ -92,7 +104,7 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
     if (account) {
       console.log('AccountForm: Setting form data from account:', account);
       setFormData({
-        account_type: account.account_type || 'individual',
+        account_type: mapAccountTypeForUI(account.account_type),
         name: account.name || '',
         tin_last4: account.tin_last4 || '',
         address_line1: account.address_line1 || '',
@@ -107,7 +119,7 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
     } else {
       // Reset for new account
       setFormData({
-        account_type: 'individual',
+        account_type: 'household',
         name: '',
         tin_last4: '',
         address_line1: '',
@@ -163,13 +175,18 @@ export function AccountForm({ open, onOpenChange, onSubmit, account, loading }: 
 
     try {
       console.log('AccountForm: Calling onSubmit with formData:', formData);
-      await onSubmit(formData);
+      // Map UI account_type back to database format before submitting
+      const dbFormData = {
+        ...formData,
+        account_type: mapAccountTypeForDB(formData.account_type as 'household' | 'business')
+      };
+      await onSubmit(dbFormData);
       console.log('AccountForm: onSubmit completed successfully');
       onOpenChange(false);
       // Reset form only if creating new account (not editing)
       if (!account) {
         setFormData({
-          account_type: 'individual',
+          account_type: 'household',
           name: '',
           tin_last4: '',
           address_line1: '',
