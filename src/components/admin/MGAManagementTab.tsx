@@ -67,38 +67,53 @@ export function MGAManagementTab() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Since we don't have an MGAs table yet, we'll create mock data
-  // In a real implementation, you'd create an MGAs table first
   const { data: mgas, isLoading } = useQuery({
     queryKey: ['mgas'],
     queryFn: async () => {
-      // Mock data for MGAs - in real implementation, this would be a database query
-      return [
-        {
-          id: '1',
-          name: 'Florida Insurance Partners',
-          license_number: 'FL-MGA-12345',
-          contact_name: 'John Smith',
-          contact_email: 'john@flinspartners.com',
-          contact_phone: '(555) 123-4567',
-          commission_rate: 0.05,
-          status: 'active' as const,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Southeast Risk Management',
-          license_number: 'FL-MGA-67890',
-          contact_name: 'Sarah Johnson',
-          contact_email: 'sarah@serisk.com',
-          contact_phone: '(555) 987-6543',
-          commission_rate: 0.07,
-          status: 'active' as const,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ] as MGA[];
+      const { data, error } = await supabase
+        .from('mgas')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data as MGA[];
+    }
+  });
+
+  const createMGAMutation = useMutation({
+    mutationFn: async (data: MGAFormData) => {
+      const { error } = await supabase
+        .from('mgas')
+        .insert([data]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mgas'] });
+      setIsDialogOpen(false);
+      setFormData(initialFormData);
+      toast.success('MGA created successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to create MGA: ' + error.message);
+    }
+  });
+
+  const updateMGAMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<MGAFormData> }) => {
+      const { error } = await supabase
+        .from('mgas')
+        .update(data.updates)
+        .eq('id', data.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mgas'] });
+      setIsDialogOpen(false);
+      setEditingMGA(null);
+      setFormData(initialFormData);
+      toast.success('MGA updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to update MGA: ' + error.message);
     }
   });
 
@@ -129,11 +144,11 @@ export function MGAManagementTab() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In real implementation, this would save to database
-    toast.success(editingMGA ? 'MGA updated successfully' : 'MGA created successfully');
-    setIsDialogOpen(false);
-    setEditingMGA(null);
-    setFormData(initialFormData);
+    if (editingMGA) {
+      updateMGAMutation.mutate({ id: editingMGA.id, updates: formData });
+    } else {
+      createMGAMutation.mutate(formData);
+    }
   };
 
   if (isLoading) {
@@ -392,7 +407,10 @@ export function MGAManagementTab() {
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button 
+                type="submit" 
+                disabled={createMGAMutation.isPending || updateMGAMutation.isPending}
+              >
                 {editingMGA ? 'Update MGA' : 'Create MGA'}
               </Button>
             </div>
