@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { TaskBulkActionsBar } from './TaskBulkActionsBar';
+import { TaskEditModal } from './TaskEditModal';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast, isThisWeek } from 'date-fns';
 
@@ -12,6 +13,8 @@ export function MyTasksDashboard() {
   const { tasks, loading, fetchTasks } = useTasks();
   const [activeTab, setActiveTab] = useState('today');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   useEffect(() => {
     // Fetch all tasks (filtering by current user would need to be added to the hook)
@@ -62,8 +65,21 @@ export function MyTasksDashboard() {
     );
   };
 
+  const handleTaskClick = (task: Task, e: React.MouseEvent) => {
+    // Don't open edit modal if clicking on checkbox
+    if ((e.target as HTMLElement).closest('[role="checkbox"]')) {
+      return;
+    }
+    setEditingTask(task);
+    setEditModalOpen(true);
+  };
+
   const renderTaskCard = (task: Task) => (
-    <Card key={task.id} className="hover:shadow-md transition-shadow">
+    <Card 
+      key={task.id} 
+      className="hover:shadow-md transition-shadow cursor-pointer"
+      onClick={(e) => handleTaskClick(task, e)}
+    >
       <CardContent className="p-4">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-2">
@@ -245,6 +261,17 @@ export function MyTasksDashboard() {
         onComplete={() => {
           fetchTasks();
           setSelectedTaskIds([]);
+        }}
+      />
+
+      {/* Edit Task Modal */}
+      <TaskEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        task={editingTask as any}
+        onTaskUpdate={() => {
+          fetchTasks();
+          setEditModalOpen(false);
         }}
       />
     </div>
