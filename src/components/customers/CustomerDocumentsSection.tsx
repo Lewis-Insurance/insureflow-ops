@@ -26,6 +26,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   } = useDocumentManager(accountId);
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [repairDocId, setRepairDocId] = useState<string | null>(null);
   
   const handleUploadSuccess = () => {
     // Refresh the documents list after successful upload
@@ -33,7 +34,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     setUploadModalOpen(false);
   };
 
-  const handleReplace = (doc: any) => {
+  const handleReplace = async (doc: any) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/pdf,image/*,.doc,.docx,.txt';
@@ -41,6 +42,8 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
       const file = e.target.files?.[0];
       if (file) {
         await replaceDocumentFile(doc, file);
+        setRepairDocId(null);
+        fetchDocuments();
       }
     };
     input.click();
@@ -184,7 +187,10 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => viewDocument(document)}
+                      onClick={async () => {
+                        const ok = await viewDocument(document as any);
+                        if (!ok) setRepairDocId(document.id);
+                      }}
                       title="View document"
                     >
                       <FileText className="h-4 w-4" />
@@ -211,6 +217,16 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                     )}
                   </div>
                 </div>
+                {repairDocId === document.id && (
+                  <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
+                    <span>File missing in storage.</span>
+                    {canManageDocuments && (
+                      <Button size="sm" variant="outline" onClick={() => handleReplace(document)}>
+                        Replace now
+                      </Button>
+                    )}
+                  </div>
+                )}
 
               </div>
             ))}
