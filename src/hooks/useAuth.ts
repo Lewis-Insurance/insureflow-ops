@@ -27,7 +27,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   // Centralized profile fetching with proper error handling
-  const fetchProfile = useCallback(async (userId: string): Promise<void> => {
+  const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<void> => {
     const { data: profileData, error } = await supabase
       .from('profiles')
       .select('*')
@@ -38,7 +38,7 @@ export function useAuth() {
       // Create minimal profile to prevent infinite loading - don't show toast for profile fetch failures
       const fallbackProfile: UserProfile = {
         id: userId,
-        full_name: user?.email?.split('@')[0] || 'User',
+        full_name: userEmail?.split('@')[0] || 'User',
         role: 'customer',
         phone: null,
         is_staff: false,
@@ -58,7 +58,7 @@ export function useAuth() {
         notification_sms: false // Default since field doesn't exist in database yet
       });
     }
-  }, [user?.email]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -72,7 +72,7 @@ export function useAuth() {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.user.email);
         } else {
           setProfile(null);
         }
@@ -97,7 +97,7 @@ export function useAuth() {
       setUser(existingSession?.user ?? null);
       
       if (existingSession?.user) {
-        await fetchProfile(existingSession.user.id);
+        await fetchProfile(existingSession.user.id, existingSession.user.email);
       }
       
       setLoading(false);
