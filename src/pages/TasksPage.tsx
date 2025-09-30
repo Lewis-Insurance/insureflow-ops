@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskKanbanBoard } from '@/components/tasks/TaskKanbanBoard';
 import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
 import { MyTasksDashboard } from '@/components/tasks/MyTasksDashboard';
-import { LayoutGrid, Calendar, User } from 'lucide-react';
+import { TaskAnalyticsDashboard } from '@/components/tasks/TaskAnalyticsDashboard';
+import { LayoutGrid, Calendar, User, BarChart3 } from 'lucide-react';
 
 export default function TasksPage() {
   const [activeTab, setActiveTab] = useState('my-tasks');
@@ -33,6 +34,10 @@ export default function TasksPage() {
               <Calendar className="h-4 w-4" />
               Calendar
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="my-tasks" className="mt-6">
@@ -45,6 +50,10 @@ export default function TasksPage() {
 
           <TabsContent value="calendar" className="mt-6">
             <TaskCalendarView />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-6">
+            <TaskAnalyticsDashboard />
           </TabsContent>
         </Tabs>
       </div>

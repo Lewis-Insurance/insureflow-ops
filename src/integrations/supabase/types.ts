@@ -2720,6 +2720,44 @@ export type Database = {
           },
         ]
       }
+      task_activity_feed: {
+        Row: {
+          action_type: string
+          changes: Json | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          task_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          task_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          task_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_activity_feed_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_attachments: {
         Row: {
           attached_at: string
@@ -2832,6 +2870,45 @@ export type Database = {
           },
         ]
       }
+      task_dependencies: {
+        Row: {
+          created_at: string
+          dependency_type: string
+          depends_on_task_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_generation_log: {
         Row: {
           entity_id: string | null
@@ -2876,6 +2953,65 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_recurrence_rules: {
+        Row: {
+          created_at: string
+          day_of_month: number | null
+          days_of_week: number[] | null
+          end_date: string | null
+          id: string
+          is_active: boolean
+          last_generated_at: string | null
+          max_occurrences: number | null
+          month_of_year: number | null
+          occurrences_count: number | null
+          recurrence_interval: number
+          recurrence_pattern: string
+          template_task_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_month?: number | null
+          days_of_week?: number[] | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          max_occurrences?: number | null
+          month_of_year?: number | null
+          occurrences_count?: number | null
+          recurrence_interval?: number
+          recurrence_pattern: string
+          template_task_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_month?: number | null
+          days_of_week?: number[] | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          max_occurrences?: number | null
+          month_of_year?: number | null
+          occurrences_count?: number | null
+          recurrence_interval?: number
+          recurrence_pattern?: string
+          template_task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_recurrence_rules_template_task_id_fkey"
+            columns: ["template_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -2930,6 +3066,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      task_time_entries: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          ended_at: string | null
+          id: string
+          notes: string | null
+          started_at: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          started_at: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          started_at?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {

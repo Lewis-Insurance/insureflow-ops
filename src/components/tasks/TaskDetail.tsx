@@ -7,6 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { TaskChecklist } from './TaskChecklist';
+import { TaskTimeTracker } from './TaskTimeTracker';
+import { TaskActivityFeed } from './TaskActivityFeed';
+import { TaskDependencyVisualizer } from './TaskDependencyVisualizer';
 import {
   Calendar,
   User,
@@ -254,6 +257,21 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
 
               {/* Checklist Section */}
               <TaskChecklist taskId={task.id} />
+
+              <Separator />
+
+              {/* Time Tracking */}
+              <TaskTimeTracker taskId={task.id} />
+
+              <Separator />
+
+              {/* Dependencies */}
+              <TaskDependencyVisualizer taskId={task.id} accountId={task.account_id} />
+
+              <Separator />
+
+              {/* Activity Feed */}
+              <TaskActivityFeed taskId={task.id} />
 
               <Separator />
 
