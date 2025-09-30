@@ -52,3 +52,9 @@ verify_jwt = true
 
 [functions.admin-approvals]
 verify_jwt = true
+
+[functions.twilio-voice-webhook]
+verify_jwt = false
+
+[functions.twilio-recording-webhook]
+verify_jwt = false
