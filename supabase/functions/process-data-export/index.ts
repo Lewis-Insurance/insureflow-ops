@@ -70,7 +70,7 @@ serve(async (req) => {
       })
     }
 
-    // Process export in background - Deno will handle this asynchronously
+    // Process export in background
     processExport(supabaseClient, user.id, exportRequest.id, request_type).catch(console.error)
 
     return new Response(JSON.stringify({ success: true, request_id: exportRequest.id }), {
@@ -87,60 +87,131 @@ serve(async (req) => {
 
 async function processExport(supabase: any, userId: string, requestId: string, requestType: string) {
   try {
+    console.log(`Starting export process for user ${userId}, request ${requestId}, type ${requestType}`);
+    
     let exportData: any = {}
 
     // Gather data based on request type
     if (requestType === 'profile' || requestType === 'full') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle()
 
-      exportData.profile = profile
-    }
-
-    if (requestType === 'activity' || requestType === 'full') {
-      const { data: accessLogs } = await supabase
-        .from('profile_access_logs')
-        .select('*')
-        .eq('target_user_id', userId)
-        .order('created_at', { ascending: false })
-
-      const { data: sessions } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-
-      exportData.activity = {
-        access_logs: accessLogs,
-        sessions: sessions
+        exportData.profile = profile
+        console.log('Profile data gathered:', !!profile);
+      } catch (profileError) {
+        console.error('Error fetching profile:', profileError);
+        exportData.profile = null;
       }
     }
 
-    if (requestType === 'full') {
-      // Add other related data for full export
-      const { data: emailRequests } = await supabase
-        .from('email_change_requests')
-        .select('*')
-        .eq('user_id', userId)
+    if (requestType === 'accounts' || requestType === 'full') {
+      try {
+        // Get accounts the user has access to via memberships
+        const { data: accounts } = await supabase
+          .from('accounts')
+          .select(`
+            *,
+            account_memberships!inner(
+              user_id,
+              role
+            )
+          `)
+          .eq('account_memberships.user_id', userId)
+          .order('created_at', { ascending: false })
 
-      const { data: roleRequests } = await supabase
-        .from('role_change_requests')
-        .select('*')
-        .eq('user_id', userId)
-
-      const { data: phoneVerifications } = await supabase
-        .from('phone_verification_codes')
-        .select('phone_number, verified, created_at')
-        .eq('user_id', userId)
-
-      exportData.change_requests = {
-        email_changes: emailRequests,
-        role_changes: roleRequests
+        exportData.accounts = accounts || [];
+        console.log('Accounts data gathered:', accounts?.length || 0);
+      } catch (accountsError) {
+        console.error('Error fetching accounts:', accountsError);
+        exportData.accounts = [];
       }
-      exportData.phone_verifications = phoneVerifications
+    }
+
+    if (requestType === 'contacts' || requestType === 'full') {
+      try {
+        // Get contacts from accounts the user has access to
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select(`
+            *,
+            account:accounts!inner(
+              id,
+              name,
+              account_memberships!inner(
+                user_id,
+                role
+              )
+            )
+          `)
+          .eq('account.account_memberships.user_id', userId)
+          .order('created_at', { ascending: false })
+
+        exportData.contacts = contacts || [];
+        console.log('Contacts data gathered:', contacts?.length || 0);
+      } catch (contactsError) {
+        console.error('Error fetching contacts:', contactsError);
+        exportData.contacts = [];
+      }
+    }
+
+    if (requestType === 'policies' || requestType === 'full') {
+      try {
+        // Get policies from accounts the user has access to
+        const { data: policies } = await supabase
+          .from('policies')
+          .select(`
+            *,
+            account:accounts!inner(
+              id,
+              name,
+              account_memberships!inner(
+                user_id,
+                role
+              )
+            ),
+            carrier:carriers(id, name)
+          `)
+          .eq('account.account_memberships.user_id', userId)
+          .order('created_at', { ascending: false })
+
+        exportData.policies = policies || [];
+        console.log('Policies data gathered:', policies?.length || 0);
+      } catch (policiesError) {
+        console.error('Error fetching policies:', policiesError);
+        exportData.policies = [];
+      }
+    }
+
+    if (requestType === 'audit_logs' || requestType === 'full') {
+      try {
+        // Get audit logs - only if user is staff/admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, is_staff')
+          .eq('id', userId)
+          .single()
+
+        if (profile?.is_staff || profile?.role === 'admin' || profile?.role === 'staff') {
+          const { data: auditLogs } = await supabase
+            .from('audit_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1000) // Limit for performance
+
+          exportData.audit_logs = auditLogs || [];
+          console.log('Audit logs data gathered:', auditLogs?.length || 0);
+        } else {
+          exportData.audit_logs = [];
+          console.log('User not authorized for audit logs');
+        }
+      } catch (auditError) {
+        console.error('Error fetching audit logs:', auditError);
+        exportData.audit_logs = [];
+      }
     }
 
     // Add metadata
@@ -148,14 +219,19 @@ async function processExport(supabase: any, userId: string, requestId: string, r
       exported_at: new Date().toISOString(),
       request_type: requestType,
       user_id: userId,
-      format: 'json'
+      format: 'json',
+      total_records: Object.values(exportData).filter(Array.isArray).reduce((sum: number, arr: any) => sum + arr.length, 0)
     }
+
+    console.log('Export data prepared, total records:', exportData.metadata.total_records);
 
     // Convert to JSON
     const jsonData = JSON.stringify(exportData, null, 2)
     const fileName = `${userId}-${requestType}-export-${Date.now()}.json`
 
-    // Upload to storage (in production, you'd use a proper cloud storage service)
+    console.log('Uploading to storage:', fileName);
+
+    // Upload to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('exports')
       .upload(fileName, new Blob([jsonData], { type: 'application/json' }), {
@@ -168,33 +244,51 @@ async function processExport(supabase: any, userId: string, requestId: string, r
       throw uploadError
     }
 
+    console.log('Upload successful, creating signed URL');
+
     // Generate signed URL (24 hour expiry)
-    const { data: signedUrl } = await supabase.storage
+    const { data: signedUrlData, error: urlError } = await supabase.storage
       .from('exports')
       .createSignedUrl(fileName, 24 * 60 * 60) // 24 hours
 
+    if (urlError) {
+      console.error('Error creating signed URL:', urlError);
+      throw urlError;
+    }
+
+    console.log('Signed URL created, updating request status');
+
     // Update export request with completion
-    await supabase
+    const { error: updateError } = await supabase
       .from('data_export_requests')
       .update({
         status: 'completed',
-        export_url: signedUrl?.signedUrl,
+        export_url: signedUrlData?.signedUrl,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
         completed_at: new Date().toISOString()
       })
       .eq('id', requestId)
 
-    console.log(`Export completed for user ${userId}, request ${requestId}`)
+    if (updateError) {
+      console.error('Error updating request status:', updateError);
+      throw updateError;
+    }
+
+    console.log(`Export completed successfully for user ${userId}, request ${requestId}`)
   } catch (error) {
     console.error('Error processing export:', error)
     
     // Mark as failed
-    await supabase
-      .from('data_export_requests')
-      .update({
-        status: 'failed',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', requestId)
+    try {
+      await supabase
+        .from('data_export_requests')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+    } catch (updateError) {
+      console.error('Error updating failed status:', updateError);
+    }
   }
 }

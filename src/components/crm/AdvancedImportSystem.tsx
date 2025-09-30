@@ -218,27 +218,32 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
   const requestDataExport = async (exportType: string) => {
     try {
-      const { error } = await supabase
-        .from('data_export_requests')
-        .insert({
-          user_id: (await supabase.auth.getUser()).data.user?.id || '',
-          request_type: exportType,
-          status: 'pending',
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Export requested",
-        description: "Your data export request has been submitted and will be processed shortly.",
+      console.log('Requesting data export:', exportType);
+      
+      // Call the edge function to process the export
+      const { data, error } = await supabase.functions.invoke('process-data-export', {
+        body: { request_type: exportType }
       });
 
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      console.log('Export request response:', data);
+
+      toast({
+        title: "Export Started",
+        description: "Policy data export will be available for download shortly.",
+      });
+
+      // Refresh the export requests list
       fetchImportData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error requesting export:', error);
       toast({
         title: "Export request failed",
-        description: "Failed to submit export request.",
+        description: error.message || "Failed to submit export request.",
         variant: "destructive",
       });
     }
@@ -388,7 +393,11 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
                   <Download className="h-4 w-4 mr-2" />
                   Export Contacts
                 </Button>
-                <Button onClick={() => requestDataExport('full_backup')}>
+                <Button onClick={() => requestDataExport('policies')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Policies
+                </Button>
+                <Button onClick={() => requestDataExport('full')}>
                   <Download className="h-4 w-4 mr-2" />
                   Full Data Export
                 </Button>
