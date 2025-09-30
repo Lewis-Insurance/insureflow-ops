@@ -26,9 +26,10 @@ import { Task, TaskComment, TaskAttachment, useTasks, TaskStatus } from '@/hooks
 import { format, formatDistanceToNow } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useDocumentManager } from '@/hooks/useDocumentManager';
+import { useProfiles } from '@/hooks/useProfiles';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 interface TaskDetailProps {
   open: boolean;
@@ -40,12 +41,12 @@ interface TaskDetailProps {
 
 export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskDetailProps) {
   const { canEdit } = usePermissions();
+  const { profiles } = useProfiles();
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
   const {
     fetchComments,
@@ -55,29 +56,12 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
     updateTask,
   } = useTasks();
 
-  const { viewDocument } = useDocumentManager(task?.account_id || '');
-
   useEffect(() => {
     if (task?.id && open) {
-      Promise.all([loadComments(), loadAttachments(), fetchStaffMembers()]);
+      Promise.all([loadComments(), loadAttachments()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, open]);
-
-  const fetchStaffMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('role', ['staff', 'admin'])
-        .order('full_name');
-
-      if (error) throw error;
-      setStaffMembers(data || []);
-    } catch (error) {
-      console.error('Error fetching staff members:', error);
-    }
-  };
 
   const loadComments = async () => {
     if (!task?.id) return;
@@ -150,11 +134,19 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
     }
   };
 
-  const handleViewAttachment = async (document: TaskAttachment['document']) => {
-    if (!document) return;
+  const handleViewAttachment = async (document: any) => {
+    if (!document?.storage_path) return;
     
     try {
-      await viewDocument(document as any);
+      const { data, error } = await supabase.storage
+        .from(document.storage_bucket || 'documents')
+        .createSignedUrl(document.storage_path, 3600);
+
+      if (error) throw error;
+      
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
     } catch (error) {
       console.error('Error viewing attachment:', error);
       toast({
@@ -170,7 +162,7 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
     
     try {
       const success = await updateTask(task.id, { 
-        status: newStatus as TaskStatus,
+        status: newStatus as Database['public']['Enums']['task_status'],
         completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
       });
       if (success) {
@@ -326,9 +318,9 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {staffMembers.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.full_name}
+                        {profiles.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.full_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
