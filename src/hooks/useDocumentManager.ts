@@ -7,19 +7,22 @@ export interface DocumentRecord {
   id: string;
   account_id: string;
   name: string;
-  category: string;
+  kind: string;
+  category?: string;
   storage_path: string;
+  storage_bucket?: string;
+  filename?: string;
   mime_type?: string;
   size_bytes?: number;
+  file_missing?: boolean;
   sha256?: string;
   uploaded_by?: string;
   uploaded_at: string;
   created_at: string;
   updated_at: string;
-  // Optional fields present in DB but not always selected
-  filename?: string;
-  storage_bucket?: string;
-  file_missing?: boolean;
+  policy_id?: string;
+  pii_level?: string;
+  last_checked_at?: string;
 }
 
 export function useDocumentManager(accountId?: string) {
@@ -41,6 +44,8 @@ export function useDocumentManager(accountId?: string) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched documents:', data);
       setDocuments(data || []);
     } catch (err: any) {
       console.error('Error fetching documents:', err);
@@ -96,12 +101,12 @@ export function useDocumentManager(accountId?: string) {
 
       // Create document record
       const { data: { user } } = await supabase.auth.getUser();
-      const documentData = {
+      const documentData: any = {
         account_id: accountId,
         filename: file.name,
         kind: 'document',
         name: file.name,
-        category: category as any, // Type assertion to handle enum mismatch
+        category: category || 'other',
         storage_path: filePath,
         storage_bucket: 'customer-docs',
         file_missing: false,
@@ -150,75 +155,41 @@ export function useDocumentManager(accountId?: string) {
       return false;
     }
 
-    // Normalize legacy paths that accidentally included bucket names
-    const normalizePath = (p?: string) =>
-      (p || '')
-        .replace(/^customer-docs\//, '')
-        .replace(/^documents\//, '')
-        .replace(/^\/+/, '');
-
     try {
-      const filename = (document as any).filename as string | undefined;
-      const preferredBucket = (document as any).storage_bucket as string | undefined;
-      const normalizedPath = normalizePath(document.storage_path);
-      const candidates: Array<{ bucket: string; path: string }> = [];
-
-      // Prefer the recorded storage_bucket when present
-      if (preferredBucket) {
-        candidates.push({ bucket: preferredBucket, path: normalizedPath });
+      // Use the stored bucket or default to customer-docs
+      const bucket = document.storage_bucket || 'customer-docs';
+      const path = document.storage_path;
+      
+      console.log('Viewing document:', { id: document.id, bucket, path });
+      
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, 3600);
+        
+      if (error) {
+        console.error('Storage error:', error);
+        throw error;
       }
-
-      // Always try our known buckets as fallback
-      candidates.push(
-        { bucket: 'customer-docs', path: normalizedPath },
-        { bucket: 'documents', path: normalizedPath },
-      );
-
-      // Also try the raw storage_path if it differs from normalized (for older records)
-      if (normalizedPath !== document.storage_path) {
-        if (preferredBucket) candidates.push({ bucket: preferredBucket, path: document.storage_path });
-        candidates.push(
-          { bucket: 'customer-docs', path: document.storage_path },
-          { bucket: 'documents', path: document.storage_path },
-        );
+      
+      if (!data?.signedUrl) {
+        throw new Error('No signed URL returned');
       }
-
-      if (filename) {
-        const accountScoped = `${document.account_id}/${filename}`;
-        if (preferredBucket) {
-          candidates.push(
-            { bucket: preferredBucket, path: accountScoped },
-            { bucket: preferredBucket, path: filename },
-          );
-        }
-        candidates.push(
-          { bucket: 'customer-docs', path: accountScoped },
-          { bucket: 'documents', path: accountScoped },
-          { bucket: 'customer-docs', path: filename },
-          { bucket: 'documents', path: filename },
-        );
-      }
-
-      for (const c of candidates) {
-        const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
-        if (!error && data?.signedUrl) {
-          const a = window.document.createElement('a');
-          a.href = data.signedUrl;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          window.document.body.appendChild(a);
-          a.click();
-          window.document.body.removeChild(a);
-          return true;
-        }
-      }
-
-      throw new Error('File not found in storage');
+      
+      // Open the document using anchor tag
+      const a = window.document.createElement('a');
+      a.href = data.signedUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      
+      return true;
     } catch (err: any) {
       console.error('Error viewing document:', err);
       toast({
         title: "View Failed",
-        description: err?.message || "Failed to view document",
+        description: err.message || "Failed to view document",
         variant: "destructive",
       });
       return false;
@@ -235,70 +206,34 @@ export function useDocumentManager(accountId?: string) {
       return;
     }
 
-    // Normalize legacy paths that accidentally included bucket names
-    const normalizePath = (p?: string) =>
-      (p || '')
-        .replace(/^customer-docs\//, '')
-        .replace(/^documents\//, '')
-        .replace(/^\/+/, '');
-
     try {
-      const filename = (document as any).filename as string | undefined;
-      const preferredBucket = (document as any).storage_bucket as string | undefined;
-      const normalizedPath = normalizePath(document.storage_path);
-      const candidates: Array<{ bucket: string; path: string }> = [];
-
-      if (preferredBucket) {
-        candidates.push({ bucket: preferredBucket, path: normalizedPath });
+      // Use the stored bucket or default to customer-docs
+      const bucket = document.storage_bucket || 'customer-docs';
+      const path = document.storage_path;
+      
+      console.log('Downloading document:', { id: document.id, bucket, path });
+      
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, 3600);
+        
+      if (error) {
+        console.error('Storage error:', error);
+        throw error;
       }
-
-      candidates.push(
-        { bucket: 'customer-docs', path: normalizedPath },
-        { bucket: 'documents', path: normalizedPath },
-      );
-
-      if (normalizedPath !== document.storage_path) {
-        if (preferredBucket) candidates.push({ bucket: preferredBucket, path: document.storage_path });
-        candidates.push(
-          { bucket: 'customer-docs', path: document.storage_path },
-          { bucket: 'documents', path: document.storage_path },
-        );
+      
+      if (!data?.signedUrl) {
+        throw new Error('No signed URL returned');
       }
+      
+      const link = window.document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = document.name;
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
 
-      if (filename) {
-        const accountScoped = `${document.account_id}/${filename}`;
-        if (preferredBucket) {
-          candidates.push(
-            { bucket: preferredBucket, path: accountScoped },
-            { bucket: preferredBucket, path: filename },
-          );
-        }
-        candidates.push(
-          { bucket: 'customer-docs', path: accountScoped },
-          { bucket: 'documents', path: accountScoped },
-          { bucket: 'customer-docs', path: filename },
-          { bucket: 'documents', path: filename },
-        );
-      }
-
-      let lastError: any = null;
-      for (const c of candidates) {
-        const { data, error } = await supabase.storage.from(c.bucket).createSignedUrl(c.path, 3600);
-        if (!error && data?.signedUrl) {
-          const link = window.document.createElement('a');
-          link.href = data.signedUrl;
-          link.download = document.name;
-          window.document.body.appendChild(link);
-          link.click();
-          window.document.body.removeChild(link);
-
-          toast({ title: "Success", description: "Document download started" });
-          return;
-        }
-        lastError = error;
-      }
-
-      throw lastError || new Error('File not found in storage');
+      toast({ title: "Success", description: "Document download started" });
     } catch (err: any) {
       console.error('Error downloading document:', err);
       toast({
