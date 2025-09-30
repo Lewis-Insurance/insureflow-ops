@@ -11,18 +11,11 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-interface TwilioVoiceWebhook {
-  CallSid: string;
-  From: string;
-  To: string;
-  CallStatus: string;
-  Direction: string;
-  AccountSid?: string;
-  CallerName?: string;
-  CallerCity?: string;
-  CallerState?: string;
-  CallerZip?: string;
-  CallerCountry?: string;
+function xml(strings: TemplateStringsArray, ...values: any[]) {
+  // Tiny helper to keep XML readable
+  let out = '';
+  strings.forEach((s, i) => (out += s + (values[i] ?? '')));
+  return out.trim();
 }
 
 serve(async (req) => {
@@ -32,26 +25,38 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Twilio voice webhook called:', req.method);
-
-    // Parse form data from Twilio
+    // Parse form-encoded webhook from Twilio
     const formData = await req.formData();
-    const webhookData: Partial<TwilioVoiceWebhook> = {};
-    
-    for (const [key, value] of formData.entries()) {
-      webhookData[key as keyof TwilioVoiceWebhook] = value.toString();
-    }
+    const data: Record<string, string> = {};
+    for (const [k, v] of formData.entries()) data[k] = v.toString();
 
-    console.log('Webhook data:', webhookData);
+    const CallSid = data['CallSid'] || '';
+    const From = data['From'] || '';
+    const To = data['To'] || '';
+    const CallStatus = data['CallStatus'] || '';
 
-    const { CallSid, From, To, CallStatus, Direction } = webhookData;
+    // Load telephony settings (first row)
+    const { data: settings, error: settingsError } = await supabase
+      .from('telephony_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
 
-    // Find or create contact/account based on phone number
-    let accountId = null;
-    let contactId = null;
+    if (settingsError) console.error('Settings error:', settingsError);
+
+    const twilioNumber: string | undefined = settings?.twilio_phone_number || undefined;
+    const forwardNumber: string | undefined = settings?.forward_number || undefined;
+
+    // Determine direction: if call is to our Twilio number → inbound
+    const direction = twilioNumber && To && To.replace(/\s/g, '') === twilioNumber.replace(/\s/g, '')
+      ? 'inbound'
+      : 'outbound';
+
+    // Try to find linked contact/account
+    let accountId: string | null = null;
+    let contactId: string | null = null;
 
     if (From && From !== To) {
-      // First try to find existing contact
       const { data: contacts } = await supabase
         .from('contacts')
         .select('id, account_id')
@@ -62,100 +67,91 @@ serve(async (req) => {
         contactId = contacts[0].id;
         accountId = contacts[0].account_id;
       } else {
-        // Try to find account by phone
         const { data: accounts } = await supabase
           .from('accounts')
           .select('id')
           .eq('phone', From)
           .limit(1);
-
         if (accounts && accounts.length > 0) {
           accountId = accounts[0].id;
         }
       }
     }
 
-    // Create or update call session
+    // Insert or update call session without relying on a unique index
     if (CallSid) {
-      const callData = {
+      // Does a row already exist for this CallSid?
+      const { data: existing, error: findErr } = await supabase
+        .from('call_sessions')
+        .select('id')
+        .eq('twilio_call_sid', CallSid)
+        .limit(1);
+
+      if (findErr) console.error('Find call error:', findErr);
+
+      const callPayload = {
         twilio_call_sid: CallSid,
-        from_number: From || '',
-        to_number: To || '',
+        from_number: From,
+        to_number: To,
         started_at: new Date().toISOString(),
         account_id: accountId,
         contact_id: contactId,
-        disposition: CallStatus,
-        metadata: {
-          direction: Direction,
-          caller_name: webhookData.CallerName,
-          caller_city: webhookData.CallerCity,
-          caller_state: webhookData.CallerState,
-          caller_country: webhookData.CallerCountry,
-          webhook_received_at: new Date().toISOString()
-        }
-      };
+        disposition: CallStatus || null,
+        metadata: { direction, webhook_received_at: new Date().toISOString() },
+      } as const;
 
-      const { error: callError } = await supabase
-        .from('call_sessions')
-        .upsert(callData, { 
-          onConflict: 'twilio_call_sid',
-          ignoreDuplicates: false 
-        });
-
-      if (callError) {
-        console.error('Error saving call session:', callError);
+      if (existing && existing.length > 0) {
+        const { error: updErr } = await supabase
+          .from('call_sessions')
+          .update(callPayload)
+          .eq('twilio_call_sid', CallSid);
+        if (updErr) console.error('Update call error:', updErr);
       } else {
-        console.log('Call session saved successfully');
+        const { error: insErr } = await supabase
+          .from('call_sessions')
+          .insert(callPayload);
+        if (insErr) console.error('Insert call error:', insErr);
       }
     }
 
-    // Generate TwiML response based on call direction and status
-    let twimlResponse = '';
-
-    if (Direction === 'inbound') {
-      // Handle incoming call
-      twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+    // Build TwiML safely: never dial our own Twilio number
+    let twiml: string;
+    if (direction === 'inbound') {
+      if (forwardNumber && (!twilioNumber || forwardNumber.replace(/\s/g, '') !== twilioNumber.replace(/\s/g, ''))) {
+        // Forward to configured destination (not the same as our Twilio DID)
+        twiml = xml`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! Thank you for calling Lewis Insurance. Please hold while we connect you to an agent.</Say>
-    <Dial timeout="30" record="record-from-ringing">
-        <Number>+13864879494</Number>
-    </Dial>
-    <Say voice="alice">Sorry, no one is available to take your call right now. Please leave a message after the beep.</Say>
-    <Record timeout="30" maxLength="300" action="${supabaseUrl}/functions/v1/twilio-recording-webhook" />
-    <Say voice="alice">Thank you for your message. We will get back to you soon. Goodbye!</Say>
+  <Say voice="alice">Hello! Thank you for calling. Please hold while we connect you.</Say>
+  <Dial callerId="${twilioNumber ?? ''}" timeout="30" record="record-from-answer">
+    <Number>${forwardNumber}</Number>
+  </Dial>
+  <Say voice="alice">Sorry, no one is available to take your call right now. Please leave a message after the beep.</Say>
+  <Record timeout="30" maxLength="300" action="${supabaseUrl}/functions/v1/twilio-recording-webhook" />
+  <Say voice="alice">Thank you. Goodbye!</Say>
 </Response>`;
-    } else {
-      // Handle outbound call status updates
-      twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+      } else {
+        // No forward configured → go straight to voicemail
+        twiml = xml`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <!-- Outbound call status update received -->
+  <Say voice="alice">Hello! Please leave a message after the beep.</Say>
+  <Record timeout="30" maxLength="300" action="${supabaseUrl}/functions/v1/twilio-recording-webhook" />
+  <Say voice="alice">Thank you. Goodbye!</Say>
+</Response>`;
+      }
+    } else {
+      // Outbound status callbacks (optional)
+      twiml = xml`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <!-- Outbound call webhook received -->
 </Response>`;
     }
 
-    console.log('Sending TwiML response:', twimlResponse);
-
-    return new Response(twimlResponse, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/xml',
-      },
+    return new Response(twiml, {
+      headers: { ...corsHeaders, 'Content-Type': 'application/xml' },
     });
-
-  } catch (error) {
-    console.error('Error in Twilio voice webhook:', error);
-    
-    // Return a basic TwiML response even on error
-    const errorResponse = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">We're sorry, but we're experiencing technical difficulties. Please try calling back later.</Say>
-</Response>`;
-
-    return new Response(errorResponse, {
-      status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/xml',
-      },
-    });
+  } catch (err) {
+    console.error('Twilio voice webhook error:', err);
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="alice">We are experiencing technical difficulties. Please try again later.</Say>\n</Response>`;
+    return new Response(errorTwiml, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/xml' } });
   }
 });
