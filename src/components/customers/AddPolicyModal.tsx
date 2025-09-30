@@ -144,6 +144,31 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+    
+    // Auto-calculate expiration date when effective date or policy term changes
+    if (field === 'effective_date' || field === 'policy_term') {
+      const effectiveDate = field === 'effective_date' ? value : formData.effective_date;
+      const policyTerm = field === 'policy_term' ? value : formData.policy_term;
+      
+      if (effectiveDate && policyTerm) {
+        const startDate = new Date(effectiveDate);
+        let expirationDate: Date;
+        
+        if (policyTerm === 'semiannual') {
+          expirationDate = new Date(startDate);
+          expirationDate.setMonth(startDate.getMonth() + 6);
+        } else if (policyTerm === 'annual') {
+          expirationDate = new Date(startDate);
+          expirationDate.setFullYear(startDate.getFullYear() + 1);
+        } else {
+          return; // Unknown term, don't auto-calculate
+        }
+        
+        // Format as YYYY-MM-DD for date input
+        const formattedDate = expirationDate.toISOString().split('T')[0];
+        setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
+      }
+    }
   };
 
   return (
