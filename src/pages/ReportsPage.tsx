@@ -8,6 +8,7 @@ import { FileText, Users, TrendingUp, DollarSign, ArrowLeft } from 'lucide-react
 import { RenewalsByLineOfBusiness } from '@/components/reports/RenewalsByLineOfBusiness';
 import { AgentCommissionsReport } from '@/components/reports/AgentCommissionsReport';
 import { RevenueReport } from '@/components/reports/RevenueReport';
+import { InsuredTotalValueReport } from '@/components/reports/InsuredTotalValueReport';
 
 interface Report {
   id: string;
@@ -235,6 +236,8 @@ export default function ReportsPage() {
         return <AgentCommissionsReport />;
       case 'revenue':
         return <RevenueReport />;
+      case 'insured-total-value':
+        return <InsuredTotalValueReport />;
       default:
         return (
           <Card>
