@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut } from 'lucide-react';
 import { NavItem } from './NavItem';
+import { GlobalSearch } from '@/components/crm/GlobalSearch';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -31,6 +32,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 alt="Lewis Insurance"
                 className="h-24 w-auto"
               />
+            </div>
+            
+            {/* Global Search */}
+            <div className="px-4 pb-4">
+              <GlobalSearch className="w-full" />
             </div>
           </SidebarHeader>
           

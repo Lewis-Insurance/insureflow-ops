@@ -3,11 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export interface SearchResult {
-  entity_type: 'contact' | 'account' | 'business';
+  entity_type: 'contact' | 'account' | 'business' | 'policy';
   id: string;
   label: string;
   email: string | null;
   phone: string | null;
+  subtitle?: string;
 }
 
 export function useGlobalSearch() {
@@ -29,7 +30,7 @@ export function useGlobalSearch() {
       console.log('Searching for:', trimmedQuery);
 
       // Fallback to manual search with broader criteria
-      const [accountResponse, contactResponse, businessResponse] = await Promise.allSettled([
+      const [accountResponse, contactResponse, businessResponse, policyResponse] = await Promise.allSettled([
         // Search accounts by name, email, phone, address, notes, zip, tin_last4
         supabase
           .from('accounts')
@@ -52,6 +53,20 @@ export function useGlobalSearch() {
           .select('id, legal_name, dba')
           .or(`legal_name.ilike.%${trimmedQuery}%,dba.ilike.%${trimmedQuery}%`)
           .is('deleted_at', null)
+          .limit(10),
+
+        // Search policies by policy number, carrier, line of business
+        supabase
+          .from('policies')
+          .select(`
+            id, 
+            policy_number, 
+            carrier, 
+            line_of_business,
+            account:accounts!policies_account_id_fkey(name),
+            carrier_info:carriers!policies_carrier_id_fkey(name)
+          `)
+          .or(`policy_number.ilike.%${trimmedQuery}%,carrier.ilike.%${trimmedQuery}%,line_of_business.ilike.%${trimmedQuery}%`)
           .limit(10)
       ]);
 
@@ -90,6 +105,19 @@ export function useGlobalSearch() {
           label: business.legal_name || business.dba || 'Unnamed Business',
           email: null,
           phone: null
+        })));
+      }
+
+      // Process policy results
+      if (policyResponse.status === 'fulfilled' && policyResponse.value.data) {
+        console.log('Policy results:', policyResponse.value.data);
+        results.push(...policyResponse.value.data.map(policy => ({
+          entity_type: 'policy' as const,
+          id: policy.id,
+          label: `Policy #${policy.policy_number}`,
+          email: null,
+          phone: null,
+          subtitle: `${policy.carrier_info?.name || policy.carrier || 'Unknown Carrier'} - ${policy.line_of_business || 'Unknown Line'} ${policy.account?.name ? `(${policy.account.name})` : ''}`
         })));
       }
 

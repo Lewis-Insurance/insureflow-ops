@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Users, Building2, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Users, Building2, User, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,9 +16,10 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ 
   onResultSelect, 
-  placeholder = "Search customers, insureds, accounts, businesses...",
+  placeholder = "Search customers, policies, contacts...",
   className = ""
 }: GlobalSearchProps) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const { results, loading, search, clearResults } = useGlobalSearch();
@@ -38,9 +40,28 @@ export function GlobalSearch({
 
   const handleResultClick = useCallback((result: SearchResult) => {
     setShowResults(false);
-    setQuery(result.label);
+    setQuery('');
+    
+    // Navigate to the appropriate page based on entity type
+    switch (result.entity_type) {
+      case 'account':
+        navigate(`/crm/accounts/${result.id}`);
+        break;
+      case 'contact':
+        navigate(`/customers/${result.id}`);
+        break;
+      case 'policy':
+        navigate(`/policies/${result.id}`);
+        break;
+      case 'business':
+        // Navigate to business detail page when available
+        break;
+      default:
+        break;
+    }
+    
     onResultSelect?.(result);
-  }, [onResultSelect]);
+  }, [navigate, onResultSelect]);
 
   const handleClear = useCallback(() => {
     setQuery('');
@@ -56,6 +77,8 @@ export function GlobalSearch({
         return <Users className="h-4 w-4" />;
       case 'business':
         return <Building2 className="h-4 w-4" />;
+      case 'policy':
+        return <FileText className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
     }
@@ -69,6 +92,8 @@ export function GlobalSearch({
         return 'default';
       case 'business':
         return 'outline';
+      case 'policy':
+        return 'destructive';
       default:
         return 'secondary';
     }
@@ -102,7 +127,7 @@ export function GlobalSearch({
       </div>
 
       {showResults && (
-        <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-96 overflow-y-auto">
+        <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-96 overflow-y-auto bg-background border shadow-lg">
           <CardContent className="p-2">
             {loading && (
               <div className="flex items-center justify-center py-4">
@@ -131,6 +156,9 @@ export function GlobalSearch({
                         <div>
                           <div className="font-medium">{result.label}</div>
                           <div className="text-xs text-muted-foreground">
+                            {result.subtitle && (
+                              <div className="mb-1">{result.subtitle}</div>
+                            )}
                             {result.email && (
                               <span className="mr-3">{result.email}</span>
                             )}
