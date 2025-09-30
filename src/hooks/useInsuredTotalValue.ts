@@ -28,24 +28,28 @@ export function useInsuredTotalValue() {
   return useQuery({
     queryKey: ['insured-total-value'],
     queryFn: async (): Promise<InsuredTotalValueData> => {
-      // Fetch accounts with their policies
-      const { data: accounts, error } = await supabase
-        .from('accounts')
-        .select(`
-          id,
-          name,
-          policies (
-            id,
-            premium,
-            line_of_business
-          )
-        `)
-        .is('deleted_at', null);
+      // Fetch accounts and policies separately to respect RLS policies
+      const [accountsResult, policiesResult] = await Promise.all([
+        supabase
+          .from('accounts')
+          .select('id, name')
+          .is('deleted_at', null),
+        supabase
+          .from('policies')
+          .select('id, premium, line_of_business, account_id')
+      ]);
 
-      if (error) throw error;
+      if (accountsResult.error) throw accountsResult.error;
+      if (policiesResult.error) throw policiesResult.error;
+
+      // Combine accounts with their policies
+      const accounts = accountsResult.data?.map(account => ({
+        ...account,
+        policies: policiesResult.data?.filter(policy => policy.account_id === account.id) || []
+      })) || [];
 
       // Calculate total value per customer and segment them
-      const customerValues = accounts?.map(account => {
+      const customerValues = accounts.map(account => {
         const totalPolicies = account.policies?.length || 0;
         const totalValue = account.policies?.reduce((sum, policy) => sum + (policy.premium || 0), 0) || 0;
         
@@ -58,7 +62,7 @@ export function useInsuredTotalValue() {
           policies: totalPolicies,
           risk: estimatedInsuredValue > 200000 ? 'High' : estimatedInsuredValue > 100000 ? 'Medium' : 'Low'
         };
-      }) || [];
+      });
 
       // Sort by value and get top customers
       const topCustomers = customerValues
