@@ -59,31 +59,34 @@ export function TelephonyDashboard() {
     try {
       setLoading(true);
 
-      // Fetch stats - using existing tables only
+      // Fetch stats and settings from actual tables
       const [callsResult, smsResult, settingsResult] = await Promise.all([
         supabase.from('call_sessions').select('id').limit(1000),
         supabase.from('sms_messages').select('id').limit(1000),
-        // Mock telephony settings since table may not exist yet
-        Promise.resolve({ data: null, error: null })
+        supabase.from('telephony_settings').select('*').single()
       ]);
+
+      // Check for consent opt-outs
+      const optOutResult = await supabase
+        .from('consents')
+        .select('id')
+        .eq('granted', false)
+        .eq('type', 'sms_consent');
 
       setStats({
         totalCalls: callsResult.data?.length || 0,
         totalSMS: smsResult.data?.length || 0,
-        optOutCount: 0, // Would come from consent tracking
-        webhookHealth: 'unknown', // Would come from settings
-        lastError: undefined,
-        lastErrorAt: undefined
+        optOutCount: optOutResult.data?.length || 0,
+        webhookHealth: settingsResult.data?.webhook_status === 'ok' ? 'healthy' : 
+                      settingsResult.data?.last_webhook_error ? 'error' : 'unknown',
+        lastError: settingsResult.data?.last_webhook_error,
+        lastErrorAt: settingsResult.data?.last_error_at
       });
 
-      // Mock settings for now
-      setSettings({
-        id: '1',
-        twilio_phone_number: '+1234567890',
-        forward_number: '+1987654321',
-        recording_enabled: true,
-        webhook_status: 'unknown'
-      });
+      // Use actual settings from database
+      if (settingsResult.data) {
+        setSettings(settingsResult.data);
+      }
     } catch (error) {
       toast({
         title: "Error loading telephony data",
@@ -135,6 +138,31 @@ export function TelephonyDashboard() {
       });
     } finally {
       setTestLoading(false);
+    }
+  };
+
+  const handleUpdateSettings = async (updatedSettings: Partial<TelephonySettings>) => {
+    try {
+      const { error } = await supabase
+        .from('telephony_settings')
+        .update(updatedSettings)
+        .eq('id', settings?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings updated",
+        description: "Telephony settings have been updated successfully",
+      });
+
+      // Refresh data
+      await fetchTelephonyData();
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: asMessage(error, "Failed to update telephony settings"),
+        variant: "destructive",
+      });
     }
   };
 
