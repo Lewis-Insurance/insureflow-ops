@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Plus, Building2, Users } from 'lucide-react';
+import { Pencil, Plus, Building2, Users, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Carrier {
@@ -64,6 +65,7 @@ export function CarrierManagementTab() {
   const [editingCarrier, setEditingCarrier] = useState<Carrier | null>(null);
   const [formData, setFormData] = useState<CarrierFormData>(initialFormData);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [deletingCarrier, setDeletingCarrier] = useState<Carrier | null>(null);
   const queryClient = useQueryClient();
 
   const { data: carriers, isLoading } = useQuery({
@@ -116,6 +118,24 @@ export function CarrierManagementTab() {
     }
   });
 
+  const deleteCarrierMutation = useMutation({
+    mutationFn: async (carrierId: string) => {
+      const { error } = await supabase
+        .from('carriers')
+        .delete()
+        .eq('id', carrierId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      setDeletingCarrier(null);
+      toast.success('Carrier deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete carrier: ' + error.message);
+    }
+  });
+
   const handleEdit = (carrier: Carrier) => {
     setEditingCarrier(carrier);
     setFormData({
@@ -148,6 +168,16 @@ export function CarrierManagementTab() {
     setEditingCarrier(null);
     setFormData(initialFormData);
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = (carrier: Carrier) => {
+    setDeletingCarrier(carrier);
+  };
+
+  const confirmDelete = () => {
+    if (deletingCarrier) {
+      deleteCarrierMutation.mutate(deletingCarrier.id);
+    }
   };
 
   if (isLoading) {
@@ -206,13 +236,23 @@ export function CarrierManagementTab() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(carrier)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(carrier)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(carrier)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -369,6 +409,29 @@ export function CarrierManagementTab() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingCarrier} onOpenChange={() => setDeletingCarrier(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Carrier</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingCarrier?.name}"? This action cannot be undone.
+              This will permanently remove the carrier from your system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              disabled={deleteCarrierMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCarrierMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
