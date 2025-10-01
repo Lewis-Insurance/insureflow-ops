@@ -388,21 +388,27 @@ export function useTasks(accountId?: string) {
 
   const backfillDueDatesForUser = useCallback(async (userId: string) => {
     try {
-      const todayYMD = new Date().toISOString().slice(0,10);
-      const noonET = fromZonedTime(`${todayYMD} 12:00:00`, 'America/New_York').toISOString();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
       const { error } = await supabase
         .from('tasks')
-        .update({ due_at: noonET })
+        .update({ due_at: tomorrow.toISOString() })
         .is('due_at', null)
         .eq('assignee_id', userId);
+
       if (error) throw error;
-      await fetchTasks(lastFiltersRef.current);
+
+      toast({
+        title: 'Updated',
+        description: 'Set default due dates for tasks without dates',
+      });
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error backfilling due dates:', error);
       return false;
     }
-  }, [fetchTasks]);
+  }, []);
 
   return {
     tasks,
