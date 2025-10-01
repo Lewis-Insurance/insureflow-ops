@@ -7,34 +7,18 @@ import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
 import { MyTasksDashboard } from '@/components/tasks/MyTasksDashboard';
 import { TaskAnalyticsDashboard } from '@/components/tasks/TaskAnalyticsDashboard';
 import { TaskForm } from '@/components/tasks/TaskForm';
-import { useTasks } from '@/hooks/useTasks';
-import { useToast } from '@/hooks/use-toast';
+import { useTasks, Task } from '@/hooks/useTasks';
 import { LayoutGrid, Calendar, User, BarChart3, Plus } from 'lucide-react';
 
 export default function TasksPage() {
   const [activeTab, setActiveTab] = useState('my-tasks');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const { createTask } = useTasks();
-  const { toast } = useToast();
 
-const handleCreateTask = async (taskData: any) => {
-  try {
+  const handleCreateTask = async (taskData: Partial<Task>) => {
     await createTask(taskData);
     setCreateDialogOpen(false);
-    setRefreshKey((k) => k + 1);
-    toast({
-      title: 'Success',
-      description: 'Task created successfully',
-    });
-  } catch (error) {
-    toast({
-      title: 'Error',
-      description: 'Failed to create task',
-      variant: 'destructive',
-    });
-  }
-};
+  };
 
   return (
     <AppLayout>
@@ -73,19 +57,19 @@ const handleCreateTask = async (taskData: any) => {
           </TabsList>
 
           <TabsContent value="my-tasks" className="mt-6">
-            <MyTasksDashboard key={`my-${refreshKey}`} />
+            <MyTasksDashboard />
           </TabsContent>
 
           <TabsContent value="kanban" className="mt-6">
-            <TaskKanbanBoard key={`kanban-${refreshKey}`} />
+            <TaskKanbanBoard />
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
-            <TaskCalendarView key={`cal-${refreshKey}`} />
+            <TaskCalendarView />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">
-            <TaskAnalyticsDashboard key={`ana-${refreshKey}`} />
+            <TaskAnalyticsDashboard />
           </TabsContent>
         </Tabs>
 
