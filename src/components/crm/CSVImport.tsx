@@ -265,6 +265,43 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
     }
   };
 
+  const downloadTemplate = () => {
+    const fields = importType === 'accounts' ? accountFields : contactFields;
+    const headers = fields.map(f => f.key).join(',');
+    const sampleRow = fields.map(f => {
+      if (f.key === 'name') return 'John Doe Insurance';
+      if (f.key === 'first_name') return 'John';
+      if (f.key === 'last_name') return 'Doe';
+      if (f.key === 'email') return 'example@email.com';
+      if (f.key === 'phone') return '555-123-4567';
+      if (f.key === 'type') return 'household';
+      if (f.key === 'address_line1') return '123 Main St';
+      if (f.key === 'city') return 'Anytown';
+      if (f.key === 'state') return 'CA';
+      if (f.key === 'zip_code') return '12345';
+      if (f.key === 'date_of_birth') return '1990-01-01';
+      if (f.key === 'role') return 'Primary Contact';
+      if (f.key === 'source') return 'Website';
+      return '';
+    }).join(',');
+    
+    const csvContent = `${headers}\n${sampleRow}`;
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${importType}_template.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast({
+      title: 'Template downloaded',
+      description: `${importType} CSV template has been downloaded.`,
+    });
+  };
+
   const errorRows = importRows.filter(row => row.validation_status === 'invalid');
 
   return (
@@ -321,8 +358,19 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
                 </Select>
               </div>
               
-              <div>
-                <Label htmlFor="csv-file">CSV File</Label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="csv-file">CSV File</Label>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={downloadTemplate}
+                    type="button"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Template
+                  </Button>
+                </div>
                 <Input
                   ref={fileInputRef}
                   id="csv-file"
