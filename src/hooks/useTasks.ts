@@ -358,6 +358,33 @@ export function useTasks(accountId?: string) {
     }
   }, []);
 
+  const backfillAssignmentsForUser = useCallback(async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ assignee_id: userId })
+        .is('assignee_id', null)
+        .eq('created_by', userId);
+
+      if (error) throw error;
+
+      await fetchTasks(lastFiltersRef.current);
+      toast({
+        title: 'Updated',
+        description: 'Assigned your unassigned tasks to you',
+      });
+      return true;
+    } catch (error: any) {
+      console.error('Error backfilling assignments:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to assign unassigned tasks',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [fetchTasks]);
+
   return {
     tasks,
     loading,
@@ -370,5 +397,6 @@ export function useTasks(accountId?: string) {
     fetchAttachments,
     addAttachment,
     removeAttachment,
+    backfillAssignmentsForUser,
   };
 }

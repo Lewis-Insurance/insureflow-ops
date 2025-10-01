@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,12 +7,12 @@ import { useTasks, Task } from '@/hooks/useTasks';
 import { TaskBulkActionsBar } from './TaskBulkActionsBar';
 import { TaskEditModal } from './TaskEditModal';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval, isBefore } from 'date-fns';
+import { addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatInTimeZone } from 'date-fns-tz';
 const TZ = 'America/New_York';
 export function MyTasksDashboard() {
-  const { tasks, loading, fetchTasks } = useTasks();
+  const { tasks, loading, fetchTasks, backfillAssignmentsForUser } = useTasks();
   const [activeTab, setActiveTab] = useState('all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -36,6 +36,22 @@ export function MyTasksDashboard() {
     // Fetch tasks assigned to the current user
     if (currentUserId) {
       fetchTasks({ assignedTo: currentUserId });
+    }
+  }, [currentUserId, fetchTasks]);
+
+  const backfilledOnce = useRef(false);
+  useEffect(() => {
+    if (currentUserId && !backfilledOnce.current) {
+      backfilledOnce.current = true;
+      // One-time backfill of unassigned tasks created by the current user
+      // then refresh the assigned view
+      (async () => {
+        try {
+          await backfillAssignmentsForUser(currentUserId);
+        } finally {
+          fetchTasks({ assignedTo: currentUserId });
+        }
+      })();
     }
   }, [currentUserId, fetchTasks]);
 
