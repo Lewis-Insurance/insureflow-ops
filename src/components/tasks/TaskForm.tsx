@@ -228,7 +228,15 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                 <Calendar
                   mode="single"
                   selected={formData.due_at ? new Date(formData.due_at) : undefined}
-                  onSelect={(date) => setFormData({ ...formData, due_at: date?.toISOString() })}
+                  onSelect={(date) => {
+                    if (!date) {
+                      setFormData({ ...formData, due_at: undefined });
+                      return;
+                    }
+                    const d = new Date(date);
+                    d.setHours(12, 0, 0, 0); // normalize to local noon to avoid timezone shifting
+                    setFormData({ ...formData, due_at: d.toISOString() });
+                  }}
                   initialFocus
                 />
               </PopoverContent>

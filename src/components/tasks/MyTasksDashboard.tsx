@@ -36,7 +36,7 @@ export function MyTasksDashboard() {
     if (currentUserId) {
       fetchTasks({ assignedTo: currentUserId });
     }
-  }, [currentUserId]); // Remove fetchTasks from dependencies to prevent infinite loop
+  }, [currentUserId, fetchTasks]);
 
   useEffect(() => {
     if (currentUserId && tasks.length > 0) {

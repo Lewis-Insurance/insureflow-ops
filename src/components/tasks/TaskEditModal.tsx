@@ -125,13 +125,13 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
     try {
       setLoading(true);
       
+      const dueISO = formData.due_at ? (() => { const d = new Date(formData.due_at); d.setHours(12,0,0,0); return d.toISOString(); })() : null;
       const updateData = {
         ...formData,
-        due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
+        due_at: dueISO,
         assignee_id: formData.assignee_id === 'unassigned' ? null : formData.assignee_id || null,
         updated_at: new Date().toISOString()
       };
-
       const { error } = await supabase
         .from('tasks')
         .update(updateData)
