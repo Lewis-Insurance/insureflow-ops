@@ -65,6 +65,15 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
   const [staffMembers, setStaffMembers] = useState<Array<{ id: string; full_name: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -75,10 +84,10 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
         priority: task.priority,
         status: task.status,
         due_at: task.due_at ? formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd') : '',
-        assignee_id: task.assignee_id || 'unassigned'
+        assignee_id: task.assignee_id || currentUserId || 'unassigned'
       });
     }
-  }, [task]);
+  }, [task, currentUserId]);
 
   useEffect(() => {
     if (open) {
@@ -129,7 +138,7 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
       const updateData = {
         ...formData,
         due_at: formData.due_at ? fromZonedTime(`${formData.due_at} 12:00:00`, TZ).toISOString() : null,
-        assignee_id: formData.assignee_id === 'unassigned' ? null : formData.assignee_id || null,
+        assignee_id: (formData.assignee_id && formData.assignee_id !== 'unassigned') ? formData.assignee_id : (currentUserId || null),
         updated_at: new Date().toISOString()
       };
       const { error } = await supabase
