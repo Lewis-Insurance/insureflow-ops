@@ -38,6 +38,19 @@ export function MyTasksDashboard() {
     }
   }, [currentUserId]); // Remove fetchTasks from dependencies to prevent infinite loop
 
+  useEffect(() => {
+    if (currentUserId && tasks.length > 0) {
+      console.log('Current User ID:', currentUserId);
+      console.log('Tasks:', tasks.map(t => ({
+        title: t.title,
+        assignee_id: t.assignee_id,
+        due_at: t.due_at,
+        status: t.status,
+        isAssignedToMe: t.assignee_id === currentUserId
+      })));
+    }
+  }, [tasks, currentUserId]);
+
   const isAssignedToMe = (task: Task) => {
     if (!currentUserId) return true;
     return task.assignee_id === currentUserId;
