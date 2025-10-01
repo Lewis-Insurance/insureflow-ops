@@ -14,24 +14,27 @@ import { LayoutGrid, Calendar, User, BarChart3, Plus } from 'lucide-react';
 export default function TasksPage() {
   const [activeTab, setActiveTab] = useState('my-tasks');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { createTask } = useTasks();
   const { toast } = useToast();
 
-  const handleCreateTask = async (taskData: any) => {
-    try {
-      await createTask(taskData);
-      toast({
-        title: 'Success',
-        description: 'Task created successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create task',
-        variant: 'destructive',
-      });
-    }
-  };
+const handleCreateTask = async (taskData: any) => {
+  try {
+    await createTask(taskData);
+    setCreateDialogOpen(false);
+    setRefreshKey((k) => k + 1);
+    toast({
+      title: 'Success',
+      description: 'Task created successfully',
+    });
+  } catch (error) {
+    toast({
+      title: 'Error',
+      description: 'Failed to create task',
+      variant: 'destructive',
+    });
+  }
+};
 
   return (
     <AppLayout>
@@ -70,26 +73,25 @@ export default function TasksPage() {
           </TabsList>
 
           <TabsContent value="my-tasks" className="mt-6">
-            <MyTasksDashboard />
+            <MyTasksDashboard key={`my-${refreshKey}`} />
           </TabsContent>
 
           <TabsContent value="kanban" className="mt-6">
-            <TaskKanbanBoard />
+            <TaskKanbanBoard key={`kanban-${refreshKey}`} />
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
-            <TaskCalendarView />
+            <TaskCalendarView key={`cal-${refreshKey}`} />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">
-            <TaskAnalyticsDashboard />
+            <TaskAnalyticsDashboard key={`ana-${refreshKey}`} />
           </TabsContent>
         </Tabs>
 
         <TaskForm
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
-          accountId="" // General task not tied to specific account
           onSubmit={handleCreateTask}
         />
       </div>

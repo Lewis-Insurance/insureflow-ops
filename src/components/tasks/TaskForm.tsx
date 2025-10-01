@@ -17,7 +17,7 @@ interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task?: Task | null;
-  accountId: string;
+  accountId?: string;
   onSubmit: (taskData: Partial<Task>) => Promise<void>;
 }
 
@@ -93,10 +93,11 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
     setSubmitting(true);
     
     try {
-      await onSubmit({
-        ...formData,
-        account_id: accountId,
-      });
+      const payload: any = { ...formData };
+      if (accountId) {
+        payload.account_id = accountId;
+      }
+      await onSubmit(payload);
       onOpenChange(false);
     } finally {
       setSubmitting(false);
