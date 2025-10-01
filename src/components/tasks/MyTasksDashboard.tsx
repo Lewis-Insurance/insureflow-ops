@@ -7,7 +7,7 @@ import { useTasks, Task } from '@/hooks/useTasks';
 import { TaskBulkActionsBar } from './TaskBulkActionsBar';
 import { TaskEditModal } from './TaskEditModal';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { format, isToday, isTomorrow, isPast, isThisWeek } from 'date-fns';
+import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval, isBefore } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 export function MyTasksDashboard() {
@@ -35,27 +35,44 @@ export function MyTasksDashboard() {
   }, [currentUserId]); // Remove fetchTasks from dependencies to prevent infinite loop
 
   const getTodayTasks = () => {
-    return tasks.filter(task => 
-      task.due_at && isToday(new Date(task.due_at)) && task.status !== 'completed'
-    );
+    const now = new Date();
+    const start = startOfDay(now);
+    const end = endOfDay(now);
+    return tasks.filter(task => {
+      if (!task.due_at || task.status === 'completed') return false;
+      const due = new Date(task.due_at);
+      return isWithinInterval(due, { start, end });
+    });
   };
 
   const getTomorrowTasks = () => {
-    return tasks.filter(task => 
-      task.due_at && isTomorrow(new Date(task.due_at)) && task.status !== 'completed'
-    );
+    const date = addDays(new Date(), 1);
+    const start = startOfDay(date);
+    const end = endOfDay(date);
+    return tasks.filter(task => {
+      if (!task.due_at || task.status === 'completed') return false;
+      const due = new Date(task.due_at);
+      return isWithinInterval(due, { start, end });
+    });
   };
 
   const getThisWeekTasks = () => {
-    return tasks.filter(task => 
-      task.due_at && isThisWeek(new Date(task.due_at)) && task.status !== 'completed'
-    );
+    const start = startOfWeek(new Date());
+    const end = endOfWeek(new Date());
+    return tasks.filter(task => {
+      if (!task.due_at || task.status === 'completed') return false;
+      const due = new Date(task.due_at);
+      return isWithinInterval(due, { start, end });
+    });
   };
 
   const getOverdueTasks = () => {
-    return tasks.filter(task => 
-      task.due_at && isPast(new Date(task.due_at)) && task.status !== 'completed'
-    );
+    const todayStart = startOfDay(new Date());
+    return tasks.filter(task => {
+      if (!task.due_at || task.status === 'completed') return false;
+      const due = new Date(task.due_at);
+      return isBefore(due, todayStart);
+    });
   };
 
   const getCompletedTasks = () => {
