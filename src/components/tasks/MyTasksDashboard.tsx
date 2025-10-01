@@ -32,7 +32,7 @@ export function MyTasksDashboard() {
     if (currentUserId) {
       fetchTasks({ assignedTo: currentUserId });
     }
-  }, [fetchTasks, currentUserId]);
+  }, [currentUserId]); // Remove fetchTasks from dependencies to prevent infinite loop
 
   const getTodayTasks = () => {
     return tasks.filter(task => 
@@ -290,7 +290,9 @@ export function MyTasksDashboard() {
         selectedTaskIds={selectedTaskIds}
         onClearSelection={() => setSelectedTaskIds([])}
         onComplete={() => {
-          fetchTasks();
+          if (currentUserId) {
+            fetchTasks({ assignedTo: currentUserId });
+          }
           setSelectedTaskIds([]);
         }}
       />
@@ -301,7 +303,9 @@ export function MyTasksDashboard() {
         onOpenChange={setEditModalOpen}
         task={editingTask as any}
         onTaskUpdate={() => {
-          fetchTasks();
+          if (currentUserId) {
+            fetchTasks({ assignedTo: currentUserId });
+          }
           setEditModalOpen(false);
         }}
       />
