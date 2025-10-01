@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
+import { generateTasks } from '@/lib/taskAutomation';
 import { z } from 'zod';
 
 const policySchema = z.object({
@@ -97,7 +98,11 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         status: formData.status,
       };
 
-      const { error } = await supabase.from('policies').insert([policyData]);
+      const { data: newPolicy, error } = await supabase
+        .from('policies')
+        .insert([policyData])
+        .select()
+        .single();
 
       if (error) {
         toast({
@@ -108,9 +113,14 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         return;
       }
 
+      // Auto-generate tasks for new policy
+      if (newPolicy) {
+        await generateTasks('policy_issued', accountId, 'policy', newPolicy.id);
+      }
+
       toast({
         title: 'Success',
-        description: 'Policy added successfully',
+        description: 'Policy added successfully and tasks created',
       });
       
       // Reset form

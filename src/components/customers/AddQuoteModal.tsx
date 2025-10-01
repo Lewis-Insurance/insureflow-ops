@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { generateTasks } from '@/lib/taskAutomation';
 import { z } from 'zod';
 
 const quoteSchema = z.object({
@@ -90,7 +91,11 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
         notes: formData.notes.trim() || null,
       };
 
-      const { error } = await supabase.from('policies').insert([quoteData]);
+      const { data: newQuote, error } = await supabase
+        .from('policies')
+        .insert([quoteData])
+        .select()
+        .single();
 
       if (error) {
         toast({
@@ -101,9 +106,14 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
         return;
       }
 
+      // Auto-generate tasks for quote
+      if (newQuote) {
+        await generateTasks('quote_requested', accountId, 'quote', newQuote.id);
+      }
+
       toast({
         title: 'Success',
-        description: 'Quote added successfully',
+        description: 'Quote added successfully and tasks created',
       });
       
       // Reset form
