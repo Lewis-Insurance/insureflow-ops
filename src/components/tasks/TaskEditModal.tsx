@@ -24,7 +24,7 @@ const taskSchema = z.object({
 
 interface Task {
   id: string;
-  account_id: string;
+  account_id?: string;
   title: string;
   description?: string;
   details?: string;

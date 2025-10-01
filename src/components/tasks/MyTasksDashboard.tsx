@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,8 +21,12 @@ export function MyTasksDashboard() {
   // Get current user ID
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUserId(user?.id || null);
+      } catch (error) {
+        console.error('Auth error:', error);
+      }
     };
     getCurrentUser();
   }, []);
@@ -36,10 +40,10 @@ export function MyTasksDashboard() {
 
   const isAssignedToMe = (task: Task) => {
     if (!currentUserId) return true;
-    return task.assignee_id === currentUserId || task.assigned_to === currentUserId;
+    return task.assignee_id === currentUserId;
   };
 
-  const getTodayTasks = () => {
+  const todayTasks = useMemo(() => {
     const now = new Date();
     const start = startOfDay(now);
     const end = endOfDay(now);
@@ -49,9 +53,9 @@ export function MyTasksDashboard() {
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
     });
-  };
+  }, [tasks, currentUserId]);
 
-  const getTomorrowTasks = () => {
+  const tomorrowTasks = useMemo(() => {
     const date = addDays(new Date(), 1);
     const start = startOfDay(date);
     const end = endOfDay(date);
@@ -61,9 +65,9 @@ export function MyTasksDashboard() {
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
     });
-  };
+  }, [tasks, currentUserId]);
 
-  const getThisWeekTasks = () => {
+  const weekTasks = useMemo(() => {
     const start = startOfWeek(new Date());
     const end = endOfWeek(new Date());
     return tasks.filter(task => {
@@ -72,19 +76,19 @@ export function MyTasksDashboard() {
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
     });
-  };
+  }, [tasks, currentUserId]);
 
-  const getFutureTasks = () => {
-    const tomorrowStart = startOfDay(addDays(new Date(), 1));
+  const futureTasks = useMemo(() => {
+    const weekEnd = endOfWeek(new Date());
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
       const due = new Date(task.due_at);
-      return due >= tomorrowStart;
+      return due > weekEnd;
     });
-  };
+  }, [tasks, currentUserId]);
 
-  const getOverdueTasks = () => {
+  const overdueTasks = useMemo(() => {
     const todayStart = startOfDay(new Date());
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
@@ -92,15 +96,15 @@ export function MyTasksDashboard() {
       const due = new Date(task.due_at);
       return isBefore(due, todayStart);
     });
-  };
+  }, [tasks, currentUserId]);
 
-  const getCompletedTasks = () => {
+  const completedTasks = useMemo(() => {
     return tasks.filter(task => task.status === 'completed' && isAssignedToMe(task));
-  };
+  }, [tasks, currentUserId]);
 
-  const getAllAssignedTasks = () => {
+  const allTasks = useMemo(() => {
     return tasks.filter(task => task.status !== 'completed' && isAssignedToMe(task));
-  };
+  }, [tasks, currentUserId]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -177,13 +181,6 @@ export function MyTasksDashboard() {
     return <div className="text-center py-8">Loading your tasks...</div>;
   }
 
-  const todayTasks = getTodayTasks();
-  const tomorrowTasks = getTomorrowTasks();
-  const weekTasks = getThisWeekTasks();
-  const futureTasks = getFutureTasks();
-  const overdueTasks = getOverdueTasks();
-  const completedTasks = getCompletedTasks();
-  const allTasks = getAllAssignedTasks();
 
   return (
     <div className="space-y-6">
@@ -351,7 +348,7 @@ export function MyTasksDashboard() {
       <TaskEditModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
-        task={editingTask as any}
+        task={editingTask}
         onTaskUpdate={() => {
           if (currentUserId) {
             fetchTasks({ assignedTo: currentUserId });
