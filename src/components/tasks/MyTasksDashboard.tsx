@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatInTimeZone } from 'date-fns-tz';
 const TZ = 'America/New_York';
 export function MyTasksDashboard() {
-  const { tasks, loading, fetchTasks, backfillAssignmentsForUser } = useTasks();
+  const { tasks, loading, fetchTasks, backfillAssignmentsForUser, backfillDueDatesForUser } = useTasks();
   const [activeTab, setActiveTab] = useState('all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -43,11 +43,11 @@ export function MyTasksDashboard() {
   useEffect(() => {
     if (currentUserId && !backfilledOnce.current) {
       backfilledOnce.current = true;
-      // One-time backfill of unassigned tasks created by the current user
-      // then refresh the assigned view
+      // One-time backfill of unassigned tasks + missing due dates for this user, then refresh
       (async () => {
         try {
           await backfillAssignmentsForUser(currentUserId);
+          await backfillDueDatesForUser(currentUserId);
         } finally {
           fetchTasks({ assignedTo: currentUserId });
         }

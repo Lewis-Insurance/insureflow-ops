@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { fromZonedTime } from 'date-fns-tz';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -385,6 +386,24 @@ export function useTasks(accountId?: string) {
     }
   }, [fetchTasks]);
 
+  const backfillDueDatesForUser = useCallback(async (userId: string) => {
+    try {
+      const todayYMD = new Date().toISOString().slice(0,10);
+      const noonET = fromZonedTime(`${todayYMD} 12:00:00`, 'America/New_York').toISOString();
+      const { error } = await supabase
+        .from('tasks')
+        .update({ due_at: noonET })
+        .is('due_at', null)
+        .eq('assignee_id', userId);
+      if (error) throw error;
+      await fetchTasks(lastFiltersRef.current);
+      return true;
+    } catch (error) {
+      console.error('Error backfilling due dates:', error);
+      return false;
+    }
+  }, [fetchTasks]);
+
   return {
     tasks,
     loading,
@@ -398,5 +417,6 @@ export function useTasks(accountId?: string) {
     addAttachment,
     removeAttachment,
     backfillAssignmentsForUser,
+    backfillDueDatesForUser,
   };
 }
