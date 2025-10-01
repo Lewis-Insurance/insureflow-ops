@@ -11,7 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { z } from 'zod';
-
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+const TZ = 'America/New_York';
 const taskSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200, "Title must be less than 200 characters"),
   description: z.string().trim().max(500, "Description must be less than 500 characters").optional(),
@@ -73,7 +74,7 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
         details: task.details || '',
         priority: task.priority,
         status: task.status,
-        due_at: task.due_at ? task.due_at.split('T')[0] : '',
+        due_at: task.due_at ? formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd') : '',
         assignee_id: task.assignee_id || 'unassigned'
       });
     }
@@ -125,10 +126,9 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
     try {
       setLoading(true);
       
-      const dueISO = formData.due_at ? (() => { const d = new Date(formData.due_at); d.setHours(12,0,0,0); return d.toISOString(); })() : null;
       const updateData = {
         ...formData,
-        due_at: dueISO,
+        due_at: formData.due_at ? fromZonedTime(`${formData.due_at} 12:00:00`, TZ).toISOString() : null,
         assignee_id: formData.assignee_id === 'unassigned' ? null : formData.assignee_id || null,
         updated_at: new Date().toISOString()
       };

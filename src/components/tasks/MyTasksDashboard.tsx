@@ -9,7 +9,8 @@ import { TaskEditModal } from './TaskEditModal';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, isWithinInterval, isBefore } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-
+import { formatInTimeZone } from 'date-fns-tz';
+const TZ = 'America/New_York';
 export function MyTasksDashboard() {
   const { tasks, loading, fetchTasks } = useTasks();
   const [activeTab, setActiveTab] = useState('all');
@@ -57,57 +58,60 @@ export function MyTasksDashboard() {
   };
 
   const todayTasks = useMemo(() => {
-    const now = new Date();
-    const start = startOfDay(now);
-    const end = endOfDay(now);
+    const todayStr = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
-      const due = new Date(task.due_at);
-      return isWithinInterval(due, { start, end });
+      const dueStr = formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd');
+      return dueStr === todayStr;
     });
   }, [tasks, currentUserId]);
 
   const tomorrowTasks = useMemo(() => {
-    const date = addDays(new Date(), 1);
-    const start = startOfDay(date);
-    const end = endOfDay(date);
+    const tomorrow = addDays(new Date(), 1);
+    const tomorrowStr = formatInTimeZone(tomorrow, TZ, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
-      const due = new Date(task.due_at);
-      return isWithinInterval(due, { start, end });
+      const dueStr = formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd');
+      return dueStr === tomorrowStr;
     });
   }, [tasks, currentUserId]);
 
   const weekTasks = useMemo(() => {
-    const start = startOfWeek(new Date());
-    const end = endOfWeek(new Date());
+    const isoDow = parseInt(formatInTimeZone(new Date(), TZ, 'i'), 10); // 1=Mon .. 7=Sun
+    const startDate = addDays(new Date(), -(isoDow % 7)); // previous Sunday
+    const endDate = addDays(startDate, 6);
+    const startStr = formatInTimeZone(startDate, TZ, 'yyyy-MM-dd');
+    const endStr = formatInTimeZone(endDate, TZ, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
-      const due = new Date(task.due_at);
-      return isWithinInterval(due, { start, end });
+      const dueStr = formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd');
+      return dueStr >= startStr && dueStr <= endStr;
     });
   }, [tasks, currentUserId]);
 
   const futureTasks = useMemo(() => {
-    const weekEnd = endOfWeek(new Date());
+    const isoDow = parseInt(formatInTimeZone(new Date(), TZ, 'i'), 10);
+    const startDate = addDays(new Date(), -(isoDow % 7));
+    const endDate = addDays(startDate, 6);
+    const weekEndStr = formatInTimeZone(endDate, TZ, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
-      const due = new Date(task.due_at);
-      return due > weekEnd;
+      const dueStr = formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd');
+      return dueStr > weekEndStr;
     });
   }, [tasks, currentUserId]);
 
   const overdueTasks = useMemo(() => {
-    const todayStart = startOfDay(new Date());
+    const todayStr = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
-      const due = new Date(task.due_at);
-      return isBefore(due, todayStart);
+      const dueStr = formatInTimeZone(new Date(task.due_at), TZ, 'yyyy-MM-dd');
+      return dueStr < todayStr;
     });
   }, [tasks, currentUserId]);
 
@@ -175,7 +179,7 @@ export function MyTasksDashboard() {
             {task.due_at && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                {format(new Date(task.due_at), 'MMM d, h:mm a')}
+                {formatInTimeZone(new Date(task.due_at), TZ, 'MMM d, h:mm a zzz')}
               </div>
             )}
             <div className="flex items-center gap-1">

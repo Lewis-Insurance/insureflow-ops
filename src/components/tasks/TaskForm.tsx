@@ -11,7 +11,8 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { Task, TaskCategory, TaskPriority, TaskStatus } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
-
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+const TZ = 'America/New_York';
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -221,7 +222,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                   className="w-full justify-start text-left font-normal"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.due_at ? format(new Date(formData.due_at), 'PPP') : 'Pick a date'}
+                  {formData.due_at ? formatInTimeZone(new Date(formData.due_at), TZ, 'PPP zzz') : 'Pick a date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -233,9 +234,9 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                       setFormData({ ...formData, due_at: undefined });
                       return;
                     }
-                    const d = new Date(date);
-                    d.setHours(12, 0, 0, 0); // normalize to local noon to avoid timezone shifting
-                    setFormData({ ...formData, due_at: d.toISOString() });
+                    const ymd = formatInTimeZone(date, TZ, 'yyyy-MM-dd');
+                    const iso = fromZonedTime(`${ymd} 12:00:00`, TZ).toISOString();
+                    setFormData({ ...formData, due_at: iso });
                   }}
                   initialFocus
                 />
