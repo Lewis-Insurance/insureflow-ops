@@ -19,7 +19,6 @@ export interface Task {
   priority: TaskPriority;
   due_at?: string;
   completed_at?: string;
-  assigned_to?: string;
   assignee_id?: string;
   assigned_by?: string;
   created_by?: string;
@@ -32,7 +31,6 @@ export interface Task {
   entity_type?: string;
   entity_id?: string;
   customer_id?: string;
-  assignee_agent_id?: string;
 }
 
 export interface TaskComment {
@@ -117,19 +115,27 @@ export function useTasks(accountId?: string) {
     try {
       const { data: user } = await supabase.auth.getUser();
       
-      const insertData: any = {
+      const insertData = {
         account_id: taskData.account_id,
         policy_id: taskData.policy_id,
         quote_id: taskData.quote_id,
         title: taskData.title || 'Untitled Task',
         description: taskData.description,
-        details: taskData.notes,
+        details: taskData.details,
+        notes: taskData.notes,
         category: taskData.category || 'general',
         status: taskData.status || 'pending',
         priority: taskData.priority || 'medium',
         due_at: taskData.due_at,
-        assignee_id: taskData.assigned_to,
+        assignee_id: taskData.assignee_id,
+        assigned_by: user.user?.id,
         created_by: user.user?.id,
+        parent_task_id: taskData.parent_task_id,
+        entity_type: taskData.entity_type,
+        entity_id: taskData.entity_id,
+        customer_id: taskData.customer_id,
+        metadata: taskData.metadata,
+        dependencies: taskData.dependencies,
       };
 
       const { data, error } = await supabase

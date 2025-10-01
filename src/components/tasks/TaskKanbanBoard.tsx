@@ -117,7 +117,7 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                           {format(new Date(task.due_at), 'MMM d')}
                         </div>
                       )}
-                      {task.assigned_to && (
+                      {task.assignee_id && (
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           Assigned

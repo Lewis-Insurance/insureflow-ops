@@ -28,7 +28,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
     priority: 'medium' as TaskPriority,
     status: 'pending' as TaskStatus,
     due_at: undefined,
-    assigned_to: undefined,
+    assignee_id: undefined,
     notes: '',
   });
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
@@ -53,7 +53,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         priority: task.priority,
         status: task.status,
         due_at: task.due_at,
-        assigned_to: task.assigned_to,
+        assignee_id: task.assignee_id,
         notes: task.notes || '',
       });
     } else {
@@ -65,7 +65,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         priority: 'medium' as TaskPriority,
         status: 'pending' as TaskStatus,
         due_at: undefined,
-        assigned_to: currentUserId || undefined,
+        assignee_id: currentUserId || undefined,
         notes: '',
       });
     }
@@ -192,12 +192,12 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
             </div>
 
             <div>
-              <Label htmlFor="assigned_to">Assigned To</Label>
+              <Label htmlFor="assignee_id">Assigned To</Label>
               <Select
-                value={formData.assigned_to || 'unassigned'}
-                onValueChange={(value) => setFormData({ ...formData, assigned_to: value === 'unassigned' ? undefined : value })}
+                value={formData.assignee_id || 'unassigned'}
+                onValueChange={(value) => setFormData({ ...formData, assignee_id: value === 'unassigned' ? undefined : value })}
               >
-                <SelectTrigger id="assigned_to">
+                <SelectTrigger id="assignee_id">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
