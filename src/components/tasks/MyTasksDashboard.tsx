@@ -65,6 +65,8 @@ export function MyTasksDashboard() {
         status: t.status,
         isAssignedToMe: t.assignee_id === currentUserId
       })));
+      console.log('Completed tasks count:', tasks.filter(t => t.status === 'completed').length);
+      console.log('Completed & assigned to me:', tasks.filter(t => t.status === 'completed' && t.assignee_id === currentUserId).length);
     }
   }, [tasks, currentUserId]);
 
