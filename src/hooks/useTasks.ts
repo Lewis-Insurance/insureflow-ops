@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -64,6 +64,7 @@ export interface TaskAttachment {
 export function useTasks(accountId?: string) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
+  const lastFiltersRef = useRef<{ status?: TaskStatus; category?: TaskCategory; assignedTo?: string } | undefined>(undefined);
 
   const fetchTasks = useCallback(async (filters?: {
     status?: TaskStatus;
@@ -72,6 +73,7 @@ export function useTasks(accountId?: string) {
   }) => {
     try {
       setLoading(true);
+      lastFiltersRef.current = filters;
       let query = supabase
         .from('tasks')
         .select('*')
@@ -143,7 +145,7 @@ export function useTasks(accountId?: string) {
         description: 'Task created successfully',
       });
 
-      await fetchTasks();
+      await fetchTasks(lastFiltersRef.current);
       return data;
     } catch (error: any) {
       console.error('Error creating task:', error);
@@ -170,7 +172,7 @@ export function useTasks(accountId?: string) {
         description: 'Task updated successfully',
       });
 
-      await fetchTasks();
+      await fetchTasks(lastFiltersRef.current);
       return true;
     } catch (error: any) {
       console.error('Error updating task:', error);
@@ -197,7 +199,7 @@ export function useTasks(accountId?: string) {
         description: 'Task deleted successfully',
       });
 
-      await fetchTasks();
+      await fetchTasks(lastFiltersRef.current);
       return true;
     } catch (error: any) {
       console.error('Error deleting task:', error);

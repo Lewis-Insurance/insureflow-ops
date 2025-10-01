@@ -34,11 +34,17 @@ export function MyTasksDashboard() {
     }
   }, [currentUserId]); // Remove fetchTasks from dependencies to prevent infinite loop
 
+  const isAssignedToMe = (task: Task) => {
+    if (!currentUserId) return true;
+    return task.assignee_id === currentUserId || task.assigned_to === currentUserId;
+  };
+
   const getTodayTasks = () => {
     const now = new Date();
     const start = startOfDay(now);
     const end = endOfDay(now);
     return tasks.filter(task => {
+      if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
@@ -50,6 +56,7 @@ export function MyTasksDashboard() {
     const start = startOfDay(date);
     const end = endOfDay(date);
     return tasks.filter(task => {
+      if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
@@ -60,15 +67,27 @@ export function MyTasksDashboard() {
     const start = startOfWeek(new Date());
     const end = endOfWeek(new Date());
     return tasks.filter(task => {
+      if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
       const due = new Date(task.due_at);
       return isWithinInterval(due, { start, end });
     });
   };
 
+  const getFutureTasks = () => {
+    const tomorrowStart = startOfDay(addDays(new Date(), 1));
+    return tasks.filter(task => {
+      if (!isAssignedToMe(task)) return false;
+      if (!task.due_at || task.status === 'completed') return false;
+      const due = new Date(task.due_at);
+      return due >= tomorrowStart;
+    });
+  };
+
   const getOverdueTasks = () => {
     const todayStart = startOfDay(new Date());
     return tasks.filter(task => {
+      if (!isAssignedToMe(task)) return false;
       if (!task.due_at || task.status === 'completed') return false;
       const due = new Date(task.due_at);
       return isBefore(due, todayStart);
@@ -76,11 +95,11 @@ export function MyTasksDashboard() {
   };
 
   const getCompletedTasks = () => {
-    return tasks.filter(task => task.status === 'completed');
+    return tasks.filter(task => task.status === 'completed' && isAssignedToMe(task));
   };
 
   const getAllAssignedTasks = () => {
-    return tasks.filter(task => task.status !== 'completed');
+    return tasks.filter(task => task.status !== 'completed' && isAssignedToMe(task));
   };
 
   const getPriorityColor = (priority: string) => {
@@ -161,6 +180,7 @@ export function MyTasksDashboard() {
   const todayTasks = getTodayTasks();
   const tomorrowTasks = getTomorrowTasks();
   const weekTasks = getThisWeekTasks();
+  const futureTasks = getFutureTasks();
   const overdueTasks = getOverdueTasks();
   const completedTasks = getCompletedTasks();
   const allTasks = getAllAssignedTasks();
@@ -225,6 +245,7 @@ export function MyTasksDashboard() {
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="tomorrow">Tomorrow</TabsTrigger>
           <TabsTrigger value="week">This Week</TabsTrigger>
+          <TabsTrigger value="future">Future</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
@@ -274,6 +295,18 @@ export function MyTasksDashboard() {
             </Card>
           ) : (
             weekTasks.map(renderTaskCard)
+          )}
+        </TabsContent>
+
+        <TabsContent value="future" className="space-y-3">
+          {futureTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                No future tasks
+              </CardContent>
+            </Card>
+          ) : (
+            futureTasks.map(renderTaskCard)
           )}
         </TabsContent>
 
