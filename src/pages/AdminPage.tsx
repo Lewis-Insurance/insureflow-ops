@@ -11,6 +11,7 @@ import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
 import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
+import { UserManagement } from '@/components/admin/UserManagement';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
@@ -49,8 +50,12 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="carriers" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="carriers" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Carriers
@@ -72,6 +77,10 @@ export default function AdminPage() {
               System
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="users" className="space-y-6">
+            <UserManagement />
+          </TabsContent>
 
           <TabsContent value="carriers" className="space-y-6">
             <CarrierManagementTab />
