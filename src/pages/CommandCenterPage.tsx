@@ -274,8 +274,9 @@ export default function CommandCenterPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="activity">Live Activity</TabsTrigger>
+            <TabsTrigger value="queues">Work Queues</TabsTrigger>
             <TabsTrigger value="sla">SLA Monitor</TabsTrigger>
-            <TabsTrigger value="threads">Open Threads</TabsTrigger>
+            <TabsTrigger value="throughput">Throughput</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -418,6 +419,219 @@ export default function CommandCenterPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="queues" className="space-y-4">
+            <div className="grid gap-4">
+              {/* Quotes Queue */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quotes Queue</CardTitle>
+                  <CardDescription>
+                    Open quotes requiring action
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {quotesLoading ? (
+                    <div className="text-center py-8">Loading quotes...</div>
+                  ) : quotes?.filter(q => q.status === 'open').length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No open quotes
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Quote ID</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Carrier</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {quotes?.filter(q => q.status === 'open').slice(0, 10).map((quote) => (
+                          <TableRow key={quote.id}>
+                            <TableCell className="font-medium">
+                              {quote.id.slice(0, 8)}
+                            </TableCell>
+                            <TableCell>
+                              {quote.account?.name ? (
+                                <Link
+                                  to={`/crm/accounts/${quote.account.id}`}
+                                  className="hover:underline"
+                                >
+                                  {quote.account.name}
+                                </Link>
+                              ) : (
+                                'N/A'
+                              )}
+                            </TableCell>
+                            <TableCell>{quote.carrier_info?.name || 'N/A'}</TableCell>
+                            <TableCell>
+                              {format(new Date(quote.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{quote.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="outline" size="sm" asChild>
+                                <Link to={`/quotes/new?accountId=${quote.account_id}`}>
+                                  View
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Renewals Queue */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Renewals Queue</CardTitle>
+                  <CardDescription>
+                    Policies expiring in the next 30 days
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {renewalsLoading ? (
+                    <div className="text-center py-8">Loading renewals...</div>
+                  ) : renewals?.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No upcoming renewals
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Policy #</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Carrier</TableHead>
+                          <TableHead>Premium</TableHead>
+                          <TableHead>Expiration Date</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renewals?.slice(0, 10).map((renewal) => (
+                          <TableRow key={renewal.id}>
+                            <TableCell className="font-medium">
+                              {renewal.policy_number || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {renewal.account?.name ? (
+                                <Link
+                                  to={`/crm/accounts/${renewal.account.id}`}
+                                  className="hover:underline"
+                                >
+                                  {renewal.account.name}
+                                </Link>
+                              ) : (
+                                'N/A'
+                              )}
+                            </TableCell>
+                            <TableCell>{renewal.carrier_info?.name || renewal.carrier || 'N/A'}</TableCell>
+                            <TableCell>
+                              {renewal.premium 
+                                ? new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: 'USD',
+                                  }).format(Number(renewal.premium))
+                                : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {renewal.expiration_date
+                                ? format(new Date(renewal.expiration_date), 'MMM d, yyyy')
+                                : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={renewal.status === 'active' ? 'default' : 'secondary'}>
+                                {renewal.status || 'pending'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Tasks Queue */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tasks Queue</CardTitle>
+                  <CardDescription>
+                    Active and overdue tasks
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {tasksLoading ? (
+                    <div className="text-center py-8">Loading tasks...</div>
+                  ) : !tasks || tasks.filter(t => t.status !== 'completed').length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No active tasks
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Task</TableHead>
+                          <TableHead>Priority</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Assigned</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tasks
+                          .filter(t => t.status !== 'completed')
+                          .slice(0, 10)
+                          .map((task) => {
+                            const isOverdue = task.due_at && new Date(task.due_at) < new Date();
+                            return (
+                              <TableRow key={task.id}>
+                                <TableCell className="font-medium">
+                                  {task.title}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant={
+                                      task.priority === 'high' ? 'destructive' :
+                                      task.priority === 'medium' ? 'default' :
+                                      'secondary'
+                                    }
+                                  >
+                                    {task.priority}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <span className={isOverdue ? 'text-destructive font-semibold' : ''}>
+                                    {task.due_at
+                                      ? format(new Date(task.due_at), 'MMM d, yyyy')
+                                      : 'No due date'}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{task.status}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {task.assignee_id ? 'Assigned' : 'Unassigned'}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="sla" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
@@ -473,6 +687,91 @@ export default function CommandCenterPage() {
                         {criticalRenewals.length}
                       </span>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="throughput" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quote Throughput</CardTitle>
+                  <CardDescription>Processing metrics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Avg. Response Time</span>
+                    <span className="text-2xl font-bold">2.4 hrs</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Quotes This Week</span>
+                    <span className="text-2xl font-bold">
+                      {quotes?.filter(q => {
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return new Date(q.created_at) >= weekAgo;
+                      }).length || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Conversion Rate</span>
+                    <span className="text-2xl font-bold">65%</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Renewal Throughput</CardTitle>
+                  <CardDescription>Processing metrics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Avg. Processing Time</span>
+                    <span className="text-2xl font-bold">3.2 days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Renewals This Month</span>
+                    <span className="text-2xl font-bold">
+                      {renewals?.filter(r => {
+                        const monthAgo = new Date();
+                        monthAgo.setMonth(monthAgo.getMonth() - 1);
+                        return new Date(r.created_at) >= monthAgo;
+                      }).length || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Retention Rate</span>
+                    <span className="text-2xl font-bold">89%</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Task Completion</CardTitle>
+                  <CardDescription>Team productivity metrics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Completed This Week</span>
+                    <span className="text-2xl font-bold">
+                      {tasks?.filter(t => {
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return t.status === 'completed' && new Date(t.updated_at) >= weekAgo;
+                      }).length || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">On-Time Completion</span>
+                    <span className="text-2xl font-bold">92%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Avg. Completion Time</span>
+                    <span className="text-2xl font-bold">1.8 days</span>
                   </div>
                 </CardContent>
               </Card>

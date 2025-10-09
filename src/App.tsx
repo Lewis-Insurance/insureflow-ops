@@ -28,7 +28,6 @@ const TaskTemplatesPage = React.lazy(() => import("./pages/TaskTemplatesPage"));
 const AdminPage = React.lazy(() => import("./pages/AdminPage"));
 const TelephonyDashboard = React.lazy(() => import("./pages/TelephonyDashboard"));
 const ReportsPage = React.lazy(() => import("./pages/ReportsPage"));
-const OperationsPage = React.lazy(() => import("./pages/OperationsPage"));
 const CommandCenterPage = React.lazy(() => import("./pages/CommandCenterPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
@@ -200,14 +199,6 @@ const App = () => (
                 } 
               />
               <Route 
-                path="/operations" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <OperationsPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
                 path="/command-center" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
@@ -215,6 +206,8 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
+              {/* Redirect old /operations route to Command Center */}
+              <Route path="/operations" element={<CommandCenterPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
