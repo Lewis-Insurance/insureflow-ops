@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, ClipboardList } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
@@ -82,6 +82,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 icon={CheckSquare} 
                 label="Tasks" 
                 to="/tasks" 
+              />
+              <NavItem 
+                icon={ClipboardList} 
+                label="Operations" 
+                to="/operations" 
               />
               <NavItem 
                 icon={BarChart3} 
