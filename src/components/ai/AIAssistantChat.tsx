@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, Loader2, FileText, CheckCircle2 } from 'lucide-react';
+import { Send, Paperclip, X, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,8 @@ interface DocumentInfo {
   content?: string;
 }
 
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
 export function AIAssistantChat() {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
@@ -35,21 +36,30 @@ export function AIAssistantChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
+  // Cleanup on unmount
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    return () => abortRef.current?.abort();
+  }, []);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    // For now, return file metadata. In production, you'd use libraries like pdf.js, mammoth, etc.
+    // For now, return file metadata. In production, use pdf.js, mammoth, etc.
     return `[File: ${file.name}, Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)}KB]`;
   };
 
   const handleSend = async () => {
     if (!input.trim() && attachedDocs.length === 0) return;
+    if (isLoading) return;
 
     const userMessage: Message = {
       role: 'user',
@@ -65,6 +75,11 @@ export function AIAssistantChat() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+
+    // Abort any existing request
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
 
     try {
       // Extract document content
@@ -98,11 +113,19 @@ export function AIAssistantChat() {
         }
       });
 
+      // Check if aborted
+      if (signal.aborted) return;
+
       if (error) throw error;
+
+      // Guard against malformed response
+      const responseText = typeof data?.response === 'string' 
+        ? data.response 
+        : 'I analyzed your request, but the response format was unexpected.';
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.response,
+        content: responseText,
         timestamp: new Date()
       };
 
@@ -110,6 +133,9 @@ export function AIAssistantChat() {
       setAttachedDocs([]);
 
     } catch (error) {
+      // Ignore abort errors
+      if ((error as any).name === 'AbortError') return;
+
       console.error('AI Assistant Error:', error);
       toast({
         title: 'Error',
@@ -123,14 +149,17 @@ export function AIAssistantChat() {
         timestamp: new Date()
       }]);
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
     const validFiles = files.filter(file => {
-      const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
         toast({
           title: 'File too large',
@@ -142,7 +171,15 @@ export function AIAssistantChat() {
       return true;
     });
 
-    setAttachedDocs(prev => [...prev, ...validFiles]);
+    // Deduplicate by name + size
+    setAttachedDocs(prev => {
+      const map = new Map(prev.map(f => [f.name + f.size, f]));
+      for (const f of validFiles) {
+        map.set(f.name + f.size, f);
+      }
+      return Array.from(map.values());
+    });
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -154,7 +191,7 @@ export function AIAssistantChat() {
 
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="flex-1 p-4 overflow-y-auto" ref={scrollerRef}>
         <div className="space-y-4">
           {messages.map((message, idx) => (
             <div
@@ -173,12 +210,13 @@ export function AIAssistantChat() {
                       <div key={docIdx} className="flex items-center gap-2 text-xs opacity-80">
                         <FileText className="h-3 w-3" />
                         <span>{doc.name}</span>
+                        <span className="opacity-70">({(doc.size / 1024 / 1024).toFixed(1)} MB)</span>
                       </div>
                     ))}
                   </div>
                 )}
                 <div className="text-xs opacity-60 mt-2">
-                  {message.timestamp.toLocaleTimeString()}
+                  {timeFmt.format(message.timestamp)}
                 </div>
               </Card>
             </div>
@@ -194,7 +232,7 @@ export function AIAssistantChat() {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Attached Documents */}
       {attachedDocs.length > 0 && (
@@ -204,9 +242,12 @@ export function AIAssistantChat() {
               <Badge key={idx} variant="secondary" className="gap-2">
                 <FileText className="h-3 w-3" />
                 <span className="text-xs">{file.name}</span>
+                <span className="text-xs opacity-70">({(file.size / 1024 / 1024).toFixed(1)} MB)</span>
                 <button
+                  type="button"
                   onClick={() => removeAttachment(idx)}
                   className="ml-1 hover:text-destructive"
+                  aria-label={`Remove ${file.name}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -232,6 +273,7 @@ export function AIAssistantChat() {
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
+            aria-label="Attach files"
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -245,6 +287,11 @@ export function AIAssistantChat() {
                 e.preventDefault();
                 handleSend();
               }
+              // Allow Ctrl/Cmd+Enter as alternative
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSend();
+              }
             }}
             disabled={isLoading}
           />
@@ -252,6 +299,7 @@ export function AIAssistantChat() {
             onClick={handleSend}
             disabled={isLoading || (!input.trim() && attachedDocs.length === 0)}
             size="icon"
+            aria-label="Send message"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -261,7 +309,7 @@ export function AIAssistantChat() {
           </Button>
         </div>
         <div className="mt-2 text-xs text-muted-foreground">
-          Tip: Upload multiple documents to compare quotes • Shift+Enter for new line
+          Tip: Upload multiple documents to compare quotes • Shift+Enter or Ctrl+Enter for new line
         </div>
       </div>
     </div>
