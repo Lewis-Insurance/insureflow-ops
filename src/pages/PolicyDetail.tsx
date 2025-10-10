@@ -13,6 +13,7 @@ import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
+import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -293,6 +294,13 @@ export default function PolicyDetail() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                {policy.account && (
+                  <DocumentAnalysisButton
+                    accountId={policy.account.id}
+                    variant="outline"
+                    size="default"
+                  />
+                )}
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"

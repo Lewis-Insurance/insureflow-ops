@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDocumentManager, DocumentRecord } from '@/hooks/useDocumentManager';
 import { PermissionGuard } from '@/components/common/PermissionGuard';
 import { formatBytes } from '@/lib/utils';
+import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 
 interface DocumentManagerProps {
   accountId: string;
@@ -76,30 +77,39 @@ export function DocumentManager({ accountId, className = "" }: DocumentManagerPr
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Documents</CardTitle>
-          <PermissionGuard permission="canManageDocuments">
-            <div className="flex items-center space-x-2">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_CATEGORIES.map(category => (
-                    <SelectItem key={category.value} value={category.value}>
-                      {category.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
+          <div className="flex items-center gap-2">
+            {documents.length > 0 && (
+              <DocumentAnalysisButton
+                accountId={accountId}
+                variant="outline"
                 size="sm"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploading ? 'Uploading...' : 'Upload'}
-              </Button>
-            </div>
-          </PermissionGuard>
+              />
+            )}
+            <PermissionGuard permission="canManageDocuments">
+              <div className="flex items-center space-x-2">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_CATEGORIES.map(category => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </Button>
+              </div>
+            </PermissionGuard>
+          </div>
         </div>
       </CardHeader>
 
@@ -157,6 +167,13 @@ export function DocumentManager({ accountId, className = "" }: DocumentManagerPr
                   <Badge variant={getCategoryBadgeVariant(doc.category)}>
                     {DOCUMENT_CATEGORIES.find(c => c.value === doc.category)?.label || doc.category}
                   </Badge>
+                  
+                  <DocumentAnalysisButton
+                    documentId={doc.id}
+                    documentName={doc.name}
+                    variant="ghost"
+                    size="sm"
+                  />
                   
                   <PermissionGuard permission="canManageDocuments">
                     <Button
