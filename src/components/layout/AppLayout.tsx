@@ -5,10 +5,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
+import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
+import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
+import { useAIAssistant } from '@/hooks/useAIAssistant';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -16,6 +19,13 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, profile, signOut } = useAuth();
+  const { 
+    isModalOpen, 
+    toggleModal, 
+    isSidebarOpen, 
+    openSidebar, 
+    closeSidebar 
+  } = useAIAssistant();
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -180,7 +190,18 @@ export function AppLayout({ children }: AppLayoutProps) {
           <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-14 items-center justify-between px-4">
               <SidebarTrigger />
-              <NotificationCenter />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openSidebar}
+                  className="gap-2"
+                >
+                  <Bot className="h-4 w-4" />
+                  <span className="hidden sm:inline">AI Assistant</span>
+                </Button>
+                <NotificationCenter />
+              </div>
             </div>
           </header>
           <main className="flex-1 overflow-auto">
@@ -188,6 +209,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           </main>
         </div>
       </div>
+
+      {/* AI Assistant Modal */}
+      <AIAssistantModal open={isModalOpen} onOpenChange={toggleModal} />
+      
+      {/* AI Assistant Sidebar */}
+      <AIAssistantSidebar open={isSidebarOpen} onOpenChange={closeSidebar} />
     </SidebarProvider>
   );
 }

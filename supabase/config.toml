@@ -58,3 +58,6 @@ verify_jwt = false
 
 [functions.twilio-recording-webhook]
 verify_jwt = false
+
+[functions.ai-document-analysis]
+verify_jwt = true
