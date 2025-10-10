@@ -32,6 +32,7 @@ const CommandCenterPage = React.lazy(() => import("./pages/CommandCenterPage"));
 const ExecutivePage = React.lazy(() => import("./pages/ExecutivePage"));
 const AnalyticsPage = React.lazy(() => import("./pages/AnalyticsPage"));
 const CarriersPage = React.lazy(() => import("./pages/CarriersPage"));
+const CustomerSuccessPage = React.lazy(() => import("./pages/CustomerSuccessPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -230,6 +231,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CarriersPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/customer-success"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CustomerSuccessPage />
                   </ErrorBoundary>
                 }
               />
