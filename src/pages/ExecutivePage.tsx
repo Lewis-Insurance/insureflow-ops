@@ -23,12 +23,16 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+type MetricUnit = 'currency' | 'number' | 'percentage';
+
+type MetricTrend = 'up' | 'down' | 'neutral';
+
 interface Metric {
   name: string;
   actual: number;
   target: number;
-  unit: 'currency' | 'number' | 'percentage';
-  trend: 'up' | 'down' | 'neutral';
+  unit: MetricUnit;
+  trend: MetricTrend;
   trendValue: number;
 }
 
@@ -39,6 +43,14 @@ interface Initiative {
   status: 'on-track' | 'at-risk' | 'behind';
   progress: number;
   dueDate: Date;
+}
+
+interface RiskItem {
+  id: string;
+  title: string;
+  severity: 'high' | 'medium' | 'low';
+  impact: string;
+  mitigation: string;
 }
 
 export default function ExecutivePage() {
@@ -132,7 +144,7 @@ export default function ExecutivePage() {
   ];
 
   // Risk items
-  const risks = [
+  const risks: RiskItem[] = [
     {
       id: '1',
       title: 'Carrier Capacity Constraints',
@@ -156,7 +168,7 @@ export default function ExecutivePage() {
     },
   ];
 
-  const formatValue = (value: number, unit: Metric['unit']) => {
+  const formatValue = (value: number, unit: MetricUnit) => {
     switch (unit) {
       case 'currency':
         return new Intl.NumberFormat('en-US', {
