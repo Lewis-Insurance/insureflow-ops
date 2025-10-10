@@ -98,6 +98,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 label="Analytics"
                 to="/analytics"
               />
+              <NavItem
+                icon={Building2}
+                label="Carriers"
+                to="/carriers"
+              />
               <NavItem 
                 icon={BarChart3} 
                 label="Reports" 
