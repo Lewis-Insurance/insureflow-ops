@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
@@ -117,6 +117,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 icon={DollarSign}
                 label="Financial"
                 to="/financial"
+              />
+              <NavItem
+                icon={Brain}
+                label="AI Insights"
+                to="/ai-insights"
               />
               <NavItem 
                 icon={BarChart3} 
