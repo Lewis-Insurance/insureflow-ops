@@ -36,20 +36,149 @@ export default function AnalyticsPage() {
     });
   }, [policies, timeRange]);
 
-  // Cohort analysis data (mock for demonstration)
+  // Calculate real cohort retention data from policies
   const cohortData = useMemo(() => {
-    const cohorts = ['Jan 2024', 'Feb 2024', 'Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024'];
-    return cohorts.map((cohort, idx) => ({
-      cohort,
-      month0: 100,
-      month1: 100 - (idx * 2 + 5),
-      month2: 100 - (idx * 2 + 12),
-      month3: 100 - (idx * 2 + 18),
-      month4: 100 - (idx * 2 + 23),
-      month5: 100 - (idx * 2 + 27),
-      month6: 100 - (idx * 2 + 30),
-    }));
-  }, []);
+    if (!policies || policies.length === 0) return [];
+
+    const months = 6;
+    const endDate = new Date();
+    const startDate = subMonths(endDate, months);
+    const monthsArray = eachMonthOfInterval({ start: startDate, end: endDate });
+
+    return monthsArray.map(cohortMonth => {
+      // Get accounts created in this cohort month
+      const cohortAccounts = new Set(
+        policies
+          .filter(p => {
+            const policyDate = new Date(p.created_at);
+            return policyDate >= startOfMonth(cohortMonth) && policyDate <= endOfMonth(cohortMonth);
+          })
+          .map(p => p.account_id)
+      );
+
+      const cohortSize = cohortAccounts.size;
+      if (cohortSize === 0) return null;
+
+      // Calculate retention for each subsequent month
+      const retention: Record<string, number> = { month0: 100 };
+      
+      for (let i = 1; i <= 6; i++) {
+        const checkMonth = new Date(cohortMonth);
+        checkMonth.setMonth(checkMonth.getMonth() + i);
+        
+        // Count how many accounts from this cohort still have active policies in the check month
+        const activeAccounts = new Set(
+          policies
+            .filter(p => {
+              if (!cohortAccounts.has(p.account_id)) return false;
+              const effectiveDate = p.effective_date ? new Date(p.effective_date) : null;
+              const expirationDate = p.expiration_date ? new Date(p.expiration_date) : null;
+              
+              return effectiveDate && expirationDate &&
+                     effectiveDate <= checkMonth &&
+                     expirationDate >= checkMonth &&
+                     (p.status === 'active' || p.status === 'pending');
+            })
+            .map(p => p.account_id)
+        );
+
+        retention[`month${i}`] = cohortSize > 0 ? Math.round((activeAccounts.size / cohortSize) * 100) : 0;
+      }
+
+      return {
+        cohort: format(cohortMonth, 'MMM yyyy'),
+        ...retention,
+      };
+    }).filter(Boolean);
+  }, [policies]);
+
+  // Calculate real customer retention rate
+  const customerRetention = useMemo(() => {
+    if (!policies || policies.length === 0) return 0;
+
+    const threeMonthsAgo = subMonths(new Date(), 3);
+    const oldAccounts = new Set(
+      policies
+        .filter(p => new Date(p.created_at) <= threeMonthsAgo)
+        .map(p => p.account_id)
+    );
+
+    if (oldAccounts.size === 0) return 0;
+
+    const activeAccounts = new Set(
+      policies
+        .filter(p => {
+          if (!oldAccounts.has(p.account_id)) return false;
+          const expDate = p.expiration_date ? new Date(p.expiration_date) : null;
+          return expDate && expDate >= new Date() && (p.status === 'active' || p.status === 'pending');
+        })
+        .map(p => p.account_id)
+    );
+
+    return Math.round((activeAccounts.size / oldAccounts.size) * 100);
+  }, [policies]);
+
+  // Calculate real customer segments by policy value
+  const customerSegments = useMemo(() => {
+    if (!policies || policies.length === 0) return [];
+
+    const accountValues: Record<string, { count: number; revenue: number }> = {};
+    
+    policies.forEach(p => {
+      const accountId = p.account_id;
+      if (!accountValues[accountId]) {
+        accountValues[accountId] = { count: 0, revenue: 0 };
+      }
+      accountValues[accountId].count++;
+      accountValues[accountId].revenue += Number(p.premium) || 0;
+    });
+
+    const segments = { high: 0, medium: 0, low: 0, highRev: 0, mediumRev: 0, lowRev: 0 };
+    
+    Object.values(accountValues).forEach(({ count, revenue }) => {
+      if (revenue >= 5000) {
+        segments.high++;
+        segments.highRev += revenue;
+      } else if (revenue >= 2000) {
+        segments.medium++;
+        segments.mediumRev += revenue;
+      } else {
+        segments.low++;
+        segments.lowRev += revenue;
+      }
+    });
+
+    return [
+      { segment: 'High Value (>$5K)', count: segments.high, revenue: Math.round(segments.highRev) },
+      { segment: 'Medium Value ($2-5K)', count: segments.medium, revenue: Math.round(segments.mediumRev) },
+      { segment: 'Low Value (<$2K)', count: segments.low, revenue: Math.round(segments.lowRev) },
+    ];
+  }, [policies]);
+
+  // Calculate real line of business distribution
+  const lobDistribution = useMemo(() => {
+    if (!policies || policies.length === 0) return [];
+
+    const lobMap: Record<string, { policies: number; premium: number }> = {};
+    
+    policies.forEach(p => {
+      const lob = p.line_of_business || 'Other';
+      if (!lobMap[lob]) {
+        lobMap[lob] = { policies: 0, premium: 0 };
+      }
+      lobMap[lob].policies++;
+      lobMap[lob].premium += Number(p.premium) || 0;
+    });
+
+    return Object.entries(lobMap)
+      .map(([lob, data]) => ({
+        lob,
+        policies: data.policies,
+        premium: Math.round(data.premium),
+      }))
+      .sort((a, b) => b.premium - a.premium)
+      .slice(0, 8); // Top 8 LOBs
+  }, [policies]);
 
   // Forecasting data
   const forecastData = useMemo(() => {
@@ -115,8 +244,8 @@ export default function AnalyticsPage() {
       },
       {
         label: 'Customer Retention',
-        value: '87%',
-        change: 2.3,
+        value: `${customerRetention}%`,
+        change: 0, // No historical comparison available
         icon: Users,
       },
     ];
@@ -302,30 +431,38 @@ export default function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {cohortData.map((cohort) => (
-                      <tr key={cohort.cohort} className="border-b">
-                        <td className="p-2 font-medium">{cohort.cohort}</td>
-                        <td className="text-center p-2 bg-primary/20">{cohort.month0}%</td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month1 / 100 * 0.3})` }}>
-                          {cohort.month1}%
-                        </td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month2 / 100 * 0.3})` }}>
-                          {cohort.month2}%
-                        </td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month3 / 100 * 0.3})` }}>
-                          {cohort.month3}%
-                        </td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month4 / 100 * 0.3})` }}>
-                          {cohort.month4}%
-                        </td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month5 / 100 * 0.3})` }}>
-                          {cohort.month5}%
-                        </td>
-                        <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${cohort.month6 / 100 * 0.3})` }}>
-                          {cohort.month6}%
+                    {cohortData.length > 0 ? (
+                      cohortData.map((cohort: any) => (
+                        <tr key={cohort.cohort} className="border-b">
+                          <td className="p-2 font-medium">{cohort.cohort}</td>
+                          <td className="text-center p-2 bg-primary/20">{cohort.month0}%</td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month1 || 0) / 100 * 0.3})` }}>
+                            {cohort.month1 || 0}%
+                          </td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month2 || 0) / 100 * 0.3})` }}>
+                            {cohort.month2 || 0}%
+                          </td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month3 || 0) / 100 * 0.3})` }}>
+                            {cohort.month3 || 0}%
+                          </td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month4 || 0) / 100 * 0.3})` }}>
+                            {cohort.month4 || 0}%
+                          </td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month5 || 0) / 100 * 0.3})` }}>
+                            {cohort.month5 || 0}%
+                          </td>
+                          <td className="text-center p-2" style={{ backgroundColor: `hsl(var(--primary) / ${(cohort.month6 || 0) / 100 * 0.3})` }}>
+                            {cohort.month6 || 0}%
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-muted-foreground">
+                          No cohort data available - need more historical policy data
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -467,13 +604,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={[
-                      { segment: 'High Value', count: 45, revenue: 450000 },
-                      { segment: 'Medium Value', count: 120, revenue: 360000 },
-                      { segment: 'Low Value', count: 235, revenue: 235000 },
-                    ]}
-                  >
+                  <BarChart data={customerSegments}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="segment" />
                     <YAxis />
@@ -493,14 +624,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={[
-                      { lob: 'Auto', policies: 180, premium: 540000 },
-                      { lob: 'Home', policies: 150, premium: 450000 },
-                      { lob: 'Life', policies: 90, premium: 270000 },
-                      { lob: 'Commercial', policies: 60, premium: 360000 },
-                    ]}
-                  >
+                  <BarChart data={lobDistribution}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="lob" />
                     <YAxis />
