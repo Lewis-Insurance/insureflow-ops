@@ -100,13 +100,16 @@ export function AIAssistantChat() {
         action = 'analyze_policy';
       }
 
+      // Build conversation history including the latest user message
+      const recentMessages = [...messages, userMessage].slice(-10);
+
       // Call AI edge function
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
           action,
           documents: documentsWithContent,
-          message: input,
-          conversationHistory: messages.slice(-10).map(m => ({
+          message: userMessage.content,
+          conversationHistory: recentMessages.map(m => ({
             role: m.role,
             content: m.content
           }))
