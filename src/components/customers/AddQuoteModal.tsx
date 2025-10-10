@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateTasks } from '@/lib/taskAutomation';
 import { z } from 'zod';
+import { AIQuoteAssistant, type QuoteSuggestion } from '@/components/quotes/AIQuoteAssistant';
 
 const quoteSchema = z.object({
   quote_number: z.string().min(1, 'Quote number is required').max(50, 'Quote number too long'),
@@ -148,6 +149,16 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
     }
   };
 
+  const handleAISuggestion = (suggestion: QuoteSuggestion) => {
+    setFormData(prev => ({
+      ...prev,
+      ...(suggestion.carrier && { carrier: suggestion.carrier }),
+      ...(suggestion.line_of_business && { line_of_business: suggestion.line_of_business }),
+      ...(suggestion.premium && { premium: suggestion.premium }),
+      ...(suggestion.notes && { notes: prev.notes ? `${prev.notes}\n\nAI Insights:\n${suggestion.notes}` : `AI Insights:\n${suggestion.notes}` }),
+    }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -155,6 +166,7 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
           <DialogTitle>Add New Quote</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <AIQuoteAssistant accountId={accountId} onSuggestion={handleAISuggestion} />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="quote_number">Quote Number *</Label>
