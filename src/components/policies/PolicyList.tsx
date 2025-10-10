@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { 
   FileText, 
@@ -73,6 +74,8 @@ function isExpiringSoon(expirationDate: string): boolean {
 }
 
 export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProps) {
+  const navigate = useNavigate();
+  
   if (loading) {
     return (
       <Card>
@@ -157,7 +160,17 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
 
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="font-medium">{policy.carrier}</div>
+                      {policy.carrier_info?.id ? (
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto font-medium"
+                          onClick={() => navigate(`/carriers?carrier=${policy.carrier_info!.id}`)}
+                        >
+                          {policy.carrier}
+                        </Button>
+                      ) : (
+                        <div className="font-medium">{policy.carrier}</div>
+                      )}
                       {policy.carrier_info?.name && policy.carrier_info.name !== policy.carrier && (
                         <div className="text-sm text-muted-foreground">
                           {policy.carrier_info.name}

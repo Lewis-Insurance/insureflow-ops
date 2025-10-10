@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, Building2, Phone, Mail, AlertTriangle, Clock, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,8 @@ interface RenewalsListProps {
 }
 
 export function RenewalsList({ policies, type, loading, onPolicySelect }: RenewalsListProps) {
+  const navigate = useNavigate();
+  
   const getDaysUntilExpiration = (expirationDate: string) => {
     const today = new Date();
     const expDate = new Date(expirationDate);
@@ -133,9 +136,13 @@ export function RenewalsList({ policies, type, loading, onPolicySelect }: Renewa
                 <div className="text-sm text-muted-foreground space-y-1">
                   <div className="flex items-center gap-2">
                     <span>Carrier:</span>
-                    <span className="font-medium">
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto font-medium text-sm"
+                      onClick={() => navigate(`/carriers?carrier=${policy.carrier_info?.id || ''}`)}
+                    >
                       {policy.carrier_info?.name || policy.carrier || 'Unknown'}
-                    </span>
+                    </Button>
                   </div>
                   <div className="flex items-center gap-2">
                     <span>Line:</span>

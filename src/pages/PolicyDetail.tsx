@@ -171,7 +171,17 @@ export default function PolicyDetail() {
                   <label className="text-sm font-medium text-muted-foreground">Carrier</label>
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4" />
-                    <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
+                    {policy.carrier_info?.id ? (
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto font-normal"
+                        onClick={() => navigate(`/carriers?carrier=${policy.carrier_info!.id}`)}
+                      >
+                        {policy.carrier || policy.carrier_info.name}
+                      </Button>
+                    ) : (
+                      <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
+                    )}
                   </div>
                 </div>
                 <div>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -62,6 +63,9 @@ const initialFormData: CarrierFormData = {
 };
 
 export default function CarriersPage() {
+  const [searchParams] = useSearchParams();
+  const highlightCarrierId = searchParams.get('carrier');
+  
   const [editingCarrier, setEditingCarrier] = useState<Carrier | null>(null);
   const [formData, setFormData] = useState<CarrierFormData>(initialFormData);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -79,6 +83,18 @@ export default function CarriersPage() {
       return data as Carrier[];
     }
   });
+
+  // Scroll to highlighted carrier
+  useEffect(() => {
+    if (highlightCarrierId && carriers) {
+      const element = document.getElementById(`carrier-${highlightCarrierId}`);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+    }
+  }, [highlightCarrierId, carriers]);
 
   const createCarrierMutation = useMutation({
     mutationFn: async (data: CarrierFormData) => {
@@ -228,7 +244,11 @@ export default function CarriersPage() {
                   </TableHeader>
                   <TableBody>
                     {carriers.map((carrier) => (
-                      <TableRow key={carrier.id}>
+                      <TableRow 
+                        key={carrier.id}
+                        id={`carrier-${carrier.id}`}
+                        className={highlightCarrierId === carrier.id ? 'bg-accent' : ''}
+                      >
                         <TableCell className="font-medium">{carrier.name}</TableCell>
                         <TableCell>{carrier.naic || 'N/A'}</TableCell>
                         <TableCell>{carrier.agency_code || 'N/A'}</TableCell>
