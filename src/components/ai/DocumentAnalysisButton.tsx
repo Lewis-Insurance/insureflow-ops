@@ -1,15 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
 
 interface DocumentAnalysisButtonProps {
@@ -18,6 +12,8 @@ interface DocumentAnalysisButtonProps {
   accountId?: string;
   variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
+  maxDocs?: number;
+  promptOverride?: string;
 }
 
 export function DocumentAnalysisButton({
@@ -26,105 +22,109 @@ export function DocumentAnalysisButton({
   accountId,
   variant = 'outline',
   size = 'sm',
+  maxDocs = 5,
+  promptOverride,
 }: DocumentAnalysisButtonProps) {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const analyzeDocument = async () => {
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const safeLocalDate = (d?: string | null) => {
+    const t = d ? new Date(d) : null;
+    return t && !isNaN(+t) ? t.toLocaleDateString() : '—';
+  };
+
+  const analyzeDocument = useCallback(async () => {
     if (!documentId && !accountId) {
-      toast({
-        title: 'Error',
-        description: 'No document or account specified',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'No document or account specified', variant: 'destructive' });
       return;
     }
 
     setIsAnalyzing(true);
     setIsDialogOpen(true);
+    setAnalysisResult(null);
+
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const { signal } = abortRef.current;
 
     try {
-      // Fetch document(s) from database
       let documentsToAnalyze: any[] = [];
 
       if (documentId) {
-        // Analyze single document
         const { data: doc, error: docError } = await supabase
           .from('documents')
-          .select('*')
+          .select('id, filename, name, size_bytes, mime_type, category, uploaded_at, created_at')
           .eq('id', documentId)
           .single();
-
         if (docError) throw docError;
-        documentsToAnalyze = [doc];
+        documentsToAnalyze = doc ? [doc] : [];
       } else if (accountId) {
-        // Analyze all documents for account
         const { data: docs, error: docsError } = await supabase
           .from('documents')
-          .select('*')
+          .select('id, filename, name, size_bytes, mime_type, category, uploaded_at, created_at')
           .eq('account_id', accountId)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
+          .order('uploaded_at', { ascending: false })
+          .limit(maxDocs);
         if (docsError) throw docsError;
         documentsToAnalyze = docs || [];
       }
 
       if (documentsToAnalyze.length === 0) {
-        toast({
-          title: 'No documents found',
-          description: 'There are no documents to analyze.',
-        });
+        toast({ title: 'No documents found', description: 'There are no documents to analyze.' });
         setIsDialogOpen(false);
         return;
       }
 
-      // Prepare documents for AI analysis
-      const documents = documentsToAnalyze.map(doc => ({
+      const documents = documentsToAnalyze.map((doc) => ({
         name: doc.filename || doc.name || 'Untitled',
-        size: doc.size_bytes || 0,
+        size: doc.size_bytes ?? 0,
         type: doc.mime_type || 'application/octet-stream',
-        content: `Document: ${doc.filename || doc.name}\nCategory: ${doc.category || 'Unknown'}\nUploaded: ${new Date(doc.uploaded_at).toLocaleDateString()}\nStorage: ${doc.storage_bucket}/${doc.storage_path}`,
+        content: [
+          `Document: ${doc.filename || doc.name || 'Untitled'}`,
+          `Category: ${doc.category || 'Unknown'}`,
+          `Uploaded: ${safeLocalDate(doc.uploaded_at ?? doc.created_at)}`,
+        ].join('\n'),
       }));
 
-      // Call AI analysis
+      const multi = documentsToAnalyze.length > 1;
+      const message =
+        promptOverride ||
+        (multi
+          ? 'Please compare these insurance documents and highlight key differences.'
+          : 'Please analyze this insurance document and provide a comprehensive summary.');
+
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
-        body: {
-          action: documentsToAnalyze.length > 1 ? 'compare_quotes' : 'analyze_policy',
-          documents,
-          message: documentsToAnalyze.length > 1
-            ? 'Please compare these insurance documents and highlight key differences.'
-            : 'Please analyze this insurance document and provide a comprehensive summary.',
-          conversationHistory: [],
-        },
+        body: { action: multi ? 'compare_quotes' : 'analyze_policy', documents, message, conversationHistory: [] },
       });
 
+      if (signal.aborted) return;
       if (error) throw error;
 
-      const responseText = typeof data?.response === 'string'
-        ? data.response
-        : 'Analysis completed, but the response format was unexpected.';
+      const responseText =
+        typeof data?.response === 'string'
+          ? data.response
+          : 'Analysis completed, but the response format was unexpected.';
 
       setAnalysisResult(responseText);
-
-      toast({
-        title: 'Analysis Complete',
-        description: 'Document analysis has been generated.',
-      });
-    } catch (error) {
-      console.error('Document analysis error:', error);
+      toast({ title: 'Analysis Complete', description: 'Document analysis has been generated.' });
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      console.error('Document analysis error:', err);
       toast({
         title: 'Analysis Failed',
-        description: 'Failed to analyze documents. Please try again.',
+        description: err?.message || 'Failed to analyze documents. Please try again.',
         variant: 'destructive',
       });
       setIsDialogOpen(false);
     } finally {
-      setIsAnalyzing(false);
+      if (!signal.aborted) setIsAnalyzing(false);
     }
-  };
+  }, [accountId, documentId, maxDocs, promptOverride, toast]);
 
   return (
     <>
@@ -134,30 +134,23 @@ export function DocumentAnalysisButton({
         onClick={analyzeDocument}
         disabled={isAnalyzing}
         className="gap-2"
+        aria-label="AI Analyze"
       >
-        {isAnalyzing ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Brain className="h-4 w-4" />
-        )}
-        <span>AI Analyze</span>
+        {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+        {size !== 'icon' && <span>AI Analyze</span>}
       </Button>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-busy={isAnalyzing}>
           <DialogHeader>
             <DialogTitle>Document Analysis</DialogTitle>
-            <DialogDescription>
-              {documentName || 'AI-powered analysis of your documents'}
-            </DialogDescription>
+            <DialogDescription>{documentName || 'AI-powered analysis of your documents'}</DialogDescription>
           </DialogHeader>
 
           {isAnalyzing ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Analyzing documents with AI...
-              </p>
+              <p className="text-sm text-muted-foreground">Analyzing documents with AI...</p>
             </div>
           ) : analysisResult ? (
             <Card className="p-6">

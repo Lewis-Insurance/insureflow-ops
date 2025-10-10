@@ -312,7 +312,7 @@ export function AIAssistantChat() {
           </Button>
         </div>
         <div className="mt-2 text-xs text-muted-foreground">
-          Tip: Upload multiple documents to compare quotes • Shift+Enter or Ctrl+Enter for new line
+          Tip: Upload multiple documents to compare quotes • Shift+Enter for new line • Ctrl/Cmd+Enter to send
         </div>
       </div>
     </div>
