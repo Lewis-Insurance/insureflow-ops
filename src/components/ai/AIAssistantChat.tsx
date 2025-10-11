@@ -308,106 +308,29 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         ? { contextType: context.type, contextId: context.id, contextName: context.name, contextMetadata: context.metadata }
         : undefined;
 
-      // Enhance message with knowledge base context if available
-      const enhancedMessage = userMessage.content + knowledgeBaseContext;
-
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
           action,
           documents: documentsWithContent,
-          message: enhancedMessage,
+          message: userMessage.content + knowledgeBaseContext,
           conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
           context: contextPayload,
         },
-        // signal, // enable when supported by Supabase client
       });
 
       if (signal.aborted) return;
       if (error) throw error;
 
-      // Stream the response
-      const CHAT_URL = `https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/ai-document-analysis`;
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycWFqendjbWR3YWhuanlpZGd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODk5OTksImV4cCI6MjA3Mjg2NTk5OX0.Pyob4fMYhHjHhVCxhP2UdSSMAv6i9eqmLD-lxavfV5s',
-        },
-        body: JSON.stringify({
-          action,
-          documents: documentsWithContent,
-          message: enhancedMessage,
-          conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
-          context: contextPayload,
-        }),
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error('Failed to start streaming');
-      }
-
-      // Process the stream
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let fullResponse = '';
-
-      // Create placeholder assistant message
-      const assistantIndex = messages.length;
-      setMessages((prev) => [...prev, { role: 'assistant', content: '', timestamp: new Date() }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        
-        for (const line of lines) {
-          if (!line.trim() || line.startsWith(':')) continue;
-          if (!line.startsWith('data: ')) continue;
-          
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            
-            if (content) {
-              fullResponse += content;
-              // Update the assistant message in place
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[assistantIndex] = {
-                  ...updated[assistantIndex],
-                  content: fullResponse,
-                };
-                return updated;
-              });
-            }
-          } catch (e) {
-            // Ignore parse errors for incomplete JSON
-          }
-        }
-      }
+      const fullResponse = typeof data === 'string' ? data : (data?.response || data?.text || '');
 
       const assistantMessage: Message = { 
         role: 'assistant', 
         content: fullResponse + kbSourceAttribution, 
         timestamp: new Date() 
       };
-      
-      // Update final message with attribution
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[assistantIndex] = assistantMessage;
-        return updated;
-      });
-      
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
       // Save assistant message to database
       if (conversationId && fullResponse) {
         supabase.from('ai_messages').insert({
