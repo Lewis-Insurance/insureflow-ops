@@ -288,23 +288,95 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       if (signal.aborted) return;
       if (error) throw error;
 
-      const responseText = typeof data?.response === 'string'
-        ? data.response
-        : 'I analyzed your request, but the response format was unexpected.';
+      // Stream the response
+      const CHAT_URL = `https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/ai-document-analysis`;
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycWFqendjbWR3YWhuanlpZGd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyODk5OTksImV4cCI6MjA3Mjg2NTk5OX0.Pyob4fMYhHjHhVCxhP2UdSSMAv6i9eqmLD-lxavfV5s',
+        },
+        body: JSON.stringify({
+          action,
+          documents: documentsWithContent,
+          message: enhancedMessage,
+          conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+          context: contextPayload,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error('Failed to start streaming');
+      }
+
+      // Process the stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullResponse = '';
+
+      // Create placeholder assistant message
+      const assistantIndex = messages.length;
+      setMessages((prev) => [...prev, { role: 'assistant', content: '', timestamp: new Date() }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (!line.trim() || line.startsWith(':')) continue;
+          if (!line.startsWith('data: ')) continue;
+          
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            
+            if (content) {
+              fullResponse += content;
+              // Update the assistant message in place
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[assistantIndex] = {
+                  ...updated[assistantIndex],
+                  content: fullResponse,
+                };
+                return updated;
+              });
+            }
+          } catch (e) {
+            // Ignore parse errors for incomplete JSON
+          }
+        }
+      }
 
       const assistantMessage: Message = { 
         role: 'assistant', 
-        content: responseText + kbSourceAttribution, 
+        content: fullResponse + kbSourceAttribution, 
         timestamp: new Date() 
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      
+      // Update final message with attribution
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[assistantIndex] = assistantMessage;
+        return updated;
+      });
       
       // Save assistant message to database
-      if (conversationId) {
+      if (conversationId && fullResponse) {
         supabase.from('ai_messages').insert({
           conversation_id: conversationId,
           role: 'assistant',
-          content: assistantMessage.content,
+          content: fullResponse + kbSourceAttribution,
           metadata: {} as any,
         }).then(({ error }) => {
           if (error) console.error('Error saving assistant message:', error);

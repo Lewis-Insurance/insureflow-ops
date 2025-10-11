@@ -179,7 +179,7 @@ Be helpful, professional, and concise.`;
 
     console.log('Calling OpenAI with', messages.length, 'messages');
 
-    // Call OpenAI
+    // Call OpenAI with streaming
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -191,6 +191,7 @@ Be helpful, professional, and concise.`;
         messages,
         temperature: 0.7,
         max_completion_tokens: 2000,
+        stream: true, // Enable streaming
       }),
     });
 
@@ -200,22 +201,15 @@ Be helpful, professional, and concise.`;
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    console.log('AI Response generated successfully');
-
-    return new Response(
-      JSON.stringify({ 
-        response: aiResponse,
-        model: 'gpt-4o-mini',
-        tokens: data.usage 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+    // Return the streaming response directly
+    return new Response(response.body, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
 
   } catch (error) {
     console.error('Error in ai-document-analysis:', error);
