@@ -11,8 +11,7 @@ import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
-import { AIAssistantProvider } from '@/contexts/AIAssistantContext';
-import { useAIAssistant } from '@/hooks/useAIAssistant';
+import { AIAssistantProvider, useAIAssistantContext } from '@/contexts/AIAssistantContext';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -28,7 +27,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     openSidebar, 
     closeSidebar,
     context 
-  } = useAIAssistant();
+  } = useAIAssistantContext();
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
