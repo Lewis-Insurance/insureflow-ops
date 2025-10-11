@@ -26,6 +26,7 @@ const KnowledgeManager = () => {
   
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importTable, setImportTable] = useState<'kb_entries' | 'kb_sources'>('kb_entries');
   const [selectedGap, setSelectedGap] = useState<any>(null);
   const [newEntry, setNewEntry] = useState({
     title: '',
@@ -109,15 +110,20 @@ const KnowledgeManager = () => {
     }
   };
 
-  // Sample bulk import data
-  const SAMPLE_KNOWLEDGE = `title,content,category,tags,source
-"Auto Liability Coverage","Bodily injury and property damage liability protects you when you're at fault. State minimums vary but we recommend 100/300/100.","policies","auto|liability|coverage","Lewis Policy Guide"
-"Homeowners Deductible","Standard deductibles are $500, $1000, or $2500. Higher deductible = lower premium. Separate deductibles may apply for wind/hail.","policies","home|deductible","Lewis Policy Guide"
-"Filing a Claim Online","Visit lewis-insurance.com/claims, click File a Claim, enter policy number, describe incident, upload photos. Adjuster contacts within 24 hours.","procedures","claims|online|process","Claims SOP"
-"Bundle Discount Eligibility","Combine 2+ policies (auto, home, umbrella) for 25% discount. All policies must be active. Discount applies at renewal.","products","bundle|discount|savings","Product Catalog"`;
+  // Sample bulk import data for kb_entries
+  const SAMPLE_KB_ENTRIES = `question,answer_short,answer_canonical,category,tags,carrier,program,jurisdiction
+"What is comprehensive coverage?","Covers non-collision damage like theft, vandalism, weather","Comprehensive coverage protects your vehicle from non-collision incidents including:\n- Theft\n- Vandalism\n- Weather damage (hail, flood)\n- Animal strikes\n- Falling objects\n\nDeductibles typically range from $250-$1000.","coverage","auto|comprehensive|physical-damage","","Auto","All States"
+"How do I file a claim?","Call 1-800-CLAIMS or use our mobile app within 24 hours","To file a claim:\n1. Contact us at 1-800-CLAIMS or use mobile app\n2. Provide policy number and incident details\n3. Upload photos if available\n4. Adjuster will contact within 24 hours\n\nRequired information:\n- Date, time, location of incident\n- Police report number (if applicable)\n- Other party information (if applicable)","claims","process|filing|steps","","All","All States"`;
 
-  // Handle CSV import
-  const handleBulkImport = async (csvContent: string) => {
+  // Sample bulk import data for kb_sources
+  const SAMPLE_KB_SOURCES = `title,url,source_type,description,priority
+"State Farm Auto Policy Guide 2024","https://statefarm.com/policy-guide-2024.pdf","policy_document","Complete guide to auto insurance coverages and state requirements",1
+"Progressive Claims Process SOP","https://progressive.com/claims-sop","internal_doc","Step-by-step claims filing procedures for all lines of business",1
+"NAIC State Requirements Database","https://naic.org/state-requirements","external_reference","Official state-by-state insurance requirements and minimums",2
+"Carrier Rate Sheets 2024","https://agency.com/rates/2024","rate_sheet","Current rate tables for all carriers and products",1`;
+
+  // Handle CSV import for kb_entries and kb_sources
+  const handleBulkImport = async (csvContent: string, table: 'kb_entries' | 'kb_sources') => {
     try {
       const lines = csvContent.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
@@ -131,26 +137,43 @@ const KnowledgeManager = () => {
         return entry;
       });
       
-      // Process each entry
+      // Process each entry based on table type
       for (const entry of entries) {
-        const knowledgeData = {
-          title: entry.title,
-          content: entry.content,
-          category: entry.category,
-          tags: entry.tags.split('|').map((t: string) => t.trim()),
-          source: entry.source || 'Bulk Import'
-        };
+        let rowData: any;
         
-        await supabase.from('knowledge_base').insert(knowledgeData);
+        if (table === 'kb_entries') {
+          rowData = {
+            question: entry.question,
+            answer_short: entry.answer_short,
+            answer_canonical: entry.answer_canonical,
+            category: entry.category || null,
+            tags: entry.tags ? entry.tags.split('|').map((t: string) => t.trim()) : [],
+            carrier: entry.carrier || null,
+            program: entry.program || null,
+            jurisdiction: entry.jurisdiction || null,
+          };
+        } else if (table === 'kb_sources') {
+          rowData = {
+            title: entry.title,
+            url: entry.url || null,
+            source_type: entry.source_type || null,
+            description: entry.description || null,
+            priority: entry.priority ? parseInt(entry.priority) : null,
+          };
+        }
+        
+        await supabase.from(table as any).insert(rowData);
       }
       
       toast({
         title: "Success",
-        description: `Imported ${entries.length} knowledge entries`,
+        description: `Imported ${entries.length} records to ${table}`,
       });
       
-      // Generate embeddings for all
-      await updateEmbeddings();
+      // Generate embeddings if importing knowledge entries
+      if (table === 'kb_entries') {
+        await updateEmbeddings();
+      }
       
       setShowBulkImport(false);
       fetchKnowledgeBase();
@@ -451,25 +474,74 @@ const KnowledgeManager = () => {
       <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Bulk Import Knowledge</DialogTitle>
+            <DialogTitle>Bulk Import CSV</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Table Selection */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Import to Table:</label>
+              <Select value={importTable} onValueChange={(v: 'kb_entries' | 'kb_sources') => setImportTable(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kb_entries">
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-4 h-4" />
+                      <span>kb_entries (Knowledge Entries)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="kb_sources">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      <span>kb_sources (Source Documents)</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Format Info */}
             <Alert>
               <AlertDescription>
-                <p className="font-medium mb-2">CSV Format Required:</p>
-                <code className="text-xs block bg-muted p-2 rounded font-mono">
-                  title,content,category,tags,source
-                </code>
-                <p className="text-xs mt-2">Tags should be pipe-separated (|) within the tags column</p>
+                <p className="font-medium mb-2">CSV Format for {importTable}:</p>
+                {importTable === 'kb_entries' ? (
+                  <>
+                    <code className="text-xs block bg-muted p-2 rounded font-mono mb-2">
+                      question,answer_short,answer_canonical,category,tags,carrier,program,jurisdiction
+                    </code>
+                    <ul className="text-xs space-y-1 mt-2">
+                      <li>• <strong>question</strong>: The question being answered (required)</li>
+                      <li>• <strong>answer_short</strong>: Brief answer for quick display</li>
+                      <li>• <strong>answer_canonical</strong>: Full detailed answer in markdown</li>
+                      <li>• <strong>tags</strong>: Pipe-separated tags (e.g., "auto|coverage|comprehensive")</li>
+                      <li>• <strong>carrier</strong>, <strong>program</strong>, <strong>jurisdiction</strong>: Optional filters</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <code className="text-xs block bg-muted p-2 rounded font-mono mb-2">
+                      title,url,source_type,description,priority
+                    </code>
+                    <ul className="text-xs space-y-1 mt-2">
+                      <li>• <strong>title</strong>: Name of the source document (required)</li>
+                      <li>• <strong>url</strong>: Link to the document</li>
+                      <li>• <strong>source_type</strong>: Type (e.g., "policy_document", "rate_sheet")</li>
+                      <li>• <strong>description</strong>: Brief description of the source</li>
+                      <li>• <strong>priority</strong>: Priority level (1=highest)</li>
+                    </ul>
+                  </>
+                )}
               </AlertDescription>
             </Alert>
             
             <div>
               <label className="text-sm font-medium">Paste CSV Data</label>
               <Textarea
-                defaultValue={SAMPLE_KNOWLEDGE}
-                rows={15}
+                defaultValue={importTable === 'kb_entries' ? SAMPLE_KB_ENTRIES : SAMPLE_KB_SOURCES}
+                key={importTable}
+                rows={12}
                 className="font-mono text-xs"
                 id="csv-import"
               />
@@ -479,11 +551,12 @@ const KnowledgeManager = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  const blob = new Blob([SAMPLE_KNOWLEDGE], { type: 'text/csv' });
+                  const csvData = importTable === 'kb_entries' ? SAMPLE_KB_ENTRIES : SAMPLE_KB_SOURCES;
+                  const blob = new Blob([csvData], { type: 'text/csv' });
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = 'knowledge-template.csv';
+                  a.download = `${importTable}-template.csv`;
                   a.click();
                 }}
               >
@@ -497,9 +570,9 @@ const KnowledgeManager = () => {
                 </Button>
                 <Button onClick={() => {
                   const textarea = document.getElementById('csv-import') as HTMLTextAreaElement;
-                  handleBulkImport(textarea.value);
+                  handleBulkImport(textarea.value, importTable);
                 }}>
-                  Import Knowledge
+                  Import to {importTable}
                 </Button>
               </div>
             </div>
