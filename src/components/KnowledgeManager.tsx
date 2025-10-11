@@ -30,6 +30,7 @@ const KnowledgeManager = () => {
   const [selectedGap, setSelectedGap] = useState<any>(null);
   const [csvContent, setCsvContent] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newEntry, setNewEntry] = useState({
     title: '',
@@ -113,38 +114,100 @@ const KnowledgeManager = () => {
     }
   };
 
-  // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload (CSV or PDF)
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+
+    if (!isPdf && !isCsv) {
       toast({
         title: "Invalid File",
-        description: "Please upload a CSV file",
+        description: "Please upload a CSV or PDF file",
         variant: "destructive",
       });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setCsvContent(content);
-      setUploadedFileName(file.name);
-      toast({
-        title: "File Loaded",
-        description: `${file.name} loaded successfully`,
-      });
-    };
-    reader.onerror = () => {
-      toast({
-        title: "Upload Error",
-        description: "Failed to read file",
-        variant: "destructive",
-      });
-    };
-    reader.readAsText(file);
+    setUploadedFileName(file.name);
+
+    if (isPdf) {
+      // Handle PDF upload
+      setIsProcessingPdf(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const { data, error } = await supabase.functions.invoke('parse-pdf-knowledge', {
+          body: formData
+        });
+
+        if (error) throw error;
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to parse PDF');
+        }
+
+        const { entries } = data;
+        
+        toast({
+          title: "PDF Parsed Successfully",
+          description: `Extracted ${entries.length} knowledge entries from ${data.totalPages} pages`,
+        });
+        
+        // Convert to CSV format for existing import logic
+        const csvLines = ['product_line,topic,question,answer_short,answer_canonical,tags,carrier,program,jurisdiction'];
+        entries.forEach((entry: any) => {
+          const tags = Array.isArray(entry.tags) ? entry.tags.join('|') : entry.tags;
+          const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
+          csvLines.push([
+            escapeCsv(entry.category || 'general'),
+            escapeCsv(entry.category || 'general'),
+            escapeCsv(entry.title),
+            escapeCsv(entry.content.substring(0, 200)),
+            escapeCsv(entry.content),
+            tags,
+            'ALL',
+            '',
+            'FL'
+          ].join(','));
+        });
+        
+        setCsvContent(csvLines.join('\n'));
+      } catch (error: any) {
+        console.error('PDF parsing error:', error);
+        toast({
+          title: "PDF Parsing Failed",
+          description: error.message || 'Failed to parse PDF file',
+          variant: "destructive",
+        });
+        setUploadedFileName('');
+      } finally {
+        setIsProcessingPdf(false);
+      }
+    } else {
+      // Handle CSV upload
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        setCsvContent(content);
+        toast({
+          title: "File Loaded",
+          description: `${file.name} loaded successfully`,
+        });
+      };
+      reader.onerror = () => {
+        toast({
+          title: "Upload Error",
+          description: "Failed to read file",
+          variant: "destructive",
+        });
+        setUploadedFileName('');
+      };
+      reader.readAsText(file);
+    }
   };
 
   // Sample bulk import data for kb_entries
@@ -599,7 +662,7 @@ const KnowledgeManager = () => {
             {/* File Upload Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium">Upload CSV File</label>
+                <label className="text-sm font-medium">Upload CSV or PDF File</label>
                 {uploadedFileName && (
                   <Badge variant="secondary" className="text-xs">
                     <FileText className="w-3 h-3 mr-1" />
@@ -611,7 +674,7 @@ const KnowledgeManager = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.pdf"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -620,9 +683,10 @@ const KnowledgeManager = () => {
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full"
+                  disabled={isProcessingPdf}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  Choose CSV File
+                  {isProcessingPdf ? 'Processing PDF...' : 'Choose CSV or PDF File'}
                 </Button>
                 {uploadedFileName && (
                   <Button

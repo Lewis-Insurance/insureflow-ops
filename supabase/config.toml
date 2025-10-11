@@ -73,3 +73,6 @@ verify_jwt = true
 
 [functions.ai-ticket-automation]
 verify_jwt = true
+
+[functions.parse-pdf-knowledge]
+verify_jwt = true
