@@ -71,6 +71,11 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const kbCacheRef = useRef<Map<string, any>>(new Map());
+  
+  // Extract carrier/jurisdiction from context if available
+  const userCarrier = context?.metadata?.carrier || '';
+  const userJurisdiction = context?.metadata?.jurisdiction || 'FL';
 
   // Update greeting when context changes
   useEffect(() => {
@@ -122,17 +127,29 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
       // Query knowledge base first if the message is a question (without documents)
       let knowledgeBaseContext = '';
+      let kbSourceAttribution = '';
       if (input.trim() && documentsWithContent.length === 0) {
         try {
-          const { data: kbData } = await supabase.rpc('kb_resolve_answer' as any, {
-            q: input.trim(),
-            in_carrier: null,
-            in_jurisdiction: null,
-          });
+          // Check cache first
+          const cacheKey = `${input.trim()}_${userCarrier}_${userJurisdiction}`;
+          let kbAnswer = kbCacheRef.current.get(cacheKey);
+          
+          if (!kbAnswer) {
+            const { data: kbData } = await supabase.rpc('kb_resolve_answer' as any, {
+              q: input.trim(),
+              in_carrier: userCarrier || null,
+              in_jurisdiction: userJurisdiction || 'FL',
+            });
 
-          if (kbData && Array.isArray(kbData) && kbData.length > 0) {
-            const kbAnswer = kbData[0];
+            if (kbData && Array.isArray(kbData) && kbData.length > 0) {
+              kbAnswer = kbData[0];
+              kbCacheRef.current.set(cacheKey, kbAnswer);
+            }
+          }
+
+          if (kbAnswer) {
             knowledgeBaseContext = `\n\nKnowledge Base Reference:\nQ: ${kbAnswer.question_canonical}\nA: ${kbAnswer.answer_canonical_markdown}\nCarrier: ${kbAnswer.carrier} | Jurisdiction: ${kbAnswer.jurisdiction}`;
+            kbSourceAttribution = '\n\n📚 *Source: Lewis Insurance Knowledge Base*';
             console.log('KB context found:', kbAnswer.question_canonical);
           }
         } catch (kbError) {
@@ -174,7 +191,11 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         ? data.response
         : 'I analyzed your request, but the response format was unexpected.';
 
-      const assistantMessage: Message = { role: 'assistant', content: responseText, timestamp: new Date() };
+      const assistantMessage: Message = { 
+        role: 'assistant', 
+        content: responseText + kbSourceAttribution, 
+        timestamp: new Date() 
+      };
       setMessages((prev) => [...prev, assistantMessage]);
       setAttachedDocs([]);
     } catch (err: any) {
@@ -212,6 +233,13 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   }, [toast]);
 
   const removeAttachment = (index: number) => setAttachedDocs((prev) => prev.filter((_, i) => i !== index));
+
+  const quickQuestions = [
+    "What is comprehensive coverage?",
+    "How do I file a claim?",
+    "What discounts are available?",
+    "What are state minimum requirements?"
+  ];
 
   return (
     <div className="flex flex-col h-full">
@@ -272,6 +300,21 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       )}
 
       <div className="border-t p-4">
+        <div className="flex flex-wrap gap-2 mb-3">
+          {quickQuestions.map((q) => (
+            <Button
+              key={q}
+              variant="outline"
+              size="sm"
+              onClick={() => setInput(q)}
+              disabled={isLoading}
+              className="text-xs"
+            >
+              {q}
+            </Button>
+          ))}
+        </div>
+        
         <div className="flex gap-2">
           <input ref={fileInputRef} type="file" multiple onChange={handleFileAttach} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
           <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading} aria-label="Attach files">
