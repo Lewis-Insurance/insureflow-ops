@@ -2421,6 +2421,117 @@ export type Database = {
           },
         ]
       }
+      kb_entries: {
+        Row: {
+          answer_canonical_markdown: string
+          applies_if: string | null
+          carrier: string | null
+          citations: string | null
+          confidence: number | null
+          display_order: number | null
+          effective_date: string | null
+          exceptions_notes: string | null
+          expiration_date: string | null
+          faq_short_answer: string | null
+          jurisdiction: string | null
+          last_verified_date: string | null
+          policy_form_id: string | null
+          priority: number | null
+          product_line: string
+          program_or_form: string | null
+          question_canonical: string
+          record_id: string
+          seo_snippet: string | null
+          source_type: string | null
+          tags: string | null
+          topic: string
+          verified_by: string | null
+        }
+        Insert: {
+          answer_canonical_markdown: string
+          applies_if?: string | null
+          carrier?: string | null
+          citations?: string | null
+          confidence?: number | null
+          display_order?: number | null
+          effective_date?: string | null
+          exceptions_notes?: string | null
+          expiration_date?: string | null
+          faq_short_answer?: string | null
+          jurisdiction?: string | null
+          last_verified_date?: string | null
+          policy_form_id?: string | null
+          priority?: number | null
+          product_line: string
+          program_or_form?: string | null
+          question_canonical: string
+          record_id: string
+          seo_snippet?: string | null
+          source_type?: string | null
+          tags?: string | null
+          topic: string
+          verified_by?: string | null
+        }
+        Update: {
+          answer_canonical_markdown?: string
+          applies_if?: string | null
+          carrier?: string | null
+          citations?: string | null
+          confidence?: number | null
+          display_order?: number | null
+          effective_date?: string | null
+          exceptions_notes?: string | null
+          expiration_date?: string | null
+          faq_short_answer?: string | null
+          jurisdiction?: string | null
+          last_verified_date?: string | null
+          policy_form_id?: string | null
+          priority?: number | null
+          product_line?: string
+          program_or_form?: string | null
+          question_canonical?: string
+          record_id?: string
+          seo_snippet?: string | null
+          source_type?: string | null
+          tags?: string | null
+          topic?: string
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+      kb_sources: {
+        Row: {
+          jurisdiction: string | null
+          name: string
+          notes: string | null
+          publisher: string | null
+          source_id: string
+          source_type: string
+          url_or_path: string | null
+          version_or_date: string | null
+        }
+        Insert: {
+          jurisdiction?: string | null
+          name: string
+          notes?: string | null
+          publisher?: string | null
+          source_id: string
+          source_type: string
+          url_or_path?: string | null
+          version_or_date?: string | null
+        }
+        Update: {
+          jurisdiction?: string | null
+          name?: string
+          notes?: string | null
+          publisher?: string | null
+          source_id?: string
+          source_type?: string
+          url_or_path?: string | null
+          version_or_date?: string | null
+        }
+        Relationships: []
+      }
       knowledge_base: {
         Row: {
           account_id: string | null
@@ -4252,6 +4363,42 @@ export type Database = {
           },
         ]
       }
+      v_kb_simple: {
+        Row: {
+          category: string | null
+          content: string | null
+          created_at: string | null
+          id: string | null
+          metadata: string | null
+          source: string | null
+          tags: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: never
+          content?: string | null
+          created_at?: never
+          id?: string | null
+          metadata?: never
+          source?: string | null
+          tags?: string | null
+          title?: string | null
+          updated_at?: never
+        }
+        Update: {
+          category?: never
+          content?: string | null
+          created_at?: never
+          id?: string | null
+          metadata?: never
+          source?: string | null
+          tags?: string | null
+          title?: string | null
+          updated_at?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_tag_to_customer: {
@@ -4634,6 +4781,40 @@ export type Database = {
       jsonb_diff_vals: {
         Args: { a: Json; b: Json }
         Returns: Json
+      }
+      kb_resolve_answer: {
+        Args: {
+          in_carrier?: string
+          in_date?: string
+          in_jurisdiction?: string
+          in_program?: string
+          q: string
+        }
+        Returns: {
+          answer_canonical_markdown: string
+          applies_if: string | null
+          carrier: string | null
+          citations: string | null
+          confidence: number | null
+          display_order: number | null
+          effective_date: string | null
+          exceptions_notes: string | null
+          expiration_date: string | null
+          faq_short_answer: string | null
+          jurisdiction: string | null
+          last_verified_date: string | null
+          policy_form_id: string | null
+          priority: number | null
+          product_line: string
+          program_or_form: string | null
+          question_canonical: string
+          record_id: string
+          seo_snippet: string | null
+          source_type: string | null
+          tags: string | null
+          topic: string
+          verified_by: string | null
+        }[]
       }
       l2_norm: {
         Args: { "": unknown } | { "": unknown }
