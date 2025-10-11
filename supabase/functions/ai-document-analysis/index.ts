@@ -107,7 +107,8 @@ Return insights as a JSON array with objects containing: type (opportunity|risk|
 4. Summarize pros and cons of each option
 5. Provide clear, actionable recommendations
 
-Be concise but thorough. Use tables when comparing numerical data.`;
+Be concise but thorough. Use tables when comparing numerical data.
+IMPORTANT: When answering questions without verified document data, keep responses brief, direct, and to the point - no more than 2-3 sentences unless specifically asked for detail.`;
           userPrompt = message || 'Please analyze and compare these insurance documents.';
           break;
 
@@ -119,7 +120,8 @@ Be concise but thorough. Use tables when comparing numerical data.`;
 4. Extract coverage limits and deductibles
 5. Flag any unusual clauses or restrictions
 
-Present information in a clear, organized format.`;
+Present information in a clear, organized format.
+IMPORTANT: When answering questions without verified document data, keep responses brief, direct, and to the point - no more than 2-3 sentences unless specifically asked for detail.`;
           userPrompt = message || 'Please analyze this policy document and provide a comprehensive summary.';
           break;
 
@@ -144,7 +146,11 @@ Format as JSON where possible.`;
 - Helping draft communications
 - Analyzing documents when provided
 
-Be helpful, professional, and concise.`;
+CRITICAL INSTRUCTIONS:
+- When answering from verified knowledge base sources, provide the full answer with source attribution
+- When answering general questions WITHOUT verified sources, be BRIEF and DIRECT - use 2-3 sentences maximum
+- Avoid verbose explanations unless specifically requested
+- Get straight to the point - no preambles or unnecessary context`;
           userPrompt = message || 'How can I help you today?';
           break;
       }
