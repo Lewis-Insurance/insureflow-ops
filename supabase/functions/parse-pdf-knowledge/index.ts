@@ -24,10 +24,23 @@ serve(async (req) => {
 
     // Parse PDF using pdfjs-dist (works in Deno Edge runtime)
     const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
-    // Disable worker usage in Edge runtime
-    pdfjs.GlobalWorkerOptions.workerSrc = '';
-    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer), disableFontFace: true });
-    const pdfDoc = await loadingTask.promise;
+    // Try to provide a remote worker script URL; Edge may still ignore workers
+    const workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/legacy/build/pdf.worker.mjs';
+    try { (pdfjs as any).GlobalWorkerOptions.workerSrc = workerSrc; } catch (_) { /* no-op */ }
+
+    const loadingTask = (pdfjs as any).getDocument({ 
+      data: new Uint8Array(arrayBuffer), 
+      disableFontFace: true,
+      // Be conservative in Edge runtime
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      disableRange: true,
+      disableStream: true,
+      disableAutoFetch: true,
+      // Some builds still honor this flag
+      disableWorker: true as any
+    });
+    const pdfDoc = await (loadingTask as any).promise;
 
     let text = '';
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
