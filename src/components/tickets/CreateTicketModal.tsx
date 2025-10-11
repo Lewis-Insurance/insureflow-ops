@@ -95,14 +95,18 @@ export function CreateTicketModal({ open, onOpenChange, accounts = [], contacts 
             <Label htmlFor="account">Customer Account *</Label>
             <Select value={accountId} onValueChange={setAccountId} required>
               <SelectTrigger id="account">
-                <SelectValue placeholder="Select account" />
+                <SelectValue placeholder={accounts.length === 0 ? "Loading accounts..." : "Select account"} />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
+                {accounts.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground">No accounts found</div>
+                ) : (
+                  accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
