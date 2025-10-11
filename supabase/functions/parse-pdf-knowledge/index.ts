@@ -1,10 +1,56 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getDocument } from 'https://esm.sh/pdfjs-serverless@1.1.0';
+import { getDocument } from 'https://esm.sh/pdfjs-serverless@1.1.0'; // Correct import for Deno
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Maximum processing time to avoid Edge Function timeout (30s limit)
+const MAX_PROCESSING_TIME = 25000; // 25 seconds, leave 5s buffer
+
+// Helper function to extract text in batches to avoid memory/timeout issues
+async function extractTextInBatches(pdfDoc: any, batchSize: number = 5): Promise<string> {
+  let fullText = '';
+  const totalPages = pdfDoc.numPages;
+  
+  console.log(`Extracting text from ${totalPages} pages in batches of ${batchSize}`);
+  
+  for (let i = 0; i < totalPages; i += batchSize) {
+    const batch = [];
+    const end = Math.min(i + batchSize, totalPages);
+    
+    // Process batch of pages in parallel
+    for (let pageNum = i + 1; pageNum <= end; pageNum++) {
+      batch.push(pdfDoc.getPage(pageNum));
+    }
+    
+    const pages = await Promise.all(batch);
+    const texts = await Promise.all(
+      pages.map((page: any) => page.getTextContent())
+    );
+    
+    // Extract text from batch
+    texts.forEach((content: any) => {
+      const pageText = content.items
+        .map((item: any) => {
+          if ('str' in item) {
+            return item.str;
+          }
+          return '';
+        })
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      fullText += pageText + '\n\n';
+    });
+    
+    console.log(`Processed pages ${i + 1} to ${end} of ${totalPages}`);
+  }
+  
+  return fullText;
+}
 
 // Helper Functions
 function chunkContent(text: string, maxChunkSize: number = 1000): string[] {
@@ -363,6 +409,18 @@ serve(async (req) => {
       throw new Error('PDF appears to be empty');
     }
     
+    // Check for timeout risk before processing large PDFs
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'File processing time limit exceeded',
+          code: 'TIMEOUT_RISK'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 408 }
+      );
+    }
+    
     metrics.parseTime = Date.now() - startTime;
 
     // Extract metadata - with error handling
@@ -388,26 +446,9 @@ serve(async (req) => {
       console.log('Metadata extraction failed, using defaults:', e);
     }
 
-    // Extract text from all pages
-    let text = '';
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      const page = await pdfDoc.getPage(pageNum);
-      const content = await page.getTextContent();
-      
-      // Process text items
-      const pageText = content.items
-        .map((item: any) => {
-          if ('str' in item) {
-            return item.str;
-          }
-          return '';
-        })
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      text += pageText + '\n\n';
-    }
+    // Extract text from all pages using batching to avoid timeout
+    console.log(`Starting text extraction for ${pdfDoc.numPages} pages`);
+    const text = await extractTextInBatches(pdfDoc, 5);
     
     metrics.extractionTime = Date.now() - startTime - metrics.parseTime;
     
@@ -549,6 +590,27 @@ serve(async (req) => {
           }
         }
       });
+    }
+    
+    // Check timeout before continuing with heavy processing
+    if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+      console.log('Approaching timeout, returning partial results with', entries.length, 'entries');
+      // Return what we have so far
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          entries: entries.slice(0, 50), // Return first 50 entries
+          partial: true,
+          message: 'Processing time limit reached, returning partial results',
+          totalPages: pdfDoc.numPages,
+          metadata: pdfInfo,
+          language
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
     }
     
     // Add glossary terms as separate entries
