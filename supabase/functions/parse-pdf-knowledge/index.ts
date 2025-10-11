@@ -78,6 +78,27 @@ function detectCategory(content: string): string {
   return 'information';
 }
 
+function detectInsuranceCategory(content: string): string {
+  const lowerContent = content.toLowerCase();
+  
+  // More specific categorization for insurance documents
+  if (lowerContent.includes('hurricane') || lowerContent.includes('windstorm') || lowerContent.includes('named storm')) return 'hurricane';
+  if (lowerContent.includes('sinkhole') || lowerContent.includes('catastrophic ground cover')) return 'sinkhole';
+  if (lowerContent.includes('flood') || lowerContent.includes('water damage')) return 'flood';
+  if (lowerContent.includes('liability') || lowerContent.includes('bodily injury')) return 'liability';
+  if (lowerContent.includes('dwelling') || lowerContent.includes('structure') || lowerContent.includes('building')) return 'property';
+  if (lowerContent.includes('personal property') || lowerContent.includes('contents')) return 'personal-property';
+  if (lowerContent.includes('claim') || lowerContent.includes('loss') || lowerContent.includes('damage')) return 'claims';
+  if (lowerContent.includes('premium') || lowerContent.includes('payment') || lowerContent.includes('billing')) return 'billing';
+  if (lowerContent.includes('deductible') || lowerContent.includes('out-of-pocket')) return 'deductibles';
+  if (lowerContent.includes('exclusion') || lowerContent.includes('not covered')) return 'exclusions';
+  if (lowerContent.includes('endorsement') || lowerContent.includes('rider') || lowerContent.includes('additional coverage')) return 'endorsements';
+  if (lowerContent.includes('definition') || lowerContent.includes('means') || lowerContent.includes('refers to')) return 'glossary';
+  if (lowerContent.includes('question') || lowerContent.includes('answer') || lowerContent.includes('faq')) return 'faq';
+  
+  return 'general';
+}
+
 function extractPolicyInfo(text: string) {
   const policyInfo = {
     policyNumbers: [] as string[],
@@ -528,6 +549,41 @@ serve(async (req) => {
         language,
         confidence: 0.9 // High confidence for explicit definitions
       });
+    });
+    
+    // Enhanced entry creation with insurance metadata
+    entries.forEach((entry: any) => {
+      // Use the enhanced category detection
+      entry.category = detectInsuranceCategory(entry.content);
+      
+      // Add policy metadata if found
+      if (policyMetadata.policyNumbers.length > 0) {
+        entry.policyNumbers = policyMetadata.policyNumbers;
+      }
+      if (policyMetadata.carriers.length > 0) {
+        entry.carrier = policyMetadata.carriers[0]; // Primary carrier
+      }
+      
+      // Add Florida-specific tags
+      if (floridaInfo.hurricaneProvisions.length > 0 && 
+          (entry.content.toLowerCase().includes('hurricane') || 
+           entry.content.toLowerCase().includes('wind'))) {
+        entry.tags.push('hurricane-coverage');
+      }
+      if (floridaInfo.sinkholeCoverage.length > 0 && 
+          entry.content.toLowerCase().includes('sinkhole')) {
+        entry.tags.push('sinkhole-coverage');
+      }
+      if (floridaInfo.assignmentOfBenefits.length > 0 && 
+          (entry.content.toLowerCase().includes('assignment of benefits') || 
+           entry.content.toLowerCase().includes('aob'))) {
+        entry.tags.push('aob');
+      }
+      
+      // Auto-detect jurisdiction
+      if (text.includes('Florida') || text.includes('FL') || text.includes('F.S.')) {
+        entry.jurisdiction = 'FL';
+      }
     });
 
     // Process entries
