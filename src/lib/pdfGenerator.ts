@@ -1,33 +1,49 @@
 import jsPDF from 'jspdf';
+import { z } from 'zod';
 
-interface COIPDFData {
-  certificate_number: string;
-  certificate_holder_name: string;
-  certificate_holder_address: string;
-  effective_date: string;
-  expiration_date: string;
-  coverage_details: {
-    general_liability?: string;
-    auto_liability?: string;
-    workers_comp?: string;
-    umbrella?: string;
-  };
-  additional_insureds?: string[];
-  special_provisions?: string;
-  account?: {
-    name: string;
-    address_line1?: string;
-    city?: string;
-    state?: string;
-    zip_code?: string;
-  };
-  policy?: {
-    carrier?: string;
-    policy_number?: string;
-  };
-}
+// Validation schema for COI PDF data
+const COIPDFDataSchema = z.object({
+  certificate_number: z.string().min(1, "Certificate number is required"),
+  certificate_holder_name: z.string().min(1, "Certificate holder name is required").max(200, "Name too long"),
+  certificate_holder_address: z.string().min(1, "Address is required").max(500, "Address too long"),
+  effective_date: z.string().min(1, "Effective date is required"),
+  expiration_date: z.string().min(1, "Expiration date is required"),
+  coverage_details: z.object({
+    general_liability: z.string().max(200).optional(),
+    auto_liability: z.string().max(200).optional(),
+    workers_comp: z.string().max(200).optional(),
+    umbrella: z.string().max(200).optional(),
+  }).refine(data => Object.values(data).some(v => v && v.length > 0), {
+    message: "At least one coverage type is required"
+  }),
+  additional_insureds: z.array(z.string().max(200)).optional(),
+  special_provisions: z.string().max(2000).optional(),
+  account: z.object({
+    name: z.string().min(1),
+    address_line1: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zip_code: z.string().optional(),
+  }).optional(),
+  policy: z.object({
+    carrier: z.string().optional(),
+    policy_number: z.string().optional(),
+  }).optional(),
+}).refine(data => {
+  const effective = new Date(data.effective_date);
+  const expiration = new Date(data.expiration_date);
+  return effective < expiration;
+}, {
+  message: "Effective date must be before expiration date",
+  path: ["expiration_date"],
+});
 
-export function generateCOIPDF(data: COIPDFData): Blob {
+export type COIPDFData = z.infer<typeof COIPDFDataSchema>;
+
+export function generateCOIPDF(rawData: unknown): Blob {
+  // Validate and parse data
+  const data = COIPDFDataSchema.parse(rawData);
+  
   const doc = new jsPDF();
   let yPosition = 20;
 
