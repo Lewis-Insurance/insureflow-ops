@@ -11,6 +11,7 @@ import { CustomerTasksSection } from '@/components/customers/CustomerTasksSectio
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
+import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, CheckSquare, Plus } from 'lucide-react';
@@ -190,6 +191,9 @@ export default function CustomerDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Comprehensive Contact Information */}
           <CustomerContactInfo account={account} />
+
+          {/* AI Assistant Actions */}
+          <AICustomerActions accountId={account.id} accountName={account.name} />
 
           {/* Recent Notes */}
           <Card>

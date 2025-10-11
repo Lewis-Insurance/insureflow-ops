@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { DashboardSkeleton } from '@/components/ui/skeleton-components';
 import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
 import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
+import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -44,6 +45,13 @@ const DashboardContent = React.memo(() => {
         >
           Policies / Quotes
         </Button>
+      </div>
+
+      {/* AI Insights */}
+      <div className="mt-6">
+        <ErrorBoundary level="component">
+          <AIInsightsCard />
+        </ErrorBoundary>
       </div>
 
       {/* Tab Content */}
