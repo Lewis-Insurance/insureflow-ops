@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Plus, Upload, Brain, AlertCircle, CheckCircle, 
   Database, FileText, Download, Trash2, Edit,
@@ -28,6 +28,9 @@ const KnowledgeManager = () => {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [importTable, setImportTable] = useState<'kb_entries' | 'kb_sources'>('kb_entries');
   const [selectedGap, setSelectedGap] = useState<any>(null);
+  const [csvContent, setCsvContent] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newEntry, setNewEntry] = useState({
     title: '',
     content: '',
@@ -108,6 +111,40 @@ const KnowledgeManager = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload a CSV file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setCsvContent(content);
+      setUploadedFileName(file.name);
+      toast({
+        title: "File Loaded",
+        description: `${file.name} loaded successfully`,
+      });
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Upload Error",
+        description: "Failed to read file",
+        variant: "destructive",
+      });
+    };
+    reader.readAsText(file);
   };
 
   // Sample bulk import data for kb_entries
@@ -558,11 +595,70 @@ const KnowledgeManager = () => {
                 )}
               </AlertDescription>
             </Alert>
+
+            {/* File Upload Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium">Upload CSV File</label>
+                {uploadedFileName && (
+                  <Badge variant="secondary" className="text-xs">
+                    <FileText className="w-3 h-3 mr-1" />
+                    {uploadedFileName}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose CSV File
+                </Button>
+                {uploadedFileName && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setCsvContent('');
+                      setUploadedFileName('');
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* OR Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or paste CSV data</span>
+              </div>
+            </div>
             
             <div>
               <label className="text-sm font-medium">Paste CSV Data</label>
               <Textarea
-                defaultValue={importTable === 'kb_entries' ? SAMPLE_KB_ENTRIES : SAMPLE_KB_SOURCES}
+                value={csvContent || (importTable === 'kb_entries' ? SAMPLE_KB_ENTRIES : SAMPLE_KB_SOURCES)}
+                onChange={(e) => {
+                  setCsvContent(e.target.value);
+                  setUploadedFileName('');
+                }}
                 key={importTable}
                 rows={12}
                 className="font-mono text-xs"
@@ -588,12 +684,28 @@ const KnowledgeManager = () => {
               </Button>
               
               <div className="space-x-2">
-                <Button variant="outline" onClick={() => setShowBulkImport(false)}>
+                <Button variant="outline" onClick={() => {
+                  setShowBulkImport(false);
+                  setCsvContent('');
+                  setUploadedFileName('');
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={() => {
-                  const textarea = document.getElementById('csv-import') as HTMLTextAreaElement;
-                  handleBulkImport(textarea.value, importTable);
+                  const content = csvContent || (document.getElementById('csv-import') as HTMLTextAreaElement).value;
+                  if (!content.trim()) {
+                    toast({
+                      title: "No Data",
+                      description: "Please upload a file or paste CSV data",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  handleBulkImport(content, importTable);
+                  setCsvContent('');
+                  setUploadedFileName('');
+                  if (fileInputRef.current) fileInputRef.current.value = '';
                 }}>
                   Import to {importTable}
                 </Button>
