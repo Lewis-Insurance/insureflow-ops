@@ -8,6 +8,8 @@ export interface ExportOptions {
   filename?: string;
   addWatermark?: boolean;
   watermarkText?: string;
+  isRevision?: boolean;
+  revisionNote?: string;
 }
 
 // Validation schema for COI PDF data

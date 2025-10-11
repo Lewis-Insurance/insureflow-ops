@@ -21,6 +21,8 @@ export interface COI {
   generated_by?: string;
   approved_by?: string;
   sent_at?: string;
+  current_version?: number;
+  versions?: any[];
   created_at: string;
   updated_at: string;
 }

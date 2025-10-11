@@ -1,3 +1,12 @@
+// COI version history tracking
+export interface COIVersion {
+  version: number;
+  url: string;
+  created_at: string;
+  created_by: string;
+  changes?: string;
+}
+
 // Types for Certificate of Insurance metadata in tickets
 export interface TicketCOIMetadata {
   coi_generated: boolean;

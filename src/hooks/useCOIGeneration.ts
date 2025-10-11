@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
-import { TicketCOIMetadata, GenerationProgress } from '@/types/coi';
+import { TicketCOIMetadata, GenerationProgress, COIVersion } from '@/types/coi';
 import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
 
@@ -72,14 +72,31 @@ export function useCOIGeneration() {
     exportOptions?: Partial<ExportOptions>,
     onProgress?: (progress: GenerationProgress) => void
   ): Promise<string | null> => {
-    const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
-
     const updateProgress = (progressData: GenerationProgress) => {
       setProgress(progressData);
       onProgress?.(progressData);
     };
 
     try {
+      // Check for existing versions if this is a revision
+      let version = 1;
+      if (exportOptions?.isRevision) {
+        const { data: existingCOI } = await supabase
+          .from('certificates_of_insurance')
+          .select('versions, current_version')
+          .eq('id', coiId)
+          .maybeSingle();
+
+        if (existingCOI?.versions && Array.isArray(existingCOI.versions)) {
+          version = existingCOI.versions.length + 1;
+        } else if (existingCOI?.current_version) {
+          version = existingCOI.current_version + 1;
+        }
+      }
+
+      // Generate filename with version
+      const fileName = `coi_${coiData.certificate_number}_v${version}_${Date.now()}.pdf`;
+
       // Step 1: Generate PDF
       updateProgress({
         step: 'generating',
@@ -110,29 +127,45 @@ export function useCOIGeneration() {
         .from('certificates')
         .getPublicUrl(fileName);
 
-      // Step 3: Update records
+      // Step 3: Update records with version tracking
       updateProgress({
         step: 'updating',
         percentage: 75,
         message: 'Updating records...'
       });
 
-      // Update COI record with document URL
+      // Create version data
+      const versionData: COIVersion = {
+        version,
+        url: publicUrl,
+        created_at: new Date().toISOString(),
+        created_by: user?.id || 'system',
+        changes: exportOptions?.revisionNote,
+      };
+
+      // Append version to history
+      await supabase.rpc('append_coi_version', {
+        p_coi_id: coiId,
+        p_version_data: versionData as any,
+      });
+
+      // Update COI record with document URL and current version
       await updateCOI({
         id: coiId,
         updates: {
           document_url: publicUrl,
           status: 'issued',
+          current_version: version,
         },
       });
 
-      // Update ticket metadata with proper typing
+      // Update ticket metadata with proper typing and version info
       const coiMetadata: Record<string, any> = {
         coi_generated: true,
         coi_url: publicUrl,
         coi_number: coiData.certificate_number,
         coi_generated_at: new Date().toISOString(),
-        coi_version: 1,
+        coi_version: version,
         coi_generated_by: user?.id || null,
       };
 
@@ -167,8 +200,13 @@ export function useCOIGeneration() {
       // Reset progress on error
       setProgress(null);
 
-      // Cleanup failed upload if it exists
-      await cleanupFailedUpload(fileName);
+      // Cleanup failed upload if it exists (use try-catch since fileName might not be defined in early errors)
+      try {
+        const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
+        await cleanupFailedUpload(fileName);
+      } catch (cleanupError) {
+        console.error('Cleanup error:', cleanupError);
+      }
 
       toast({
         title: 'Failed to Generate COI',

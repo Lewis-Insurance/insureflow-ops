@@ -634,6 +634,7 @@ export type Database = {
           certificate_number: string
           coverage_details: Json
           created_at: string
+          current_version: number | null
           document_url: string | null
           effective_date: string
           expiration_date: string
@@ -645,6 +646,7 @@ export type Database = {
           status: string
           ticket_id: string | null
           updated_at: string
+          versions: Json | null
         }
         Insert: {
           account_id: string
@@ -656,6 +658,7 @@ export type Database = {
           certificate_number: string
           coverage_details: Json
           created_at?: string
+          current_version?: number | null
           document_url?: string | null
           effective_date: string
           expiration_date: string
@@ -667,6 +670,7 @@ export type Database = {
           status?: string
           ticket_id?: string | null
           updated_at?: string
+          versions?: Json | null
         }
         Update: {
           account_id?: string
@@ -678,6 +682,7 @@ export type Database = {
           certificate_number?: string
           coverage_details?: Json
           created_at?: string
+          current_version?: number | null
           document_url?: string | null
           effective_date?: string
           expiration_date?: string
@@ -689,6 +694,7 @@ export type Database = {
           status?: string
           ticket_id?: string | null
           updated_at?: string
+          versions?: Json | null
         }
         Relationships: [
           {
@@ -3865,6 +3871,10 @@ export type Database = {
           p_customer_id: string
           p_tag_name: string
         }
+        Returns: undefined
+      }
+      append_coi_version: {
+        Args: { p_coi_id: string; p_version_data: Json }
         Returns: undefined
       }
       compute_insured_search_vector: {
