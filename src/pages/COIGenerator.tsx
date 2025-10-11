@@ -62,13 +62,45 @@ export default function COIGenerator() {
   }, [ticketId, toast]);
 
   const handleGenerateWithAI = async () => {
+    if (!ticket) return;
+    
     setLoading(true);
     try {
-      // TODO: Call AI edge function to generate COI data
-      toast({ 
-        title: 'AI Generation', 
-        description: 'AI COI generation will be implemented with edge function',
+      const { data, error } = await supabase.functions.invoke('generate-coi-data', {
+        body: {
+          ticketData: {
+            subject: ticket.subject,
+            description: ticket.description,
+          },
+          accountData: ticket.accounts,
+          policyData: ticket.policies?.[0] || null,
+        },
       });
+
+      if (error) throw error;
+
+      if (data?.data) {
+        setFormData({
+          certificate_holder_name: data.data.certificate_holder_name || '',
+          certificate_holder_address: data.data.certificate_holder_address || '',
+          effective_date: data.data.effective_date || '',
+          expiration_date: data.data.expiration_date || '',
+          coverage_details: {
+            general_liability: data.data.coverage_details?.general_liability || '',
+            auto_liability: data.data.coverage_details?.auto_liability || '',
+            workers_comp: data.data.coverage_details?.workers_comp || '',
+            umbrella: data.data.coverage_details?.umbrella || '',
+          },
+          additional_insureds: false,
+          waiver_of_subrogation: false,
+          special_provisions: data.data.special_provisions || '',
+        });
+
+        toast({
+          title: 'AI Generation Complete',
+          description: 'COI data has been generated. Please review and adjust as needed.',
+        });
+      }
     } catch (error: any) {
       toast({ title: 'Failed to generate', description: error.message, variant: 'destructive' });
     } finally {
@@ -98,10 +130,71 @@ export default function COIGenerator() {
   };
 
   const handleGeneratePDF = async () => {
-    toast({ 
-      title: 'PDF Generation', 
-      description: 'PDF generation will be implemented with edge function',
-    });
+    if (!ticket || !formData.certificate_holder_name) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in required fields before generating PDF',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // First, save the COI to get a certificate number
+      const savedCOI = await createCOI({
+        ticket_id: ticketId!,
+        account_id: ticket.account_id,
+        certificate_holder_name: formData.certificate_holder_name,
+        certificate_holder_address: { text: formData.certificate_holder_address },
+        effective_date: formData.effective_date,
+        expiration_date: formData.expiration_date,
+        coverage_details: formData.coverage_details,
+        additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : [],
+        special_provisions: formData.special_provisions,
+        status: 'issued',
+      });
+
+      // Import PDF generator dynamically
+      const { generateCOIPDF } = await import('@/lib/pdfGenerator');
+
+      const pdfBlob = generateCOIPDF({
+        certificate_number: savedCOI.certificate_number,
+        certificate_holder_name: formData.certificate_holder_name,
+        certificate_holder_address: formData.certificate_holder_address,
+        effective_date: formData.effective_date,
+        expiration_date: formData.expiration_date,
+        coverage_details: formData.coverage_details,
+        additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : undefined,
+        special_provisions: formData.special_provisions,
+        account: ticket.accounts,
+        policy: ticket.policies?.[0],
+      });
+
+      // Download the PDF
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `COI-${savedCOI.certificate_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'PDF Generated',
+        description: 'Certificate of Insurance has been generated and downloaded',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to generate PDF',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
