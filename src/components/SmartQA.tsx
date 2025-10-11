@@ -44,11 +44,14 @@ const SmartQA = () => {
     setShowFullAnswer(false);
 
     try {
+      // Normalize carrier input
+      const normalizedCarrier = carrier.trim() || null;
+      
       // Try to call the RPC function
       const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
-        q: question,
-        in_carrier: carrier || null,
-        in_jurisdiction: jurisdiction || null,
+        q: question.trim(),
+        in_carrier: normalizedCarrier,
+        in_jurisdiction: jurisdiction || 'FL',
       });
 
       if (error) {
@@ -87,7 +90,15 @@ const SmartQA = () => {
 
       if (data && Array.isArray(data) && data.length > 0) {
         setAnswer(data[0]);
+        // Log for debugging
+        console.log('Answer found:', {
+          carrier: data[0].carrier,
+          priority: data[0].priority,
+          question: data[0].question_canonical
+        });
       } else {
+        // No answer found
+        console.log('No answer found for:', { question, carrier: normalizedCarrier, jurisdiction });
         setAnswer(null);
         toast({
           title: "No Answer Found",
