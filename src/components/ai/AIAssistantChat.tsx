@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, X, Loader2, FileText } from 'lucide-react';
+import { Send, Paperclip, X, Loader2, FileText, Copy, Edit2, RotateCw, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +69,9 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<File[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [editedContent, setEditedContent] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -429,6 +432,73 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
   const removeAttachment = (index: number) => setAttachedDocs((prev) => prev.filter((_, i) => i !== index));
 
+  const handleCopyMessage = useCallback(async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+      toast({ title: 'Copied!', description: 'Message copied to clipboard' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to copy message', variant: 'destructive' });
+    }
+  }, [toast]);
+
+  const handleEditMessage = useCallback((index: number, content: string) => {
+    setEditingMessageIndex(index);
+    setEditedContent(content);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (editingMessageIndex === null || !editedContent.trim()) return;
+
+    // Remove all messages after the edited one
+    const updatedMessages = messages.slice(0, editingMessageIndex);
+    
+    // Update the edited message
+    const editedMessage: Message = {
+      ...messages[editingMessageIndex],
+      content: editedContent,
+      timestamp: new Date(),
+    };
+
+    setMessages([...updatedMessages, editedMessage]);
+    setEditingMessageIndex(null);
+    setInput(editedContent);
+    setEditedContent('');
+    
+    // Trigger send on next tick
+    setTimeout(() => {
+      const sendButton = document.querySelector('[aria-label="Send message"]') as HTMLButtonElement;
+      sendButton?.click();
+    }, 100);
+  }, [editingMessageIndex, editedContent, messages]);
+
+  const handleRegenerateResponse = useCallback(() => {
+    if (messages.length < 2) return;
+    
+    // Find the last user message
+    let lastUserMessageIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+    
+    if (lastUserMessageIndex === -1) return;
+    
+    // Remove all messages after the last user message
+    const updatedMessages = messages.slice(0, lastUserMessageIndex + 1);
+    setMessages(updatedMessages);
+    
+    // Set input and trigger send on next tick
+    setInput(messages[lastUserMessageIndex].content);
+    setTimeout(() => {
+      const sendButton = document.querySelector('[aria-label="Send message"]') as HTMLButtonElement;
+      sendButton?.click();
+    }, 100);
+  }, [messages]);
+
   const quickQuestions = [
     "What is comprehensive coverage?",
     "How do I file a claim?",
@@ -447,21 +517,86 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         <div className="space-y-4">
           {messages.map((message, idx) => (
             <div key={idx} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <Card className={`max-w-[80%] p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                <div className="whitespace-pre-wrap text-sm">{stripBasicMarkdown(message.content)}</div>
-                {message.documents?.length ? (
-                  <div className="mt-2 space-y-1">
-                    {message.documents.map((doc, docIdx) => (
-                      <div key={docIdx} className="flex items-center gap-2 text-xs opacity-80">
-                        <FileText className="h-3 w-3" />
-                        <span>{doc.name}</span>
-                        <span className="opacity-70">({(doc.size / 1024 / 1024).toFixed(1)} MB)</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="text-xs opacity-60 mt-2">{timeFmt.format(message.timestamp)}</div>
-              </Card>
+              <div className={`max-w-[80%] ${message.role === 'user' ? 'flex flex-col items-end' : ''}`}>
+                {editingMessageIndex === idx ? (
+                  <Card className="w-full p-3 bg-muted">
+                    <Textarea
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="min-h-[100px] mb-2"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button size="sm" variant="outline" onClick={() => setEditingMessageIndex(null)}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={handleSaveEdit}>
+                        Save & Regenerate
+                      </Button>
+                    </div>
+                  </Card>
+                ) : (
+                  <>
+                    <Card className={`p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                      <div className="whitespace-pre-wrap text-sm">{stripBasicMarkdown(message.content)}</div>
+                      {message.documents?.length ? (
+                        <div className="mt-2 space-y-1">
+                          {message.documents.map((doc, docIdx) => (
+                            <div key={docIdx} className="flex items-center gap-2 text-xs opacity-80">
+                              <FileText className="h-3 w-3" />
+                              <span>{doc.name}</span>
+                              <span className="opacity-70">({(doc.size / 1024 / 1024).toFixed(1)} MB)</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="text-xs opacity-60 mt-2">{timeFmt.format(message.timestamp)}</div>
+                    </Card>
+                    
+                    <div className="flex gap-1 mt-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2"
+                        onClick={() => handleCopyMessage(message.content, idx)}
+                        title="Copy message"
+                      >
+                        {copiedIndex === idx ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                      
+                      {message.role === 'user' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => handleEditMessage(idx, message.content)}
+                          disabled={isLoading}
+                          title="Edit and regenerate"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                      
+                      {message.role === 'assistant' && idx === messages.length - 1 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={handleRegenerateResponse}
+                          disabled={isLoading}
+                          title="Regenerate response"
+                        >
+                          <RotateCw className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))}
           {isLoading && (
