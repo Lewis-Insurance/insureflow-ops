@@ -264,6 +264,79 @@ export type Database = {
           },
         ]
       }
+      ai_conversations: {
+        Row: {
+          account_id: string | null
+          context: Json | null
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          context?: Json | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          context?: Json | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          content: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2348,6 +2421,59 @@ export type Database = {
           },
         ]
       }
+      knowledge_base: {
+        Row: {
+          account_id: string | null
+          category: string
+          content: string
+          created_at: string
+          created_by: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          source: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          category: string
+          content: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lines_of_business: {
         Row: {
           category: string | null
@@ -4046,6 +4172,10 @@ export type Database = {
         Args: { p_coi_id: string; p_version_data: Json }
         Returns: undefined
       }
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
       compute_insured_search_vector: {
         Args: { p_account_id: string }
         Returns: unknown
@@ -4314,6 +4444,22 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      halfvec_avg: {
+        Args: { "": number[] }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
         Returns: boolean
@@ -4321,6 +4467,22 @@ export type Database = {
       has_sms_consent: {
         Args: { target_contact_id: string }
         Returns: boolean
+      }
+      hnsw_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: { "": unknown }
+        Returns: unknown
       }
       insureds_search_v1: {
         Args: {
@@ -4362,9 +4524,29 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      ivfflat_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       jsonb_diff_vals: {
         Args: { a: Json; b: Json }
         Returns: Json
+      }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: unknown
       }
       log_profile_access: {
         Args: { action_type: string; details_json?: Json; target_id: string }
@@ -4410,6 +4592,23 @@ export type Database = {
           phone: string
         }[]
       }
+      search_knowledge: {
+        Args: {
+          filter_account_id?: string
+          filter_category?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          content: string
+          id: string
+          similarity: number
+          tags: string[]
+          title: string
+        }[]
+      }
       seed_default_tags: {
         Args: { p_account_id: string }
         Returns: undefined
@@ -4420,6 +4619,18 @@ export type Database = {
           target_user_id: string
         }
         Returns: undefined
+      }
+      sparsevec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
       }
       test_auth_context: {
         Args: Record<PropertyKey, never>
@@ -4463,6 +4674,30 @@ export type Database = {
       upsert_membership: {
         Args: { p_account: string; p_role?: string; p_user: string }
         Returns: undefined
+      }
+      vector_avg: {
+        Args: { "": number[] }
+        Returns: string
+      }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
+      vector_norm: {
+        Args: { "": string }
+        Returns: number
+      }
+      vector_out: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: { "": string }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
       }
     }
     Enums: {
