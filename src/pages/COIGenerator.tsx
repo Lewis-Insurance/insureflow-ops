@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useCOI } from '@/hooks/useCOI';
+import { useCOIGeneration } from '@/hooks/useCOIGeneration';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, Download, Send, Sparkles } from 'lucide-react';
@@ -18,6 +19,7 @@ export default function COIGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { cois, createCOI, updateCOI } = useCOI(ticketId);
+  const { generateAndAttachCOI, downloadCOI } = useCOIGeneration();
   
   const [ticket, setTicket] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -153,45 +155,34 @@ export default function COIGenerator() {
         coverage_details: formData.coverage_details,
         additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : [],
         special_provisions: formData.special_provisions,
-        status: 'issued',
+        status: 'draft',
       });
 
-      // Import PDF generator dynamically
-      const { generateCOIPDF } = await import('@/lib/pdfGenerator');
+      // Generate and attach PDF using the hook
+      const publicUrl = await generateAndAttachCOI(
+        ticketId!,
+        savedCOI.id,
+        {
+          certificate_number: savedCOI.certificate_number,
+          certificate_holder_name: formData.certificate_holder_name,
+          certificate_holder_address: formData.certificate_holder_address,
+          effective_date: formData.effective_date,
+          expiration_date: formData.expiration_date,
+          coverage_details: formData.coverage_details,
+          additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : undefined,
+          special_provisions: formData.special_provisions,
+          account: ticket.accounts,
+          policy: ticket.policies?.[0],
+        }
+      );
 
-      const pdfBlob = generateCOIPDF({
-        certificate_number: savedCOI.certificate_number,
-        certificate_holder_name: formData.certificate_holder_name,
-        certificate_holder_address: formData.certificate_holder_address,
-        effective_date: formData.effective_date,
-        expiration_date: formData.expiration_date,
-        coverage_details: formData.coverage_details,
-        additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : undefined,
-        special_provisions: formData.special_provisions,
-        account: ticket.accounts,
-        policy: ticket.policies?.[0],
-      });
-
-      // Download the PDF
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `COI-${savedCOI.certificate_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: 'PDF Generated',
-        description: 'Certificate of Insurance has been generated and downloaded',
-      });
+      if (publicUrl) {
+        // Auto-download the generated PDF
+        await downloadCOI(publicUrl, savedCOI.certificate_number);
+      }
     } catch (error: any) {
-      toast({
-        title: 'Failed to generate PDF',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Error already handled by the hook
+      console.error('PDF generation failed:', error);
     } finally {
       setLoading(false);
     }
@@ -397,7 +388,12 @@ export default function COIGenerator() {
                       </div>
                       <p className="text-sm text-muted-foreground">{coi.certificate_holder_name}</p>
                       {coi.document_url && (
-                        <Button size="sm" variant="link" className="p-0 h-auto mt-2">
+                        <Button 
+                          size="sm" 
+                          variant="link" 
+                          className="p-0 h-auto mt-2"
+                          onClick={() => downloadCOI(coi.document_url!, coi.certificate_number)}
+                        >
                           <Download className="h-3 w-3 mr-1" />
                           Download
                         </Button>
