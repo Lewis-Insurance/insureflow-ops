@@ -2,6 +2,14 @@ import jsPDF from 'jspdf';
 import { z } from 'zod';
 import { PDFLayoutManager } from './PDFLayoutManager';
 
+// Export options interface
+export interface ExportOptions {
+  format: 'blob' | 'base64' | 'download';
+  filename?: string;
+  addWatermark?: boolean;
+  watermarkText?: string;
+}
+
 // Validation schema for COI PDF data
 const COIPDFDataSchema = z.object({
   certificate_number: z.string().min(1, "Certificate number is required"),
@@ -19,6 +27,7 @@ const COIPDFDataSchema = z.object({
   }),
   additional_insureds: z.array(z.string().max(200)).optional(),
   special_provisions: z.string().max(2000).optional(),
+  signature_data: z.string().optional(), // Base64 encoded signature image
   account: z.object({
     name: z.string().min(1),
     address_line1: z.string().optional(),
@@ -182,6 +191,41 @@ class COIPDFGenerator {
     this.layout.addMultilineText(provisions, 20, 170, 10, 'normal');
   }
   
+  private addWatermark(text: string = 'SAMPLE'): void {
+    const pageCount = this.doc.getNumberOfPages();
+    
+    for (let i = 1; i <= pageCount; i++) {
+      this.doc.setPage(i);
+      this.doc.saveGraphicsState();
+      // Set opacity for watermark
+      this.doc.setGState({ opacity: 0.1 });
+      this.doc.setFontSize(60);
+      this.doc.setTextColor(128, 128, 128);
+      this.doc.text(text, 105, 150, {
+        align: 'center',
+        angle: 45,
+      });
+      this.doc.restoreGraphicsState();
+    }
+  }
+
+  private addDigitalSignature(signatureData: string, x: number = 20, y: number = 240): void {
+    if (!signatureData) return;
+
+    try {
+      // Add signature image if provided (base64 PNG)
+      this.doc.addImage(signatureData, 'PNG', x, y, 50, 20);
+
+      // Add signature line and date
+      this.doc.setFontSize(8);
+      this.doc.line(x, y + 25, x + 50, y + 25);
+      this.doc.text('Authorized Signature', x, y + 30);
+      this.doc.text(`Date: ${new Date().toLocaleDateString()}`, x + 60, y + 30);
+    } catch (error) {
+      console.error('Failed to add signature:', error);
+    }
+  }
+
   private addFooter(): void {
     const pageCount = this.doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -195,42 +239,70 @@ class COIPDFGenerator {
       );
     }
   }
-  
-  generate(data: COIPDFData): Blob {
+
+  generate(data: COIPDFData, options?: { addWatermark?: boolean; watermarkText?: string }): jsPDF {
     // Header
     this.addHeader(data.certificate_number);
-    
+
     // Producer and Insured
     this.addProducerAndInsured(data.account);
-    
+
     // Certificate Holder
     this.addCertificateHolder(data.certificate_holder_name, data.certificate_holder_address);
-    
+
     // Coverage Table
     this.addCoverageTable(data.coverage_details, data.policy?.policy_number);
-    
+
     // Policy Period
     this.addPolicyPeriod(data.effective_date, data.expiration_date);
-    
+
     // Additional Insureds
     this.addAdditionalInsureds(data.additional_insureds);
-    
+
     // Special Provisions
     this.addSpecialProvisions(data.special_provisions);
-    
+
+    // Digital Signature (if provided)
+    if (data.signature_data) {
+      this.addDigitalSignature(data.signature_data);
+    }
+
     // Footer
     this.addFooter();
-    
-    return this.doc.output('blob');
+
+    // Watermark (if requested)
+    if (options?.addWatermark) {
+      this.addWatermark(options.watermarkText);
+    }
+
+    return this.doc;
   }
 }
 
-export function generateCOIPDF(rawData: unknown): Blob {
+export function generateCOIPDF(
+  rawData: unknown,
+  options: ExportOptions = { format: 'blob' }
+): Blob | string | void {
   // Validate and parse data
   const data = COIPDFDataSchema.parse(rawData);
-  
+
   // Generate PDF using the class
   const generator = new COIPDFGenerator();
-  return generator.generate(data);
+  const doc = generator.generate(data, {
+    addWatermark: options.addWatermark,
+    watermarkText: options.watermarkText,
+  });
+
+  // Return based on format option
+  switch (options.format) {
+    case 'download':
+      doc.save(options.filename || `COI_${data.certificate_number}.pdf`);
+      return;
+    case 'base64':
+      return doc.output('datauristring');
+    case 'blob':
+    default:
+      return doc.output('blob') as Blob;
+  }
 }
   

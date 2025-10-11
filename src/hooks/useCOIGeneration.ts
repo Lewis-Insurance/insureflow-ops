@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { generateCOIPDF, COIPDFData } from '@/lib/pdfGenerator';
+import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
 
 export function useCOIGeneration() {
@@ -10,11 +10,15 @@ export function useCOIGeneration() {
   const generateAndAttachCOI = async (
     ticketId: string,
     coiId: string,
-    coiData: COIPDFData
+    coiData: COIPDFData,
+    exportOptions?: Partial<ExportOptions>
   ): Promise<string | null> => {
     try {
-      // Generate PDF
-      const pdfBlob = generateCOIPDF(coiData);
+      // Generate PDF with options
+      const pdfBlob = generateCOIPDF(coiData, {
+        format: 'blob',
+        ...exportOptions,
+      }) as Blob;
 
       // Upload to Supabase Storage
       const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
