@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as pdfjs from 'npm:pdfjs-serverless@0.7.0';
+import { getDocument } from 'https://esm.sh/pdfjs-serverless@1.1.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -353,7 +353,7 @@ serve(async (req) => {
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Parse PDF using pdfjs-serverless
-    const pdfDoc = await pdfjs.getDocument({
+    const pdfDoc = await getDocument({
       data: uint8Array,
       useSystemFonts: true
     }).promise;
