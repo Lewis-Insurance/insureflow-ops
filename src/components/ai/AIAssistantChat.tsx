@@ -234,24 +234,26 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     setInput('');
     setIsLoading(true);
 
-    // Save user message to database
+    // Abort any existing request
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const { signal } = abortRef.current;
+
+    // Initialize KB tracking
+    let kbRecordId: string | null = null;
+
+    // Save user message to database (will update with kb_record_id later if found)
     if (conversationId) {
-      supabase.from('ai_messages').insert({
+      await supabase.from('ai_messages').insert({
         conversation_id: conversationId,
         role: 'user',
         content: userMessage.content,
         metadata: {
           documents: userMessage.documents,
+          kb_record_id: null // Will be set later if KB is used
         } as any,
-      }).then(({ error }) => {
-        if (error) console.error('Error saving user message:', error);
       });
     }
-
-    // Abort any existing request
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    const { signal } = abortRef.current;
 
     try {
       const documentsWithContent = await Promise.all(
@@ -266,7 +268,6 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       // Query knowledge base first if the message is a question (no docs)
       let knowledgeBaseContext = '';
       let kbSourceAttribution = '';
-      let kbRecordId: string | null = null;
 
       if (input.trim() && documentsWithContent.length === 0) {
         const cacheKey = `${input.trim()}_${userCarrier}_${userJurisdiction}_${userProgram || ''}`;
@@ -333,23 +334,20 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
       // Save assistant message to database
       if (conversationId && fullResponse) {
-        supabase.from('ai_messages').insert({
+        await supabase.from('ai_messages').insert({
           conversation_id: conversationId,
           role: 'assistant',
           content: fullResponse + kbSourceAttribution,
-          metadata: {} as any,
-        }).then(({ error }) => {
-          if (error) console.error('Error saving assistant message:', error);
+          metadata: {
+            kb_record_id: kbRecordId
+          } as any,
         });
 
         // Update conversation timestamp
-        supabase
+        await supabase
           .from('ai_conversations')
           .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId)
-          .then(({ error }) => {
-            if (error) console.error('Error updating conversation:', error);
-          });
+          .eq('id', conversationId);
       }
       
       setAttachedDocs([]);
