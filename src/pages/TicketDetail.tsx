@@ -25,7 +25,13 @@ export default function TicketDetail() {
   const [aiActions, setAiActions] = useState<any[]>([]);
   const [generatingAI, setGeneratingAI] = useState(false);
   
-  const { messages, addMessage } = useTicketMessages(id);
+  const { 
+    messages, 
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    addMessage 
+  } = useTicketMessages(id);
   const { updateTicket } = useTickets();
 
   useEffect(() => {
@@ -356,38 +362,54 @@ export default function TicketDetail() {
                       No messages yet. Start the conversation below.
                     </p>
                   ) : (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex gap-3 ${message.author_type === 'ai' ? 'bg-primary/5 -mx-6 px-6 py-3' : ''}`}
-                      >
-                        <div className="flex-shrink-0">
-                          {message.author_type === 'ai' ? (
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                              <Brain className="h-4 w-4 text-primary" />
-                            </div>
-                          ) : (
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                              <User className="h-4 w-4" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">
-                              {message.profiles?.full_name || message.author_type}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                            </span>
-                            {message.is_internal && (
-                              <Badge variant="outline" className="text-xs">Internal</Badge>
+                    <>
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex gap-3 ${message.author_type === 'ai' ? 'bg-primary/5 -mx-6 px-6 py-3' : ''}`}
+                        >
+                          <div className="flex-shrink-0">
+                            {message.author_type === 'ai' ? (
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Brain className="h-4 w-4 text-primary" />
+                              </div>
+                            ) : (
+                              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                <User className="h-4 w-4" />
+                              </div>
                             )}
                           </div>
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">
+                                {message.profiles?.full_name || message.author_type}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                              </span>
+                              {message.is_internal && (
+                                <Badge variant="outline" className="text-xs">Internal</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                      
+                      {hasNextPage && (
+                        <div className="flex justify-center py-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            {isFetchingNextPage ? 'Loading...' : 'Load Earlier Messages'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
