@@ -68,6 +68,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<File[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -77,10 +78,96 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const userCarrier = context?.metadata?.carrier || '';
   const userJurisdiction = context?.metadata?.jurisdiction || 'FL';
 
-  // Update greeting when context changes
+  // Load or create conversation on mount
   useEffect(() => {
-    setMessages([{ role: 'assistant', content: getContextualGreeting(context), timestamp: new Date() }]);
-  }, [context]);
+    const initConversation = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const contextType = context?.type;
+        const contextId = context?.id;
+
+        // Try to find existing conversation for this context
+        const { data: existingConversations } = await supabase
+          .from('ai_conversations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(10);
+
+        // Filter conversations by context in JavaScript to avoid TS issues
+        const matchingConversation = existingConversations?.find((conv) => {
+          const convContext = conv.context as any;
+          if (contextType && contextId) {
+            return convContext?.type === contextType && convContext?.id === contextId;
+          }
+          return !convContext;
+        });
+
+        let convId: string;
+
+        if (matchingConversation) {
+          // Use existing conversation
+          convId = matchingConversation.id;
+          setConversationId(convId);
+
+          // Load messages
+          const { data: savedMessages } = await supabase
+            .from('ai_messages')
+            .select('*')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: true });
+
+          if (savedMessages && savedMessages.length > 0) {
+            const loadedMessages: Message[] = savedMessages.map((msg) => ({
+              role: msg.role as 'user' | 'assistant',
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+              documents: (msg.metadata as any)?.documents,
+            }));
+            setMessages(loadedMessages);
+          }
+        } else {
+          // Create new conversation
+          const contextPayload = contextType && contextId 
+            ? { type: contextType, id: contextId, name: context?.name || '' } 
+            : null;
+
+          const { data: newConversation, error } = await supabase
+            .from('ai_conversations')
+            .insert({
+              user_id: user.id,
+              account_id: contextId || null,
+              context: contextPayload as any,
+              title: context?.name || 'AI Assistant Chat',
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          if (newConversation) {
+            convId = newConversation.id;
+            setConversationId(convId);
+
+            // Save greeting message
+            const greeting = getContextualGreeting(context);
+            await supabase.from('ai_messages').insert({
+              conversation_id: convId,
+              role: 'assistant',
+              content: greeting,
+              metadata: {} as any,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+      }
+    };
+
+    initConversation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context?.type, context?.id]);
 
   // Cleanup on unmount
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -109,6 +196,20 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+
+    // Save user message to database
+    if (conversationId) {
+      supabase.from('ai_messages').insert({
+        conversation_id: conversationId,
+        role: 'user',
+        content: userMessage.content,
+        metadata: {
+          documents: userMessage.documents,
+        } as any,
+      }).then(({ error }) => {
+        if (error) console.error('Error saving user message:', error);
+      });
+    }
 
     // Abort any existing request
     abortRef.current?.abort();
@@ -197,6 +298,28 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         timestamp: new Date() 
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      
+      // Save assistant message to database
+      if (conversationId) {
+        supabase.from('ai_messages').insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: assistantMessage.content,
+          metadata: {} as any,
+        }).then(({ error }) => {
+          if (error) console.error('Error saving assistant message:', error);
+        });
+
+        // Update conversation timestamp
+        supabase
+          .from('ai_conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', conversationId)
+          .then(({ error }) => {
+            if (error) console.error('Error updating conversation:', error);
+          });
+      }
+      
       setAttachedDocs([]);
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
