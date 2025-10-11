@@ -315,6 +315,69 @@ export function useCOIGeneration() {
     return results;
   };
 
+  const generateAndEmailCOI = async (
+    ticketId: string,
+    coiId: string,
+    coiData: COIPDFData,
+    recipientEmail: string,
+    exportOptions?: Partial<ExportOptions>
+  ): Promise<void> => {
+    try {
+      // Step 1: Generate and upload COI
+      const publicUrl = await generateAndAttachCOI(
+        ticketId,
+        coiId,
+        coiData,
+        exportOptions
+      );
+
+      if (!publicUrl) {
+        throw new Error('Failed to generate COI');
+      }
+
+      // Step 2: Send email via edge function
+      const { data, error } = await supabase.functions.invoke('send-coi-email', {
+        body: {
+          to: recipientEmail,
+          certificateNumber: coiData.certificate_number,
+          certificateUrl: publicUrl,
+          holderName: coiData.certificate_holder_name,
+        },
+      });
+
+      if (error) throw error;
+
+      // Step 3: Update ticket metadata with email status
+      const { error: updateError } = await supabase
+        .from('tickets')
+        .update({
+          metadata: {
+            coi_emailed_to: recipientEmail,
+            coi_emailed_at: new Date().toISOString(),
+          } as any,
+        })
+        .eq('id', ticketId);
+
+      if (updateError) {
+        console.error('Failed to update ticket metadata:', updateError);
+        // Don't throw - email was sent successfully
+      }
+
+      toast({
+        title: 'COI Sent Successfully',
+        description: `Certificate emailed to ${recipientEmail}`,
+      });
+    } catch (error: any) {
+      console.error('Email delivery error:', error);
+      toast({
+        title: 'Email Failed',
+        description: error.message || 'Failed to email certificate',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const downloadCOI = async (documentUrl: string, certificateNumber: string) => {
     try {
       const response = await fetch(documentUrl);
@@ -348,6 +411,7 @@ export function useCOIGeneration() {
     downloadCOI,
     previewCOI,
     batchGenerateCOIs,
+    generateAndEmailCOI,
     progress,
   };
 }
