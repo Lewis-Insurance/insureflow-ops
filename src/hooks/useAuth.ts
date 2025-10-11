@@ -36,7 +36,14 @@ export function useAuth() {
         .maybeSingle();
       
       if (error) {
-        // Create minimal profile to prevent infinite loading - don't show toast for profile fetch failures
+        console.error('Profile fetch error:', error);
+        toast({
+          title: "Profile Error",
+          description: `Failed to load profile: ${error.message}`,
+          variant: "destructive",
+        });
+        
+        // Create minimal profile to prevent infinite loading
         const fallbackProfile: UserProfile = {
           id: userId,
           full_name: userEmail?.split('@')[0] || 'User',
@@ -50,6 +57,11 @@ export function useAuth() {
       }
 
       if (profileData) {
+        console.log('Profile loaded successfully:', { 
+          id: profileData.id, 
+          role: profileData.role, 
+          is_staff: profileData.is_staff 
+        });
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
@@ -58,8 +70,11 @@ export function useAuth() {
             : Boolean(profileData.notification_email),
           notification_sms: false // Default since field doesn't exist in database yet
         });
+      } else {
+        console.warn('No profile data found for user:', userId);
       }
     } catch (error) {
+      console.error('Profile fetch exception:', error);
       // Fallback profile on any error to prevent infinite loading
       const fallbackProfile: UserProfile = {
         id: userId,
@@ -71,7 +86,7 @@ export function useAuth() {
       };
       setProfile(fallbackProfile);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     let mounted = true;
