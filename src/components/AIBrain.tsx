@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Brain, Search, Sparkles, RefreshCw, Plus, 
-  Database, Shield, Zap, Loader2, Tag, Download, Upload
+  Database, Shield, Zap, Loader2, Tag, Download, Upload, FileText
 } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { useAIBrain } from '@/hooks/useAIBrain';
@@ -35,6 +35,8 @@ const InsuranceAIBrain = () => {
     source: ''
   });
   const [isImporting, setIsImporting] = useState(false);
+  const [showDocumentImport, setShowDocumentImport] = useState(false);
+  const [isConvertingDocs, setIsConvertingDocs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleSearch = async () => {
@@ -167,6 +169,82 @@ const InsuranceAIBrain = () => {
       }
     }
   };
+
+  const convertDocumentToKnowledge = async (document: any) => {
+    // Extract key sections from document
+    const knowledge = {
+      title: document.name?.replace(/\.[^/.]+$/, "") || document.filename?.replace(/\.[^/.]+$/, "") || "Untitled",
+      content: document.extracted_content || document.content || "No content available",
+      category: document.category || 'policies',
+      tags: document.keywords || document.tags || [],
+      source: document.name || document.filename || 'Document Import'
+    };
+    
+    const { error } = await supabase.from('knowledge_base').insert(knowledge);
+    if (error) throw error;
+    return knowledge;
+  };
+
+  const handleImportFromDocuments = async () => {
+    setIsConvertingDocs(true);
+    
+    try {
+      // Fetch documents that haven't been converted yet
+      const { data: documents, error: docError } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (docError) throw docError;
+
+      if (!documents || documents.length === 0) {
+        toast({
+          title: "No Documents",
+          description: "No documents found in Document Intelligence. Upload some documents first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let convertedCount = 0;
+      const errors: string[] = [];
+
+      for (const doc of documents) {
+        try {
+          await convertDocumentToKnowledge(doc);
+          convertedCount++;
+        } catch (err: any) {
+          errors.push(`${doc.name || doc.filename}: ${err.message}`);
+        }
+      }
+
+      if (convertedCount > 0) {
+        toast({
+          title: "Success",
+          description: `Converted ${convertedCount} documents to knowledge entries`,
+        });
+        fetchKnowledgeBase();
+      }
+
+      if (errors.length > 0) {
+        toast({
+          title: "Partial Success",
+          description: `Converted ${convertedCount} documents, but ${errors.length} failed`,
+          variant: "destructive",
+        });
+      }
+
+    } catch (error: any) {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsConvertingDocs(false);
+      setShowDocumentImport(false);
+    }
+  };
   
   // Group entries by category
   const categorizedEntries = entries.reduce((acc, entry) => {
@@ -218,6 +296,18 @@ const InsuranceAIBrain = () => {
               >
                 <Download className="w-4 h-4 mr-2" />
                 Download Template
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDocumentImport(true)}
+                disabled={isConvertingDocs}
+              >
+                {isConvertingDocs ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4 mr-2" />
+                )}
+                Import from Documents
               </Button>
               <Button
                 variant="outline"
@@ -430,6 +520,60 @@ const InsuranceAIBrain = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Import from Documents Dialog */}
+      <Dialog open={showDocumentImport} onOpenChange={setShowDocumentImport}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import from Document Intelligence</DialogTitle>
+            <DialogDescription>
+              Convert documents from Document Intelligence into knowledge base entries
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will convert all documents from your Document Intelligence into knowledge base entries. 
+              Each document will be added with its extracted content, title, and metadata.
+            </p>
+            <div className="bg-muted p-4 rounded-lg">
+              <h4 className="font-semibold mb-2">What gets converted:</h4>
+              <ul className="text-sm space-y-1 list-disc list-inside">
+                <li>Document title becomes knowledge title</li>
+                <li>Extracted content becomes knowledge content</li>
+                <li>Document category is preserved</li>
+                <li>Keywords/tags are imported</li>
+                <li>Original filename is stored as source</li>
+              </ul>
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleImportFromDocuments}
+                disabled={isConvertingDocs}
+                className="flex-1"
+              >
+                {isConvertingDocs ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Convert Documents
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setShowDocumentImport(false)}
+                disabled={isConvertingDocs}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Knowledge Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
