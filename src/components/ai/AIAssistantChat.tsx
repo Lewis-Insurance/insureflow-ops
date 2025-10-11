@@ -332,7 +332,19 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       if (signal.aborted) return;
       if (error) throw error;
 
-      const fullResponse = typeof data === 'string' ? data : (data?.response || data?.text || '');
+      // Extract response properly - handle string, response field, or analysis field
+      let fullResponse = '';
+      if (typeof data === 'string') {
+        fullResponse = data;
+      } else if (data?.response) {
+        fullResponse = data.response;
+      } else if (data?.analysis) {
+        fullResponse = data.analysis;
+      } else if (data?.message) {
+        fullResponse = data.message;
+      } else {
+        fullResponse = 'I received your question but couldn\'t generate a response. Please try again.';
+      }
 
       const assistantMessage: Message = { 
         role: 'assistant', 
