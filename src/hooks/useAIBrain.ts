@@ -19,6 +19,15 @@ export function useAIBrain() {
       });
 
       if (error) throw error;
+      
+      // Log knowledge gap if confidence is low or no answer found
+      if (data && (data.confidence < 0.5 || !data.answer)) {
+        await supabase.rpc('log_knowledge_gap', {
+          p_question: query,
+          p_context: category || window.location.pathname
+        });
+      }
+      
       return data;
     } catch (error: any) {
       toast({

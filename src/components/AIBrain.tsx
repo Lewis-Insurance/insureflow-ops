@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { 
   Brain, Search, Sparkles, RefreshCw, Plus, 
-  Database, Shield, Zap, Loader2, Tag, Download, Upload, FileText
+  Database, Shield, Zap, Loader2, Tag, Download, Upload, FileText, Check, Trash2
 } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { useAIBrain } from '@/hooks/useAIBrain';
+import { useKnowledgeGaps } from '@/hooks/useKnowledgeGaps';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 const InsuranceAIBrain = () => {
   const { entries, loading: kbLoading, stats, fetchKnowledgeBase } = useKnowledgeBase();
   const { queryKnowledge, updateEmbeddings, loading: aiLoading } = useAIBrain();
+  const { gaps, loading: gapsLoading, fetchGaps, markAsAnswered, deleteGap } = useKnowledgeGaps();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -465,67 +467,158 @@ const InsuranceAIBrain = () => {
         </Card>
       </div>
       
-      {/* Knowledge Entries by Category */}
+      {/* Main Content Tabs */}
       <Card>
         <CardHeader>
-          <CardTitle>Knowledge Base Entries</CardTitle>
+          <CardTitle>Knowledge Management</CardTitle>
           <CardDescription>
-            Browse and manage your insurance knowledge base
+            Browse entries, track knowledge gaps, and query AI
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {kbLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>No knowledge entries found</p>
-            </div>
-          ) : (
-            <Tabs defaultValue={categories[0] || 'all'}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                {categories.slice(0, 4).map(cat => (
-                  <TabsTrigger key={cat} value={cat}>
-                    {cat} ({categorizedEntries[cat].length})
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              
-              {categories.map(category => (
-                <TabsContent key={category} value={category} className="space-y-2">
-                  {categorizedEntries[category].map(entry => (
-                    <div key={entry.id} className="p-4 border rounded-lg hover:bg-gray-50">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-semibold">{entry.title}</h4>
-                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                            {entry.content}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-2">
-                            {entry.tags.map((tag, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
+          <Tabs defaultValue="knowledge" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
+              <TabsTrigger value="gaps">
+                Knowledge Gaps
+                {gaps.filter(g => !g.answered).length > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {gaps.filter(g => !g.answered).length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="query">Query AI</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="knowledge" className="space-y-4">
+              {kbLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No knowledge entries found</p>
+                </div>
+              ) : (
+                <Tabs defaultValue={categories[0] || 'all'}>
+                  <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+                    {categories.slice(0, 4).map(cat => (
+                      <TabsTrigger key={cat} value={cat}>
+                        {cat} ({categorizedEntries[cat].length})
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  
+                  {categories.map(category => (
+                    <TabsContent key={category} value={category} className="space-y-2">
+                      {categorizedEntries[category].map(entry => (
+                        <div key={entry.id} className="p-4 border rounded-lg hover:bg-gray-50">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-semibold">{entry.title}</h4>
+                              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                {entry.content}
+                              </p>
+                              <div className="flex items-center space-x-2 mt-2">
+                                {entry.tags.map((tag, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                            <Badge variant="secondary">{entry.category}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                            <span className="text-xs text-gray-500">
+                              Source: {entry.source || 'Manual Entry'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Updated: {new Date(entry.updated_at).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
-                        <Badge variant="secondary">{entry.category}</Badge>
-                      </div>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                        <span className="text-xs text-gray-500">
-                          Source: {entry.source || 'Manual Entry'}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          Updated: {new Date(entry.updated_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
+                      ))}
+                    </TabsContent>
                   ))}
-                </TabsContent>
-              ))}
-            </Tabs>
-          )}
+                </Tabs>
+              )}
+            </TabsContent>
+
+            <TabsContent value="gaps" className="space-y-4">
+              <div className="rounded-md border">
+                <div className="p-4 border-b bg-muted/50">
+                  <h3 className="font-semibold">Unanswered Questions</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Track questions the AI couldn't answer to identify knowledge gaps
+                  </p>
+                </div>
+                {gapsLoading ? (
+                  <div className="p-8 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+                  </div>
+                ) : gaps.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No knowledge gaps found
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {gaps.map((gap) => (
+                      <div key={gap.id} className="p-4 hover:bg-muted/50">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{gap.question}</p>
+                              <Badge variant={gap.answered ? "outline" : "default"}>
+                                Asked {gap.frequency}x
+                              </Badge>
+                              {gap.answered && (
+                                <Badge variant="secondary">Answered</Badge>
+                              )}
+                            </div>
+                            {gap.context && (
+                              <p className="text-sm text-muted-foreground">
+                                Context: {gap.context}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Last asked: {new Date(gap.last_asked_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {!gap.answered && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => markAsAnswered(gap.id)}
+                                title="Mark as answered"
+                              >
+                                <Check className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteGap(gap.id)}
+                              title="Delete gap"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="query" className="space-y-4">
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Use the AI-Powered Knowledge Search above to query the knowledge base</p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

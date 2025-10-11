@@ -2430,8 +2430,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           embedding: string | null
+          embedding_model: string | null
+          helpful_count: number | null
           id: string
+          last_accessed: string | null
           metadata: Json | null
+          not_helpful_count: number | null
           processed_at: string | null
           source: string | null
           tags: string[] | null
@@ -2447,8 +2451,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           embedding?: string | null
+          embedding_model?: string | null
+          helpful_count?: number | null
           id?: string
+          last_accessed?: string | null
           metadata?: Json | null
+          not_helpful_count?: number | null
           processed_at?: string | null
           source?: string | null
           tags?: string[] | null
@@ -2464,8 +2472,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           embedding?: string | null
+          embedding_model?: string | null
+          helpful_count?: number | null
           id?: string
+          last_accessed?: string | null
           metadata?: Json | null
+          not_helpful_count?: number | null
           processed_at?: string | null
           source?: string | null
           tags?: string[] | null
@@ -2479,6 +2491,80 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_gaps: {
+        Row: {
+          answered: boolean | null
+          context: string | null
+          created_at: string | null
+          frequency: number | null
+          id: string
+          last_asked_at: string | null
+          question: string
+          updated_at: string | null
+        }
+        Insert: {
+          answered?: boolean | null
+          context?: string | null
+          created_at?: string | null
+          frequency?: number | null
+          id?: string
+          last_asked_at?: string | null
+          question: string
+          updated_at?: string | null
+        }
+        Update: {
+          answered?: boolean | null
+          context?: string | null
+          created_at?: string | null
+          frequency?: number | null
+          id?: string
+          last_asked_at?: string | null
+          question?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      knowledge_usage_logs: {
+        Row: {
+          context: string | null
+          created_at: string | null
+          id: string
+          knowledge_base_id: string | null
+          query: string | null
+          response_helpful: boolean | null
+          response_time_ms: number | null
+          user_id: string | null
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string | null
+          id?: string
+          knowledge_base_id?: string | null
+          query?: string | null
+          response_helpful?: boolean | null
+          response_time_ms?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          context?: string | null
+          created_at?: string | null
+          id?: string
+          knowledge_base_id?: string | null
+          query?: string | null
+          response_helpful?: boolean | null
+          response_time_ms?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_usage_logs_knowledge_base_id_fkey"
+            columns: ["knowledge_base_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
             referencedColumns: ["id"]
           },
         ]
@@ -4557,6 +4643,10 @@ export type Database = {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: unknown
       }
+      log_knowledge_gap: {
+        Args: { p_context?: string; p_question: string }
+        Returns: string
+      }
       log_profile_access: {
         Args: { action_type: string; details_json?: Json; target_id: string }
         Returns: undefined
@@ -4614,6 +4704,24 @@ export type Database = {
           content: string
           id: string
           similarity: number
+          tags: string[]
+          title: string
+        }[]
+      }
+      search_knowledge_base: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+          search_category?: string
+        }
+        Returns: {
+          category: string
+          confidence_score: number
+          content: string
+          id: string
+          similarity: number
+          source: string
           tags: string[]
           title: string
         }[]
