@@ -17,13 +17,32 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const { action, query, documents } = await req.json();
-    console.log('AI Document Intelligence Request:', { action, documentsCount: documents?.length });
+    const { action, query, documents, imageData } = await req.json();
+    console.log('AI Document Intelligence Request:', { action, documentsCount: documents?.length, hasImage: !!imageData });
 
     let systemPrompt = '';
     let userPrompt = '';
 
     switch (action) {
+      case 'ocr':
+        systemPrompt = `You are an advanced OCR system specialized in insurance documents. Extract ALL text accurately from images, including:
+1. Typed and handwritten text
+2. Tables and structured data
+3. Headers, footers, and metadata
+4. Policy numbers, dates, amounts
+5. Signatures and stamps (describe location)
+
+Return structured JSON with:
+- extracted_text: full text content
+- document_type: detected type (policy, claim, certificate, etc.)
+- key_fields: {policy_number, insured_name, dates, amounts}
+- confidence: 0-100 score
+- tables: array of detected tables
+- language: detected language`;
+        
+        userPrompt = `Extract all text and data from this insurance document image. Be thorough and accurate.`;
+        break;
+
       case 'search':
         systemPrompt = `You are an AI-powered document search system for insurance documents. Your role is to:
 1. Understand natural language queries about insurance policies, claims, and documents
@@ -75,7 +94,29 @@ Return as structured JSON.`;
         throw new Error(`Unknown action: ${action}`);
     }
 
-    // Call Lovable AI
+    // Call Lovable AI with vision support for OCR
+    const messages: any[] = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    if (action === 'ocr' && imageData) {
+      // For OCR, send image data to Gemini vision
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: userPrompt },
+          { 
+            type: 'image_url', 
+            image_url: { 
+              url: imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${imageData}`
+            }
+          }
+        ]
+      });
+    } else {
+      messages.push({ role: 'user', content: userPrompt });
+    }
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -84,10 +125,7 @@ Return as structured JSON.`;
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
+        messages
       }),
     });
 
@@ -118,7 +156,27 @@ Return as structured JSON.`;
     // Parse AI response based on action
     let result: any = {};
     
-    if (action === 'search') {
+    if (action === 'ocr') {
+      // Parse OCR results
+      try {
+        const ocrData = JSON.parse(aiResponse);
+        result = { 
+          success: true,
+          ocr: ocrData,
+          raw_text: ocrData.extracted_text
+        };
+      } catch {
+        // Fallback if JSON parsing fails
+        result = {
+          success: true,
+          ocr: {
+            extracted_text: aiResponse,
+            confidence: 85
+          },
+          raw_text: aiResponse
+        };
+      }
+    } else if (action === 'search') {
       // Try to parse JSON, fallback to simulated results
       try {
         result = { results: JSON.parse(aiResponse) };

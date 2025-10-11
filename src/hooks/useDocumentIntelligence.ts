@@ -94,19 +94,55 @@ export function useDocumentIntelligence() {
     }
   }, [toast]);
 
-  // Process document with AI
-  const processDocument = async (file: File): Promise<void> => {
+  // Process document with AI including OCR for images/PDFs
+  const processDocument = async (file: File): Promise<any> => {
+    let ocrResult = null;
+
+    // Check if file needs OCR (images or PDFs)
+    const needsOCR = file.type.includes('image') || file.type.includes('pdf');
+    
+    if (needsOCR) {
+      setProcessingStatus('Running Enhanced OCR...');
+      
+      try {
+        // Convert file to base64 for OCR
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        // Call OCR edge function
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ai-document-intelligence', {
+          body: {
+            action: 'ocr',
+            imageData: base64
+          }
+        });
+
+        if (ocrError) throw ocrError;
+        ocrResult = ocrData?.ocr;
+        
+        setProcessingStatus('OCR complete - extracting entities...');
+      } catch (err) {
+        console.error('OCR failed:', err);
+        setProcessingStatus('OCR failed - continuing with basic processing...');
+      }
+    }
+    
     setProcessingStatus('Analyzing document structure...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     setProcessingStatus('Extracting key information...');
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setProcessingStatus('Generating embeddings...');
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    setProcessingStatus('Indexing for search...');
+    setProcessingStatus('Generating embeddings...');
     await new Promise(resolve => setTimeout(resolve, 800));
+    
+    setProcessingStatus('Indexing for search...');
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    return ocrResult;
   };
 
   // Upload documents
@@ -146,8 +182,8 @@ export function useDocumentIntelligence() {
         const file = files[i];
         setUploadProgress((i / files.length) * 100);
 
-        // Process with AI
-        await processDocument(file);
+        // Process with AI (includes OCR for images/PDFs)
+        const ocrResult = await processDocument(file);
 
         // Upload to storage
         const fileExt = file.name.split('.').pop();
@@ -163,14 +199,15 @@ export function useDocumentIntelligence() {
 
         if (uploadError) throw uploadError;
 
-        // Create document record
+        // Create document record with OCR metadata
         const docInsert: any = {
           account_id: membership.account_id,
           filename: file.name,
           name: file.name,
           kind: 'document',
-          category: file.name.includes('policy') ? 'policy' : 
-                   file.name.includes('claim') ? 'claim' : 'other',
+          category: ocrResult?.document_type || 
+                   (file.name.includes('policy') ? 'policy' : 
+                    file.name.includes('claim') ? 'claim' : 'other'),
           storage_path: filePath,
           storage_bucket: 'customer-docs',
           file_missing: false,

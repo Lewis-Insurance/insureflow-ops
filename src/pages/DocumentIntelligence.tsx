@@ -3,7 +3,7 @@ import {
   FileText, Upload, Search, Brain, Database, 
   TrendingUp, FileSearch, Sparkles, ChevronRight,
   AlertCircle, Loader2, Filter, Download, Eye, 
-  Trash2, Shield, RefreshCw, ArrowLeft
+  Trash2, Shield, RefreshCw, ArrowLeft, ScanLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,7 +89,10 @@ export default function DocumentIntelligence() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Document Intelligence Hub</h1>
-                <p className="text-sm text-muted-foreground">AI-powered policy and document analysis</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Enhanced OCR + AI analysis for policies and documents
+                </p>
               </div>
             </div>
             
@@ -108,7 +111,7 @@ export default function DocumentIntelligence() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.docx,.txt,.doc"
+                accept=".pdf,.docx,.txt,.doc,.jpg,.jpeg,.png"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -314,7 +317,13 @@ export default function DocumentIntelligence() {
                 <CardContent className="p-12 text-center">
                   <Database className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No documents yet</h3>
-                  <p className="text-muted-foreground mb-4">Upload your insurance policies, contracts, and documents to get started</p>
+                  <p className="text-muted-foreground mb-4">
+                    Upload insurance policies, contracts, and documents to get started
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4 flex items-center justify-center gap-1.5">
+                    <ScanLine className="h-3.5 w-3.5" />
+                    Supports PDF, DOCX, TXT, and images (JPG, PNG) with Enhanced OCR
+                  </p>
                   <Button onClick={() => fileInputRef.current?.click()}>
                     <Upload className="w-4 h-4 mr-2" />
                     Upload Documents
