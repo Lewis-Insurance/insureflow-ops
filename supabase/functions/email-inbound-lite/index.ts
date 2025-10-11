@@ -142,12 +142,6 @@ serve(async (req) => {
       }
     }
 
-    const metadata: any = {};
-    if (messageId) metadata.email_message_id = messageId;
-    if (inReplyTo) metadata.email_in_reply_to = inReplyTo;
-    if (from) metadata.external_sender = from;
-    if (recipients.length) metadata.external_recipients = recipients;
-
     const { error: merr } = await sb.from('ticket_messages').insert({
       ticket_id: ticketId,
       author_id: requesterId,
@@ -155,8 +149,11 @@ serve(async (req) => {
       message_type: 'email',
       content,
       is_internal: false,
+      email_message_id: messageId || null,
+      email_in_reply_to: inReplyTo || null,
+      external_sender: from,
+      external_recipients: recipients,
       attachments,
-      metadata,
     });
     if (merr) throw merr;
 

@@ -213,6 +213,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_actions: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          id: string
+          payload: Json
+          result: Json | null
+          source_message_id: string | null
+          status: string
+          ticket_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          id?: string
+          payload: Json
+          result?: Json | null
+          source_message_id?: string | null
+          status?: string
+          ticket_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          id?: string
+          payload?: Json
+          result?: Json | null
+          source_message_id?: string | null
+          status?: string
+          ticket_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_actions_source_message_id_fkey"
+            columns: ["source_message_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_actions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -3557,6 +3608,10 @@ export type Database = {
           author_type: string
           content: string
           created_at: string
+          email_in_reply_to: string | null
+          email_message_id: string | null
+          external_recipients: string[] | null
+          external_sender: string | null
           id: string
           is_internal: boolean | null
           message_type: string
@@ -3570,6 +3625,10 @@ export type Database = {
           author_type?: string
           content: string
           created_at?: string
+          email_in_reply_to?: string | null
+          email_message_id?: string | null
+          external_recipients?: string[] | null
+          external_sender?: string | null
           id?: string
           is_internal?: boolean | null
           message_type?: string
@@ -3583,6 +3642,10 @@ export type Database = {
           author_type?: string
           content?: string
           created_at?: string
+          email_in_reply_to?: string | null
+          email_message_id?: string | null
+          external_recipients?: string[] | null
+          external_sender?: string | null
           id?: string
           is_internal?: boolean | null
           message_type?: string
@@ -3604,14 +3667,17 @@ export type Database = {
         Row: {
           account_id: string
           assigned_to: string | null
+          assignee_id: string | null
           closed_at: string | null
           contact_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
           id: string
+          last_activity_at: string | null
           metadata: Json | null
           priority: Database["public"]["Enums"]["ticket_priority"]
+          requester_id: string | null
           resolution: string | null
           search_vector: unknown | null
           source: Database["public"]["Enums"]["ticket_source"]
@@ -3619,19 +3685,23 @@ export type Database = {
           subject: string
           tags: string[] | null
           ticket_number: string
+          title: string
           updated_at: string
         }
         Insert: {
           account_id: string
           assigned_to?: string | null
+          assignee_id?: string | null
           closed_at?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          last_activity_at?: string | null
           metadata?: Json | null
           priority?: Database["public"]["Enums"]["ticket_priority"]
+          requester_id?: string | null
           resolution?: string | null
           search_vector?: unknown | null
           source?: Database["public"]["Enums"]["ticket_source"]
@@ -3639,19 +3709,23 @@ export type Database = {
           subject: string
           tags?: string[] | null
           ticket_number: string
+          title?: string
           updated_at?: string
         }
         Update: {
           account_id?: string
           assigned_to?: string | null
+          assignee_id?: string | null
           closed_at?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          last_activity_at?: string | null
           metadata?: Json | null
           priority?: Database["public"]["Enums"]["ticket_priority"]
+          requester_id?: string | null
           resolution?: string | null
           search_vector?: unknown | null
           source?: Database["public"]["Enums"]["ticket_source"]
@@ -3659,6 +3733,7 @@ export type Database = {
           subject?: string
           tags?: string[] | null
           ticket_number?: string
+          title?: string
           updated_at?: string
         }
         Relationships: [
@@ -3670,10 +3745,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3855,6 +3944,33 @@ export type Database = {
       encrypt_ssn: {
         Args: { ssn: string }
         Returns: string
+      }
+      find_recent_ticket_by_sender: {
+        Args: { p_sender: string }
+        Returns: {
+          account_id: string
+          assigned_to: string | null
+          assignee_id: string | null
+          closed_at: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          last_activity_at: string | null
+          metadata: Json | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          requester_id: string | null
+          resolution: string | null
+          search_vector: unknown | null
+          source: Database["public"]["Enums"]["ticket_source"]
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags: string[] | null
+          ticket_number: string
+          title: string
+          updated_at: string
+        }
       }
       generate_backup_codes: {
         Args: Record<PropertyKey, never>
