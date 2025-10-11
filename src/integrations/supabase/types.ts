@@ -794,6 +794,86 @@ export type Database = {
           },
         ]
       }
+      coi_audit_log: {
+        Row: {
+          action: string
+          coi_id: string | null
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          coi_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          coi_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coi_audit_log_coi_id_fkey"
+            columns: ["coi_id"]
+            isOneToOne: false
+            referencedRelation: "certificates_of_insurance"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coi_templates: {
+        Row: {
+          coverage_defaults: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          special_provisions_template: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          coverage_defaults?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          special_provisions_template?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          coverage_defaults?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          special_provisions_template?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       commercial_business_accounts: {
         Row: {
           account_id: string

@@ -7,6 +7,20 @@ export interface COIVersion {
   changes?: string;
 }
 
+// COI Template interface
+export interface COITemplate {
+  id: string;
+  name: string;
+  description?: string;
+  coverage_defaults: any;
+  special_provisions_template?: string;
+  created_by?: string;
+  is_default?: boolean;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Types for Certificate of Insurance metadata in tickets
 export interface TicketCOIMetadata {
   coi_generated: boolean;

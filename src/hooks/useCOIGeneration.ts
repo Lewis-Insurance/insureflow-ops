@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
-import { TicketCOIMetadata, GenerationProgress, COIVersion, BatchCOIItem, BatchCOIResult } from '@/types/coi';
+import { TicketCOIMetadata, GenerationProgress, COIVersion, BatchCOIItem, BatchCOIResult, COITemplate } from '@/types/coi';
 import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
+import { Queue } from '@/lib/utils/queue';
+import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
 
 export function useCOIGeneration() {
   const { toast } = useToast();
@@ -13,17 +16,23 @@ export function useCOIGeneration() {
   const { user } = useAuth();
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * Upload PDF with retry logic
+   * Upload PDF with retry logic and abort signal support
    */
   const uploadWithRetry = async (
     fileName: string,
     pdfBlob: Blob,
-    maxAttempts: number = 3
+    maxAttempts: number = 3,
+    signal?: AbortSignal
   ) => {
     return retry(
       async () => {
+        if (signal?.aborted) {
+          throw new Error('Generation cancelled');
+        }
+
         const { data, error } = await supabase.storage
           .from('certificates')
           .upload(fileName, pdfBlob, {
@@ -66,6 +75,28 @@ export function useCOIGeneration() {
     }
   };
 
+  /**
+   * Log COI activity for audit trail
+   */
+  const logCOIActivity = async (
+    action: 'generated' | 'downloaded' | 'emailed' | 'previewed' | 'revised' | 'cancelled',
+    coiId: string,
+    metadata?: Record<string, any>
+  ) => {
+    try {
+      await supabase.from('coi_audit_log').insert({
+        coi_id: coiId,
+        action,
+        user_id: user?.id,
+        metadata: metadata || {},
+        created_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to log COI activity:', error);
+      // Don't throw - logging is non-critical
+    }
+  };
+
   const generateAndAttachCOI = async (
     ticketId: string,
     coiId: string,
@@ -73,6 +104,21 @@ export function useCOIGeneration() {
     exportOptions?: Partial<ExportOptions>,
     onProgress?: (progress: GenerationProgress) => void
   ): Promise<string | null> => {
+    // Validate data before generation
+    const validationErrors = validateCOIData(coiData);
+    if (validationErrors.length > 0) {
+      toast({
+        title: 'Validation Failed',
+        description: validationErrors.join(', '),
+        variant: 'destructive',
+      });
+      throw new Error('Validation failed: ' + validationErrors.join(', '));
+    }
+
+    // Create new abort controller for this generation
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     const updateProgress = (progressData: GenerationProgress) => {
       setProgress(progressData);
       onProgress?.(progressData);
@@ -81,6 +127,11 @@ export function useCOIGeneration() {
     setIsGenerating(true);
 
     try {
+      // Check for cancellation
+      if (signal.aborted) {
+        throw new Error('Generation cancelled');
+      }
+
       // Check for existing versions if this is a revision
       let version = 1;
       if (exportOptions?.isRevision) {
@@ -101,6 +152,10 @@ export function useCOIGeneration() {
       const fileName = `coi_${coiData.certificate_number}_v${version}_${Date.now()}.pdf`;
 
       // Step 1: Generate PDF
+      if (signal.aborted) {
+        throw new Error('Generation cancelled');
+      }
+
       updateProgress({
         step: 'generating',
         percentage: 25,
@@ -113,13 +168,17 @@ export function useCOIGeneration() {
       }) as Blob;
 
       // Step 2: Upload
+      if (signal.aborted) {
+        throw new Error('Generation cancelled');
+      }
+
       updateProgress({
         step: 'uploading',
         percentage: 50,
         message: 'Uploading certificate...'
       });
 
-      const uploadData = await uploadWithRetry(fileName, pdfBlob);
+      const uploadData = await uploadWithRetry(fileName, pdfBlob, 3, signal);
 
       if (!uploadData) {
         throw new Error('Upload failed - no data returned');
@@ -191,6 +250,12 @@ export function useCOIGeneration() {
         message: 'Certificate generated successfully!'
       });
 
+      // Log activity
+      await logCOIActivity('generated', coiId, {
+        version,
+        certificate_number: coiData.certificate_number,
+      });
+
       toast({
         title: 'COI Generated Successfully',
         description: `Certificate ${coiData.certificate_number} has been created and attached`,
@@ -199,6 +264,16 @@ export function useCOIGeneration() {
       return publicUrl;
     } catch (error: any) {
       console.error('COI generation error:', error);
+
+      // Check if cancelled
+      if (error.message === 'Generation cancelled' || signal.aborted) {
+        await logCOIActivity('cancelled', coiId);
+        toast({
+          title: 'Generation Cancelled',
+          description: 'COI generation was cancelled',
+        });
+        return null;
+      }
 
       // Reset progress and generating state on error
       setProgress(null);
@@ -257,6 +332,12 @@ export function useCOIGeneration() {
         throw new Error('Failed to open preview window. Please check your popup blocker settings.');
       }
 
+      // Log preview activity
+      const coiExists = await checkCOIExists(coiData.certificate_number);
+      if (coiExists?.id) {
+        await logCOIActivity('previewed', coiExists.id);
+      }
+
       toast({
         title: 'Preview Opened',
         description: 'COI preview opened in new tab',
@@ -271,6 +352,18 @@ export function useCOIGeneration() {
         variant: 'destructive',
       });
       throw error;
+    }
+  };
+
+  const cancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsGenerating(false);
+      setProgress(null);
+      toast({
+        title: 'Cancelling...',
+        description: 'COI generation is being cancelled',
+      });
     }
   };
 
@@ -321,6 +414,73 @@ export function useCOIGeneration() {
     return results;
   };
 
+  const checkStorageQuota = async (): Promise<{
+    used: number;
+    limit: number;
+    percentage: number;
+  }> => {
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('certificates')
+        .list('', { limit: 1000 });
+
+      if (error) throw error;
+
+      // Calculate total size
+      const totalSize = data.reduce((sum, file) => sum + (file.metadata?.size || 0), 0);
+      const limit = 1024 * 1024 * 1024; // 1GB limit example
+
+      return {
+        used: totalSize,
+        limit,
+        percentage: (totalSize / limit) * 100,
+      };
+    } catch (error) {
+      console.error('Error checking storage quota:', error);
+      return { used: 0, limit: 0, percentage: 0 };
+    }
+  };
+
+  const applyTemplate = async (
+    templateId: string,
+    overrides: Record<string, any> = {}
+  ): Promise<Record<string, any>> => {
+    const { data: template, error } = await supabase
+      .from('coi_templates')
+      .select('*')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (error || !template) {
+      throw new Error('Template not found');
+    }
+
+    const coverageDefaults = (template.coverage_defaults as Record<string, any>) || {};
+    const overrideCoverage = (overrides.coverage_details as Record<string, any>) || {};
+
+    const result: Record<string, any> = {
+      ...coverageDefaults,
+      ...overrides,
+      coverage_details: {
+        ...coverageDefaults,
+        ...overrideCoverage,
+      },
+    };
+
+    return result;
+  };
+
+  const useCOICache = (certificateNumber?: string) => {
+    return useQuery({
+      queryKey: ['coi-cache', certificateNumber],
+      queryFn: () => checkCOIExists(certificateNumber!),
+      enabled: !!certificateNumber,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    });
+  };
+
   const generateAndEmailCOI = async (
     ticketId: string,
     coiId: string,
@@ -328,6 +488,17 @@ export function useCOIGeneration() {
     recipientEmail: string,
     exportOptions?: Partial<ExportOptions>
   ): Promise<void> => {
+    // Validate and sanitize email
+    const emailValidation = validateRecipientEmail(recipientEmail);
+    if (!emailValidation.valid) {
+      toast({
+        title: 'Invalid Email',
+        description: emailValidation.error || 'Invalid email address',
+        variant: 'destructive',
+      });
+      throw new Error(emailValidation.error || 'Invalid email address');
+    }
+
     try {
       // Step 1: Generate and upload COI
       const publicUrl = await generateAndAttachCOI(
@@ -344,7 +515,7 @@ export function useCOIGeneration() {
       // Step 2: Send email via edge function
       const { data, error } = await supabase.functions.invoke('send-coi-email', {
         body: {
-          to: recipientEmail,
+          to: emailValidation.sanitized,
           certificateNumber: coiData.certificate_number,
           certificateUrl: publicUrl,
           holderName: coiData.certificate_holder_name,
@@ -369,9 +540,14 @@ export function useCOIGeneration() {
         // Don't throw - email was sent successfully
       }
 
+      // Log email activity
+      await logCOIActivity('emailed', coiId, {
+        recipient: emailValidation.sanitized,
+      });
+
       toast({
         title: 'COI Sent Successfully',
-        description: `Certificate emailed to ${recipientEmail}`,
+        description: `Certificate emailed to ${emailValidation.sanitized}`,
       });
     } catch (error: any) {
       console.error('Email delivery error:', error);
@@ -382,6 +558,61 @@ export function useCOIGeneration() {
       });
       throw error;
     }
+  };
+
+  const batchGenerateCOIsWithConcurrency = async (
+    coiDataList: BatchCOIItem[],
+    options?: {
+      concurrency?: number;
+      onProgress?: (completed: number, total: number) => void;
+      onItemComplete?: (result: BatchCOIResult) => void;
+    }
+  ): Promise<BatchCOIResult[]> => {
+    const { concurrency = 3, onProgress, onItemComplete } = options || {};
+    const results: BatchCOIResult[] = new Array(coiDataList.length);
+    const queue = new Queue(concurrency);
+
+    const tasks = coiDataList.map((item, index) => async () => {
+      try {
+        const url = await generateAndAttachCOI(
+          item.ticketId,
+          item.coiId,
+          item.data
+        );
+
+        const result: BatchCOIResult = { id: item.coiId, url };
+        results[index] = result;
+        onItemComplete?.(result);
+        onProgress?.(results.filter(Boolean).length, coiDataList.length);
+
+        return result;
+      } catch (error: any) {
+        const result: BatchCOIResult = {
+          id: item.coiId,
+          url: null,
+          error: error.message || 'Generation failed',
+        };
+        results[index] = result;
+        onItemComplete?.(result);
+        onProgress?.(results.filter(Boolean).length, coiDataList.length);
+
+        return result;
+      }
+    });
+
+    await queue.addAll(tasks);
+
+    // Summary toast
+    const successful = results.filter(r => r.url).length;
+    const failed = results.length - successful;
+
+    toast({
+      title: 'Batch Generation Complete',
+      description: `${successful} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
+      variant: failed > 0 ? 'destructive' : 'default',
+    });
+
+    return results;
   };
 
   const checkCOIExists = async (certificateNumber: string) => {
@@ -418,6 +649,12 @@ export function useCOIGeneration() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
+      // Log download activity
+      const coiData = await checkCOIExists(certificateNumber);
+      if (coiData?.id) {
+        await logCOIActivity('downloaded', coiData.id);
+      }
+
       toast({
         title: 'Download Started',
         description: 'Your certificate is being downloaded',
@@ -433,12 +670,25 @@ export function useCOIGeneration() {
   };
 
   return {
+    // Generation
     generateAndAttachCOI,
+    batchGenerateCOIs,
+    batchGenerateCOIsWithConcurrency,
+    cancelGeneration,
+
+    // Delivery
     downloadCOI,
     previewCOI,
-    batchGenerateCOIs,
     generateAndEmailCOI,
+
+    // Utilities
     checkCOIExists,
+    validateCOIData,
+    checkStorageQuota,
+    applyTemplate,
+    useCOICache,
+
+    // State
     progress,
     isGenerating,
   };

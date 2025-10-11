@@ -13,7 +13,7 @@ export interface ExportOptions {
 }
 
 // Validation schema for COI PDF data
-const COIPDFDataSchema = z.object({
+export const COIPDFDataSchema = z.object({
   certificate_number: z.string().min(1, "Certificate number is required"),
   certificate_holder_name: z.string().min(1, "Certificate holder name is required").max(200, "Name too long"),
   certificate_holder_address: z.string().min(1, "Address is required").max(500, "Address too long"),
