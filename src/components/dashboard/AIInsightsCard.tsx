@@ -15,6 +15,7 @@ interface Insight {
 export function AIInsightsCard() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const { toast } = useToast();
   const abortRef = useRef<AbortController | null>(null);
 
@@ -114,7 +115,7 @@ export function AIInsightsCard() {
           expiringPolicies: countExpiring(policies),
         },
         message:
-          'Analyze the business metrics and provide 3-4 actionable insights. Return ONLY a JSON array of objects with fields: type (opportunity|risk|action), title, description. Be specific and concise. No prose outside JSON.',
+          'Analyze the business metrics and provide 3-4 actionable insights. Return ONLY a JSON array of objects with EXACT fields: type (opportunity|risk|action), title, description. No extra keys. Be specific and concise. No prose outside JSON.',
         conversationHistory: [],
       } as const;
 
@@ -130,11 +131,14 @@ export function AIInsightsCard() {
 
       const mapped = coerceInsights(parsed);
       if (mapped.length === 0) {
+        const hasTasks = tasks.length > 0;
         setInsights([
           {
             type: 'action',
-            title: 'Review pending tasks',
-            description: `You have ${tasks.length} pending tasks that need attention.`,
+            title: hasTasks ? 'Review pending tasks' : 'No insights yet',
+            description: hasTasks
+              ? `You have ${tasks.length} pending tasks that need attention.`
+              : 'Click refresh to analyze your latest business data.',
             icon: Target,
           },
         ]);
@@ -142,6 +146,7 @@ export function AIInsightsCard() {
         setInsights(mapped);
       }
 
+      setLastRefreshed(new Date());
       toast({ title: 'Insights generated', description: 'AI-powered business insights ready' });
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
@@ -158,7 +163,7 @@ export function AIInsightsCard() {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [loading, toast]);
+  }, [loading, toast /*, supabase*/]);
 
   useEffect(() => {
     generateInsights();
@@ -172,15 +177,22 @@ export function AIInsightsCard() {
             <Brain className="h-5 w-5 text-primary" aria-hidden="true" />
             <CardTitle>AI Business Insights</CardTitle>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={generateInsights}
-            disabled={loading}
-            aria-label="Refresh insights"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-2">
+            {lastRefreshed && (
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                Refreshed {lastRefreshed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={generateInsights}
+              disabled={loading}
+              aria-label="Refresh insights"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
         <CardDescription>AI-powered recommendations for your business</CardDescription>
       </CardHeader>
