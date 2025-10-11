@@ -3,15 +3,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentManager } from '@/hooks/useDocumentManager';
 import { UploadDocModal } from './UploadDocModal';
-import { FileText, Download, Trash2, Upload, Calendar, FileType } from 'lucide-react';
+import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
+import { useAIAssistant } from '@/hooks/useAIAssistant';
 
 interface CustomerDocumentsSectionProps {
   accountId: string;
 }
 
 export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSectionProps) {
+  const { openSidebar } = useAIAssistant();
   const {
     documents,
     loading,
@@ -177,6 +179,25 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openSidebar({
+                        type: 'account',
+                        id: document.id,
+                        name: document.name,
+                        metadata: {
+                          documentId: document.id,
+                          accountId: accountId,
+                          category: document.category,
+                          mimeType: document.mime_type,
+                        }
+                      })}
+                      title="Ask AI about this document"
+                      className="text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      <Brain className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

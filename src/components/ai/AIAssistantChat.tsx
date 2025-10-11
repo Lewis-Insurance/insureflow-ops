@@ -41,6 +41,10 @@ const getContextualGreeting = (ctx?: AIContext | null): string => {
 
   switch (ctx.type) {
     case 'account':
+      // Check if this is specifically a document context
+      if (ctx.metadata?.documentId) {
+        return `Hello! I'm ready to analyze **${ctx.name}**. Ask me questions about this document, request a summary, extract key information, or compare it with other documents.`;
+      }
       return `Hello! I'm here to help with **${ctx.name}**. I can analyze their policies, suggest coverage improvements, review documents, or answer questions about this account.`;
     case 'policy':
       return `Hello! I'm here to help with policy **${ctx.name}**. I can explain coverage details, identify gaps, suggest improvements, or answer questions about this policy.`;
@@ -133,7 +137,10 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
       // Determine action based on context
       let action = 'chat';
-      if (documentsWithContent.length > 1) {
+      if (context?.metadata?.documentId) {
+        // Document context automatically triggers document analysis
+        action = 'analyze_policy';
+      } else if (documentsWithContent.length > 1) {
         action = 'compare_quotes';
       } else if (documentsWithContent.length === 1) {
         action = 'analyze_policy';

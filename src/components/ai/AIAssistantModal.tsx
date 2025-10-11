@@ -12,6 +12,11 @@ export function AIAssistantModal({ open, onOpenChange, context }: AIAssistantMod
   const getContextDescription = () => {
     if (!context) return 'Ask me anything about insurance, policies, or quotes';
     
+    // Special handling for document context
+    if (context.type === 'account' && context.metadata?.documentId) {
+      return `Document Analysis: ${context.name}`;
+    }
+    
     switch (context.type) {
       case 'account':
         return `Context: Customer ${context.name}`;

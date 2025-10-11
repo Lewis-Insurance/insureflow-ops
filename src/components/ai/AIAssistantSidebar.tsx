@@ -12,6 +12,11 @@ export function AIAssistantSidebar({ open, onOpenChange, context }: AIAssistantS
   const getContextDescription = () => {
     if (!context) return 'Ask me anything';
     
+    // Special handling for document context
+    if (context.type === 'account' && context.metadata?.documentId) {
+      return `Analyzing: ${context.name}`;
+    }
+    
     switch (context.type) {
       case 'account':
         return `Helping with: ${context.name}`;
