@@ -14,6 +14,13 @@ const PARSE_SECRET = Deno.env.get('INBOUND_PARSE_SECRET');
 
 const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+async function putAndSign(path: string, bytes: Uint8Array, type: string) {
+  const { error: upErr } = await sb.storage.from('ticket-attachments').upload(path, bytes, { contentType: type, upsert: true });
+  if (upErr) throw upErr;
+  const { data: signed } = await sb.storage.from('ticket-attachments').createSignedUrl(path, 60 * 60);
+  return signed?.signedUrl || '';
+}
+
 async function jsonOrForm(req: Request) {
   const ct = req.headers.get('content-type') || '';
   if (ct.includes('application/json')) return await req.json();
@@ -100,6 +107,47 @@ serve(async (req) => {
     const content = html?.trim() || text?.trim() || '(no content)';
     const recipients = to ? [to] : [];
 
+    // Parse attachments
+    let attachments: any[] = [];
+    // JSON with base64 items: { attachments: [{ name, type, contentBase64 }] }
+    if (Array.isArray(body.attachments)) {
+      for (const a of body.attachments) {
+        const b64 = String(a.contentBase64 || '');
+        if (!b64) continue;
+        try {
+          const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+          const key = `email/${crypto.randomUUID()}-${a.name || 'file'}`;
+          const url = await putAndSign(key, bytes, a.type || 'application/octet-stream');
+          attachments.push({ name: a.name, type: a.type, size: bytes.byteLength, url, expiresIn: 3600 });
+        } catch (e) {
+          console.error('Failed to process attachment:', e);
+        }
+      }
+    }
+    
+    // Multipart form: iterate File entries
+    const ct = req.headers.get('content-type') || '';
+    if (ct.includes('multipart/form-data')) {
+      const form = await req.formData();
+      const files = [...form.entries()].filter(([k,v]) => v instanceof File) as [string, File][];
+      for (const [name, file] of files) {
+        try {
+          const buf = new Uint8Array(await file.arrayBuffer());
+          const key = `email/${crypto.randomUUID()}-${file.name || name}`;
+          const url = await putAndSign(key, buf, file.type || 'application/octet-stream');
+          attachments.push({ name: file.name || name, type: file.type, size: buf.byteLength, url, expiresIn: 3600 });
+        } catch (e) {
+          console.error('Failed to process attachment:', e);
+        }
+      }
+    }
+
+    const metadata: any = {};
+    if (messageId) metadata.email_message_id = messageId;
+    if (inReplyTo) metadata.email_in_reply_to = inReplyTo;
+    if (from) metadata.external_sender = from;
+    if (recipients.length) metadata.external_recipients = recipients;
+
     const { error: merr } = await sb.from('ticket_messages').insert({
       ticket_id: ticketId,
       author_id: requesterId,
@@ -107,10 +155,8 @@ serve(async (req) => {
       message_type: 'email',
       content,
       is_internal: false,
-      email_message_id: messageId || null,
-      email_in_reply_to: inReplyTo || null,
-      external_sender: from,
-      external_recipients: recipients,
+      attachments,
+      metadata,
     });
     if (merr) throw merr;
 
