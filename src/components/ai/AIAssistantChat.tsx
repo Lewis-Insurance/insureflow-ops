@@ -215,6 +215,16 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  // Clear KB cache every 30 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      kbCacheRef.current.clear();
+      console.log('KB cache cleared');
+    }, 30 * 60 * 1000); // 30 minutes
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const extractTextFromFile = useCallback(async (file: File): Promise<string> => {
     return `[File: ${file.name}, Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)}KB]`;
   }, []);
