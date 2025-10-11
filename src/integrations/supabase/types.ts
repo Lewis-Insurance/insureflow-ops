@@ -2425,44 +2425,53 @@ export type Database = {
         Row: {
           account_id: string | null
           category: string
+          confidence_score: number | null
           content: string
           created_at: string
           created_by: string | null
           embedding: string | null
           id: string
           metadata: Json | null
+          processed_at: string | null
           source: string | null
           tags: string[] | null
           title: string
           updated_at: string
+          usage_count: number | null
         }
         Insert: {
           account_id?: string | null
           category: string
+          confidence_score?: number | null
           content: string
           created_at?: string
           created_by?: string | null
           embedding?: string | null
           id?: string
           metadata?: Json | null
+          processed_at?: string | null
           source?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
+          usage_count?: number | null
         }
         Update: {
           account_id?: string | null
           category?: string
+          confidence_score?: number | null
           content?: string
           created_at?: string
           created_by?: string | null
           embedding?: string | null
           id?: string
           metadata?: Json | null
+          processed_at?: string | null
           source?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
+          usage_count?: number | null
         }
         Relationships: [
           {
