@@ -478,8 +478,15 @@ serve(async (req) => {
     if (matches.length > 0) {
       // Q&A format detected
       matches.forEach((match) => {
+        // Safety check for undefined captures
+        if (!match[1] || !match[2]) return;
+        
         const title = match[1].trim();
         const content = match[2].trim();
+        
+        // Skip empty or too short entries
+        if (!title || !content || title.length < 3 || content.length < 10) return;
+        
         const references = extractReferences(content);
         
         entries.push({
@@ -499,13 +506,17 @@ serve(async (req) => {
       let currentTitle = 'General Information';
       
       sections.forEach((section, index) => {
+        if (!section || section.trim().length < 20) return; // Skip empty/tiny sections
+        
         const lines = section.trim().split('\n');
         if (lines.length > 0) {
-          const firstLine = lines[0].trim();
+          const firstLine = lines[0]?.trim() || '';
           if (firstLine.length < 100 && !firstLine.endsWith('.')) {
-            currentTitle = firstLine;
+            currentTitle = firstLine || 'General Information';
             if (lines.length > 1) {
               const entryContent = lines.slice(1).join('\n').trim();
+              if (entryContent.length < 10) return; // Skip too short content
+              
               const references = extractReferences(entryContent);
               
               entries.push({
@@ -521,6 +532,8 @@ serve(async (req) => {
             }
           } else {
             const entryContent = section.trim();
+            if (entryContent.length < 10) return; // Skip too short content
+            
             const references = extractReferences(entryContent);
             
             entries.push({
