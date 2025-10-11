@@ -2,10 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
+import { TicketCOIMetadata } from '@/types/coi';
+import { useAuth } from './useAuth';
 
 export function useCOIGeneration() {
   const { toast } = useToast();
   const { updateCOI } = useCOI();
+  const { user } = useAuth();
 
   const generateAndAttachCOI = async (
     ticketId: string,
@@ -48,16 +51,20 @@ export function useCOIGeneration() {
         },
       });
 
-      // Update ticket metadata
+      // Update ticket metadata with proper typing
+      const coiMetadata: Record<string, any> = {
+        coi_generated: true,
+        coi_url: publicUrl,
+        coi_number: coiData.certificate_number,
+        coi_generated_at: new Date().toISOString(),
+        coi_version: 1,
+        coi_generated_by: user?.id || null,
+      };
+
       const { error: ticketError } = await supabase
         .from('tickets')
         .update({
-          metadata: {
-            coi_generated: true,
-            coi_url: publicUrl,
-            coi_number: coiData.certificate_number,
-            coi_generated_at: new Date().toISOString(),
-          },
+          metadata: coiMetadata,
         })
         .eq('id', ticketId);
 
