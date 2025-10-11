@@ -77,6 +77,113 @@ function detectCategory(content: string): string {
   return 'information';
 }
 
+function extractPolicyInfo(text: string) {
+  const policyInfo = {
+    policyNumbers: [] as string[],
+    effectiveDates: [] as string[],
+    premiums: [] as string[],
+    deductibles: [] as string[],
+    coverageLimits: [] as string[],
+    carriers: [] as string[],
+    forms: [] as string[]
+  };
+  
+  // Policy number patterns
+  const policyPatterns = [
+    /(?:Policy\s*(?:Number|No\.?|#)[\s:]*)([\w\d-]+)/gi,
+    /(?:Contract\s*(?:Number|No\.?|#)[\s:]*)([\w\d-]+)/gi,
+    /(?:Form\s*(?:Number|No\.?|#)[\s:]*)([\w\d-]+)/gi,
+    /\b([A-Z]{2,4}[-\s]?\d{6,10})\b/g, // Common format: XX-123456789
+    /\b(HO[-\s]?\d{4}|DP[-\s]?\d{4}|CP[-\s]?\d{4})\b/gi, // Home/Property forms
+  ];
+  
+  policyPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1] && !policyInfo.policyNumbers.includes(match[1])) {
+        policyInfo.policyNumbers.push(match[1].trim());
+      }
+    });
+  });
+  
+  // Extract dates
+  const datePatterns = [
+    /(?:Effective\s*Date|Policy\s*Period)[\s:]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/gi,
+    /(?:From|Starting)[\s:]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
+    /(?:To|Ending|Through)[\s:]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
+  ];
+  
+  datePatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1]) policyInfo.effectiveDates.push(match[1].trim());
+    });
+  });
+  
+  // Extract premiums
+  const premiumPatterns = [
+    /(?:Premium|Annual Premium|Monthly Premium)[\s:]*\$?([\d,]+(?:\.\d{2})?)/gi,
+    /\$?([\d,]+(?:\.\d{2})?)\s*(?:per year|per month|annually|monthly)/gi,
+  ];
+  
+  premiumPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1]) policyInfo.premiums.push(match[1].replace(/,/g, ''));
+    });
+  });
+  
+  // Extract deductibles
+  const deductiblePatterns = [
+    /(?:Deductible|Hurricane Deductible|Wind Deductible)[\s:]*\$?([\d,]+|\d+%)/gi,
+    /\$?([\d,]+)\s*deductible/gi,
+    /(\d+)%\s*(?:hurricane|wind|named storm)\s*deductible/gi,
+  ];
+  
+  deductiblePatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1]) policyInfo.deductibles.push(match[1].replace(/,/g, ''));
+    });
+  });
+  
+  // Extract coverage limits
+  const limitPatterns = [
+    /(?:Coverage|Limit|Maximum)[\s:]*\$?([\d,]+)/gi,
+    /(?:Dwelling|Personal Property|Liability)[\s:]*\$?([\d,]+)/gi,
+    /\$?([\d,]+)\s*(?:coverage|limit)/gi,
+  ];
+  
+  limitPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1] && parseInt(match[1].replace(/,/g, '')) > 1000) {
+        policyInfo.coverageLimits.push(match[1].replace(/,/g, ''));
+      }
+    });
+  });
+  
+  // Extract carrier names (Florida specific)
+  const carrierPatterns = [
+    /(?:Underwritten by|Issued by|Insurance Company)[\s:]*([A-Za-z\s&]+?)(?:\.|,|;|\n)/gi,
+    /\b(Citizens Property Insurance|State Farm|Progressive|GEICO|Allstate|Liberty Mutual|USAA|Farmers|American Family)\b/gi,
+  ];
+  
+  carrierPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1]) {
+        const carrier = match[1].trim();
+        if (!policyInfo.carriers.includes(carrier) && carrier.length > 3) {
+          policyInfo.carriers.push(carrier);
+        }
+      }
+    });
+  });
+  
+  return policyInfo;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -218,6 +325,10 @@ serve(async (req) => {
     
     // Detect language
     const language = detectLanguage(text);
+    
+    // Extract policy-specific information
+    const policyMetadata = extractPolicyInfo(text);
+    console.log('Extracted policy metadata:', JSON.stringify(policyMetadata, null, 2));
     
     // Parse the text into knowledge base entries
     const entries = [];
@@ -389,6 +500,7 @@ serve(async (req) => {
         entries: validEntries,
         totalPages: pdfDoc.numPages,
         metadata: pdfInfo,
+        policyInfo: policyMetadata,
         language,
         metrics,
         stats,
