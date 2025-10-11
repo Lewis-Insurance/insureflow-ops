@@ -4,11 +4,64 @@ import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
 import { TicketCOIMetadata } from '@/types/coi';
 import { useAuth } from './useAuth';
+import { retry } from '@/lib/utils/retry';
 
 export function useCOIGeneration() {
   const { toast } = useToast();
   const { updateCOI } = useCOI();
   const { user } = useAuth();
+
+  /**
+   * Upload PDF with retry logic
+   */
+  const uploadWithRetry = async (
+    fileName: string,
+    pdfBlob: Blob,
+    maxAttempts: number = 3
+  ) => {
+    return retry(
+      async () => {
+        const { data, error } = await supabase.storage
+          .from('certificates')
+          .upload(fileName, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: false,
+          });
+
+        if (error) throw error;
+        return data;
+      },
+      {
+        maxAttempts,
+        delay: 1000,
+        backoffMultiplier: 2,
+        onRetry: (attempt, error) => {
+          console.log(`Upload retry attempt ${attempt}/${maxAttempts}:`, error.message);
+          toast({
+            title: 'Retrying upload...',
+            description: `Attempt ${attempt} of ${maxAttempts}`,
+          });
+        },
+      }
+    );
+  };
+
+  /**
+   * Cleanup failed uploads
+   */
+  const cleanupFailedUpload = async (fileName: string) => {
+    try {
+      const { error } = await supabase.storage
+        .from('certificates')
+        .remove([fileName]);
+
+      if (error) {
+        console.error('Failed to cleanup file:', fileName, error);
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error);
+    }
+  };
 
   const generateAndAttachCOI = async (
     ticketId: string,
@@ -16,6 +69,8 @@ export function useCOIGeneration() {
     coiData: COIPDFData,
     exportOptions?: Partial<ExportOptions>
   ): Promise<string | null> => {
+    const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
+
     try {
       // Generate PDF with options
       const pdfBlob = generateCOIPDF(coiData, {
@@ -23,18 +78,11 @@ export function useCOIGeneration() {
         ...exportOptions,
       }) as Blob;
 
-      // Upload to Supabase Storage
-      const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('certificates')
-        .upload(fileName, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: false,
-        });
+      // Upload to Supabase Storage with retry logic
+      const uploadData = await uploadWithRetry(fileName, pdfBlob);
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      if (!uploadData) {
+        throw new Error('Upload failed - no data returned');
       }
 
       // Get public URL
@@ -81,6 +129,10 @@ export function useCOIGeneration() {
       return publicUrl;
     } catch (error: any) {
       console.error('COI generation error:', error);
+
+      // Cleanup failed upload if it exists
+      await cleanupFailedUpload(fileName);
+
       toast({
         title: 'Failed to Generate COI',
         description: error.message || 'An error occurred while generating the certificate',
