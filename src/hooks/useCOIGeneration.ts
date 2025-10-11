@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +10,55 @@ import { retry } from '@/lib/utils/retry';
 import { COIQueue } from '@/lib/utils/queue';
 import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
 
+enum COIErrorType {
+  VALIDATION = 'VALIDATION',
+  NETWORK = 'NETWORK',
+  STORAGE = 'STORAGE',
+  PERMISSION = 'PERMISSION',
+  CANCELLED = 'CANCELLED',
+  UNKNOWN = 'UNKNOWN',
+}
+
+/**
+ * Type guard for COI version data from database
+ */
+const isCOIVersion = (data: any): data is COIVersion => {
+  return (
+    typeof data === 'object' &&
+    typeof data.version === 'number' &&
+    typeof data.url === 'string' &&
+    typeof data.created_at === 'string'
+  );
+};
+
+/**
+ * Categorize error for better user messaging
+ */
+const categorizeError = (error: any): COIErrorType => {
+  if (error.message?.includes('cancelled') || error.name === 'AbortError') return COIErrorType.CANCELLED;
+  if (error.message?.includes('validation') || error.message?.includes('Validation')) return COIErrorType.VALIDATION;
+  if (error.code === 'storage-unauthorized' || error.code === '42501') return COIErrorType.PERMISSION;
+  if (error.code === 'PGRST301') return COIErrorType.PERMISSION;
+  if (error.message?.includes('fetch') || error.message?.includes('network')) return COIErrorType.NETWORK;
+  if (error.message?.includes('upload') || error.message?.includes('storage')) return COIErrorType.STORAGE;
+  return COIErrorType.UNKNOWN;
+};
+
+/**
+ * Get user-friendly error message
+ */
+const getErrorMessage = (errorType: COIErrorType): string => {
+  const messages = {
+    [COIErrorType.VALIDATION]: 'Please check the form and try again',
+    [COIErrorType.NETWORK]: 'Connection issue. Please check your internet',
+    [COIErrorType.STORAGE]: 'Storage issue. Please try again later',
+    [COIErrorType.PERMISSION]: "You don't have permission for this action",
+    [COIErrorType.CANCELLED]: 'Operation was cancelled',
+    [COIErrorType.UNKNOWN]: 'An unexpected error occurred',
+  };
+  return messages[errorType];
+};
+
 export function useCOIGeneration() {
   const { toast } = useToast();
   const { updateCOI } = useCOI();
@@ -17,6 +66,21 @@ export function useCOIGeneration() {
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingGenerations = useRef<Map<string, Promise<string | null>>>(new Map());
+
+  /**
+   * Cleanup on unmount to prevent memory leaks
+   */
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      setProgress(null);
+      setIsGenerating(false);
+      pendingGenerations.current.clear();
+    };
+  }, []);
 
   /**
    * Upload PDF with retry logic and abort signal support
@@ -97,7 +161,7 @@ export function useCOIGeneration() {
     }
   };
 
-  const generateAndAttachCOI = async (
+  const performGeneration = async (
     ticketId: string,
     coiId: string,
     coiData: COIPDFData,
@@ -142,7 +206,8 @@ export function useCOIGeneration() {
           .maybeSingle();
 
         if (existingCOI?.versions && Array.isArray(existingCOI.versions)) {
-          version = existingCOI.versions.length + 1;
+          const validVersions = existingCOI.versions.filter(isCOIVersion);
+          version = validVersions.length + 1;
         } else if (existingCOI?.current_version) {
           version = existingCOI.current_version + 1;
         }
@@ -265,8 +330,10 @@ export function useCOIGeneration() {
     } catch (error: any) {
       console.error('COI generation error:', error);
 
+      const errorType = categorizeError(error);
+
       // Check if cancelled
-      if (error.message === 'Generation cancelled' || signal.aborted) {
+      if (errorType === COIErrorType.CANCELLED) {
         await logCOIActivity('cancelled', coiId);
         toast({
           title: 'Generation Cancelled',
@@ -289,13 +356,43 @@ export function useCOIGeneration() {
 
       toast({
         title: 'Failed to Generate COI',
-        description: error.message || 'An error occurred while generating the certificate',
+        description: getErrorMessage(errorType),
         variant: 'destructive',
       });
       throw error;
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const generateAndAttachCOI = async (
+    ticketId: string,
+    coiId: string,
+    coiData: COIPDFData,
+    exportOptions?: Partial<ExportOptions>,
+    onProgress?: (progress: GenerationProgress) => void
+  ): Promise<string | null> => {
+    const key = `${coiId}-${coiData.certificate_number}`;
+
+    // Check if already generating to prevent duplicate requests
+    if (pendingGenerations.current.has(key)) {
+      console.log('Generation already in progress for', key);
+      return pendingGenerations.current.get(key)!;
+    }
+
+    // Start new generation
+    const generationPromise = performGeneration(
+      ticketId,
+      coiId,
+      coiData,
+      exportOptions,
+      onProgress
+    ).finally(() => {
+      pendingGenerations.current.delete(key);
+    });
+
+    pendingGenerations.current.set(key, generationPromise);
+    return generationPromise;
   };
 
   const previewCOI = async (
