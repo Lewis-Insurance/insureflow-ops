@@ -1134,6 +1134,38 @@ export type Database = {
           },
         ]
       }
+      customer_identities: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          phone: string | null
+          profile_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+          profile_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+          profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_identities_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_tags: {
         Row: {
           created_at: string
@@ -1826,6 +1858,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inbound_allowlist: {
+        Row: {
+          channel: string
+          created_at: string | null
+          id: string
+          note: string | null
+          value: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          value: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          value?: string
+        }
+        Relationships: []
       }
       insured_addresses: {
         Row: {
@@ -3748,6 +3804,18 @@ export type Database = {
           p_description: string
           p_priority?: string
           p_source?: string
+          p_subject: string
+        }
+        Returns: string
+      }
+      create_ticket_with_message_v2: {
+        Args: {
+          p_account_id: string
+          p_contact_id: string
+          p_content: string
+          p_description: string
+          p_priority: string
+          p_source: string
           p_subject: string
         }
         Returns: string
