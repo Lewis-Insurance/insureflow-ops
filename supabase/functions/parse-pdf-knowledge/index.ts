@@ -7,6 +7,16 @@ const corsHeaders = {
 };
 
 // Helper Functions
+function preprocessText(text: string): string {
+  return text
+    // Fix common OCR issues
+    .replace(/([a-z])([A-Z])/g, '$1 $2') // Split camelCase
+    .replace(/(\d),(\d{3})/g, '$1$2') // Remove thousands separators
+    .replace(/\s{2,}/g, ' ') // Multiple spaces to single
+    .replace(/([.!?])\s*([a-z])/g, (match, p1, p2) => `${p1} ${p2.toUpperCase()}`) // Fix sentence starts
+    .trim();
+}
+
 function chunkContent(text: string, maxChunkSize: number = 1000): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
   const chunks = [];
@@ -215,6 +225,9 @@ serve(async (req) => {
       );
     }
     
+    // Preprocess text for better quality
+    text = preprocessText(text);
+    
     // Detect language
     const language = detectLanguage(text);
     
@@ -232,12 +245,29 @@ serve(async (req) => {
     // Support multiple Q&A formats
     const entries = [];
     
-    // Try multiple Q&A patterns
+    // Try multiple Q&A patterns including insurance-specific
     const qaPatterns = [
       /(?:Question|Q|FAQ)[\s:]+(.+?)(?:\n|\r\n)(?:Answer|A|Response)[\s:]+(.+?)(?=(?:Question|Q|FAQ)[\s:]|$)/gis,
       /^\d+\.\s*(.+?)\n+(.+?)(?=^\d+\.|$)/gms, // Numbered questions
       /^[•·▪︎]\s*(.+?)\n+(.+?)(?=^[•·▪︎]|$)/gms, // Bullet points
+      /(?:Section|Article)\s+(\d+[A-Z]?)\s*[-:]?\s*(.+?)(?=(?:Section|Article)\s+\d+|$)/gis, // Policy sections
     ];
+    
+    // Extract insurance-specific key terms
+    const insuranceTerms: any[] = [];
+    const termPattern = /(?:Deductible|Premium|Coverage|Limit|Coinsurance|Copay|Exclusion|Endorsement)\s*:\s*(.+?)(?=\n|$)/gi;
+    let termMatch;
+    while ((termMatch = termPattern.exec(text)) !== null) {
+      insuranceTerms.push({
+        title: termMatch[0].split(':')[0].trim(),
+        content: termMatch[1].trim(),
+        category: 'policy',
+        source: file.name,
+        tags: ['pdf-import', 'florida-insurance', 'insurance-term'],
+        language,
+        confidence: 0.8 // High confidence for explicit terms
+      });
+    }
     
     let matches: RegExpMatchArray[] = [];
     for (const pattern of qaPatterns) {
@@ -308,7 +338,10 @@ serve(async (req) => {
         }
       });
     }
-
+    
+    // Merge insurance terms with entries
+    entries.push(...insuranceTerms);
+    
     // Remove duplicates
     const uniqueEntries = removeDuplicates(entries);
     
