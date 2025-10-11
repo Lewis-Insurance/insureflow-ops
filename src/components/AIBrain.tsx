@@ -5,10 +5,18 @@ import {
   FileText, Link, Tag, Layers, RefreshCw,
   Shield, AlertCircle, Zap, BookMarked, 
   Building, Users, DollarSign, Scale, Info,
-  ChevronRight, ChevronDown, FolderOpen, Hash
+  ChevronRight, ChevronDown, FolderOpen, Hash, Loader2
 } from 'lucide-react';
+import { useAIBrain } from '@/hooks/useAIBrain';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const InsuranceAIBrain = () => {
+  const { addKnowledge, updateEmbeddings, loading } = useAIBrain();
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState('overview');
   const [knowledgeBase, setKnowledgeBase] = useState({
     policies: [],
@@ -22,8 +30,17 @@ const InsuranceAIBrain = () => {
   });
   const [selectedItem, setSelectedItem] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [syncing, setSyncing] = useState(false);
+  
+  // Import form state
+  const [importForm, setImportForm] = useState({
+    title: '',
+    content: '',
+    category: 'general',
+    tags: '',
+    source: 'manual'
+  });
   const [brainStats, setBrainStats] = useState({
     totalEntries: 1247,
     categories: 8,
@@ -105,9 +122,60 @@ const InsuranceAIBrain = () => {
   };
 
   useEffect(() => {
-    // Initialize with sample data
+    // Initialize with sample data (in production, fetch from knowledge_base table)
     setKnowledgeBase(sampleKnowledge);
   }, []);
+
+  const handleImportKnowledge = async () => {
+    if (!importForm.title.trim() || !importForm.content.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Title and content are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const tags = importForm.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+
+    const result = await addKnowledge({
+      title: importForm.title,
+      content: importForm.content,
+      category: importForm.category,
+      tags,
+      source: importForm.source
+    });
+
+    if (result) {
+      // Reset form and close dialog
+      setImportForm({
+        title: '',
+        content: '',
+        category: 'general',
+        tags: '',
+        source: 'manual'
+      });
+      setIsImporting(false);
+      
+      toast({
+        title: "Success",
+        description: "Knowledge entry added and embedded successfully"
+      });
+    }
+  };
+
+  const handleSyncKnowledge = async () => {
+    const result = await updateEmbeddings();
+    if (result) {
+      toast({
+        title: "Sync Complete",
+        description: `Updated ${result.updated} knowledge entries`
+      });
+    }
+  };
 
   const KnowledgeEntry = ({ entry, onEdit, onDelete }) => (
     <div className="bg-card rounded-lg border border-border p-4 hover:shadow-md transition-shadow">
@@ -401,14 +469,17 @@ const InsuranceAIBrain = () => {
             
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => setSyncing(true)}
-                disabled={syncing}
-                className="flex items-center space-x-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent"
+                onClick={handleSyncKnowledge}
+                disabled={loading}
+                className="flex items-center space-x-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span>Sync Knowledge</span>
               </button>
-              <button className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+              <button 
+                onClick={() => setIsImporting(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+              >
                 <Upload className="w-4 h-4" />
                 <span>Import Knowledge</span>
               </button>
@@ -497,6 +568,105 @@ const InsuranceAIBrain = () => {
         )}
         {activeSection === 'training' && <TrainingDataSection />}
       </div>
+
+      {/* Import Knowledge Dialog */}
+      <Dialog open={isImporting} onOpenChange={setIsImporting}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Knowledge Entry</DialogTitle>
+            <DialogDescription>
+              Add new information to the AI knowledge base with automatic embedding generation
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="import-title">Title</Label>
+              <Input
+                id="import-title"
+                value={importForm.title}
+                onChange={(e) => setImportForm({ ...importForm, title: e.target.value })}
+                placeholder="e.g., Auto Insurance Guidelines"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="import-category">Category</Label>
+              <select
+                id="import-category"
+                value={importForm.category}
+                onChange={(e) => setImportForm({ ...importForm, category: e.target.value })}
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+              >
+                <option value="general">General</option>
+                <option value="policies">Policies</option>
+                <option value="procedures">Procedures</option>
+                <option value="claims">Claims</option>
+                <option value="compliance">Compliance</option>
+                <option value="sales">Sales</option>
+              </select>
+            </div>
+            
+            <div>
+              <Label htmlFor="import-tags">Tags (comma-separated)</Label>
+              <Input
+                id="import-tags"
+                value={importForm.tags}
+                onChange={(e) => setImportForm({ ...importForm, tags: e.target.value })}
+                placeholder="e.g., insurance, auto, coverage"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="import-source">Source</Label>
+              <Input
+                id="import-source"
+                value={importForm.source}
+                onChange={(e) => setImportForm({ ...importForm, source: e.target.value })}
+                placeholder="e.g., Policy Manual 2024"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="import-content">Content</Label>
+              <Textarea
+                id="import-content"
+                value={importForm.content}
+                onChange={(e) => setImportForm({ ...importForm, content: e.target.value })}
+                placeholder="Enter detailed information..."
+                rows={10}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setIsImporting(false)}
+                disabled={loading}
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportKnowledge}
+                disabled={loading || !importForm.title.trim() || !importForm.content.trim()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center space-x-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Importing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Import Knowledge</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
       {isEditing && selectedItem && (
