@@ -26,6 +26,7 @@ export default function DocumentIntelligence() {
     uploadProgress,
     processingStatus,
     searchResults,
+    activeBatches,
     handleUpload,
     handleSearch,
     generateInsights,
@@ -191,8 +192,8 @@ export default function DocumentIntelligence() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 pb-8">
-        {/* Upload Progress */}
-        {uploading && processingStatus && (
+        {/* Upload Progress with Batch Queue Status */}
+        {uploading && (
           <Card className="mb-4 border-primary/50 bg-primary/5">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
@@ -208,6 +209,23 @@ export default function DocumentIntelligence() {
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
+              
+              {/* Active Batch Status */}
+              {activeBatches.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {activeBatches.map(batch => (
+                    <div key={batch.batchId} className="text-xs text-muted-foreground flex items-center justify-between p-2 bg-background rounded">
+                      <span>Batch: {batch.batchId.slice(0, 8)}...</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-green-600">✓ {batch.completed}</span>
+                        <span className="text-blue-600">⟳ {batch.processing}</span>
+                        <span className="text-yellow-600">⏱ {batch.queued}</span>
+                        {batch.failed > 0 && <span className="text-destructive">✗ {batch.failed}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

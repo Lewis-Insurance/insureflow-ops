@@ -62,6 +62,9 @@ verify_jwt = false
 [functions.ai-document-intelligence]
 verify_jwt = true
 
+[functions.process-document-batch]
+verify_jwt = true
+
 [functions.ai-document-analysis]
 verify_jwt = true
 

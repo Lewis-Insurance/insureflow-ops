@@ -1497,6 +1497,74 @@ export type Database = {
         }
         Relationships: []
       }
+      document_processing_queue: {
+        Row: {
+          account_id: string
+          attempts: number | null
+          batch_id: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_name: string
+          file_size: number
+          id: string
+          max_attempts: number | null
+          metadata: Json | null
+          ocr_result: Json | null
+          priority: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["batch_status"]
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          attempts?: number | null
+          batch_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name: string
+          file_size: number
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          ocr_result?: Json | null
+          priority?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["batch_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          attempts?: number | null
+          batch_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name?: string
+          file_size?: number
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          ocr_result?: Json | null
+          priority?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["batch_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           account_id: string | null
@@ -3941,7 +4009,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      document_batch_summary: {
+        Row: {
+          account_id: string | null
+          batch_completed: string | null
+          batch_id: string | null
+          batch_started: string | null
+          completed: number | null
+          failed: number | null
+          processing: number | null
+          queued: number | null
+          total_files: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_tag_to_customer: {
@@ -4383,6 +4472,7 @@ export type Database = {
       account_type_new: "individual" | "business" | "household"
       account_type_v2: "household" | "commercial_business"
       agent_role: "staff" | "admin" | "producer"
+      batch_status: "queued" | "processing" | "completed" | "failed"
       billing_freq_enum: "monthly" | "quarterly" | "semiannual" | "annual"
       billing_frequency: "monthly" | "quarterly" | "semiannual" | "annual"
       billing_method: "direct_bill" | "agency_bill"
@@ -4657,6 +4747,7 @@ export const Constants = {
       account_type_new: ["individual", "business", "household"],
       account_type_v2: ["household", "commercial_business"],
       agent_role: ["staff", "admin", "producer"],
+      batch_status: ["queued", "processing", "completed", "failed"],
       billing_freq_enum: ["monthly", "quarterly", "semiannual", "annual"],
       billing_frequency: ["monthly", "quarterly", "semiannual", "annual"],
       billing_method: ["direct_bill", "agency_bill"],

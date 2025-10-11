@@ -44,6 +44,15 @@ interface Insight {
   value: string;
 }
 
+interface BatchStatus {
+  batchId: string;
+  total: number;
+  completed: number;
+  processing: number;
+  queued: number;
+  failed: number;
+}
+
 export function useDocumentIntelligence() {
   const { toast } = useToast();
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -53,6 +62,7 @@ export function useDocumentIntelligence() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [activeBatches, setActiveBatches] = useState<BatchStatus[]>([]);
 
   // Fetch documents from database
   const fetchDocuments = useCallback(async () => {
@@ -94,62 +104,72 @@ export function useDocumentIntelligence() {
     }
   }, [toast]);
 
-  // Process document with AI including OCR for images/PDFs
-  const processDocument = async (file: File): Promise<any> => {
-    let ocrResult = null;
+  // Poll batch status
+  const pollBatchStatus = useCallback(async (batchId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('document_batch_summary')
+        .select('*')
+        .eq('batch_id', batchId)
+        .single();
 
-    // Check if file needs OCR (images or PDFs)
-    const needsOCR = file.type.includes('image') || file.type.includes('pdf');
-    
-    if (needsOCR) {
-      setProcessingStatus('Running Enhanced OCR...');
-      
-      try {
-        // Convert file to base64 for OCR
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
+      if (error) throw error;
 
-        // Call OCR edge function
-        const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ai-document-intelligence', {
-          body: {
-            action: 'ocr',
-            imageData: base64
+      if (data) {
+        const status: BatchStatus = {
+          batchId: data.batch_id,
+          total: data.total_files,
+          completed: data.completed,
+          processing: data.processing,
+          queued: data.queued,
+          failed: data.failed
+        };
+
+        setActiveBatches(prev => {
+          const filtered = prev.filter(b => b.batchId !== batchId);
+          if (status.queued > 0 || status.processing > 0) {
+            return [...filtered, status];
           }
+          return filtered;
         });
 
-        if (ocrError) throw ocrError;
-        ocrResult = ocrData?.ocr;
-        
-        setProcessingStatus('OCR complete - extracting entities...');
-      } catch (err) {
-        console.error('OCR failed:', err);
-        setProcessingStatus('OCR failed - continuing with basic processing...');
+        // Update progress
+        const progress = (status.completed / status.total) * 100;
+        setUploadProgress(progress);
+
+        // Update status message
+        if (status.processing > 0) {
+          setProcessingStatus(`Processing ${status.processing} of ${status.total} documents...`);
+        } else if (status.queued > 0) {
+          setProcessingStatus(`Queued: ${status.queued} documents waiting...`);
+        } else if (status.completed === status.total) {
+          setProcessingStatus('All documents processed!');
+          setUploading(false);
+          fetchDocuments();
+          toast({
+            title: "Success",
+            description: `${status.total} document(s) processed successfully`,
+          });
+        } else if (status.failed > 0) {
+          setProcessingStatus(`Completed with ${status.failed} failed documents`);
+        }
+
+        // Continue polling if not done
+        if (status.queued > 0 || status.processing > 0) {
+          setTimeout(() => pollBatchStatus(batchId), 2000);
+        }
       }
+    } catch (err) {
+      console.error('Error polling batch status:', err);
     }
-    
-    setProcessingStatus('Analyzing document structure...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    setProcessingStatus('Extracting key information...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setProcessingStatus('Generating embeddings...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    setProcessingStatus('Indexing for search...');
-    await new Promise(resolve => setTimeout(resolve, 600));
+  }, [fetchDocuments, toast]);
 
-    return ocrResult;
-  };
-
-  // Upload documents
+  // Upload documents using queue system
   const handleUpload = useCallback(async (files: File[]) => {
     try {
       setUploading(true);
       setUploadProgress(0);
+      setProcessingStatus('Preparing upload...');
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -178,12 +198,17 @@ export function useDocumentIntelligence() {
         return;
       }
 
+      // Generate batch ID
+      const batchId = crypto.randomUUID();
+      const queueItems = [];
+
+      setProcessingStatus('Uploading files to storage...');
+
+      // Upload files to storage and create queue items
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        setUploadProgress((i / files.length) * 100);
-
-        // Process with AI (includes OCR for images/PDFs)
-        const ocrResult = await processDocument(file);
+        const progress = ((i + 1) / files.length) * 50; // First 50% for uploads
+        setUploadProgress(progress);
 
         // Upload to storage
         const fileExt = file.name.split('.').pop();
@@ -197,46 +222,57 @@ export function useDocumentIntelligence() {
             upsert: false
           });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error(`Failed to upload ${file.name}:`, uploadError);
+          continue;
+        }
 
-        // Create document record with OCR metadata
-        const docInsert: any = {
+        // Add to queue items
+        queueItems.push({
           account_id: membership.account_id,
-          filename: file.name,
-          name: file.name,
-          kind: 'document',
-          category: ocrResult?.document_type || 
-                   (file.name.includes('policy') ? 'policy' : 
-                    file.name.includes('claim') ? 'claim' : 'other'),
+          batch_id: batchId,
+          file_name: file.name,
+          file_size: file.size,
           storage_path: filePath,
-          storage_bucket: 'customer-docs',
-          file_missing: false,
-          mime_type: file.type,
-          size_bytes: file.size,
-          uploaded_by: user.id
-        };
-
-        const { error: dbError } = await supabase
-          .from('documents')
-          .insert(docInsert);
-
-        if (dbError) throw dbError;
+          status: 'queued',
+          priority: 0,
+          metadata: {
+            mime_type: file.type,
+            original_name: file.name
+          }
+        });
       }
 
-      setUploadProgress(100);
-      setProcessingStatus('Processing complete!');
-      
-      setTimeout(() => {
-        setUploading(false);
-        setUploadProgress(0);
-        setProcessingStatus('');
-        fetchDocuments();
-      }, 2000);
+      if (queueItems.length === 0) {
+        throw new Error('No files were uploaded successfully');
+      }
+
+      setProcessingStatus('Adding documents to processing queue...');
+
+      // Insert all queue items
+      const { error: queueError } = await supabase
+        .from('document_processing_queue')
+        .insert(queueItems);
+
+      if (queueError) throw queueError;
+
+      setProcessingStatus('Starting batch processing...');
+
+      // Trigger batch processing
+      const { error: processError } = await supabase.functions.invoke('process-document-batch', {
+        body: { batchId, maxConcurrent: 3 }
+      });
+
+      if (processError) throw processError;
 
       toast({
-        title: "Success",
-        description: `${files.length} document(s) uploaded successfully`,
+        title: "Upload Complete",
+        description: `${files.length} documents queued for processing`,
       });
+
+      // Start polling for status
+      pollBatchStatus(batchId);
+
     } catch (err: any) {
       console.error('Error uploading documents:', err);
       toast({
@@ -248,7 +284,7 @@ export function useDocumentIntelligence() {
       setUploadProgress(0);
       setProcessingStatus('');
     }
-  }, [toast, fetchDocuments]);
+  }, [toast, pollBatchStatus]);
 
   // AI-powered search
   const handleSearch = useCallback(async (query: string) => {
@@ -424,6 +460,7 @@ export function useDocumentIntelligence() {
     uploading,
     uploadProgress,
     processingStatus,
+    activeBatches,
     handleUpload,
     handleSearch,
     generateInsights,
