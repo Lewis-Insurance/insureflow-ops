@@ -718,11 +718,14 @@ const KnowledgeManager = () => {
             <div>
               <label className="text-sm font-medium">Paste CSV Data</label>
               <Textarea
-                value={csvContent || (importTable === 'kb_entries' ? SAMPLE_KB_ENTRIES : SAMPLE_KB_SOURCES)}
+                value={csvContent}
                 onChange={(e) => {
                   setCsvContent(e.target.value);
                   setUploadedFileName('');
                 }}
+                placeholder={importTable === 'kb_entries' 
+                  ? 'Upload a PDF/CSV file or paste CSV data here...' 
+                  : 'Paste CSV data for knowledge sources...'}
                 key={importTable}
                 rows={12}
                 className="font-mono text-xs"
