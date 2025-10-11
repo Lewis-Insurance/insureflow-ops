@@ -9,7 +9,7 @@ export function FloatingAIButton() {
   return (
     <>
       <Button
-        onClick={openModal}
+        onClick={() => openModal()}
         size="lg"
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-[60] 
                    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2

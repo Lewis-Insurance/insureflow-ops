@@ -1,16 +1,47 @@
 import { useState } from 'react';
 
+export interface AIContext {
+  type: 'account' | 'policy' | 'quote' | 'task';
+  id: string;
+  name: string;
+  metadata?: Record<string, any>;
+}
+
 export function useAIAssistant() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [context, setContext] = useState<AIContext | null>(null);
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
-  const toggleModal = () => setIsModalOpen(prev => !prev);
+  const openModal = (ctx?: AIContext) => {
+    if (ctx) setContext(ctx);
+    setIsModalOpen(true);
+  };
 
-  const openSidebar = () => setIsSidebarOpen(true);
-  const closeSidebar = () => setIsSidebarOpen(false);
-  const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    // Clear context after a delay to avoid visual flash
+    setTimeout(() => setContext(null), 300);
+  };
+
+  const toggleModal = (ctx?: AIContext) => {
+    if (ctx) setContext(ctx);
+    setIsModalOpen(prev => !prev);
+  };
+
+  const openSidebar = (ctx?: AIContext) => {
+    if (ctx) setContext(ctx);
+    setIsSidebarOpen(true);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+    setTimeout(() => setContext(null), 300);
+  };
+
+  const toggleSidebar = (ctx?: AIContext) => {
+    if (ctx) setContext(ctx);
+    setIsSidebarOpen(prev => !prev);
+  };
 
   return {
     // Modal
@@ -24,5 +55,9 @@ export function useAIAssistant() {
     openSidebar,
     closeSidebar,
     toggleSidebar,
+
+    // Context
+    context,
+    setContext,
   };
 }

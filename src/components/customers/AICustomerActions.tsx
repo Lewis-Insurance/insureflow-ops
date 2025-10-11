@@ -14,6 +14,14 @@ export function AICustomerActions({ accountId, accountName }: AICustomerActionsP
   const { openModal } = useAIAssistant();
   const navigate = useNavigate();
 
+  const handleOpenChat = () => {
+    openModal({
+      type: 'account',
+      id: accountId,
+      name: accountName,
+    });
+  };
+
   const goToAIQuote = () => {
     navigate(`/quotes/new?accountId=${encodeURIComponent(accountId)}`);
   };
@@ -41,7 +49,7 @@ export function AICustomerActions({ accountId, accountName }: AICustomerActionsP
         <Button
           variant="outline"
           className="w-full gap-2"
-          onClick={openModal}
+          onClick={handleOpenChat}
           aria-label={`Ask AI about ${accountName}`}
           data-testid="btn-open-chat"
         >

@@ -21,10 +21,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { user, profile, signOut } = useAuth();
   const { 
     isModalOpen, 
-    toggleModal, 
+    openModal,
+    closeModal,
     isSidebarOpen, 
     openSidebar, 
-    closeSidebar 
+    closeSidebar,
+    context 
   } = useAIAssistant();
 
   const getInitials = (name: string | null) => {
@@ -194,7 +196,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={openSidebar}
+                  onClick={() => openSidebar()}
                   className="gap-2"
                 >
                   <Bot className="h-4 w-4" />
@@ -211,10 +213,18 @@ export function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* AI Assistant Modal */}
-      <AIAssistantModal open={isModalOpen} onOpenChange={toggleModal} />
+      <AIAssistantModal 
+        open={isModalOpen} 
+        onOpenChange={(open) => open ? openModal() : closeModal()}
+        context={context}
+      />
       
       {/* AI Assistant Sidebar */}
-      <AIAssistantSidebar open={isSidebarOpen} onOpenChange={closeSidebar} />
+      <AIAssistantSidebar 
+        open={isSidebarOpen} 
+        onOpenChange={(open) => open ? openSidebar() : closeSidebar()}
+        context={context}
+      />
     </SidebarProvider>
   );
 }

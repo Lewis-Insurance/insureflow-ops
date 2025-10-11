@@ -21,14 +21,44 @@ interface DocumentInfo {
   content?: string;
 }
 
+export interface AIContext {
+  type: 'account' | 'policy' | 'quote' | 'task';
+  id: string;
+  name: string;
+  metadata?: Record<string, any>;
+}
+
+interface AIAssistantChatProps {
+  context?: AIContext | null;
+}
+
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 
-export function AIAssistantChat() {
+const getContextualGreeting = (ctx?: AIContext | null): string => {
+  if (!ctx) {
+    return 'Hello! I\'m your AI assistant. I can help you compare quotes, analyze policies, and answer insurance questions. Upload documents or ask me anything!';
+  }
+
+  switch (ctx.type) {
+    case 'account':
+      return `Hello! I'm here to help with **${ctx.name}**. I can analyze their policies, suggest coverage improvements, review documents, or answer questions about this account.`;
+    case 'policy':
+      return `Hello! I'm here to help with policy **${ctx.name}**. I can explain coverage details, identify gaps, suggest improvements, or answer questions about this policy.`;
+    case 'quote':
+      return `Hello! I'm here to help with quote **${ctx.name}**. I can compare options, explain pricing, suggest alternatives, or answer questions about this quote.`;
+    case 'task':
+      return `Hello! I'm here to help with task **${ctx.name}**. I can provide guidance, suggest next steps, or answer questions about completing this task.`;
+    default:
+      return 'Hello! I\'m your AI assistant. How can I help you today?';
+  }
+};
+
+export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! I\'m your AI assistant. I can help you compare quotes, analyze policies, and answer insurance questions. Upload documents or ask me anything!',
+      content: getContextualGreeting(context),
       timestamp: new Date(),
     }
   ]);
@@ -38,6 +68,15 @@ export function AIAssistantChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Update greeting when context changes
+  useEffect(() => {
+    setMessages([{
+      role: 'assistant',
+      content: getContextualGreeting(context),
+      timestamp: new Date(),
+    }]);
+  }, [context]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -103,6 +142,14 @@ export function AIAssistantChat() {
       // Build conversation history including the latest user message
       const recentMessages = [...messages, userMessage].slice(-10);
 
+      // Build context payload
+      const contextPayload = context ? {
+        contextType: context.type,
+        contextId: context.id,
+        contextName: context.name,
+        contextMetadata: context.metadata,
+      } : undefined;
+
       // Call AI edge function
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
@@ -112,7 +159,8 @@ export function AIAssistantChat() {
           conversationHistory: recentMessages.map(m => ({
             role: m.role,
             content: m.content
-          }))
+          })),
+          context: contextPayload,
         }
       });
 

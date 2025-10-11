@@ -13,7 +13,7 @@ export default function QuoteNew() {
   const navigate = useNavigate();
   const accountId = searchParams.get('accountId');
   const [showQuoteModal, setShowQuoteModal] = useState(false);
-  const { isModalOpen, openModal, closeModal } = useAIAssistant();
+  const { isModalOpen, openModal, closeModal, context } = useAIAssistant();
 
   if (!accountId) {
     return (
@@ -69,7 +69,7 @@ export default function QuoteNew() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={openModal} variant="outline" className="w-full">
+              <Button onClick={() => openModal()} variant="outline" className="w-full">
                 Open AI Assistant
               </Button>
             </CardContent>
@@ -121,7 +121,11 @@ export default function QuoteNew() {
         onSuccess={() => navigate('/customers')}
       />
       
-      <AIAssistantModal open={isModalOpen} onOpenChange={(open) => open ? openModal() : closeModal()} />
+      <AIAssistantModal 
+        open={isModalOpen} 
+        onOpenChange={(open) => open ? openModal() : closeModal()}
+        context={context}
+      />
     </AppLayout>
   );
 }
