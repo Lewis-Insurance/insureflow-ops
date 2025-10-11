@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
-import { TicketCOIMetadata, GenerationProgress, COIVersion } from '@/types/coi';
+import { TicketCOIMetadata, GenerationProgress, COIVersion, BatchCOIItem, BatchCOIResult } from '@/types/coi';
 import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
 
@@ -268,6 +268,53 @@ export function useCOIGeneration() {
     }
   };
 
+  const batchGenerateCOIs = async (
+    coiDataList: BatchCOIItem[],
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<BatchCOIResult[]> => {
+    const results: BatchCOIResult[] = [];
+    const total = coiDataList.length;
+
+    for (let i = 0; i < coiDataList.length; i++) {
+      const item = coiDataList[i];
+
+      try {
+        const url = await generateAndAttachCOI(
+          item.ticketId,
+          item.coiId,
+          item.data
+        );
+
+        results.push({ id: item.coiId, url });
+        
+        // Update progress
+        onProgress?.(i + 1, total);
+      } catch (error: any) {
+        console.error(`Failed to generate COI for ${item.coiId}:`, error);
+        results.push({
+          id: item.coiId,
+          url: null,
+          error: error.message || 'Generation failed',
+        });
+        
+        // Update progress even on error
+        onProgress?.(i + 1, total);
+      }
+    }
+
+    // Summary toast
+    const successful = results.filter(r => r.url).length;
+    const failed = results.length - successful;
+
+    toast({
+      title: 'Batch Generation Complete',
+      description: `${successful} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
+      variant: failed > 0 ? 'destructive' : 'default',
+    });
+
+    return results;
+  };
+
   const downloadCOI = async (documentUrl: string, certificateNumber: string) => {
     try {
       const response = await fetch(documentUrl);
@@ -300,6 +347,7 @@ export function useCOIGeneration() {
     generateAndAttachCOI,
     downloadCOI,
     previewCOI,
+    batchGenerateCOIs,
     progress,
   };
 }

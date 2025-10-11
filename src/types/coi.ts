@@ -31,6 +31,19 @@ export interface GenerationProgress {
   message: string;
 }
 
+// Batch generation types
+export interface BatchCOIItem {
+  ticketId: string;
+  coiId: string;
+  data: any; // COIPDFData
+}
+
+export interface BatchCOIResult {
+  id: string;
+  url: string | null;
+  error?: string;
+}
+
 // Type guard to check if ticket has COI metadata
 export function hasCoiMetadata(metadata: any): metadata is TicketCOIMetadata {
   return (
