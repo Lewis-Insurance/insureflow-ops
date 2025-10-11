@@ -280,38 +280,6 @@ const SmartQA = () => {
         </Card>
       )}
 
-      {/* Quick Examples */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Try These Questions:</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {[
-              "What is comprehensive coverage?",
-              "How do I file a claim?",
-              "What are the state minimum requirements?",
-              "What discounts are available?",
-              "How does bundling work?",
-              "What is the deductible for homeowners insurance?"
-            ].map((q, idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                size="sm"
-                className="justify-start text-left h-auto py-2 px-3"
-                onClick={() => {
-                  setQuestion(q);
-                  setAnswer(null);
-                }}
-              >
-                <Search className="w-3 h-3 mr-2 flex-shrink-0" />
-                <span className="text-xs">{q}</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
