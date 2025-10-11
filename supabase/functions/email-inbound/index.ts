@@ -18,6 +18,13 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    async function putAndSign(path: string, bytes: Uint8Array, type: string) {
+      const { error: upErr } = await supabase.storage.from('ticket-attachments').upload(path, bytes, { contentType: type, upsert: true });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage.from('ticket-attachments').createSignedUrl(path, 60 * 60);
+      return signed?.signedUrl || '';
+    }
+
     // Verify webhook secret if configured
     const providedSecret = req.headers.get('x-parse-secret');
     if (parseSecret && providedSecret !== parseSecret) {
@@ -85,6 +92,23 @@ serve(async (req) => {
       }
     }
 
+    // Parse attachments
+    let attachments: any[] = [];
+    if (Array.isArray(payload.attachments)) {
+      for (const a of payload.attachments) {
+        const b64 = String(a.contentBase64 || '');
+        if (!b64) continue;
+        try {
+          const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+          const key = `email/${crypto.randomUUID()}-${a.name || 'file'}`;
+          const url = await putAndSign(key, bytes, a.type || 'application/octet-stream');
+          attachments.push({ name: a.name, type: a.type, size: bytes.byteLength, url, expiresIn: 3600 });
+        } catch (e) {
+          console.error('Failed to process attachment:', e);
+        }
+      }
+    }
+
     // Insert message
     const { error: msgError } = await supabase
       .from('ticket_messages')
@@ -98,6 +122,7 @@ serve(async (req) => {
         email_message_id: messageId,
         email_in_reply_to: inReplyTo,
         is_internal: false,
+        attachments,
       });
 
     if (msgError) throw msgError;
