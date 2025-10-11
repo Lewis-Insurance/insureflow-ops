@@ -136,7 +136,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 to="/financial"
               />
               <NavItem
-                icon={Brain}
+                icon={Bot}
                 label="AI Insights"
                 to="/ai-insights"
               />
@@ -144,6 +144,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 icon={Database}
                 label="Document Intelligence"
                 to="/document-intelligence"
+              />
+              <NavItem
+                icon={Brain}
+                label="AI Brain"
+                to="/ai-brain"
               />
               <NavItem 
                 icon={BarChart3} 
