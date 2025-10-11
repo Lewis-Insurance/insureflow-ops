@@ -319,47 +319,108 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         ? { contextType: context.type, contextId: context.id, contextName: context.name, contextMetadata: context.metadata }
         : undefined;
 
-      const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
-        body: {
-          action,
-          documents: documentsWithContent,
-          message: userMessage.content + knowledgeBaseContext,
-          conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
-          context: contextPayload,
-        },
-      });
+      // Stream the response from the edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/ai-document-analysis`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+          },
+          body: JSON.stringify({
+            action,
+            documents: documentsWithContent,
+            message: userMessage.content + knowledgeBaseContext,
+            conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+            context: contextPayload,
+          }),
+          signal,
+        }
+      );
 
       if (signal.aborted) return;
-      if (error) throw error;
-
-      // Extract response properly - handle string, response field, or analysis field
-      let fullResponse = '';
-      if (typeof data === 'string') {
-        fullResponse = data;
-      } else if (data?.response) {
-        fullResponse = data.response;
-      } else if (data?.analysis) {
-        fullResponse = data.analysis;
-      } else if (data?.message) {
-        fullResponse = data.message;
-      } else {
-        fullResponse = 'I received your question but couldn\'t generate a response. Please try again.';
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to get AI response' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+      let buffer = '';
+
+      // Add an empty assistant message that we'll update
+      const assistantMessageIndex = messages.length + 1;
+      setMessages((prev) => [...prev, { role: 'assistant', content: '', timestamp: new Date() }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (signal.aborted) {
+          reader.cancel();
+          return;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete SSE lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+          if (!trimmedLine.startsWith('data: ')) continue;
+
+          const data = trimmedLine.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              // Update the assistant message in real-time
+              setMessages((prev) => prev.map((msg, idx) => 
+                idx === assistantMessageIndex 
+                  ? { ...msg, content: fullResponse }
+                  : msg
+              ));
+            }
+          } catch (e) {
+            // Skip malformed JSON
+            console.warn('Failed to parse SSE data:', data);
+          }
+        }
+      }
+
+      // Final update with KB attribution
+      const finalContent = fullResponse + kbSourceAttribution;
       const assistantMessage: Message = { 
         role: 'assistant', 
-        content: fullResponse + kbSourceAttribution, 
+        content: finalContent, 
         timestamp: new Date() 
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Update final message with KB attribution
+      setMessages((prev) => prev.map((msg, idx) => 
+        idx === assistantMessageIndex 
+          ? { ...msg, content: finalContent }
+          : msg
+      ));
 
       // Save assistant message to database
-      if (conversationId && fullResponse) {
+      if (conversationId && finalContent) {
         await supabase.from('ai_messages').insert({
           conversation_id: conversationId,
           role: 'assistant',
-          content: fullResponse + kbSourceAttribution,
+          content: finalContent,
           metadata: {
             kb_record_id: kbRecordId
           } as any,
