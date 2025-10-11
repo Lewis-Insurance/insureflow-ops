@@ -11,14 +11,29 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const InsuranceAIBrain = () => {
   const { entries, loading: kbLoading, stats, fetchKnowledgeBase } = useKnowledgeBase();
   const { queryKnowledge, updateEmbeddings, loading: aiLoading } = useAIBrain();
+  const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newEntry, setNewEntry] = useState({
+    title: '',
+    content: '',
+    category: 'policies',
+    tags: '',
+    source: ''
+  });
   
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -31,6 +46,49 @@ const InsuranceAIBrain = () => {
   const handleUpdateEmbeddings = async () => {
     await updateEmbeddings();
     await fetchKnowledgeBase();
+  };
+
+  const handleAddKnowledge = async () => {
+    if (!newEntry.title || !newEntry.content) {
+      toast({
+        title: "Error",
+        description: "Title and content are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('knowledge_base')
+      .insert({
+        title: newEntry.title,
+        content: newEntry.content,
+        category: newEntry.category,
+        tags: newEntry.tags.split(',').map(t => t.trim()).filter(Boolean),
+        source: newEntry.source || 'Manual Entry'
+      });
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({ 
+        title: "Success", 
+        description: "Knowledge added successfully!" 
+      });
+      setShowAddDialog(false);
+      setNewEntry({
+        title: '',
+        content: '',
+        category: 'policies',
+        tags: '',
+        source: ''
+      });
+      fetchKnowledgeBase();
+    }
   };
   
   // Group entries by category
@@ -61,6 +119,10 @@ const InsuranceAIBrain = () => {
               </div>
             </div>
             <div className="flex space-x-2">
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Knowledge
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleUpdateEmbeddings}
@@ -265,6 +327,81 @@ const InsuranceAIBrain = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Knowledge Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Insurance Knowledge</DialogTitle>
+            <DialogDescription>
+              Add new knowledge to your AI brain for intelligent search and assistance
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={newEntry.title}
+                onChange={(e) => setNewEntry({...newEntry, title: e.target.value})}
+                placeholder="e.g., Auto Insurance Deductibles"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="content">Content</Label>
+              <Textarea
+                id="content"
+                value={newEntry.content}
+                onChange={(e) => setNewEntry({...newEntry, content: e.target.value})}
+                placeholder="Detailed explanation..."
+                rows={6}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Select value={newEntry.category} onValueChange={(v) => setNewEntry({...newEntry, category: v})}>
+                <SelectTrigger id="category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="policies">Policies</SelectItem>
+                  <SelectItem value="procedures">Procedures</SelectItem>
+                  <SelectItem value="products">Products</SelectItem>
+                  <SelectItem value="regulations">Regulations</SelectItem>
+                  <SelectItem value="claims">Claims</SelectItem>
+                  <SelectItem value="faqs">FAQs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="tags">Tags (comma separated)</Label>
+              <Input
+                id="tags"
+                value={newEntry.tags}
+                onChange={(e) => setNewEntry({...newEntry, tags: e.target.value})}
+                placeholder="auto, coverage, liability"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="source">Source</Label>
+              <Input
+                id="source"
+                value={newEntry.source}
+                onChange={(e) => setNewEntry({...newEntry, source: e.target.value})}
+                placeholder="e.g., Policy Manual v2.3"
+              />
+            </div>
+            
+            <Button onClick={handleAddKnowledge} className="w-full">
+              Add to Knowledge Base
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
