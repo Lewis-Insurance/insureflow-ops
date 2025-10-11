@@ -157,14 +157,28 @@ serve(async (req) => {
     
     metrics.parseTime = Date.now() - startTime;
 
-    // Extract metadata
-    const metadata = await pdfDoc.getMetadata();
-    const pdfInfo = {
-      title: metadata?.info?.Title || file.name,
-      author: metadata?.info?.Author || 'Unknown',
-      subject: metadata?.info?.Subject || '',
-      keywords: metadata?.info?.Keywords || '',
+    // Extract metadata - with error handling
+    let pdfInfo = {
+      title: file.name,
+      author: 'Unknown',
+      subject: '',
+      keywords: '',
     };
+    
+    // Try to get metadata if available
+    try {
+      const metadata = await pdfDoc.getMetadata();
+      if (metadata?.info) {
+        pdfInfo = {
+          title: metadata.info.Title || file.name,
+          author: metadata.info.Author || 'Unknown',
+          subject: metadata.info.Subject || '',
+          keywords: metadata.info.Keywords || '',
+        };
+      }
+    } catch (e) {
+      console.log('Metadata extraction failed, using defaults:', e);
+    }
 
     // Extract text from all pages
     let text = '';
