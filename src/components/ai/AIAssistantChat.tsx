@@ -110,9 +110,10 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const abortRef = useRef<AbortController | null>(null);
   const kbCacheRef = useRef<Map<string, any>>(new Map());
   
-  // Extract carrier/jurisdiction from context if available
+  // Extract carrier/jurisdiction/program from context if available
   const userCarrier = context?.metadata?.carrier || '';
   const userJurisdiction = context?.metadata?.jurisdiction || 'FL';
+  const userProgram = context?.metadata?.program_or_form || null;
 
   // Load or create conversation on mount
   useEffect(() => {
