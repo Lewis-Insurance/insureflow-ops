@@ -15,8 +15,41 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
+    // Validate file presence
     if (!file) {
-      throw new Error('No file provided');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No file provided',
+          code: 'MISSING_FILE'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid file type. Only PDF files are accepted.',
+          code: 'INVALID_FILE_TYPE'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Check file size (10MB limit)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'File too large. Maximum size is 10MB.',
+          code: 'FILE_TOO_LARGE'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 413 }
+      );
     }
 
     // Read file as array buffer
@@ -42,29 +75,70 @@ serve(async (req) => {
     });
     const pdfDoc = await (loadingTask as any).promise;
 
+    // Extract PDF metadata
+    const metadata = await (pdfDoc as any).getMetadata();
+    const pdfInfo = {
+      title: metadata?.info?.Title || file.name,
+      author: metadata?.info?.Author || 'Unknown',
+      subject: metadata?.info?.Subject || '',
+      keywords: metadata?.info?.Keywords || '',
+    };
+
     let text = '';
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
       const page = await pdfDoc.getPage(pageNum);
       const content = await page.getTextContent();
-      const pageText = (content.items as any[]).map((item: any) => item.str || '').join(' ');
+      
+      // Better text extraction with space handling
+      const pageText = (content.items as any[])
+        .map((item: any) => {
+          const text = item.str || '';
+          const hasTrailingSpace = item.hasEOL || false;
+          return text + (hasTrailingSpace ? '\n' : ' ');
+        })
+        .join('')
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+      
       text += pageText + '\n\n';
     }
     
+    // Auto-detect category based on content
+    function detectCategory(content: string): string {
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes('policy') || lowerContent.includes('coverage')) return 'policy';
+      if (lowerContent.includes('claim') || lowerContent.includes('damage')) return 'claims';
+      if (lowerContent.includes('premium') || lowerContent.includes('payment')) return 'billing';
+      if (lowerContent.includes('question') || lowerContent.includes('answer')) return 'faq';
+      return 'information';
+    }
+    
     // Parse the text into knowledge base entries
-    // Split by common FAQ patterns (Q&A format)
+    // Support multiple Q&A formats
     const entries = [];
     
-    // Try to detect Q&A patterns
-    const qaPattern = /(?:Question|Q)[\s:]+(.+?)(?:\n|\r\n)(?:Answer|A)[\s:]+(.+?)(?=(?:Question|Q)[\s:]|$)/gis;
-    const matches = [...text.matchAll(qaPattern)];
+    // Try multiple Q&A patterns
+    const qaPatterns = [
+      /(?:Question|Q|FAQ)[\s:]+(.+?)(?:\n|\r\n)(?:Answer|A|Response)[\s:]+(.+?)(?=(?:Question|Q|FAQ)[\s:]|$)/gis,
+      /^\d+\.\s*(.+?)\n+(.+?)(?=^\d+\.|$)/gms, // Numbered questions
+      /^[•·▪︎]\s*(.+?)\n+(.+?)(?=^[•·▪︎]|$)/gms, // Bullet points
+    ];
+    
+    let matches: RegExpMatchArray[] = [];
+    for (const pattern of qaPatterns) {
+      matches = [...text.matchAll(pattern)];
+      if (matches.length > 0) break;
+    }
     
     if (matches.length > 0) {
       // Q&A format detected
-      matches.forEach((match, index) => {
+      matches.forEach((match) => {
+        const title = match[1].trim();
+        const content = match[2].trim();
         entries.push({
-          title: match[1].trim(),
-          content: match[2].trim(),
-          category: 'faq',
+          title,
+          content,
+          category: detectCategory(content),
           source: file.name,
           tags: ['pdf-import', 'florida-insurance']
         });
@@ -82,19 +156,21 @@ serve(async (req) => {
           if (firstLine.length < 100 && !firstLine.endsWith('.')) {
             currentTitle = firstLine;
             if (lines.length > 1) {
+              const entryContent = lines.slice(1).join('\n').trim();
               entries.push({
                 title: currentTitle,
-                content: lines.slice(1).join('\n').trim(),
-                category: 'information',
+                content: entryContent,
+                category: detectCategory(entryContent),
                 source: file.name,
                 tags: ['pdf-import', 'florida-insurance']
               });
             }
           } else {
+            const entryContent = section.trim();
             entries.push({
               title: currentTitle + ` - Part ${index + 1}`,
-              content: section.trim(),
-              category: 'information',
+              content: entryContent,
+              category: detectCategory(entryContent),
               source: file.name,
               tags: ['pdf-import', 'florida-insurance']
             });
@@ -115,6 +191,7 @@ serve(async (req) => {
         success: true, 
         entries: validEntries,
         totalPages: pdfDoc.numPages,
+        metadata: pdfInfo,
         extractedText: text.substring(0, 500) // Preview
       }),
       { 
