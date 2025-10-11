@@ -41,6 +41,7 @@ const TicketDetail = React.lazy(() => import("./pages/TicketDetail"));
 const COIGenerator = React.lazy(() => import("./pages/COIGenerator"));
 const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
+const KnowledgeManagerPage = React.lazy(() => import("./pages/KnowledgeManagerPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -311,6 +312,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AIBrain />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/knowledge-manager"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <KnowledgeManagerPage />
                   </ErrorBoundary>
                 }
               />
