@@ -263,35 +263,35 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         }))
       );
 
-      // Query knowledge base first if the message is a question (without documents)
+      // Query knowledge base first if the message is a question (no docs)
       let knowledgeBaseContext = '';
       let kbSourceAttribution = '';
+      let kbRecordId: string | null = null;
+
       if (input.trim() && documentsWithContent.length === 0) {
-        try {
-          // Check cache first
-          const cacheKey = `${input.trim()}_${userCarrier}_${userJurisdiction}`;
-          let kbAnswer = kbCacheRef.current.get(cacheKey);
-          
-          if (!kbAnswer) {
-            const { data: kbData } = await supabase.rpc('kb_resolve_answer' as any, {
-              q: input.trim(),
-              in_carrier: userCarrier || null,
-              in_jurisdiction: userJurisdiction || 'FL',
-            });
+        const cacheKey = `${input.trim()}_${userCarrier}_${userJurisdiction}_${userProgram || ''}`;
+        let kbAnswer = kbCacheRef.current.get(cacheKey);
 
-            if (kbData && Array.isArray(kbData) && kbData.length > 0) {
-              kbAnswer = kbData[0];
-              kbCacheRef.current.set(cacheKey, kbAnswer);
-            }
-          }
+        if (!kbAnswer) {
+          kbAnswer = await getKbAnswer(input.trim(), userCarrier || null, userJurisdiction || 'FL', userProgram);
+          if (kbAnswer) kbCacheRef.current.set(cacheKey, kbAnswer);
+        }
 
-          if (kbAnswer) {
-            knowledgeBaseContext = `\n\nKnowledge Base Reference:\nQ: ${kbAnswer.question_canonical}\nA: ${kbAnswer.answer_canonical_markdown}\nCarrier: ${kbAnswer.carrier} | Jurisdiction: ${kbAnswer.jurisdiction}`;
-            kbSourceAttribution = '\n\n📚 *Source: Lewis Insurance Knowledge Base*';
-            console.log('KB context found:', kbAnswer.question_canonical);
-          }
-        } catch (kbError) {
-          console.log('KB query failed, continuing without KB context:', kbError);
+        if (kbAnswer) {
+          kbRecordId = kbAnswer.record_id;
+
+          // Provide a fenced, model-friendly context block
+          knowledgeBaseContext =
+            `\n\n---\nKB_REFERENCE_START\n` +
+            `Q: ${kbAnswer.question_canonical}\n` +
+            `A:\n${kbAnswer.answer_canonical_markdown}\n` +
+            `Carrier: ${kbAnswer.carrier} | Jurisdiction: ${kbAnswer.jurisdiction}\n` +
+            `KB_REFERENCE_END\n---\n`;
+
+          kbSourceAttribution = kbAnswer.citations
+            ? `\n\n📚 Sources: ${kbAnswer.citations}`
+            : `\n\n📚 Source: Lewis Insurance Knowledge Base`;
+          console.log('KB context found:', kbAnswer.question_canonical);
         }
       }
 
