@@ -92,6 +92,15 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
+    // Parse optional parameters from form data
+    const options = {
+      chunkSize: parseInt(formData.get('chunkSize') as string) || 1000,
+      minContentLength: parseInt(formData.get('minContentLength') as string) || 50,
+      includeReferences: formData.get('includeReferences') !== 'false',
+      includeConfidence: formData.get('includeConfidence') !== 'false',
+      maxEntries: parseInt(formData.get('maxEntries') as string) || -1
+    };
+    
     // Validate file presence
     if (!file) {
       return new Response(
@@ -152,6 +161,11 @@ serve(async (req) => {
     });
     const pdfDoc = await (loadingTask as any).promise;
     
+    // Check if PDF has extractable pages
+    if (pdfDoc.numPages === 0) {
+      throw new Error('PDF appears to be empty');
+    }
+    
     metrics.parseTime = Date.now() - startTime;
 
     // Extract PDF metadata
@@ -183,6 +197,23 @@ serve(async (req) => {
     }
     
     metrics.extractionTime = Date.now() - startTime - metrics.parseTime;
+    
+    // Check if we got meaningful text
+    if (text.trim().length < 100) {
+      // Cleanup before returning
+      (pdfDoc as any).cleanup?.();
+      (pdfDoc as any).destroy?.();
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'PDF appears to be scanned or contains no extractable text. OCR may be required.',
+          code: 'NO_TEXT_CONTENT',
+          metadata: pdfInfo
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 422 }
+      );
+    }
     
     // Detect language
     const language = detectLanguage(text);
@@ -281,9 +312,28 @@ serve(async (req) => {
     // Remove duplicates
     const uniqueEntries = removeDuplicates(entries);
     
+    // Apply chunking for large entries
+    const chunkedEntries: any[] = [];
+    uniqueEntries.forEach(entry => {
+      if (entry.content.length > 1500) { // Large content
+        const chunks = chunkContent(entry.content, options.chunkSize);
+        chunks.forEach((chunk, idx) => {
+          chunkedEntries.push({
+            ...entry,
+            title: chunks.length > 1 ? `${entry.title} (Part ${idx + 1}/${chunks.length})` : entry.title,
+            content: chunk,
+            chunkIndex: idx,
+            totalChunks: chunks.length
+          });
+        });
+      } else {
+        chunkedEntries.push(entry);
+      }
+    });
+    
     // Filter out very short entries
-    const validEntries = uniqueEntries.filter(entry => 
-      entry.content.length > 50 && entry.title.length > 3
+    let validEntries = chunkedEntries.filter(entry => 
+      entry.content.length > options.minContentLength && entry.title.length > 3
     );
     
     // Calculate confidence scores
@@ -294,21 +344,58 @@ serve(async (req) => {
     // Sort by confidence (highest first)
     validEntries.sort((a, b) => b.confidence - a.confidence);
     
+    // Apply max entries limit if specified
+    if (options.maxEntries > 0) {
+      validEntries = validEntries.slice(0, options.maxEntries);
+    }
+    
+    // Calculate statistics
+    const stats = {
+      totalEntries: validEntries.length,
+      byCategory: validEntries.reduce((acc, entry) => {
+        acc[entry.category] = (acc[entry.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      byLanguage: {
+        english: validEntries.filter(e => e.language === 'english').length,
+        spanish: validEntries.filter(e => e.language === 'spanish').length
+      },
+      averageConfidence: validEntries.length > 0 
+        ? validEntries.reduce((sum, e) => sum + e.confidence, 0) / validEntries.length 
+        : 0,
+      totalReferences: validEntries.reduce((sum, e) => sum + (e.references?.length || 0), 0),
+      averageContentLength: validEntries.length > 0
+        ? Math.round(validEntries.reduce((sum, e) => sum + e.content.length, 0) / validEntries.length)
+        : 0
+    };
+    
     metrics.processingTime = Date.now() - startTime - metrics.parseTime - metrics.extractionTime;
     metrics.totalTime = Date.now() - startTime;
 
     console.log(`Extracted ${validEntries.length} knowledge entries from PDF in ${metrics.totalTime}ms`);
+    
+    // Cleanup PDF resources
+    (pdfDoc as any).cleanup?.();
+    (pdfDoc as any).destroy?.();
 
+    // Prepare response with memory optimization
+    const responseData: any = {
+      success: true, 
+      entries: validEntries,
+      totalPages: pdfDoc.numPages,
+      metadata: pdfInfo,
+      language,
+      metrics,
+      stats
+    };
+    
+    // Only include preview for smaller texts (memory optimization)
+    if (text.length <= 1000000) { // 1MB threshold
+      responseData.extractedText = text.substring(0, 500);
+    }
+    
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        entries: validEntries,
-        totalPages: pdfDoc.numPages,
-        metadata: pdfInfo,
-        language,
-        metrics,
-        extractedText: text.substring(0, 500) // Preview
-      }),
+      JSON.stringify(responseData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
@@ -317,10 +404,35 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error parsing PDF:', error);
+    
+    // Check for specific PDF errors
+    if (error.message?.includes('password')) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'PDF is password protected',
+          code: 'PASSWORD_PROTECTED'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+    
+    if (error.message?.includes('Invalid PDF')) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid or corrupted PDF file',
+          code: 'INVALID_PDF'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        code: 'PARSE_ERROR'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
