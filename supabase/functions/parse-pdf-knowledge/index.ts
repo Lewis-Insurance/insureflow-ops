@@ -214,6 +214,56 @@ function extractInsuranceTerms(text: string) {
   return glossaryTerms;
 }
 
+function extractFloridaSpecificInfo(text: string) {
+  const floridaInfo = {
+    hurricaneProvisions: [] as string[],
+    sinkholeCoverage: [] as string[],
+    ordinanceOrLaw: [] as string[],
+    assignmentOfBenefits: [] as string[],
+    statutoryReferences: [] as string[]
+  };
+  
+  // Hurricane/Wind specific
+  const hurricanePatterns = [
+    /(?:hurricane|windstorm|named storm)\s+deductible[\s:]*([^.]+\.)/gi,
+    /(?:separate|special)\s+(?:hurricane|wind)\s+(?:deductible|coverage)[\s:]*([^.]+\.)/gi,
+  ];
+  
+  hurricanePatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1]) floridaInfo.hurricaneProvisions.push(match[1].trim());
+    });
+  });
+  
+  // Florida statutes
+  const statutePattern = /(?:F\.S\.|Florida Statute[s]?)\s*([\d.]+)/gi;
+  const matches = [...text.matchAll(statutePattern)];
+  matches.forEach(match => {
+    if (match[1]) floridaInfo.statutoryReferences.push(`F.S. ${match[1]}`);
+  });
+  
+  // Sinkhole coverage (Florida-specific concern)
+  if (text.toLowerCase().includes('sinkhole')) {
+    const sinkPattern = /[^.]*sinkhole[^.]*\./gi;
+    const sinkMatches = [...text.matchAll(sinkPattern)];
+    sinkMatches.forEach(match => {
+      floridaInfo.sinkholeCoverage.push(match[0].trim());
+    });
+  }
+  
+  // Assignment of Benefits (AOB) - Florida hot topic
+  if (text.toLowerCase().includes('assignment of benefits') || text.toLowerCase().includes('aob')) {
+    const aobPattern = /[^.]*(?:assignment of benefits|AOB)[^.]*\./gi;
+    const aobMatches = [...text.matchAll(aobPattern)];
+    aobMatches.forEach(match => {
+      floridaInfo.assignmentOfBenefits.push(match[0].trim());
+    });
+  }
+  
+  return floridaInfo;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -363,6 +413,10 @@ serve(async (req) => {
     // Extract insurance glossary terms
     const glossaryTerms = extractInsuranceTerms(text);
     console.log(`Extracted ${glossaryTerms.length} glossary terms`);
+    
+    // Extract Florida-specific insurance info
+    const floridaInfo = extractFloridaSpecificInfo(text);
+    console.log('Extracted Florida-specific info:', JSON.stringify(floridaInfo, null, 2));
     
     // Parse the text into knowledge base entries
     const entries = [];
@@ -548,6 +602,7 @@ serve(async (req) => {
         totalPages: pdfDoc.numPages,
         metadata: pdfInfo,
         policyInfo: policyMetadata,
+        floridaSpecific: floridaInfo,
         language,
         metrics,
         stats,
