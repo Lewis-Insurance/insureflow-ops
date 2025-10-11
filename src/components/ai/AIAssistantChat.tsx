@@ -120,6 +120,26 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         }))
       );
 
+      // Query knowledge base first if the message is a question (without documents)
+      let knowledgeBaseContext = '';
+      if (input.trim() && documentsWithContent.length === 0) {
+        try {
+          const { data: kbData } = await supabase.rpc('kb_resolve_answer' as any, {
+            q: input.trim(),
+            in_carrier: null,
+            in_jurisdiction: null,
+          });
+
+          if (kbData && Array.isArray(kbData) && kbData.length > 0) {
+            const kbAnswer = kbData[0];
+            knowledgeBaseContext = `\n\nKnowledge Base Reference:\nQ: ${kbAnswer.question_canonical}\nA: ${kbAnswer.answer_canonical_markdown}\nCarrier: ${kbAnswer.carrier} | Jurisdiction: ${kbAnswer.jurisdiction}`;
+            console.log('KB context found:', kbAnswer.question_canonical);
+          }
+        } catch (kbError) {
+          console.log('KB query failed, continuing without KB context:', kbError);
+        }
+      }
+
       // Determine action based on context
       let action: 'chat' | 'compare_quotes' | 'analyze_policy' = 'chat';
       if (context?.metadata?.documentId) action = 'analyze_policy';
@@ -133,11 +153,14 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         ? { contextType: context.type, contextId: context.id, contextName: context.name, contextMetadata: context.metadata }
         : undefined;
 
+      // Enhance message with knowledge base context if available
+      const enhancedMessage = userMessage.content + knowledgeBaseContext;
+
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
           action,
           documents: documentsWithContent,
-          message: userMessage.content,
+          message: enhancedMessage,
           conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
           context: contextPayload,
         },
