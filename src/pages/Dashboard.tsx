@@ -7,6 +7,7 @@ import { DashboardSkeleton } from '@/components/ui/skeleton-components';
 import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
 import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
 import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
+import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -26,6 +27,11 @@ const DashboardContent = React.memo(() => {
           </p>
         </div>
       </div>
+
+      {/* AI Knowledge Search */}
+      <ErrorBoundary level="component">
+        <AIKnowledgeSearch />
+      </ErrorBoundary>
       
       {/* Tab Navigation */}
       <div className="flex space-x-4 border-b border-border">
