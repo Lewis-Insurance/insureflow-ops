@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Brain, Search, Sparkles, RefreshCw, Plus, 
-  Database, Shield, Zap, Loader2, Tag
+  Database, Shield, Zap, Loader2, Tag, Download, Upload
 } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { useAIBrain } from '@/hooks/useAIBrain';
@@ -34,6 +34,8 @@ const InsuranceAIBrain = () => {
     tags: '',
     source: ''
   });
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -90,6 +92,81 @@ const InsuranceAIBrain = () => {
       fetchKnowledgeBase();
     }
   };
+
+  const handleDownloadTemplate = () => {
+    const link = document.createElement('a');
+    link.href = '/knowledge-template.csv';
+    link.download = 'knowledge-template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to import knowledge entries",
+    });
+  };
+
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        throw new Error('CSV file is empty or invalid');
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const entries = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
+        if (!values || values.length < headers.length) continue;
+
+        const entry: any = {};
+        headers.forEach((header, index) => {
+          entry[header] = values[index]?.replace(/^"|"$/g, '').trim();
+        });
+
+        // Convert tags from pipe-separated to array
+        if (entry.tags) {
+          entry.tags = entry.tags.split('|').map((t: string) => t.trim());
+        }
+
+        entries.push(entry);
+      }
+
+      const { error } = await supabase
+        .from('knowledge_base')
+        .insert(entries);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Imported ${entries.length} knowledge entries`,
+      });
+
+      fetchKnowledgeBase();
+      
+    } catch (error: any) {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
   
   // Group entries by category
   const categorizedEntries = entries.reduce((acc, entry) => {
@@ -125,6 +202,25 @@ const InsuranceAIBrain = () => {
               </Button>
               <Button
                 variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-2" />
+                )}
+                Import CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadTemplate}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+              <Button
+                variant="outline"
                 onClick={handleUpdateEmbeddings}
                 disabled={aiLoading}
               >
@@ -136,6 +232,13 @@ const InsuranceAIBrain = () => {
                 Refresh
               </Button>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
           </div>
         </CardHeader>
       </Card>
