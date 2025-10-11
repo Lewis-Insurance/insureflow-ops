@@ -151,25 +151,14 @@ serve(async (req) => {
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer();
 
-    // Parse PDF using pdfjs-dist (works in Deno Edge runtime)
-    const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
-    // Try to provide a remote worker script URL; Edge may still ignore workers
-    const workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/legacy/build/pdf.worker.mjs';
-    try { (pdfjs as any).GlobalWorkerOptions.workerSrc = workerSrc; } catch (_) { /* no-op */ }
+    // Parse PDF using pdfjs-serverless (designed for edge runtime)
+    const { getDocument } = await import('https://esm.sh/pdfjs-serverless@0.7.0');
 
-    const loadingTask = (pdfjs as any).getDocument({ 
-      data: new Uint8Array(arrayBuffer), 
-      disableFontFace: true,
-      // Be conservative in Edge runtime
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      disableRange: true,
-      disableStream: true,
-      disableAutoFetch: true,
-      // Some builds still honor this flag
-      disableWorker: true as any
+    const loadingTask = getDocument({ 
+      data: new Uint8Array(arrayBuffer),
+      useSystemFonts: true,
     });
-    const pdfDoc = await (loadingTask as any).promise;
+    const pdfDoc = await loadingTask.promise;
     
     // Check if PDF has extractable pages
     if (pdfDoc.numPages === 0) {
