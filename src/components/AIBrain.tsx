@@ -44,8 +44,7 @@ const InsuranceAIBrain = () => {
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
-    const category = selectedCategory === 'all' ? undefined : selectedCategory;
-    const results = await queryKnowledge(searchQuery, category);
+    const results = await queryKnowledge(searchQuery);
     setSearchResults(results);
   };
   
@@ -385,30 +384,60 @@ const InsuranceAIBrain = () => {
           
           {/* Search Results */}
           {searchResults && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-2">AI Response:</h4>
-              <p className="text-gray-700 whitespace-pre-wrap">{searchResults.response}</p>
+            <div className="mt-4 p-4 bg-muted rounded-lg space-y-4">
+              <div>
+                <h4 className="font-semibold mb-2 flex items-center">
+                  <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                  Quick Answer:
+                </h4>
+                <p className="text-foreground">{searchResults.shortAnswer}</p>
+              </div>
               
-              {searchResults.sources && searchResults.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm text-gray-500 mb-2">Sources:</p>
-                  <div className="flex flex-wrap gap-2">
+              {searchResults.fullAnswer && (
+                <details className="cursor-pointer">
+                  <summary className="font-medium text-sm text-primary hover:underline">
+                    Read full answer...
+                  </summary>
+                  <div className="mt-2 pt-2 border-t prose prose-sm max-w-none">
+                    <div dangerouslySetInnerHTML={{ __html: searchResults.fullAnswer }} />
+                  </div>
+                </details>
+              )}
+              
+              {searchResults.fallback && searchResults.sources && searchResults.sources.length > 0 && (
+                <div className="pt-3 border-t">
+                  <p className="text-sm text-muted-foreground mb-2">Matching entries:</p>
+                  <div className="space-y-2">
                     {searchResults.sources.map((source: any, idx: number) => (
-                      <Badge key={idx} variant="secondary">
-                        {source.title} ({Math.round(source.relevance * 100)}%)
-                      </Badge>
+                      <details key={idx} className="cursor-pointer">
+                        <summary className="text-sm font-medium text-primary hover:underline">
+                          {source.title}
+                        </summary>
+                        <div className="mt-1 pl-4 text-sm text-muted-foreground">
+                          <p>{source.content?.substring(0, 200)}...</p>
+                          {source.tags && source.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {source.tags.map((tag: string, i: number) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </details>
                     ))}
                   </div>
                 </div>
               )}
               
-              {searchResults.confidence && (
-                <div className="mt-3">
+              {searchResults.confidence !== undefined && (
+                <div className="pt-3 border-t">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Confidence:</span>
-                    <span className="font-medium">{searchResults.confidence}%</span>
+                    <span className="text-muted-foreground">Confidence:</span>
+                    <span className="font-medium">{Math.round(searchResults.confidence * 100)}%</span>
                   </div>
-                  <Progress value={searchResults.confidence} className="mt-1" />
+                  <Progress value={searchResults.confidence * 100} className="mt-1" />
                 </div>
               )}
             </div>

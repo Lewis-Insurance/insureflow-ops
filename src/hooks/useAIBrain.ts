@@ -6,29 +6,53 @@ export function useAIBrain() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const queryKnowledge = async (query: string, category?: string) => {
+  const queryKnowledge = async (
+    query: string, 
+    carrier?: string, 
+    program?: string, 
+    jurisdiction?: string
+  ) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-brain-rag', {
-        body: {
-          action: 'query',
-          query,
-          category,
-          context: window.location.pathname
-        }
+      // Try the RPC endpoint first
+      const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
+        q: query,
+        in_carrier: carrier || null,
+        in_program: program || null,
+        in_jurisdiction: jurisdiction || null
       });
 
-      if (error) throw error;
-      
-      // Log knowledge gap if confidence is low or no answer found
-      if (data && (data.confidence < 0.5 || !data.answer)) {
-        await supabase.rpc('log_knowledge_gap', {
-          p_question: query,
-          p_context: category || window.location.pathname
-        });
+      if (error) {
+        console.warn('RPC failed, falling back to knowledge_base table:', error);
+        
+        // Fallback to reading from knowledge_base table
+        const { data: viewData, error: viewError } = await supabase
+          .from('knowledge_base' as any)
+          .select('title, content, category, tags, source')
+          .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
+          .limit(5);
+        
+        if (viewError) {
+          console.error('Fallback query failed:', viewError);
+          throw viewError;
+        }
+        
+        return {
+          shortAnswer: 'Found matching knowledge entries',
+          fullAnswer: null,
+          sources: viewData || [],
+          fallback: true
+        };
       }
       
-      return data;
+      const result = data as any;
+      return {
+        shortAnswer: result?.faq_short_answer || 'No answer found',
+        fullAnswer: result?.answer_canonical_markdown || null,
+        sources: result?.sources || [],
+        confidence: result?.confidence || 0,
+        fallback: false
+      };
     } catch (error: any) {
       toast({
         title: "Query Failed",
