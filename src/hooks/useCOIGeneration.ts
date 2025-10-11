@@ -7,7 +7,7 @@ import { useCOI } from './useCOI';
 import { TicketCOIMetadata, GenerationProgress, COIVersion, BatchCOIItem, BatchCOIResult, COITemplate } from '@/types/coi';
 import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
-import { Queue } from '@/lib/utils/queue';
+import { COIQueue } from '@/lib/utils/queue';
 import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
 
 export function useCOIGeneration() {
@@ -570,7 +570,16 @@ export function useCOIGeneration() {
   ): Promise<BatchCOIResult[]> => {
     const { concurrency = 3, onProgress, onItemComplete } = options || {};
     const results: BatchCOIResult[] = new Array(coiDataList.length);
-    const queue = new Queue(concurrency);
+    const queue = new COIQueue(concurrency);
+
+    // Listen to queue events
+    queue.addEventListener('task:complete', (e: any) => {
+      console.log(`COI ${e.detail.metadata.certificateNumber} completed in ${e.detail.duration}ms`);
+    });
+
+    queue.addEventListener('queue:empty', (e: any) => {
+      console.log('All COIs processed:', e.detail);
+    });
 
     const tasks = coiDataList.map((item, index) => async () => {
       try {
@@ -600,7 +609,17 @@ export function useCOIGeneration() {
       }
     });
 
-    await queue.addAll(tasks);
+    // Add all tasks to queue with proper COI tracking
+    await Promise.all(
+      tasks.map((task, index) => 
+        queue.addCOI(task, {
+          certificateNumber: coiDataList[index].data.certificate_number || `unknown-${index}`,
+          priority: 0,
+          maxRetries: 2,
+          timeout: 60000, // 60 seconds per COI
+        })
+      )
+    );
 
     // Summary toast
     const successful = results.filter(r => r.url).length;
