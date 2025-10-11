@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import * as pdfjsLib from 'https://esm.sh/pdfjs-serverless@0.2.6';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,16 +7,6 @@ const corsHeaders = {
 };
 
 // Helper Functions
-function preprocessText(text: string): string {
-  return text
-    // Fix common OCR issues
-    .replace(/([a-z])([A-Z])/g, '$1 $2') // Split camelCase
-    .replace(/(\d),(\d{3})/g, '$1$2') // Remove thousands separators
-    .replace(/\s{2,}/g, ' ') // Multiple spaces to single
-    .replace(/([.!?])\s*([a-z])/g, (match, p1, p2) => `${p1} ${p2.toUpperCase()}`) // Fix sentence starts
-    .trim();
-}
-
 function chunkContent(text: string, maxChunkSize: number = 1000): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
   const chunks = [];
@@ -54,18 +44,11 @@ function removeDuplicates(entries: any[]): any[] {
 }
 
 function calculateConfidence(entry: any): number {
-  let score = 0.5; // Base score
-  
-  // Well-formatted Q&A gets higher score
+  let score = 0.5;
   if (entry.category === 'faq') score += 0.2;
-  
-  // Longer, more detailed content
   if (entry.content.length > 200) score += 0.1;
   if (entry.content.length > 500) score += 0.1;
-  
-  // Has proper punctuation and structure
   if (/[.!?]$/.test(entry.content)) score += 0.1;
-  
   return Math.min(score, 1.0);
 }
 
@@ -85,6 +68,15 @@ function extractReferences(text: string): string[] {
   return Array.from(refs);
 }
 
+function detectCategory(content: string): string {
+  const lowerContent = content.toLowerCase();
+  if (lowerContent.includes('policy') || lowerContent.includes('coverage')) return 'policy';
+  if (lowerContent.includes('claim') || lowerContent.includes('damage')) return 'claims';
+  if (lowerContent.includes('premium') || lowerContent.includes('payment')) return 'billing';
+  if (lowerContent.includes('question') || lowerContent.includes('answer')) return 'faq';
+  return 'information';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -102,7 +94,7 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
-    // Parse optional parameters from form data
+    // Parse optional parameters
     const options = {
       chunkSize: parseInt(formData.get('chunkSize') as string) || 1000,
       minContentLength: parseInt(formData.get('minContentLength') as string) || 50,
@@ -150,15 +142,16 @@ serve(async (req) => {
 
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-    // Parse PDF using pdfjs-serverless (designed for edge runtime)
-    const { getDocument } = await import('https://esm.sh/pdfjs-serverless@0.7.0');
-
-    const loadingTask = getDocument({ 
-      data: new Uint8Array(arrayBuffer),
+    // Parse PDF using pdfjs-serverless
+    const pdfDoc = await pdfjsLib.getDocument({
+      data: uint8Array,
       useSystemFonts: true,
-    });
-    const pdfDoc = await loadingTask.promise;
+      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
+      disableFontFace: true,
+      verbosity: 0
+    }).promise;
     
     // Check if PDF has extractable pages
     if (pdfDoc.numPages === 0) {
@@ -167,8 +160,8 @@ serve(async (req) => {
     
     metrics.parseTime = Date.now() - startTime;
 
-    // Extract PDF metadata
-    const metadata = await (pdfDoc as any).getMetadata();
+    // Extract metadata
+    const metadata = await pdfDoc.getMetadata();
     const pdfInfo = {
       title: metadata?.info?.Title || file.name,
       author: metadata?.info?.Author || 'Unknown',
@@ -176,20 +169,22 @@ serve(async (req) => {
       keywords: metadata?.info?.Keywords || '',
     };
 
+    // Extract text from all pages
     let text = '';
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
       const page = await pdfDoc.getPage(pageNum);
       const content = await page.getTextContent();
       
-      // Better text extraction with space handling
-      const pageText = (content.items as any[])
+      // Process text items
+      const pageText = content.items
         .map((item: any) => {
-          const text = item.str || '';
-          const hasTrailingSpace = item.hasEOL || false;
-          return text + (hasTrailingSpace ? '\n' : ' ');
+          if ('str' in item) {
+            return item.str;
+          }
+          return '';
         })
-        .join('')
-        .replace(/\s+/g, ' ') // Normalize whitespace
+        .join(' ')
+        .replace(/\s+/g, ' ')
         .trim();
       
       text += pageText + '\n\n';
@@ -199,10 +194,6 @@ serve(async (req) => {
     
     // Check if we got meaningful text
     if (text.trim().length < 100) {
-      // Cleanup before returning
-      (pdfDoc as any).cleanup?.();
-      (pdfDoc as any).destroy?.();
-      
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -214,49 +205,18 @@ serve(async (req) => {
       );
     }
     
-    // Preprocess text for better quality
-    text = preprocessText(text);
-    
     // Detect language
     const language = detectLanguage(text);
     
-    // Auto-detect category based on content
-    function detectCategory(content: string): string {
-      const lowerContent = content.toLowerCase();
-      if (lowerContent.includes('policy') || lowerContent.includes('coverage')) return 'policy';
-      if (lowerContent.includes('claim') || lowerContent.includes('damage')) return 'claims';
-      if (lowerContent.includes('premium') || lowerContent.includes('payment')) return 'billing';
-      if (lowerContent.includes('question') || lowerContent.includes('answer')) return 'faq';
-      return 'information';
-    }
-    
     // Parse the text into knowledge base entries
-    // Support multiple Q&A formats
     const entries = [];
     
-    // Try multiple Q&A patterns including insurance-specific
+    // Try multiple Q&A patterns
     const qaPatterns = [
       /(?:Question|Q|FAQ)[\s:]+(.+?)(?:\n|\r\n)(?:Answer|A|Response)[\s:]+(.+?)(?=(?:Question|Q|FAQ)[\s:]|$)/gis,
-      /^\d+\.\s*(.+?)\n+(.+?)(?=^\d+\.|$)/gms, // Numbered questions
-      /^[•·▪︎]\s*(.+?)\n+(.+?)(?=^[•·▪︎]|$)/gms, // Bullet points
-      /(?:Section|Article)\s+(\d+[A-Z]?)\s*[-:]?\s*(.+?)(?=(?:Section|Article)\s+\d+|$)/gis, // Policy sections
+      /^\d+\.\s*(.+?)\n+(.+?)(?=^\d+\.|$)/gms,
+      /^[•·▪︎]\s*(.+?)\n+(.+?)(?=^[•·▪︎]|$)/gms,
     ];
-    
-    // Extract insurance-specific key terms
-    const insuranceTerms: any[] = [];
-    const termPattern = /(?:Deductible|Premium|Coverage|Limit|Coinsurance|Copay|Exclusion|Endorsement)\s*:\s*(.+?)(?=\n|$)/gi;
-    let termMatch;
-    while ((termMatch = termPattern.exec(text)) !== null) {
-      insuranceTerms.push({
-        title: termMatch[0].split(':')[0].trim(),
-        content: termMatch[1].trim(),
-        category: 'policy',
-        source: file.name,
-        tags: ['pdf-import', 'florida-insurance', 'insurance-term'],
-        language,
-        confidence: 0.8 // High confidence for explicit terms
-      });
-    }
     
     let matches: RegExpMatchArray[] = [];
     for (const pattern of qaPatterns) {
@@ -279,18 +239,17 @@ serve(async (req) => {
           tags: ['pdf-import', 'florida-insurance'],
           language,
           references: references.length > 0 ? references : undefined,
-          confidence: 0 // Will be calculated later
+          confidence: 0
         });
       });
     } else {
-      // Try splitting by headings/sections
+      // Split by sections
       const sections = text.split(/\n\n+/);
       let currentTitle = 'General Information';
       
       sections.forEach((section, index) => {
         const lines = section.trim().split('\n');
         if (lines.length > 0) {
-          // First line as title if it looks like a heading
           const firstLine = lines[0].trim();
           if (firstLine.length < 100 && !firstLine.endsWith('.')) {
             currentTitle = firstLine;
@@ -327,17 +286,14 @@ serve(async (req) => {
         }
       });
     }
-    
-    // Merge insurance terms with entries
-    entries.push(...insuranceTerms);
-    
-    // Remove duplicates
+
+    // Process entries
     const uniqueEntries = removeDuplicates(entries);
     
     // Apply chunking for large entries
     const chunkedEntries: any[] = [];
     uniqueEntries.forEach(entry => {
-      if (entry.content.length > 1500) { // Large content
+      if (entry.content.length > 1500) {
         const chunks = chunkContent(entry.content, options.chunkSize);
         chunks.forEach((chunk, idx) => {
           chunkedEntries.push({
@@ -353,7 +309,7 @@ serve(async (req) => {
       }
     });
     
-    // Filter out very short entries
+    // Filter and process
     let validEntries = chunkedEntries.filter(entry => 
       entry.content.length > options.minContentLength && entry.title.length > 3
     );
@@ -363,10 +319,10 @@ serve(async (req) => {
       entry.confidence = calculateConfidence(entry);
     });
     
-    // Sort by confidence (highest first)
+    // Sort by confidence
     validEntries.sort((a, b) => b.confidence - a.confidence);
     
-    // Apply max entries limit if specified
+    // Apply max entries limit
     if (options.maxEntries > 0) {
       validEntries = validEntries.slice(0, options.maxEntries);
     }
@@ -395,29 +351,18 @@ serve(async (req) => {
     metrics.totalTime = Date.now() - startTime;
 
     console.log(`Extracted ${validEntries.length} knowledge entries from PDF in ${metrics.totalTime}ms`);
-    
-    // Cleanup PDF resources
-    (pdfDoc as any).cleanup?.();
-    (pdfDoc as any).destroy?.();
 
-    // Prepare response with memory optimization
-    const responseData: any = {
-      success: true, 
-      entries: validEntries,
-      totalPages: pdfDoc.numPages,
-      metadata: pdfInfo,
-      language,
-      metrics,
-      stats
-    };
-    
-    // Only include preview for smaller texts (memory optimization)
-    if (text.length <= 1000000) { // 1MB threshold
-      responseData.extractedText = text.substring(0, 500);
-    }
-    
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify({ 
+        success: true, 
+        entries: validEntries,
+        totalPages: pdfDoc.numPages,
+        metadata: pdfInfo,
+        language,
+        metrics,
+        stats,
+        extractedText: text.length <= 1000000 ? text.substring(0, 500) : undefined
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
@@ -427,7 +372,6 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error parsing PDF:', error);
     
-    // Check for specific PDF errors
     if (error.message?.includes('password')) {
       return new Response(
         JSON.stringify({ 
@@ -453,7 +397,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message,
+        error: error.message || 'Failed to parse PDF',
         code: 'PARSE_ERROR'
       }),
       { 
