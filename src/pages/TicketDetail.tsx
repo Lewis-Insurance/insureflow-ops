@@ -7,12 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTickets } from '@/hooks/useTickets';
 import { useTicketMessages } from '@/hooks/useTicketMessages';
-import { ArrowLeft, Send, Brain, Sparkles, CheckCircle2, Clock, User } from 'lucide-react';
+import { ArrowLeft, Send, Brain, Sparkles, CheckCircle2, Clock, User, FileText, ListTodo, Edit2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
+import { useNavigate as useRouterNavigate } from 'react-router-dom';
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,8 @@ export default function TicketDetail() {
   const [newMessage, setNewMessage] = useState('');
   const [aiActions, setAiActions] = useState<any[]>([]);
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [editingDraft, setEditingDraft] = useState<string | null>(null);
+  const [draftContent, setDraftContent] = useState('');
   
   const { 
     messages, 
@@ -163,6 +166,71 @@ export default function TicketDetail() {
     }
   };
 
+  const handleGenerateActionItems = async () => {
+    if (!id) return;
+    setGeneratingAI(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-ticket-automation', {
+        body: {
+          action: 'extract_action_items',
+          ticketId: id,
+          messages: messages.map(m => ({ role: m.author_type, content: m.content })),
+        },
+      });
+
+      if (error) throw error;
+
+      await supabase.from('ticket_actions').insert({
+        ticket_id: id,
+        action_type: 'ai_action_item',
+        content: JSON.stringify(data.actionItems),
+        metadata: { 
+          generated_at: new Date().toISOString(),
+          count: data.actionItems?.length || 0 
+        },
+      });
+
+      toast({ 
+        title: 'Action Items Extracted', 
+        description: `Found ${data.actionItems?.length || 0} actionable tasks` 
+      });
+      
+      const { data: actions } = await supabase
+        .from('ticket_actions')
+        .select('*')
+        .eq('ticket_id', id)
+        .order('created_at', { ascending: false });
+      setAiActions(actions || []);
+    } catch (error: any) {
+      toast({ title: 'Failed to extract action items', description: error.message, variant: 'destructive' });
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const handleEditDraft = (actionId: string, content: string) => {
+    setEditingDraft(actionId);
+    setDraftContent(content);
+  };
+
+  const handleSaveDraft = async (actionId: string) => {
+    await supabase
+      .from('ticket_actions')
+      .update({ content: draftContent })
+      .eq('id', actionId);
+
+    const { data: actions } = await supabase
+      .from('ticket_actions')
+      .select('*')
+      .eq('ticket_id', id)
+      .order('created_at', { ascending: false });
+    setAiActions(actions || []);
+    
+    setEditingDraft(null);
+    toast({ title: 'Draft updated', description: 'Your changes have been saved' });
+  };
+
   const handleApproveDraft = async (actionId: string, content: string) => {
     if (!id) return;
 
@@ -179,7 +247,13 @@ export default function TicketDetail() {
       .update({ is_approved: true, approved_at: new Date().toISOString() })
       .eq('id', actionId);
 
+    setEditingDraft(null);
     toast({ title: 'Response sent', description: 'Draft approved and sent to customer' });
+  };
+
+  const handleGenerateCOI = () => {
+    // Navigate to COI generator with ticket context
+    navigate(`/coi-generator?ticketId=${id}&accountId=${ticket.account_id}`);
   };
 
   if (loading || !ticket) {
@@ -299,13 +373,14 @@ export default function TicketDetail() {
                     <Sparkles className="h-5 w-5 text-primary" />
                     AI Assistance
                   </CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={handleGenerateAISummary}
                       disabled={generatingAI}
                     >
+                      <Sparkles className="h-3 w-3 mr-1" />
                       {generatingAI ? 'Generating...' : 'Summarize'}
                     </Button>
                     <Button
@@ -314,7 +389,25 @@ export default function TicketDetail() {
                       onClick={handleGenerateDraftResponse}
                       disabled={generatingAI}
                     >
+                      <Send className="h-3 w-3 mr-1" />
                       {generatingAI ? 'Generating...' : 'Draft Response'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateActionItems}
+                      disabled={generatingAI}
+                    >
+                      <ListTodo className="h-3 w-3 mr-1" />
+                      {generatingAI ? 'Extracting...' : 'Extract Tasks'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateCOI}
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Generate COI
                     </Button>
                   </div>
                 </div>
@@ -327,22 +420,93 @@ export default function TicketDetail() {
                 ) : (
                   <div className="space-y-3">
                     {aiActions.map((action) => (
-                      <div key={action.id} className="border rounded-lg p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <Badge variant="secondary">
-                            {action.action_type.replace('ai_', '').replace('_', ' ')}
-                          </Badge>
+                      <div key={action.id} className="border rounded-lg p-4 bg-card">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {action.action_type.replace('ai_', '').replace('_', ' ')}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          
                           {!action.is_approved && action.action_type === 'ai_draft_response' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleApproveDraft(action.id, action.content)}
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                              Approve & Send
-                            </Button>
+                            <div className="flex gap-2">
+                              {editingDraft === action.id ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingDraft(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSaveDraft(action.id)}
+                                  >
+                                    Save
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditDraft(action.id, action.content)}
+                                  >
+                                    <Edit2 className="h-3 w-3 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApproveDraft(action.id, action.content)}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    Approve & Send
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
-                        <p className="text-sm whitespace-pre-wrap">{action.content}</p>
+                        
+                        {action.action_type === 'ai_action_item' ? (
+                          <div className="space-y-2">
+                            {(() => {
+                              try {
+                                const items = JSON.parse(action.content);
+                                return items.map((item: any, idx: number) => (
+                                  <div key={idx} className="flex items-start gap-2 p-2 bg-muted/50 rounded">
+                                    <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">{item.title}</p>
+                                      <div className="flex gap-2 mt-1">
+                                        <Badge variant="outline" className="text-xs">
+                                          {item.priority}
+                                        </Badge>
+                                        <Badge variant="outline" className="text-xs">
+                                          {item.category}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ));
+                              } catch {
+                                return <p className="text-sm text-muted-foreground">No action items found</p>;
+                              }
+                            })()}
+                          </div>
+                        ) : editingDraft === action.id ? (
+                          <Textarea
+                            value={draftContent}
+                            onChange={(e) => setDraftContent(e.target.value)}
+                            className="min-h-[120px] font-mono text-sm"
+                          />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{action.content}</p>
+                        )}
                       </div>
                     ))}
                   </div>
