@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,17 +9,35 @@ import { Plus, Search, Filter, Ticket as TicketIcon, Brain } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDistanceToNow } from 'date-fns';
+import { CreateTicketModal } from '@/components/tickets/CreateTicketModal';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function TicketsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  
   
   const { tickets, isLoading } = useTickets({
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
   });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [accountsRes, contactsRes] = await Promise.all([
+        supabase.from('accounts').select('id, name').order('name'),
+        supabase.from('contacts').select('id, first_name, last_name, account_id').order('first_name'),
+      ]);
+      if (accountsRes.data) setAccounts(accountsRes.data);
+      if (contactsRes.data) setContacts(contactsRes.data);
+    };
+    fetchData();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -60,7 +78,7 @@ export default function TicketsPage() {
             <h1 className="text-3xl font-bold">Service Tickets</h1>
             <p className="text-muted-foreground">Manage customer requests and support tickets</p>
           </div>
-          <Button onClick={() => navigate('/tickets/new')}>
+          <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Ticket
           </Button>
@@ -174,6 +192,13 @@ export default function TicketsPage() {
             )}
           </CardContent>
         </Card>
+
+        <CreateTicketModal
+          open={showCreateModal}
+          onOpenChange={setShowCreateModal}
+          accounts={accounts}
+          contacts={contacts}
+        />
       </div>
     </AppLayout>
   );

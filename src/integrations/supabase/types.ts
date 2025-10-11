@@ -3740,6 +3740,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_ticket_with_message: {
+        Args: {
+          p_account_id: string
+          p_contact_id: string
+          p_content?: string
+          p_description: string
+          p_priority?: string
+          p_source?: string
+          p_subject: string
+        }
+        Returns: string
+      }
       customers_search_v1: {
         Args: {
           p_filters?: Json
