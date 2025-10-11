@@ -15,6 +15,13 @@ export interface TicketWithCOI {
   [key: string]: any;
 }
 
+// Progress tracking for COI generation
+export interface GenerationProgress {
+  step: 'generating' | 'uploading' | 'updating' | 'completed';
+  percentage: number;
+  message: string;
+}
+
 // Type guard to check if ticket has COI metadata
 export function hasCoiMetadata(metadata: any): metadata is TicketCOIMetadata {
   return (

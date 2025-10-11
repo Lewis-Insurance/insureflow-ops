@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateCOIPDF, COIPDFData, ExportOptions } from '@/lib/pdfGenerator';
 import { useCOI } from './useCOI';
-import { TicketCOIMetadata } from '@/types/coi';
+import { TicketCOIMetadata, GenerationProgress } from '@/types/coi';
 import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
 
@@ -10,6 +11,7 @@ export function useCOIGeneration() {
   const { toast } = useToast();
   const { updateCOI } = useCOI();
   const { user } = useAuth();
+  const [progress, setProgress] = useState<GenerationProgress | null>(null);
 
   /**
    * Upload PDF with retry logic
@@ -67,18 +69,36 @@ export function useCOIGeneration() {
     ticketId: string,
     coiId: string,
     coiData: COIPDFData,
-    exportOptions?: Partial<ExportOptions>
+    exportOptions?: Partial<ExportOptions>,
+    onProgress?: (progress: GenerationProgress) => void
   ): Promise<string | null> => {
     const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
 
+    const updateProgress = (progressData: GenerationProgress) => {
+      setProgress(progressData);
+      onProgress?.(progressData);
+    };
+
     try {
-      // Generate PDF with options
+      // Step 1: Generate PDF
+      updateProgress({
+        step: 'generating',
+        percentage: 25,
+        message: 'Generating PDF document...'
+      });
+
       const pdfBlob = generateCOIPDF(coiData, {
         format: 'blob',
         ...exportOptions,
       }) as Blob;
 
-      // Upload to Supabase Storage with retry logic
+      // Step 2: Upload
+      updateProgress({
+        step: 'uploading',
+        percentage: 50,
+        message: 'Uploading certificate...'
+      });
+
       const uploadData = await uploadWithRetry(fileName, pdfBlob);
 
       if (!uploadData) {
@@ -89,6 +109,13 @@ export function useCOIGeneration() {
       const { data: { publicUrl } } = supabase.storage
         .from('certificates')
         .getPublicUrl(fileName);
+
+      // Step 3: Update records
+      updateProgress({
+        step: 'updating',
+        percentage: 75,
+        message: 'Updating records...'
+      });
 
       // Update COI record with document URL
       await updateCOI({
@@ -121,6 +148,13 @@ export function useCOIGeneration() {
         // Don't throw - COI was created successfully, ticket metadata is optional
       }
 
+      // Step 4: Completed
+      updateProgress({
+        step: 'completed',
+        percentage: 100,
+        message: 'Certificate generated successfully!'
+      });
+
       toast({
         title: 'COI Generated Successfully',
         description: `Certificate ${coiData.certificate_number} has been created and attached`,
@@ -129,6 +163,9 @@ export function useCOIGeneration() {
       return publicUrl;
     } catch (error: any) {
       console.error('COI generation error:', error);
+
+      // Reset progress on error
+      setProgress(null);
 
       // Cleanup failed upload if it exists
       await cleanupFailedUpload(fileName);
@@ -173,5 +210,6 @@ export function useCOIGeneration() {
   return {
     generateAndAttachCOI,
     downloadCOI,
+    progress,
   };
 }
