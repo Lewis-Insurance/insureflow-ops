@@ -572,6 +572,97 @@ export type Database = {
         }
         Relationships: []
       }
+      certificates_of_insurance: {
+        Row: {
+          account_id: string
+          additional_insureds: Json | null
+          ai_generated: boolean | null
+          approved_by: string | null
+          certificate_holder_address: Json | null
+          certificate_holder_name: string
+          certificate_number: string
+          coverage_details: Json
+          created_at: string
+          document_url: string | null
+          effective_date: string
+          expiration_date: string
+          generated_by: string | null
+          id: string
+          policy_id: string | null
+          sent_at: string | null
+          special_provisions: string | null
+          status: string
+          ticket_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          additional_insureds?: Json | null
+          ai_generated?: boolean | null
+          approved_by?: string | null
+          certificate_holder_address?: Json | null
+          certificate_holder_name: string
+          certificate_number: string
+          coverage_details: Json
+          created_at?: string
+          document_url?: string | null
+          effective_date: string
+          expiration_date: string
+          generated_by?: string | null
+          id?: string
+          policy_id?: string | null
+          sent_at?: string | null
+          special_provisions?: string | null
+          status?: string
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          additional_insureds?: Json | null
+          ai_generated?: boolean | null
+          approved_by?: string | null
+          certificate_holder_address?: Json | null
+          certificate_holder_name?: string
+          certificate_number?: string
+          coverage_details?: Json
+          created_at?: string
+          document_url?: string | null
+          effective_date?: string
+          expiration_date?: string
+          generated_by?: string | null
+          id?: string
+          policy_id?: string | null
+          sent_at?: string | null
+          special_provisions?: string | null
+          status?: string
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_of_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_of_insurance_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_of_insurance_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claims: {
         Row: {
           adjuster_contact: string | null
@@ -3356,6 +3447,181 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_actions: {
+        Row: {
+          action_type: Database["public"]["Enums"]["ticket_action_type"]
+          approved_at: string | null
+          approved_by: string | null
+          content: string
+          created_at: string
+          id: string
+          is_approved: boolean | null
+          metadata: Json | null
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["ticket_action_type"]
+          approved_at?: string | null
+          approved_by?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_approved?: boolean | null
+          metadata?: Json | null
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["ticket_action_type"]
+          approved_at?: string | null
+          approved_by?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_approved?: boolean | null
+          metadata?: Json | null
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_actions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_messages: {
+        Row: {
+          attachments: Json | null
+          author_id: string | null
+          author_type: string
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean | null
+          message_type: string
+          metadata: Json | null
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json | null
+          author_id?: string | null
+          author_type?: string
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          message_type?: string
+          metadata?: Json | null
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json | null
+          author_id?: string | null
+          author_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          message_type?: string
+          metadata?: Json | null
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tickets: {
+        Row: {
+          account_id: string
+          assigned_to: string | null
+          closed_at: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          metadata: Json | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          resolution: string | null
+          search_vector: unknown | null
+          source: Database["public"]["Enums"]["ticket_source"]
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags: string[] | null
+          ticket_number: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          assigned_to?: string | null
+          closed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolution?: string | null
+          search_vector?: unknown | null
+          source?: Database["public"]["Enums"]["ticket_source"]
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags?: string[] | null
+          ticket_number: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          assigned_to?: string | null
+          closed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolution?: string | null
+          search_vector?: unknown | null
+          source?: Database["public"]["Enums"]["ticket_source"]
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          tags?: string[] | null
+          ticket_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       twilio_consents: {
         Row: {
           channel: string
@@ -3514,6 +3780,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
+      generate_coi_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_recurring_task_instance: {
         Args: { p_due_date: string; p_template_task_id: string }
         Returns: string
@@ -3526,6 +3796,10 @@ export type Database = {
           p_trigger_event: Database["public"]["Enums"]["task_trigger_event"]
         }
         Returns: Json
+      }
+      generate_ticket_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_policies_claims_secure: {
         Args: Record<PropertyKey, never>
@@ -3942,6 +4216,20 @@ export type Database = {
         | "payment_overdue"
         | "service_request"
         | "manual"
+      ticket_action_type:
+        | "ai_summary"
+        | "ai_action_item"
+        | "ai_draft_response"
+        | "manual_note"
+        | "status_change"
+      ticket_priority: "low" | "medium" | "high" | "urgent"
+      ticket_source: "email" | "phone" | "manual" | "web_form" | "chat"
+      ticket_status:
+        | "open"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
       user_role:
         | "customer"
         | "staff"
@@ -4213,6 +4501,22 @@ export const Constants = {
         "payment_overdue",
         "service_request",
         "manual",
+      ],
+      ticket_action_type: [
+        "ai_summary",
+        "ai_action_item",
+        "ai_draft_response",
+        "manual_note",
+        "status_change",
+      ],
+      ticket_priority: ["low", "medium", "high", "urgent"],
+      ticket_source: ["email", "phone", "manual", "web_form", "chat"],
+      ticket_status: [
+        "open",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
       ],
       user_role: [
         "customer",

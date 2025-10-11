@@ -36,6 +36,8 @@ const CustomerSuccessPage = React.lazy(() => import("./pages/CustomerSuccessPage
 const RetentionPage = React.lazy(() => import("./pages/RetentionPage"));
 const FinancialPage = React.lazy(() => import("./pages/FinancialPage"));
 const AIInsightsPage = React.lazy(() => import("./pages/AIInsightsPage"));
+const TicketsPage = React.lazy(() => import("./pages/TicketsPage"));
+const TicketDetail = React.lazy(() => import("./pages/TicketDetail"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -266,6 +268,22 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AIInsightsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/tickets"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <TicketsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/tickets/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <TicketDetail />
                   </ErrorBoundary>
                 }
               />
