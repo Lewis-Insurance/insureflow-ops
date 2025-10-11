@@ -39,6 +39,7 @@ const AIInsightsPage = React.lazy(() => import("./pages/AIInsightsPage"));
 const TicketsPage = React.lazy(() => import("./pages/TicketsPage"));
 const TicketDetail = React.lazy(() => import("./pages/TicketDetail"));
 const COIGenerator = React.lazy(() => import("./pages/COIGenerator"));
+const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -293,6 +294,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <COIGenerator />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/document-intelligence"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <DocumentIntelligence />
                   </ErrorBoundary>
                 }
               />
