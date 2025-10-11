@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip, X, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,37 +34,36 @@ interface AIAssistantChatProps {
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 
+const stripBasicMarkdown = (s: string) => s
+  .replace(/\*\*(.*?)\*\*/g, '$1')
+  .replace(/\*(.*?)\*/g, '$1')
+  .replace(/`{1,3}([^`]+)`{1,3}/g, '$1');
+
 const getContextualGreeting = (ctx?: AIContext | null): string => {
   if (!ctx) {
-    return 'Hello! I\'m your AI assistant. I can help you compare quotes, analyze policies, and answer insurance questions. Upload documents or ask me anything!';
+    return "Hello! I'm your AI assistant. I can help you compare quotes, analyze policies, and answer insurance questions. Upload documents or ask me anything!";
   }
-
   switch (ctx.type) {
     case 'account':
-      // Check if this is specifically a document context
       if (ctx.metadata?.documentId) {
-        return `Hello! I'm ready to analyze **${ctx.name}**. Ask me questions about this document, request a summary, extract key information, or compare it with other documents.`;
+        return `Hello! I'm ready to analyze ${ctx.name}. Ask me questions about this document, request a summary, extract key information, or compare it with other documents.`;
       }
-      return `Hello! I'm here to help with **${ctx.name}**. I can analyze their policies, suggest coverage improvements, review documents, or answer questions about this account.`;
+      return `Hello! I'm here to help with ${ctx.name}. I can analyze their policies, suggest coverage improvements, review documents, or answer questions about this account.`;
     case 'policy':
-      return `Hello! I'm here to help with policy **${ctx.name}**. I can explain coverage details, identify gaps, suggest improvements, or answer questions about this policy.`;
+      return `Hello! I'm here to help with policy ${ctx.name}. I can explain coverage details, identify gaps, suggest improvements, or answer questions about this policy.`;
     case 'quote':
-      return `Hello! I'm here to help with quote **${ctx.name}**. I can compare options, explain pricing, suggest alternatives, or answer questions about this quote.`;
+      return `Hello! I'm here to help with quote ${ctx.name}. I can compare options, explain pricing, suggest alternatives, or answer questions about this quote.`;
     case 'task':
-      return `Hello! I'm here to help with task **${ctx.name}**. I can provide guidance, suggest next steps, or answer questions about completing this task.`;
+      return `Hello! I'm here to help with task ${ctx.name}. I can provide guidance, suggest next steps, or answer questions about completing this task.`;
     default:
-      return 'Hello! I\'m your AI assistant. How can I help you today?';
+      return "Hello! I'm your AI assistant. How can I help you today?";
   }
 };
 
 export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: getContextualGreeting(context),
-      timestamp: new Date(),
-    }
+    { role: 'assistant', content: getContextualGreeting(context), timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -75,32 +74,23 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
   // Update greeting when context changes
   useEffect(() => {
-    setMessages([{
-      role: 'assistant',
-      content: getContextualGreeting(context),
-      timestamp: new Date(),
-    }]);
+    setMessages([{ role: 'assistant', content: getContextualGreeting(context), timestamp: new Date() }]);
   }, [context]);
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Auto-scroll to bottom
   useEffect(() => {
     const el = scrollerRef.current;
-    if (el) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  const extractTextFromFile = async (file: File): Promise<string> => {
-    // For now, return file metadata. In production, use pdf.js, mammoth, etc.
+  const extractTextFromFile = useCallback(async (file: File): Promise<string> => {
     return `[File: ${file.name}, Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)}KB]`;
-  };
+  }, []);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!input.trim() && attachedDocs.length === 0) return;
     if (isLoading) return;
 
@@ -108,161 +98,112 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       role: 'user',
       content: input || 'Please analyze these documents',
       timestamp: new Date(),
-      documents: attachedDocs.map(doc => ({
-        name: doc.name,
-        size: doc.size,
-        type: doc.type
-      }))
+      documents: attachedDocs.map((doc) => ({ name: doc.name, size: doc.size, type: doc.type })),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     // Abort any existing request
     abortRef.current?.abort();
     abortRef.current = new AbortController();
-    const signal = abortRef.current.signal;
+    const { signal } = abortRef.current;
 
     try {
-      // Extract document content
       const documentsWithContent = await Promise.all(
         attachedDocs.map(async (file) => ({
           name: file.name,
           size: file.size,
           type: file.type,
-          content: await extractTextFromFile(file)
+          content: await extractTextFromFile(file),
         }))
       );
 
       // Determine action based on context
-      let action = 'chat';
-      if (context?.metadata?.documentId) {
-        // Document context automatically triggers document analysis
-        action = 'analyze_policy';
-      } else if (documentsWithContent.length > 1) {
-        action = 'compare_quotes';
-      } else if (documentsWithContent.length === 1) {
-        action = 'analyze_policy';
-      }
+      let action: 'chat' | 'compare_quotes' | 'analyze_policy' = 'chat';
+      if (context?.metadata?.documentId) action = 'analyze_policy';
+      else if (documentsWithContent.length > 1) action = 'compare_quotes';
+      else if (documentsWithContent.length === 1) action = 'analyze_policy';
 
-      // Build conversation history including the latest user message
+      // Build conversation history including this message
       const recentMessages = [...messages, userMessage].slice(-10);
 
-      // Build context payload
-      const contextPayload = context ? {
-        contextType: context.type,
-        contextId: context.id,
-        contextName: context.name,
-        contextMetadata: context.metadata,
-      } : undefined;
+      const contextPayload = context
+        ? { contextType: context.type, contextId: context.id, contextName: context.name, contextMetadata: context.metadata }
+        : undefined;
 
-      // Call AI edge function
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
           action,
           documents: documentsWithContent,
           message: userMessage.content,
-          conversationHistory: recentMessages.map(m => ({
-            role: m.role,
-            content: m.content
-          })),
+          conversationHistory: recentMessages.map((m) => ({ role: m.role, content: m.content })),
           context: contextPayload,
-        }
+        },
+        // signal, // enable when supported by Supabase client
       });
 
-      // Check if aborted
       if (signal.aborted) return;
-
       if (error) throw error;
 
-      // Guard against malformed response
-      const responseText = typeof data?.response === 'string' 
-        ? data.response 
+      const responseText = typeof data?.response === 'string'
+        ? data.response
         : 'I analyzed your request, but the response format was unexpected.';
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      const assistantMessage: Message = { role: 'assistant', content: responseText, timestamp: new Date() };
+      setMessages((prev) => [...prev, assistantMessage]);
       setAttachedDocs([]);
-
-    } catch (error) {
-      // Ignore abort errors
-      if ((error as any).name === 'AbortError') return;
-
-      console.error('AI Assistant Error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to get AI response. Please try again.',
-        variant: 'destructive',
-      });
-      
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'I apologize, but I encountered an error processing your request. Please try again.',
-        timestamp: new Date()
-      }]);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      console.error('AI Assistant Error:', err);
+      toast({ title: 'Error', description: err?.message || 'Failed to get AI response. Please try again.', variant: 'destructive' });
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'I encountered an error processing your request. Please try again.', timestamp: new Date() },
+      ]);
     } finally {
-      if (!signal.aborted) {
-        setIsLoading(false);
-      }
+      if (!signal.aborted) setIsLoading(false);
     }
-  };
+  }, [attachedDocs, context, extractTextFromFile, input, isLoading, messages, toast]);
 
-  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileAttach = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const maxSize = 10 * 1024 * 1024; // 10MB
-    
-    const validFiles = files.filter(file => {
+
+    const validFiles = files.filter((file) => {
       if (file.size > maxSize) {
-        toast({
-          title: 'File too large',
-          description: `${file.name} exceeds 10MB limit`,
-          variant: 'destructive',
-        });
+        toast({ title: 'File too large', description: `${file.name} exceeds 10MB limit`, variant: 'destructive' });
         return false;
       }
       return true;
     });
 
-    // Deduplicate by name + size
-    setAttachedDocs(prev => {
-      const map = new Map(prev.map(f => [f.name + f.size, f]));
-      for (const f of validFiles) {
-        map.set(f.name + f.size, f);
-      }
+    setAttachedDocs((prev) => {
+      const map = new Map(prev.map((f) => [f.name + f.size, f]));
+      for (const f of validFiles) map.set(f.name + f.size, f);
       return Array.from(map.values());
     });
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [toast]);
 
-  const removeAttachment = (index: number) => {
-    setAttachedDocs(prev => prev.filter((_, i) => i !== index));
-  };
+  const removeAttachment = (index: number) => setAttachedDocs((prev) => prev.filter((_, i) => i !== index));
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 p-4 overflow-y-auto" ref={scrollerRef}>
+        {/* Live region for screen readers to announce latest assistant message */}
+        <div className="sr-only" aria-live="polite">
+          {messages.length ? stripBasicMarkdown(messages[messages.length - 1]?.content || '') : ''}
+        </div>
+
         <div className="space-y-4">
           {messages.map((message, idx) => (
-            <div
-              key={idx}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <Card className={`max-w-[80%] p-3 ${
-                message.role === 'user' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted'
-              }`}>
-                <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                {message.documents && message.documents.length > 0 && (
+            <div key={idx} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <Card className={`max-w-[80%] p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                <div className="whitespace-pre-wrap text-sm">{stripBasicMarkdown(message.content)}</div>
+                {message.documents?.length ? (
                   <div className="mt-2 space-y-1">
                     {message.documents.map((doc, docIdx) => (
                       <div key={docIdx} className="flex items-center gap-2 text-xs opacity-80">
@@ -272,10 +213,8 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
                       </div>
                     ))}
                   </div>
-                )}
-                <div className="text-xs opacity-60 mt-2">
-                  {timeFmt.format(message.timestamp)}
-                </div>
+                ) : null}
+                <div className="text-xs opacity-60 mt-2">{timeFmt.format(message.timestamp)}</div>
               </Card>
             </div>
           ))}
@@ -292,7 +231,6 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         </div>
       </div>
 
-      {/* Attached Documents */}
       {attachedDocs.length > 0 && (
         <div className="border-t p-2">
           <div className="flex flex-wrap gap-2">
@@ -301,12 +239,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
                 <FileText className="h-3 w-3" />
                 <span className="text-xs">{file.name}</span>
                 <span className="text-xs opacity-70">({(file.size / 1024 / 1024).toFixed(1)} MB)</span>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(idx)}
-                  className="ml-1 hover:text-destructive"
-                  aria-label={`Remove ${file.name}`}
-                >
+                <button type="button" onClick={() => removeAttachment(idx)} className="ml-1 hover:text-destructive" aria-label={`Remove ${file.name}`}>
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -315,24 +248,10 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         </div>
       )}
 
-      {/* Input Area */}
       <div className="border-t p-4">
         <div className="flex gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileAttach}
-            className="hidden"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            aria-label="Attach files"
-          >
+          <input ref={fileInputRef} type="file" multiple onChange={handleFileAttach} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+          <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading} aria-label="Attach files">
             <Paperclip className="h-4 w-4" />
           </Button>
           <Textarea
@@ -345,7 +264,6 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
                 e.preventDefault();
                 handleSend();
               }
-              // Allow Ctrl/Cmd+Enter as alternative
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 handleSend();
@@ -353,22 +271,11 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
             }}
             disabled={isLoading}
           />
-          <Button
-            onClick={handleSend}
-            disabled={isLoading || (!input.trim() && attachedDocs.length === 0)}
-            size="icon"
-            aria-label="Send message"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
+          <Button onClick={handleSend} disabled={isLoading || (!input.trim() && attachedDocs.length === 0)} size="icon" aria-label="Send message">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          Tip: Upload multiple documents to compare quotes • Shift+Enter for new line • Ctrl/Cmd+Enter to send
-        </div>
+        <div className="mt-2 text-xs text-muted-foreground">Tip: Upload multiple documents to compare quotes • Shift+Enter for new line • Ctrl/Cmd+Enter to send</div>
       </div>
     </div>
   );
