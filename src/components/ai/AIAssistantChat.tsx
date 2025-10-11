@@ -7,6 +7,39 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+// ===== KB types & helper =====
+type KbEntry = {
+  record_id: string;
+  question_canonical: string;
+  answer_canonical_markdown: string;
+  faq_short_answer: string | null;
+  citations: string | null;
+  carrier: string;
+  jurisdiction: string;
+  priority: number;
+  program_or_form: string | null;
+};
+
+async function getKbAnswer(
+  q: string,
+  carrier?: string | null,
+  jurisdiction: string = 'FL',
+  program?: string | null
+): Promise<KbEntry | null> {
+  const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
+    q,
+    in_carrier: carrier || null,
+    in_jurisdiction: jurisdiction || 'FL',
+    in_program: program || null
+  });
+  if (error) {
+    console.warn('KB RPC error:', error);
+    return null;
+  }
+  if (!Array.isArray(data) || data.length === 0) return null;
+  return data[0] as KbEntry;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
