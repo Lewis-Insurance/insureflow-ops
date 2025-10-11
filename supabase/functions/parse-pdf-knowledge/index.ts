@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as pdfjsLib from 'https://esm.sh/pdfjs-serverless@0.2.6';
+import * as pdfjsLib from 'npm:pdfjs-serverless@0.7.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
