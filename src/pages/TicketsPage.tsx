@@ -166,10 +166,10 @@ export default function TicketsPage() {
                           <span>{ticket.accounts?.name}</span>
                           <span>•</span>
                           <span>{formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}</span>
-                          {ticket.profiles?.full_name && (
+                          {ticket.assigned_profile?.full_name && (
                             <>
                               <span>•</span>
-                              <span>Assigned to {ticket.profiles.full_name}</span>
+                              <span>Assigned to {ticket.assigned_profile.full_name}</span>
                             </>
                           )}
                         </div>
