@@ -111,16 +111,16 @@ const KnowledgeManager = () => {
   };
 
   // Sample bulk import data for kb_entries
-  const SAMPLE_KB_ENTRIES = `question,answer_short,answer_canonical,category,tags,carrier,program,jurisdiction
-"What is comprehensive coverage?","Covers non-collision damage like theft, vandalism, weather","Comprehensive coverage protects your vehicle from non-collision incidents including:\n- Theft\n- Vandalism\n- Weather damage (hail, flood)\n- Animal strikes\n- Falling objects\n\nDeductibles typically range from $250-$1000.","coverage","auto|comprehensive|physical-damage","","Auto","All States"
-"How do I file a claim?","Call 1-800-CLAIMS or use our mobile app within 24 hours","To file a claim:\n1. Contact us at 1-800-CLAIMS or use mobile app\n2. Provide policy number and incident details\n3. Upload photos if available\n4. Adjuster will contact within 24 hours\n\nRequired information:\n- Date, time, location of incident\n- Police report number (if applicable)\n- Other party information (if applicable)","claims","process|filing|steps","","All","All States"`;
+  const SAMPLE_KB_ENTRIES = `product_line,topic,question,answer_short,answer_canonical,tags,carrier,program,jurisdiction
+"Auto","Coverage","What is comprehensive coverage?","Covers non-collision damage like theft, vandalism, weather","Comprehensive coverage protects your vehicle from non-collision incidents including:\n- Theft\n- Vandalism\n- Weather damage (hail, flood)\n- Animal strikes\n- Falling objects\n\nDeductibles typically range from $250-$1000.","auto|comprehensive|physical-damage","ALL","","FL"
+"Claims","Process","How do I file a claim?","Call 1-800-CLAIMS or use our mobile app within 24 hours","To file a claim:\n1. Contact us at 1-800-CLAIMS or use mobile app\n2. Provide policy number and incident details\n3. Upload photos if available\n4. Adjuster will contact within 24 hours\n\nRequired information:\n- Date, time, location of incident\n- Police report number (if applicable)\n- Other party information (if applicable)","claims|process|filing|steps","ALL","","FL"`;
 
   // Sample bulk import data for kb_sources
-  const SAMPLE_KB_SOURCES = `title,url,source_type,description,priority
-"State Farm Auto Policy Guide 2024","https://statefarm.com/policy-guide-2024.pdf","policy_document","Complete guide to auto insurance coverages and state requirements",1
-"Progressive Claims Process SOP","https://progressive.com/claims-sop","internal_doc","Step-by-step claims filing procedures for all lines of business",1
-"NAIC State Requirements Database","https://naic.org/state-requirements","external_reference","Official state-by-state insurance requirements and minimums",2
-"Carrier Rate Sheets 2024","https://agency.com/rates/2024","rate_sheet","Current rate tables for all carriers and products",1`;
+  const SAMPLE_KB_SOURCES = `name,source_type,publisher,jurisdiction,url_or_path,version,notes
+"State Farm Auto Policy Guide 2024","policy_document","State Farm","FL","https://statefarm.com/policy-guide-2024.pdf","2024","Complete guide to auto insurance coverages and state requirements"
+"Progressive Claims Process SOP","internal_doc","Progressive","FL","https://progressive.com/claims-sop","2024","Step-by-step claims filing procedures for all lines of business"
+"NAIC State Requirements Database","external_reference","NAIC","ALL","https://naic.org/state-requirements","2024","Official state-by-state insurance requirements and minimums"
+"Carrier Rate Sheets 2024","rate_sheet","Lewis Insurance","FL","https://agency.com/rates/2024","2024","Current rate tables for all carriers and products"`;
 
   // Handle CSV import for kb_entries and kb_sources
   const handleBulkImport = async (csvContent: string, table: 'kb_entries' | 'kb_sources') => {
@@ -138,31 +138,51 @@ const KnowledgeManager = () => {
       });
       
       // Process each entry based on table type
-      for (const entry of entries) {
+      for (const [index, entry] of entries.entries()) {
         let rowData: any;
         
         if (table === 'kb_entries') {
+          // Generate a unique record_id
+          const timestamp = Date.now();
+          const random = Math.random().toString(36).substring(7);
+          const record_id = `KB-${timestamp}-${random}`;
+          
+          // Parse the entry into the correct schema
           rowData = {
-            question: entry.question,
-            answer_short: entry.answer_short,
-            answer_canonical: entry.answer_canonical,
-            category: entry.category || null,
-            tags: entry.tags ? entry.tags.split('|').map((t: string) => t.trim()) : [],
-            carrier: entry.carrier || null,
-            program: entry.program || null,
-            jurisdiction: entry.jurisdiction || null,
+            record_id: record_id,
+            product_line: entry.product_line || 'general',
+            topic: entry.topic || 'general',
+            question_canonical: entry.question,
+            answer_canonical_markdown: entry.answer_canonical || entry.answer_long || entry.answer,
+            faq_short_answer: entry.answer_short || entry.answer_canonical?.substring(0, 200) || '',
+            jurisdiction: entry.jurisdiction || 'FL',
+            carrier: entry.carrier || 'ALL',
+            program_or_form: entry.program || '',
+            tags: entry.tags || '',
+            source_type: 'manual_import',
+            confidence: 3
           };
         } else if (table === 'kb_sources') {
+          // Generate source_id
+          const source_id = `SRC-${Date.now()}-${index}`;
+          
           rowData = {
-            title: entry.title,
-            url: entry.url || null,
-            source_type: entry.source_type || null,
-            description: entry.description || null,
-            priority: entry.priority ? parseInt(entry.priority) : null,
+            source_id: source_id,
+            name: entry.name || entry.title,
+            source_type: entry.source_type || 'internal_doc',
+            publisher: entry.publisher || 'Lewis Insurance',
+            jurisdiction: entry.jurisdiction || 'FL',
+            url_or_path: entry.url_or_path || entry.url || '',
+            version_or_date: entry.version || new Date().toISOString().split('T')[0],
+            notes: entry.notes || entry.description || ''
           };
         }
         
-        await supabase.from(table as any).insert(rowData);
+        const { error } = await supabase.from(table as any).insert(rowData);
+        if (error) {
+          console.error(`Error inserting row ${index + 1}:`, error);
+          // Continue with other rows even if one fails
+        }
       }
       
       toast({
@@ -170,13 +190,10 @@ const KnowledgeManager = () => {
         description: `Imported ${entries.length} records to ${table}`,
       });
       
-      // Generate embeddings if importing knowledge entries
-      if (table === 'kb_entries') {
-        await updateEmbeddings();
-      }
-      
       setShowBulkImport(false);
-      fetchKnowledgeBase();
+      if (table === 'kb_entries') {
+        fetchKnowledgeBase();
+      }
     } catch (error: any) {
       toast({
         title: "Import Error",
@@ -509,27 +526,33 @@ const KnowledgeManager = () => {
                 {importTable === 'kb_entries' ? (
                   <>
                     <code className="text-xs block bg-muted p-2 rounded font-mono mb-2">
-                      question,answer_short,answer_canonical,category,tags,carrier,program,jurisdiction
+                      product_line,topic,question,answer_short,answer_canonical,tags,carrier,program,jurisdiction
                     </code>
                     <ul className="text-xs space-y-1 mt-2">
+                      <li>• <strong>product_line</strong>: Insurance product line (e.g., "Auto", "Home")</li>
+                      <li>• <strong>topic</strong>: Topic category (e.g., "Coverage", "Claims")</li>
                       <li>• <strong>question</strong>: The question being answered (required)</li>
                       <li>• <strong>answer_short</strong>: Brief answer for quick display</li>
                       <li>• <strong>answer_canonical</strong>: Full detailed answer in markdown</li>
-                      <li>• <strong>tags</strong>: Pipe-separated tags (e.g., "auto|coverage|comprehensive")</li>
-                      <li>• <strong>carrier</strong>, <strong>program</strong>, <strong>jurisdiction</strong>: Optional filters</li>
+                      <li>• <strong>tags</strong>: Comma or pipe-separated tags</li>
+                      <li>• <strong>carrier</strong>: Carrier code or "ALL" for all carriers</li>
+                      <li>• <strong>program</strong>: Program/form name (optional)</li>
+                      <li>• <strong>jurisdiction</strong>: State code (e.g., "FL", "ALL")</li>
                     </ul>
                   </>
                 ) : (
                   <>
                     <code className="text-xs block bg-muted p-2 rounded font-mono mb-2">
-                      title,url,source_type,description,priority
+                      name,source_type,publisher,jurisdiction,url_or_path,version,notes
                     </code>
                     <ul className="text-xs space-y-1 mt-2">
-                      <li>• <strong>title</strong>: Name of the source document (required)</li>
-                      <li>• <strong>url</strong>: Link to the document</li>
-                      <li>• <strong>source_type</strong>: Type (e.g., "policy_document", "rate_sheet")</li>
-                      <li>• <strong>description</strong>: Brief description of the source</li>
-                      <li>• <strong>priority</strong>: Priority level (1=highest)</li>
+                      <li>• <strong>name</strong>: Name of the source document (required)</li>
+                      <li>• <strong>source_type</strong>: Type (e.g., "policy_document", "rate_sheet", "internal_doc")</li>
+                      <li>• <strong>publisher</strong>: Publisher/carrier name</li>
+                      <li>• <strong>jurisdiction</strong>: State code or "ALL"</li>
+                      <li>• <strong>url_or_path</strong>: Link or file path to the document</li>
+                      <li>• <strong>version</strong>: Version or date (YYYY-MM-DD)</li>
+                      <li>• <strong>notes</strong>: Description or additional notes</li>
                     </ul>
                   </>
                 )}
