@@ -217,6 +217,57 @@ export function useCOIGeneration() {
     }
   };
 
+  const previewCOI = async (
+    coiData: COIPDFData,
+    exportOptions?: Partial<ExportOptions>
+  ): Promise<string> => {
+    try {
+      // Generate as base64 for preview
+      const pdfBase64 = generateCOIPDF(coiData, {
+        ...exportOptions,
+        format: 'base64',
+      }) as string;
+
+      // Open in new tab for preview
+      const previewWindow = window.open('', '_blank');
+      if (previewWindow) {
+        previewWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>COI Preview - ${coiData.certificate_number}</title>
+              <style>
+                body { margin: 0; padding: 0; overflow: hidden; }
+                iframe { width: 100%; height: 100vh; border: none; }
+              </style>
+            </head>
+            <body>
+              <iframe src="${pdfBase64}" type="application/pdf"></iframe>
+            </body>
+          </html>
+        `);
+        previewWindow.document.close();
+      } else {
+        throw new Error('Failed to open preview window. Please check your popup blocker settings.');
+      }
+
+      toast({
+        title: 'Preview Opened',
+        description: 'COI preview opened in new tab',
+      });
+
+      return pdfBase64;
+    } catch (error: any) {
+      console.error('Preview error:', error);
+      toast({
+        title: 'Preview Failed',
+        description: error.message || 'Failed to generate preview',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const downloadCOI = async (documentUrl: string, certificateNumber: string) => {
     try {
       const response = await fetch(documentUrl);
@@ -248,6 +299,7 @@ export function useCOIGeneration() {
   return {
     generateAndAttachCOI,
     downloadCOI,
+    previewCOI,
     progress,
   };
 }
