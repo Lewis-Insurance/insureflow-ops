@@ -35,7 +35,7 @@ export function useTickets(filters?: { status?: string; priority?: string; assig
           *,
           accounts!inner(name, email),
           contacts(first_name, last_name),
-          profiles!tickets_assigned_to_fkey(full_name)
+          profiles:assignee_id(full_name)
         `)
         .order('created_at', { ascending: false });
 

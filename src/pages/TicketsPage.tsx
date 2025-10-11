@@ -15,16 +15,16 @@ import { supabase } from '@/integrations/supabase/client';
 export default function TicketsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [priorityFilter, setPriorityFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   
   
   const { tickets, isLoading } = useTickets({
-    status: statusFilter || undefined,
-    priority: priorityFilter || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    priority: priorityFilter !== 'all' ? priorityFilter : undefined,
   });
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function TicketsPage() {
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="open">Open</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="waiting_customer">Waiting Customer</SelectItem>
@@ -114,7 +114,7 @@ export default function TicketsPage() {
                   <SelectValue placeholder="All Priorities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Priorities</SelectItem>
+                  <SelectItem value="all">All Priorities</SelectItem>
                   <SelectItem value="urgent">Urgent</SelectItem>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
