@@ -74,6 +74,7 @@ function detectCategory(content: string): string {
   if (lowerContent.includes('claim') || lowerContent.includes('damage')) return 'claims';
   if (lowerContent.includes('premium') || lowerContent.includes('payment')) return 'billing';
   if (lowerContent.includes('question') || lowerContent.includes('answer')) return 'faq';
+  if (lowerContent.includes('definition') || lowerContent.includes('means') || lowerContent.includes('refers to')) return 'glossary';
   return 'information';
 }
 
@@ -182,6 +183,35 @@ function extractPolicyInfo(text: string) {
   });
   
   return policyInfo;
+}
+
+function extractInsuranceTerms(text: string) {
+  const glossaryTerms = [];
+  
+  // Common definition patterns in insurance docs
+  const definitionPatterns = [
+    // "Term" means...
+    /"([^"]+)"\s+(?:means?|refers? to|is defined as)\s+([^.]+\.[^.]*)/gi,
+    // Term: Definition
+    /^([A-Z][^:]+):\s+([^.]+\.[^.]*)/gm,
+    // Bold or emphasized terms (simulate)
+    /\*\*([^*]+)\*\*\s*[-–—]\s*([^.]+\.)/g,
+  ];
+  
+  definitionPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      if (match[1] && match[2]) {
+        glossaryTerms.push({
+          term: match[1].trim(),
+          definition: match[2].trim(),
+          type: 'glossary'
+        });
+      }
+    });
+  });
+  
+  return glossaryTerms;
 }
 
 serve(async (req) => {
@@ -330,6 +360,10 @@ serve(async (req) => {
     const policyMetadata = extractPolicyInfo(text);
     console.log('Extracted policy metadata:', JSON.stringify(policyMetadata, null, 2));
     
+    // Extract insurance glossary terms
+    const glossaryTerms = extractInsuranceTerms(text);
+    console.log(`Extracted ${glossaryTerms.length} glossary terms`);
+    
     // Parse the text into knowledge base entries
     const entries = [];
     
@@ -428,6 +462,19 @@ serve(async (req) => {
         }
       });
     }
+    
+    // Add glossary terms as separate entries
+    glossaryTerms.forEach((term: any) => {
+      entries.push({
+        title: term.term,
+        content: term.definition,
+        category: 'glossary',
+        source: file.name,
+        tags: ['pdf-import', 'florida-insurance', 'definition', 'glossary'],
+        language,
+        confidence: 0.9 // High confidence for explicit definitions
+      });
+    });
 
     // Process entries
     const uniqueEntries = removeDuplicates(entries);
