@@ -6,10 +6,87 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper Functions
+function chunkContent(text: string, maxChunkSize: number = 1000): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+  const chunks = [];
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > maxChunkSize && currentChunk) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += sentence;
+    }
+  }
+  if (currentChunk) chunks.push(currentChunk.trim());
+  
+  return chunks;
+}
+
+function detectLanguage(text: string): string {
+  const spanishIndicators = /\b(de|la|el|que|en|por|para|con|sin)\b/gi;
+  const spanishMatches = (text.match(spanishIndicators) || []).length;
+  const wordCount = text.split(/\s+/).length;
+  
+  return (spanishMatches / wordCount) > 0.15 ? 'spanish' : 'english';
+}
+
+function removeDuplicates(entries: any[]): any[] {
+  const seen = new Set();
+  return entries.filter(entry => {
+    const hash = `${entry.title}:${entry.content.substring(0, 100)}`;
+    if (seen.has(hash)) return false;
+    seen.add(hash);
+    return true;
+  });
+}
+
+function calculateConfidence(entry: any): number {
+  let score = 0.5; // Base score
+  
+  // Well-formatted Q&A gets higher score
+  if (entry.category === 'faq') score += 0.2;
+  
+  // Longer, more detailed content
+  if (entry.content.length > 200) score += 0.1;
+  if (entry.content.length > 500) score += 0.1;
+  
+  // Has proper punctuation and structure
+  if (/[.!?]$/.test(entry.content)) score += 0.1;
+  
+  return Math.min(score, 1.0);
+}
+
+function extractReferences(text: string): string[] {
+  const patterns = [
+    /see\s+(?:section|page|appendix)\s+(\w+)/gi,
+    /refer\s+to\s+(\w+(?:\s+\w+)?)/gi,
+    /as\s+defined\s+in\s+(\w+(?:\s+\w+)?)/gi,
+  ];
+  
+  const refs = new Set<string>();
+  patterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => refs.add(match[1]));
+  });
+  
+  return Array.from(refs);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
+  const metrics = {
+    parseTime: 0,
+    extractionTime: 0,
+    processingTime: 0,
+    totalTime: 0
+  };
 
   try {
     const formData = await req.formData();
@@ -74,6 +151,8 @@ serve(async (req) => {
       disableWorker: true as any
     });
     const pdfDoc = await (loadingTask as any).promise;
+    
+    metrics.parseTime = Date.now() - startTime;
 
     // Extract PDF metadata
     const metadata = await (pdfDoc as any).getMetadata();
@@ -102,6 +181,11 @@ serve(async (req) => {
       
       text += pageText + '\n\n';
     }
+    
+    metrics.extractionTime = Date.now() - startTime - metrics.parseTime;
+    
+    // Detect language
+    const language = detectLanguage(text);
     
     // Auto-detect category based on content
     function detectCategory(content: string): string {
@@ -135,12 +219,17 @@ serve(async (req) => {
       matches.forEach((match) => {
         const title = match[1].trim();
         const content = match[2].trim();
+        const references = extractReferences(content);
+        
         entries.push({
           title,
           content,
           category: detectCategory(content),
           source: file.name,
-          tags: ['pdf-import', 'florida-insurance']
+          tags: ['pdf-import', 'florida-insurance'],
+          language,
+          references: references.length > 0 ? references : undefined,
+          confidence: 0 // Will be calculated later
         });
       });
     } else {
@@ -157,34 +246,58 @@ serve(async (req) => {
             currentTitle = firstLine;
             if (lines.length > 1) {
               const entryContent = lines.slice(1).join('\n').trim();
+              const references = extractReferences(entryContent);
+              
               entries.push({
                 title: currentTitle,
                 content: entryContent,
                 category: detectCategory(entryContent),
                 source: file.name,
-                tags: ['pdf-import', 'florida-insurance']
+                tags: ['pdf-import', 'florida-insurance'],
+                language,
+                references: references.length > 0 ? references : undefined,
+                confidence: 0
               });
             }
           } else {
             const entryContent = section.trim();
+            const references = extractReferences(entryContent);
+            
             entries.push({
               title: currentTitle + ` - Part ${index + 1}`,
               content: entryContent,
               category: detectCategory(entryContent),
               source: file.name,
-              tags: ['pdf-import', 'florida-insurance']
+              tags: ['pdf-import', 'florida-insurance'],
+              language,
+              references: references.length > 0 ? references : undefined,
+              confidence: 0
             });
           }
         }
       });
     }
 
+    // Remove duplicates
+    const uniqueEntries = removeDuplicates(entries);
+    
     // Filter out very short entries
-    const validEntries = entries.filter(entry => 
+    const validEntries = uniqueEntries.filter(entry => 
       entry.content.length > 50 && entry.title.length > 3
     );
+    
+    // Calculate confidence scores
+    validEntries.forEach(entry => {
+      entry.confidence = calculateConfidence(entry);
+    });
+    
+    // Sort by confidence (highest first)
+    validEntries.sort((a, b) => b.confidence - a.confidence);
+    
+    metrics.processingTime = Date.now() - startTime - metrics.parseTime - metrics.extractionTime;
+    metrics.totalTime = Date.now() - startTime;
 
-    console.log(`Extracted ${validEntries.length} knowledge entries from PDF`);
+    console.log(`Extracted ${validEntries.length} knowledge entries from PDF in ${metrics.totalTime}ms`);
 
     return new Response(
       JSON.stringify({ 
@@ -192,6 +305,8 @@ serve(async (req) => {
         entries: validEntries,
         totalPages: pdfDoc.numPages,
         metadata: pdfInfo,
+        language,
+        metrics,
         extractedText: text.substring(0, 500) // Preview
       }),
       { 
