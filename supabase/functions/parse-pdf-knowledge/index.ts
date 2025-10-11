@@ -222,11 +222,31 @@ serve(async (req) => {
     // Parse the text into knowledge base entries
     const entries = [];
     
-    // Try multiple Q&A patterns
+    // Try multiple Q&A patterns including insurance-specific formats
     const qaPatterns = [
+      // Standard FAQ formats
       /(?:Question|Q|FAQ)[\s:]+(.+?)(?:\n|\r\n)(?:Answer|A|Response)[\s:]+(.+?)(?=(?:Question|Q|FAQ)[\s:]|$)/gis,
       /^\d+\.\s*(.+?)\n+(.+?)(?=^\d+\.|$)/gms,
       /^[•·▪︎]\s*(.+?)\n+(.+?)(?=^[•·▪︎]|$)/gms,
+      
+      // Insurance-specific patterns
+      // Coverage questions
+      /(?:What is covered|Coverage includes?)[\s:]+(.+?)(?=(?:What is|Coverage|Exclusions|$))/gis,
+      
+      // Exclusions format
+      /(?:What is not covered|Exclusions?)[\s:]+(.+?)(?=(?:What is|Coverage|Deductible|$))/gis,
+      
+      // Policy sections
+      /(?:Section|Article|Part)\s+([IVX\d]+[A-Z]?)[:\s-]+(.+?)(?=(?:Section|Article|Part)\s+[IVX\d]+|$)/gis,
+      
+      // Definition format (common in policies)
+      /^"([^"]+)"\s+means?\s+(.+?)(?=^"|$)/gms,
+      
+      // Numbered policy clauses
+      /^(\d+\.\d+)\s+(.+?)(?=^\d+\.\d+|$)/gms,
+      
+      // Conditions and limitations
+      /(?:Conditions?|Limitations?|Requirements?)[\s:]+(.+?)(?=(?:Conditions?|Limitations?|Coverage|$))/gis,
     ];
     
     let matches: RegExpMatchArray[] = [];
