@@ -21,13 +21,21 @@ serve(async (req) => {
 
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer();
-    
-    // Use pdf-parse npm package via esm.sh
-    const pdfParse = await import('https://esm.sh/pdf-parse@1.1.1');
-    const pdfData = await pdfParse.default(arrayBuffer);
-    
-    // Extract text content
-    const text = pdfData.text;
+
+    // Parse PDF using pdfjs-dist (works in Deno Edge runtime)
+    const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
+    // Disable worker usage in Edge runtime
+    pdfjs.GlobalWorkerOptions.workerSrc = '';
+    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer), disableFontFace: true });
+    const pdfDoc = await loadingTask.promise;
+
+    let text = '';
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const content = await page.getTextContent();
+      const pageText = (content.items as any[]).map((item: any) => item.str || '').join(' ');
+      text += pageText + '\n\n';
+    }
     
     // Parse the text into knowledge base entries
     // Split by common FAQ patterns (Q&A format)
@@ -93,7 +101,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         entries: validEntries,
-        totalPages: pdfData.numpages,
+        totalPages: pdfDoc.numPages,
         extractedText: text.substring(0, 500) // Preview
       }),
       { 
