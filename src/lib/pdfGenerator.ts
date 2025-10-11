@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { z } from 'zod';
+import { PDFLayoutManager } from './PDFLayoutManager';
 
 // Validation schema for COI PDF data
 const COIPDFDataSchema = z.object({
@@ -45,30 +46,25 @@ export function generateCOIPDF(rawData: unknown): Blob {
   const data = COIPDFDataSchema.parse(rawData);
   
   const doc = new jsPDF();
-  let yPosition = 20;
+  const layout = new PDFLayoutManager(doc, 20);
 
   // Header
-  doc.setFontSize(18);
-  doc.setFont(undefined, 'bold');
-  doc.text('CERTIFICATE OF LIABILITY INSURANCE', 105, yPosition, { align: 'center' });
+  layout.addText('CERTIFICATE OF LIABILITY INSURANCE', 105, 18, 'bold', 'center');
+  layout.moveDown(15);
   
-  yPosition += 15;
-  doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
-  doc.text(`Certificate No: ${data.certificate_number}`, 20, yPosition);
+  layout.addText(`Certificate No: ${data.certificate_number}`, 20, 10, 'normal');
+  layout.moveDown(10);
   
-  yPosition += 10;
-  doc.line(20, yPosition, 190, yPosition);
+  layout.addLine();
+  layout.moveDown(10);
   
   // Producer/Insured Information
-  yPosition += 10;
-  doc.setFont(undefined, 'bold');
-  doc.text('PRODUCER', 20, yPosition);
-  doc.text('INSURED', 110, yPosition);
+  layout.addText('PRODUCER', 20, 10, 'bold');
+  layout.addText('INSURED', 110, 10, 'bold');
+  layout.moveDown(8);
   
-  yPosition += 8;
-  doc.setFont(undefined, 'normal');
   if (data.account) {
+    const currentY = layout.getY();
     const insuredLines = [
       data.account.name,
       data.account.address_line1,
@@ -76,131 +72,110 @@ export function generateCOIPDF(rawData: unknown): Blob {
     ].filter(Boolean);
     
     insuredLines.forEach((line) => {
-      doc.text(line, 110, yPosition);
-      yPosition += 6;
+      layout.addText(line, 110, 10, 'normal');
+      layout.moveDown(6);
     });
   }
   
   // Reset position for next section
-  yPosition = Math.max(yPosition, 80);
+  const minY = Math.max(layout.getY(), 80);
+  layout.setY(minY);
   
   // Certificate Holder
-  doc.setFont(undefined, 'bold');
-  doc.text('CERTIFICATE HOLDER', 20, yPosition);
+  layout.addText('CERTIFICATE HOLDER', 20, 10, 'bold');
+  layout.moveDown(8);
   
-  yPosition += 8;
-  doc.setFont(undefined, 'normal');
-  doc.text(data.certificate_holder_name, 20, yPosition);
-  yPosition += 6;
+  layout.addText(data.certificate_holder_name, 20, 10, 'normal');
+  layout.moveDown(6);
   
   if (data.certificate_holder_address) {
     const addressLines = data.certificate_holder_address.split('\n');
     addressLines.forEach((line) => {
-      doc.text(line, 20, yPosition);
-      yPosition += 6;
+      layout.addText(line, 20, 10, 'normal');
+      layout.moveDown(6);
     });
   }
   
-  yPosition += 5;
-  doc.line(20, yPosition, 190, yPosition);
+  layout.moveDown(5);
+  layout.addLine();
+  layout.moveDown(10);
   
   // Coverage Information
-  yPosition += 10;
-  doc.setFont(undefined, 'bold');
-  doc.text('COVERAGES', 20, yPosition);
-  
-  yPosition += 8;
-  doc.setFont(undefined, 'normal');
+  layout.addText('COVERAGES', 20, 10, 'bold');
+  layout.moveDown(8);
   
   // Coverage table header
-  const tableStartY = yPosition;
-  doc.setFont(undefined, 'bold');
-  doc.text('TYPE OF INSURANCE', 20, yPosition);
-  doc.text('POLICY NUMBER', 90, yPosition);
-  doc.text('LIMITS', 140, yPosition);
+  layout.addText('TYPE OF INSURANCE', 20, 10, 'bold');
+  layout.addText('POLICY NUMBER', 90, 10, 'bold');
+  layout.addText('LIMITS', 140, 10, 'bold');
+  layout.moveDown(6);
   
-  yPosition += 6;
-  doc.line(20, yPosition, 190, yPosition);
-  yPosition += 6;
-  
-  doc.setFont(undefined, 'normal');
+  layout.addLine();
+  layout.moveDown(6);
   
   // Coverage details
   if (data.coverage_details.general_liability) {
-    doc.text('GENERAL LIABILITY', 20, yPosition);
-    doc.text(data.policy?.policy_number || 'N/A', 90, yPosition);
-    doc.text(data.coverage_details.general_liability, 140, yPosition);
-    yPosition += 8;
+    layout.addText('GENERAL LIABILITY', 20, 10, 'normal');
+    layout.addText(data.policy?.policy_number || 'N/A', 90, 10, 'normal');
+    layout.addText(data.coverage_details.general_liability, 140, 10, 'normal');
+    layout.moveDown(8);
   }
   
   if (data.coverage_details.auto_liability) {
-    doc.text('AUTOMOBILE LIABILITY', 20, yPosition);
-    doc.text(data.policy?.policy_number || 'N/A', 90, yPosition);
-    doc.text(data.coverage_details.auto_liability, 140, yPosition);
-    yPosition += 8;
+    layout.addText('AUTOMOBILE LIABILITY', 20, 10, 'normal');
+    layout.addText(data.policy?.policy_number || 'N/A', 90, 10, 'normal');
+    layout.addText(data.coverage_details.auto_liability, 140, 10, 'normal');
+    layout.moveDown(8);
   }
   
   if (data.coverage_details.workers_comp) {
-    doc.text('WORKERS COMPENSATION', 20, yPosition);
-    doc.text(data.policy?.policy_number || 'N/A', 90, yPosition);
-    doc.text(data.coverage_details.workers_comp, 140, yPosition);
-    yPosition += 8;
+    layout.addText('WORKERS COMPENSATION', 20, 10, 'normal');
+    layout.addText(data.policy?.policy_number || 'N/A', 90, 10, 'normal');
+    layout.addText(data.coverage_details.workers_comp, 140, 10, 'normal');
+    layout.moveDown(8);
   }
   
   if (data.coverage_details.umbrella) {
-    doc.text('UMBRELLA LIABILITY', 20, yPosition);
-    doc.text(data.policy?.policy_number || 'N/A', 90, yPosition);
-    doc.text(data.coverage_details.umbrella, 140, yPosition);
-    yPosition += 8;
+    layout.addText('UMBRELLA LIABILITY', 20, 10, 'normal');
+    layout.addText(data.policy?.policy_number || 'N/A', 90, 10, 'normal');
+    layout.addText(data.coverage_details.umbrella, 140, 10, 'normal');
+    layout.moveDown(8);
   }
   
-  yPosition += 5;
-  doc.line(20, yPosition, 190, yPosition);
+  layout.moveDown(5);
+  layout.addLine();
+  layout.moveDown(10);
   
   // Policy Period
-  yPosition += 10;
-  doc.setFont(undefined, 'bold');
-  doc.text('POLICY PERIOD', 20, yPosition);
+  layout.addText('POLICY PERIOD', 20, 10, 'bold');
+  layout.moveDown(8);
   
-  yPosition += 8;
-  doc.setFont(undefined, 'normal');
-  doc.text(`Effective: ${new Date(data.effective_date).toLocaleDateString()}`, 20, yPosition);
-  doc.text(`Expiration: ${new Date(data.expiration_date).toLocaleDateString()}`, 90, yPosition);
+  layout.addText(`Effective: ${new Date(data.effective_date).toLocaleDateString()}`, 20, 10, 'normal');
+  layout.addText(`Expiration: ${new Date(data.expiration_date).toLocaleDateString()}`, 90, 10, 'normal');
+  layout.moveDown(10);
   
   // Additional Insureds
   if (data.additional_insureds && data.additional_insureds.length > 0) {
-    yPosition += 10;
-    doc.setFont(undefined, 'bold');
-    doc.text('ADDITIONAL INSUREDS', 20, yPosition);
+    layout.addText('ADDITIONAL INSUREDS', 20, 10, 'bold');
+    layout.moveDown(8);
     
-    yPosition += 8;
-    doc.setFont(undefined, 'normal');
     data.additional_insureds.forEach((insured) => {
-      doc.text(insured, 20, yPosition);
-      yPosition += 6;
+      layout.addText(insured, 20, 10, 'normal');
+      layout.moveDown(6);
     });
+    
+    layout.moveDown(4);
   }
   
   // Special Provisions
   if (data.special_provisions) {
-    yPosition += 10;
-    doc.setFont(undefined, 'bold');
-    doc.text('DESCRIPTION OF OPERATIONS / SPECIAL PROVISIONS', 20, yPosition);
+    layout.addText('DESCRIPTION OF OPERATIONS / SPECIAL PROVISIONS', 20, 10, 'bold');
+    layout.moveDown(8);
     
-    yPosition += 8;
-    doc.setFont(undefined, 'normal');
-    const provisions = doc.splitTextToSize(data.special_provisions, 170);
-    provisions.forEach((line: string) => {
-      if (yPosition > 270) {
-        doc.addPage();
-        yPosition = 20;
-      }
-      doc.text(line, 20, yPosition);
-      yPosition += 6;
-    });
+    layout.addMultilineText(data.special_provisions, 20, 170, 10, 'normal');
   }
   
-  // Footer
+  // Footer on all pages
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -215,3 +190,4 @@ export function generateCOIPDF(rawData: unknown): Blob {
   
   return doc.output('blob');
 }
+  
