@@ -6,14 +6,14 @@ import { UploadDocModal } from './UploadDocModal';
 import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
-import { useAIAssistant } from '@/hooks/useAIAssistant';
+import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
 
 interface CustomerDocumentsSectionProps {
   accountId: string;
 }
 
 export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSectionProps) {
-  const { openSidebar } = useAIAssistant();
+  const { openSidebar } = useAIAssistantContext();
   const {
     documents,
     loading,

@@ -11,13 +11,14 @@ import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
+import { AIAssistantProvider } from '@/contexts/AIAssistantContext';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
-export function AppLayout({ children }: AppLayoutProps) {
+function AppLayoutContent({ children }: AppLayoutProps) {
   const { user, profile, signOut } = useAuth();
   const { 
     isModalOpen, 
@@ -226,5 +227,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         context={context}
       />
     </SidebarProvider>
+  );
+}
+
+export function AppLayout({ children }: AppLayoutProps) {
+  return (
+    <AIAssistantProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </AIAssistantProvider>
   );
 }

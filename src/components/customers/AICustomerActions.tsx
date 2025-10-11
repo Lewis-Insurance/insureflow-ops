@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, FileText, MessageSquare } from 'lucide-react';
 import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
-import { useAIAssistant } from '@/hooks/useAIAssistant';
+import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
 import { useNavigate } from 'react-router-dom';
 
 interface AICustomerActionsProps {
@@ -11,7 +11,7 @@ interface AICustomerActionsProps {
 }
 
 export function AICustomerActions({ accountId, accountName }: AICustomerActionsProps) {
-  const { openModal } = useAIAssistant();
+  const { openModal } = useAIAssistantContext();
   const navigate = useNavigate();
 
   const handleOpenChat = () => {
