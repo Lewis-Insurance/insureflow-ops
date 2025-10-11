@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as pdfjsLib from 'npm:pdfjs-serverless@0.7.0';
+import { getDocument } from 'npm:pdfjs-serverless@0.7.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,12 +145,9 @@ serve(async (req) => {
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Parse PDF using pdfjs-serverless
-    const pdfDoc = await pdfjsLib.getDocument({
+    const pdfDoc = await getDocument({
       data: uint8Array,
-      useSystemFonts: true,
-      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
-      disableFontFace: true,
-      verbosity: 0
+      useSystemFonts: true
     }).promise;
     
     // Check if PDF has extractable pages
