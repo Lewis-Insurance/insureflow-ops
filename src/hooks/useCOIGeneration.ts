@@ -12,6 +12,7 @@ export function useCOIGeneration() {
   const { updateCOI } = useCOI();
   const { user } = useAuth();
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   /**
    * Upload PDF with retry logic
@@ -76,6 +77,8 @@ export function useCOIGeneration() {
       setProgress(progressData);
       onProgress?.(progressData);
     };
+
+    setIsGenerating(true);
 
     try {
       // Check for existing versions if this is a revision
@@ -197,8 +200,9 @@ export function useCOIGeneration() {
     } catch (error: any) {
       console.error('COI generation error:', error);
 
-      // Reset progress on error
+      // Reset progress and generating state on error
       setProgress(null);
+      setIsGenerating(false);
 
       // Cleanup failed upload if it exists (use try-catch since fileName might not be defined in early errors)
       try {
@@ -214,6 +218,8 @@ export function useCOIGeneration() {
         variant: 'destructive',
       });
       throw error;
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -378,6 +384,26 @@ export function useCOIGeneration() {
     }
   };
 
+  const checkCOIExists = async (certificateNumber: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('certificates_of_insurance')
+        .select('id, document_url, status, current_version')
+        .eq('certificate_number', certificateNumber)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking COI existence:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error checking COI existence:', error);
+      return null;
+    }
+  };
+
   const downloadCOI = async (documentUrl: string, certificateNumber: string) => {
     try {
       const response = await fetch(documentUrl);
@@ -412,6 +438,8 @@ export function useCOIGeneration() {
     previewCOI,
     batchGenerateCOIs,
     generateAndEmailCOI,
+    checkCOIExists,
     progress,
+    isGenerating,
   };
 }
