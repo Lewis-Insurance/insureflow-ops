@@ -273,53 +273,61 @@ const InsuranceAIBrain = () => {
                 </CardDescription>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <Button onClick={() => setShowAddDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Knowledge
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setShowAddDialog(true)} size="sm">
+                <Plus className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Add Knowledge</span>
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
               >
                 {isImporting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 md:mr-2 animate-spin" />
                 ) : (
-                  <Upload className="w-4 h-4 mr-2" />
+                  <Upload className="w-4 h-4 md:mr-2" />
                 )}
-                Import CSV
+                <span className="hidden md:inline">Import CSV</span>
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleDownloadTemplate}
               >
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
+                <Download className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Template</span>
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setShowDocumentImport(true)}
                 disabled={isConvertingDocs}
               >
                 {isConvertingDocs ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 md:mr-2 animate-spin" />
                 ) : (
-                  <FileText className="w-4 h-4 mr-2" />
+                  <FileText className="w-4 h-4 md:mr-2" />
                 )}
-                Import from Documents
+                <span className="hidden md:inline">Docs</span>
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleUpdateEmbeddings}
                 disabled={aiLoading}
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${aiLoading ? 'animate-spin' : ''}`} />
-                Update AI Embeddings
+                <RefreshCw className={`w-4 h-4 md:mr-2 ${aiLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">Update AI</span>
               </Button>
-              <Button onClick={fetchKnowledgeBase} disabled={kbLoading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${kbLoading ? 'animate-spin' : ''}`} />
-                Refresh
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={fetchKnowledgeBase} 
+                disabled={kbLoading}
+              >
+                <RefreshCw className={`w-4 h-4 ${kbLoading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
             <input
