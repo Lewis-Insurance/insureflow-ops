@@ -33,26 +33,46 @@ interface ExtractedPolicy {
   updated_at: string;
 }
 
-export function useComparisonSessions(accountId?: string) {
+export function useComparisonSessions(
+  accountId?: string,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    status?: ComparisonSession['status'];
+  }
+) {
+  const page = options?.page || 1;
+  const pageSize = options?.pageSize || 20;
+
   return useQuery({
-    queryKey: ['comparison-sessions', accountId],
+    queryKey: ['comparison-sessions', accountId, page, pageSize, options?.status],
     queryFn: async () => {
       let query = supabase
         .from('comparison_sessions')
-        .select('*')
+        .select('*', { count: 'exact' })
+        .range((page - 1) * pageSize, page * pageSize - 1)
         .order('created_at', { ascending: false });
 
       if (accountId) {
         query = query.eq('account_id', accountId);
       }
+      
+      if (options?.status) {
+        query = query.eq('status', options.status);
+      }
 
-      const { data, error } = await query;
-
+      const { data, error, count } = await query;
+      
       if (error) {
         throw new Error(`Failed to fetch comparison sessions: ${error.message}`);
       }
 
-      return data as unknown as ComparisonSession[];
+      return {
+        sessions: data as unknown as ComparisonSession[],
+        totalCount: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize),
+        currentPage: page,
+      };
     },
     enabled: !!accountId,
     staleTime: 60 * 1000, // 1 minute
@@ -102,9 +122,9 @@ export function useSaveComparisonSession() {
         .from('comparison_sessions')
         .insert({
           account_id: accountId,
-          option1_data: option1 as any,
-          option2_data: option2 as any,
-          comparison_results: comparisonResults as any || null,
+          option1_data: JSON.parse(JSON.stringify(option1)),
+          option2_data: JSON.parse(JSON.stringify(option2)),
+          comparison_results: comparisonResults ? JSON.parse(JSON.stringify(comparisonResults)) : null,
           client_name: clientName || option1.insuredName,
           status: comparisonResults ? 'completed' : 'draft',
         })
@@ -144,9 +164,20 @@ export function useUpdateComparisonSession() {
       sessionId: string;
       updates: Partial<Omit<ComparisonSession, 'id' | 'created_at' | 'updated_at'>>;
     }) => {
+      // Serialize any complex objects to avoid Supabase JSONB issues
+      const updateData: Record<string, any> = {};
+      
+      Object.entries(updates).forEach(([key, value]) => {
+        if (key === 'option1_data' || key === 'option2_data' || key === 'comparison_results') {
+          updateData[key] = value ? JSON.parse(JSON.stringify(value)) : null;
+        } else {
+          updateData[key] = value;
+        }
+      });
+
       const { data, error } = await supabase
         .from('comparison_sessions')
-        .update(updates as any)
+        .update(updateData)
         .eq('id', sessionId)
         .select()
         .single();
@@ -154,19 +185,43 @@ export function useUpdateComparisonSession() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['comparison-sessions'] });
-      queryClient.invalidateQueries({ queryKey: ['comparison-session', data.id] });
-      toast({
-        title: 'Success',
-        description: 'Comparison session updated',
-      });
+    onMutate: async ({ sessionId, updates }) => {
+      // Cancel in-flight queries
+      await queryClient.cancelQueries({ queryKey: ['comparison-session', sessionId] });
+      
+      // Snapshot previous value
+      const previousSession = queryClient.getQueryData(['comparison-session', sessionId]);
+      
+      // Optimistically update
+      queryClient.setQueryData(['comparison-session', sessionId], (old: any) => ({
+        ...old,
+        ...updates,
+      }));
+      
+      return { previousSession };
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // Rollback on error
+      if (context?.previousSession) {
+        queryClient.setQueryData(
+          ['comparison-session', variables.sessionId],
+          context.previousSession
+        );
+      }
       toast({
         title: 'Error',
         description: `Failed to update session: ${error.message}`,
         variant: 'destructive',
+      });
+    },
+    onSettled: (data, error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['comparison-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['comparison-session', variables.sessionId] });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Comparison session updated',
       });
     },
   });
@@ -234,9 +289,9 @@ export function useSaveExtractedPolicy() {
           carrier,
           policy_number: policyNumber,
           document_path: documentPath,
-          extracted_data: extractedData,
-          confidence_scores: confidenceScores || null,
-          extraction_metadata: extractionMetadata || null,
+          extracted_data: JSON.parse(JSON.stringify(extractedData)),
+          confidence_scores: confidenceScores ? JSON.parse(JSON.stringify(confidenceScores)) : null,
+          extraction_metadata: extractionMetadata ? JSON.parse(JSON.stringify(extractionMetadata)) : null,
         })
         .select()
         .single();
@@ -255,6 +310,44 @@ export function useSaveExtractedPolicy() {
       toast({
         title: 'Error',
         description: `Failed to save extraction: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useBulkUpdateSessions() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      sessionIds,
+      updates,
+    }: {
+      sessionIds: string[];
+      updates: { status?: ComparisonSession['status']; notes?: string };
+    }) => {
+      const { data, error } = await supabase
+        .from('comparison_sessions')
+        .update(updates)
+        .in('id', sessionIds)
+        .select();
+
+      if (error) throw error;
+      return data as unknown as ComparisonSession[];
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['comparison-sessions'] });
+      toast({
+        title: 'Success',
+        description: `Updated ${data.length} session${data.length > 1 ? 's' : ''}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to update sessions: ${error.message}`,
         variant: 'destructive',
       });
     },
