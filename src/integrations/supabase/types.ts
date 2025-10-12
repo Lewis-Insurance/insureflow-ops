@@ -2439,7 +2439,7 @@ export type Database = {
           priority: number | null
           product_line: string
           program_or_form: string | null
-          question_canonical: string
+          question_canonical: string | null
           record_id: string
           seo_snippet: string | null
           source_type: string | null
@@ -2464,7 +2464,7 @@ export type Database = {
           priority?: number | null
           product_line: string
           program_or_form?: string | null
-          question_canonical: string
+          question_canonical?: string | null
           record_id: string
           seo_snippet?: string | null
           source_type?: string | null
@@ -2489,7 +2489,7 @@ export type Database = {
           priority?: number | null
           product_line?: string
           program_or_form?: string | null
-          question_canonical?: string
+          question_canonical?: string | null
           record_id?: string
           seo_snippet?: string | null
           source_type?: string | null
@@ -4807,7 +4807,7 @@ export type Database = {
           priority: number | null
           product_line: string
           program_or_form: string | null
-          question_canonical: string
+          question_canonical: string | null
           record_id: string
           seo_snippet: string | null
           source_type: string | null
