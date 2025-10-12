@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
 import type { ComparisonResult } from '@/types/insurance-comparison';
+import { GapAnalysisCard } from './GapAnalysisCard';
 import { format } from 'date-fns';
 
 interface ComparisonReportProps {
@@ -74,6 +75,9 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Gap Analysis */}
+      {differences.gaps && <GapAnalysisCard gaps={differences.gaps} />}
 
       {/* Coverage Comparison */}
       <Card>

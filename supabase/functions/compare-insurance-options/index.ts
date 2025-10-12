@@ -5,6 +5,102 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ComparisonEngine implementation (inlined for edge function)
+class ComparisonEngine {
+  private normalizeTerms: Record<string, string[]> = {
+    'BI': ['Bodily Injury', 'BI Liability', 'Bodily Injury Liability', 'Liability - BI'],
+    'PD': ['Property Damage', 'PD Liability', 'Property Damage Liability', 'Liability - PD'],
+    'COMP': ['Comprehensive', 'Other Than Collision', 'OTC', 'Comprehensive Coverage'],
+    'COLL': ['Collision', 'Collision Coverage', 'Collision Damage'],
+    'UM': ['Uninsured Motorist', 'UM/UIM', 'Uninsured/Underinsured', 'UM Coverage'],
+    'UMPD': ['Uninsured Motorist Property Damage', 'UMPD', 'UM Property Damage'],
+    'MED': ['Medical Payments', 'Med Pay', 'Medical', 'Medical Coverage'],
+    'PIP': ['Personal Injury Protection', 'PIP', 'No-Fault'],
+    'RENTAL': ['Rental Reimbursement', 'Rental Car', 'Transportation Expense'],
+    'TOWING': ['Towing and Labor', 'Roadside Assistance', 'Emergency Road Service'],
+  };
+
+  private termToCanonical: Map<string, string>;
+
+  constructor() {
+    this.termToCanonical = new Map();
+    Object.entries(this.normalizeTerms).forEach(([canonical, variations]) => {
+      variations.forEach(variation => {
+        this.termToCanonical.set(variation.toLowerCase(), canonical);
+      });
+    });
+  }
+
+  getCanonicalType(type: string): string {
+    const lowerType = type.toLowerCase();
+    if (this.termToCanonical.has(lowerType)) {
+      return this.termToCanonical.get(lowerType)!;
+    }
+    for (const [canonical, variations] of Object.entries(this.normalizeTerms)) {
+      if (variations.some(v => lowerType.includes(v.toLowerCase()) || v.toLowerCase().includes(lowerType))) {
+        return canonical;
+      }
+    }
+    return type;
+  }
+
+  normalizeCoverages(coverages: any[]): Map<string, any> {
+    const normalized = new Map();
+    coverages.forEach(coverage => {
+      const canonicalType = this.getCanonicalType(coverage.type);
+      normalized.set(canonicalType, { ...coverage, type: canonicalType });
+    });
+    return normalized;
+  }
+
+  identifyGaps(coverages1: Map<string, any>, coverages2: Map<string, any>) {
+    const gaps: any[] = [];
+    const criticalCoverages = ['COLL', 'COMP', 'BI', 'PD', 'UM'];
+    
+    criticalCoverages.forEach(type => {
+      const readableName = this.getReadableName(type);
+      
+      if (!coverages1.has(type) && coverages2.has(type)) {
+        gaps.push({
+          coverageType: readableName,
+          missingIn: 'option1',
+          severity: 'critical',
+          description: `Option 1 is missing ${readableName} coverage`,
+          recommendation: `Add ${readableName} coverage to Option 1 or select Option 2`
+        });
+      }
+      
+      if (coverages1.has(type) && !coverages2.has(type)) {
+        gaps.push({
+          coverageType: readableName,
+          missingIn: 'option2',
+          severity: 'critical',
+          description: `Option 2 is missing ${readableName} coverage`,
+          recommendation: `Add ${readableName} coverage to Option 2 or select Option 1`
+        });
+      }
+    });
+
+    return gaps;
+  }
+
+  getReadableName(canonicalType: string): string {
+    const names: Record<string, string> = {
+      'BI': 'Bodily Injury',
+      'PD': 'Property Damage',
+      'COMP': 'Comprehensive',
+      'COLL': 'Collision',
+      'UM': 'Uninsured Motorist',
+      'UMPD': 'Uninsured Motorist Property Damage',
+      'MED': 'Medical Payments',
+      'PIP': 'Personal Injury Protection',
+      'RENTAL': 'Rental Reimbursement',
+      'TOWING': 'Towing and Labor'
+    };
+    return names[canonicalType] || canonicalType;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -12,13 +108,25 @@ serve(async (req) => {
 
   try {
     const { option1, option2 } = await req.json();
+    
+    // Initialize comparison engine
+    const engine = new ComparisonEngine();
+    const normalizedCoverages1 = engine.normalizeCoverages(option1.coverages);
+    const normalizedCoverages2 = engine.normalizeCoverages(option2.coverages);
+    
+    // Identify gaps using the engine
+    const gaps = engine.identifyGaps(normalizedCoverages1, normalizedCoverages2);
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    // Build detailed comparison prompt
+    // Build enhanced comparison prompt with gap analysis
+    const gapSummary = gaps.length > 0 
+      ? `\n\nCRITICAL GAPS IDENTIFIED:\n${gaps.map(g => `- ${g.description}`).join('\n')}`
+      : '\n\nNo critical coverage gaps identified.';
+
     const prompt = `You are an expert insurance analyst. Compare these two insurance options and provide a detailed analysis.
 
 OPTION 1:
@@ -26,19 +134,23 @@ OPTION 1:
 - Policy/Quote: ${option1.policyNumber || 'Quote'}
 - Term: ${option1.term}
 - Total Premium: $${option1.totalPremium}
-- Coverages: ${JSON.stringify(option1.coverages, null, 2)}
+- Coverages: ${JSON.stringify(Array.from(normalizedCoverages1.entries()), null, 2)}
 
 OPTION 2:
 - Carrier: ${option2.carrier}
 - Policy/Quote: ${option2.policyNumber || 'Quote'}
 - Term: ${option2.term}
 - Total Premium: $${option2.totalPremium}
-- Coverages: ${JSON.stringify(option2.coverages, null, 2)}
+- Coverages: ${JSON.stringify(Array.from(normalizedCoverages2.entries()), null, 2)}
+${gapSummary}
+
+IMPORTANT: Coverage types have been normalized (e.g., "Collision", "Collision Coverage" → "COLL").
 
 Provide a comprehensive comparison including:
-1. Coverage differences (better, worse, or equivalent for each coverage type)
+1. Coverage differences (better, worse, or equivalent for each NORMALIZED coverage type)
 2. Premium analysis (percentage difference and value assessment)
-3. Overall recommendation with reasoning
+3. Gap analysis (highlight any missing critical coverages like Collision, Comprehensive, etc.)
+4. Overall recommendation with reasoning
 
 Return your analysis as a structured JSON object.`;
 
@@ -121,13 +233,23 @@ Return your analysis as a structured JSON object.`;
 
     const comparisonData = JSON.parse(toolCall.function.arguments);
 
-    // Build final comparison result
+    // Build final comparison result with gaps
     const result = {
       option1,
       option2,
-      differences: comparisonData,
+      differences: {
+        ...comparisonData,
+        gaps: gaps  // Include identified gaps
+      },
       recommendation: comparisonData.recommendation,
-      analysisDate: new Date().toISOString()
+      analysisDate: new Date().toISOString(),
+      metadata: {
+        normalizedCoverageCount: {
+          option1: normalizedCoverages1.size,
+          option2: normalizedCoverages2.size
+        },
+        criticalGapsFound: gaps.filter((g: any) => g.severity === 'critical').length
+      }
     };
 
     return new Response(

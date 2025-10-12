@@ -55,6 +55,13 @@ export interface ComparisonResult {
     premiumPercentage: number;
     carrierComparison: string;
     termComparison: string;
+    gaps?: Array<{
+      coverageType: string;
+      missingIn: 'option1' | 'option2';
+      severity: 'critical' | 'high' | 'medium' | 'low';
+      description: string;
+      recommendation: string;
+    }>;
   };
   recommendation?: string;
   analysisDate: Date;
