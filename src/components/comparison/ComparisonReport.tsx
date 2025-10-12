@@ -2,8 +2,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TrendingUp, TrendingDown, AlertCircle, Check, X, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, AlertCircle, Check, X, AlertTriangle, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { PDFReport } from './PDFReport';
 import type { ComparisonResult } from '@/types/insurance-comparison';
 import { GapAnalysisCard } from './GapAnalysisCard';
 import { format } from 'date-fns';
@@ -62,6 +65,27 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Action Bar */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Comparison Report</h2>
+          <p className="text-sm text-muted-foreground">
+            {option1.carrier} vs {option2.carrier}
+          </p>
+        </div>
+        
+        <PDFDownloadLink
+          document={<PDFReport comparison={comparison} clientName={option1.insuredName} />}
+          fileName={`insurance-comparison-${format(comparison.analysisDate, 'yyyy-MM-dd')}.pdf`}
+        >
+          {({ loading }) => (
+            <Button disabled={loading} className="gap-2">
+              <Download className="h-4 w-4" />
+              {loading ? 'Generating PDF...' : 'Download PDF Report'}
+            </Button>
+          )}
+        </PDFDownloadLink>
+      </div>
       {/* Executive Summary */}
       <Card>
         <CardHeader>
