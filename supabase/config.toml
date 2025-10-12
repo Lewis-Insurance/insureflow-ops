@@ -76,3 +76,6 @@ verify_jwt = true
 
 [functions.parse-pdf-knowledge]
 verify_jwt = true
+
+[functions.compare-insurance-options]
+verify_jwt = true
