@@ -157,6 +157,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  advantageOption1: {
+    color: '#28a745',
+  },
+  advantageOption2: {
+    color: '#dc3545',
+  },
+  advantageNeutral: {
+    color: '#6c757d',
+  },
 });
 
 export const PDFReport = ({ comparison, clientName }: PDFReportProps) => {
@@ -172,8 +181,24 @@ export const PDFReport = ({ comparison, clientName }: PDFReportProps) => {
   const criticalGaps = differences.gaps?.filter(g => g.severity === 'critical') || [];
   const hasGaps = differences.gaps && differences.gaps.length > 0;
 
+  const getAdvantageColor = (advantage: string) => {
+    switch (advantage) {
+      case 'option1':
+        return styles.advantageOption1;
+      case 'option2':
+        return styles.advantageOption2;
+      default:
+        return styles.advantageNeutral;
+    }
+  };
+
   return (
-    <Document>
+    <Document
+      title={`Insurance Comparison - ${clientName || 'Client'}`}
+      author="Insurance Comparison Tool"
+      subject="Coverage Analysis"
+      creator="Insurance Management System"
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -220,7 +245,7 @@ export const PDFReport = ({ comparison, clientName }: PDFReportProps) => {
         </View>
 
         {/* Coverage Comparison */}
-        <View style={styles.section}>
+        <View break style={styles.section}>
           <Text style={styles.sectionTitle}>Coverage Comparison</Text>
           
           <View style={styles.table}>
@@ -234,8 +259,12 @@ export const PDFReport = ({ comparison, clientName }: PDFReportProps) => {
             {differences.coverageDifferences.map((diff, idx) => (
               <View key={idx} style={styles.tableRow}>
                 <Text style={styles.tableCol1}>{diff.coverageType}</Text>
-                <Text style={styles.tableCol2}>{diff.option1Value}</Text>
-                <Text style={styles.tableCol3}>{diff.option2Value}</Text>
+                <Text style={[styles.tableCol2, getAdvantageColor(diff.advantage === 'option1' ? 'option1' : 'neutral')]}>
+                  {diff.option1Value}
+                </Text>
+                <Text style={[styles.tableCol3, getAdvantageColor(diff.advantage === 'option2' ? 'option2' : 'neutral')]}>
+                  {diff.option2Value}
+                </Text>
                 <Text style={styles.tableCol4}>
                   {diff.option1Value === 'Not Included' || diff.option2Value === 'Not Included' 
                     ? '✗' 
@@ -250,7 +279,7 @@ export const PDFReport = ({ comparison, clientName }: PDFReportProps) => {
 
         {/* Gap Analysis */}
         {differences.gaps && differences.gaps.length > 0 && (
-          <View style={styles.section}>
+          <View break style={styles.section}>
             <Text style={styles.sectionTitle}>Gap Analysis</Text>
             
             {criticalGaps.length > 0 && (
