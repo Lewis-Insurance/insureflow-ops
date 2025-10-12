@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +76,8 @@ export function useComparisonSessions(
     },
     enabled: !!accountId,
     staleTime: 60 * 1000, // 1 minute
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -87,16 +89,22 @@ export function useComparisonSession(sessionId: string) {
         .from('comparison_sessions')
         .select('*')
         .eq('id', sessionId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw new Error(`Failed to fetch comparison session: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('Comparison session not found');
       }
 
       return data as unknown as ComparisonSession;
     },
     enabled: !!sessionId,
     staleTime: 60 * 1000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -372,7 +380,37 @@ export function useExtractedPolicies(sessionId: string) {
     },
     enabled: !!sessionId,
     staleTime: 60 * 1000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+}
+
+/**
+ * Helper hook to extract and memoize gap analysis data from a comparison session
+ */
+export function useGapAnalysis(sessionId: string) {
+  const { data: session, isLoading, error } = useComparisonSession(sessionId);
+  
+  const gaps = useMemo(() => {
+    if (!session?.comparison_results?.differences?.gaps) return [];
+    return session.comparison_results.differences.gaps;
+  }, [session]);
+
+  const criticalGaps = useMemo(() => {
+    return gaps.filter(gap => gap.severity === 'critical');
+  }, [gaps]);
+
+  const hasGaps = gaps.length > 0;
+  const hasCriticalGaps = criticalGaps.length > 0;
+
+  return {
+    gaps,
+    criticalGaps,
+    hasGaps,
+    hasCriticalGaps,
+    isLoading,
+    error,
+  };
 }
 
 export type { ComparisonSession, ExtractedPolicy };
