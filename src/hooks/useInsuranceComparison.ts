@@ -1,225 +1,140 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useReducer, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSaveComparisonSession, useUpdateComparisonSession } from '@/hooks/useComparisonSessions';
 import type { InsuranceDocument, ComparisonResult } from '@/types/insurance-comparison';
 
+/**
+ * Types for Supabase function responses
+ */
+interface AnalysisExtracted {
+  insuredName?: string;
+  account_id?: string;
+  effectiveDate: string | Date;
+  expirationDate: string | Date;
+  [k: string]: unknown;
+}
+
+interface AnalysisResponse {
+  extracted: AnalysisExtracted;
+  [k: string]: unknown;
+}
+
+/**
+ * Internal state & reducer
+ */
+type State = {
+  isProcessing: boolean;
+  uploadedFiles1: File[];
+  uploadedFiles2: File[];
+  option1: InsuranceDocument | null;
+  option2: InsuranceDocument | null;
+  comparison: ComparisonResult | null;
+  currentSessionId: string | null;
+  error: string | null;
+};
+
+type Action =
+  | { type: 'SET_PROCESSING'; value: boolean }
+  | { type: 'SET_UPLOADED'; which: 1 | 2; files: File[] }
+  | { type: 'SET_OPTION'; which: 1 | 2; doc: InsuranceDocument | null }
+  | { type: 'SET_COMPARISON'; comparison: ComparisonResult | null }
+  | { type: 'SET_SESSION_ID'; id: string | null }
+  | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'RESET' };
+
+const initialState: State = {
+  isProcessing: false,
+  uploadedFiles1: [],
+  uploadedFiles2: [],
+  option1: null,
+  option2: null,
+  comparison: null,
+  currentSessionId: null,
+  error: null
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'SET_PROCESSING':
+      return { ...state, isProcessing: action.value };
+    case 'SET_UPLOADED':
+      return action.which === 1
+        ? { ...state, uploadedFiles1: action.files }
+        : { ...state, uploadedFiles2: action.files };
+    case 'SET_OPTION':
+      return action.which === 1
+        ? { ...state, option1: action.doc }
+        : { ...state, option2: action.doc };
+    case 'SET_COMPARISON':
+      return { ...state, comparison: action.comparison };
+    case 'SET_SESSION_ID':
+      return { ...state, currentSessionId: action.id };
+    case 'SET_ERROR':
+      return { ...state, error: action.error };
+    case 'RESET':
+      return initialState;
+    default:
+      return state;
+  }
+}
+
+/**
+ * Helper to ensure Date object
+ */
+function ensureDate(value: string | Date): Date {
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+/**
+ * Sanitize filename for storage
+ */
+function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 export function useInsuranceComparison() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadedFiles1, setUploadedFiles1] = useState<File[]>([]);
-  const [uploadedFiles2, setUploadedFiles2] = useState<File[]>([]);
-  const [option1, setOption1] = useState<InsuranceDocument | null>(null);
-  const [option2, setOption2] = useState<InsuranceDocument | null>(null);
-  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(reducer, initialState);
   const { toast } = useToast();
+  const mountedRef = useRef(true);
   
   const saveSession = useSaveComparisonSession();
   const updateSession = useUpdateComparisonSession();
 
-  const processDocuments = async (files: File[], optionNumber: 1 | 2) => {
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      // Upload files to storage
-      const uploadPromises = files.map(async (file) => {
-        const filePath = `insurance-comparison/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-        return filePath;
-      });
-
-      const paths = await Promise.all(uploadPromises);
-
-      // Process with AI document analysis
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-        'ai-document-analysis',
-        {
-          body: {
-            documentPaths: paths,
-            analysisType: 'insurance_extraction'
-          }
-        }
-      );
-
-      if (analysisError) throw analysisError;
-
-      const extractedDoc: InsuranceDocument = {
-        id: crypto.randomUUID(),
-        ...analysisData.extracted,
-        effectiveDate: new Date(analysisData.extracted.effectiveDate),
-        expirationDate: new Date(analysisData.extracted.expirationDate),
-        rawData: analysisData
-      };
-
-      if (optionNumber === 1) {
-        setOption1(extractedDoc);
-      } else {
-        setOption2(extractedDoc);
-      }
-
-      toast({
-        title: 'Success',
-        description: `Option ${optionNumber} processed successfully`
-      });
-
-    } catch (err: any) {
-      const errorMsg = err.message || 'Failed to process documents';
-      setError(errorMsg);
-      toast({
-        title: 'Processing Error',
-        description: errorMsg,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsProcessing(false);
+  // Safe dispatch that checks if component is mounted
+  const safeDispatch = useCallback((action: Action) => {
+    if (mountedRef.current) {
+      dispatch(action);
     }
-  };
+  }, []);
 
-  const compareOptions = async () => {
-    if (!option1 || !option2) {
-      toast({
-        title: 'Missing Documents',
-        description: 'Please upload documents for both options',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // Use AI to generate detailed comparison
-      const { data, error: compareError } = await supabase.functions.invoke(
-        'compare-insurance-options',
-        {
-          body: {
-            option1,
-            option2
-          }
-        }
-      );
-
-      if (compareError) throw compareError;
-
-      setComparison(data);
-
-      // Save the comparison session
-      if (option1.account_id) {
-        const savedSession = await saveSession.mutateAsync({
-          accountId: option1.account_id,
-          option1,
-          option2,
-          comparisonResults: data,
-          clientName: option1.insuredName,
-        });
-        
-        if (savedSession) {
-          setCurrentSessionId(savedSession.id);
-        }
-      }
-
-      toast({
-        title: 'Comparison Complete',
-        description: 'Analysis report generated and saved successfully'
-      });
-
-    } catch (err: any) {
-      toast({
-        title: 'Comparison Error',
-        description: err.message || 'Failed to compare options',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const uploadFiles = (files: File[], optionNumber: 1 | 2) => {
-    if (optionNumber === 1) {
-      setUploadedFiles1(files);
-    } else {
-      setUploadedFiles2(files);
-    }
-  };
-
-  const processAllDocuments = async () => {
-    if (uploadedFiles1.length === 0 || uploadedFiles2.length === 0) {
-      toast({
-        title: 'Missing Documents',
-        description: 'Please upload documents for both options',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      // Process Option 1
-      const paths1 = await uploadToStorage(uploadedFiles1);
-      const analysisData1 = await analyzeDocuments(paths1);
-      const extractedDoc1: InsuranceDocument = {
-        id: crypto.randomUUID(),
-        ...analysisData1.extracted,
-        effectiveDate: new Date(analysisData1.extracted.effectiveDate),
-        expirationDate: new Date(analysisData1.extracted.expirationDate),
-        rawData: analysisData1
-      };
-      setOption1(extractedDoc1);
-
-      // Process Option 2
-      const paths2 = await uploadToStorage(uploadedFiles2);
-      const analysisData2 = await analyzeDocuments(paths2);
-      const extractedDoc2: InsuranceDocument = {
-        id: crypto.randomUUID(),
-        ...analysisData2.extracted,
-        effectiveDate: new Date(analysisData2.extracted.effectiveDate),
-        expirationDate: new Date(analysisData2.extracted.expirationDate),
-        rawData: analysisData2
-      };
-      setOption2(extractedDoc2);
-
-      toast({
-        title: 'Success',
-        description: 'Both documents processed successfully'
-      });
-
-    } catch (err: any) {
-      const errorMsg = err.message || 'Failed to process documents';
-      setError(errorMsg);
-      toast({
-        title: 'Processing Error',
-        description: errorMsg,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const uploadToStorage = async (files: File[]): Promise<string[]> => {
-    const uploadPromises = files.map(async (file) => {
-      const filePath = `insurance-comparison/${Date.now()}-${file.name}`;
+  // DRY: Upload files to storage with better collision avoidance
+  const uploadToStorage = useCallback(async (files: File[]): Promise<string[]> => {
+    const uploadPromises = files.map(async (file, index) => {
+      const uniqueId = crypto.randomUUID();
+      const sanitized = sanitizeFilename(file.name);
+      const filePath = `insurance-comparison/${Date.now()}-${index}-${uniqueId}-${sanitized}`;
+      
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          contentType: file.type || 'application/octet-stream',
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) throw uploadError;
       return filePath;
     });
 
     return Promise.all(uploadPromises);
-  };
+  }, []);
 
-  const analyzeDocuments = async (paths: string[]) => {
-    const { data, error } = await supabase.functions.invoke(
+  // DRY: Analyze documents with type-safe response
+  const analyzeDocuments = useCallback(async (paths: string[]): Promise<AnalysisResponse> => {
+    const { data, error } = await supabase.functions.invoke<AnalysisResponse>(
       'ai-document-analysis',
       {
         body: {
@@ -230,30 +145,165 @@ export function useInsuranceComparison() {
     );
 
     if (error) throw error;
+    if (!data) throw new Error('No data returned from analysis');
+    
     return data;
-  };
+  }, []);
 
-  const reset = () => {
-    setUploadedFiles1([]);
-    setUploadedFiles2([]);
-    setOption1(null);
-    setOption2(null);
-    setComparison(null);
-    setCurrentSessionId(null);
-    setError(null);
-  };
+  // Convert analysis response to InsuranceDocument
+  const createDocumentFromAnalysis = useCallback((analysisData: AnalysisResponse): InsuranceDocument => {
+    const extracted = analysisData.extracted as any;
+    return {
+      id: crypto.randomUUID(),
+      type: extracted.type || 'quote',
+      carrier: extracted.carrier || '',
+      policyNumber: extracted.policyNumber,
+      insuredName: extracted.insuredName || '',
+      effectiveDate: ensureDate(extracted.effectiveDate),
+      expirationDate: ensureDate(extracted.expirationDate),
+      term: extracted.term || '',
+      coverages: extracted.coverages || [],
+      premiums: extracted.premiums || [],
+      vehicles: extracted.vehicles,
+      properties: extracted.properties,
+      totalPremium: extracted.totalPremium,
+      account_id: extracted.account_id,
+      rawData: analysisData
+    };
+  }, []);
+
+  const compareOptions = useCallback(async () => {
+    if (!state.option1 || !state.option2) {
+      toast({
+        title: 'Missing Documents',
+        description: 'Please upload documents for both options',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    safeDispatch({ type: 'SET_PROCESSING', value: true });
+    safeDispatch({ type: 'SET_ERROR', error: null });
+
+    try {
+      // Use AI to generate detailed comparison
+      const { data, error: compareError } = await supabase.functions.invoke<ComparisonResult>(
+        'compare-insurance-options',
+        {
+          body: {
+            option1: state.option1,
+            option2: state.option2
+          }
+        }
+      );
+
+      if (compareError) throw compareError;
+      if (!data) throw new Error('No comparison data returned');
+
+      safeDispatch({ type: 'SET_COMPARISON', comparison: data });
+
+      // Save the comparison session (only if account_id exists)
+      if (state.option1.account_id) {
+        const savedSession = await saveSession.mutateAsync({
+          accountId: state.option1.account_id,
+          option1: state.option1,
+          option2: state.option2,
+          comparisonResults: data,
+          clientName: state.option1.insuredName,
+        });
+        
+        if (savedSession) {
+          safeDispatch({ type: 'SET_SESSION_ID', id: savedSession.id });
+        }
+      }
+
+      toast({
+        title: 'Comparison Complete',
+        description: 'Analysis report generated and saved successfully'
+      });
+
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to compare options';
+      safeDispatch({ type: 'SET_ERROR', error: errorMsg });
+      toast({
+        title: 'Comparison Error',
+        description: errorMsg,
+        variant: 'destructive'
+      });
+    } finally {
+      safeDispatch({ type: 'SET_PROCESSING', value: false });
+    }
+  }, [state.option1, state.option2, saveSession, toast, safeDispatch]);
+
+  const uploadFiles = useCallback((files: File[], optionNumber: 1 | 2) => {
+    safeDispatch({ type: 'SET_UPLOADED', which: optionNumber, files });
+  }, [safeDispatch]);
+
+  const processAllDocuments = useCallback(async () => {
+    if (state.uploadedFiles1.length === 0 || state.uploadedFiles2.length === 0) {
+      toast({
+        title: 'Missing Documents',
+        description: 'Please upload documents for both options',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    safeDispatch({ type: 'SET_PROCESSING', value: true });
+    safeDispatch({ type: 'SET_ERROR', error: null });
+
+    try {
+      // Process Option 1
+      const paths1 = await uploadToStorage(state.uploadedFiles1);
+      const analysisData1 = await analyzeDocuments(paths1);
+      const extractedDoc1 = createDocumentFromAnalysis(analysisData1);
+      safeDispatch({ type: 'SET_OPTION', which: 1, doc: extractedDoc1 });
+
+      // Process Option 2
+      const paths2 = await uploadToStorage(state.uploadedFiles2);
+      const analysisData2 = await analyzeDocuments(paths2);
+      const extractedDoc2 = createDocumentFromAnalysis(analysisData2);
+      safeDispatch({ type: 'SET_OPTION', which: 2, doc: extractedDoc2 });
+
+      toast({
+        title: 'Success',
+        description: 'Both documents processed successfully'
+      });
+
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to process documents';
+      safeDispatch({ type: 'SET_ERROR', error: errorMsg });
+      toast({
+        title: 'Processing Error',
+        description: errorMsg,
+        variant: 'destructive'
+      });
+    } finally {
+      safeDispatch({ type: 'SET_PROCESSING', value: false });
+    }
+  }, [state.uploadedFiles1, state.uploadedFiles2, uploadToStorage, analyzeDocuments, createDocumentFromAnalysis, toast, safeDispatch]);
+
+  const reset = useCallback(() => {
+    safeDispatch({ type: 'RESET' });
+  }, [safeDispatch]);
+
+  // Derived state: can we compare?
+  const canCompare = useMemo(
+    () => Boolean(state.option1 && state.option2 && !state.comparison),
+    [state.option1, state.option2, state.comparison]
+  );
 
   return {
-    isProcessing,
-    uploadedFiles1,
-    uploadedFiles2,
-    option1,
-    option2,
-    comparison,
-    currentSessionId,
-    error,
+    isProcessing: state.isProcessing,
+    uploadedFiles1: state.uploadedFiles1,
+    uploadedFiles2: state.uploadedFiles2,
+    option1: state.option1,
+    option2: state.option2,
+    comparison: state.comparison,
+    currentSessionId: state.currentSessionId,
+    error: state.error,
+    canCompare,
     uploadFiles,
-    processDocuments,
     processAllDocuments,
     compareOptions,
     reset
