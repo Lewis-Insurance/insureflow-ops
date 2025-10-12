@@ -1066,6 +1066,59 @@ export type Database = {
           },
         ]
       }
+      comparison_sessions: {
+        Row: {
+          account_id: string | null
+          client_name: string | null
+          comparison_results: Json | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          option1_data: Json
+          option2_data: Json
+          report_url: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          client_name?: string | null
+          comparison_results?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          option1_data: Json
+          option2_data: Json
+          report_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          client_name?: string | null
+          comparison_results?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          option1_data?: Json
+          option2_data?: Json
+          report_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comparison_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_evidence: {
         Row: {
           consent_type: string
@@ -1944,6 +1997,63 @@ export type Database = {
           type?: string
         }
         Relationships: []
+      }
+      extracted_policies: {
+        Row: {
+          account_id: string | null
+          carrier: string
+          confidence_scores: Json | null
+          created_at: string | null
+          document_path: string | null
+          extracted_data: Json
+          extraction_metadata: Json | null
+          id: string
+          policy_number: string | null
+          session_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          carrier: string
+          confidence_scores?: Json | null
+          created_at?: string | null
+          document_path?: string | null
+          extracted_data: Json
+          extraction_metadata?: Json | null
+          id?: string
+          policy_number?: string | null
+          session_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          carrier?: string
+          confidence_scores?: Json | null
+          created_at?: string | null
+          document_path?: string | null
+          extracted_data?: Json
+          extraction_metadata?: Json | null
+          id?: string
+          policy_number?: string | null
+          session_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracted_policies_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "comparison_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       household_accounts: {
         Row: {

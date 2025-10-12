@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSaveComparisonSession, useUpdateComparisonSession } from '@/hooks/useComparisonSessions';
 import type { InsuranceDocument, ComparisonResult } from '@/types/insurance-comparison';
 
 export function useInsuranceComparison() {
@@ -8,8 +9,12 @@ export function useInsuranceComparison() {
   const [option1, setOption1] = useState<InsuranceDocument | null>(null);
   const [option2, setOption2] = useState<InsuranceDocument | null>(null);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  const saveSession = useSaveComparisonSession();
+  const updateSession = useUpdateComparisonSession();
 
   const processDocuments = async (files: File[], optionNumber: 1 | 2) => {
     setIsProcessing(true);
@@ -102,9 +107,24 @@ export function useInsuranceComparison() {
 
       setComparison(data);
 
+      // Save the comparison session
+      if (option1.account_id) {
+        const savedSession = await saveSession.mutateAsync({
+          accountId: option1.account_id,
+          option1,
+          option2,
+          comparisonResults: data,
+          clientName: option1.insuredName,
+        });
+        
+        if (savedSession) {
+          setCurrentSessionId(savedSession.id);
+        }
+      }
+
       toast({
         title: 'Comparison Complete',
-        description: 'Analysis report generated successfully'
+        description: 'Analysis report generated and saved successfully'
       });
 
     } catch (err: any) {
@@ -122,6 +142,7 @@ export function useInsuranceComparison() {
     setOption1(null);
     setOption2(null);
     setComparison(null);
+    setCurrentSessionId(null);
     setError(null);
   };
 
@@ -130,6 +151,7 @@ export function useInsuranceComparison() {
     option1,
     option2,
     comparison,
+    currentSessionId,
     error,
     processDocuments,
     compareOptions,

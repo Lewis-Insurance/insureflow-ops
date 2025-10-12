@@ -43,6 +43,7 @@ export interface InsuranceDocument {
   vehicles?: Vehicle[];
   properties?: Property[];
   totalPremium?: number;
+  account_id?: string;
   rawData?: any;
 }
 
