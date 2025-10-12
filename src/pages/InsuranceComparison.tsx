@@ -8,21 +8,24 @@ import { Scale, RotateCcw } from 'lucide-react';
 export default function InsuranceComparison() {
   const {
     isProcessing,
+    uploadedFiles1,
+    uploadedFiles2,
     option1,
     option2,
     comparison,
     error,
-    processDocuments,
+    uploadFiles,
+    processAllDocuments,
     compareOptions,
     reset
   } = useInsuranceComparison();
 
   const handleOption1Upload = async (files: File[]) => {
-    await processDocuments(files, 1);
+    uploadFiles(files, 1);
   };
 
   const handleOption2Upload = async (files: File[]) => {
-    await processDocuments(files, 2);
+    uploadFiles(files, 2);
   };
 
   return (
@@ -55,7 +58,13 @@ export default function InsuranceComparison() {
                 description="Upload quotes or policies for the first option"
                 onFilesDropped={handleOption1Upload}
                 isProcessing={isProcessing}
-                processedFile={option1 ? `${option1.carrier} - ${option1.policyNumber || 'Quote'}` : undefined}
+                processedFile={
+                  option1 
+                    ? `${option1.carrier} - ${option1.policyNumber || 'Quote'}` 
+                    : uploadedFiles1.length > 0 
+                    ? `${uploadedFiles1.length} file(s) uploaded` 
+                    : undefined
+                }
                 error={error || undefined}
               />
               
@@ -64,21 +73,40 @@ export default function InsuranceComparison() {
                 description="Upload quotes or policies for the second option"
                 onFilesDropped={handleOption2Upload}
                 isProcessing={isProcessing}
-                processedFile={option2 ? `${option2.carrier} - ${option2.policyNumber || 'Quote'}` : undefined}
+                processedFile={
+                  option2 
+                    ? `${option2.carrier} - ${option2.policyNumber || 'Quote'}` 
+                    : uploadedFiles2.length > 0 
+                    ? `${uploadedFiles2.length} file(s) uploaded` 
+                    : undefined
+                }
                 error={error || undefined}
               />
             </div>
 
-            <div className="flex justify-center">
-              <Button
-                size="lg"
-                onClick={compareOptions}
-                disabled={!option1 || !option2 || isProcessing}
-                className="min-w-[200px]"
-              >
-                <Scale className="h-4 w-4 mr-2" />
-                {isProcessing ? 'Processing...' : 'Compare Options'}
-              </Button>
+            <div className="flex justify-center gap-4">
+              {!option1 && !option2 && (uploadedFiles1.length > 0 || uploadedFiles2.length > 0) && (
+                <Button
+                  size="lg"
+                  onClick={processAllDocuments}
+                  disabled={uploadedFiles1.length === 0 || uploadedFiles2.length === 0 || isProcessing}
+                  className="min-w-[200px]"
+                >
+                  {isProcessing ? 'Processing...' : 'Process Documents'}
+                </Button>
+              )}
+              
+              {option1 && option2 && !comparison && (
+                <Button
+                  size="lg"
+                  onClick={compareOptions}
+                  disabled={isProcessing}
+                  className="min-w-[200px]"
+                >
+                  <Scale className="h-4 w-4 mr-2" />
+                  {isProcessing ? 'Processing...' : 'Compare Options'}
+                </Button>
+              )}
             </div>
           </>
         ) : (
