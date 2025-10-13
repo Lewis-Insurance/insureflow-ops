@@ -22,7 +22,7 @@ export default function ComparisonReportPage() {
           .from('comparison_sessions')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
 

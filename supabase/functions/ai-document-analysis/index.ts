@@ -325,7 +325,7 @@ CRITICAL INSTRUCTIONS:
     };
 
     // For insurance extraction, we need JSON response, not streaming
-    if (analysisType === 'insurance_extraction') {
+    if (type === 'insurance_extraction' || analysisType === 'insurance_extraction') {
       const response = await fetchWithRetry(OPENAI_URL, {
         method: 'POST',
         headers,
