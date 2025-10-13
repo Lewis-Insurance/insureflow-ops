@@ -157,6 +157,9 @@ export function useInsuranceComparison() {
 
   // Convert analysis response to InsuranceDocument
   const createDocumentFromAnalysis = useCallback((analysisData: AnalysisResponse): InsuranceDocument => {
+    if (!analysisData || !analysisData.extracted) {
+      throw new Error('Invalid analysis data: missing extracted field');
+    }
     const extracted = analysisData.extracted as any;
     return {
       id: crypto.randomUUID(),
