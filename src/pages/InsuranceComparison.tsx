@@ -35,8 +35,30 @@ export default function InsuranceComparison() {
     uploadFiles(files, 2);
   };
   
+  // Upload to Supabase Storage and return object paths
+  const uploadFilesToStorage = async (files: File[]): Promise<string[]> => {
+    const uploadPromises = files.map(async (file, index) => {
+      const uniqueId = crypto.randomUUID();
+      const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `insurance-comparison/${Date.now()}-${index}-${uniqueId}-${sanitized}`;
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          contentType: file.type || 'application/pdf',
+          cacheControl: '3600',
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+      return filePath;
+    });
+    return Promise.all(uploadPromises);
+  };
+  
   const handleSubmitComparison = async () => {
-    if (!option1 || !option2 || uploadedFiles1.length === 0 || uploadedFiles2.length === 0) return;
+    if (uploadedFiles1.length === 0 || uploadedFiles2.length === 0) {
+      toast({ title: 'Missing documents', description: 'Upload files for both options', variant: 'destructive' });
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -67,18 +89,18 @@ export default function InsuranceComparison() {
         workspaceId = newWorkspace.id;
       }
 
-      // Get storage paths from uploaded files
-      // We need to extract the storage paths from the files
-      // Since they're uploaded, we can construct the paths
-      const option1Paths = uploadedFiles1.map(f => `comparison-documents/${f.name}`);
-      const option2Paths = uploadedFiles2.map(f => `comparison-documents/${f.name}`);
+      // Ensure files are uploaded to storage and collect paths
+      const [option1Paths, option2Paths] = await Promise.all([
+        uploadFilesToStorage(uploadedFiles1),
+        uploadFilesToStorage(uploadedFiles2),
+      ]);
 
-      // Submit comparison job
-      const { data: jobData, error: jobError } = await supabase.functions.invoke('submit-comparison', {
+      // Submit comparison job to background worker
+      const { error: jobError } = await supabase.functions.invoke('submit-comparison', {
         body: {
           workspaceId,
           accountId: null,
-          title: `${option1.carrier} vs ${option2.carrier}`,
+          title: `${uploadedFiles1[0]?.name || 'Option 1'} vs ${uploadedFiles2[0]?.name || 'Option 2'}`,
           option1Paths,
           option2Paths,
         },
@@ -86,19 +108,11 @@ export default function InsuranceComparison() {
 
       if (jobError) throw jobError;
 
-      toast({
-        title: "Job Submitted",
-        description: "Your comparison is being processed in the background",
-      });
-
+      toast({ title: 'Job submitted', description: 'Processing in background' });
       navigate(`/workspace/${workspaceId}`);
     } catch (error) {
       console.error('Submission error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to submit comparison job",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to submit comparison job', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -172,7 +186,7 @@ export default function InsuranceComparison() {
                 </Button>
               )}
               
-              {option1 && option2 && !comparison && (
+              {(uploadedFiles1.length > 0 && uploadedFiles2.length > 0 && !comparison) && (
                 <Button
                   size="lg"
                   onClick={handleSubmitComparison}
@@ -180,7 +194,7 @@ export default function InsuranceComparison() {
                   className="min-w-[200px]"
                 >
                   <Scale className="h-4 w-4 mr-2" />
-                  {isSubmitting ? 'Submitting...' : 'Compare Options'}
+                  {isSubmitting ? 'Submitting...' : 'Run in background'}
                 </Button>
               )}
             </div>
