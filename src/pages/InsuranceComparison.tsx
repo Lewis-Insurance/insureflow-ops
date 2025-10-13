@@ -62,7 +62,7 @@ export default function InsuranceComparison() {
     
     setIsSubmitting(true);
     try {
-      // Get or create default workspace
+      // Get or create default workspace (allow anonymous)
       let { data: workspaces } = await supabase
         .from('workspaces')
         .select('id')
@@ -73,14 +73,13 @@ export default function InsuranceComparison() {
       
       if (!workspaceId) {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
         
         const { data: newWorkspace, error: wsError } = await supabase
           .from('workspaces')
           .insert({
             name: 'Default Workspace',
             description: 'Insurance comparison workspace',
-            created_by: user.id,
+            created_by: user?.id || null, // Allow null for anonymous users
           })
           .select()
           .single();
