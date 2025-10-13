@@ -44,6 +44,7 @@ const AIBrain = React.lazy(() => import("./pages/AIBrain"));
 const KnowledgeManagerPage = React.lazy(() => import("./pages/KnowledgeManagerPage"));
 const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison"));
 const WorkspacePage = React.lazy(() => import("./pages/WorkspacePage"));
+const WorkspaceListPage = React.lazy(() => import("./pages/WorkspaceListPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -330,6 +331,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <InsuranceComparison />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/workspace"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <WorkspaceListPage />
                   </ErrorBoundary>
                 }
               />
