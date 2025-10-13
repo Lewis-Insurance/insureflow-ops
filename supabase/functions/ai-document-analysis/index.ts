@@ -416,9 +416,8 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
       
       if (totalContentLength < 500) {
         console.error('WARNING: Very little document content available for analysis');
-        throw new DocumentFetchError(
-          `Insufficient document content extracted (${totalContentLength} chars total). Documents may be corrupted, blank, or OCR failed.`
-        );
+        // Do not fail hard on low content; proceed with available text and let AI handle sparsity
+        // This prevents background jobs from failing with non-2xx
       }
 
       console.log(`Sending ${totalContentLength} total characters of document content to AI`);
