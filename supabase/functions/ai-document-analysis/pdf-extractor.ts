@@ -154,32 +154,45 @@ async function extractPdfInBatches(
   console.log(`Processing PDF with Vision API (max ${maxPages} pages)...`);
   
   try {
+    const requestPayload = {
+      requests: [{
+        inputConfig: {
+          content: base64Pdf,
+          mimeType: 'application/pdf'
+        },
+        features: [
+          { 
+            type: 'DOCUMENT_TEXT_DETECTION'
+          }
+        ]
+      }]
+    };
+    
+    console.log('Vision API Request:', JSON.stringify({
+      ...requestPayload,
+      requests: [{
+        ...requestPayload.requests[0],
+        inputConfig: {
+          ...requestPayload.requests[0].inputConfig,
+          content: `[base64 PDF, ${base64Pdf.length} chars]`
+        }
+      }]
+    }, null, 2));
+    
     // Make single request - synchronous API processes all pages automatically
     const response = await fetch(
       `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            inputConfig: {
-              content: base64Pdf,
-              mimeType: 'application/pdf'
-            },
-            features: [
-              { 
-                type: 'DOCUMENT_TEXT_DETECTION'
-              }
-            ]
-            // Note: pages parameter not supported in synchronous API
-          }]
-        })
+        body: JSON.stringify(requestPayload)
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Vision API error:', response.status, errorText);
+      console.error('Vision API HTTP Error:', response.status);
+      console.error('Vision API Error Response:', errorText);
       
       try {
         const errorJson = JSON.parse(errorText);
@@ -194,6 +207,16 @@ async function extractPdfInBatches(
     }
 
     const result = await response.json();
+    
+    console.log('Vision API Response:', JSON.stringify({
+      responseCount: result.responses?.length || 0,
+      hasError: !!result.responses?.[0]?.error,
+      firstResponse: result.responses?.[0] ? {
+        hasFullTextAnnotation: !!result.responses[0].fullTextAnnotation,
+        textLength: result.responses[0].fullTextAnnotation?.text?.length || 0,
+        pageCount: result.responses[0].fullTextAnnotation?.pages?.length || 0
+      } : null
+    }, null, 2));
 
     if (result.responses?.[0]?.error) {
       throw new Error(`Vision API error: ${result.responses[0].error.message}`);
