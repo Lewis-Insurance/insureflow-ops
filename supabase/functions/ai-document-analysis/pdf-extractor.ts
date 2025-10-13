@@ -261,15 +261,25 @@ async function extractPdfInBatches(
       }
 
       const fullTextAnnotation = pageResponse.fullTextAnnotation;
-      const text = fullTextAnnotation?.text || '';
+      let text = fullTextAnnotation?.text?.trim() ?? '';
 
-      if (text.trim().length < 20) {
+      if (!text && fullTextAnnotation?.pages?.length) {
+        text = rebuildTextFromAnnotation(fullTextAnnotation).trim();
+        if (text) {
+          warnings.push(`Reconstructed text for PDF page ${pageNum} from annotation hierarchy`);
+        }
+      }
+
+      if (!text) {
+        warnings.push(`Page ${pageNum} has no detectable text`);
+        text = '[No text extracted]';
+      } else if (text.length < 20) {
         warnings.push(`Page ${pageNum} has very little text`);
       }
 
       allPages.push({
         page: pageNum,
-        text: text.trim(),
+        text,
         confidence: calculateAverageConfidence(fullTextAnnotation)
       });
     }
@@ -337,34 +347,60 @@ function rebuildTextFromAnnotation(fullTextAnnotation: any): string {
     for (const block of page.blocks || []) {
       for (const paragraph of block.paragraphs || []) {
         for (const word of paragraph.words || []) {
-          const symbols = word.symbols || [];
-          if (symbols.length === 0) {
-            continue;
-          }
+          for (const symbol of word.symbols || []) {
+            if (symbol?.text) {
+              parts.push(symbol.text);
+            }
 
-          const wordText = symbols.map((symbol: any) => symbol.text ?? '').join('');
-          if (!wordText) {
-            continue;
-          }
-
-          parts.push(wordText);
-
-          const detectedBreak = getDetectedBreak(symbols[symbols.length - 1]);
-          if (detectedBreak) {
-            parts.push(detectedBreak);
-          } else {
-            parts.push(' ');
+            const detectedBreak = getDetectedBreak(symbol);
+            if (detectedBreak) {
+              appendBreak(parts, detectedBreak);
+            }
           }
         }
 
-        if (parts.length > 0 && parts[parts.length - 1] !== '\n') {
-          parts.push('\n');
-        }
+        appendBreak(parts, '\n');
       }
     }
+
+    appendBreak(parts, '\n');
   }
 
-  return parts.join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  const joined = parts.join('');
+  return joined
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function appendBreak(parts: string[], breakChar: string): void {
+  if (!breakChar) {
+    return;
+  }
+
+  if (breakChar === ' ') {
+    const last = parts[parts.length - 1] ?? '';
+    if (!last || last === ' ' || last === '\n') {
+      return;
+    }
+    parts.push(' ');
+    return;
+  }
+
+  if (breakChar === '\n') {
+    while (parts.length > 0 && parts[parts.length - 1] === ' ') {
+      parts.pop();
+    }
+
+    if (parts[parts.length - 1] === '\n') {
+      return;
+    }
+
+    parts.push('\n');
+    return;
+  }
+
+  parts.push(breakChar);
 }
 
 function getDetectedBreak(symbol: any): string | undefined {
@@ -373,8 +409,8 @@ function getDetectedBreak(symbol: any): string | undefined {
   switch (breakType) {
     case 'SPACE':
     case 'SURE_SPACE':
-    case 'EOL_SURE_SPACE':
       return ' ';
+    case 'EOL_SURE_SPACE':
     case 'LINE_BREAK':
       return '\n';
     case 'HYPHEN':
