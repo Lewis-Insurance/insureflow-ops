@@ -8,6 +8,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry helper for transient failures
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok || response.status < 500) return response;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError || new Error('Fetch failed after retries');
+}
+
+type AnalysisExtracted = {
+  type?: string;
+  carrier?: string;
+  policyNumber?: string;
+  insuredName?: string;
+  effectiveDate?: string;
+  expirationDate?: string;
+  term?: string;
+  coverages?: any[];
+  premiums?: any[];
+  totalPremium?: number;
+  vehicles?: any[];
+  properties?: any[];
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -285,14 +318,17 @@ CRITICAL INSTRUCTIONS:
 
     console.log('Calling OpenAI with', messages.length, 'messages');
 
+    const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+    const headers = {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
     // For insurance extraction, we need JSON response, not streaming
     if (analysisType === 'insurance_extraction') {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchWithRetry(OPENAI_URL, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages,
@@ -312,56 +348,102 @@ CRITICAL INSTRUCTIONS:
       const content = result.choices?.[0]?.message?.content;
       
       if (!content) {
-        throw new Error('No content in OpenAI response');
+        return new Response(
+          JSON.stringify({ error: "BAD_JSON", detail: "Empty model response" }), 
+          { headers: corsHeaders, status: 502 }
+        );
       }
 
-      // Parse and return the JSON
-      const parsed = JSON.parse(content);
+      let parsed: { extracted?: AnalysisExtracted } = {};
+      try {
+        parsed = JSON.parse(content);
+        const ok = parsed?.extracted && 
+          ["carrier", "insuredName", "effectiveDate", "expirationDate"].every(
+            (k) => k in (parsed.extracted as any)
+          );
+        if (!ok) throw new Error("Missing required fields");
+      } catch (parseErr) {
+        console.warn('Initial JSON parse failed, attempting repair:', parseErr);
+        // One repair attempt
+        try {
+          const repair = await fetchWithRetry(OPENAI_URL, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { 
+                  role: "system", 
+                  content: "Fix the following into STRICT JSON matching the earlier schema. No prose, just valid JSON." 
+                },
+                { role: "user", content: content }
+              ],
+              temperature: 0,
+              response_format: { type: "json_object" },
+              max_tokens: 800
+            })
+          });
+          const rj = await repair.json();
+          const repaired = rj?.choices?.[0]?.message?.content || "{}";
+          parsed = JSON.parse(repaired);
+          console.log('JSON repair succeeded');
+        } catch (repairErr) {
+          console.error('JSON repair failed:', repairErr);
+        }
+      }
+
+      if (!parsed?.extracted) {
+        return new Response(
+          JSON.stringify({ 
+            error: "BAD_JSON", 
+            detail: "Model returned invalid or incomplete JSON" 
+          }), 
+          { headers: corsHeaders, status: 502 }
+        );
+      }
+
       return new Response(JSON.stringify(parsed), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Call OpenAI with streaming for other cases
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Non-extraction: stream through
+    const streamRes = await fetchWithRetry(OPENAI_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.7,
         max_tokens: 2000,
-        stream: true, // Enable streaming
+        stream: true,
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+    if (!streamRes.ok) {
+      const errorText = await streamRes.text();
+      console.error('OpenAI API error:', streamRes.status, errorText);
+      throw new Error(`OpenAI API error: ${streamRes.status}`);
     }
 
-    // Return the streaming response directly
-    return new Response(response.body, {
+    return new Response(streamRes.body, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Vary': '*',
       },
     });
 
   } catch (error) {
-    console.error('Error in ai-document-analysis:', error);
+    console.error('ai-document-analysis error:', error);
+    const msg = (error as any)?.message || 'Unknown error';
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      }),
+      JSON.stringify({ error: msg }), 
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
         status: 500 
       }
     );
