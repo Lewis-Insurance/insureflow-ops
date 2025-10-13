@@ -108,7 +108,9 @@ export function useAuth() {
           setProfile(null);
         }
         
-        setLoading(false);
+        if (event !== 'INITIAL_SESSION') {
+          setLoading(false);
+        }
       }
     );
 
