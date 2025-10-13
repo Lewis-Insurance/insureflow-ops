@@ -73,8 +73,12 @@ async function extractImageWithVision(
         requests: [{
           image: { content: base64Image },
           features: [
-            { 
+            {
               type: 'DOCUMENT_TEXT_DETECTION',
+              maxResults: 1
+            },
+            {
+              type: 'TEXT_DETECTION',
               maxResults: 1
             }
           ],
@@ -93,25 +97,43 @@ async function extractImageWithVision(
   }
 
   const result = await response.json();
-  
+
   if (result.responses?.[0]?.error) {
     throw new Error(`Vision API error: ${result.responses[0].error.message}`);
   }
 
-  const fullTextAnnotation = result.responses?.[0]?.fullTextAnnotation;
-  const text = fullTextAnnotation?.text || '';
-  
-  if (!text || text.trim().length < 50) {
+  const imageResponse = result.responses?.[0] ?? {};
+  const fullTextAnnotation = imageResponse.fullTextAnnotation;
+  let text = fullTextAnnotation?.text?.trim() ?? '';
+
+  if (!text) {
+    const textAnnotations: Array<{ description?: string }> | undefined = imageResponse.textAnnotations;
+    if (Array.isArray(textAnnotations) && textAnnotations.length > 0) {
+      text = textAnnotations[0]?.description?.trim() ?? '';
+      if (text) {
+        warnings.push('Used Vision API textAnnotations fallback for image OCR');
+      }
+    }
+  }
+
+  if (!text) {
+    warnings.push('No text detected in image');
+  } else if (text.length < 50) {
     warnings.push('Very little text detected in image');
   }
+
+  const averageConfidence = calculateAverageConfidence(fullTextAnnotation);
+  const confidence = typeof averageConfidence === 'number' && averageConfidence > 0
+    ? averageConfidence
+    : undefined;
 
   console.log(`✓ Image OCR complete: ${text.length} characters extracted`);
 
   return {
     pages: [{
       page: 1,
-      text: text.trim(),
-      confidence: calculateAverageConfidence(fullTextAnnotation)
+      text,
+      confidence
     }],
     warnings
   };
@@ -277,9 +299,9 @@ async function extractPdfInBatches(
   };
 }
 
-function calculateAverageConfidence(fullTextAnnotation: any): number {
+function calculateAverageConfidence(fullTextAnnotation: any): number | undefined {
   if (!fullTextAnnotation?.pages) {
-    return 0;
+    return undefined;
   }
 
   let totalConfidence = 0;
@@ -298,7 +320,7 @@ function calculateAverageConfidence(fullTextAnnotation: any): number {
     }
   }
 
-  return wordCount > 0 ? totalConfidence / wordCount : 0;
+  return wordCount > 0 ? totalConfidence / wordCount : undefined;
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
