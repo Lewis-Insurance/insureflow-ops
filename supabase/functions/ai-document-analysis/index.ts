@@ -201,10 +201,15 @@ serve(async (req) => {
               .join('\n\n');
 
             if (!fullText.trim()) {
-              throw new DocumentFetchError(
-                `No text extracted from ${fileName}. OCR may have failed.`,
-                path
-              );
+              console.warn(`⚠ No text extracted from ${fileName}. OCR may have failed or document is blank.`);
+              // Don't throw error - return minimal content with warning so job doesn't fail
+              return {
+                name: fileName,
+                type: mimeType,
+                content: `[No text could be extracted from ${fileName}]`,
+                path: path,
+                warnings: [...extractResult.warnings, 'No text extracted - document may be blank or OCR failed']
+              };
             }
 
             // Validate meaningful content
