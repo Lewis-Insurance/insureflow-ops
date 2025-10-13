@@ -11,6 +11,15 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts"; // fetch/XHR polyfill
 // Tip: pin the exact version you validate in prod
 import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.6.82/build/pdf.mjs";
 
+// Ensure pdf.js works in Edge runtime without external worker config
+try {
+  // deno-lint-ignore no-explicit-any
+  (pdfjsLib as any).GlobalWorkerOptions = (pdfjsLib as any).GlobalWorkerOptions || {};
+  // deno-lint-ignore no-explicit-any
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = (pdfjsLib as any).GlobalWorkerOptions.workerSrc ||
+    'https://esm.sh/pdfjs-dist@4.6.82/build/pdf.worker.min.js';
+} catch (_) { /* ignore */ }
+
 /** TYPES **/
 export type ExtractOptions = {
   ocr?: {
@@ -57,7 +66,7 @@ export async function extractTextFromBlob(blob: Blob, mimeType: string, opts: Ex
 
 /** PDF TEXT EXTRACTION **/
 async function extractFromPdf(buffer: ArrayBuffer, opts: ExtractOptions): Promise<ExtractResult> {
-  const loadingTask = pdfjsLib.getDocument({ data: buffer, useSystemFonts: true });
+  const loadingTask = pdfjsLib.getDocument({ data: buffer, useSystemFonts: true, disableWorker: true });
   const pdf = await loadingTask.promise;
   const pageCount = pdf.numPages;
   const maxPages = Math.min(opts.maxPages ?? 150, pageCount);
@@ -167,7 +176,7 @@ function stripHeadersAndFooters(pages: PageText[]): { pages: PageText[]; removed
 
 /** Rasterize specific PDF page to Blob (PNG) for OCR fallback */
 async function rasterizePdfPage(pdfBuffer: ArrayBuffer, pageNum: number, scale = 2.0): Promise<Blob> {
-  const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: pdfBuffer, disableWorker: true }).promise;
   const page = await pdf.getPage(pageNum);
   const viewport = page.getViewport({ scale });
   const canvasFactory = new CanvasFactory();

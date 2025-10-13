@@ -108,11 +108,13 @@ serve(async (req) => {
 
   try {
     const { option1, option2 } = await req.json();
+    const o1 = option1 ?? {};
+    const o2 = option2 ?? {};
     
     // Initialize comparison engine
     const engine = new ComparisonEngine();
-    const normalizedCoverages1 = engine.normalizeCoverages(option1.coverages);
-    const normalizedCoverages2 = engine.normalizeCoverages(option2.coverages);
+    const normalizedCoverages1 = engine.normalizeCoverages(Array.isArray(o1.coverages) ? o1.coverages : []);
+    const normalizedCoverages2 = engine.normalizeCoverages(Array.isArray(o2.coverages) ? o2.coverages : []);
     
     // Identify gaps using the engine
     const gaps = engine.identifyGaps(normalizedCoverages1, normalizedCoverages2);
@@ -130,17 +132,17 @@ serve(async (req) => {
     const prompt = `You are an expert insurance analyst. Compare these two insurance options and provide a detailed analysis.
 
 OPTION 1:
-- Carrier: ${option1.carrier}
-- Policy/Quote: ${option1.policyNumber || 'Quote'}
-- Term: ${option1.term}
-- Total Premium: $${option1.totalPremium}
+- Carrier: ${o1.carrier || 'Unknown'}
+- Policy/Quote: ${o1.policyNumber || 'Quote'}
+- Term: ${o1.term || 'N/A'}
+- Total Premium: $${o1.totalPremium ?? 0}
 - Coverages: ${JSON.stringify(Array.from(normalizedCoverages1.entries()), null, 2)}
 
 OPTION 2:
-- Carrier: ${option2.carrier}
-- Policy/Quote: ${option2.policyNumber || 'Quote'}
-- Term: ${option2.term}
-- Total Premium: $${option2.totalPremium}
+- Carrier: ${o2.carrier || 'Unknown'}
+- Policy/Quote: ${o2.policyNumber || 'Quote'}
+- Term: ${o2.term || 'N/A'}
+- Total Premium: $${o2.totalPremium ?? 0}
 - Coverages: ${JSON.stringify(Array.from(normalizedCoverages2.entries()), null, 2)}
 ${gapSummary}
 
