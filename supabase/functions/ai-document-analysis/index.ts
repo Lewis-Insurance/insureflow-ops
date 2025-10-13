@@ -194,7 +194,7 @@ serve(async (req) => {
     let userPrompt = '';
 
     // Handle analysisType (for insurance comparison)
-    if (analysisType === 'insurance_extraction') {
+    if (type === 'insurance_extraction' || analysisType === 'insurance_extraction') {
       systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents.
 
 Return the extracted data in valid JSON format with this exact structure:
