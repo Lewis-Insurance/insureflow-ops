@@ -83,6 +83,16 @@ serve(async (req) => {
         message: 'Job queued for processing',
       });
 
+    // Fire-and-forget: nudge the worker to start processing
+    try {
+      // Do not await – start in background
+      supabaseClient.functions
+        .invoke('worker-comparison', { body: { source: 'submit-comparison', jobId: job.id } })
+        .catch((e) => console.warn('worker-comparison invoke failed (non-blocking):', e?.message || e));
+    } catch (e) {
+      console.warn('worker-comparison kick-off error:', (e as Error).message);
+    }
+
     return new Response(
       JSON.stringify({ job }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
