@@ -357,9 +357,19 @@ CRITICAL INSTRUCTIONS:
       const content = result.choices?.[0]?.message?.content;
       
       if (!content) {
+        const fallback = {
+          extracted: {
+            type: 'unknown',
+            coverages: [],
+            premiums: [],
+            vehicles: [],
+            properties: []
+          },
+          warnings: ["Empty model response; returned minimal structure"],
+        };
         return new Response(
-          JSON.stringify({ error: "BAD_JSON", detail: "Empty model response" }), 
-          { headers: corsHeaders, status: 502 }
+          JSON.stringify(fallback),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       }
 
@@ -402,12 +412,21 @@ CRITICAL INSTRUCTIONS:
       }
 
       if (!parsed?.extracted) {
+        const fallback = {
+          extracted: {
+            type: 'unknown',
+            coverages: [],
+            premiums: [],
+            vehicles: [],
+            properties: []
+          },
+          warnings: ["Model returned invalid JSON; used fallback structure"],
+          raw: typeof content === 'string' ? content.slice(0, 4000) : undefined
+        };
+        console.warn('Returning fallback extraction due to JSON issues');
         return new Response(
-          JSON.stringify({ 
-            error: "BAD_JSON", 
-            detail: "Model returned invalid or incomplete JSON" 
-          }), 
-          { headers: corsHeaders, status: 502 }
+          JSON.stringify(fallback),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       }
 
