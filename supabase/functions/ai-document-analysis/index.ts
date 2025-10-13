@@ -80,9 +80,7 @@ serve(async (req) => {
     }
     
     // If context includes a documentId, fetch and analyze that specific document
-    if (context?.metadata?.documentId) {
     let inferredAction = action;
-    
     if (context?.metadata?.documentId) {
       console.log('Fetching document from context:', context.metadata.documentId);
       
@@ -269,7 +267,7 @@ CRITICAL INSTRUCTIONS:
           model: 'gpt-4o-mini',
           messages,
           temperature: 0.3,
-          max_completion_tokens: 2000,
+          max_tokens: 2000,
           response_format: { type: "json_object" },
         }),
       });
@@ -305,7 +303,7 @@ CRITICAL INSTRUCTIONS:
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.7,
-        max_completion_tokens: 2000,
+        max_tokens: 2000,
         stream: true, // Enable streaming
       }),
     });
