@@ -25,6 +25,13 @@ export interface Job {
   metadata?: any;
 }
 
+// types
+export type JobRow = Omit<Job, 'input_data' | 'result_data' | 'metadata'> & {
+  input_data?: unknown;
+  result_data?: unknown;
+  metadata?: unknown;
+};
+
 export interface JobEvent {
   id: string;
   job_id: string;
@@ -34,156 +41,170 @@ export interface JobEvent {
   created_at: string;
 }
 
+// tiny guards
+const asJob = (v: unknown): v is JobRow => !!v && typeof (v as any).id === 'string';
+const asEvent = (v: unknown): v is JobEvent => !!v && typeof (v as any).id === 'string';
+
+// --- useWorkspaceJobs ---
 export function useWorkspaceJobs(workspaceId?: string) {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!workspaceId) {
-      setLoading(false);
-      return;
-    }
+    if (!workspaceId) { setLoading(false); return; }
+
+    let mounted = true;
+    const seen = new Set<string>(); // guard against dup inserts on reconnect
+
+    const mergeUpsert = (row: JobRow) => {
+      setJobs(prev => {
+        const idx = prev.findIndex(j => j.id === row.id);
+        if (idx === -1) return [row, ...prev];
+        const next = [...prev]; next[idx] = row; return next;
+      });
+    };
+
+    const fetchJobs = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('id,workspace_id,account_id,job_type,status,title,created_by,created_at,started_at,completed_at,updated_at,result_session_id,error_message,attempts,max_attempts')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(200); // pagination ready
+        if (error) throw error;
+        if (!mounted) return;
+        setJobs((data as JobRow[]) ?? []);
+        data?.forEach((j: any) => seen.add(j.id));
+      } catch (e) {
+        console.error('fetchJobs', e);
+        toast({ title: 'Error', description: 'Failed to load jobs', variant: 'destructive' });
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
     fetchJobs();
 
-    // Subscribe to job changes
-    const jobsChannel = supabase
+    const channel = supabase
       .channel(`workspace-${workspaceId}-jobs`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'jobs',
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        (payload) => {
-          console.log('Job change:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            setJobs((prev) => [payload.new as Job, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === payload.new.id ? (payload.new as Job) : job
-              )
-            );
-            
-            // Show toast on completion
-            const newJob = payload.new as Job;
-            if (newJob.status === 'succeeded') {
-              toast({
-                title: 'Job Completed',
-                description: `${newJob.title} has finished processing`,
-              });
-            } else if (newJob.status === 'failed') {
-              toast({
-                title: 'Job Failed',
-                description: newJob.error_message || `${newJob.title} failed to complete`,
-                variant: 'destructive',
-              });
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setJobs((prev) => prev.filter((job) => job.id !== payload.old.id));
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'jobs',
+        filter: `workspace_id=eq.${workspaceId}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const row = payload.new;
+          if (asJob(row)) {
+            if (!seen.has(row.id)) { seen.add(row.id); mergeUpsert(row); }
           }
         }
-      )
+        if (payload.eventType === 'UPDATE') {
+          const prev = payload.old as JobRow | undefined;
+          const next = payload.new as JobRow | undefined;
+          if (!asJob(next)) return;
+          mergeUpsert(next);
+
+          // toast only on transition to terminal states
+          const was = prev?.status;
+          const now = next.status;
+          const terminal = (s: JobStatus) => ['succeeded','failed','canceled'].includes(s);
+          if (!was || was === now) return;
+          if (!terminal(was as JobStatus) && terminal(now as JobStatus)) {
+            if (now === 'succeeded') {
+              toast({ title: 'Job completed', description: next.title || next.id });
+            } else if (now === 'failed') {
+              toast({ title: 'Job failed', description: next.error_message || next.title || next.id, variant: 'destructive' });
+            }
+          }
+        }
+        if (payload.eventType === 'DELETE') {
+          const row = payload.old;
+          if (asJob(row)) {
+            setJobs(prev => prev.filter(j => j.id !== row.id));
+            seen.delete(row.id);
+          }
+        }
+      })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(jobsChannel);
+      mounted = false;
+      supabase.removeChannel(channel);
     };
   }, [workspaceId, toast]);
 
-  async function fetchJobs() {
+  const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'running');
+  const historyJobs = jobs.filter(j => j.status === 'succeeded' || j.status === 'failed' || j.status === 'canceled');
+
+  const refetch = async () => {
     if (!workspaceId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setJobs(data || []);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load jobs',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const activeJobs = jobs.filter((j) => ['queued', 'running'].includes(j.status));
-  const historyJobs = jobs.filter((j) => ['succeeded', 'failed', 'canceled'].includes(j.status));
-
-  return {
-    jobs,
-    activeJobs,
-    historyJobs,
-    loading,
-    refetch: fetchJobs,
+    const { data } = await supabase
+      .from('jobs')
+      .select('id,workspace_id,account_id,job_type,status,title,created_by,created_at,started_at,completed_at,updated_at,result_session_id,error_message,attempts,max_attempts')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    setJobs((data as JobRow[]) ?? []);
   };
+
+  return { jobs, activeJobs, historyJobs, loading, refetch };
 }
 
+// --- useJobEvents ---
 export function useJobEvents(jobId?: string) {
   const [events, setEvents] = useState<JobEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!jobId) {
-      setLoading(false);
-      return;
-    }
+    if (!jobId) { setLoading(false); return; }
+    let mounted = true;
+    const seen = new Set<string>();
+
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('job_events')
+          .select('id,job_id,event_type,message,details,created_at')
+          .eq('job_id', jobId)
+          .order('created_at', { ascending: true })
+          .limit(500);
+        if (error) throw error;
+        if (!mounted) return;
+        setEvents((data as JobEvent[]) ?? []);
+        data?.forEach((e: any) => seen.add(e.id));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
     fetchEvents();
 
-    // Subscribe to new events
-    const eventsChannel = supabase
+    const channel = supabase
       .channel(`job-${jobId}-events`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'job_events',
-          filter: `job_id=eq.${jobId}`,
-        },
-        (payload) => {
-          setEvents((prev) => [...prev, payload.new as JobEvent]);
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'job_events',
+        filter: `job_id=eq.${jobId}`,
+      }, (payload) => {
+        const row = payload.new;
+        if (asEvent(row) && !seen.has(row.id)) {
+          seen.add(row.id);
+          setEvents(prev => [...prev, row]);
         }
-      )
+      })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(eventsChannel);
+      mounted = false;
+      supabase.removeChannel(channel);
     };
   }, [jobId]);
-
-  async function fetchEvents() {
-    if (!jobId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('job_events')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setEvents(data || []);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return { events, loading };
 }

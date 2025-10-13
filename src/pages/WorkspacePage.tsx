@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useWorkspaceJobs, Job } from '@/hooks/useWorkspaceJobs';
+import { useWorkspaceJobs, type JobRow } from '@/hooks/useWorkspaceJobs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,7 @@ export default function WorkspacePage() {
             ) : (
               <div className="divide-y">
                 {activeJobs.map((job) => (
-                  <JobRow key={job.id} job={job} />
+                  <JobItem key={job.id} job={job} />
                 ))}
               </div>
             )}
@@ -60,7 +60,7 @@ export default function WorkspacePage() {
             ) : (
               <div className="divide-y">
                 {historyJobs.map((job) => (
-                  <JobRow key={job.id} job={job} showActions />
+                  <JobItem key={job.id} job={job} showActions />
                 ))}
               </div>
             )}
@@ -71,8 +71,8 @@ export default function WorkspacePage() {
   );
 }
 
-function JobRow({ job, showActions }: { job: Job; showActions?: boolean }) {
-  const getStatusBadge = (status: Job['status']) => {
+function JobItem({ job, showActions }: { job: JobRow; showActions?: boolean }) {
+  const getStatusBadge = (status: JobRow['status']) => {
     switch (status) {
       case 'queued':
         return <Badge variant="secondary" className="flex items-center gap-1"><Clock className="h-3 w-3" /> Queued</Badge>;
@@ -86,6 +86,8 @@ function JobRow({ job, showActions }: { job: Job; showActions?: boolean }) {
         return <Badge variant="outline">Canceled</Badge>;
     }
   };
+
+  const resultData = job.result_data as { summary?: string } | undefined;
 
   return (
     <div className="p-4 flex items-center justify-between hover:bg-accent/50 transition-colors">
@@ -104,8 +106,8 @@ function JobRow({ job, showActions }: { job: Job; showActions?: boolean }) {
         {job.error_message && (
           <p className="text-sm text-destructive mt-1">{job.error_message}</p>
         )}
-        {job.result_data?.summary && (
-          <p className="text-sm text-muted-foreground mt-1">{job.result_data.summary}</p>
+        {resultData?.summary && (
+          <p className="text-sm text-muted-foreground mt-1">{resultData.summary}</p>
         )}
       </div>
 
