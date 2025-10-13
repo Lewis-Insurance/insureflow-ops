@@ -197,7 +197,7 @@ serve(async (req) => {
     if (analysisType === 'insurance_extraction') {
       systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents.
 
-Return a JSON object with this exact structure:
+Return the extracted data in valid JSON format with this exact structure:
 {
   "extracted": {
     "type": "quote" or "policy" or "declaration",
@@ -219,8 +219,8 @@ Return a JSON object with this exact structure:
   }
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
-      userPrompt = message || 'Extract all key information from these insurance documents and return as structured JSON.';
+CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no code blocks, no explanations - just pure JSON.`;
+      userPrompt = message || 'Extract all key information from these insurance documents and return as structured JSON. Be thorough in extracting coverage details, limits, deductibles, and premium information.';
     } else if (type === 'business_insights') {
       systemPrompt = `You are an AI business analyst for insurance agencies. Analyze the provided business metrics and generate 3-4 actionable insights. Focus on:
 - Revenue opportunities (policies expiring soon, underinsured accounts)
