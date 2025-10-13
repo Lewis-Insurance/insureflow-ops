@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSaveComparisonSession, useUpdateComparisonSession } from '@/hooks/useComparisonSessions';
+import { useSaveComparisonSession } from '@/hooks/useComparisonSessions';
 import type { InsuranceDocument, ComparisonResult } from '@/types/insurance-comparison';
 
 /**
@@ -101,7 +101,12 @@ export function useInsuranceComparison() {
   const mountedRef = useRef(true);
   
   const saveSession = useSaveComparisonSession();
-  const updateSession = useUpdateComparisonSession();
+
+  // Cleanup mounted ref on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Safe dispatch that checks if component is mounted
   const safeDispatch = useCallback((action: Action) => {
@@ -155,24 +160,26 @@ export function useInsuranceComparison() {
     const extracted = analysisData.extracted as any;
     return {
       id: crypto.randomUUID(),
-      type: extracted.type || 'quote',
-      carrier: extracted.carrier || '',
-      policyNumber: extracted.policyNumber,
-      insuredName: extracted.insuredName || '',
+      type: extracted.type ?? 'quote',
+      carrier: extracted.carrier ?? '',
+      policyNumber: extracted.policyNumber ?? '',
+      insuredName: extracted.insuredName ?? '',
       effectiveDate: ensureDate(extracted.effectiveDate),
       expirationDate: ensureDate(extracted.expirationDate),
-      term: extracted.term || '',
-      coverages: extracted.coverages || [],
-      premiums: extracted.premiums || [],
-      vehicles: extracted.vehicles,
-      properties: extracted.properties,
-      totalPremium: extracted.totalPremium,
+      term: extracted.term ?? '',
+      coverages: Array.isArray(extracted.coverages) ? extracted.coverages : [],
+      premiums: Array.isArray(extracted.premiums) ? extracted.premiums : [],
+      vehicles: extracted.vehicles ?? [],
+      properties: extracted.properties ?? [],
+      totalPremium: typeof extracted.totalPremium === 'number' ? extracted.totalPremium : undefined,
       account_id: extracted.account_id,
       rawData: analysisData
-    };
+    } as InsuranceDocument;
   }, []);
 
   const compareOptions = useCallback(async () => {
+    if (state.isProcessing) return;
+    
     if (!state.option1 || !state.option2) {
       toast({
         title: 'Missing Documents',
@@ -240,6 +247,8 @@ export function useInsuranceComparison() {
   }, [safeDispatch]);
 
   const processAllDocuments = useCallback(async () => {
+    if (state.isProcessing) return;
+    
     if (state.uploadedFiles1.length === 0 || state.uploadedFiles2.length === 0) {
       toast({
         title: 'Missing Documents',
@@ -253,16 +262,23 @@ export function useInsuranceComparison() {
     safeDispatch({ type: 'SET_ERROR', error: null });
 
     try {
-      // Process Option 1
-      const paths1 = await uploadToStorage(state.uploadedFiles1);
-      const analysisData1 = await analyzeDocuments(paths1);
-      const extractedDoc1 = createDocumentFromAnalysis(analysisData1);
-      safeDispatch({ type: 'SET_OPTION', which: 1, doc: extractedDoc1 });
+      // Parallelize uploads and analysis for both options
+      const [paths1, paths2] = await Promise.all([
+        uploadToStorage(state.uploadedFiles1),
+        uploadToStorage(state.uploadedFiles2),
+      ]);
 
-      // Process Option 2
-      const paths2 = await uploadToStorage(state.uploadedFiles2);
-      const analysisData2 = await analyzeDocuments(paths2);
-      const extractedDoc2 = createDocumentFromAnalysis(analysisData2);
+      const [analysisData1, analysisData2] = await Promise.all([
+        analyzeDocuments(paths1),
+        analyzeDocuments(paths2),
+      ]);
+
+      const [extractedDoc1, extractedDoc2] = [
+        createDocumentFromAnalysis(analysisData1),
+        createDocumentFromAnalysis(analysisData2)
+      ];
+
+      safeDispatch({ type: 'SET_OPTION', which: 1, doc: extractedDoc1 });
       safeDispatch({ type: 'SET_OPTION', which: 2, doc: extractedDoc2 });
 
       toast({
@@ -281,7 +297,7 @@ export function useInsuranceComparison() {
     } finally {
       safeDispatch({ type: 'SET_PROCESSING', value: false });
     }
-  }, [state.uploadedFiles1, state.uploadedFiles2, uploadToStorage, analyzeDocuments, createDocumentFromAnalysis, toast, safeDispatch]);
+  }, [state.isProcessing, state.uploadedFiles1, state.uploadedFiles2, uploadToStorage, analyzeDocuments, createDocumentFromAnalysis, toast, safeDispatch]);
 
   const reset = useCallback(() => {
     safeDispatch({ type: 'RESET' });
