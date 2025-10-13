@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { extractTextFromBlob } from './pdf-extractor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,19 +59,48 @@ serve(async (req) => {
               };
             }
 
-            // For now, treat as binary/PDF - OpenAI will need vision or a different approach
-            // This is a placeholder; real PDF parsing would need additional tools
+            // Extract text from PDF or image
+            const fileName = path.split('/').pop() || `Document ${idx + 1}`;
+            const mimeType = fileData.type || 'application/pdf';
+            
+            console.log(`Extracting text from ${fileName} (${mimeType})`);
+            
+            const extractResult = await extractTextFromBlob(fileData, mimeType, {
+              maxPages: 60,
+              headerFooterFilter: true
+            });
+
+            if (extractResult.warnings.length > 0) {
+              console.log('Extraction warnings:', extractResult.warnings);
+            }
+
+            // Merge all pages into single text
+            const fullText = extractResult.pages
+              .map(p => `=== Page ${p.page} ===\n${p.text}`)
+              .join('\n\n');
+
+            if (!fullText.trim()) {
+              console.warn('No text extracted from', fileName);
+              return {
+                name: fileName,
+                type: mimeType,
+                content: '[Warning: No text could be extracted from this document. It may be an image-only PDF or empty file.]'
+              };
+            }
+
+            console.log(`Extracted ${fullText.length} characters from ${fileName}`);
+
             return {
-              name: path.split('/').pop() || `Document ${idx + 1}`,
-              type: 'application/pdf',
-              content: `[PDF Document uploaded at ${path}. Note: PDF text extraction not yet implemented - returning metadata only]`
+              name: fileName,
+              type: mimeType,
+              content: fullText
             };
           } catch (err) {
-            console.error('Error fetching document:', err);
+            console.error('Error processing document:', err);
             return {
               name: `Document ${idx + 1}`,
               type: 'unknown',
-              content: '[Error: Failed to process document]'
+              content: `[Error: Failed to process document - ${err instanceof Error ? err.message : 'Unknown error'}]`
             };
           }
         })
