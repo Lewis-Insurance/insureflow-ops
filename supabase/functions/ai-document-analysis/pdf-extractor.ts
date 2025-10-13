@@ -138,7 +138,8 @@ async function extractPdfWithVision(
 }
 
 /**
- * Process PDF in batches of 5 pages (Vision API limit)
+ * Extract all pages from PDF using Google Vision API
+ * Note: The synchronous API processes all pages automatically, doesn't support page selection
  */
 async function extractPdfInBatches(
   pdfData: Blob,
@@ -148,107 +149,86 @@ async function extractPdfInBatches(
 ): Promise<ExtractionResult> {
   
   const base64Pdf = await blobToBase64(pdfData);
-  const BATCH_SIZE = 5; // Vision API limit
   const allPages: PageResult[] = [];
   
-  // Process in batches of 5 pages
-  for (let startPage = 1; startPage <= maxPages; startPage += BATCH_SIZE) {
-    const endPage = Math.min(startPage + BATCH_SIZE - 1, maxPages);
-    const pageRange = Array.from(
-      { length: endPage - startPage + 1 }, 
-      (_, i) => startPage + i
+  console.log(`Processing PDF with Vision API (max ${maxPages} pages)...`);
+  
+  try {
+    // Make single request - synchronous API processes all pages automatically
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            inputConfig: {
+              content: base64Pdf,
+              mimeType: 'application/pdf'
+            },
+            features: [
+              { 
+                type: 'DOCUMENT_TEXT_DETECTION'
+              }
+            ]
+            // Note: pages parameter not supported in synchronous API
+          }]
+        })
+      }
     );
-    
-    console.log(`Processing pages ${startPage}-${endPage}...`);
-    
-    try {
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requests: [{
-              inputConfig: {
-                content: base64Pdf,
-                mimeType: 'application/pdf'
-              },
-              features: [
-                { 
-                  type: 'DOCUMENT_TEXT_DETECTION'
-                }
-              ],
-              pages: pageRange
-            }]
-          })
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Vision API error:', response.status, errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          throw new Error(`Vision API: ${errorJson.error.message}`);
         }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Vision API error:', response.status, errorText);
-        
-        try {
-          const errorJson = JSON.parse(errorText);
-          if (errorJson.error?.message) {
-            throw new Error(`Vision API: ${errorJson.error.message}`);
-          }
-        } catch {
-          // Use generic error if parsing fails
-        }
-        
-        throw new Error(`Vision API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.responses?.[0]?.error) {
-        throw new Error(`Vision API error: ${result.responses[0].error.message}`);
-      }
-
-      // Parse responses for this batch
-      const responses = result.responses || [];
-
-      for (let i = 0; i < responses.length; i++) {
-        const pageResponse = responses[i];
-        const actualPageNum = startPage + i;
-        
-        if (pageResponse.error) {
-          warnings.push(`Page ${actualPageNum} error: ${pageResponse.error.message}`);
-          continue;
-        }
-
-        const fullTextAnnotation = pageResponse.fullTextAnnotation;
-        const text = fullTextAnnotation?.text || '';
-        
-        if (text.trim().length < 20) {
-          warnings.push(`Page ${actualPageNum} has very little text`);
-        }
-
-        allPages.push({
-          page: actualPageNum,
-          text: text.trim(),
-          confidence: calculateAverageConfidence(fullTextAnnotation)
-        });
+      } catch {
+        // Use generic error if parsing fails
       }
       
-      // Small delay between batches to avoid rate limiting
-      if (endPage < maxPages) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-    } catch (error) {
-      console.error(`Error processing pages ${startPage}-${endPage}:`, error);
-      warnings.push(`Failed to process pages ${startPage}-${endPage}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
-      // If we hit an error and have no pages yet, this is critical
-      if (allPages.length === 0 && startPage === 1) {
-        throw error;
-      }
-      
-      // Otherwise, continue with what we have
-      break;
+      throw new Error(`Vision API error: ${response.status}`);
     }
+
+    const result = await response.json();
+
+    if (result.responses?.[0]?.error) {
+      throw new Error(`Vision API error: ${result.responses[0].error.message}`);
+    }
+
+    // Parse all page responses (API returns all pages)
+    const responses = result.responses || [];
+
+    for (let i = 0; i < responses.length && i < maxPages; i++) {
+      const pageResponse = responses[i];
+      const pageNum = i + 1;
+      
+      if (pageResponse.error) {
+        warnings.push(`Page ${pageNum} error: ${pageResponse.error.message}`);
+        continue;
+      }
+
+      const fullTextAnnotation = pageResponse.fullTextAnnotation;
+      const text = fullTextAnnotation?.text || '';
+      
+      if (text.trim().length < 20) {
+        warnings.push(`Page ${pageNum} has very little text`);
+      }
+
+      allPages.push({
+        page: pageNum,
+        text: text.trim(),
+        confidence: calculateAverageConfidence(fullTextAnnotation)
+      });
+    }
+    
+  } catch (error) {
+    console.error(`Error processing PDF:`, error);
+    warnings.push(`Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 
   if (allPages.length === 0) {
