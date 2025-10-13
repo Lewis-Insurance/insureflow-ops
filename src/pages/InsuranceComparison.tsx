@@ -3,7 +3,11 @@ import { DocumentDropZone } from '@/components/comparison/DocumentDropZone';
 import { ComparisonReport } from '@/components/comparison/ComparisonReport';
 import { Button } from '@/components/ui/button';
 import { useInsuranceComparison } from '@/hooks/useInsuranceComparison';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Scale, RotateCcw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 export default function InsuranceComparison() {
   const {
@@ -16,9 +20,12 @@ export default function InsuranceComparison() {
     error,
     uploadFiles,
     processAllDocuments,
-    compareOptions,
     reset
   } = useInsuranceComparison();
+  
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleOption1Upload = async (files: File[]) => {
     uploadFiles(files, 1);
@@ -26,6 +33,75 @@ export default function InsuranceComparison() {
 
   const handleOption2Upload = async (files: File[]) => {
     uploadFiles(files, 2);
+  };
+  
+  const handleSubmitComparison = async () => {
+    if (!option1 || !option2 || uploadedFiles1.length === 0 || uploadedFiles2.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      // Get or create default workspace
+      let { data: workspaces } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      
+      let workspaceId = workspaces?.id;
+      
+      if (!workspaceId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+        
+        const { data: newWorkspace, error: wsError } = await supabase
+          .from('workspaces')
+          .insert({
+            name: 'Default Workspace',
+            description: 'Insurance comparison workspace',
+            created_by: user.id,
+          })
+          .select()
+          .single();
+        
+        if (wsError) throw wsError;
+        workspaceId = newWorkspace.id;
+      }
+
+      // Get storage paths from uploaded files
+      // We need to extract the storage paths from the files
+      // Since they're uploaded, we can construct the paths
+      const option1Paths = uploadedFiles1.map(f => `comparison-documents/${f.name}`);
+      const option2Paths = uploadedFiles2.map(f => `comparison-documents/${f.name}`);
+
+      // Submit comparison job
+      const { data: jobData, error: jobError } = await supabase.functions.invoke('submit-comparison', {
+        body: {
+          workspaceId,
+          accountId: null,
+          title: `${option1.carrier} vs ${option2.carrier}`,
+          option1Paths,
+          option2Paths,
+        },
+      });
+
+      if (jobError) throw jobError;
+
+      toast({
+        title: "Job Submitted",
+        description: "Your comparison is being processed in the background",
+      });
+
+      navigate(`/workspace/${workspaceId}`);
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit comparison job",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,12 +175,12 @@ export default function InsuranceComparison() {
               {option1 && option2 && !comparison && (
                 <Button
                   size="lg"
-                  onClick={compareOptions}
-                  disabled={isProcessing}
+                  onClick={handleSubmitComparison}
+                  disabled={isSubmitting}
                   className="min-w-[200px]"
                 >
                   <Scale className="h-4 w-4 mr-2" />
-                  {isProcessing ? 'Processing...' : 'Compare Options'}
+                  {isSubmitting ? 'Submitting...' : 'Compare Options'}
                 </Button>
               )}
             </div>

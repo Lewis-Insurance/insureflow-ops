@@ -2531,6 +2531,126 @@ export type Database = {
           },
         ]
       }
+      job_events: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event_type: string
+          id: string
+          job_id: string
+          message: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event_type: string
+          id?: string
+          job_id: string
+          message: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          job_id?: string
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          account_id: string | null
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          input_data: Json
+          job_type: Database["public"]["Enums"]["job_type"]
+          max_attempts: number
+          metadata: Json | null
+          result_data: Json | null
+          result_session_id: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          input_data?: Json
+          job_type?: Database["public"]["Enums"]["job_type"]
+          max_attempts?: number
+          metadata?: Json | null
+          result_data?: Json | null
+          result_session_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          input_data?: Json
+          job_type?: Database["public"]["Enums"]["job_type"]
+          max_attempts?: number
+          metadata?: Json | null
+          result_data?: Json | null
+          result_session_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_result_session_id_fkey"
+            columns: ["result_session_id"]
+            isOneToOne: false
+            referencedRelation: "comparison_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kb_entries: {
         Row: {
           answer_canonical_markdown: string
@@ -4449,6 +4569,33 @@ export type Database = {
         }
         Relationships: []
       }
+      workspaces: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       document_batch_summary: {
@@ -4527,6 +4674,29 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      claim_jobs_for_worker: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          account_id: string | null
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          input_data: Json
+          job_type: Database["public"]["Enums"]["job_type"]
+          max_attempts: number
+          metadata: Json | null
+          result_data: Json | null
+          result_session_id: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }[]
       }
       compute_insured_search_vector: {
         Args: { p_account_id: string }
@@ -5155,6 +5325,8 @@ export type Database = {
       gender_type: "male" | "female" | "other" | "prefer_not_to_say"
       invoice_status: "open" | "paid" | "overdue" | "void"
       invoice_status_enum: "open" | "paid" | "overdue" | "void"
+      job_status: "queued" | "running" | "succeeded" | "failed" | "canceled"
+      job_type: "comparison" | "extraction" | "analysis"
       line_of_business:
         | "auto"
         | "home"
@@ -5434,6 +5606,8 @@ export const Constants = {
       gender_type: ["male", "female", "other", "prefer_not_to_say"],
       invoice_status: ["open", "paid", "overdue", "void"],
       invoice_status_enum: ["open", "paid", "overdue", "void"],
+      job_status: ["queued", "running", "succeeded", "failed", "canceled"],
+      job_type: ["comparison", "extraction", "analysis"],
       line_of_business: [
         "auto",
         "home",

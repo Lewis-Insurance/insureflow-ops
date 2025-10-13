@@ -79,3 +79,9 @@ verify_jwt = true
 
 [functions.compare-insurance-options]
 verify_jwt = true
+
+[functions.submit-comparison]
+verify_jwt = true
+
+[functions.worker-comparison]
+verify_jwt = false
