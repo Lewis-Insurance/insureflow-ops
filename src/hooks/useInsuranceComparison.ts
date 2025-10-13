@@ -139,6 +139,8 @@ export function useInsuranceComparison() {
 
   // DRY: Analyze documents with type-safe response
   const analyzeDocuments = useCallback(async (paths: string[]): Promise<AnalysisResponse> => {
+    console.log('Analyzing documents with paths:', paths);
+    
     const { data, error } = await supabase.functions.invoke<AnalysisResponse>(
       'ai-document-analysis',
       {
@@ -148,6 +150,8 @@ export function useInsuranceComparison() {
         }
       }
     );
+
+    console.log('Analysis response:', { data, error });
 
     if (error) throw error;
     if (!data) throw new Error('No data returned from analysis');
@@ -161,6 +165,12 @@ export function useInsuranceComparison() {
       throw new Error('Invalid analysis data: missing extracted field');
     }
     const extracted = analysisData.extracted as any;
+    
+    // Validate required fields
+    if (!extracted.insuredName && !extracted.carrier) {
+      throw new Error('Analysis failed: Could not extract insurance information from document. The document may not be a valid insurance policy or quote.');
+    }
+    
     return {
       id: crypto.randomUUID(),
       type: extracted.type ?? 'quote',

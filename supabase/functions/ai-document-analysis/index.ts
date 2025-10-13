@@ -23,19 +23,64 @@ serve(async (req) => {
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { action, documents, message, conversationHistory, context, type } = await req.json();
+    const { action, documents, message, conversationHistory, context, type, documentPaths, analysisType } = await req.json();
 
     console.log('AI Document Analysis Request:', { 
       action, 
       type,
+      analysisType,
       documentsCount: documents?.length,
+      documentPathsCount: documentPaths?.length,
       hasContext: !!context,
       contextType: context?.type,
       contextDocumentId: context?.metadata?.documentId
     });
 
-    // If context includes a documentId, fetch and analyze that specific document
+    // Handle documentPaths (for insurance comparison)
     let contextualDocuments = documents || [];
+    
+    if (documentPaths && Array.isArray(documentPaths) && documentPaths.length > 0) {
+      console.log('Fetching documents from storage paths:', documentPaths);
+      
+      const fetchedDocs = await Promise.all(
+        documentPaths.map(async (path: string, idx: number) => {
+          try {
+            const { data: fileData, error: storageError } = await supabase.storage
+              .from('documents')
+              .download(path);
+
+            if (storageError || !fileData) {
+              console.error('Storage error for path', path, storageError);
+              return {
+                name: `Document ${idx + 1}`,
+                type: 'unknown',
+                content: '[Error: Could not retrieve document]'
+              };
+            }
+
+            // For now, treat as binary/PDF - OpenAI will need vision or a different approach
+            // This is a placeholder; real PDF parsing would need additional tools
+            return {
+              name: path.split('/').pop() || `Document ${idx + 1}`,
+              type: 'application/pdf',
+              content: `[PDF Document uploaded at ${path}. Note: PDF text extraction not yet implemented - returning metadata only]`
+            };
+          } catch (err) {
+            console.error('Error fetching document:', err);
+            return {
+              name: `Document ${idx + 1}`,
+              type: 'unknown',
+              content: '[Error: Failed to process document]'
+            };
+          }
+        })
+      );
+      
+      contextualDocuments = fetchedDocs;
+    }
+    
+    // If context includes a documentId, fetch and analyze that specific document
+    if (context?.metadata?.documentId) {
     let inferredAction = action;
     
     if (context?.metadata?.documentId) {
@@ -87,8 +132,35 @@ serve(async (req) => {
     let systemPrompt = '';
     let userPrompt = '';
 
-    // Handle type-based requests (for AI insights card)
-    if (type === 'business_insights') {
+    // Handle analysisType (for insurance comparison)
+    if (analysisType === 'insurance_extraction') {
+      systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents.
+
+Return a JSON object with this exact structure:
+{
+  "extracted": {
+    "type": "quote" or "policy" or "declaration",
+    "carrier": "Carrier name",
+    "policyNumber": "Policy number if available",
+    "insuredName": "Name of insured",
+    "effectiveDate": "YYYY-MM-DD",
+    "expirationDate": "YYYY-MM-DD",
+    "term": "12 months" or similar,
+    "coverages": [
+      { "type": "Coverage name", "limit": "Amount", "deductible": "Amount", "premium": number }
+    ],
+    "premiums": [
+      { "type": "Premium type", "amount": number, "frequency": "annual" }
+    ],
+    "totalPremium": number,
+    "vehicles": [],
+    "properties": []
+  }
+}
+
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
+      userPrompt = message || 'Extract all key information from these insurance documents and return as structured JSON.';
+    } else if (type === 'business_insights') {
       systemPrompt = `You are an AI business analyst for insurance agencies. Analyze the provided business metrics and generate 3-4 actionable insights. Focus on:
 - Revenue opportunities (policies expiring soon, underinsured accounts)
 - Risk factors (pending tasks, coverage gaps)
@@ -185,7 +257,44 @@ CRITICAL INSTRUCTIONS:
 
     console.log('Calling OpenAI with', messages.length, 'messages');
 
-    // Call OpenAI with streaming
+    // For insurance extraction, we need JSON response, not streaming
+    if (analysisType === 'insurance_extraction') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+          temperature: 0.3,
+          max_completion_tokens: 2000,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OpenAI API error:', response.status, errorText);
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const content = result.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('No content in OpenAI response');
+      }
+
+      // Parse and return the JSON
+      const parsed = JSON.parse(content);
+      return new Response(JSON.stringify(parsed), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Call OpenAI with streaming for other cases
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
