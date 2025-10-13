@@ -47,9 +47,9 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -316,32 +316,41 @@ CRITICAL INSTRUCTIONS:
       });
     }
 
-    console.log('Calling OpenAI with', messages.length, 'messages');
+    console.log('Calling Lovable AI (Gemini 2.5 Pro) with', messages.length, 'messages');
 
-    const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+    const AI_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
     const headers = {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       'Content-Type': 'application/json',
     };
 
     // For insurance extraction, we need JSON response, not streaming
     if (type === 'insurance_extraction' || analysisType === 'insurance_extraction') {
-      const response = await fetchWithRetry(OPENAI_URL, {
+      const response = await fetchWithRetry(AI_URL, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'google/gemini-2.5-pro',
           messages,
-          temperature: 0.3,
-          max_tokens: 2000,
+          temperature: 0.1,
+          max_tokens: 4000,
           response_format: { type: "json_object" },
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenAI API error:', response.status, errorText);
-        throw new Error(`OpenAI API error: ${response.status}`);
+        console.error('AI API error:', response.status, errorText);
+        
+        // Handle rate limits and payment issues
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again in a moment.');
+        }
+        if (response.status === 402) {
+          throw new Error('AI credits exhausted. Please add credits to your Lovable workspace.');
+        }
+        
+        throw new Error(`AI API error: ${response.status}`);
       }
 
       const result = await response.json();
@@ -366,11 +375,11 @@ CRITICAL INSTRUCTIONS:
         console.warn('Initial JSON parse failed, attempting repair:', parseErr);
         // One repair attempt
         try {
-          const repair = await fetchWithRetry(OPENAI_URL, {
+          const repair = await fetchWithRetry(AI_URL, {
             method: "POST",
             headers,
             body: JSON.stringify({
-              model: "gpt-4o-mini",
+              model: "google/gemini-2.5-pro",
               messages: [
                 { 
                   role: "system", 
@@ -380,7 +389,7 @@ CRITICAL INSTRUCTIONS:
               ],
               temperature: 0,
               response_format: { type: "json_object" },
-              max_tokens: 800
+              max_tokens: 1000
             })
           });
           const rj = await repair.json();
@@ -408,22 +417,31 @@ CRITICAL INSTRUCTIONS:
     }
 
     // Non-extraction: stream through
-    const streamRes = await fetchWithRetry(OPENAI_URL, {
+    const streamRes = await fetchWithRetry(AI_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'google/gemini-2.5-pro',
         messages,
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.3,
+        max_tokens: 4000,
         stream: true,
       }),
     });
 
     if (!streamRes.ok) {
       const errorText = await streamRes.text();
-      console.error('OpenAI API error:', streamRes.status, errorText);
-      throw new Error(`OpenAI API error: ${streamRes.status}`);
+      console.error('AI API error:', streamRes.status, errorText);
+      
+      // Handle rate limits and payment issues
+      if (streamRes.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      }
+      if (streamRes.status === 402) {
+        throw new Error('AI credits exhausted. Please add credits to your Lovable workspace.');
+      }
+      
+      throw new Error(`AI API error: ${streamRes.status}`);
     }
 
     return new Response(streamRes.body, {
