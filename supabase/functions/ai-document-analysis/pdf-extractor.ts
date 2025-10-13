@@ -127,17 +127,20 @@ async function extractPdfWithVision(
   const fileSize = pdfData.size;
   const sizeMB = fileSize / (1024 * 1024);
   
-  console.log(`Processing PDF: ${sizeMB.toFixed(2)} MB`);
+  console.log(`Processing PDF: ${sizeMB.toFixed(2)} MB, max pages: ${maxPages}`);
 
   if (fileSize < 10 * 1024 * 1024) {
-    return await extractPdfSynchronous(pdfData, apiKey, maxPages, warnings);
+    return await extractPdfInBatches(pdfData, apiKey, maxPages, warnings);
   } else {
     warnings.push('PDF is large (>10MB), processing may be slower');
-    return await extractPdfSynchronous(pdfData, apiKey, maxPages, warnings);
+    return await extractPdfInBatches(pdfData, apiKey, maxPages, warnings);
   }
 }
 
-async function extractPdfSynchronous(
+/**
+ * Process PDF in batches of 5 pages (Vision API limit)
+ */
+async function extractPdfInBatches(
   pdfData: Blob,
   apiKey: string,
   maxPages: number,
@@ -145,95 +148,128 @@ async function extractPdfSynchronous(
 ): Promise<ExtractionResult> {
   
   const base64Pdf = await blobToBase64(pdfData);
-
-  const response = await fetch(
-    `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{
-          inputConfig: {
-            content: base64Pdf,
-            mimeType: 'application/pdf'
-          },
-          features: [
-            { 
-              type: 'DOCUMENT_TEXT_DETECTION'
-            }
-          ],
-          pages: maxPages ? Array.from({ length: maxPages }, (_, i) => i + 1) : undefined
-        }]
-      })
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Vision API error:', response.status, errorText);
+  const BATCH_SIZE = 5; // Vision API limit
+  const allPages: PageResult[] = [];
+  
+  // Process in batches of 5 pages
+  for (let startPage = 1; startPage <= maxPages; startPage += BATCH_SIZE) {
+    const endPage = Math.min(startPage + BATCH_SIZE - 1, maxPages);
+    const pageRange = Array.from(
+      { length: endPage - startPage + 1 }, 
+      (_, i) => startPage + i
+    );
+    
+    console.log(`Processing pages ${startPage}-${endPage}...`);
     
     try {
-      const errorJson = JSON.parse(errorText);
-      if (errorJson.error?.message) {
-        throw new Error(`Vision API: ${errorJson.error.message}`);
+      const response = await fetch(
+        `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{
+              inputConfig: {
+                content: base64Pdf,
+                mimeType: 'application/pdf'
+              },
+              features: [
+                { 
+                  type: 'DOCUMENT_TEXT_DETECTION'
+                }
+              ],
+              pages: pageRange
+            }]
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Vision API error:', response.status, errorText);
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            throw new Error(`Vision API: ${errorJson.error.message}`);
+          }
+        } catch {
+          // Use generic error if parsing fails
+        }
+        
+        throw new Error(`Vision API error: ${response.status}`);
       }
-    } catch {
-      // Use generic error
+
+      const result = await response.json();
+
+      if (result.responses?.[0]?.error) {
+        throw new Error(`Vision API error: ${result.responses[0].error.message}`);
+      }
+
+      // Parse responses for this batch
+      const responses = result.responses || [];
+
+      for (let i = 0; i < responses.length; i++) {
+        const pageResponse = responses[i];
+        const actualPageNum = startPage + i;
+        
+        if (pageResponse.error) {
+          warnings.push(`Page ${actualPageNum} error: ${pageResponse.error.message}`);
+          continue;
+        }
+
+        const fullTextAnnotation = pageResponse.fullTextAnnotation;
+        const text = fullTextAnnotation?.text || '';
+        
+        if (text.trim().length < 20) {
+          warnings.push(`Page ${actualPageNum} has very little text`);
+        }
+
+        allPages.push({
+          page: actualPageNum,
+          text: text.trim(),
+          confidence: calculateAverageConfidence(fullTextAnnotation)
+        });
+      }
+      
+      // Small delay between batches to avoid rate limiting
+      if (endPage < maxPages) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+    } catch (error) {
+      console.error(`Error processing pages ${startPage}-${endPage}:`, error);
+      warnings.push(`Failed to process pages ${startPage}-${endPage}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // If we hit an error and have no pages yet, this is critical
+      if (allPages.length === 0 && startPage === 1) {
+        throw error;
+      }
+      
+      // Otherwise, continue with what we have
+      break;
     }
-    
-    throw new Error(`Vision API error: ${response.status}`);
   }
 
-  const result = await response.json();
-
-  if (result.responses?.[0]?.error) {
-    throw new Error(`Vision API error: ${result.responses[0].error.message}`);
-  }
-
-  const pages: PageResult[] = [];
-  const responses = result.responses || [];
-
-  for (let i = 0; i < responses.length; i++) {
-    const pageResponse = responses[i];
-    
-    if (pageResponse.error) {
-      warnings.push(`Page ${i + 1} error: ${pageResponse.error.message}`);
-      continue;
-    }
-
-    const fullTextAnnotation = pageResponse.fullTextAnnotation;
-    const text = fullTextAnnotation?.text || '';
-    
-    if (text.trim().length < 20) {
-      warnings.push(`Page ${i + 1} has very little text`);
-    }
-
-    pages.push({
-      page: i + 1,
-      text: text.trim(),
-      confidence: calculateAverageConfidence(fullTextAnnotation)
-    });
-  }
-
-  if (pages.length === 0) {
+  if (allPages.length === 0) {
     warnings.push('No text could be extracted from PDF');
-    pages.push({
+    allPages.push({
       page: 1,
       text: '[No text extracted]'
     });
   }
 
-  const totalChars = pages.reduce((sum, p) => sum + p.text.length, 0);
-  const avgConfidence = pages.reduce((sum, p) => sum + (p.confidence || 0), 0) / pages.length;
+  const totalChars = allPages.reduce((sum, p) => sum + p.text.length, 0);
+  const avgConfidence = allPages.reduce((sum, p) => sum + (p.confidence || 0), 0) / allPages.length;
   
-  console.log(`✓ PDF OCR complete: ${pages.length} pages, ${totalChars} characters, avg confidence: ${(avgConfidence * 100).toFixed(1)}%`);
+  console.log(`✓ PDF OCR complete: ${allPages.length} pages, ${totalChars} characters, avg confidence: ${(avgConfidence * 100).toFixed(1)}%`);
 
   if (avgConfidence < 0.7) {
-    warnings.push(`Low OCR confidence (${(avgConfidence * 100).toFixed(1)}%)`);
+    warnings.push(`Low OCR confidence (${(avgConfidence * 100).toFixed(1)}%) - document may be poor quality`);
   }
 
   return {
-    pages,
+    pages: allPages,
     warnings
   };
 }
