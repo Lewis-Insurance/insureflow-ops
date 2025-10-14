@@ -14,7 +14,8 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
-    borderBottom: 2,
+    borderBottomWidth: 2,
+    borderBottomColor: '#000',
     paddingBottom: 10,
   },
   title: {
@@ -40,8 +41,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#333',
-    borderBottom: 1,
-    borderColor: '#ddd',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
     paddingBottom: 4,
   },
   subsectionTitle: {
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
   },
   alert: {
     backgroundColor: '#fff3cd',
-    border: 1,
+    borderWidth: 1,
     borderColor: '#ffc107',
     padding: 10,
     marginTop: 8,
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
   },
   criticalAlert: {
     backgroundColor: '#f8d7da',
-    border: 1,
+    borderWidth: 1,
     borderColor: '#dc3545',
     padding: 10,
     marginTop: 8,
@@ -133,8 +134,8 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: '#999',
     textAlign: 'center',
-    borderTop: 1,
-    borderColor: '#eee',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
     paddingTop: 10,
   },
   grid: {
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     flex: 1,
-    border: 1,
+    borderWidth: 1,
     borderColor: '#ddd',
     padding: 8,
   },
