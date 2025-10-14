@@ -95,7 +95,7 @@ export default function InsuranceComparison() {
       ]);
 
       // Submit comparison job to background worker
-      const { error: jobError } = await supabase.functions.invoke('submit-comparison', {
+      const { data: submitData, error: jobError } = await supabase.functions.invoke<{ job: { id: string } }>('submit-comparison', {
         body: {
           workspaceId,
           accountId: null,
@@ -107,8 +107,43 @@ export default function InsuranceComparison() {
 
       if (jobError) throw jobError;
 
-      toast({ title: 'Job submitted', description: 'Processing in background' });
-      navigate(`/workspace/${workspaceId}`);
+      const jobId = submitData?.job?.id;
+      if (!jobId) throw new Error('Failed to get job id');
+
+      // Trigger the worker to process immediately, then poll until done
+      await supabase.functions.invoke('worker-comparison');
+
+      toast({ title: 'Processing…', description: 'Analyzing both options. This may take ~30-60s.' });
+
+      // Poll job status and navigate to report when ready
+      let attempts = 0;
+      let sessionId: string | null = null;
+      while (attempts < 40 && !sessionId) {
+        const { data: jobRow, error: jobFetchError } = await supabase
+          .from('jobs')
+          .select('status, result_session_id, error_message')
+          .eq('id', jobId)
+          .maybeSingle();
+        if (jobFetchError) throw jobFetchError;
+        if (jobRow?.result_session_id) {
+          sessionId = jobRow.result_session_id;
+          break;
+        }
+        if (jobRow?.status === 'failed') {
+          throw new Error(jobRow.error_message || 'Background job failed');
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        attempts++;
+      }
+
+      if (!sessionId) {
+        toast({ title: 'Still processing', description: 'You will see the report in Workspace when ready.' });
+        navigate(`/workspace/${workspaceId}`);
+        return;
+      }
+
+      navigate(`/comparison-report/${sessionId}`);
+      return;
     } catch (error) {
       console.error('Submission error:', error);
       toast({ title: 'Error', description: 'Failed to submit comparison job', variant: 'destructive' });
