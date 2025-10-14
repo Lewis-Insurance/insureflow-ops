@@ -565,20 +565,34 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
             const rawLimit = (cov.limit ?? '').toString().trim().toUpperCase();
             if (rawLimit === 'YES' || rawLimit === 'Y' || rawLimit === 'CHECKED' || rawLimit === 'TRUE') {
               let extracted: string | undefined;
-              if (typeLower.includes('bodily injury')) {
+
+              // Common patterns available across carriers
+              const triSplit = docsText.match(/(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)/);
+
+              const isBI = typeLower.includes('bodily injury') || /\bbi\b/i.test(typeLower);
+              const isPD = typeLower.includes('property damage') || /\bpd\b/i.test(typeLower);
+              const isPIP = typeLower.includes('personal injury protection') || /\bpip\b/i.test(typeLower);
+
+              if (isBI) {
                 extracted = findNearby(
                   docsText,
-                  /bodily\s+injury[^\n]{0,160}?((?:\$?\d{1,3}(?:,\d{3})*)(?:\s*\/\s*\$?\d{1,3}(?:,\d{3})*){1,2})/i
+                  /(bodily\s+injury|\bBI\b)[^\n]{0,200}?((?:\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(?:\$?\d{1,3}(?:,\d{3})?))/i
                 );
-              } else if (typeLower.includes('property damage')) {
+                if (!extracted && triSplit) {
+                  extracted = `${triSplit[1]}/${triSplit[2]}`;
+                }
+              } else if (isPD) {
                 extracted = findNearby(
                   docsText,
-                  /property\s+damage[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i
+                  /(property\s+damage|\bPD\b)[^\n]{0,200}?(\$?\d{1,3}(?:,\d{3})+)/i
                 );
-              } else if (typeLower.includes('personal injury protection') || typeLower.includes('pip')) {
+                if (!extracted && triSplit) {
+                  extracted = triSplit[3];
+                }
+              } else if (isPIP) {
                 extracted = findNearby(
                   docsText,
-                  /(personal\s+injury\s+protection|pip)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i
+                  /(personal\s+injury\s+protection|\bPIP\b)[^\n]{0,200}?(\$?\d{1,3}(?:,\d{3})+)/i
                 );
               }
 
