@@ -234,13 +234,16 @@ async function extractPdfInBatches(
 
     const result = await response.json();
 
-    console.log('Vision API Response:', JSON.stringify({
+    // Log the full structure to understand what we're getting
+    console.log('Vision API Full Response Structure:', JSON.stringify({
       responseCount: result.responses?.length || 0,
       hasError: !!result.responses?.[0]?.error,
       firstResponse: result.responses?.[0] ? {
         hasFullTextAnnotation: !!result.responses[0].fullTextAnnotation,
+        hasResponses: !!result.responses[0].responses,
         textLength: result.responses[0].fullTextAnnotation?.text?.length || 0,
-        pageCount: result.responses[0].fullTextAnnotation?.pages?.length || 0
+        pageCount: result.responses[0].fullTextAnnotation?.pages?.length || 0,
+        nestedResponsesCount: result.responses[0].responses?.length || 0
       } : null
     }, null, 2));
 
@@ -248,8 +251,21 @@ async function extractPdfInBatches(
       throw new Error(`Vision API error: ${result.responses[0].error.message}`);
     }
 
-    // Parse all page responses (API returns all pages)
-    const responses = result.responses || [];
+    // Handle nested responses structure (for batch PDF processing)
+    let responses: any[] = [];
+    if (result.responses?.[0]?.responses) {
+      // Nested structure: responses[0].responses[] contains page-by-page results
+      responses = result.responses[0].responses;
+      console.log(`Using nested responses structure: ${responses.length} pages`);
+    } else if (result.responses?.[0]?.fullTextAnnotation) {
+      // Single response with fullTextAnnotation
+      responses = result.responses;
+      console.log(`Using flat responses structure: ${responses.length} responses`);
+    } else {
+      // No text found
+      responses = result.responses || [];
+      console.log(`No fullTextAnnotation found, using default structure`);
+    }
 
     for (let i = 0; i < responses.length && i < maxPages; i++) {
       const pageResponse = responses[i];
