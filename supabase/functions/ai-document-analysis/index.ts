@@ -596,43 +596,88 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
           if (Array.isArray(parsed.extracted.coverages)) {
             parsed.extracted.coverages = parsed.extracted.coverages.map(refineCoverage);
           }
-        } catch (refineErr) {
-          console.warn('Coverage refinement failed:', refineErr);
-        }
 
-        console.warn('JSON parse failed, attempting repair:', parseErr);
-        
-        try {
-          const repairResponse = await fetchWithRetry(AI_URL, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              model: "google/gemini-2.5-pro",
-              messages: [
-                { 
-                  role: "system", 
-                  content: "Convert the following into valid JSON matching the extraction schema. Return only valid JSON." 
-                },
-                { role: "user", content: content }
-              ],
-              temperature: 0,
-              response_format: { type: "json_object" },
-              max_tokens: 2000
-            })
-          });
-          
-          if (repairResponse.ok) {
-            const repairResult = await repairResponse.json();
-            const repairedContent = repairResult?.choices?.[0]?.message?.content;
-            if (repairedContent) {
-              parsed = JSON.parse(repairedContent);
-              console.log('✓ JSON repair succeeded');
+          // Heuristic: if no coverages extracted, infer from OCR text signals
+          if (!parsed.extracted.coverages || parsed.extracted.coverages.length === 0) {
+            try {
+              const docsText = Array.isArray(contextualDocuments)
+                ? contextualDocuments.map((d: any) => d?.content || '').join('\n')
+                : '';
+              const inferred: any[] = [];
+
+              const yesNear = (pattern: RegExp) =>
+                new RegExp(pattern.source + '[^\n]{0,80}\\b(YES|Y)\\b', 'i').test(docsText);
+
+              const hasWord = (pattern: RegExp) => pattern.test(docsText);
+
+              const split = docsText.match(/(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)/);
+
+              if (hasWord(/bodily\s+injury/i) || yesNear(/bodily\s+injury/i)) {
+                inferred.push({
+                  type: 'Bodily Injury Liability',
+                  limit: split ? `${split[1]}/${split[2]}` : undefined,
+                  notes: split ? undefined : 'Included (numeric limit not specified)'
+                });
+              }
+
+              if (hasWord(/property\s+damage/i) || yesNear(/property\s+damage/i)) {
+                inferred.push({
+                  type: 'Property Damage Liability',
+                  limit: split ? (split[3] || undefined) : undefined,
+                  notes: split ? undefined : 'Included (numeric limit not specified)'
+                });
+              }
+
+              const pipAmt = docsText.match(/(personal\s+injury\s+protection|\bPIP\b)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
+              if (hasWord(/personal\s+injury\s+protection|\bPIP\b/i) || yesNear(/personal\s+injury\s+protection|\bPIP\b/i)) {
+                inferred.push({
+                  type: 'Personal Injury Protection',
+                  limit: pipAmt || undefined,
+                  notes: pipAmt ? undefined : 'Included (numeric limit not specified)'
+                });
+              }
+
+              if (inferred.length > 0) {
+                parsed.extracted.coverages = inferred;
+              }
+            } catch (inferErr) {
+              console.warn('Coverage inference failed:', inferErr);
             }
           }
-        } catch (repairErr) {
-          console.error('JSON repair failed:', repairErr);
+        } catch (parseErr) {
+          console.warn('JSON parse failed, attempting repair:', parseErr);
+          
+          try {
+            const repairResponse = await fetchWithRetry(AI_URL, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                model: "google/gemini-2.5-pro",
+                messages: [
+                  { 
+                    role: "system", 
+                    content: "Convert the following into valid JSON matching the extraction schema. Return only valid JSON." 
+                  },
+                  { role: "user", content: content }
+                ],
+                temperature: 0,
+                response_format: { type: "json_object" },
+                max_tokens: 2000
+              })
+            });
+            
+            if (repairResponse.ok) {
+              const repairResult = await repairResponse.json();
+              const repairedContent = repairResult?.choices?.[0]?.message?.content;
+              if (repairedContent) {
+                parsed = JSON.parse(repairedContent);
+                console.log('✓ JSON repair succeeded');
+              }
+            }
+          } catch (repairErr) {
+            console.error('JSON repair failed:', repairErr);
+          }
         }
-      }
 
       if (!parsed?.extracted) {
         console.warn('Returning fallback extraction structure');
