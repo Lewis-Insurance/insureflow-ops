@@ -35,6 +35,14 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
     return 'different';
   };
 
+  const displayValue = (val?: string) => {
+    if (!val) return '—';
+    const v = String(val).trim();
+    if (/^yes$/i.test(v)) return 'Included';
+    if (/^no$/i.test(v)) return 'Not Included';
+    return v;
+  };
+
   const hasGaps = differences.gaps && differences.gaps.length > 0;
   const criticalGaps = differences.gaps?.filter(g => g.severity === 'critical') || [];
   
@@ -158,8 +166,8 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
                 return (
                   <TableRow key={idx}>
                     <TableCell className="font-medium">{diff.coverageType}</TableCell>
-                    <TableCell>{diff.option1Value}</TableCell>
-                    <TableCell>{diff.option2Value}</TableCell>
+                    <TableCell>{displayValue(diff.option1Value)}</TableCell>
+                    <TableCell>{displayValue(diff.option2Value)}</TableCell>
                     <TableCell className="text-center">
                       {status === 'identical' && (
                         <div className="flex items-center justify-center gap-1">

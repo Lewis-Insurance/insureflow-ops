@@ -347,7 +347,7 @@ Return the extracted data in valid JSON format with this exact structure:
     "expirationDate": "YYYY-MM-DD",
     "term": "12 months" or similar,
     "coverages": [
-      { "type": "Coverage name", "limit": "Amount", "deductible": "Amount", "premium": number }
+      { "type": "Coverage name", "limit": "Amount", "deductible": "Amount", "premium": number, "notes": "optional" }
     ],
     "premiums": [
       { "type": "Premium type", "amount": number, "frequency": "annual" }
@@ -357,6 +357,16 @@ Return the extracted data in valid JSON format with this exact structure:
     "properties": []
   }
 }
+
+STRICT EXTRACTION RULES:
+- Never set a coverage "limit" to values like "YES/NO", "Y/N", or boolean. Those indicate a checkbox selection only.
+- If a checkbox indicates a coverage is present, locate the corresponding numeric limit(s) elsewhere in the document (tables, schedules, declarations) and return those numbers.
+- For Auto Liability coverages:
+  • Bodily Injury (BI): extract per person and per accident amounts (e.g., "$50,000/$100,000" or "50/100").
+  • Property Damage (PD): extract the per accident/property damage amount (e.g., "$50,000").
+  • If split limits are shown as 50/100/50, keep the exact string (do not convert to words).
+- For PIP/MedPay: return the numeric amount (e.g., "$10,000"). If only work loss/extra benefits are indicated, include that in "notes" and still provide the base numeric amount if present.
+- If, after searching the document text, no numeric limit can be found for a selected coverage, omit the "limit" field and set "notes": "Included (numeric limit not specified)".
 
 CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no code blocks, no explanations - just pure JSON.`;
       userPrompt = message || 'Extract all key information from these insurance documents and return as structured JSON.';
@@ -535,7 +545,61 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
           coverageCount: parsed.extracted.coverages?.length || 0,
           premiumCount: parsed.extracted.premiums?.length || 0
         });
-      } catch (parseErr) {
+
+        // Post-process: resolve "YES" placeholders and normalize limits
+        try {
+          const docsText = Array.isArray(contextualDocuments)
+            ? contextualDocuments.map((d: any) => d?.content || '').join('\n')
+            : '';
+
+          function findNearby(text: string, re: RegExp): string | undefined {
+            const m = text.match(re);
+            if (!m) return undefined;
+            // Prefer the first capturing group if present
+            return m[1] || m[0];
+          }
+
+          const refineCoverage = (cov: any) => {
+            if (!cov || typeof cov.type !== 'string') return cov;
+            const typeLower = cov.type.toLowerCase();
+            const rawLimit = (cov.limit ?? '').toString().trim().toUpperCase();
+            if (rawLimit === 'YES' || rawLimit === 'Y' || rawLimit === 'CHECKED' || rawLimit === 'TRUE') {
+              let extracted: string | undefined;
+              if (typeLower.includes('bodily injury')) {
+                extracted = findNearby(
+                  docsText,
+                  /bodily\s+injury[^\n]{0,160}?((?:\$?\d{1,3}(?:,\d{3})*)(?:\s*\/\s*\$?\d{1,3}(?:,\d{3})*){1,2})/i
+                );
+              } else if (typeLower.includes('property damage')) {
+                extracted = findNearby(
+                  docsText,
+                  /property\s+damage[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i
+                );
+              } else if (typeLower.includes('personal injury protection') || typeLower.includes('pip')) {
+                extracted = findNearby(
+                  docsText,
+                  /(personal\s+injury\s+protection|pip)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i
+                );
+              }
+
+              if (extracted) {
+                cov.limit = extracted.replace(/Limit:?\s*/i, '').trim();
+              } else {
+                // Could not find numeric value; treat as Included without numeric limit
+                delete cov.limit;
+                cov.notes = (cov.notes ? cov.notes + ' ' : '') + 'Included (numeric limit not specified)';
+              }
+            }
+            return cov;
+          };
+
+          if (Array.isArray(parsed.extracted.coverages)) {
+            parsed.extracted.coverages = parsed.extracted.coverages.map(refineCoverage);
+          }
+        } catch (refineErr) {
+          console.warn('Coverage refinement failed:', refineErr);
+        }
+
         console.warn('JSON parse failed, attempting repair:', parseErr);
         
         try {
