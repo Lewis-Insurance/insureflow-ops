@@ -361,10 +361,10 @@ Return the extracted data in valid JSON format with this exact structure:
 STRICT EXTRACTION RULES:
 - Never set a coverage "limit" to values like "YES/NO", "Y/N", or boolean. Those indicate a checkbox selection only.
 - If a checkbox indicates a coverage is present, locate the corresponding numeric limit(s) elsewhere in the document (tables, schedules, declarations) and return those numbers.
-- For Auto Liability coverages:
-  • Bodily Injury (BI): extract per person and per accident amounts (e.g., "$50,000/$100,000" or "50/100").
-  • Property Damage (PD): extract the per accident/property damage amount (e.g., "$50,000").
-  • If split limits are shown as 50/100/50, keep the exact string (do not convert to words).
+- Recognize abbreviations: BI = Bodily Injury, PD = Property Damage, PIP = Personal Injury Protection, UM = Uninsured Motorist, COMP = Comprehensive, COLL = Collision, CSL = Combined Single Limit.
+- For Auto Liability:
+  • Split limits (e.g., "50/100/50"): first two are BI (per person/per accident), third is PD. Keep the exact string format.
+  • If noted as CSL or Combined Single Limit, set type to "Liability CSL" and use that numeric amount.
 - For PIP/MedPay: return the numeric amount (e.g., "$10,000"). If only work loss/extra benefits are indicated, include that in "notes" and still provide the base numeric amount if present.
 - If, after searching the document text, no numeric limit can be found for a selected coverage, omit the "limit" field and set "notes": "Included (numeric limit not specified)".
 
@@ -603,43 +603,44 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
               const docsText = Array.isArray(contextualDocuments)
                 ? contextualDocuments.map((d: any) => d?.content || '').join('\n')
                 : '';
+
               const inferred: any[] = [];
+              const has = (re: RegExp) => re.test(docsText);
+              const nearYes = (re: RegExp) => new RegExp(re.source + '[^\n]{0,120}\\b(YES|Y)\\b', 'i').test(docsText);
 
-              const yesNear = (pattern: RegExp) =>
-                new RegExp(pattern.source + '[^\n]{0,80}\\b(YES|Y)\\b', 'i').test(docsText);
-
-              const hasWord = (pattern: RegExp) => pattern.test(docsText);
-
-              const split = docsText.match(/(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)/);
-
-              if (hasWord(/bodily\s+injury/i) || yesNear(/bodily\s+injury/i)) {
-                inferred.push({
-                  type: 'Bodily Injury Liability',
-                  limit: split ? `${split[1]}/${split[2]}` : undefined,
-                  notes: split ? undefined : 'Included (numeric limit not specified)'
-                });
+              // Split limits (BI/PD) near liability indicators
+              const splitMatch = docsText.match(/(BI\s*\/\s*PD|BI\/PD|Liability)[^\n]{0,120}?((\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?)(?:\s*\/\s*(\$?\d{1,3}(?:,\d{3})?))?)/i);
+              if (splitMatch) {
+                const part1 = splitMatch[3];
+                const part2 = splitMatch[4];
+                const part3 = splitMatch[5];
+                if (part1 && part2) inferred.push({ type: 'Bodily Injury Liability', limit: `${part1}/${part2}` });
+                if (part3) inferred.push({ type: 'Property Damage Liability', limit: part3 });
               }
 
-              if (hasWord(/property\s+damage/i) || yesNear(/property\s+damage/i)) {
-                inferred.push({
-                  type: 'Property Damage Liability',
-                  limit: split ? (split[3] || undefined) : undefined,
-                  notes: split ? undefined : 'Included (numeric limit not specified)'
-                });
+              // Bodily Injury (by words or BI)
+              if (!inferred.find(c => /Bodily Injury/i.test(c.type)) && (has(/bodily\s+injury/i) || has(/\bBI\b/i) || nearYes(/bodily\s+injury|\bBI\b/i))) {
+                const biNum = docsText.match(/(bodily\s+injury|\bBI\b)[^\n]{0,160}?((\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?))/i)?.[2];
+                inferred.push({ type: 'Bodily Injury Liability', limit: biNum || undefined, notes: biNum ? undefined : 'Included (numeric limit not specified)' });
               }
 
-              const pipAmt = docsText.match(/(personal\s+injury\s+protection|\bPIP\b)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
-              if (hasWord(/personal\s+injury\s+protection|\bPIP\b/i) || yesNear(/personal\s+injury\s+protection|\bPIP\b/i)) {
-                inferred.push({
-                  type: 'Personal Injury Protection',
-                  limit: pipAmt || undefined,
-                  notes: pipAmt ? undefined : 'Included (numeric limit not specified)'
-                });
+              // Property Damage (by words or PD)
+              if (!inferred.find(c => /Property Damage/i.test(c.type)) && (has(/property\s+damage/i) || has(/\bPD\b/i) || nearYes(/property\s+damage|\bPD\b/i))) {
+                const pdNum = docsText.match(/(property\s+damage|\bPD\b)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
+                inferred.push({ type: 'Property Damage Liability', limit: pdNum || undefined, notes: pdNum ? undefined : 'Included (numeric limit not specified)' });
               }
 
-              if (inferred.length > 0) {
-                parsed.extracted.coverages = inferred;
+              // CSL (Combined Single Limit)
+              const csl = docsText.match(/(combined\s+single\s+limit|\bCSL\b)[^\n]{0,120}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
+              if (csl) inferred.push({ type: 'Liability CSL', limit: csl });
+
+              // PIP
+              if (has(/personal\s+injury\s+protection|\bPIP\b/i) || nearYes(/personal\s+injury\s+protection|\bPIP\b/i)) {
+                const pipAmt = docsText.match(/(personal\s+injury\s+protection|\bPIP\b)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
+                inferred.push({ type: 'Personal Injury Protection', limit: pipAmt || undefined, notes: pipAmt ? undefined : 'Included (numeric limit not specified)' });
               }
+
+              if (inferred.length > 0) parsed.extracted.coverages = inferred;
             } catch (inferErr) {
               console.warn('Coverage inference failed:', inferErr);
             }
