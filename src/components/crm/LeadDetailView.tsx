@@ -142,9 +142,21 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
     mutationFn: async (note: string) => {
       if (!lead?.id) return;
       
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      // Fetch user profile for name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      const userName = profile?.full_name || "Unknown User";
       const currentNotes = lead.notes || "";
       const timestamp = new Date().toISOString();
-      const formattedNote = `[${format(new Date(timestamp), "PPpp")}]\n${note}\n\n`;
+      const formattedNote = `[${format(new Date(timestamp), "PPpp")} - ${userName}]\n${note}\n\n`;
       const updatedNotes = formattedNote + currentNotes;
 
       const { error } = await supabase
