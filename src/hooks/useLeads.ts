@@ -77,7 +77,7 @@ export function useLeads(filters?: LeadFilters) {
   });
 }
 
-// Fetch single lead
+// Fetch single lead by ID
 export function useLead(leadId: string | undefined) {
   return useQuery({
     queryKey: ['lead', leadId],
@@ -100,6 +100,11 @@ export function useLead(leadId: string | undefined) {
     },
     enabled: !!leadId
   });
+}
+
+// Alias for useLead to match common naming convention
+export function useLeadById(leadId: string | undefined) {
+  return useLead(leadId);
 }
 
 // Fetch lead sources - moved to @/integrations/supabase/hooks/useLeadSources
@@ -278,6 +283,118 @@ export function useUsers() {
 
       if (error) throw error;
       return data;
+    }
+  });
+}
+
+// Bulk move leads to stage
+export function useBulkMoveLeads() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ leadIds, newStatus }: { leadIds: string[]; newStatus: string }) => {
+      const { data, error } = await supabase
+        .from('leads')
+        .update({ status: newStatus })
+        .in('id', leadIds)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-by-stage'] });
+      toast.success(`${data.length} leads moved successfully`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to move leads: ${error.message}`);
+    }
+  });
+}
+
+// Assign lead to user
+export function useAssignLead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ leadId, assignedTo, reason }: { leadId: string; assignedTo: string; reason?: string }) => {
+      // First update the lead
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .update({ assigned_to: assignedTo })
+        .eq('id', leadId)
+        .select()
+        .single();
+
+      if (leadError) throw leadError;
+
+      // Then create an assignment record
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('lead_assignments')
+        .insert({
+          lead_id: leadId,
+          assigned_to: assignedTo,
+          assignment_method: 'manual',
+          reason: reason || 'Manual assignment'
+        })
+        .select()
+        .single();
+
+      if (assignmentError) throw assignmentError;
+
+      return { lead: leadData, assignment: assignmentData };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-by-stage'] });
+      toast.success('Lead assigned successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign lead: ${error.message}`);
+    }
+  });
+}
+
+// Bulk assign leads to user
+export function useBulkAssignLeads() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ leadIds, assignedTo, reason }: { leadIds: string[]; assignedTo: string; reason?: string }) => {
+      // Update all leads
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .update({ assigned_to: assignedTo })
+        .in('id', leadIds)
+        .select();
+
+      if (leadError) throw leadError;
+
+      // Create assignment records for each lead
+      const assignmentRecords = leadIds.map(leadId => ({
+        lead_id: leadId,
+        assigned_to: assignedTo,
+        assignment_method: 'manual' as const,
+        reason: reason || 'Bulk manual assignment'
+      }));
+
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('lead_assignments')
+        .insert(assignmentRecords)
+        .select();
+
+      if (assignmentError) throw assignmentError;
+
+      return { leads: leadData, assignments: assignmentData };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-by-stage'] });
+      toast.success(`${data.leads.length} leads assigned successfully`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign leads: ${error.message}`);
     }
   });
 }
