@@ -89,7 +89,7 @@ export function useLead(leadId: string | undefined) {
         .select(`
           *,
           source:lead_sources(*),
-          assigned:profiles!leads_assigned_to_fkey(id, full_name, email, avatar_url),
+          assigned:profiles!leads_assigned_to_fkey(id, full_name, avatar_url),
           activities:lead_activities(*)
         `)
         .eq('id', leadId)
@@ -286,7 +286,7 @@ export function useUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, avatar_url')
         .eq('is_staff', true)
         .order('full_name');
 
