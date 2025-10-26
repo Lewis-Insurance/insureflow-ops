@@ -72,6 +72,7 @@ export interface LeadSource {
 
 export interface Lead {
   id: string;
+  account_id?: string | null;
   source_id?: string;
   source_details?: string;
   
@@ -83,7 +84,7 @@ export interface Lead {
   address?: string;
   city?: string;
   state?: string;
-  zip?: string;
+  zip_code?: string;
   company_name?: string;
   
   // Status & Scoring
@@ -91,7 +92,7 @@ export interface Lead {
   lead_score: number;
   assigned_to?: string;
   
-  // Insurance Needs
+  // Insurance Needs - using correct column name
   insurance_types: InsuranceNeedType[];
   current_carrier?: string;
   current_premium?: number;
@@ -101,7 +102,7 @@ export interface Lead {
   // Additional Data
   notes?: string;
   tags: string[];
-  custom_fields: Record<string, any>;
+  custom_fields?: Record<string, any>;
   
   // Conversion Tracking
   converted_at?: string;
@@ -121,6 +122,16 @@ export interface Lead {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  
+  // Relations
+  source_name?: string;
+  assigned_to_name?: string;
+  assigned_producer?: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar_url?: string;
+  };
 }
 
 export interface LeadActivity {
@@ -298,7 +309,7 @@ export interface UpdateLeadRequest {
   address?: string;
   city?: string;
   state?: string;
-  zip?: string;
+  zip_code?: string;
 }
 
 export interface LeadFilters {

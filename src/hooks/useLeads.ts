@@ -8,7 +8,7 @@ type LeadRow = Database['public']['Tables']['leads']['Row'];
 type LeadInsert = Database['public']['Tables']['leads']['Insert'];
 type LeadUpdate = Database['public']['Tables']['leads']['Update'];
 
-export interface Lead extends Omit<LeadRow, 'insurance_types' | 'tags' | 'lead_score'> {
+export interface Lead extends Omit<LeadRow, 'insurance_types' | 'lead_score'> {
   lead_score: number;
   insurance_types: string[];
   source_name?: string;
