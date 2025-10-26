@@ -20,6 +20,7 @@ const CustomerDetail = React.lazy(() => import("./pages/CustomerDetail"));
 const CustomerEdit = React.lazy(() => import("./pages/CustomerEdit"));
 const PoliciesPage = React.lazy(() => import("./pages/PoliciesPage"));
 const RenewalsPage = React.lazy(() => import("./pages/RenewalsPage"));
+const RenewalIntelligencePage = React.lazy(() => import("./pages/RenewalIntelligencePage"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
 const MessageNew = React.lazy(() => import("./pages/MessageNew"));
@@ -164,7 +165,15 @@ const App = () => (
                 } 
               />
               <Route 
-                path="/policies/:policyId" 
+                path="/renewals/intelligence" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <RenewalIntelligencePage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/policies/:policyId"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <PolicyDetail />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, AlertTriangle, RefreshCw, Download } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, RefreshCw, Download, Brain } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { RenewalsList } from '@/components/renewals/RenewalsList';
 import { RenewalsStats } from '@/components/renewals/RenewalsStats';
@@ -60,6 +60,10 @@ export default function RenewalsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="default" onClick={() => navigate('/renewals/intelligence')}>
+              <Brain className="h-4 w-4 mr-2" />
+              AI Intelligence
+            </Button>
             <Button variant="outline" onClick={handleRefresh}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loadingUpcoming || loadingExpired ? 'animate-spin' : ''}`} />
               Refresh

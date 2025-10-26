@@ -92,6 +92,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 to="/renewals" 
               />
               <NavItem 
+                icon={Brain} 
+                label="Renewal Intelligence" 
+                to="/renewals/intelligence" 
+                badge="AI"
+              />
+              <NavItem 
                 icon={Phone} 
                 label="Calls" 
                 to="/calls" 
