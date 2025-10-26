@@ -6,25 +6,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface LeadData {
+interface LeadSubmission {
   first_name: string;
   last_name: string;
   email?: string;
   phone?: string;
-  address?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
   insurance_types?: string[];
   current_carrier?: string;
   current_premium?: number;
   decision_timeframe?: string;
   source_name?: string;
+  source_details?: Record<string, any>;
   notes?: string;
   tags?: string[];
+  custom_fields?: Record<string, any>;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -32,137 +37,128 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Parse request body
-    const body: LeadData = await req.json();
+    const submission: LeadSubmission = await req.json();
 
     // Validate required fields
-    if (!body.first_name || !body.last_name) {
+    if (!submission.first_name || !submission.last_name) {
       return new Response(
         JSON.stringify({ error: 'first_name and last_name are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!body.email && !body.phone) {
+    if (!submission.email && !submission.phone) {
       return new Response(
         JSON.stringify({ error: 'Either email or phone is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check for duplicate leads by email or phone
-    let duplicateQuery = supabase
-      .from('leads')
-      .select('*')
-      .is('deleted_at', null);
-
-    if (body.email && body.phone) {
-      duplicateQuery = duplicateQuery.or(`email.eq.${body.email},phone.eq.${body.phone}`);
-    } else if (body.email) {
-      duplicateQuery = duplicateQuery.eq('email', body.email);
-    } else if (body.phone) {
-      duplicateQuery = duplicateQuery.eq('phone', body.phone);
+    // Check for duplicates
+    const duplicateQuery = supabase.from('leads').select('id, status, email, phone');
+    
+    if (submission.email && submission.phone) {
+      duplicateQuery.or(`email.eq.${submission.email},phone.eq.${submission.phone}`);
+    } else if (submission.email) {
+      duplicateQuery.eq('email', submission.email);
+    } else if (submission.phone) {
+      duplicateQuery.eq('phone', submission.phone);
     }
 
-    const { data: existingLeads, error: searchError } = await duplicateQuery;
+    const { data: duplicates } = await duplicateQuery;
 
-    if (searchError) {
-      console.error('Error checking for duplicates:', searchError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to check for duplicates', details: searchError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // If duplicate found, return existing lead
-    if (existingLeads && existingLeads.length > 0) {
-      const existingLead = existingLeads[0];
-      console.log('Duplicate lead found:', existingLead.id);
-
+    if (duplicates && duplicates.length > 0) {
       return new Response(
         JSON.stringify({
-          success: true,
+          message: 'Duplicate lead found',
           duplicate: true,
-          lead_id: existingLead.id,
-          message: 'Lead already exists',
-          lead: existingLead
+          lead_id: duplicates[0].id,
+          existing_status: duplicates[0].status,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Insert new lead
-    const leadData = {
-      first_name: body.first_name,
-      last_name: body.last_name,
-      email: body.email || null,
-      phone: body.phone || null,
-      address: body.address || null,
-      insurance_types: body.insurance_types || null,
-      current_carrier: body.current_carrier || null,
-      current_premium: body.current_premium || null,
-      decision_timeframe: body.decision_timeframe || null,
-      source_name: body.source_name || 'webhook',
-      notes: body.notes || null,
-      tags: body.tags || null,
-      status: 'new'
-    };
+    // Find or create lead source
+    let sourceId: string | null = null;
+    if (submission.source_name) {
+      const { data: existingSource } = await supabase
+        .from('lead_sources')
+        .select('id')
+        .eq('name', submission.source_name)
+        .single();
 
-    const { data: newLead, error: insertError } = await supabase
+      if (existingSource) {
+        sourceId = existingSource.id;
+      } else {
+        const { data: newSource } = await supabase
+          .from('lead_sources')
+          .insert({
+            name: submission.source_name,
+            type: 'other',
+            description: 'Auto-created from webhook',
+          })
+          .select('id')
+          .single();
+
+        sourceId = newSource?.id || null;
+      }
+    }
+
+    // Create lead
+    const { data: lead, error: insertError } = await supabase
       .from('leads')
-      .insert(leadData)
+      .insert({
+        first_name: submission.first_name,
+        last_name: submission.last_name,
+        email: submission.email,
+        phone: submission.phone,
+        address_line1: submission.address_line1,
+        address_line2: submission.address_line2,
+        city: submission.city,
+        state: submission.state,
+        zip_code: submission.zip_code,
+        insurance_types: submission.insurance_types || [],
+        current_carrier: submission.current_carrier,
+        current_premium: submission.current_premium,
+        decision_timeframe: submission.decision_timeframe || 'future',
+        source_id: sourceId,
+        source_details: submission.source_details || {},
+        notes: submission.notes,
+        tags: submission.tags || [],
+        custom_fields: submission.custom_fields || {},
+        status: 'new',
+      })
       .select()
       .single();
 
     if (insertError) {
       console.error('Error inserting lead:', insertError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create lead', details: insertError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw insertError;
     }
 
-    console.log('New lead created:', newLead.id);
+    console.log('Lead created:', lead.id);
 
-    // Log activity for lead capture
-    const activityData = {
-      lead_id: newLead.id,
-      activity_type: 'lead_captured',
-      description: `Lead captured via ${body.source_name || 'webhook'}`,
-      metadata: {
-        source: body.source_name || 'webhook',
-        method: 'webhook',
-        capture_time: new Date().toISOString()
-      }
-    };
-
-    const { error: activityError } = await supabase
-      .from('lead_activities')
-      .insert(activityData);
-
-    if (activityError) {
-      console.error('Error logging activity:', activityError);
-      // Don't fail the request if activity logging fails
-    }
+    // Log activity
+    await supabase.from('lead_activities').insert({
+      lead_id: lead.id,
+      activity_type: 'note',
+      title: 'Lead captured',
+      description: `Lead captured via webhook from ${submission.source_name || 'unknown source'}`,
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
-        duplicate: false,
-        lead_id: newLead.id,
+        lead_id: lead.id,
         message: 'Lead captured successfully',
-        lead: newLead
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error in lead-capture-webhook:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
