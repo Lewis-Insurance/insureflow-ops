@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 interface ScoringFactors {
   contactInfo: number;
@@ -19,7 +19,10 @@ interface ScoringResult {
   recommendation: string;
 }
 
-export function useCalculateLeadScore() {
+/**
+ * Hook to manually trigger lead scoring
+ */
+export function useScoreLead() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -29,45 +32,71 @@ export function useCalculateLeadScore() {
       });
 
       if (error) throw error;
-      return data as ScoringResult;
+      return data;
     },
-    onSuccess: (data) => {
-      toast.success(`Lead score updated: ${data.score}/100`);
+    onSuccess: (data, leadId) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: ['lead', data.leadId] });
+      queryClient.invalidateQueries({ queryKey: ['leads', leadId] });
+      toast({
+        title: "Lead scored",
+        description: `Score: ${data.score}/100`,
+      });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to calculate lead score: ${error.message}`);
+      toast({
+        title: "Failed to score lead",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
 
-export function useBulkCalculateLeadScores() {
+/**
+ * Hook to bulk score all leads
+ */
+export function useBulkScoreLeads() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (leadIds: string[]) => {
+    mutationFn: async () => {
+      // Fetch all unscored leads
+      const { data: leads, error: fetchError } = await supabase
+        .from('leads')
+        .select('id')
+        .is('lead_score', null);
+
+      if (fetchError) throw fetchError;
+
+      // Score each lead
       const results = await Promise.allSettled(
-        leadIds.map(async (leadId) => {
-          const { data, error } = await supabase.functions.invoke('calculate-lead-score', {
-            body: { leadId },
-          });
-          if (error) throw error;
-          return data as ScoringResult;
-        })
+        leads.map((lead) =>
+          supabase.functions.invoke('calculate-lead-score', {
+            body: { leadId: lead.id },
+          })
+        )
       );
 
       const successful = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
 
-      return { successful, failed, total: leadIds.length };
+      return { successful, failed, total: leads.length };
     },
-    onSuccess: (data) => {
-      toast.success(`Scored ${data.successful}/${data.total} leads successfully`);
+    onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast({
+        title: "Bulk scoring complete",
+        description: `Scored ${results.successful} leads successfully${
+          results.failed > 0 ? `, ${results.failed} failed` : ''
+        }`,
+      });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to calculate lead scores: ${error.message}`);
+      toast({
+        title: "Bulk scoring failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
