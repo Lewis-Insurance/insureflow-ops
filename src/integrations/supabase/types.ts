@@ -339,6 +339,7 @@ export type Database = {
       }
       assignment_rules: {
         Row: {
+          account_id: string
           assignment_strategy: string
           conditions: Json | null
           created_at: string | null
@@ -354,6 +355,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          account_id: string
           assignment_strategy: string
           conditions?: Json | null
           created_at?: string | null
@@ -369,6 +371,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          account_id?: string
           assignment_strategy?: string
           conditions?: Json | null
           created_at?: string | null
@@ -384,6 +387,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "assignment_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assignment_rules_created_by_fkey"
             columns: ["created_by"]
@@ -3124,6 +3134,54 @@ export type Database = {
           },
         ]
       }
+      lead_assignments: {
+        Row: {
+          assigned_by: string | null
+          assigned_to: string
+          assignment_method: string
+          assignment_rule_id: string | null
+          created_at: string | null
+          id: string
+          lead_id: string
+          reason: string | null
+        }
+        Insert: {
+          assigned_by?: string | null
+          assigned_to: string
+          assignment_method: string
+          assignment_rule_id?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          reason?: string | null
+        }
+        Update: {
+          assigned_by?: string | null
+          assigned_to?: string
+          assignment_method?: string
+          assignment_rule_id?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignments_assignment_rule_id_fkey"
+            columns: ["assignment_rule_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_assignments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_dashboard_metrics: {
         Row: {
           avg_deal_size: number | null
@@ -3233,6 +3291,7 @@ export type Database = {
       }
       lead_sources: {
         Row: {
+          account_id: string
           cost_per_lead: number | null
           created_at: string | null
           created_by: string | null
@@ -3240,10 +3299,14 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          total_conversions: number | null
+          total_leads: number | null
+          total_revenue: number | null
           type: string
           updated_at: string | null
         }
         Insert: {
+          account_id: string
           cost_per_lead?: number | null
           created_at?: string | null
           created_by?: string | null
@@ -3251,10 +3314,14 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          total_conversions?: number | null
+          total_leads?: number | null
+          total_revenue?: number | null
           type: string
           updated_at?: string | null
         }
         Update: {
+          account_id?: string
           cost_per_lead?: number | null
           created_at?: string | null
           created_by?: string | null
@@ -3262,13 +3329,25 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          total_conversions?: number | null
+          total_leads?: number | null
+          total_revenue?: number | null
           type?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_sources_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
+          account_id: string | null
           address_line1: string | null
           address_line2: string | null
           assigned_at: string | null
@@ -3283,28 +3362,40 @@ export type Database = {
           custom_fields: Json | null
           decision_timeframe: string | null
           email: string | null
+          estimated_premium: number | null
           first_name: string
           id: string
           insurance_types: string[] | null
           last_contact_at: string | null
           last_contact_type: string | null
           last_name: string
+          last_scored_at: string | null
           lead_score: number | null
           lost_notes: string | null
           lost_reason: string | null
           next_follow_up_date: string | null
           notes: string | null
           phone: string | null
+          pipeline_stage_id: string | null
+          pipeline_velocity_score: number | null
+          previous_stage_id: string | null
+          scoring_factors: Json | null
+          scoring_recommendation: string | null
           search_vector: unknown
           source_details: Json | null
           source_id: string | null
+          stage_entered_at: string | null
           state: string | null
           status: string
+          stuck_alert: boolean | null
           tags: string[] | null
+          time_in_current_stage_hours: number | null
+          total_pipeline_time_hours: number | null
           updated_at: string | null
           zip_code: string | null
         }
         Insert: {
+          account_id?: string | null
           address_line1?: string | null
           address_line2?: string | null
           assigned_at?: string | null
@@ -3319,28 +3410,40 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          estimated_premium?: number | null
           first_name: string
           id?: string
           insurance_types?: string[] | null
           last_contact_at?: string | null
           last_contact_type?: string | null
           last_name: string
+          last_scored_at?: string | null
           lead_score?: number | null
           lost_notes?: string | null
           lost_reason?: string | null
           next_follow_up_date?: string | null
           notes?: string | null
           phone?: string | null
+          pipeline_stage_id?: string | null
+          pipeline_velocity_score?: number | null
+          previous_stage_id?: string | null
+          scoring_factors?: Json | null
+          scoring_recommendation?: string | null
           search_vector?: unknown
           source_details?: Json | null
           source_id?: string | null
+          stage_entered_at?: string | null
           state?: string | null
           status?: string
+          stuck_alert?: boolean | null
           tags?: string[] | null
+          time_in_current_stage_hours?: number | null
+          total_pipeline_time_hours?: number | null
           updated_at?: string | null
           zip_code?: string | null
         }
         Update: {
+          account_id?: string | null
           address_line1?: string | null
           address_line2?: string | null
           assigned_at?: string | null
@@ -3355,28 +3458,46 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          estimated_premium?: number | null
           first_name?: string
           id?: string
           insurance_types?: string[] | null
           last_contact_at?: string | null
           last_contact_type?: string | null
           last_name?: string
+          last_scored_at?: string | null
           lead_score?: number | null
           lost_notes?: string | null
           lost_reason?: string | null
           next_follow_up_date?: string | null
           notes?: string | null
           phone?: string | null
+          pipeline_stage_id?: string | null
+          pipeline_velocity_score?: number | null
+          previous_stage_id?: string | null
+          scoring_factors?: Json | null
+          scoring_recommendation?: string | null
           search_vector?: unknown
           source_details?: Json | null
           source_id?: string | null
+          stage_entered_at?: string | null
           state?: string | null
           status?: string
+          stuck_alert?: boolean | null
           tags?: string[] | null
+          time_in_current_stage_hours?: number | null
+          total_pipeline_time_hours?: number | null
           updated_at?: string | null
           zip_code?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_assigned_to_fkey"
             columns: ["assigned_to"]
@@ -3410,6 +3531,20 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_pipeline_stage_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_previous_stage_id_fkey"
+            columns: ["previous_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
           {
@@ -3877,6 +4012,162 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_automation_rules: {
+        Row: {
+          account_id: string
+          actions: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          enabled: boolean | null
+          failure_count: number | null
+          id: string
+          last_executed_at: string | null
+          name: string
+          priority: number | null
+          success_count: number | null
+          total_executions: number | null
+          trigger_conditions: Json | null
+          trigger_stage_id: string | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          actions: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          failure_count?: number | null
+          id?: string
+          last_executed_at?: string | null
+          name: string
+          priority?: number | null
+          success_count?: number | null
+          total_executions?: number | null
+          trigger_conditions?: Json | null
+          trigger_stage_id?: string | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          actions?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          failure_count?: number | null
+          id?: string
+          last_executed_at?: string | null
+          name?: string
+          priority?: number | null
+          success_count?: number | null
+          total_executions?: number | null
+          trigger_conditions?: Json | null
+          trigger_stage_id?: string | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_automation_rules_trigger_stage_id_fkey"
+            columns: ["trigger_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_metrics: {
+        Row: {
+          account_id: string
+          avg_lead_value: number | null
+          avg_time_in_stage_hours: number | null
+          calculated_at: string | null
+          conversion_rate: number | null
+          id: string
+          leads_at_end: number | null
+          leads_converted: number | null
+          leads_entered: number | null
+          leads_exited: number | null
+          leads_lost: number | null
+          median_time_in_stage_hours: number | null
+          metric_date: string
+          metric_period: string
+          producer_id: string | null
+          producer_name: string | null
+          stage_id: string | null
+          stage_name: string | null
+          total_pipeline_value: number | null
+        }
+        Insert: {
+          account_id: string
+          avg_lead_value?: number | null
+          avg_time_in_stage_hours?: number | null
+          calculated_at?: string | null
+          conversion_rate?: number | null
+          id?: string
+          leads_at_end?: number | null
+          leads_converted?: number | null
+          leads_entered?: number | null
+          leads_exited?: number | null
+          leads_lost?: number | null
+          median_time_in_stage_hours?: number | null
+          metric_date: string
+          metric_period: string
+          producer_id?: string | null
+          producer_name?: string | null
+          stage_id?: string | null
+          stage_name?: string | null
+          total_pipeline_value?: number | null
+        }
+        Update: {
+          account_id?: string
+          avg_lead_value?: number | null
+          avg_time_in_stage_hours?: number | null
+          calculated_at?: string | null
+          conversion_rate?: number | null
+          id?: string
+          leads_at_end?: number | null
+          leads_converted?: number | null
+          leads_entered?: number | null
+          leads_exited?: number | null
+          leads_lost?: number | null
+          median_time_in_stage_hours?: number | null
+          metric_date?: string
+          metric_period?: string
+          producer_id?: string | null
+          producer_name?: string | null
+          stage_id?: string | null
+          stage_name?: string | null
+          total_pipeline_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_metrics_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_metrics_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_rules: {
         Row: {
           actions: Json
@@ -3942,6 +4233,195 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stage_transitions: {
+        Row: {
+          account_id: string
+          actions_triggered: Json | null
+          email_sent: boolean | null
+          from_stage_id: string | null
+          from_stage_name: string | null
+          id: string
+          lead_id: string
+          notes: string | null
+          sms_sent: boolean | null
+          task_created_id: string | null
+          time_in_previous_stage_hours: number | null
+          to_stage_id: string
+          to_stage_name: string
+          transition_reason: string | null
+          transitioned_at: string | null
+          transitioned_by: string | null
+        }
+        Insert: {
+          account_id: string
+          actions_triggered?: Json | null
+          email_sent?: boolean | null
+          from_stage_id?: string | null
+          from_stage_name?: string | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          sms_sent?: boolean | null
+          task_created_id?: string | null
+          time_in_previous_stage_hours?: number | null
+          to_stage_id: string
+          to_stage_name: string
+          transition_reason?: string | null
+          transitioned_at?: string | null
+          transitioned_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          actions_triggered?: Json | null
+          email_sent?: boolean | null
+          from_stage_id?: string | null
+          from_stage_name?: string | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          sms_sent?: boolean | null
+          task_created_id?: string | null
+          time_in_previous_stage_hours?: number | null
+          to_stage_id?: string
+          to_stage_name?: string
+          transition_reason?: string | null
+          transitioned_at?: string | null
+          transitioned_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stage_transitions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_transitions_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_transitions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_transitions_task_created_id_fkey"
+            columns: ["task_created_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_transitions_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          account_id: string
+          alert_threshold_hours: number | null
+          auto_create_task: boolean | null
+          auto_send_email: boolean | null
+          auto_send_sms: boolean | null
+          avg_time_in_stage_hours: number | null
+          color: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          display_order: number
+          email_template_id: string | null
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          is_final: boolean | null
+          leads_count: number | null
+          name: string
+          slug: string
+          sms_template_id: string | null
+          stage_type: string
+          target_duration_hours: number | null
+          task_template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          alert_threshold_hours?: number | null
+          auto_create_task?: boolean | null
+          auto_send_email?: boolean | null
+          auto_send_sms?: boolean | null
+          avg_time_in_stage_hours?: number | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          email_template_id?: string | null
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_final?: boolean | null
+          leads_count?: number | null
+          name: string
+          slug: string
+          sms_template_id?: string | null
+          stage_type?: string
+          target_duration_hours?: number | null
+          task_template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          alert_threshold_hours?: number | null
+          auto_create_task?: boolean | null
+          auto_send_email?: boolean | null
+          auto_send_sms?: boolean | null
+          avg_time_in_stage_hours?: number | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          email_template_id?: string | null
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_final?: boolean | null
+          leads_count?: number | null
+          name?: string
+          slug?: string
+          sms_template_id?: string | null
+          stage_type?: string
+          target_duration_hours?: number | null
+          task_template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -4068,6 +4548,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      producer_workload_stats: {
+        Row: {
+          account_id: string
+          active_leads_count: number | null
+          avg_response_time_hours: number | null
+          last_updated: string | null
+          pending_tasks_count: number | null
+          producer_id: string
+          quoted_this_week: number | null
+          total_pipeline_value: number | null
+          won_this_month: number | null
+        }
+        Insert: {
+          account_id: string
+          active_leads_count?: number | null
+          avg_response_time_hours?: number | null
+          last_updated?: string | null
+          pending_tasks_count?: number | null
+          producer_id: string
+          quoted_this_week?: number | null
+          total_pipeline_value?: number | null
+          won_this_month?: number | null
+        }
+        Update: {
+          account_id?: string
+          active_leads_count?: number | null
+          avg_response_time_hours?: number | null
+          last_updated?: string | null
+          pending_tasks_count?: number | null
+          producer_id?: string
+          quoted_this_week?: number | null
+          total_pipeline_value?: number | null
+          won_this_month?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producer_workload_stats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_access_logs: {
         Row: {
@@ -5988,6 +6512,10 @@ export type Database = {
         Args: { account_data: Json; owner_user_id: string }
         Returns: Json
       }
+      create_default_pipeline_stages: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
       create_detailed_audit_log: {
         Args: {
           p_action: string
@@ -6098,6 +6626,10 @@ export type Database = {
         Returns: Json
       }
       generate_ticket_number: { Args: never; Returns: string }
+      get_next_round_robin_producer: {
+        Args: { p_rule_id: string }
+        Returns: string
+      }
       get_policies_claims_secure: {
         Args: never
         Returns: {
