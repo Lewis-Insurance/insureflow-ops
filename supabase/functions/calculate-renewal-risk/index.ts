@@ -267,8 +267,8 @@ serve(async (req) => {
 
       // Auto-create high-risk campaign if needed
       if (level === 'critical' || level === 'high') {
-        const daysToRenewal = renewal.target_renewal_date 
-          ? Math.floor((new Date(renewal.target_renewal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        const daysToRenewal = renewal.renewal_date 
+          ? Math.floor((new Date(renewal.renewal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
           : 90;
         await createRenewalCampaign(supabase, renewal, level, daysToRenewal);
       }
@@ -370,8 +370,8 @@ async function createRenewalCampaign(
     );
   }
 
-  const renewalDate = renewal.target_renewal_date || renewal.renewal_date;
-  const targetDate = new Date(renewalDate);
+  const renewalDate = renewal.renewal_date;
+  const targetDate = renewalDate ? new Date(renewalDate) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
   console.log('📧 Creating renewal campaign:', { renewal_id: renewal.id, touchpoints: touchpoints.length });
 
