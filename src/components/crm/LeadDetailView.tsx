@@ -49,6 +49,7 @@ import {
   Save,
 } from "lucide-react";
 import { format } from "date-fns";
+import { LeadScoreBreakdown } from "./LeadScoreBreakdown";
 
 interface LeadDetailViewProps {
   lead: Lead | null;
@@ -515,6 +516,16 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                   )}
                 </div>
               </div>
+
+              <Separator />
+
+              <LeadScoreBreakdown
+                leadId={lead.id}
+                score={lead.lead_score}
+                factors={(lead as any).scoring_factors}
+                recommendation={(lead as any).scoring_recommendation}
+                lastScoredAt={(lead as any).last_scored_at}
+              />
 
               <Separator />
 
