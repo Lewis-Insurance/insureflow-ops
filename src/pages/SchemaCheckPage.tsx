@@ -19,6 +19,7 @@ export default function SchemaCheckPage() {
 
   const checkSchema = async () => {
     setLoading(true);
+    toast.info('Checking database schema...');
     console.log('🔍 Starting schema check...');
     
     const tablesToCheck = [
@@ -95,6 +96,7 @@ export default function SchemaCheckPage() {
     setLoading(false);
     
     console.log('\n📊 Check complete!');
+    toast.success('Schema check complete!');
   };
 
   useEffect(() => {
@@ -404,9 +406,13 @@ CREATE TRIGGER update_renewal_campaigns_updated_at
                 <p className="text-sm">
                   <strong>Step 3:</strong> Verify
                 </p>
-                <Button onClick={checkSchema} className="w-full">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Recheck Schema After Migration
+                <Button 
+                  onClick={checkSchema} 
+                  disabled={loading}
+                  className="w-full"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  {loading ? 'Rechecking...' : 'Recheck Schema After Migration'}
                 </Button>
               </div>
             </CardContent>
