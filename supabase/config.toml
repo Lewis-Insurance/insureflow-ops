@@ -88,3 +88,9 @@ verify_jwt = false
 
 [functions.lead-capture-webhook]
 verify_jwt = false
+
+[functions.calculate-renewal-risk]
+verify_jwt = true
+
+[functions.renewal-risk-batch]
+verify_jwt = false

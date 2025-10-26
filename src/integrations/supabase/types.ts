@@ -4106,6 +4106,265 @@ export type Database = {
           },
         ]
       }
+      renewal_campaigns: {
+        Row: {
+          account_id: string
+          campaign_type: string
+          completed_touchpoints: number | null
+          created_at: string
+          created_by: string | null
+          days_before_renewal: number
+          end_date: string | null
+          id: string
+          personalization: Json | null
+          renewal_id: string
+          renewal_result: string | null
+          start_date: string
+          status: string
+          total_touchpoints: number
+          touchpoints: Json
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          campaign_type: string
+          completed_touchpoints?: number | null
+          created_at?: string
+          created_by?: string | null
+          days_before_renewal: number
+          end_date?: string | null
+          id?: string
+          personalization?: Json | null
+          renewal_id: string
+          renewal_result?: string | null
+          start_date: string
+          status?: string
+          total_touchpoints: number
+          touchpoints?: Json
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          campaign_type?: string
+          completed_touchpoints?: number | null
+          created_at?: string
+          created_by?: string | null
+          days_before_renewal?: number
+          end_date?: string | null
+          id?: string
+          personalization?: Json | null
+          renewal_id?: string
+          renewal_result?: string | null
+          start_date?: string
+          status?: string
+          total_touchpoints?: number
+          touchpoints?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "renewal_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_campaigns_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renewal_risk_history: {
+        Row: {
+          account_id: string
+          calculated_at: string
+          id: string
+          renewal_id: string
+          risk_factors: Json
+          risk_level: string
+          risk_score: number
+        }
+        Insert: {
+          account_id: string
+          calculated_at?: string
+          id?: string
+          renewal_id: string
+          risk_factors: Json
+          risk_level: string
+          risk_score: number
+        }
+        Update: {
+          account_id?: string
+          calculated_at?: string
+          id?: string
+          renewal_id?: string
+          risk_factors?: Json
+          risk_level?: string
+          risk_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_risk_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_risk_history_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renewals: {
+        Row: {
+          account_id: string
+          assigned_to: string | null
+          carrier: string | null
+          competitor_activity_detected: boolean | null
+          completed_at: string | null
+          contact_count: number | null
+          created_at: string
+          current_premium: number | null
+          engagement_score: number | null
+          expiration_date: string
+          has_payment_issues: boolean | null
+          has_recent_claim: boolean | null
+          id: string
+          last_contact_date: string | null
+          last_risk_calculation: string | null
+          lost_reason: string | null
+          notes: string | null
+          policy_id: string | null
+          policy_number: string | null
+          policy_type: string
+          price_change_pct: number | null
+          priority: string | null
+          renewal_date: string
+          renewal_premium: number | null
+          risk_factors: Json | null
+          risk_level: string | null
+          risk_score: number | null
+          sentiment_score: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          assigned_to?: string | null
+          carrier?: string | null
+          competitor_activity_detected?: boolean | null
+          completed_at?: string | null
+          contact_count?: number | null
+          created_at?: string
+          current_premium?: number | null
+          engagement_score?: number | null
+          expiration_date: string
+          has_payment_issues?: boolean | null
+          has_recent_claim?: boolean | null
+          id?: string
+          last_contact_date?: string | null
+          last_risk_calculation?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          policy_id?: string | null
+          policy_number?: string | null
+          policy_type: string
+          price_change_pct?: number | null
+          priority?: string | null
+          renewal_date: string
+          renewal_premium?: number | null
+          risk_factors?: Json | null
+          risk_level?: string | null
+          risk_score?: number | null
+          sentiment_score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          assigned_to?: string | null
+          carrier?: string | null
+          competitor_activity_detected?: boolean | null
+          completed_at?: string | null
+          contact_count?: number | null
+          created_at?: string
+          current_premium?: number | null
+          engagement_score?: number | null
+          expiration_date?: string
+          has_payment_issues?: boolean | null
+          has_recent_claim?: boolean | null
+          id?: string
+          last_contact_date?: string | null
+          last_risk_calculation?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          policy_id?: string | null
+          policy_number?: string | null
+          policy_type?: string
+          price_change_pct?: number | null
+          priority?: string | null
+          renewal_date?: string
+          renewal_premium?: number | null
+          risk_factors?: Json | null
+          risk_level?: string | null
+          risk_score?: number | null
+          sentiment_score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "renewals_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_change_requests: {
         Row: {
           created_at: string
@@ -5350,6 +5609,10 @@ export type Database = {
       assign_lead: {
         Args: { p_lead_id: string; p_manual_assignee?: string }
         Returns: string
+      }
+      calculate_days_since_last_contact: {
+        Args: { renewal_account_id: string }
+        Returns: number
       }
       calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
       claim_jobs_for_worker: {
