@@ -58,8 +58,8 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   const deleteLead = useDeleteLead();
 
   // Fetch lead tasks - simplified to show recent tasks
-  const { data: leadTasks } = useQuery({
-    queryKey: ["tasks", "lead", lead?.id],
+  const { data: leadTasks } = useQuery<any[]>({
+    queryKey: ["tasks", "lead", lead?.id ?? ""] as const,
     queryFn: async () => {
       if (!lead?.id) return [];
       
@@ -82,8 +82,8 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   });
 
   // Fetch lead activities (audit logs)
-  const { data: activities } = useQuery({
-    queryKey: ["activities", "lead", lead?.id],
+  const { data: activities } = useQuery<any[]>({
+    queryKey: ["activities", "lead", lead?.id ?? ""] as const,
     queryFn: async () => {
       if (!lead?.id) return [];
       
