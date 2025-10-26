@@ -1,296 +1,297 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface RiskFactor {
-  factor: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  points: number;
-  details: string;
+interface RiskFactors {
+  no_contact_6_months: boolean;
+  price_increase_high: boolean;
+  recent_claim: boolean;
+  competitor_activity: boolean;
+  low_engagement: boolean;
+  negative_sentiment: boolean;
+  payment_issues: boolean;
 }
 
-interface RenewalData {
-  id: string;
-  account_id: string;
-  renewal_date: string;
-  current_premium: number;
-  renewal_premium: number;
-  policy_type: string;
-  last_contact_date: string | null;
-  has_recent_claim: boolean;
-  has_payment_issues: boolean;
-  competitor_activity_detected: boolean;
-  sentiment_score: number;
-  engagement_score: number;
+function calculateRiskScore(renewal: any): { score: number; factors: RiskFactors; level: string } {
+  let score = 0;
+  const factors: RiskFactors = {
+    no_contact_6_months: false,
+    price_increase_high: false,
+    recent_claim: false,
+    competitor_activity: false,
+    low_engagement: false,
+    negative_sentiment: false,
+    payment_issues: false,
+  };
+
+  // Calculate days since last contact if we have a date
+  let daysSinceContact = 0;
+  if (renewal.last_contact_date) {
+    const lastContact = new Date(renewal.last_contact_date);
+    const now = new Date();
+    daysSinceContact = Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Factor 1: No contact in 6+ months (20 points)
+  if (daysSinceContact >= 180) {
+    score += 20;
+    factors.no_contact_6_months = true;
+  } else if (daysSinceContact >= 90) {
+    score += 10;
+  }
+
+  // Factor 2: Price increase >15% (25 points)
+  if (renewal.price_increase_pct && renewal.price_increase_pct > 15) {
+    score += 25;
+    factors.price_increase_high = true;
+  } else if (renewal.price_increase_pct && renewal.price_increase_pct > 10) {
+    score += 15;
+  }
+
+  // Factor 3: Recent claim (15 points)
+  if (renewal.has_recent_claim) {
+    score += 15;
+    factors.recent_claim = true;
+  }
+
+  // Factor 4: Competitor activity detected (20 points)
+  if (renewal.competitor_activity_detected) {
+    score += 20;
+    factors.competitor_activity = true;
+  }
+
+  // Factor 5: Low engagement (15 points)
+  if (renewal.engagement_score && renewal.engagement_score < 30) {
+    score += 15;
+    factors.low_engagement = true;
+  } else if (renewal.engagement_score && renewal.engagement_score < 50) {
+    score += 8;
+  }
+
+  // Factor 6: Negative sentiment (15 points)
+  if (renewal.sentiment_score && renewal.sentiment_score < 30) {
+    score += 15;
+    factors.negative_sentiment = true;
+  } else if (renewal.sentiment_score && renewal.sentiment_score < 50) {
+    score += 8;
+  }
+
+  // Factor 7: Payment issues (10 points)
+  if (renewal.has_payment_issues) {
+    score += 10;
+    factors.payment_issues = true;
+  }
+
+  // Determine risk level
+  let level = 'low';
+  if (score >= 75) {
+    level = 'critical';
+  } else if (score >= 50) {
+    level = 'high';
+  } else if (score >= 25) {
+    level = 'medium';
+  }
+
+  return { score, factors, level };
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { renewal_id } = await req.json();
+    console.log('🎯 Calculate Renewal Risk function called');
 
-    if (!renewal_id) {
-      throw new Error('renewal_id is required');
-    }
+    const { renewal_id, bulk } = await req.json();
 
-    console.log('Calculating risk for renewal:', renewal_id);
-
-    // Fetch renewal data with related information
-    const { data: renewal, error: renewalError } = await supabase
-      .from('renewals')
-      .select(`
-        *,
-        account:accounts(id, name),
-        policy:policies(id, claims_count, premium)
-      `)
-      .eq('id', renewal_id)
-      .single();
-
-    if (renewalError) throw renewalError;
-    if (!renewal) throw new Error('Renewal not found');
-
-    // Calculate risk factors
-    const riskFactors: RiskFactor[] = [];
-    let totalRiskPoints = 0;
-
-    // FACTOR 1: Days since last contact (0-30 points)
-    const { data: lastContactResult } = await supabase
-      .rpc('calculate_days_since_last_contact', { 
-        renewal_account_id: renewal.account_id 
-      });
-    
-    const daysSinceContact = lastContactResult || 999;
-    
-    if (daysSinceContact >= 180) {
-      const points = 30;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'no_contact',
-        severity: 'critical',
-        points,
-        details: `No contact in ${daysSinceContact} days (6+ months)`
-      });
-    } else if (daysSinceContact >= 90) {
-      const points = 20;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'limited_contact',
-        severity: 'high',
-        points,
-        details: `Limited contact: ${daysSinceContact} days since last interaction`
-      });
-    } else if (daysSinceContact >= 60) {
-      const points = 10;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'low_contact',
-        severity: 'medium',
-        points,
-        details: `${daysSinceContact} days since last contact`
-      });
-    }
-
-    // FACTOR 2: Price increase (0-25 points)
-    if (renewal.renewal_premium && renewal.current_premium) {
-      const priceChangePct = ((renewal.renewal_premium - renewal.current_premium) / renewal.current_premium) * 100;
+    if (bulk) {
+      console.log('📊 Starting bulk calculation for all upcoming renewals');
       
-      if (priceChangePct > 15) {
-        const points = Math.min(25, Math.floor(priceChangePct));
-        totalRiskPoints += points;
-        riskFactors.push({
-          factor: 'price_increase',
-          severity: priceChangePct > 30 ? 'critical' : 'high',
-          points,
-          details: `Premium increase of ${priceChangePct.toFixed(1)}%`
-        });
-      }
-
-      // Update price_change_pct in renewals table
-      await supabase
+      const { data: renewals, error: fetchError } = await supabase
         .from('renewals')
-        .update({ price_change_pct: priceChangePct })
-        .eq('id', renewal_id);
-    }
+        .select('*')
+        .in('status', ['upcoming', 'in_progress']);
 
-    // FACTOR 3: Recent claim (0-20 points)
-    if (renewal.has_recent_claim) {
-      const points = 20;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'recent_claim',
-        severity: 'high',
-        points,
-        details: 'Recent claim may cause dissatisfaction'
-      });
-    }
-
-    // FACTOR 4: Competitor activity (0-15 points)
-    if (renewal.competitor_activity_detected) {
-      const points = 15;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'competitor_activity',
-        severity: 'high',
-        points,
-        details: 'Competitor quotes detected or mentioned'
-      });
-    }
-
-    // FACTOR 5: Low engagement (0-15 points)
-    const engagementScore = renewal.engagement_score || 50;
-    if (engagementScore < 30) {
-      const points = 15;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'low_engagement',
-        severity: 'medium',
-        points,
-        details: `Very low engagement score: ${engagementScore}/100`
-      });
-    } else if (engagementScore < 50) {
-      const points = 10;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'low_engagement',
-        severity: 'medium',
-        points,
-        details: `Low engagement score: ${engagementScore}/100`
-      });
-    }
-
-    // FACTOR 6: Negative sentiment (0-15 points)
-    const sentimentScore = renewal.sentiment_score || 50;
-    if (sentimentScore < 30) {
-      const points = 15;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'negative_sentiment',
-        severity: 'high',
-        points,
-        details: `Negative sentiment detected: ${sentimentScore}/100`
-      });
-    } else if (sentimentScore < 50) {
-      const points = 8;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'negative_sentiment',
-        severity: 'medium',
-        points,
-        details: `Below-average sentiment: ${sentimentScore}/100`
-      });
-    }
-
-    // FACTOR 7: Payment issues (0-15 points)
-    if (renewal.has_payment_issues) {
-      const points = 15;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'payment_issues',
-        severity: 'high',
-        points,
-        details: 'History of payment problems'
-      });
-    }
-
-    // FACTOR 8: Time to renewal (reduces risk if far out)
-    const daysToRenewal = Math.floor(
-      (new Date(renewal.renewal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (daysToRenewal < 30 && totalRiskPoints > 50) {
-      const points = 10;
-      totalRiskPoints += points;
-      riskFactors.push({
-        factor: 'urgent_timeline',
-        severity: 'high',
-        points,
-        details: `Only ${daysToRenewal} days until renewal with high risk factors`
-      });
-    }
-
-    // Calculate final risk score (0-100)
-    const riskScore = Math.min(100, totalRiskPoints);
-
-    // Determine risk level
-    let riskLevel: 'low' | 'medium' | 'high' | 'critical';
-    if (riskScore >= 75) {
-      riskLevel = 'critical';
-    } else if (riskScore >= 50) {
-      riskLevel = 'high';
-    } else if (riskScore >= 25) {
-      riskLevel = 'medium';
-    } else {
-      riskLevel = 'low';
-    }
-
-    console.log('Risk calculation complete:', { riskScore, riskLevel, factorCount: riskFactors.length });
-
-    // Update renewal with risk score
-    const { error: updateError } = await supabase
-      .from('renewals')
-      .update({
-        risk_score: riskScore,
-        risk_level: riskLevel,
-        risk_factors: riskFactors,
-        last_risk_calculation: new Date().toISOString(),
-        last_contact_date: daysSinceContact < 999 
-          ? new Date(Date.now() - daysSinceContact * 24 * 60 * 60 * 1000).toISOString()
-          : null
-      })
-      .eq('id', renewal_id);
-
-    if (updateError) throw updateError;
-
-    // Create risk history record
-    const { error: historyError } = await supabase
-      .from('renewal_risk_history')
-      .insert({
-        renewal_id: renewal_id,
-        account_id: renewal.account_id,
-        risk_score: riskScore,
-        risk_level: riskLevel,
-        risk_factors: riskFactors
-      });
-
-    if (historyError) {
-      console.error('Failed to create history record:', historyError);
-    }
-
-    // Auto-create high-risk campaign if needed
-    if (riskLevel === 'critical' || riskLevel === 'high') {
-      await createRenewalCampaign(supabase, renewal, riskLevel, daysToRenewal);
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        renewal_id,
-        risk_score: riskScore,
-        risk_level: riskLevel,
-        risk_factors: riskFactors,
-        days_to_renewal: daysToRenewal
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      if (fetchError) {
+        console.error('❌ Error fetching renewals:', fetchError);
+        throw fetchError;
       }
-    );
+
+      console.log(`📋 Found ${renewals?.length || 0} renewals to process`);
+
+      const updates = [];
+      const riskFactorInserts = [];
+
+      for (const renewal of renewals || []) {
+        const { score, factors, level } = calculateRiskScore(renewal);
+        console.log(`  ✅ Calculated risk for renewal ${renewal.id}: ${level} (${score})`);
+
+        updates.push({
+          id: renewal.id,
+          risk_score: score,
+          risk_level: level,
+          risk_calculated_at: new Date().toISOString(),
+        });
+
+        // Log individual risk factors
+        for (const [factorType, isPresent] of Object.entries(factors)) {
+          if (isPresent) {
+            riskFactorInserts.push({
+              renewal_id: renewal.id,
+              factor_type: factorType,
+              factor_value: 1,
+              impact_score: getFactorImpact(factorType),
+              detected_at: new Date().toISOString(),
+              notes: getFactorDescription(factorType, renewal),
+            });
+          }
+        }
+      }
+
+      console.log(`🔄 Updating ${updates.length} renewals...`);
+
+      // Batch update renewals
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from('renewals')
+          .update({
+            risk_score: update.risk_score,
+            risk_level: update.risk_level,
+            risk_calculated_at: update.risk_calculated_at,
+          })
+          .eq('id', update.id);
+        
+        if (updateError) {
+          console.error(`❌ Error updating renewal ${update.id}:`, updateError);
+        }
+      }
+
+      console.log(`📝 Inserting ${riskFactorInserts.length} risk factors...`);
+
+      // Insert risk factors
+      if (riskFactorInserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('renewal_risk_factors')
+          .insert(riskFactorInserts);
+        
+        if (insertError) {
+          console.error('❌ Error inserting risk factors:', insertError);
+        }
+      }
+
+      console.log('✅ Bulk calculation complete');
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          processed: updates.length,
+          message: `Updated risk scores for ${updates.length} renewals`,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    } else {
+      // Single renewal calculation
+      if (!renewal_id) {
+        throw new Error('renewal_id is required');
+      }
+
+      console.log(`🎯 Calculating risk for renewal ${renewal_id}`);
+
+      const { data: renewal, error: fetchError } = await supabase
+        .from('renewals')
+        .select('*')
+        .eq('id', renewal_id)
+        .single();
+
+      if (fetchError) {
+        console.error('❌ Error fetching renewal:', fetchError);
+        throw fetchError;
+      }
+
+      const { score, factors, level } = calculateRiskScore(renewal);
+      console.log(`✅ Risk calculated: ${level} (${score})`);
+
+      // Update renewal with risk score
+      const { error: updateError } = await supabase
+        .from('renewals')
+        .update({
+          risk_score: score,
+          risk_level: level,
+          risk_calculated_at: new Date().toISOString(),
+        })
+        .eq('id', renewal_id);
+
+      if (updateError) {
+        console.error('❌ Error updating renewal:', updateError);
+        throw updateError;
+      }
+
+      // Log individual risk factors
+      const riskFactorInserts = [];
+      for (const [factorType, isPresent] of Object.entries(factors)) {
+        if (isPresent) {
+          riskFactorInserts.push({
+            renewal_id: renewal_id,
+            factor_type: factorType,
+            factor_value: 1,
+            impact_score: getFactorImpact(factorType),
+            detected_at: new Date().toISOString(),
+            notes: getFactorDescription(factorType, renewal),
+          });
+        }
+      }
+
+      if (riskFactorInserts.length > 0) {
+        console.log(`📝 Inserting ${riskFactorInserts.length} risk factors...`);
+        const { error: insertError } = await supabase
+          .from('renewal_risk_factors')
+          .insert(riskFactorInserts);
+        
+        if (insertError) {
+          console.error('❌ Error inserting risk factors:', insertError);
+        }
+      }
+
+      // Auto-create high-risk campaign if needed
+      if (level === 'critical' || level === 'high') {
+        const daysToRenewal = renewal.target_renewal_date 
+          ? Math.floor((new Date(renewal.target_renewal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : 90;
+        await createRenewalCampaign(supabase, renewal, level, daysToRenewal);
+      }
+
+      console.log('✅ Single renewal calculation complete');
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renewal_id,
+          risk_score: score,
+          risk_level: level,
+          risk_factors: factors,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
 
   } catch (error) {
-    console.error('Error calculating renewal risk:', error);
+    console.error('❌ Error calculating renewal risk:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -300,6 +301,36 @@ serve(async (req) => {
     );
   }
 });
+
+function getFactorImpact(factorType: string): number {
+  const impacts: Record<string, number> = {
+    no_contact_6_months: 20,
+    price_increase_high: 25,
+    recent_claim: 15,
+    competitor_activity: 20,
+    low_engagement: 15,
+    negative_sentiment: 15,
+    payment_issues: 10,
+  };
+  return impacts[factorType] || 10;
+}
+
+function getFactorDescription(factorType: string, renewal: any): string {
+  const daysSinceContact = renewal.last_contact_date 
+    ? Math.floor((new Date().getTime() - new Date(renewal.last_contact_date).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  const descriptions: Record<string, string> = {
+    no_contact_6_months: `No contact in ${daysSinceContact} days`,
+    price_increase_high: `Price increase of ${renewal.price_increase_pct?.toFixed(1)}%`,
+    recent_claim: 'Recent claim activity detected',
+    competitor_activity: 'Competitor activity detected',
+    low_engagement: `Low engagement score: ${renewal.engagement_score || 0}`,
+    negative_sentiment: `Negative sentiment score: ${renewal.sentiment_score || 0}`,
+    payment_issues: 'Payment issues detected',
+  };
+  return descriptions[factorType] || factorType;
+}
 
 // Helper function to create renewal campaign
 async function createRenewalCampaign(
@@ -314,11 +345,11 @@ async function createRenewalCampaign(
     .select('id')
     .eq('renewal_id', renewal.id)
     .eq('status', 'active')
-    .single();
+    .maybeSingle();
 
   if (existing) {
-    console.log('Campaign already exists for renewal:', renewal.id);
-    return; // Campaign already exists
+    console.log('✅ Campaign already exists for renewal:', renewal.id);
+    return;
   }
 
   // Define touchpoints based on risk level and days to renewal
@@ -339,23 +370,31 @@ async function createRenewalCampaign(
     );
   }
 
-  console.log('Creating renewal campaign:', { renewal_id: renewal.id, touchpoints: touchpoints.length });
+  const renewalDate = renewal.target_renewal_date || renewal.renewal_date;
+  const targetDate = new Date(renewalDate);
 
-  await supabase
+  console.log('📧 Creating renewal campaign:', { renewal_id: renewal.id, touchpoints: touchpoints.length });
+
+  const { error } = await supabase
     .from('renewal_campaigns')
     .insert({
       renewal_id: renewal.id,
-      account_id: renewal.account_id,
       campaign_type: riskLevel === 'critical' ? 'high_risk' : 'standard',
-      days_before_renewal: daysToRenewal,
-      start_date: new Date().toISOString().split('T')[0],
+      start_date: new Date().toISOString(),
+      target_renewal_date: targetDate.toISOString(),
       touchpoints: touchpoints,
       total_touchpoints: touchpoints.length,
       status: 'active',
       personalization: {
         risk_level: riskLevel,
-        policy_type: renewal.policy_type,
-        premium: renewal.renewal_premium
+        policy_type: renewal.policy_type || 'unknown',
+        premium: renewal.renewal_premium || 0
       }
     });
+
+  if (error) {
+    console.error('❌ Error creating campaign:', error);
+  } else {
+    console.log('✅ Campaign created successfully');
+  }
 }
