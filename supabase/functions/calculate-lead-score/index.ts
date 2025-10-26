@@ -262,9 +262,6 @@ serve(async (req) => {
       .from("leads")
       .update({
         lead_score: result.score,
-        scoring_factors: result.factors,
-        scoring_recommendation: result.recommendation,
-        last_scored_at: new Date().toISOString(),
       })
       .eq("id", lead.id);
 
