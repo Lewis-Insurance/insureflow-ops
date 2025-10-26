@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useTableExists, useTableColumns } from '@/hooks/useSchemaValidator';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SCHEMA_REQUIREMENTS } from '@/config/schemaRequirements';
+import { SchemaTestRunner } from '@/components/renewals/SchemaTestRunner';
 
 const SchemaVerification = () => {
   const requiredTables = Object.entries(SCHEMA_REQUIREMENTS)
@@ -33,6 +34,9 @@ const SchemaVerification = () => {
             Verify that all required tables and columns exist for the renewal risk system
           </p>
         </div>
+
+        {/* Automated Test Runner */}
+        <SchemaTestRunner />
 
         {/* Tables Verification */}
         <Card>
