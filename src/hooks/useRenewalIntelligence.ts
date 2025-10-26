@@ -12,18 +12,28 @@ export interface AtRiskRenewal {
   current_premium: number;
   renewal_premium: number;
   renewal_date: string;
+  expiration_date?: string;
   status: string;
   assigned_to: string;
   risk_score?: number;
   risk_level?: 'low' | 'medium' | 'high' | 'critical';
   risk_calculated_at?: string;
+  last_risk_calculation?: string;
   last_contact_date?: string;
+  days_since_last_contact?: number;
+  contact_count?: number;
   engagement_score?: number;
   sentiment_score?: number;
+  customer_satisfaction_score?: number;
   price_increase_pct?: number;
+  price_change_pct?: number;
   has_recent_claim?: boolean;
   has_payment_issues?: boolean;
   competitor_activity_detected?: boolean;
+  risk_factors?: Record<string, boolean>;
+  campaign_type?: string;
+  completed_touchpoints?: number;
+  total_touchpoints?: number;
 }
 
 export interface RenewalIntelligenceSummary {
