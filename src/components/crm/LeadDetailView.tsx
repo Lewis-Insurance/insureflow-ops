@@ -58,38 +58,50 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   const deleteLead = useDeleteLead();
 
   // Fetch lead tasks
-  const { data: leadTasks } = useQuery<any[]>({
+  const { data: leadTasks } = useQuery({
     queryKey: ["tasks", "lead", lead?.id],
     queryFn: async () => {
       if (!lead?.id) return [];
-      const result: any = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("related_to_type", "lead")
-        .eq("related_to_id", lead.id)
-        .order("due_at", { ascending: true });
+      
+      try {
+        const response = await (supabase as any)
+          .from("tasks")
+          .select("*")
+          .eq("related_to_type", "lead")
+          .eq("related_to_id", lead.id)
+          .order("due_at", { ascending: true });
 
-      if (result.error) throw result.error;
-      return result.data || [];
+        if (response.error) throw response.error;
+        return response.data || [];
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        return [];
+      }
     },
     enabled: !!lead?.id && open,
   });
 
   // Fetch lead activities (audit logs)
-  const { data: activities } = useQuery<any[]>({
+  const { data: activities } = useQuery({
     queryKey: ["activities", "lead", lead?.id],
     queryFn: async () => {
       if (!lead?.id) return [];
-      const result: any = await supabase
-        .from("audit_logs")
-        .select("*")
-        .eq("entity_type", "lead")
-        .eq("entity_id", lead.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      
+      try {
+        const response = await (supabase as any)
+          .from("audit_logs")
+          .select("*")
+          .eq("entity_type", "lead")
+          .eq("entity_id", lead.id)
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-      if (result.error) throw result.error;
-      return result.data || [];
+        if (response.error) throw response.error;
+        return response.data || [];
+      } catch (error) {
+        console.error("Error fetching activities:", error);
+        return [];
+      }
     },
     enabled: !!lead?.id && open,
   });
