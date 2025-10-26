@@ -92,7 +92,7 @@ export interface Lead {
   assigned_to?: string;
   
   // Insurance Needs
-  insurance_needs: InsuranceNeedType[];
+  insurance_types: InsuranceNeedType[];
   current_carrier?: string;
   current_premium?: number;
   estimated_premium?: number;
@@ -272,7 +272,7 @@ export interface CreateLeadRequest {
   state?: string;
   zip?: string;
   company_name?: string;
-  insurance_needs: InsuranceNeedType[];
+  insurance_types: InsuranceNeedType[];
   current_carrier?: string;
   current_premium?: number;
   estimated_premium?: number;
@@ -307,7 +307,7 @@ export interface LeadFilters {
   source_id?: string[];
   lead_score_min?: number;
   lead_score_max?: number;
-  insurance_needs?: InsuranceNeedType[];
+  insurance_types?: InsuranceNeedType[];
   decision_timeframe?: DecisionTimeframe[];
   created_after?: string;
   created_before?: string;
