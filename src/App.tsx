@@ -49,6 +49,7 @@ const WorkspaceListPage = React.lazy(() => import("./pages/WorkspaceListPage"));
 const ComparisonReportPage = React.lazy(() => import("./pages/ComparisonReportPage"));
 const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
 const AgencyDashboard = React.lazy(() => import("./pages/AgencyDashboard"));
+const SchemaCheckPage = React.lazy(() => import("./pages/SchemaCheckPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -223,6 +224,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AdminPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/schema-check" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <SchemaCheckPage />
                   </ErrorBoundary>
                 } 
               />
