@@ -49,7 +49,7 @@ export function LeadAnalyticsDashboard() {
 
   // Group leads by source for bar chart
   const leadsBySource = leads?.reduce((acc, lead) => {
-    const source = lead.source_name || 'Unknown';
+    const source = (lead.source_name || 'Unknown').trim();
     acc[source] = (acc[source] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
