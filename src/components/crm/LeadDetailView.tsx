@@ -99,10 +99,9 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
       
       try {
         const response = await (supabase as any)
-          .from("audit_logs")
+          .from("lead_activities")
           .select("*")
-          .eq("entity", "leads")
-          .eq("entity_id", lead.id)
+          .eq("lead_id", lead.id)
           .order("created_at", { ascending: false })
           .limit(50);
 
@@ -576,20 +575,33 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">{activity.action}</span>
+                          <span className="text-sm font-medium">{activity.title}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
                           {format(new Date(activity.created_at), "PPp")}
                         </span>
                       </div>
-                      {activity.diff && (
-                        <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                          {JSON.stringify(activity.diff, null, 2)}
-                        </pre>
+                      {activity.description && (
+                        <p className="text-sm text-muted-foreground">{activity.description}</p>
                       )}
-                      {activity.user_id && (
+                      {(activity.old_value || activity.new_value) && (
+                        <div className="flex items-center gap-2 text-xs">
+                          {activity.old_value && (
+                            <span className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                              {activity.old_value}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">→</span>
+                          {activity.new_value && (
+                            <span className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                              {activity.new_value}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {activity.created_by && (
                         <p className="text-xs text-muted-foreground">
-                          By: {activity.user_id.slice(0, 8)}
+                          By: {activity.created_by.slice(0, 8)}
                         </p>
                       )}
                     </div>
