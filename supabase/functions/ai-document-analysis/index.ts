@@ -659,7 +659,10 @@ CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no
               console.warn('Coverage inference failed:', inferErr);
             }
           }
-        } catch (parseErr) {
+        } catch (postProcessErr) {
+          console.warn('Post-processing failed:', postProcessErr);
+        }
+      } catch (parseErr) {
           console.warn('JSON parse failed, attempting repair:', parseErr);
           
           try {
