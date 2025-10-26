@@ -10,6 +10,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +61,8 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   const [isEditing, setIsEditing] = useState(false);
   const [editedLead, setEditedLead] = useState<Partial<Lead>>({});
   const [newNote, setNewNote] = useState("");
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
 
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
@@ -104,6 +114,27 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
       }
     },
     enabled: !!lead?.id && open,
+  });
+
+  // Update task mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: any }) => {
+      const { error } = await supabase
+        .from("tasks")
+        .update(updates)
+        .eq("id", taskId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", "lead", lead?.id] });
+      setSelectedTask(null);
+      setEditingTask(null);
+      toast.success("Task updated successfully");
+    },
+    onError: (error: any) => {
+      toast.error("Failed to update task: " + error.message);
+    },
   });
 
   // Add note mutation
@@ -528,7 +559,11 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                   {leadTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="border rounded-lg p-4 space-y-2"
+                      className="border rounded-lg p-4 space-y-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setEditingTask({ ...task });
+                      }}
                     >
                       <div className="flex items-start justify-between">
                         <h4 className="font-medium">{task.title}</h4>
@@ -603,6 +638,121 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
           </TabsContent>
         </Tabs>
       </SheetContent>
+
+      {/* Task Edit Dialog */}
+      <Dialog open={!!selectedTask} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedTask(null);
+          setEditingTask(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>
+              Update task details and status
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingTask && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-title">Title</Label>
+                <Input
+                  id="task-title"
+                  value={editingTask.title || ""}
+                  onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="task-description">Description</Label>
+                <Textarea
+                  id="task-description"
+                  value={editingTask.description || ""}
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="task-status">Status</Label>
+                <Select
+                  value={editingTask.status || "pending"}
+                  onValueChange={(value) => setEditingTask({ ...editingTask, status: value })}
+                >
+                  <SelectTrigger id="task-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="task-priority">Priority</Label>
+                <Select
+                  value={editingTask.priority || "medium"}
+                  onValueChange={(value) => setEditingTask({ ...editingTask, priority: value })}
+                >
+                  <SelectTrigger id="task-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editingTask.due_at && (
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>{format(new Date(editingTask.due_at), "PPP")}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedTask(null);
+                setEditingTask(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (editingTask && selectedTask) {
+                  updateTaskMutation.mutate({
+                    taskId: selectedTask.id,
+                    updates: {
+                      title: editingTask.title,
+                      description: editingTask.description,
+                      status: editingTask.status,
+                      priority: editingTask.priority,
+                    },
+                  });
+                }
+              }}
+              disabled={updateTaskMutation.isPending}
+            >
+              {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
