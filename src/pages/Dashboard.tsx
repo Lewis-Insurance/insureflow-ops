@@ -1,4 +1,5 @@
 import React, { Suspense, useState } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,11 +15,16 @@ const DashboardContent = React.memo(() => {
   const [activeTab, setActiveTab] = useState<'book-of-business' | 'policies-quotes'>('book-of-business');
 
   if (authLoading) {
-    return <DashboardSkeleton />;
+    return (
+      <AppLayout>
+        <DashboardSkeleton />
+      </AppLayout>
+    );
   }
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8">
+    <AppLayout>
+      <div className="flex-1 space-y-6 p-4 md:p-8">
       <div className="flex items-center justify-between space-y-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
@@ -70,7 +76,8 @@ const DashboardContent = React.memo(() => {
           )}
         </ErrorBoundary>
       </div>
-    </div>
+      </div>
+    </AppLayout>
   );
 });
 
@@ -79,7 +86,11 @@ DashboardContent.displayName = 'DashboardContent';
 export default function Dashboard() {
   return (
     <ErrorBoundary level="page" resetOnPropsChange>
-      <Suspense fallback={<DashboardSkeleton />}>
+      <Suspense fallback={
+        <AppLayout>
+          <DashboardSkeleton />
+        </AppLayout>
+      }>
         <DashboardContent />
       </Suspense>
     </ErrorBoundary>

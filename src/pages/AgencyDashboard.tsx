@@ -1,4 +1,5 @@
 import { useDashboardMetrics, useProducerLeaderboard, usePipelineHealth } from '@/hooks/useDashboardMetrics';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +75,8 @@ export default function AgencyDashboard() {
                            metrics.pipeline.qualified + metrics.pipeline.quoted;
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <AppLayout>
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -365,6 +367,7 @@ export default function AgencyDashboard() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

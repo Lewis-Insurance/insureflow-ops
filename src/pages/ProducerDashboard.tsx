@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDashboardMetrics, useHistoricalTrend } from '@/hooks/useDashboardMetrics';
 import { useAuth } from '@/hooks/useAuth';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -42,21 +43,24 @@ export default function ProducerDashboard() {
 
   if (isLoading || !metrics) {
     return (
-      <div className="flex-1 p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="grid gap-4 md:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-muted rounded"></div>
-            ))}
+      <AppLayout>
+        <div className="flex-1 p-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/4"></div>
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <AppLayout>
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -374,6 +378,7 @@ export default function ProducerDashboard() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

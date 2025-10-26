@@ -4,11 +4,13 @@ import { LeadAnalyticsDashboard } from '@/components/crm/LeadAnalyticsDashboard'
 import { LeadCaptureForm } from '@/components/crm/LeadCaptureForm';
 import { PipelineKanban } from '@/components/crm/PipelineKanban';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { UserPlus, BarChart3, List, Workflow } from 'lucide-react';
 
 export default function Leads() {
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <AppLayout>
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -65,6 +67,7 @@ export default function Leads() {
           </ErrorBoundary>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
