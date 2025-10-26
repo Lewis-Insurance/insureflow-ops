@@ -337,6 +337,83 @@ export type Database = {
           },
         ]
       }
+      assignment_rules: {
+        Row: {
+          assignment_strategy: string
+          conditions: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          eligible_users: string[] | null
+          id: string
+          is_active: boolean | null
+          last_assigned_at: string | null
+          last_assigned_to: string | null
+          name: string
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assignment_strategy: string
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          eligible_users?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          last_assigned_at?: string | null
+          last_assigned_to?: string | null
+          name: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assignment_strategy?: string
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          eligible_users?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          last_assigned_at?: string | null
+          last_assigned_to?: string | null
+          name?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_last_assigned_to_fkey"
+            columns: ["last_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_last_assigned_to_fkey"
+            columns: ["last_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -617,6 +694,75 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_enrollments: {
+        Row: {
+          campaign_id: string
+          completed_at: string | null
+          converted_at: string | null
+          current_step: number | null
+          emails_clicked: number | null
+          emails_opened: number | null
+          emails_sent: number | null
+          enrolled_at: string | null
+          id: string
+          lead_id: string
+          next_step_at: string | null
+          sms_responded: number | null
+          sms_sent: number | null
+          status: string
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          completed_at?: string | null
+          converted_at?: string | null
+          current_step?: number | null
+          emails_clicked?: number | null
+          emails_opened?: number | null
+          emails_sent?: number | null
+          enrolled_at?: string | null
+          id?: string
+          lead_id: string
+          next_step_at?: string | null
+          sms_responded?: number | null
+          sms_sent?: number | null
+          status?: string
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          completed_at?: string | null
+          converted_at?: string | null
+          current_step?: number | null
+          emails_clicked?: number | null
+          emails_opened?: number | null
+          emails_sent?: number | null
+          enrolled_at?: string | null
+          id?: string
+          lead_id?: string
+          next_step_at?: string | null
+          sms_responded?: number | null
+          sms_sent?: number | null
+          status?: string
+          unsubscribed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_enrollments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -1420,6 +1566,13 @@ export type Database = {
           profile_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "customer_identities_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
           {
             foreignKeyName: "customer_identities_profile_id_fkey"
             columns: ["profile_id"]
@@ -2910,6 +3063,261 @@ export type Database = {
           },
         ]
       }
+      lead_activities: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          new_value: string | null
+          old_value: string | null
+          title: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          title: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "lead_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_sources: {
+        Row: {
+          cost_per_lead: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          cost_per_lead?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          cost_per_lead?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          assigned_at: string | null
+          assigned_to: string | null
+          city: string | null
+          converted_account_id: string | null
+          converted_at: string | null
+          created_at: string | null
+          created_by: string | null
+          current_carrier: string | null
+          current_premium: number | null
+          custom_fields: Json | null
+          decision_timeframe: string | null
+          email: string | null
+          first_name: string
+          id: string
+          insurance_types: string[] | null
+          last_contact_at: string | null
+          last_contact_type: string | null
+          last_name: string
+          lead_score: number | null
+          lost_notes: string | null
+          lost_reason: string | null
+          next_follow_up_date: string | null
+          notes: string | null
+          phone: string | null
+          search_vector: unknown
+          source_details: Json | null
+          source_id: string | null
+          state: string | null
+          status: string
+          tags: string[] | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          city?: string | null
+          converted_account_id?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_carrier?: string | null
+          current_premium?: number | null
+          custom_fields?: Json | null
+          decision_timeframe?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          insurance_types?: string[] | null
+          last_contact_at?: string | null
+          last_contact_type?: string | null
+          last_name: string
+          lead_score?: number | null
+          lost_notes?: string | null
+          lost_reason?: string | null
+          next_follow_up_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          search_vector?: unknown
+          source_details?: Json | null
+          source_id?: string | null
+          state?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          city?: string | null
+          converted_account_id?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_carrier?: string | null
+          current_premium?: number | null
+          custom_fields?: Json | null
+          decision_timeframe?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          insurance_types?: string[] | null
+          last_contact_at?: string | null
+          last_contact_type?: string | null
+          last_name?: string
+          lead_score?: number | null
+          lost_notes?: string | null
+          lost_reason?: string | null
+          next_follow_up_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          search_vector?: unknown
+          source_details?: Json | null
+          source_id?: string | null
+          state?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_account_id_fkey"
+            columns: ["converted_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_source_performance"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "leads_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lines_of_business: {
         Row: {
           category: string | null
@@ -3123,6 +3531,72 @@ export type Database = {
         }
         Relationships: []
       }
+      nurture_campaigns: {
+        Row: {
+          completed_count: number | null
+          converted_count: number | null
+          created_at: string | null
+          created_by: string | null
+          currently_enrolled: number | null
+          description: string | null
+          enrollment_conditions: Json
+          id: string
+          is_active: boolean | null
+          name: string
+          steps: Json
+          total_enrolled: number | null
+          unsubscribed_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          completed_count?: number | null
+          converted_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          currently_enrolled?: number | null
+          description?: string | null
+          enrollment_conditions: Json
+          id?: string
+          is_active?: boolean | null
+          name: string
+          steps: Json
+          total_enrolled?: number | null
+          unsubscribed_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          completed_count?: number | null
+          converted_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          currently_enrolled?: number | null
+          description?: string | null
+          enrollment_conditions?: Json
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          steps?: Json
+          total_enrolled?: number | null
+          unsubscribed_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "nurture_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ocr_cache: {
         Row: {
           accessed_at: string
@@ -3292,6 +3766,75 @@ export type Database = {
           verified?: boolean | null
         }
         Relationships: []
+      }
+      pipeline_rules: {
+        Row: {
+          actions: Json
+          conditions: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          execution_count: number | null
+          id: string
+          is_active: boolean | null
+          last_executed_at: string | null
+          name: string
+          priority: number | null
+          time_threshold_hours: number | null
+          trigger_event: string
+          trigger_stage: string
+          updated_at: string | null
+        }
+        Insert: {
+          actions: Json
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_executed_at?: string | null
+          name: string
+          priority?: number | null
+          time_threshold_hours?: number | null
+          trigger_event: string
+          trigger_stage: string
+          updated_at?: string | null
+        }
+        Update: {
+          actions?: Json
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_executed_at?: string | null
+          name?: string
+          priority?: number | null
+          time_threshold_hours?: number | null
+          trigger_event?: string
+          trigger_stage?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "pipeline_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       policies: {
         Row: {
@@ -4171,6 +4714,7 @@ export type Database = {
           policy_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           quote_id: string | null
+          related_lead_id: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
@@ -4198,6 +4742,7 @@ export type Database = {
           policy_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           quote_id?: string | null
+          related_lead_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
@@ -4225,6 +4770,7 @@ export type Database = {
           policy_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           quote_id?: string | null
+          related_lead_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
@@ -4263,6 +4809,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_related_lead_id_fkey"
+            columns: ["related_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -4497,6 +5050,13 @@ export type Database = {
             foreignKeyName: "tickets_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "tickets_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -4506,6 +5066,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
           },
           {
             foreignKeyName: "tickets_requester_id_fkey"
@@ -4653,6 +5220,49 @@ export type Database = {
           },
         ]
       }
+      lead_source_performance: {
+        Row: {
+          avg_lead_score: number | null
+          conversion_rate: number | null
+          converted_leads: number | null
+          cost_per_lead: number | null
+          roi: number | null
+          source_id: string | null
+          source_name: string | null
+          source_type: string | null
+          total_leads: number | null
+          total_revenue: number | null
+        }
+        Relationships: []
+      }
+      pipeline_summary: {
+        Row: {
+          avg_score: number | null
+          lead_count: number | null
+          new_this_month: number | null
+          new_this_week: number | null
+          status: string | null
+          total_premium_value: number | null
+        }
+        Relationships: []
+      }
+      producer_lead_stats: {
+        Row: {
+          avg_lead_score: number | null
+          contacted_leads: number | null
+          lost_leads: number | null
+          new_leads: number | null
+          producer_id: string | null
+          producer_name: string | null
+          qualified_leads: number | null
+          quoted_leads: number | null
+          total_leads: number | null
+          total_won_premium: number | null
+          win_rate: number | null
+          won_leads: number | null
+        }
+        Relationships: []
+      }
       v_kb_simple: {
         Row: {
           category: string | null
@@ -4704,6 +5314,11 @@ export type Database = {
         Args: { p_coi_id: string; p_version_data: Json }
         Returns: undefined
       }
+      assign_lead: {
+        Args: { p_lead_id: string; p_manual_assignee?: string }
+        Returns: string
+      }
+      calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
       claim_jobs_for_worker: {
         Args: { p_batch_size?: number }
         Returns: {
@@ -5105,6 +5720,10 @@ export type Database = {
         Args: { group_id: string; merged_data?: Json; survivor_id: string }
         Returns: Json
       }
+      move_lead_to_stage: {
+        Args: { p_lead_id: string; p_new_status: string }
+        Returns: boolean
+      }
       normalize_phone_number: { Args: { phone_input: string }; Returns: string }
       pick_enum_label: {
         Args: { candidates: string[]; enum_type: unknown }
@@ -5221,6 +5840,7 @@ export type Database = {
         Args: { p_account: string; p_role?: string; p_user: string }
         Returns: undefined
       }
+      user_has_lead_access: { Args: { p_lead_id: string }; Returns: boolean }
     }
     Enums: {
       account_status: "lead" | "active" | "churned"
