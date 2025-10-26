@@ -393,6 +393,47 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       )}
                     </div>
                   )}
+                  {((lead as any).city || (lead as any).state || (lead as any).zip_code) && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground opacity-0" />
+                      {isEditing ? (
+                        <div className="flex gap-2 flex-1">
+                          <Input
+                            placeholder="City"
+                            value={(editedLead as any).city !== undefined ? (editedLead as any).city : (lead as any).city || ""}
+                            onChange={(e) =>
+                              setEditedLead({ ...editedLead, city: e.target.value } as any)
+                            }
+                            className="flex-1"
+                          />
+                          <Input
+                            placeholder="State"
+                            value={(editedLead as any).state !== undefined ? (editedLead as any).state : (lead as any).state || ""}
+                            onChange={(e) =>
+                              setEditedLead({ ...editedLead, state: e.target.value } as any)
+                            }
+                            className="w-20"
+                          />
+                          <Input
+                            placeholder="Zip"
+                            value={(editedLead as any).zip_code !== undefined ? (editedLead as any).zip_code : (lead as any).zip_code || ""}
+                            onChange={(e) =>
+                              setEditedLead({ ...editedLead, zip_code: e.target.value } as any)
+                            }
+                            className="w-24"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-sm">
+                          {[
+                            (lead as any).city,
+                            (lead as any).state,
+                            (lead as any).zip_code
+                          ].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
