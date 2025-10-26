@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AppLayout } from '@/components/layout/AppLayout';
 import {
   Select,
   SelectContent,
@@ -36,7 +37,8 @@ export default function LeadsPage() {
   const { data: metrics, isLoading: metricsLoading } = useLeadMetrics();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <AppLayout>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -192,6 +194,7 @@ export default function LeadsPage() {
           <LeadAnalyticsDashboard />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
