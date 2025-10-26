@@ -28,7 +28,7 @@ serve(async (req) => {
     const { data: renewals, error: fetchError } = await supabase
       .from('renewals')
       .select('id, renewal_date, account_id, status')
-      .in('status', ['pending', 'contacted'])
+      .in('status', ['pending', 'contacted', 'quoted'])
       .lte('renewal_date', futureDate.toISOString().split('T')[0])
       .order('renewal_date', { ascending: true });
 
