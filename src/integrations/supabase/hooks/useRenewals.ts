@@ -131,9 +131,10 @@ export const useRenewal = (renewalId?: string) => {
         `
         )
         .eq("id", renewalId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Renewal not found");
       return data as Renewal;
     },
     enabled: !!renewalId,
@@ -577,9 +578,10 @@ export const useLogRenewalContact = () => {
         .from("renewals")
         .select("contact_count")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
+      if (!currentRenewal) throw new Error("Renewal not found");
 
       const newContactCount = (currentRenewal.contact_count || 0) + 1;
 
