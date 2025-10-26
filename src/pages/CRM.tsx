@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, memo, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Users, Building2, TrendingUp } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountSearch } from '@/components/crm/AccountSearch';
@@ -17,6 +18,8 @@ import { AuditLogViewer } from '@/components/crm/AuditLogViewer';
 import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
 import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
 import { RecentlyAccessed } from '@/components/crm/RecentlyAccessed';
+import { LeadList } from '@/components/crm/LeadList';
+import { LeadAnalyticsDashboard } from '@/components/crm/LeadAnalyticsDashboard';
 import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -281,117 +284,150 @@ const CRMContent = memo(() => {
           <RecentlyAccessed />
         </ErrorBoundary>
 
-        {/* Stats Cards */}
-        <ErrorBoundary level="component">
-          <StatsCards accounts={accounts} />
-        </ErrorBoundary>
+        {/* Main Tabs */}
+        <Tabs defaultValue="accounts" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="accounts">Accounts</TabsTrigger>
+            <TabsTrigger value="leads">Leads</TabsTrigger>
+          </TabsList>
 
-        {/* Saved Views */}
-        <ErrorBoundary level="component">
-          <Card>
-            <CardContent className="pt-6">
-              <SavedViewsManager
-                currentFilters={filters}
-                savedViews={savedViews}
-                onViewSelect={handleViewSelect}
-                onViewSave={handleViewSave}
-                onViewDelete={handleViewDelete}
-              />
-            </CardContent>
-          </Card>
-        </ErrorBoundary>
+          {/* Accounts Tab */}
+          <TabsContent value="accounts" className="space-y-6">
+            {/* Stats Cards */}
+            <ErrorBoundary level="component">
+              <StatsCards accounts={accounts} />
+            </ErrorBoundary>
 
-        {/* Data Quality Tools */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <ErrorBoundary level="component">
-            <DuplicateDetection onMergeComplete={handleRefreshAccounts} />
-          </ErrorBoundary>
-          <ErrorBoundary level="component">
-            <CSVImport onImportComplete={handleRefreshAccounts} />
-          </ErrorBoundary>
-          <ErrorBoundary level="component">
-            <SecurityStatus />
-          </ErrorBoundary>
-        </div>
+            {/* Saved Views */}
+            <ErrorBoundary level="component">
+              <Card>
+                <CardContent className="pt-6">
+                  <SavedViewsManager
+                    currentFilters={filters}
+                    savedViews={savedViews}
+                    onViewSelect={handleViewSelect}
+                    onViewSave={handleViewSave}
+                    onViewDelete={handleViewDelete}
+                  />
+                </CardContent>
+              </Card>
+            </ErrorBoundary>
 
-        {/* Advanced Import/Export System */}
-        <ErrorBoundary level="component">
-          <AdvancedImportSystem onImportComplete={handleRefreshAccounts} />
-        </ErrorBoundary>
-
-        {/* Enhanced Audit System for Staff/Admin */}
-        {canViewAuditLogs && (
-          <ErrorBoundary level="component">
-            <EnhancedAuditViewer />
-          </ErrorBoundary>
-        )}
-
-        {/* Search and Filters */}
-        <ErrorBoundary level="component">
-          <Card>
-            <CardHeader>
-              <CardTitle>Search Accounts</CardTitle>
-              <CardDescription>
-                Find customer accounts by name, phone, email, or other criteria
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AccountSearch
-                filters={filters}
-                onFiltersChange={setFilters}
-                onSearch={debouncedSearch}
-                loading={loading}
-              />
-            </CardContent>
-          </Card>
-        </ErrorBoundary>
-
-        {/* Error State */}
-        {error && (
-          <Card className="border-destructive">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2">
-                <Badge variant="destructive">Error</Badge>
-                <span className="text-sm">{error}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Bulk Actions Bar */}
-        <ErrorBoundary level="component">
-          <BulkActionsBar
-            selectedAccounts={selectedAccounts as any}
-            onSelectionClear={handleSelectionClear}
-            onBulkAction={handleBulkAction}
-          />
-        </ErrorBoundary>
-
-        {/* Results */}
-        <ErrorBoundary level="component">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">
-                Accounts ({accounts.length})
-              </h3>
-              {accounts.length > 0 && (
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <TrendingUp className="h-4 w-4" />
-                  <span>Showing {accounts.length} accounts</span>
-                </div>
-              )}
+            {/* Data Quality Tools */}
+            <div className="grid gap-6 md:grid-cols-3">
+              <ErrorBoundary level="component">
+                <DuplicateDetection onMergeComplete={handleRefreshAccounts} />
+              </ErrorBoundary>
+              <ErrorBoundary level="component">
+                <CSVImport onImportComplete={handleRefreshAccounts} />
+              </ErrorBoundary>
+              <ErrorBoundary level="component">
+                <SecurityStatus />
+              </ErrorBoundary>
             </div>
 
-            <AccountList
-              accounts={accounts as any}
-              loading={loading}
-              onEdit={handleEdit as any}
-              onDelete={handleDelete}
-              selectedAccounts={selectedAccounts as any}
-              onAccountSelection={handleAccountSelection as any}
-            />
-          </div>
-        </ErrorBoundary>
+            {/* Advanced Import/Export System */}
+            <ErrorBoundary level="component">
+              <AdvancedImportSystem onImportComplete={handleRefreshAccounts} />
+            </ErrorBoundary>
+
+            {/* Enhanced Audit System for Staff/Admin */}
+            {canViewAuditLogs && (
+              <ErrorBoundary level="component">
+                <EnhancedAuditViewer />
+              </ErrorBoundary>
+            )}
+
+            {/* Search and Filters */}
+            <ErrorBoundary level="component">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Search Accounts</CardTitle>
+                  <CardDescription>
+                    Find customer accounts by name, phone, email, or other criteria
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AccountSearch
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onSearch={debouncedSearch}
+                    loading={loading}
+                  />
+                </CardContent>
+              </Card>
+            </ErrorBoundary>
+
+            {/* Error State */}
+            {error && (
+              <Card className="border-destructive">
+                <CardContent className="pt-6">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="destructive">Error</Badge>
+                    <span className="text-sm">{error}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Bulk Actions Bar */}
+            <ErrorBoundary level="component">
+              <BulkActionsBar
+                selectedAccounts={selectedAccounts as any}
+                onSelectionClear={handleSelectionClear}
+                onBulkAction={handleBulkAction}
+              />
+            </ErrorBoundary>
+
+            {/* Results */}
+            <ErrorBoundary level="component">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">
+                    Accounts ({accounts.length})
+                  </h3>
+                  {accounts.length > 0 && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Showing {accounts.length} accounts</span>
+                    </div>
+                  )}
+                </div>
+
+                <AccountList
+                  accounts={accounts as any}
+                  loading={loading}
+                  onEdit={handleEdit as any}
+                  onDelete={handleDelete}
+                  selectedAccounts={selectedAccounts as any}
+                  onAccountSelection={handleAccountSelection as any}
+                />
+              </div>
+            </ErrorBoundary>
+          </TabsContent>
+
+          {/* Leads Tab */}
+          <TabsContent value="leads" className="space-y-6">
+            <Tabs defaultValue="list" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="list">Lead List</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="list">
+                <ErrorBoundary level="component">
+                  <LeadList />
+                </ErrorBoundary>
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <ErrorBoundary level="component">
+                  <LeadAnalyticsDashboard />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+        </Tabs>
 
         {/* Account Form Dialog */}
         <ErrorBoundary level="component">
