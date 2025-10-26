@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { usePipelineStats, useLeadSourcePerformance } from '@/hooks/useLeadManagement';
-import { useWinRateByProducer, useWinRateBySource, useWinRateByInsuranceType } from '@/hooks/useLeadAnalytics';
 import { GoalProgressChart } from '@/components/visualizations/GoalProgressChart';
 import { ConversionFunnel } from '@/components/visualizations/ConversionFunnel';
 import { ProjectionMetricsToggle } from './ProjectionMetricsToggle';
@@ -36,9 +35,6 @@ const COLORS = ['#3b82f6', '#eab308', '#a855f7', '#f97316', '#22c55e', '#ef4444'
 export function LeadAnalyticsDashboard() {
   const { data: pipelineStats } = usePipelineStats();
   const { data: sourcePerformance } = useLeadSourcePerformance();
-  const { data: producerPerformance } = useWinRateByProducer();
-  const { data: sourceWinRates } = useWinRateBySource();
-  const { data: insuranceTypeRates } = useWinRateByInsuranceType();
 
   // Dashboard customization state
   const [showGoals, setShowGoals] = useState(true);
@@ -94,13 +90,12 @@ export function LeadAnalyticsDashboard() {
     { label: 'Won', count: wonLeads, color: '#22c55e' },
   ];
 
-  // Team performance radar data
-  const teamRadarData = producerPerformance?.slice(0, 5).map(p => ({
-    producer: p.producer_name.split(' ')[0], // First name only
-    winRate: p.win_rate,
-    avgDeal: (p.avg_deal_value / 1000), // Convert to thousands
-    totalLeads: p.total_leads,
-  })) || [];
+  // Mock team performance data (would come from analytics in production)
+  const teamRadarData = [
+    { producer: 'Producer 1', winRate: 45, avgDeal: 5, totalLeads: 20 },
+    { producer: 'Producer 2', winRate: 38, avgDeal: 4.5, totalLeads: 18 },
+    { producer: 'Producer 3', winRate: 52, avgDeal: 6, totalLeads: 25 },
+  ];
 
   return (
     <div className="space-y-6">
@@ -340,28 +335,12 @@ export function LeadAnalyticsDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Producer Win Rates</CardTitle>
-                  <CardDescription>Performance metrics by team member</CardDescription>
+                  <CardDescription>Performance metrics by team member (coming soon)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {producerPerformance?.map((producer) => (
-                      <div key={producer.producer_id} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{producer.producer_name}</span>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span>{producer.total_leads} leads</span>
-                            <span className="font-bold">{producer.win_rate.toFixed(1)}%</span>
-                            <span className="text-muted-foreground">{formatCurrency(producer.avg_deal_value)}</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-full transition-all"
-                            style={{ width: `${Math.min(producer.win_rate, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Producer analytics will be available soon</p>
                   </div>
                 </CardContent>
               </Card>
@@ -371,18 +350,18 @@ export function LeadAnalyticsDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Source Performance</CardTitle>
-                  <CardDescription>Win rates and ROI by lead source</CardDescription>
+                  <CardDescription>Lead volume and conversion by source</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={sourceWinRates?.slice(0, 8)}>
+                    <BarChart data={sourcePerformance?.slice(0, 8)}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="source_name" angle={-45} textAnchor="end" height={100} />
+                      <XAxis dataKey="source" angle={-45} textAnchor="end" height={100} />
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="win_rate" fill="#3b82f6" name="Win Rate %" />
-                      <Bar dataKey="total_leads" fill="#22c55e" name="Total Leads" />
+                      <Bar dataKey="conversion_rate" fill="#3b82f6" name="Conversion %" />
+                      <Bar dataKey="total" fill="#22c55e" name="Total Leads" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -393,20 +372,13 @@ export function LeadAnalyticsDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Insurance Type Performance</CardTitle>
-                  <CardDescription>Win rates by insurance product</CardDescription>
+                  <CardDescription>Analytics by insurance product (coming soon)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={insuranceTypeRates} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis type="category" dataKey="insurance_type" width={100} />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="win_rate" fill="#8b5cf6" name="Win Rate %" />
-                      <Bar dataKey="total_leads" fill="#f97316" name="Total Leads" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Insurance type analytics will be available soon</p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

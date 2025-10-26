@@ -134,7 +134,7 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
     queryFn: async () => {
       let query = supabase
         .from('leads')
-        .select('source, status, lead_score, estimated_premium, created_at');
+        .select('source_id, status, lead_score, estimated_premium, created_at');
 
       if (dateRange) {
         query = query
@@ -149,11 +149,13 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
         throw error;
       }
 
-      // Group by source
+      // Group by source_id
       const sourceMetrics = data.reduce((acc, lead) => {
-        if (!acc[lead.source]) {
-          acc[lead.source] = {
-            source: lead.source,
+        const sourceId = lead.source_id || 'unknown';
+        
+        if (!acc[sourceId]) {
+          acc[sourceId] = {
+            source: sourceId,
             total: 0,
             won: 0,
             lost: 0,
@@ -165,14 +167,14 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
           };
         }
 
-        acc[lead.source].total++;
-        if (lead.status === 'won') acc[lead.source].won++;
-        if (lead.status === 'lost') acc[lead.source].lost++;
+        acc[sourceId].total++;
+        if (lead.status === 'won') acc[sourceId].won++;
+        if (lead.status === 'lost') acc[sourceId].lost++;
         if (['contacted', 'qualified', 'quoted', 'pending'].includes(lead.status)) {
-          acc[lead.source].in_progress++;
+          acc[sourceId].in_progress++;
         }
-        acc[lead.source].total_value += lead.estimated_premium || 0;
-        acc[lead.source].scores.push(lead.lead_score || 0);
+        acc[sourceId].total_value += lead.estimated_premium || 0;
+        acc[sourceId].scores.push(lead.lead_score || 0);
 
         return acc;
       }, {} as Record<string, any>);
