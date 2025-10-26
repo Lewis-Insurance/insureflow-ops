@@ -127,7 +127,7 @@ export function InsuredTotalValueReport() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(1)}%`}
+                    label={({ name, percent }) => `${name.split(' ')[0]} ${((Number(percent) || 0) * 100).toFixed(1)}%`}
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"

@@ -46,6 +46,8 @@ const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison
 const WorkspacePage = React.lazy(() => import("./pages/WorkspacePage"));
 const WorkspaceListPage = React.lazy(() => import("./pages/WorkspaceListPage"));
 const ComparisonReportPage = React.lazy(() => import("./pages/ComparisonReportPage"));
+const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
+const AgencyDashboard = React.lazy(() => import("./pages/AgencyDashboard"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -79,6 +81,22 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ProducerDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/dashboard/agency"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AgencyDashboard />
+                  </ErrorBoundary>
+                }
+              />
               <Route 
                 path="/crm" 
                 element={

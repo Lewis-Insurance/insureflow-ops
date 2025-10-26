@@ -3926,6 +3926,39 @@ export type Database = {
           },
         ]
       }
+      producer_goals: {
+        Row: {
+          created_at: string
+          daily_target: number | null
+          id: string
+          month: string
+          monthly_revenue_target: number | null
+          monthly_target: number | null
+          producer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_target?: number | null
+          id?: string
+          month: string
+          monthly_revenue_target?: number | null
+          monthly_target?: number | null
+          producer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_target?: number | null
+          id?: string
+          month?: string
+          monthly_revenue_target?: number | null
+          monthly_target?: number | null
+          producer_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profile_access_logs: {
         Row: {
           accessor_user_id: string | null
