@@ -1,108 +1,211 @@
+// src/pages/Leads.tsx
 import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { LeadCaptureForm } from '@/components/crm/LeadCaptureForm';
-import { LeadsList } from '@/components/leads/LeadsList';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PipelineKanban } from '@/components/leads/PipelineKanban';
-import { LeadDetailView } from '@/components/crm/LeadDetailView';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { useLeads } from '@/hooks/useLeads';
-import { Plus, List, LayoutGrid } from 'lucide-react';
+import { QuickLeadCapture } from '@/components/leads/QuickLeadCapture';
+import { useLeadMetrics } from '@/hooks/useLeadAnalytics';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Search, 
+  Filter, 
+  Download,
+  TrendingUp,
+  Users,
+  CheckCircle2,
+  DollarSign,
+  BarChart3
+} from 'lucide-react';
+import { LeadStatus } from '@/types/leads';
 
-export default function Leads() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'kanban' | 'list'>('kanban');
-
-  // Fetch leads data to get the selected lead
-  const { data: leads = [] } = useLeads();
-
-  const handleLeadSelect = (leadId: string) => {
-    setSelectedLeadId(leadId);
-  };
-
-  const handleCreateSuccess = () => {
-    setIsCreateDialogOpen(false);
-  };
-
-  // Find the selected lead from the leads data
-  const selectedLead = selectedLeadId 
-    ? leads.find(lead => lead.id === selectedLeadId) || null
-    : null;
+export default function LeadsPage() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
+  
+  const { data: metrics, isLoading: metricsLoading } = useLeadMetrics();
 
   return (
-    <AppLayout>
-      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Leads</h1>
-            <p className="text-muted-foreground">
-              Manage your sales pipeline and track lead progress
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={activeView === 'kanban' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveView('kanban')}
-            >
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Pipeline
-            </Button>
-            <Button
-              variant={activeView === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveView('list')}
-            >
-              <List className="mr-2 h-4 w-4" />
-              List
-            </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Lead
-            </Button>
-          </div>
-        </div>
-
-        {/* Content */}
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          {activeView === 'kanban' ? (
-            <PipelineKanban onLeadClick={handleLeadSelect} />
-          ) : (
-            <LeadsList
-              onLeadSelect={handleLeadSelect}
-              onCreateLead={() => setIsCreateDialogOpen(true)}
-            />
-          )}
+          <h1 className="text-3xl font-bold tracking-tight">Lead Pipeline</h1>
+          <p className="text-muted-foreground">
+            Manage and track your leads through the sales pipeline
+          </p>
         </div>
-
-        {/* Create Lead Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Lead</DialogTitle>
-              <DialogDescription>
-                Capture a new lead and add them to your pipeline
-              </DialogDescription>
-            </DialogHeader>
-            <LeadCaptureForm onSuccess={handleCreateSuccess} />
-          </DialogContent>
-        </Dialog>
-
-        {/* Lead Detail Panel */}
-        <LeadDetailView
-          lead={selectedLead as any}
-          open={!!selectedLeadId}
-          onOpenChange={(open) => !open && setSelectedLeadId(null)}
-        />
+        <QuickLeadCapture />
       </div>
-    </AppLayout>
+
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsLoading ? '...' : metrics?.total_leads || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {metricsLoading ? '...' : metrics?.new_leads || 0} new this week
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsLoading ? '...' : `${metrics?.conversion_rate.toFixed(1)}%` || '0%'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {metricsLoading ? '...' : metrics?.won_leads || 0} won leads
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsLoading 
+                ? '...' 
+                : `$${metrics?.total_pipeline_value.toLocaleString()}` || '$0'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Estimated annual premium
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Lead Score</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsLoading ? '...' : metrics?.average_score.toFixed(0) || '0'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Out of 100 points
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search leads by name, email, phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="qualified">Qualified</SelectItem>
+                <SelectItem value="quoted">Quoted</SelectItem>
+                <SelectItem value="won">Won</SelectItem>
+                <SelectItem value="lost">Lost</SelectItem>
+                <SelectItem value="nurturing">Nurturing</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Source Filter */}
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="All Sources" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="website">Website</SelectItem>
+                <SelectItem value="social_media">Social Media</SelectItem>
+                <SelectItem value="referral">Referral</SelectItem>
+                <SelectItem value="walk_in">Walk-in</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+                <SelectItem value="event">Event</SelectItem>
+                <SelectItem value="purchased_list">Purchased List</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Export Button */}
+            <Button variant="outline" className="w-full sm:w-auto">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content - Tabs */}
+      <Tabs defaultValue="pipeline" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="pipeline">Pipeline View</TabsTrigger>
+          <TabsTrigger value="list">List View</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pipeline" className="space-y-4">
+          <PipelineKanban />
+        </TabsContent>
+
+        <TabsContent value="list" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">List View Coming Soon</h3>
+                <p>Table view with advanced sorting and filtering</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12 text-muted-foreground">
+                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">Analytics Coming Soon</h3>
+                <p>Detailed charts and insights about your pipeline</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

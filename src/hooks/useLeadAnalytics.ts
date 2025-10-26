@@ -195,3 +195,101 @@ export function useWinRateByInsuranceType() {
     }
   });
 }
+
+export interface LeadMetrics {
+  total_leads: number;
+  new_leads: number;
+  contacted_leads: number;
+  qualified_leads: number;
+  quoted_leads: number;
+  won_leads: number;
+  lost_leads: number;
+  nurturing_leads: number;
+  conversion_rate: number;
+  total_pipeline_value: number;
+  average_score: number;
+}
+
+export function useLeadMetrics() {
+  return useQuery({
+    queryKey: ['lead-metrics'],
+    queryFn: async () => {
+      // Get current week start date
+      const now = new Date();
+      const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+      weekStart.setHours(0, 0, 0, 0);
+
+      // Fetch all leads
+      const { data: allLeads, error: allError } = await supabase
+        .from('leads')
+        .select('status, lead_score, estimated_premium, created_at');
+
+      if (allError) throw allError;
+
+      // Fetch new leads from this week
+      const { data: newLeadsData, error: newError } = await supabase
+        .from('leads')
+        .select('id')
+        .gte('created_at', weekStart.toISOString());
+
+      if (newError) throw newError;
+
+      // Calculate metrics
+      const totalLeads = allLeads?.length || 0;
+      const newLeads = newLeadsData?.length || 0;
+      
+      const statusCounts = {
+        new: 0,
+        contacted: 0,
+        qualified: 0,
+        quoted: 0,
+        won: 0,
+        lost: 0,
+        nurturing: 0,
+      };
+
+      let totalScore = 0;
+      let totalPipelineValue = 0;
+
+      allLeads?.forEach((lead) => {
+        // Count by status
+        if (lead.status in statusCounts) {
+          statusCounts[lead.status as keyof typeof statusCounts]++;
+        }
+
+        // Sum scores
+        totalScore += lead.lead_score || 0;
+
+        // Sum pipeline value (excluding won/lost)
+        if (lead.status !== 'won' && lead.status !== 'lost') {
+          totalPipelineValue += lead.estimated_premium || 0;
+        }
+      });
+
+      const conversionRate = totalLeads > 0 
+        ? (statusCounts.won / totalLeads) * 100 
+        : 0;
+
+      const averageScore = totalLeads > 0 
+        ? totalScore / totalLeads 
+        : 0;
+
+      const metrics: LeadMetrics = {
+        total_leads: totalLeads,
+        new_leads: newLeads,
+        contacted_leads: statusCounts.contacted,
+        qualified_leads: statusCounts.qualified,
+        quoted_leads: statusCounts.quoted,
+        won_leads: statusCounts.won,
+        lost_leads: statusCounts.lost,
+        nurturing_leads: statusCounts.nurturing,
+        conversion_rate: conversionRate,
+        total_pipeline_value: totalPipelineValue,
+        average_score: averageScore,
+      };
+
+      return metrics;
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+}
