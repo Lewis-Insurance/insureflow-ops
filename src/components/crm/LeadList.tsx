@@ -292,13 +292,13 @@ export function LeadList() {
       </div>
 
       {/* Lead Detail Sheet */}
-      <Sheet open={!!selectedLeadId} onOpenChange={() => setSelectedLeadId(null)}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col p-0">
-          {selectedLeadId && (
-            <LeadDetailView leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} />
-          )}
-        </SheetContent>
-      </Sheet>
+      {selectedLeadId && leads && (
+        <LeadDetailView 
+          lead={(leads.find(l => l.id === selectedLeadId) as any) || null}
+          open={!!selectedLeadId}
+          onOpenChange={(open) => !open && setSelectedLeadId(null)}
+        />
+      )}
 
       {/* New Lead Sheet */}
       <Sheet open={showNewLeadForm} onOpenChange={setShowNewLeadForm}>
