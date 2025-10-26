@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Ticket, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Ticket, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
@@ -187,9 +187,15 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 label="Reports" 
                 to="/reports" 
               />
+              <NavItem 
+                icon={Sliders} 
+                label="Customization" 
+                to="/customization"
+                badge="New"
+              />
               {profile?.role === 'admin' && (
                 <NavItem 
-                  icon={Settings} 
+                  icon={Shield} 
                   label="Admin" 
                   to="/admin" 
                 />

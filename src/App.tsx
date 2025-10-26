@@ -51,6 +51,7 @@ const ComparisonReportPage = React.lazy(() => import("./pages/ComparisonReportPa
 const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
 const AgencyDashboard = React.lazy(() => import("./pages/AgencyDashboard"));
 const SchemaCheckPage = React.lazy(() => import("./pages/SchemaCheckPage"));
+const CustomizationPage = React.lazy(() => import("./pages/CustomizationPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -233,6 +234,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AdminPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/customization" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CustomizationPage />
                   </ErrorBoundary>
                 } 
               />
