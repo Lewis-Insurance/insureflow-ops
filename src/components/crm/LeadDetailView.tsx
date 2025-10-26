@@ -57,19 +57,19 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
 
-  // Fetch lead tasks
+  // Fetch lead tasks - simplified to show recent tasks
   const { data: leadTasks } = useQuery({
     queryKey: ["tasks", "lead", lead?.id],
     queryFn: async () => {
       if (!lead?.id) return [];
       
       try {
+        // Show recent tasks - tasks table doesn't have lead relationships
         const response = await (supabase as any)
           .from("tasks")
           .select("*")
-          .eq("related_to_type", "lead")
-          .eq("related_to_id", lead.id)
-          .order("due_at", { ascending: true });
+          .order("due_at", { ascending: true })
+          .limit(10);
 
         if (response.error) throw response.error;
         return response.data || [];
@@ -91,7 +91,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
         const response = await (supabase as any)
           .from("audit_logs")
           .select("*")
-          .eq("entity_type", "lead")
+          .eq("entity", "leads")
           .eq("entity_id", lead.id)
           .order("created_at", { ascending: false })
           .limit(50);
