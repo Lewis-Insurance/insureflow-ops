@@ -116,6 +116,27 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
     enabled: !!lead?.id && open,
   });
 
+  // Fetch assigned user profile
+  const { data: assignedUser } = useQuery({
+    queryKey: ["profile", lead?.assigned_to ?? ""] as const,
+    queryFn: async () => {
+      if (!lead?.assigned_to) return null;
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("id", lead.assigned_to)
+        .single();
+
+      if (error) {
+        console.error("Error fetching assigned user:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!lead?.assigned_to && open,
+  });
+
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, updates }: { taskId: string; updates: any }) => {
@@ -565,7 +586,9 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                     <h3 className="text-sm font-semibold mb-3">Assignment</h3>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Assigned to: {lead.assigned_to.slice(0, 8)}</span>
+                      <span className="text-sm">
+                        Assigned to: {assignedUser?.full_name || "Loading..."}
+                      </span>
                     </div>
                   </div>
                 </>
