@@ -121,7 +121,7 @@ serve(async (req) => {
         insurance_types: submission.insurance_types || [],
         current_carrier: submission.current_carrier,
         current_premium: submission.current_premium,
-        decision_timeframe: submission.decision_timeframe || 'future',
+        decision_timeframe: submission.decision_timeframe || 'just_shopping',
         source_id: sourceId,
         source_details: submission.source_details || {},
         notes: submission.notes,
