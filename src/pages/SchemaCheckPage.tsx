@@ -24,10 +24,10 @@ export default function SchemaCheckPage() {
     
     const tablesToCheck = [
       'renewals',
-      'renewal_risk_history',
       'renewal_campaigns',
-      'accounts',
-      'policies'
+      'renewal_risk_factors',
+      'renewal_touchpoints',
+      'at_risk_renewals'
     ];
 
     const newResults: Record<string, TableResult> = {};
@@ -66,14 +66,14 @@ export default function SchemaCheckPage() {
       const riskFields = [
         'risk_score',
         'risk_level',
-        'risk_factors',
-        'last_risk_calculation',
-        'days_since_last_contact',
-        'contact_count',
-        'has_recent_claims',
+        'risk_calculated_at',
+        'last_contact_date',
+        'engagement_score',
+        'sentiment_score',
+        'price_increase_pct',
+        'has_recent_claim',
+        'has_payment_issues',
         'competitor_activity_detected',
-        'customer_satisfaction_score',
-        'engagement_score'
       ];
 
       const fieldsCheck: Record<string, boolean> = {};
@@ -109,152 +109,16 @@ export default function SchemaCheckPage() {
     checkSchema();
   }, []);
 
-  const migrationSQL = `-- ============================================================================
--- RENEWAL RISK MIGRATION - Add Risk Fields & Tables
--- ============================================================================
-
--- PART 1: Add Risk Fields to Renewals Table
-ALTER TABLE public.renewals 
-ADD COLUMN IF NOT EXISTS risk_score INTEGER,
-ADD COLUMN IF NOT EXISTS risk_level TEXT CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
-ADD COLUMN IF NOT EXISTS risk_factors JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS last_risk_calculation TIMESTAMP WITH TIME ZONE,
-ADD COLUMN IF NOT EXISTS days_since_last_contact INTEGER,
-ADD COLUMN IF NOT EXISTS contact_count INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS has_recent_claims BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS competitor_activity_detected BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS customer_satisfaction_score INTEGER,
-ADD COLUMN IF NOT EXISTS engagement_score INTEGER;
-
--- Create indexes
-CREATE INDEX IF NOT EXISTS idx_renewals_risk_score ON public.renewals(risk_score);
-CREATE INDEX IF NOT EXISTS idx_renewals_risk_level ON public.renewals(risk_level);
-CREATE INDEX IF NOT EXISTS idx_renewals_renewal_date_risk ON public.renewals(renewal_date, risk_level);
-
--- PART 2: Create Renewal Risk History Table
-CREATE TABLE IF NOT EXISTS public.renewal_risk_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  renewal_id UUID NOT NULL REFERENCES public.renewals(id) ON DELETE CASCADE,
-  risk_score INTEGER NOT NULL,
-  risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
-  risk_factors JSONB DEFAULT '[]'::jsonb,
-  calculated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  calculated_by UUID REFERENCES auth.users(id),
-  notes TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_risk_history_renewal_id ON public.renewal_risk_history(renewal_id);
-CREATE INDEX IF NOT EXISTS idx_risk_history_calculated_at ON public.renewal_risk_history(calculated_at DESC);
-
--- RLS for history table
-ALTER TABLE public.renewal_risk_history ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view risk history for their account renewals" ON public.renewal_risk_history;
-CREATE POLICY "Users can view risk history for their account renewals"
-  ON public.renewal_risk_history FOR SELECT
-  USING (
-    renewal_id IN (
-      SELECT r.id FROM public.renewals r
-      INNER JOIN public.account_memberships am ON am.account_id = r.account_id
-      WHERE am.user_id = auth.uid()
-    )
-  );
-
-DROP POLICY IF EXISTS "Users can create risk history for their account renewals" ON public.renewal_risk_history;
-CREATE POLICY "Users can create risk history for their account renewals"
-  ON public.renewal_risk_history FOR INSERT
-  WITH CHECK (
-    renewal_id IN (
-      SELECT r.id FROM public.renewals r
-      INNER JOIN public.account_memberships am ON am.account_id = r.account_id
-      WHERE am.user_id = auth.uid()
-    )
-  );
-
--- PART 3: Create Renewal Campaigns Table
-CREATE TABLE IF NOT EXISTS public.renewal_campaigns (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  renewal_id UUID NOT NULL REFERENCES public.renewals(id) ON DELETE CASCADE,
-  account_id UUID NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
-  campaign_type TEXT NOT NULL CHECK (campaign_type IN ('standard', 'high_risk', 'loyalty', 'win_back')),
-  days_before_renewal INTEGER NOT NULL DEFAULT 90,
-  start_date DATE NOT NULL,
-  touchpoints JSONB NOT NULL DEFAULT '[]'::jsonb,
-  total_touchpoints INTEGER NOT NULL DEFAULT 0,
-  completed_touchpoints INTEGER NOT NULL DEFAULT 0,
-  personalization JSONB DEFAULT '{}'::jsonb,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'cancelled')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_renewal_campaigns_renewal_id ON public.renewal_campaigns(renewal_id);
-CREATE INDEX IF NOT EXISTS idx_renewal_campaigns_account_id ON public.renewal_campaigns(account_id);
-CREATE INDEX IF NOT EXISTS idx_renewal_campaigns_status ON public.renewal_campaigns(status);
-
--- RLS for campaigns
-ALTER TABLE public.renewal_campaigns ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view campaigns for their accounts" ON public.renewal_campaigns;
-CREATE POLICY "Users can view campaigns for their accounts"
-  ON public.renewal_campaigns FOR SELECT
-  USING (
-    account_id IN (
-      SELECT account_id FROM public.account_memberships WHERE user_id = auth.uid()
-    )
-  );
-
-DROP POLICY IF EXISTS "Users can create campaigns for their accounts" ON public.renewal_campaigns;
-CREATE POLICY "Users can create campaigns for their accounts"
-  ON public.renewal_campaigns FOR INSERT
-  WITH CHECK (
-    account_id IN (
-      SELECT account_id FROM public.account_memberships WHERE user_id = auth.uid()
-    )
-  );
-
-DROP POLICY IF EXISTS "Users can update campaigns for their accounts" ON public.renewal_campaigns;
-CREATE POLICY "Users can update campaigns for their accounts"
-  ON public.renewal_campaigns FOR UPDATE
-  USING (
-    account_id IN (
-      SELECT account_id FROM public.account_memberships WHERE user_id = auth.uid()
-    )
-  );
-
-DROP POLICY IF EXISTS "Users can delete campaigns for their accounts" ON public.renewal_campaigns;
-CREATE POLICY "Users can delete campaigns for their accounts"
-  ON public.renewal_campaigns FOR DELETE
-  USING (
-    account_id IN (
-      SELECT account_id FROM public.account_memberships WHERE user_id = auth.uid()
-    )
-  );
-
--- Updated_at trigger
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = timezone('utc'::text, now());
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-DROP TRIGGER IF EXISTS update_renewal_campaigns_updated_at ON public.renewal_campaigns;
-CREATE TRIGGER update_renewal_campaigns_updated_at
-  BEFORE UPDATE ON public.renewal_campaigns
-  FOR EACH ROW
-  EXECUTE FUNCTION public.update_updated_at_column();`;
-
   const copyMigrationSQL = () => {
-    navigator.clipboard.writeText(migrationSQL);
-    toast.success('Migration SQL copied to clipboard!');
+    toast.success('The migration SQL has already been run! Click Recheck to verify.');
   };
 
   const allTablesExist = 
     results.renewals?.exists &&
-    results.renewal_risk_history?.exists &&
-    results.renewal_campaigns?.exists;
+    results.renewal_campaigns?.exists &&
+    results.renewal_risk_factors?.exists &&
+    results.renewal_touchpoints?.exists &&
+    results.at_risk_renewals?.exists;
 
   const allRiskFieldsExist = Object.values(riskFieldsCheck).every(v => v);
   const isReady = allTablesExist && allRiskFieldsExist;
@@ -290,7 +154,7 @@ CREATE TRIGGER update_renewal_campaigns_updated_at
                   <div>
                     <p className="font-semibold text-green-900 dark:text-green-100">✅ Schema Ready!</p>
                     <p className="text-sm text-green-700 dark:text-green-300">
-                      All tables and fields exist. You can use the renewal risk hooks.
+                      All tables and fields exist. You can use the renewal risk features.
                     </p>
                   </div>
                 </>
@@ -298,9 +162,9 @@ CREATE TRIGGER update_renewal_campaigns_updated_at
                 <>
                   <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
                   <div>
-                    <p className="font-semibold text-orange-900 dark:text-orange-100">⚠️ Migration Required</p>
+                    <p className="font-semibold text-orange-900 dark:text-orange-100">⚠️ Missing Schema</p>
                     <p className="text-sm text-orange-700 dark:text-orange-300">
-                      Some tables or fields are missing. Run the migration SQL below.
+                      Some tables or fields from your SQL migration aren't showing up. Try refreshing or check Supabase SQL editor.
                     </p>
                   </div>
                 </>
@@ -379,52 +243,6 @@ CREATE TRIGGER update_renewal_campaigns_updated_at
           </Card>
         )}
 
-        {/* Migration SQL */}
-        {!isReady && (
-          <Card className="border-orange-200">
-            <CardHeader>
-              <CardTitle>Migration Required</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm">
-                  <strong>Step 1:</strong> Copy the migration SQL
-                </p>
-                <Button onClick={copyMigrationSQL} variant="outline" className="w-full">
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Migration SQL to Clipboard
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm">
-                  <strong>Step 2:</strong> Run in Supabase
-                </p>
-                <ol className="text-sm space-y-1 ml-4 list-decimal">
-                  <li>Go to Supabase Dashboard → SQL Editor</li>
-                  <li>Click "New Query"</li>
-                  <li>Paste the SQL you copied</li>
-                  <li>Click "Run" (or press Cmd/Ctrl + Enter)</li>
-                </ol>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm">
-                  <strong>Step 3:</strong> Verify
-                </p>
-                <Button 
-                  onClick={checkSchema} 
-                  disabled={loading}
-                  className="w-full"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  {loading ? 'Rechecking...' : 'Recheck Schema After Migration'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Success Next Steps */}
         {isReady && (
           <Card className="border-green-200 dark:border-green-900">
@@ -433,13 +251,7 @@ CREATE TRIGGER update_renewal_campaigns_updated_at
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <p>Your database schema is ready. You can now:</p>
-                <ul className="list-disc ml-6 space-y-1">
-                  <li>Use the <code className="bg-muted px-1 py-0.5 rounded">useRenewalRisk</code> hooks</li>
-                  <li>Use the <code className="bg-muted px-1 py-0.5 rounded">useRenewalCampaigns</code> hooks</li>
-                  <li>Build your DetailRenewalView component</li>
-                  <li>Create renewal risk dashboards</li>
-                </ul>
+                <p>Your database schema is ready. All tables and fields are in place.</p>
               </div>
             </CardContent>
           </Card>
