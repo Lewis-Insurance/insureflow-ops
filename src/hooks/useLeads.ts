@@ -114,7 +114,18 @@ export function useLeadSources() {
         .order('name');
 
       if (error) throw error;
-      return data;
+
+      // Deduplicate by normalized name (trimmed, case-insensitive)
+      const uniqueByName = new Map<string, (typeof data)[number]>();
+      for (const s of data || []) {
+        const key = (s.name || '').trim().toLowerCase();
+        if (!key) continue;
+        if (!uniqueByName.has(key)) uniqueByName.set(key, s);
+      }
+
+      return Array.from(uniqueByName.values()).sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
     }
   });
 }
