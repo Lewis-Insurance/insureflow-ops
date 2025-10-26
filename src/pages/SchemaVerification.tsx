@@ -4,31 +4,25 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useTableExists, useTableColumns } from '@/hooks/useSchemaValidator';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SCHEMA_REQUIREMENTS } from '@/config/schemaRequirements';
 
 const SchemaVerification = () => {
-  const requiredTables = [
-    { name: 'renewals', description: 'Policy renewal tracking' },
-    { name: 'renewal_risk_history', description: 'Risk score history' },
-    { name: 'renewal_campaigns', description: 'Renewal campaigns' },
-    { name: 'accounts', description: 'Customer accounts' },
-    { name: 'profiles', description: 'User profiles' },
-    { name: 'policies', description: 'Insurance policies' }
-  ];
+  const requiredTables = Object.entries(SCHEMA_REQUIREMENTS)
+    .filter(([_, config]) => config.required)
+    .map(([name, config]) => ({
+      name,
+      description: config.description
+    }));
 
-  const requiredRenewalFields = [
-    'risk_score',
-    'risk_level',
-    'risk_factors',
-    'last_risk_calculation',
-    'days_since_last_contact',
-    'contact_count',
-    'has_recent_claims',
-    'has_payment_issues',
-    'competitor_activity_detected',
-    'customer_satisfaction_score',
-    'engagement_score',
-    'sentiment_score'
-  ];
+  const requiredRenewalFields = SCHEMA_REQUIREMENTS.renewals.columns.filter(col => 
+    col.includes('risk_') || 
+    col.includes('_contact') || 
+    col.includes('engagement') || 
+    col.includes('sentiment') ||
+    col.includes('has_') ||
+    col.includes('competitor_') ||
+    col.includes('satisfaction')
+  );
 
   return (
     <AppLayout>
