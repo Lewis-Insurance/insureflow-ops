@@ -87,24 +87,27 @@ export function LeadAnalyticsDashboard() {
   });
   const insuranceTypeData = Object.entries(insuranceTypeMap).map(([name, value]) => ({ name, value }));
 
-  // Calculate activity heatmap data
+  // Calculate activity heatmap data with activity types
   const heatmapData = allLeads?.reduce((acc, lead) => {
     const date = parseISO(lead.created_at);
     const hour = getHours(date);
     const dayIndex = getDay(date);
     const day = DAY_NAMES[dayIndex];
     
-    const key = `${day}-${hour}`;
-    const existing = acc.find(d => d.day === day && d.hour === hour);
+    // Determine activity type based on lead source or other criteria
+    const activityType = lead.source_name || 'Lead Created';
+    
+    const key = `${day}-${hour}-${activityType}`;
+    const existing = acc.find(d => d.day === day && d.hour === hour && d.activityType === activityType);
     
     if (existing) {
       existing.count++;
     } else {
-      acc.push({ day, hour, count: 1 });
+      acc.push({ day, hour, count: 1, activityType });
     }
     
     return acc;
-  }, [] as { day: string; hour: number; count: number }[]) || [];
+  }, [] as { day: string; hour: number; count: number; activityType?: string }[]) || [];
 
   // Lead score distribution
   const scoreRanges = [
@@ -373,6 +376,9 @@ export function LeadAnalyticsDashboard() {
         data={heatmapData}
         title="Lead Activity Heatmap"
         description="When leads are most active (by day and hour)"
+        enableFiltering={true}
+        enableExport={true}
+        enableDateRange={true}
       />
 
       {/* Pipeline Health Metrics */}
