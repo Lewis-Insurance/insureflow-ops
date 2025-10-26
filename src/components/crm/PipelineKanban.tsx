@@ -21,15 +21,17 @@ const STAGES = [
 interface LeadCardProps {
   lead: Lead;
   isDragging?: boolean;
+  onClick?: () => void;
 }
 
-function LeadCard({ lead, isDragging }: LeadCardProps) {
+function LeadCard({ lead, isDragging, onClick }: LeadCardProps) {
   return (
     <Card
       className={cn(
-        'cursor-grab active:cursor-grabbing transition-shadow',
+        'cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md',
         isDragging && 'opacity-50'
       )}
+      onClick={onClick}
     >
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between">
@@ -69,11 +71,16 @@ function LeadCard({ lead, isDragging }: LeadCardProps) {
 
         {lead.insurance_types && lead.insurance_types.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {lead.insurance_types.map((type) => (
-              <Badge key={type} variant="outline" className="text-xs">
+            {lead.insurance_types.slice(0, 3).map((type) => (
+              <Badge key={type} variant="outline" className="text-xs capitalize">
                 {type}
               </Badge>
             ))}
+            {lead.insurance_types.length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{lead.insurance_types.length - 3}
+              </Badge>
+            )}
           </div>
         )}
 
@@ -81,7 +88,11 @@ function LeadCard({ lead, isDragging }: LeadCardProps) {
           <div className="flex items-center gap-2 pt-2 border-t">
             <Avatar className="h-5 w-5">
               <AvatarFallback className="text-xs">
-                {lead.assigned_to_name.split(' ').map(n => n[0]).join('')}
+                {lead.assigned_to_name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <span className="text-xs text-muted-foreground truncate">
@@ -98,12 +109,13 @@ interface StageColumnProps {
   stage: typeof STAGES[number];
   leads: Lead[];
   count: number;
+  onLeadClick: (leadId: string) => void;
 }
 
-function StageColumn({ stage, leads, count }: StageColumnProps) {
+function StageColumn({ stage, leads, count, onLeadClick }: StageColumnProps) {
   return (
     <div className="flex-shrink-0 w-80">
-      <div className="bg-muted/50 rounded-lg p-4 h-full flex flex-col">
+      <div className="bg-muted/50 rounded-lg p-4 h-[calc(100vh-16rem)] flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className={cn('w-3 h-3 rounded-full', stage.color)} />
@@ -116,7 +128,7 @@ function StageColumn({ stage, leads, count }: StageColumnProps) {
           <div className="space-y-3 pr-4">
             {leads.map((lead) => (
               <div key={lead.id} data-lead-id={lead.id}>
-                <LeadCard lead={lead} />
+                <LeadCard lead={lead} onClick={() => onLeadClick(lead.id)} />
               </div>
             ))}
             {leads.length === 0 && (
@@ -131,8 +143,12 @@ function StageColumn({ stage, leads, count }: StageColumnProps) {
   );
 }
 
-export function PipelineKanban() {
-  const { data: leadsByStage, isLoading } = useLeadsByStage();
+interface PipelineKanbanProps {
+  onLeadClick?: (leadId: string) => void;
+}
+
+export function PipelineKanban({ onLeadClick }: PipelineKanbanProps) {
+  const { data: leadsByStage, isLoading, error } = useLeadsByStage();
   const moveLeadToStage = useMoveLeadToStage();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -155,7 +171,10 @@ export function PipelineKanban() {
       const leadId = active.id as string;
       const newStatus = over.id as string;
 
-      moveLeadToStage.mutate({ leadId, newStatus });
+      // Only move if dropping on a valid stage
+      if (STAGES.some((stage) => stage.id === newStatus)) {
+        moveLeadToStage.mutate({ leadId, newStatus });
+      }
     }
 
     setActiveId(null);
@@ -169,6 +188,19 @@ export function PipelineKanban() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-destructive font-semibold">Error loading pipeline</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {error instanceof Error ? error.message : 'Unknown error occurred'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const activeLead = activeId
     ? Object.values(leadsByStage || {})
         .flat()
@@ -176,11 +208,7 @@ export function PipelineKanban() {
     : null;
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {STAGES.map((stage) => (
           <StageColumn
@@ -188,6 +216,7 @@ export function PipelineKanban() {
             stage={stage}
             leads={leadsByStage?.[stage.id as keyof typeof leadsByStage] || []}
             count={leadsByStage?.[stage.id as keyof typeof leadsByStage]?.length || 0}
+            onLeadClick={onLeadClick || (() => {})}
           />
         ))}
       </div>
