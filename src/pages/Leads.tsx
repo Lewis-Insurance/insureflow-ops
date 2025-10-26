@@ -2,8 +2,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LeadList } from '@/components/crm/LeadList';
 import { LeadAnalyticsDashboard } from '@/components/crm/LeadAnalyticsDashboard';
 import { LeadCaptureForm } from '@/components/crm/LeadCaptureForm';
+import { PipelineKanban } from '@/components/crm/PipelineKanban';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
-import { UserPlus, BarChart3, List } from 'lucide-react';
+import { UserPlus, BarChart3, List, Workflow } from 'lucide-react';
 
 export default function Leads() {
   return (
@@ -20,8 +21,12 @@ export default function Leads() {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="list" className="space-y-6">
+      <Tabs defaultValue="pipeline" className="space-y-6">
         <TabsList>
+          <TabsTrigger value="pipeline">
+            <Workflow className="h-4 w-4 mr-2" />
+            Pipeline
+          </TabsTrigger>
           <TabsTrigger value="list">
             <List className="h-4 w-4 mr-2" />
             Lead List
@@ -35,6 +40,12 @@ export default function Leads() {
             Capture Form
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pipeline">
+          <ErrorBoundary level="component">
+            <PipelineKanban />
+          </ErrorBoundary>
+        </TabsContent>
 
         <TabsContent value="list">
           <ErrorBoundary level="component">
