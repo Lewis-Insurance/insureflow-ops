@@ -59,16 +59,10 @@ export default function SchemaCheckPage() {
       }
     }
 
-    // Check renewals for risk fields
+    // Check renewals for risk fields by trying to select them
     if (newResults.renewals?.exists) {
       console.log('\n🔍 Checking renewals for risk fields...');
       
-      const { data: renewal } = await supabase
-        .from('renewals')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-
       const riskFields = [
         'risk_score',
         'risk_level',
@@ -83,11 +77,23 @@ export default function SchemaCheckPage() {
       ];
 
       const fieldsCheck: Record<string, boolean> = {};
-      riskFields.forEach(field => {
-        const exists = renewal ? field in renewal : false;
-        fieldsCheck[field] = exists;
-        console.log(`  ${exists ? '✅' : '❌'} ${field}`);
-      });
+      
+      // Test each field individually by trying to select it
+      for (const field of riskFields) {
+        try {
+          const { error } = await supabase
+            .from('renewals')
+            .select(field)
+            .limit(0); // Don't fetch data, just test the column
+          
+          const exists = !error;
+          fieldsCheck[field] = exists;
+          console.log(`  ${exists ? '✅' : '❌'} ${field}${error ? ` (${error.message})` : ''}`);
+        } catch (e) {
+          fieldsCheck[field] = false;
+          console.log(`  ❌ ${field} (error)`);
+        }
+      }
 
       setRiskFieldsCheck(fieldsCheck);
     }
