@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Ticket, Database, BookMarked, Scale, Briefcase } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Ticket, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
@@ -56,9 +56,20 @@ function AppLayoutContent({ children }: AppLayoutProps) {
           <SidebarContent>
             <div className="flex flex-col space-y-1 px-3">
               <NavItem 
-                icon={Home} 
-                label="Dashboard" 
-                to="/" 
+                icon={LayoutDashboard} 
+                label="My Dashboard" 
+                to="/dashboard" 
+              />
+              <NavItem 
+                icon={BarChart3} 
+                label="Agency Dashboard" 
+                to="/dashboard/agency"
+                badge={profile?.role === 'admin' ? 'Admin' : undefined}
+              />
+              <NavItem 
+                icon={UserPlus} 
+                label="Leads" 
+                to="/leads" 
               />
               <NavItem 
                 icon={Users} 

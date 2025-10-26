@@ -12,6 +12,7 @@ const Index = React.lazy(() => import("./pages/Index"));
 const Auth = React.lazy(() => import("./pages/Auth"));
 const CRM = React.lazy(() => import("./pages/CRM"));
 const AccountDetail = React.lazy(() => import("./pages/AccountDetail"));
+const Leads = React.lazy(() => import("./pages/Leads"));
 
 const PolicyDetail = React.lazy(() => import("./pages/PolicyDetail"));
 const CustomersPage = React.lazy(() => import("./pages/CustomersPage"));
@@ -96,6 +97,14 @@ const App = () => (
                     <AgencyDashboard />
                   </ErrorBoundary>
                 }
+              />
+              <Route 
+                path="/leads" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <Leads />
+                  </ErrorBoundary>
+                } 
               />
               <Route 
                 path="/crm" 
