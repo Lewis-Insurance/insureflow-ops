@@ -12,7 +12,25 @@ export interface DashboardMetrics {
     goalTarget: number;
     goalProgress: number;
   };
+  week: {
+    newLeads: number;
+    contacted: number;
+    qualified: number;
+    quoted: number;
+    won: number;
+    revenue: number;
+    conversionRate: number;
+  };
   mtd: {
+    newLeads: number;
+    contacted: number;
+    qualified: number;
+    quoted: number;
+    won: number;
+    revenue: number;
+    conversionRate: number;
+  };
+  quarter: {
     newLeads: number;
     contacted: number;
     qualified: number;
@@ -70,6 +88,19 @@ export function useDashboardMetrics(producerId?: string) {
       const monthEnd = endOfMonth(today);
       const dayStart = startOfDay(today);
       const dayEnd = endOfDay(today);
+      
+      // Week calculations
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      // Quarter calculations
+      const quarter = Math.floor(today.getMonth() / 3);
+      const quarterStart = new Date(today.getFullYear(), quarter * 3, 1);
+      const quarterEnd = new Date(today.getFullYear(), quarter * 3 + 3, 0, 23, 59, 59, 999);
 
       // Build query with optional producer filter
       let leadsQuery = supabase.from('leads').select('*');
@@ -109,6 +140,34 @@ export function useDashboardMetrics(producerId?: string) {
 
       const { data: todayLeads, error: todayError } = await todayQuery;
       if (todayError) throw todayError;
+
+      // Fetch this week's leads
+      let weekQuery = supabase
+        .from('leads')
+        .select('*')
+        .gte('created_at', weekStart.toISOString())
+        .lte('created_at', weekEnd.toISOString());
+      
+      if (producerId) {
+        weekQuery = weekQuery.eq('assigned_to', producerId);
+      }
+
+      const { data: weekLeads, error: weekError } = await weekQuery;
+      if (weekError) throw weekError;
+
+      // Fetch this quarter's leads
+      let quarterQuery = supabase
+        .from('leads')
+        .select('*')
+        .gte('created_at', quarterStart.toISOString())
+        .lte('created_at', quarterEnd.toISOString());
+      
+      if (producerId) {
+        quarterQuery = quarterQuery.eq('assigned_to', producerId);
+      }
+
+      const { data: quarterLeads, error: quarterError } = await quarterQuery;
+      if (quarterError) throw quarterError;
 
       // Fetch producer goals (if individual dashboard)
       let dailyGoal = 5; // Default goal
@@ -153,6 +212,34 @@ export function useDashboardMetrics(producerId?: string) {
         ? (mtdStats.won / mtdStats.newLeads) * 100 
         : 0;
 
+      // Calculate this week's stats
+      const weekStats = {
+        newLeads: weekLeads?.length || 0,
+        contacted: weekLeads?.filter(l => l.status === 'contacted').length || 0,
+        qualified: weekLeads?.filter(l => l.status === 'qualified').length || 0,
+        quoted: weekLeads?.filter(l => l.status === 'quoted').length || 0,
+        won: weekLeads?.filter(l => l.status === 'won').length || 0,
+        revenue: weekLeads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
+        conversionRate: 0,
+      };
+      weekStats.conversionRate = weekStats.newLeads > 0 
+        ? (weekStats.won / weekStats.newLeads) * 100 
+        : 0;
+
+      // Calculate this quarter's stats
+      const quarterStats = {
+        newLeads: quarterLeads?.length || 0,
+        contacted: quarterLeads?.filter(l => l.status === 'contacted').length || 0,
+        qualified: quarterLeads?.filter(l => l.status === 'qualified').length || 0,
+        quoted: quarterLeads?.filter(l => l.status === 'quoted').length || 0,
+        won: quarterLeads?.filter(l => l.status === 'won').length || 0,
+        revenue: quarterLeads?.filter(l => l.status === 'won').reduce((sum, l) => sum + (l.current_premium || 0), 0) || 0,
+        conversionRate: 0,
+      };
+      quarterStats.conversionRate = quarterStats.newLeads > 0 
+        ? (quarterStats.won / quarterStats.newLeads) * 100 
+        : 0;
+
       // Calculate trend/projection
       const daysInMonth = endOfMonth(today).getDate();
       const daysElapsed = today.getDate();
@@ -183,7 +270,9 @@ export function useDashboardMetrics(producerId?: string) {
 
       const metrics: DashboardMetrics = {
         today: todayStats,
+        week: weekStats,
         mtd: mtdStats,
+        quarter: quarterStats,
         trend: trendStats,
         pipeline: pipelineStats,
       };

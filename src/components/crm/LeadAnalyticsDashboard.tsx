@@ -1,8 +1,10 @@
 import { useDashboardMetrics, useHistoricalTrend, usePipelineHealth } from '@/hooks/useDashboardMetrics';
 import { useLeads } from '@/hooks/useLeads';
+import { useWinRateByProducer, useWinRateBySource, useWinRateByInsuranceType } from '@/hooks/useLeadAnalytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ActivityHeatmap } from '@/components/visualizations/ActivityHeatmap';
 import {
   BarChart,
@@ -46,6 +48,9 @@ export function LeadAnalyticsDashboard() {
   const { data: trendData } = useHistoricalTrend(30);
   const { data: pipelineHealth } = usePipelineHealth();
   const { data: allLeads } = useLeads();
+  const { data: winRateByProducer } = useWinRateByProducer();
+  const { data: winRateBySource } = useWinRateBySource();
+  const { data: winRateByInsuranceType } = useWinRateByInsuranceType();
 
   if (!metrics) {
     return (
@@ -136,7 +141,65 @@ export function LeadAnalyticsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Key Metrics Overview */}
+      {/* Period Selector Tabs */}
+      <Tabs defaultValue="month" className="w-full">
+        <TabsList>
+          <TabsTrigger value="week">This Week</TabsTrigger>
+          <TabsTrigger value="month">This Month</TabsTrigger>
+          <TabsTrigger value="quarter">This Quarter</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="week" className="space-y-6 mt-6">
+          {/* Week Metrics */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">New Leads</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metrics.week.newLeads}</div>
+                <p className="text-xs text-muted-foreground">This week</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metrics.week.conversionRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">Week to date</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${(metrics.week.revenue / 1000).toFixed(1)}k</div>
+                <p className="text-xs text-muted-foreground">This week</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Won Deals</CardTitle>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metrics.week.won}</div>
+                <p className="text-xs text-muted-foreground">Closed this week</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="month" className="space-y-6 mt-6">
+          {/* Month Metrics */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -192,6 +255,9 @@ export function LeadAnalyticsDashboard() {
           </CardContent>
         </Card>
       </div>
+
+        </TabsContent>
+      </Tabs>
 
       {/* Conversion Funnel */}
       <Card>
@@ -413,6 +479,114 @@ export function LeadAnalyticsDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Win Rate Breakdowns */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Win Rate by Producer */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Win Rate by Producer</CardTitle>
+            <CardDescription>Performance by sales team member</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {winRateByProducer?.slice(0, 5).map((producer) => (
+                <div key={producer.producer_id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{producer.producer_name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {producer.won_leads} / {producer.total_leads} won
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <Badge variant={producer.win_rate >= 20 ? 'default' : 'secondary'}>
+                      {producer.win_rate.toFixed(1)}%
+                    </Badge>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      ${(producer.avg_deal_value / 1000).toFixed(1)}k avg
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(!winRateByProducer || winRateByProducer.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No data available
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Win Rate by Source */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Win Rate by Source</CardTitle>
+            <CardDescription>Performance by lead source</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {winRateBySource?.slice(0, 5).map((source) => (
+                <div key={source.source_id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{source.source_name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {source.won_leads} / {source.total_leads} won
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <Badge variant={source.win_rate >= 20 ? 'default' : 'secondary'}>
+                      {source.win_rate.toFixed(1)}%
+                    </Badge>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      ${(source.avg_deal_value / 1000).toFixed(1)}k avg
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(!winRateBySource || winRateBySource.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No data available
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Win Rate by Insurance Type */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Win Rate by Insurance Type</CardTitle>
+            <CardDescription>Performance by coverage type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {winRateByInsuranceType?.slice(0, 5).map((type) => (
+                <div key={type.insurance_type} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium capitalize truncate">{type.insurance_type}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {type.won_leads} / {type.total_leads} won
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <Badge variant={type.win_rate >= 20 ? 'default' : 'secondary'}>
+                      {type.win_rate.toFixed(1)}%
+                    </Badge>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      ${(type.avg_deal_value / 1000).toFixed(1)}k avg
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(!winRateByInsuranceType || winRateByInsuranceType.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No data available
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Performance Indicators */}
       <div className="grid gap-4 md:grid-cols-3">
