@@ -102,33 +102,8 @@ export function useLead(leadId: string | undefined) {
   });
 }
 
-// Fetch lead sources
-export function useLeadSources() {
-  return useQuery({
-    queryKey: ['lead-sources'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lead_sources')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-
-      // Deduplicate by normalized name (trimmed, case-insensitive)
-      const uniqueByName = new Map<string, (typeof data)[number]>();
-      for (const s of data || []) {
-        const key = (s.name || '').trim().toLowerCase();
-        if (!key) continue;
-        if (!uniqueByName.has(key)) uniqueByName.set(key, s);
-      }
-
-      return Array.from(uniqueByName.values()).sort((a, b) =>
-        (a.name || '').localeCompare(b.name || '')
-      );
-    }
-  });
-}
+// Fetch lead sources - moved to @/integrations/supabase/hooks/useLeadSources
+// Import from the new location instead
 
 // Fetch leads by pipeline stage
 export function useLeadsByStage() {

@@ -1,7 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useCreateLead, useLeadSources } from '@/hooks/useLeads';
+import { useCreateLead } from '@/hooks/useLeads';
+import { useLeadSources } from '@/integrations/supabase/hooks/useLeadSources';
 import { Button } from '@/components/ui/button';
 import {
   Form,

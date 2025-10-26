@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useLeads, useLeadSources, type LeadFilters } from '@/hooks/useLeads';
+import { useLeads, type LeadFilters } from '@/hooks/useLeads';
+import { useLeadSources } from '@/integrations/supabase/hooks/useLeadSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
