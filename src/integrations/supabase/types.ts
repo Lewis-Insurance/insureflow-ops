@@ -3124,10 +3124,118 @@ export type Database = {
           },
         ]
       }
+      lead_dashboard_metrics: {
+        Row: {
+          avg_deal_size: number | null
+          avg_response_time_hours: number | null
+          avg_time_to_contact_hours: number | null
+          contact_rate: number | null
+          contacted_leads: number | null
+          created_at: string
+          id: string
+          lost_leads: number | null
+          metric_date: string
+          new_leads: number | null
+          producer_id: string | null
+          qualification_rate: number | null
+          qualified_leads: number | null
+          quote_rate: number | null
+          quoted_leads: number | null
+          total_pipeline_value: number | null
+          win_rate: number | null
+          won_leads: number | null
+          won_premium: number | null
+        }
+        Insert: {
+          avg_deal_size?: number | null
+          avg_response_time_hours?: number | null
+          avg_time_to_contact_hours?: number | null
+          contact_rate?: number | null
+          contacted_leads?: number | null
+          created_at?: string
+          id?: string
+          lost_leads?: number | null
+          metric_date: string
+          new_leads?: number | null
+          producer_id?: string | null
+          qualification_rate?: number | null
+          qualified_leads?: number | null
+          quote_rate?: number | null
+          quoted_leads?: number | null
+          total_pipeline_value?: number | null
+          win_rate?: number | null
+          won_leads?: number | null
+          won_premium?: number | null
+        }
+        Update: {
+          avg_deal_size?: number | null
+          avg_response_time_hours?: number | null
+          avg_time_to_contact_hours?: number | null
+          contact_rate?: number | null
+          contacted_leads?: number | null
+          created_at?: string
+          id?: string
+          lost_leads?: number | null
+          metric_date?: string
+          new_leads?: number | null
+          producer_id?: string | null
+          qualification_rate?: number | null
+          qualified_leads?: number | null
+          quote_rate?: number | null
+          quoted_leads?: number | null
+          total_pipeline_value?: number | null
+          win_rate?: number | null
+          won_leads?: number | null
+          won_premium?: number | null
+        }
+        Relationships: []
+      }
+      lead_score_history: {
+        Row: {
+          created_at: string
+          factors: Json | null
+          id: string
+          lead_id: string
+          new_score: number
+          old_score: number
+          reason: string | null
+          score_delta: number
+        }
+        Insert: {
+          created_at?: string
+          factors?: Json | null
+          id?: string
+          lead_id: string
+          new_score: number
+          old_score: number
+          reason?: string | null
+          score_delta: number
+        }
+        Update: {
+          created_at?: string
+          factors?: Json | null
+          id?: string
+          lead_id?: string
+          new_score?: number
+          old_score?: number
+          reason?: string | null
+          score_delta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_sources: {
         Row: {
           cost_per_lead: number | null
           created_at: string | null
+          created_by: string | null
           description: string | null
           id: string
           is_active: boolean | null
@@ -3138,6 +3246,7 @@ export type Database = {
         Insert: {
           cost_per_lead?: number | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -3148,6 +3257,7 @@ export type Database = {
         Update: {
           cost_per_lead?: number | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -4187,6 +4297,61 @@ export type Database = {
             foreignKeyName: "renewal_campaigns_renewal_id_fkey"
             columns: ["renewal_id"]
             isOneToOne: false
+            referencedRelation: "at_risk_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_campaigns_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renewal_risk_factors: {
+        Row: {
+          created_at: string | null
+          detected_at: string | null
+          factor_type: string
+          factor_value: number | null
+          id: string
+          impact_score: number | null
+          notes: string | null
+          renewal_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          detected_at?: string | null
+          factor_type: string
+          factor_value?: number | null
+          id?: string
+          impact_score?: number | null
+          notes?: string | null
+          renewal_id: string
+        }
+        Update: {
+          created_at?: string | null
+          detected_at?: string | null
+          factor_type?: string
+          factor_value?: number | null
+          id?: string
+          impact_score?: number | null
+          notes?: string | null
+          renewal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_risk_factors_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "at_risk_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_risk_factors_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
             referencedRelation: "renewals"
             referencedColumns: ["id"]
           },
@@ -4232,6 +4397,95 @@ export type Database = {
             foreignKeyName: "renewal_risk_history_renewal_id_fkey"
             columns: ["renewal_id"]
             isOneToOne: false
+            referencedRelation: "at_risk_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_risk_history_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renewal_touchpoints: {
+        Row: {
+          campaign_id: string
+          clicked_at: string | null
+          completed_date: string | null
+          content: string | null
+          created_at: string | null
+          id: string
+          opened_at: string | null
+          performed_by: string | null
+          renewal_id: string
+          responded_at: string | null
+          response_content: string | null
+          scheduled_date: string
+          status: string
+          subject: string | null
+          template_used: string | null
+          touchpoint_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          clicked_at?: string | null
+          completed_date?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          opened_at?: string | null
+          performed_by?: string | null
+          renewal_id: string
+          responded_at?: string | null
+          response_content?: string | null
+          scheduled_date: string
+          status?: string
+          subject?: string | null
+          template_used?: string | null
+          touchpoint_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          clicked_at?: string | null
+          completed_date?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          opened_at?: string | null
+          performed_by?: string | null
+          renewal_id?: string
+          responded_at?: string | null
+          response_content?: string | null
+          scheduled_date?: string
+          status?: string
+          subject?: string | null
+          template_used?: string | null
+          touchpoint_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_touchpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "renewal_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_touchpoints_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "at_risk_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_touchpoints_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
             referencedRelation: "renewals"
             referencedColumns: ["id"]
           },
@@ -4263,9 +4517,11 @@ export type Database = {
           policy_number: string | null
           policy_type: string
           price_change_pct: number | null
+          price_increase_pct: number | null
           priority: string | null
           renewal_date: string
           renewal_premium: number | null
+          risk_calculated_at: string | null
           risk_factors: Json | null
           risk_level: string | null
           risk_score: number | null
@@ -4298,9 +4554,11 @@ export type Database = {
           policy_number?: string | null
           policy_type: string
           price_change_pct?: number | null
+          price_increase_pct?: number | null
           priority?: string | null
           renewal_date: string
           renewal_premium?: number | null
+          risk_calculated_at?: string | null
           risk_factors?: Json | null
           risk_level?: string | null
           risk_score?: number | null
@@ -4333,9 +4591,11 @@ export type Database = {
           policy_number?: string | null
           policy_type?: string
           price_change_pct?: number | null
+          price_increase_pct?: number | null
           priority?: string | null
           renewal_date?: string
           renewal_premium?: number | null
+          risk_calculated_at?: string | null
           risk_factors?: Json | null
           risk_level?: string | null
           risk_score?: number | null
@@ -5499,6 +5759,72 @@ export type Database = {
       }
     }
     Views: {
+      at_risk_renewals: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          campaign_type: string | null
+          carrier: string | null
+          competitor_activity_detected: boolean | null
+          completed_touchpoints: number | null
+          contact_count: number | null
+          current_premium: number | null
+          customer_satisfaction_score: number | null
+          days_since_last_contact: number | null
+          engagement_score: number | null
+          expiration_date: string | null
+          has_payment_issues: boolean | null
+          has_recent_claim: boolean | null
+          id: string | null
+          last_contact_date: string | null
+          last_risk_calculation: string | null
+          last_touchpoint_date: string | null
+          policy_id: string | null
+          policy_number: string | null
+          policy_type: string | null
+          price_change_pct: number | null
+          priority: string | null
+          renewal_date: string | null
+          renewal_premium: number | null
+          response_count: number | null
+          risk_factors: Json | null
+          risk_level: string | null
+          risk_score: number | null
+          sentiment_score: number | null
+          status: string | null
+          total_touchpoints: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "renewals_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_batch_summary: {
         Row: {
           account_id: string | null
@@ -5804,6 +6130,7 @@ export type Database = {
           status: Database["public"]["Enums"]["claim_status"]
         }[]
       }
+      get_renewal_intelligence_summary: { Args: never; Returns: Json }
       get_user_claims: {
         Args: never
         Returns: {
@@ -5939,6 +6266,10 @@ export type Database = {
         Returns: boolean
       }
       has_sms_consent: { Args: { target_contact_id: string }; Returns: boolean }
+      increment_campaign_touchpoints: {
+        Args: { campaign_id: string }
+        Returns: undefined
+      }
       insureds_search_v1: {
         Args: {
           p_after_id?: string
