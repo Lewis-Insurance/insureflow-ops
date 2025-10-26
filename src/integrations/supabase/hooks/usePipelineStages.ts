@@ -28,20 +28,41 @@ export interface PipelineStage {
   created_by: string | null;
 }
 
-export const usePipelineStages = (accountId?: string) => {
+export const usePipelineStages = () => {
   return useQuery({
-    queryKey: ['pipeline_stages', accountId],
+    queryKey: ['pipeline_stages'],
     queryFn: async () => {
-      let query = (supabase as any)
-        .from('pipeline_stages')
-        .select('*')
-        .order('display_order');
-
-      if (accountId) {
-        query = query.eq('account_id', accountId);
+      // First get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
       }
 
-      const { data, error } = await query;
+      // Get user's account_id through account_memberships
+      const { data: membership, error: membershipError } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      if (membershipError) {
+        console.warn('No account membership found:', membershipError);
+        // Return empty array if no account membership
+        return [];
+      }
+
+      if (!membership?.account_id) {
+        return [];
+      }
+
+      // Now fetch pipeline stages for this account only
+      const { data, error } = await (supabase as any)
+        .from('pipeline_stages')
+        .select('*')
+        .eq('account_id', membership.account_id)
+        .order('display_order');
 
       if (error) throw error;
       return data as PipelineStage[];
