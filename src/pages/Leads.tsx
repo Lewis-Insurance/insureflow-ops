@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { PipelineKanban } from '@/components/leads/PipelineKanban';
 import { QuickLeadCapture } from '@/components/leads/QuickLeadCapture';
+import { LeadAnalyticsDashboard } from '@/components/leads/analytics/LeadAnalyticsDashboard';
 import { useLeadMetrics } from '@/hooks/useLeadAnalytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -195,15 +196,7 @@ export default function LeadsPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">Analytics Coming Soon</h3>
-                <p>Detailed charts and insights about your pipeline</p>
-              </div>
-            </CardContent>
-          </Card>
+          <LeadAnalyticsDashboard />
         </TabsContent>
       </Tabs>
     </div>
