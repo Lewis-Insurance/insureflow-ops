@@ -126,9 +126,9 @@ serve(async (req) => {
 
     // Log activity for lead capture
     const activityData = {
-      entity_type: 'lead',
-      entity_id: newLead.id,
-      action: 'lead_captured',
+      lead_id: newLead.id,
+      activity_type: 'lead_captured',
+      description: `Lead captured via ${body.source_name || 'webhook'}`,
       metadata: {
         source: body.source_name || 'webhook',
         method: 'webhook',
@@ -137,7 +137,7 @@ serve(async (req) => {
     };
 
     const { error: activityError } = await supabase
-      .from('activities')
+      .from('lead_activities')
       .insert(activityData);
 
     if (activityError) {
