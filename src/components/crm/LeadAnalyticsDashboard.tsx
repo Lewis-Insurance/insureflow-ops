@@ -3,6 +3,7 @@ import { usePipelineStats, useLeadSourcePerformance } from '@/hooks/useLeadManag
 import { useWinRateByProducer, useWinRateBySource, useWinRateByInsuranceType } from '@/hooks/useLeadAnalytics';
 import { GoalProgressChart } from '@/components/visualizations/GoalProgressChart';
 import { ConversionFunnel } from '@/components/visualizations/ConversionFunnel';
+import { ProjectionMetricsToggle } from './ProjectionMetricsToggle';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -215,13 +216,14 @@ export function LeadAnalyticsDashboard() {
         </Card>
       </div>
 
-      {/* Goal Progress Section */}
+      {/* Goal Progress & Projections Section */}
       {showGoals && (
         <div className="space-y-4">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Award className="h-6 w-6" />
-            Goal Progress
+            Goal Progress & Projections
           </h2>
+          <ProjectionMetricsToggle />
           <GoalProgressChart 
             data={goalData}
             title="Monthly Lead Goals"
