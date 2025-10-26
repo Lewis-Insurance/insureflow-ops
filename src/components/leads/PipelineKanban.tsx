@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLeads, useMoveLeadToStage } from '@/hooks/useLeads';
+import { useLeads, useMoveLeadToStage, type Lead } from '@/hooks/useLeads';
 import { usePipelineStages } from '@/integrations/supabase/hooks/usePipelineStages';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,24 +24,13 @@ interface PipelineKanbanProps {
   onLeadClick?: (leadId: string) => void;
 }
 
-interface Lead {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  lead_score: number | null;
-  status: string;
-  current_premium: number | null;
-  insurance_types: string[] | null;
-  created_at: string;
-  assigned_to?: string | null;
+type LeadCardData = Lead & {
   source?: { name: string } | null;
   assigned?: { full_name: string } | null;
-}
+};
 
 interface LeadCardProps {
-  lead: Lead;
+  lead: LeadCardData;
   onClick?: () => void;
 }
 
@@ -97,10 +86,10 @@ function LeadCard({ lead, onClick }: LeadCardProps) {
                 <h4 className="font-semibold text-sm">
                   {lead.first_name} {lead.last_name}
                 </h4>
-                {(lead as any).assigned?.full_name && (
+                {(lead.assigned?.full_name) && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <User className="h-3 w-3" />
-                    {(lead as any).assigned.full_name}
+                    {lead.assigned.full_name}
                   </p>
                 )}
               </div>
