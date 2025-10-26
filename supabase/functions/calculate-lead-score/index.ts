@@ -19,7 +19,7 @@ interface Lead {
   source_id?: string;
   created_at: string;
   last_contact_at?: string;
-  lead_score?: number;
+  updated_at?: string;
 }
 
 interface ScoringFactors {
@@ -39,6 +39,16 @@ interface ScoringResult {
 
 /**
  * Calculate lead score based on multiple factors
+ * 
+ * Scoring Breakdown:
+ * - Contact Info: 0-15 points (email + phone completeness)
+ * - Insurance Needs: 0-25 points (complexity and type)
+ * - Premium Potential: 0-25 points (revenue opportunity)
+ * - Decision Timeline: 0-20 points (urgency)
+ * - Engagement Level: 0-10 points (activity and status)
+ * - Lead Source: 0-5 points (source quality)
+ * 
+ * Total: 0-100 points
  */
 function calculateLeadScore(lead: Lead): ScoringResult {
   const factors: ScoringFactors = {
@@ -50,30 +60,36 @@ function calculateLeadScore(lead: Lead): ScoringResult {
     source: 0,
   };
 
-  // FACTOR 1: Contact Information Completeness (0-15 points)
+  // ==========================================
+  // FACTOR 1: Contact Information (0-15 points)
+  // ==========================================
   let contactScore = 0;
   if (lead.email) contactScore += 7;
   if (lead.phone) contactScore += 8;
   factors.contactInfo = contactScore;
 
+  // ==========================================
   // FACTOR 2: Insurance Needs Complexity (0-25 points)
+  // ==========================================
   let needsScore = 0;
   const insuranceTypes = lead.insurance_types || [];
   
   if (insuranceTypes.length === 0) {
-    needsScore = 5; // Unknown needs
+    needsScore = 5; // Unknown needs - some potential
   } else if (insuranceTypes.includes("commercial")) {
-    needsScore = 25; // Commercial is highest value
+    needsScore = 25; // Commercial insurance = highest value
   } else if (insuranceTypes.length >= 3) {
-    needsScore = 20; // Multiple lines
+    needsScore = 20; // Multiple lines = good bundling opportunity
   } else if (insuranceTypes.length === 2) {
-    needsScore = 15; // Two lines
+    needsScore = 15; // Two lines = moderate opportunity
   } else {
-    needsScore = 10; // Single line
+    needsScore = 10; // Single line = baseline
   }
   factors.insuranceNeeds = needsScore;
 
+  // ==========================================
   // FACTOR 3: Premium Potential (0-25 points)
+  // ==========================================
   let premiumScore = 0;
   if (lead.current_premium) {
     if (lead.current_premium >= 10000) {
@@ -88,31 +104,35 @@ function calculateLeadScore(lead: Lead): ScoringResult {
       premiumScore = 5; // Under $1K
     }
   } else {
-    premiumScore = 10; // Unknown premium (middle ground)
+    premiumScore = 10; // Unknown premium - assume mid-tier
   }
   factors.premiumPotential = premiumScore;
 
+  // ==========================================
   // FACTOR 4: Decision Timeline (0-20 points)
+  // ==========================================
   let timelineScore = 0;
   switch (lead.decision_timeframe) {
     case "immediate":
-      timelineScore = 20;
+      timelineScore = 20; // Ready to buy now
       break;
     case "within_30_days":
-      timelineScore = 15;
+      timelineScore = 15; // Very soon
       break;
     case "within_90_days":
-      timelineScore = 10;
+      timelineScore = 10; // Medium term
       break;
     case "exploring_options":
-      timelineScore = 5;
+      timelineScore = 5; // Just looking
       break;
     default:
-      timelineScore = 8; // Unknown
+      timelineScore = 8; // Unknown - assume moderate
   }
   factors.timeline = timelineScore;
 
+  // ==========================================
   // FACTOR 5: Engagement Level (0-10 points)
+  // ==========================================
   let engagementScore = 5; // Default baseline
   
   // Recent contact bonus
@@ -120,43 +140,59 @@ function calculateLeadScore(lead: Lead): ScoringResult {
     const daysSinceContact = Math.floor(
       (Date.now() - new Date(lead.last_contact_at).getTime()) / (1000 * 60 * 60 * 24)
     );
-    if (daysSinceContact <= 1) engagementScore = 10;
-    else if (daysSinceContact <= 7) engagementScore = 8;
-    else if (daysSinceContact <= 30) engagementScore = 6;
-    else engagementScore = 3;
+    
+    if (daysSinceContact <= 1) {
+      engagementScore = 10; // Very recent contact
+    } else if (daysSinceContact <= 7) {
+      engagementScore = 8; // Recent contact
+    } else if (daysSinceContact <= 30) {
+      engagementScore = 6; // Somewhat recent
+    } else {
+      engagementScore = 3; // Stale
+    }
   }
   
-  // Status-based engagement
+  // Status-based engagement boost
   if (lead.status === "contacted" || lead.status === "qualified") {
     engagementScore = Math.max(engagementScore, 8);
   } else if (lead.status === "quoted") {
-    engagementScore = 10;
+    engagementScore = 10; // Quoted leads are highly engaged
+  } else if (lead.status === "new") {
+    engagementScore = Math.max(engagementScore, 6); // New leads get baseline
   }
   
   factors.engagement = engagementScore;
 
+  // ==========================================
   // FACTOR 6: Lead Source Quality (0-5 points)
-  // This would ideally come from lead_sources table with ROI data
-  // For now, we'll use a simple baseline
+  // ==========================================
+  // This is a baseline score. In the future, you can enhance this
+  // by tracking conversion rates per source and scoring accordingly
   factors.source = 5; // Default source score
 
-  // Calculate total score
+  // ==========================================
+  // CALCULATE TOTAL SCORE
+  // ==========================================
   const totalScore = Object.values(factors).reduce((sum, score) => sum + score, 0);
+  const finalScore = Math.min(100, Math.max(0, totalScore)); // Clamp to 0-100
 
-  // Determine recommendation
+  // ==========================================
+  // GENERATE RECOMMENDATION
+  // ==========================================
   let recommendation = "";
-  if (totalScore >= 80) {
-    recommendation = "High Priority - Assign to top producer immediately";
-  } else if (totalScore >= 60) {
-    recommendation = "Standard Pipeline - Follow up within 24 hours";
-  } else if (totalScore >= 40) {
-    recommendation = "Nurturing - Add to drip campaign";
+  
+  if (finalScore >= 80) {
+    recommendation = "🔥 HIGH PRIORITY - Assign to top producer immediately and contact within 1 hour";
+  } else if (finalScore >= 60) {
+    recommendation = "⭐ STANDARD PIPELINE - Follow up within 24 hours with personalized outreach";
+  } else if (finalScore >= 40) {
+    recommendation = "📧 NURTURE CAMPAIGN - Add to automated drip campaign for 30-90 day cultivation";
   } else {
-    recommendation = "Low Priority - Long-term nurture or disqualify";
+    recommendation = "❄️ LOW PRIORITY - Long-term nurture or consider disqualifying if no engagement";
   }
 
   return {
-    score: Math.min(100, totalScore), // Cap at 100
+    score: finalScore,
     factors,
     recommendation,
   };
@@ -169,15 +205,28 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client with service role
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     );
 
+    // Parse request body
     const { leadId, leadData } = await req.json();
+
+    if (!leadId && !leadData) {
+      throw new Error("Either leadId or leadData must be provided");
+    }
 
     // Fetch lead data if only ID provided
     let lead: Lead;
+    
     if (leadData) {
       lead = leadData;
     } else if (leadId) {
@@ -187,16 +236,28 @@ serve(async (req) => {
         .eq("id", leadId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching lead:", error);
+        throw new Error(`Failed to fetch lead: ${error.message}`);
+      }
+      
+      if (!data) {
+        throw new Error(`Lead not found: ${leadId}`);
+      }
+      
       lead = data;
     } else {
-      throw new Error("Either leadId or leadData must be provided");
+      throw new Error("Invalid request: missing lead data");
     }
 
-    // Calculate score
+    console.log(`Scoring lead: ${lead.id} (${lead.first_name} ${lead.last_name})`);
+
+    // Calculate the score
     const result = calculateLeadScore(lead);
 
-    // Update lead with new score
+    console.log(`Score calculated: ${result.score}/100`, result.factors);
+
+    // Update the lead record with the new score
     const { error: updateError } = await supabaseClient
       .from("leads")
       .update({
@@ -207,20 +268,30 @@ serve(async (req) => {
       })
       .eq("id", lead.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("Error updating lead score:", updateError);
+      throw new Error(`Failed to update lead score: ${updateError.message}`);
+    }
 
-    // Log the scoring event
-    await supabaseClient.from("audit_logs").insert({
-      entity: "lead",
-      entity_id: lead.id,
-      action: "score_updated",
-      details: {
-        old_score: lead.lead_score || 0,
-        new_score: result.score,
-        factors: result.factors,
-      },
-    });
+    // Log the scoring event in audit logs
+    try {
+      await supabaseClient.from("audit_logs").insert({
+        entity_type: "lead",
+        entity_id: lead.id,
+        action: "score_calculated",
+        changes: {
+          score: result.score,
+          factors: result.factors,
+          recommendation: result.recommendation,
+        },
+        created_at: new Date().toISOString(),
+      });
+    } catch (auditError) {
+      // Don't fail the request if audit logging fails
+      console.error("Failed to create audit log:", auditError);
+    }
 
+    // Return success response
     return new Response(
       JSON.stringify({
         success: true,
@@ -236,10 +307,11 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Lead scoring error:", error);
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error.message || "An unknown error occurred",
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
