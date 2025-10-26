@@ -85,3 +85,6 @@ verify_jwt = true
 
 [functions.worker-comparison]
 verify_jwt = false
+
+[functions.lead-capture-webhook]
+verify_jwt = false
