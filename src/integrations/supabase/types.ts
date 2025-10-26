@@ -94,7 +94,7 @@ export type Database = {
           notes: string | null
           owner_agent_id: string | null
           phone: string | null
-          search_vector: unknown | null
+          search_vector: unknown
           source: string | null
           state: string | null
           team_id: string | null
@@ -122,7 +122,7 @@ export type Database = {
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           source?: string | null
           state?: string | null
           team_id?: string | null
@@ -150,7 +150,7 @@ export type Database = {
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           source?: string | null
           state?: string | null
           team_id?: string | null
@@ -873,7 +873,7 @@ export type Database = {
           coi_id: string | null
           created_at: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           metadata: Json | null
           user_agent: string | null
           user_id: string | null
@@ -883,7 +883,7 @@ export type Database = {
           coi_id?: string | null
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           user_agent?: string | null
           user_id?: string | null
@@ -893,7 +893,7 @@ export type Database = {
           coi_id?: string | null
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           user_agent?: string | null
           user_id?: string | null
@@ -1129,7 +1129,7 @@ export type Database = {
           expires_at: string | null
           granted_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           location_data: Json | null
           method: string
           notes: string | null
@@ -1146,7 +1146,7 @@ export type Database = {
           expires_at?: string | null
           granted_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           location_data?: Json | null
           method: string
           notes?: string | null
@@ -1163,7 +1163,7 @@ export type Database = {
           expires_at?: string | null
           granted_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           location_data?: Json | null
           method?: string
           notes?: string | null
@@ -1477,7 +1477,7 @@ export type Database = {
           notes_summary: string | null
           phone: string | null
           postal_code: string | null
-          search_vector: unknown | null
+          search_vector: unknown
           state: string | null
           status: string | null
           type: string | null
@@ -1498,7 +1498,7 @@ export type Database = {
           notes_summary?: string | null
           phone?: string | null
           postal_code?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           state?: string | null
           status?: string | null
           type?: string | null
@@ -1519,7 +1519,7 @@ export type Database = {
           notes_summary?: string | null
           phone?: string | null
           postal_code?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           state?: string | null
           status?: string | null
           type?: string | null
@@ -1583,7 +1583,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           metadata: Json | null
           occurred_at: string
           session_id: string | null
@@ -1598,7 +1598,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           occurred_at?: string
           session_id?: string | null
@@ -1613,7 +1613,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           metadata?: Json | null
           occurred_at?: string
           session_id?: string | null
@@ -2117,7 +2117,7 @@ export type Database = {
           ended_at: string | null
           id: string
           impersonator_id: string
-          ip_address: unknown | null
+          ip_address: unknown
           reason: string | null
           session_id: string
           started_at: string
@@ -2130,7 +2130,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           impersonator_id: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           reason?: string | null
           session_id: string
           started_at?: string
@@ -2143,7 +2143,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           impersonator_id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           reason?: string | null
           session_id?: string
           started_at?: string
@@ -2419,7 +2419,7 @@ export type Database = {
           primary_address_id: string | null
           primary_email_id: string | null
           primary_phone_id: string | null
-          search_vector: unknown | null
+          search_vector: unknown
           status: string | null
           tags: string[] | null
           type: string | null
@@ -2437,7 +2437,7 @@ export type Database = {
           primary_address_id?: string | null
           primary_email_id?: string | null
           primary_phone_id?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           status?: string | null
           tags?: string[] | null
           type?: string | null
@@ -2455,7 +2455,7 @@ export type Database = {
           primary_address_id?: string | null
           primary_email_id?: string | null
           primary_phone_id?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           status?: string | null
           tags?: string[] | null
           type?: string | null
@@ -3123,6 +3123,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ocr_cache: {
+        Row: {
+          accessed_at: string
+          created_at: string
+          document_hash: string
+          expires_at: string | null
+          id: string
+          key: string
+          metadata: Json | null
+          ocr_text: string | null
+        }
+        Insert: {
+          accessed_at?: string
+          created_at?: string
+          document_hash: string
+          expires_at?: string | null
+          id?: string
+          key: string
+          metadata?: Json | null
+          ocr_text?: string | null
+        }
+        Update: {
+          accessed_at?: string
+          created_at?: string
+          document_hash?: string
+          expires_at?: string | null
+          id?: string
+          key?: string
+          metadata?: Json | null
+          ocr_text?: string | null
+        }
+        Relationships: []
+      }
       opportunities: {
         Row: {
           account_id: string
@@ -3357,7 +3390,7 @@ export type Database = {
           created_at: string
           details: Json | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           target_user_id: string
           user_agent: string | null
         }
@@ -3367,7 +3400,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           target_user_id: string
           user_agent?: string | null
         }
@@ -3377,7 +3410,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           target_user_id?: string
           user_agent?: string | null
         }
@@ -4395,7 +4428,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           requester_id: string | null
           resolution: string | null
-          search_vector: unknown | null
+          search_vector: unknown
           source: Database["public"]["Enums"]["ticket_source"]
           status: Database["public"]["Enums"]["ticket_status"]
           subject: string
@@ -4419,7 +4452,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           requester_id?: string | null
           resolution?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           source?: Database["public"]["Enums"]["ticket_source"]
           status?: Database["public"]["Enums"]["ticket_status"]
           subject: string
@@ -4443,7 +4476,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           requester_id?: string | null
           resolution?: string | null
-          search_vector?: unknown | null
+          search_vector?: unknown
           source?: Database["public"]["Enums"]["ticket_source"]
           status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
@@ -4533,7 +4566,7 @@ export type Database = {
           device_info: Json | null
           expires_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           last_active: string
           location_data: Json | null
           revoked_at: string | null
@@ -4546,7 +4579,7 @@ export type Database = {
           device_info?: Json | null
           expires_at: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           last_active?: string
           location_data?: Json | null
           revoked_at?: string | null
@@ -4559,7 +4592,7 @@ export type Database = {
           device_info?: Json | null
           expires_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           last_active?: string
           location_data?: Json | null
           revoked_at?: string | null
@@ -4671,10 +4704,6 @@ export type Database = {
         Args: { p_coi_id: string; p_version_data: Json }
         Returns: undefined
       }
-      binary_quantize: {
-        Args: { "": string } | { "": unknown }
-        Returns: unknown
-      }
       claim_jobs_for_worker: {
         Args: { p_batch_size?: number }
         Returns: {
@@ -4697,7 +4726,14 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
+      cleanup_expired_ocr_cache: { Args: never; Returns: undefined }
       compute_insured_search_vector: {
         Args: { p_account_id: string }
         Returns: unknown
@@ -4764,18 +4800,9 @@ export type Database = {
           updated_at: string
         }[]
       }
-      decrypt_ssn: {
-        Args: { enc: string }
-        Returns: string
-      }
-      digits_only: {
-        Args: { "": string }
-        Returns: string
-      }
-      encrypt_ssn: {
-        Args: { ssn: string }
-        Returns: string
-      }
+      decrypt_ssn: { Args: { enc: string }; Returns: string }
+      digits_only: { Args: { "": string }; Returns: string }
+      encrypt_ssn: { Args: { ssn: string }; Returns: string }
       find_recent_ticket_by_sender: {
         Args: { p_sender: string }
         Returns: {
@@ -4793,7 +4820,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           requester_id: string | null
           resolution: string | null
-          search_vector: unknown | null
+          search_vector: unknown
           source: Database["public"]["Enums"]["ticket_source"]
           status: Database["public"]["Enums"]["ticket_status"]
           subject: string
@@ -4802,15 +4829,15 @@ export type Database = {
           title: string
           updated_at: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "tickets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      generate_backup_codes: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
-      generate_coi_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_backup_codes: { Args: never; Returns: string[] }
+      generate_coi_number: { Args: never; Returns: string }
       generate_recurring_task_instance: {
         Args: { p_due_date: string; p_template_task_id: string }
         Returns: string
@@ -4824,12 +4851,9 @@ export type Database = {
         }
         Returns: Json
       }
-      generate_ticket_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_ticket_number: { Args: never; Returns: string }
       get_policies_claims_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           account_id: string
           amount_estimate: number
@@ -4845,7 +4869,7 @@ export type Database = {
         }[]
       }
       get_policies_with_claims_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           amount_estimate: number
           carrier: string
@@ -4861,7 +4885,7 @@ export type Database = {
         }[]
       }
       get_user_claims: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           adjuster_contact: string | null
           adjuster_name: string | null
@@ -4883,9 +4907,15 @@ export type Database = {
           type_of_loss: string | null
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "claims"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_user_claims_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           adjuster_contact: string | null
           adjuster_name: string | null
@@ -4907,9 +4937,15 @@ export type Database = {
           type_of_loss: string | null
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "claims"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_user_policies: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           account_id: string | null
           billing_frequency:
@@ -4934,9 +4970,15 @@ export type Database = {
           status: string | null
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "policies"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_user_policies_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           account_id: string | null
           billing_frequency:
@@ -4961,51 +5003,22 @@ export type Database = {
           status: string | null
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "policies"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      halfvec_avg: {
-        Args: { "": number[] }
-        Returns: unknown
-      }
-      halfvec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      halfvec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      halfvec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
       has_role: {
         Args: { desired: Database["public"]["Enums"]["user_role"]; uid: string }
         Returns: boolean
       }
-      has_sms_consent: {
-        Args: { target_contact_id: string }
-        Returns: boolean
-      }
-      hnsw_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_sparsevec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnswhandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
+      has_sms_consent: { Args: { target_contact_id: string }; Returns: boolean }
       insureds_search_v1: {
         Args: {
           p_after_id?: string
@@ -5030,38 +5043,16 @@ export type Database = {
           updated_at: string
         }[]
       }
-      is_account_member: {
-        Args: { a_id: string }
-        Returns: boolean
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never> | { uid: string }
-        Returns: boolean
-      }
+      is_account_member: { Args: { a_id: string }; Returns: boolean }
+      is_admin:
+        | { Args: { uid: string }; Returns: boolean }
+        | { Args: never; Returns: boolean }
       is_member: {
         Args: { account: string; roles?: string[] }
         Returns: boolean
       }
-      is_staff: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      ivfflat_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflathandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      jsonb_diff_vals: {
-        Args: { a: Json; b: Json }
-        Returns: Json
-      }
+      is_staff: { Args: never; Returns: boolean }
+      jsonb_diff_vals: { Args: { a: Json; b: Json }; Returns: Json }
       kb_resolve_answer: {
         Args: {
           in_carrier?: string
@@ -5095,14 +5086,12 @@ export type Database = {
           topic: string
           verified_by: string | null
         }[]
-      }
-      l2_norm: {
-        Args: { "": unknown } | { "": unknown }
-        Returns: number
-      }
-      l2_normalize: {
-        Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: unknown
+        SetofOptions: {
+          from: "*"
+          to: "kb_entries"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       log_knowledge_gap: {
         Args: { p_context?: string; p_question: string }
@@ -5116,10 +5105,7 @@ export type Database = {
         Args: { group_id: string; merged_data?: Json; survivor_id: string }
         Returns: Json
       }
-      normalize_phone_number: {
-        Args: { phone_input: string }
-        Returns: string
-      }
+      normalize_phone_number: { Args: { phone_input: string }; Returns: string }
       pick_enum_label: {
         Args: { candidates: string[]; enum_type: unknown }
         Returns: string
@@ -5187,10 +5173,7 @@ export type Database = {
           title: string
         }[]
       }
-      seed_default_tags: {
-        Args: { p_account_id: string }
-        Returns: undefined
-      }
+      seed_default_tags: { Args: { p_account_id: string }; Returns: undefined }
       set_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["user_role"]
@@ -5198,22 +5181,7 @@ export type Database = {
         }
         Returns: undefined
       }
-      sparsevec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      sparsevec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      sparsevec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      test_auth_context: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      test_auth_context: { Args: never; Returns: Json }
       unified_customer_search: {
         Args: {
           p_filters?: Json
@@ -5252,30 +5220,6 @@ export type Database = {
       upsert_membership: {
         Args: { p_account: string; p_role?: string; p_user: string }
         Returns: undefined
-      }
-      vector_avg: {
-        Args: { "": number[] }
-        Returns: string
-      }
-      vector_dims: {
-        Args: { "": string } | { "": unknown }
-        Returns: number
-      }
-      vector_norm: {
-        Args: { "": string }
-        Returns: number
-      }
-      vector_out: {
-        Args: { "": string }
-        Returns: unknown
-      }
-      vector_send: {
-        Args: { "": string }
-        Returns: string
-      }
-      vector_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
       }
     }
     Enums: {

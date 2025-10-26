@@ -8,6 +8,97 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Performance configuration
+const BATCH_CONCURRENCY = 3; // Process up to 3 documents in parallel
+const CACHE_TTL_DAYS = 7; // Cache OCR results for 7 days
+
+// Hash function for document caching
+async function hashDocument(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Cache management functions
+async function getCachedOCR(supabase: any, documentHash: string, path: string): Promise<string | null> {
+  try {
+    const cacheKey = `ocr:${path}:${documentHash}`;
+    const { data, error } = await supabase
+      .from('ocr_cache')
+      .select('ocr_text, expires_at')
+      .eq('key', cacheKey)
+      .maybeSingle();
+    
+    if (error) {
+      console.warn('Cache lookup error:', error);
+      return null;
+    }
+    
+    if (data) {
+      // Check if expired
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        console.log('Cache entry expired, removing...');
+        await supabase.from('ocr_cache').delete().eq('key', cacheKey);
+        return null;
+      }
+      console.log('✓ Cache hit for:', path);
+      return data.ocr_text;
+    }
+    
+    return null;
+  } catch (err) {
+    console.warn('Cache retrieval failed:', err);
+    return null;
+  }
+}
+
+async function cacheOCR(supabase: any, documentHash: string, path: string, ocrText: string): Promise<void> {
+  try {
+    const cacheKey = `ocr:${path}:${documentHash}`;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + CACHE_TTL_DAYS);
+    
+    await supabase.from('ocr_cache').upsert({
+      key: cacheKey,
+      document_hash: documentHash,
+      ocr_text: ocrText,
+      metadata: { path, cached_at: new Date().toISOString() },
+      expires_at: expiresAt.toISOString()
+    }, {
+      onConflict: 'key'
+    });
+    
+    console.log('✓ Cached OCR result for:', path);
+  } catch (err) {
+    console.warn('Cache save failed (non-critical):', err);
+  }
+}
+
+// Batch processing with concurrency control
+async function processBatch<T, R>(
+  items: T[],
+  processor: (item: T, index: number) => Promise<R>,
+  concurrency: number = BATCH_CONCURRENCY
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(
+      batch.map((item, batchIndex) => processor(item, i + batchIndex))
+    );
+    results.push(...batchResults);
+    
+    // Small delay between batches to prevent overwhelming resources
+    if (i + concurrency < items.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+  
+  return results;
+}
+
 // Custom error types
 class ConfigurationError extends Error {
   constructor(message: string) {
@@ -140,16 +231,18 @@ serve(async (req) => {
     
     // Handle documentPaths (critical for insurance comparison)
     if (documentPaths && Array.isArray(documentPaths) && documentPaths.length > 0) {
-      console.log('Fetching documents from storage paths:', documentPaths);
+      console.log(`Fetching ${documentPaths.length} documents from storage with batch processing (concurrency: ${BATCH_CONCURRENCY})`);
       
-      const documentResults = await Promise.allSettled(
-        documentPaths.map(async (path: string, idx: number) => {
+      // Use batch processing with concurrency control
+      const documentResults = await processBatch(
+        documentPaths,
+        async (path: string, idx: number) => {
           try {
             if (!path || typeof path !== 'string') {
               throw new DocumentFetchError(`Invalid document path at index ${idx}`);
             }
 
-            console.log(`Fetching document ${idx + 1}: ${path}`);
+            console.log(`Processing document ${idx + 1}/${documentPaths.length}: ${path}`);
 
             const { data: fileData, error: storageError } = await supabase.storage
               .from('documents')
@@ -169,8 +262,6 @@ serve(async (req) => {
             const fileName = path.split('/').pop() || `Document ${idx + 1}`;
             const mimeType = fileData.type || 'application/pdf';
             
-            console.log(`Extracting text from ${fileName} (${mimeType}, ${fileData.size} bytes)`);
-            
             if (fileData.size === 0) {
               throw new DocumentFetchError(`Empty file: ${fileName}`, path);
             }
@@ -179,37 +270,59 @@ serve(async (req) => {
               throw new DocumentFetchError(`File too large (${fileData.size} bytes): ${fileName}`, path);
             }
 
-            // Extract text using Google Vision OCR
-            const extractResult = await extractTextFromBlob(fileData, mimeType, {
-              maxPages: 60,
-              headerFooterFilter: true
-            });
+            console.log(`Document ${fileName}: ${mimeType}, ${fileData.size} bytes`);
 
-            // Validate extraction quality
-            const validation = validateExtraction(extractResult);
-            if (!validation.isValid) {
-              console.warn(`⚠ Quality issues with ${fileName}:`, validation.issues);
-              extractResult.warnings.push(...validation.issues);
-            }
+            // Generate document hash for caching
+            const documentHash = await hashDocument(fileData);
+            console.log(`Document hash: ${documentHash.substring(0, 16)}...`);
 
-            if (extractResult.warnings.length > 0) {
-              console.log(`Warnings for ${fileName}:`, extractResult.warnings);
-            }
+            // Try to get cached OCR result
+            const cachedText = await getCachedOCR(supabase, documentHash, path);
+            let fullText: string;
+            let warnings: string[] = [];
 
-            const fullText = extractResult.pages
-              .map(p => `=== Page ${p.page} ===\n${p.text}`)
-              .join('\n\n');
+            if (cachedText) {
+              fullText = cachedText;
+              console.log(`✓ Using cached OCR for ${fileName} (${fullText.length} chars)`);
+            } else {
+              console.log(`Extracting text from ${fileName}...`);
+              
+              // Extract text using Google Vision OCR
+              const extractResult = await extractTextFromBlob(fileData, mimeType, {
+                maxPages: 60,
+                headerFooterFilter: true
+              });
 
-            if (!fullText.trim()) {
-              console.warn(`⚠ No text extracted from ${fileName}. OCR may have failed or document is blank.`);
-              // Don't throw error - return minimal content with warning so job doesn't fail
-              return {
-                name: fileName,
-                type: mimeType,
-                content: `[No text could be extracted from ${fileName}]`,
-                path: path,
-                warnings: [...extractResult.warnings, 'No text extracted - document may be blank or OCR failed']
-              };
+              // Validate extraction quality
+              const validation = validateExtraction(extractResult);
+              if (!validation.isValid) {
+                console.warn(`⚠ Quality issues with ${fileName}:`, validation.issues);
+                extractResult.warnings.push(...validation.issues);
+              }
+
+              warnings = extractResult.warnings;
+
+              if (warnings.length > 0) {
+                console.log(`Warnings for ${fileName}:`, warnings);
+              }
+
+              fullText = extractResult.pages
+                .map(p => `=== Page ${p.page} ===\n${p.text}`)
+                .join('\n\n');
+
+              if (!fullText.trim()) {
+                console.warn(`⚠ No text extracted from ${fileName}. OCR may have failed or document is blank.`);
+                return {
+                  name: fileName,
+                  type: mimeType,
+                  content: `[No text could be extracted from ${fileName}]`,
+                  path: path,
+                  warnings: [...warnings, 'No text extracted - document may be blank or OCR failed']
+                };
+              }
+
+              // Cache the OCR result for future use
+              await cacheOCR(supabase, documentHash, path, fullText);
             }
 
             // Validate meaningful content
@@ -218,20 +331,21 @@ serve(async (req) => {
               console.warn(`⚠ Very little text extracted from ${fileName} (${meaningfulContent.length} chars)`);
             }
 
-            console.log(`✓ Successfully extracted ${fullText.length} characters from ${fileName}`);
+            console.log(`✓ Successfully processed ${fileName}: ${fullText.length} characters`);
 
             return {
               name: fileName,
               type: mimeType,
               content: fullText,
               path: path,
-              warnings: extractResult.warnings
+              warnings: warnings
             };
           } catch (err) {
             console.error(`✗ Error processing document at index ${idx}:`, err);
             throw err;
           }
-        })
+        },
+        BATCH_CONCURRENCY
       );
 
       // Check for failures
