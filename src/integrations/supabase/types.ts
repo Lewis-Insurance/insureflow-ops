@@ -4247,10 +4247,13 @@ export type Database = {
           contact_count: number | null
           created_at: string
           current_premium: number | null
+          customer_satisfaction_score: number | null
+          days_since_last_contact: number | null
           engagement_score: number | null
           expiration_date: string
           has_payment_issues: boolean | null
           has_recent_claim: boolean | null
+          has_recent_claims: boolean | null
           id: string
           last_contact_date: string | null
           last_risk_calculation: string | null
@@ -4279,10 +4282,13 @@ export type Database = {
           contact_count?: number | null
           created_at?: string
           current_premium?: number | null
+          customer_satisfaction_score?: number | null
+          days_since_last_contact?: number | null
           engagement_score?: number | null
           expiration_date: string
           has_payment_issues?: boolean | null
           has_recent_claim?: boolean | null
+          has_recent_claims?: boolean | null
           id?: string
           last_contact_date?: string | null
           last_risk_calculation?: string | null
@@ -4311,10 +4317,13 @@ export type Database = {
           contact_count?: number | null
           created_at?: string
           current_premium?: number | null
+          customer_satisfaction_score?: number | null
+          days_since_last_contact?: number | null
           engagement_score?: number | null
           expiration_date?: string
           has_payment_issues?: boolean | null
           has_recent_claim?: boolean | null
+          has_recent_claims?: boolean | null
           id?: string
           last_contact_date?: string | null
           last_risk_calculation?: string | null
