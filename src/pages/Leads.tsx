@@ -10,7 +10,9 @@ import {
 import { LeadCaptureForm } from '@/components/crm/LeadCaptureForm';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { PipelineKanban } from '@/components/leads/PipelineKanban';
+import { LeadDetailView } from '@/components/crm/LeadDetailView';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { useLeads } from '@/hooks/useLeads';
 import { Plus, List, LayoutGrid } from 'lucide-react';
 
 export default function Leads() {
@@ -18,15 +20,21 @@ export default function Leads() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'kanban' | 'list'>('kanban');
 
+  // Fetch leads data to get the selected lead
+  const { data: leads = [] } = useLeads();
+
   const handleLeadSelect = (leadId: string) => {
     setSelectedLeadId(leadId);
-    // TODO: Open lead detail panel/drawer
-    console.log('Selected lead:', leadId);
   };
 
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
   };
+
+  // Find the selected lead from the leads data
+  const selectedLead = selectedLeadId 
+    ? leads.find(lead => lead.id === selectedLeadId) || null
+    : null;
 
   return (
     <AppLayout>
@@ -87,6 +95,13 @@ export default function Leads() {
             <LeadCaptureForm onSuccess={handleCreateSuccess} />
           </DialogContent>
         </Dialog>
+
+        {/* Lead Detail Panel */}
+        <LeadDetailView
+          lead={selectedLead as any}
+          open={!!selectedLeadId}
+          onOpenChange={(open) => !open && setSelectedLeadId(null)}
+        />
       </div>
     </AppLayout>
   );
