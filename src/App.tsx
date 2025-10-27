@@ -59,7 +59,7 @@ const SchemaCheckPage = React.lazy(() => import("./pages/SchemaCheckPage"));
 const CustomizationPage = React.lazy(() => import("./pages/CustomizationPage"));
 const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
 const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
-const AnalyzeDocuments = React.lazy(() => import("./pages/AnalyzeDocuments"));
+const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -474,7 +474,7 @@ const App = () => (
                 path="/analyze-documents"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <AnalyzeDocuments />
+                    <ExplorePolicy />
                   </ErrorBoundary>
                 }
               />

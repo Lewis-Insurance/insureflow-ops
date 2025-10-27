@@ -87,7 +87,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 />
                 <NavItem
                   icon={FileSearch}
-                  label="Analyze Documents"
+                  label="Explore a Policy"
                   to="/analyze-documents"
                   badge="AI"
                 />
