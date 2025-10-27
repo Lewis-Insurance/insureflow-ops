@@ -265,9 +265,20 @@ export const useUpdateAORenewal = () => {
       return data as AORenewal;
     },
     onSuccess: (data) => {
+      // Invalidate all renewal-related queries
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", data.id] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
+      
+      // Invalidate analytics queries
+      queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
+      
       toast.success("Renewal updated successfully");
     },
     onError: (error) => {
@@ -316,8 +327,18 @@ export const useUpdateAORenewalStatus = () => {
       return data as AORenewal;
     },
     onSuccess: () => {
+      // Invalidate all renewal-related queries
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
+      
+      // Invalidate analytics queries
+      queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
       toast.success("Status updated successfully");
     },
     onError: (error) => {

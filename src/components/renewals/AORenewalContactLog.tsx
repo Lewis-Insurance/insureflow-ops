@@ -104,9 +104,21 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate contact log and renewal data
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", renewalId] });
+      queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
+      
+      // Invalidate analytics queries
+      queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
+      
       setNotes("");
       setContactDate(new Date().toISOString().split("T")[0]);
       setContactMethod("phone");
