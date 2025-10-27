@@ -19,6 +19,7 @@ interface PolicyStatsProps {
     expired: number;
     expiringSoon: number;
     byCarrier: Record<string, number>;
+    byMGA: Record<string, number>;
     byLineOfBusiness: Record<string, number>;
   };
   loading?: boolean;
@@ -43,6 +44,10 @@ export function PolicyStats({ stats, loading }: PolicyStatsProps) {
   if (!stats) return null;
 
   const topCarriers = Object.entries(stats.byCarrier)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 3);
+
+  const topMGAs = Object.entries(stats.byMGA || {})
     .sort(([,a], [,b]) => b - a)
     .slice(0, 3);
 
@@ -105,7 +110,30 @@ export function PolicyStats({ stats, loading }: PolicyStatsProps) {
       </div>
 
       {/* Breakdown Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Top MGAs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {topMGAs.length > 0 ? (
+                topMGAs.map(([mga, count]) => (
+                  <div key={mga} className="flex items-center justify-between">
+                    <span className="font-medium text-primary">{mga}</span>
+                    <Badge variant="secondary">{count} policies</Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No MGAs assigned</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

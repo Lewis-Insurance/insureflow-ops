@@ -5753,6 +5753,7 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
+          mga_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           policy_term: string | null
@@ -5777,6 +5778,7 @@ export type Database = {
           insured_items?: Json | null
           insured_user_id: string
           line_of_business?: string | null
+          mga_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           policy_term?: string | null
@@ -5801,6 +5803,7 @@ export type Database = {
           insured_items?: Json | null
           insured_user_id?: string
           line_of_business?: string | null
+          mga_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
           policy_number?: string
           policy_term?: string | null
@@ -5821,6 +5824,13 @@ export type Database = {
             columns: ["carrier_id"]
             isOneToOne: false
             referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_mga_id_fkey"
+            columns: ["mga_id"]
+            isOneToOne: false
+            referencedRelation: "mgas"
             referencedColumns: ["id"]
           },
         ]
@@ -8198,6 +8208,7 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
+          mga_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           policy_term: string | null
@@ -8231,6 +8242,7 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string
           line_of_business: string | null
+          mga_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
           policy_number: string
           policy_term: string | null

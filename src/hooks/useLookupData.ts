@@ -27,7 +27,6 @@ export function useMGAs() {
       const { data, error } = await supabase
         .from('mgas')
         .select('id, name')
-        .eq('is_active', true)
         .order('name');
 
       if (error) {

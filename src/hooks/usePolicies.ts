@@ -30,6 +30,11 @@ export interface PolicyWithAccount extends Policy {
     id: string;
     name: string;
   };
+  mga_info?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
 }
 
 export function usePolicies(filters: PolicyFilters = {}) {
@@ -49,6 +54,11 @@ export function usePolicies(filters: PolicyFilters = {}) {
           carrier_info:carriers!policies_carrier_id_fkey(
             id,
             name
+          ),
+          mga_info:mgas!policies_mga_id_fkey(
+            id,
+            name,
+            code
           )
         `)
         .order('created_at', { ascending: false });
@@ -82,6 +92,10 @@ export function usePolicies(filters: PolicyFilters = {}) {
 
       if (filters.carrier) {
         query = query.ilike('carrier', `%${filters.carrier}%`);
+      }
+
+      if (filters.mga) {
+        query = query.eq('mga_id', filters.mga);
       }
 
       if (filters.lineOfBusiness) {
@@ -125,7 +139,17 @@ export function usePolicyStats() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('policies')
-        .select('status, carrier, line_of_business, effective_date, expiration_date');
+        .select(`
+          status, 
+          carrier, 
+          line_of_business, 
+          effective_date, 
+          expiration_date,
+          mga_info:mgas!policies_mga_id_fkey(
+            id,
+            name
+          )
+        `);
 
       if (error) {
         throw new Error(`Failed to fetch policy stats: ${error.message}`);
@@ -144,6 +168,13 @@ export function usePolicyStats() {
         }).length,
         byCarrier: data.reduce((acc, p) => {
           acc[p.carrier] = (acc[p.carrier] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        byMGA: data.reduce((acc, p) => {
+          const mgaName = (p.mga_info as any)?.name;
+          if (mgaName) {
+            acc[mgaName] = (acc[mgaName] || 0) + 1;
+          }
           return acc;
         }, {} as Record<string, number>),
         byLineOfBusiness: data.reduce((acc, p) => {

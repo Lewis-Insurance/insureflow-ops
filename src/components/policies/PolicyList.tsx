@@ -122,7 +122,7 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
               <TableRow>
                 <TableHead>Policy Number</TableHead>
                 <TableHead>Insured</TableHead>
-                <TableHead>Carrier</TableHead>
+                <TableHead>MGA / Carrier</TableHead>
                 <TableHead>Line of Business</TableHead>
                 <TableHead>Effective Date</TableHead>
                 <TableHead>Expiration Date</TableHead>
@@ -160,7 +160,14 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
 
                   <TableCell>
                     <div className="space-y-1">
-                      {policy.carrier_info?.id ? (
+                      {policy.mga_info ? (
+                        <>
+                          <div className="font-medium text-primary">{policy.mga_info.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {policy.carrier}
+                          </div>
+                        </>
+                      ) : policy.carrier_info?.id ? (
                         <Button
                           variant="link"
                           className="p-0 h-auto font-medium"
@@ -170,11 +177,6 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                         </Button>
                       ) : (
                         <div className="font-medium">{policy.carrier}</div>
-                      )}
-                      {policy.carrier_info?.name && policy.carrier_info.name !== policy.carrier && (
-                        <div className="text-sm text-muted-foreground">
-                          {policy.carrier_info.name}
-                        </div>
                       )}
                     </div>
                   </TableCell>
