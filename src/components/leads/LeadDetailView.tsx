@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { useLead, useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
+import { InsuranceDetailsPanel } from "./insurance/InsuranceDetailsPanel";
 import {
   Phone,
   Mail,
@@ -594,6 +595,16 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                 </div>
               </form>
             </Form>
+          )}
+
+          {/* Insurance Details Section */}
+          {!isEditing && lead && lead.insurance_types && lead.insurance_types.length > 0 && (
+            <div className="mt-6 pt-6 border-t">
+              <InsuranceDetailsPanel 
+                leadId={lead.id} 
+                insuranceTypes={lead.insurance_types}
+              />
+            </div>
           )}
 
           {/* Action Buttons at Bottom */}
