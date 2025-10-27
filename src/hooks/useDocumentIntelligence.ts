@@ -424,6 +424,9 @@ export function useDocumentIntelligence() {
 
   // Delete document
   const deleteDocument = useCallback(async (documentId: string) => {
+    // Optimistically remove from UI immediately
+    setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+
     try {
       const { error } = await supabase
         .from('documents')
@@ -436,8 +439,6 @@ export function useDocumentIntelligence() {
         title: "Success",
         description: "Document deleted successfully",
       });
-
-      await fetchDocuments();
     } catch (err: any) {
       console.error('Error deleting document:', err);
       toast({
@@ -445,6 +446,8 @@ export function useDocumentIntelligence() {
         description: err.message || "Failed to delete document",
         variant: "destructive",
       });
+      // Refetch to restore the document if deletion failed
+      await fetchDocuments();
     }
   }, [toast, fetchDocuments]);
 
