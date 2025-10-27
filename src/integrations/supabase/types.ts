@@ -3652,6 +3652,218 @@ export type Database = {
           },
         ]
       }
+      lead_auto_insurance: {
+        Row: {
+          accidents_last_3_years: number | null
+          account_id: string | null
+          annual_mileage: number | null
+          created_at: string | null
+          current_collision_deductible: number | null
+          current_comprehensive_deductible: number | null
+          current_liability_limits: string | null
+          document_url: string | null
+          extracted_data: Json | null
+          id: string
+          lead_id: string
+          primary_driver_dob: string | null
+          primary_driver_license: string | null
+          primary_driver_name: string | null
+          rental_reimbursement: boolean | null
+          roadside_assistance: boolean | null
+          uninsured_motorist: boolean | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+          vehicle_make: string | null
+          vehicle_model: string | null
+          vehicle_usage: string | null
+          vehicle_vin: string | null
+          vehicle_year: number | null
+          violations_last_3_years: number | null
+        }
+        Insert: {
+          accidents_last_3_years?: number | null
+          account_id?: string | null
+          annual_mileage?: number | null
+          created_at?: string | null
+          current_collision_deductible?: number | null
+          current_comprehensive_deductible?: number | null
+          current_liability_limits?: string | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          id?: string
+          lead_id: string
+          primary_driver_dob?: string | null
+          primary_driver_license?: string | null
+          primary_driver_name?: string | null
+          rental_reimbursement?: boolean | null
+          roadside_assistance?: boolean | null
+          uninsured_motorist?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_usage?: string | null
+          vehicle_vin?: string | null
+          vehicle_year?: number | null
+          violations_last_3_years?: number | null
+        }
+        Update: {
+          accidents_last_3_years?: number | null
+          account_id?: string | null
+          annual_mileage?: number | null
+          created_at?: string | null
+          current_collision_deductible?: number | null
+          current_comprehensive_deductible?: number | null
+          current_liability_limits?: string | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          id?: string
+          lead_id?: string
+          primary_driver_dob?: string | null
+          primary_driver_license?: string | null
+          primary_driver_name?: string | null
+          rental_reimbursement?: boolean | null
+          roadside_assistance?: boolean | null
+          uninsured_motorist?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_usage?: string | null
+          vehicle_vin?: string | null
+          vehicle_year?: number | null
+          violations_last_3_years?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_auto_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_auto_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_auto_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_commercial_insurance: {
+        Row: {
+          account_id: string | null
+          annual_revenue: number | null
+          business_description: string | null
+          business_name: string | null
+          business_type: string | null
+          commercial_auto: boolean | null
+          created_at: string | null
+          cyber_liability: boolean | null
+          document_url: string | null
+          extracted_data: Json | null
+          general_liability: boolean | null
+          id: string
+          industry: string | null
+          lead_id: string
+          liability_limit: number | null
+          number_of_employees: number | null
+          number_of_vehicles: number | null
+          payroll_amount: number | null
+          professional_liability: boolean | null
+          property_coverage: boolean | null
+          property_value: number | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+          workers_comp: boolean | null
+          years_in_business: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          annual_revenue?: number | null
+          business_description?: string | null
+          business_name?: string | null
+          business_type?: string | null
+          commercial_auto?: boolean | null
+          created_at?: string | null
+          cyber_liability?: boolean | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          general_liability?: boolean | null
+          id?: string
+          industry?: string | null
+          lead_id: string
+          liability_limit?: number | null
+          number_of_employees?: number | null
+          number_of_vehicles?: number | null
+          payroll_amount?: number | null
+          professional_liability?: boolean | null
+          property_coverage?: boolean | null
+          property_value?: number | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          workers_comp?: boolean | null
+          years_in_business?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          annual_revenue?: number | null
+          business_description?: string | null
+          business_name?: string | null
+          business_type?: string | null
+          commercial_auto?: boolean | null
+          created_at?: string | null
+          cyber_liability?: boolean | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          general_liability?: boolean | null
+          id?: string
+          industry?: string | null
+          lead_id?: string
+          liability_limit?: number | null
+          number_of_employees?: number | null
+          number_of_vehicles?: number | null
+          payroll_amount?: number | null
+          professional_liability?: boolean | null
+          property_coverage?: boolean | null
+          property_value?: number | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          workers_comp?: boolean | null
+          years_in_business?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_commercial_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_commercial_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_commercial_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_dashboard_metrics: {
         Row: {
           avg_deal_size: number | null
@@ -3790,6 +4002,312 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_home_insurance: {
+        Row: {
+          account_id: string | null
+          alarm_system: boolean | null
+          claim_details: string | null
+          claims_last_5_years: number | null
+          construction_type: string | null
+          created_at: string | null
+          deductible: number | null
+          document_url: string | null
+          dog_breed: string | null
+          dogs: boolean | null
+          dwelling_coverage: number | null
+          extracted_data: Json | null
+          id: string
+          lead_id: string
+          liability_coverage: number | null
+          number_of_stories: number | null
+          personal_property_coverage: number | null
+          property_address: string | null
+          property_type: string | null
+          roof_age: number | null
+          roof_type: string | null
+          sprinkler_system: boolean | null
+          square_footage: number | null
+          swimming_pool: boolean | null
+          trampoline: boolean | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+          year_built: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          alarm_system?: boolean | null
+          claim_details?: string | null
+          claims_last_5_years?: number | null
+          construction_type?: string | null
+          created_at?: string | null
+          deductible?: number | null
+          document_url?: string | null
+          dog_breed?: string | null
+          dogs?: boolean | null
+          dwelling_coverage?: number | null
+          extracted_data?: Json | null
+          id?: string
+          lead_id: string
+          liability_coverage?: number | null
+          number_of_stories?: number | null
+          personal_property_coverage?: number | null
+          property_address?: string | null
+          property_type?: string | null
+          roof_age?: number | null
+          roof_type?: string | null
+          sprinkler_system?: boolean | null
+          square_footage?: number | null
+          swimming_pool?: boolean | null
+          trampoline?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          year_built?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          alarm_system?: boolean | null
+          claim_details?: string | null
+          claims_last_5_years?: number | null
+          construction_type?: string | null
+          created_at?: string | null
+          deductible?: number | null
+          document_url?: string | null
+          dog_breed?: string | null
+          dogs?: boolean | null
+          dwelling_coverage?: number | null
+          extracted_data?: Json | null
+          id?: string
+          lead_id?: string
+          liability_coverage?: number | null
+          number_of_stories?: number | null
+          personal_property_coverage?: number | null
+          property_address?: string | null
+          property_type?: string | null
+          roof_age?: number | null
+          roof_type?: string | null
+          sprinkler_system?: boolean | null
+          square_footage?: number | null
+          swimming_pool?: boolean | null
+          trampoline?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          year_built?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_home_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_home_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_home_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_life_insurance: {
+        Row: {
+          account_id: string | null
+          beneficiary_name: string | null
+          beneficiary_relationship: string | null
+          coverage_amount: number | null
+          coverage_type: string | null
+          created_at: string | null
+          document_url: string | null
+          extracted_data: Json | null
+          family_history: string | null
+          gender: string | null
+          health_conditions: string[] | null
+          height_inches: number | null
+          id: string
+          insured_age: number | null
+          insured_dob: string | null
+          insured_name: string | null
+          lead_id: string
+          medications: string[] | null
+          term_length: number | null
+          tobacco_use: boolean | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+          weight_lbs: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          beneficiary_name?: string | null
+          beneficiary_relationship?: string | null
+          coverage_amount?: number | null
+          coverage_type?: string | null
+          created_at?: string | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          family_history?: string | null
+          gender?: string | null
+          health_conditions?: string[] | null
+          height_inches?: number | null
+          id?: string
+          insured_age?: number | null
+          insured_dob?: string | null
+          insured_name?: string | null
+          lead_id: string
+          medications?: string[] | null
+          term_length?: number | null
+          tobacco_use?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          weight_lbs?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          beneficiary_name?: string | null
+          beneficiary_relationship?: string | null
+          coverage_amount?: number | null
+          coverage_type?: string | null
+          created_at?: string | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          family_history?: string | null
+          gender?: string | null
+          health_conditions?: string[] | null
+          height_inches?: number | null
+          id?: string
+          insured_age?: number | null
+          insured_dob?: string | null
+          insured_name?: string | null
+          lead_id?: string
+          medications?: string[] | null
+          term_length?: number | null
+          tobacco_use?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          weight_lbs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_life_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_life_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_life_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_renters_insurance: {
+        Row: {
+          account_id: string | null
+          alarm_system: boolean | null
+          created_at: string | null
+          deductible: number | null
+          document_url: string | null
+          extracted_data: Json | null
+          has_pets: boolean | null
+          id: string
+          lead_id: string
+          liability_coverage: number | null
+          loss_of_use_coverage: number | null
+          personal_property_coverage: number | null
+          pet_type: string | null
+          property_type: string | null
+          rental_address: string | null
+          square_footage: number | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+          valuable_items: boolean | null
+          valuable_items_description: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          alarm_system?: boolean | null
+          created_at?: string | null
+          deductible?: number | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          has_pets?: boolean | null
+          id?: string
+          lead_id: string
+          liability_coverage?: number | null
+          loss_of_use_coverage?: number | null
+          personal_property_coverage?: number | null
+          pet_type?: string | null
+          property_type?: string | null
+          rental_address?: string | null
+          square_footage?: number | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          valuable_items?: boolean | null
+          valuable_items_description?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          alarm_system?: boolean | null
+          created_at?: string | null
+          deductible?: number | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          has_pets?: boolean | null
+          id?: string
+          lead_id?: string
+          liability_coverage?: number | null
+          loss_of_use_coverage?: number | null
+          personal_property_coverage?: number | null
+          pet_type?: string | null
+          property_type?: string | null
+          rental_address?: string | null
+          square_footage?: number | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+          valuable_items?: boolean | null
+          valuable_items_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_renters_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_renters_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_renters_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -3973,6 +4491,91 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_umbrella_insurance: {
+        Row: {
+          account_id: string | null
+          auto_liability_limits: string | null
+          created_at: string | null
+          desired_coverage_amount: number | null
+          document_url: string | null
+          extracted_data: Json | null
+          has_recreational_vehicles: boolean | null
+          has_watercraft: boolean | null
+          home_liability_limits: string | null
+          id: string
+          lead_id: string
+          number_of_drivers: number | null
+          number_of_properties: number | null
+          number_of_vehicles: number | null
+          owns_rental_property: boolean | null
+          teen_drivers: boolean | null
+          updated_at: string | null
+          uploaded_document_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          auto_liability_limits?: string | null
+          created_at?: string | null
+          desired_coverage_amount?: number | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          has_recreational_vehicles?: boolean | null
+          has_watercraft?: boolean | null
+          home_liability_limits?: string | null
+          id?: string
+          lead_id: string
+          number_of_drivers?: number | null
+          number_of_properties?: number | null
+          number_of_vehicles?: number | null
+          owns_rental_property?: boolean | null
+          teen_drivers?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          auto_liability_limits?: string | null
+          created_at?: string | null
+          desired_coverage_amount?: number | null
+          document_url?: string | null
+          extracted_data?: Json | null
+          has_recreational_vehicles?: boolean | null
+          has_watercraft?: boolean | null
+          home_liability_limits?: string | null
+          id?: string
+          lead_id?: string
+          number_of_drivers?: number | null
+          number_of_properties?: number | null
+          number_of_vehicles?: number | null
+          owns_rental_property?: boolean | null
+          teen_drivers?: boolean | null
+          updated_at?: string | null
+          uploaded_document_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_umbrella_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_umbrella_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_umbrella_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
