@@ -1,9 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProducerPerformance } from '@/hooks/useLeadAnalytics';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, TrendingUp, Target } from 'lucide-react';
+import { Trophy, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string; end: string } }) {
@@ -84,7 +84,6 @@ export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string
               {/* Producer Info */}
               <div className="flex items-center gap-3 flex-1">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={producer.avatar_url} />
                   <AvatarFallback>
                     {producer.producer_name.charAt(0)}
                   </AvatarFallback>
@@ -92,7 +91,7 @@ export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string
                 <div>
                   <p className="font-semibold">{producer.producer_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {producer.total_leads} total leads
+                    {producer.total_assigned} total leads
                   </p>
                 </div>
               </div>
@@ -102,10 +101,10 @@ export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string
                 <div className="text-right">
                   <div className="flex items-center gap-1 text-sm font-medium">
                     <TrendingUp className="h-3 w-3 text-green-500" />
-                    <span>{producer.won_leads} Won</span>
+                    <span>{producer.won} Won</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {producer.win_rate.toFixed(1)}% win rate
+                    {producer.conversion_rate.toFixed(1)}% conv rate
                   </p>
                 </div>
 
@@ -117,19 +116,19 @@ export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string
                 </div>
 
                 <div className="w-24">
-                  <Progress value={producer.win_rate} className="h-2" />
+                  <Progress value={producer.conversion_rate} className="h-2" />
                 </div>
 
                 <Badge
                   variant={
-                    producer.active_leads > 10
+                    producer.contacted > 10
                       ? 'default'
-                      : producer.active_leads > 5
+                      : producer.contacted > 5
                       ? 'secondary'
                       : 'outline'
                   }
                 >
-                  {producer.active_leads} Active
+                  {producer.contacted} Active
                 </Badge>
               </div>
             </div>

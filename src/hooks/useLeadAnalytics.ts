@@ -130,13 +130,52 @@ export function useConversionFunnel(dateRange?: { start: string; end: string }) 
   });
 }
 
+export interface LeadSourcePerformance {
+  source_id: string;
+  source_name: string;
+  source_type: string;
+  total_leads: number;
+  contacted: number;
+  qualified: number;
+  quoted: number;
+  won: number;
+  lost: number;
+  conversion_rate: number;
+  win_rate: number;
+  total_value: number;
+  avg_value: number;
+  avg_days_to_close: number;
+}
+
 export function useLeadSourcePerformance(dateRange?: { start: string; end: string }) {
   return useQuery({
     queryKey: ['lead-source-performance', dateRange],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) throw new Error('No account membership found');
+
       let query = supabase
         .from('leads')
-        .select('source_id, status, lead_score, current_premium, created_at');
+        .select(`
+          source_id,
+          status,
+          estimated_premium,
+          created_at,
+          converted_at,
+          lead_sources (
+            name,
+            type
+          )
+        `)
+        .eq('account_id', membership.account_id);
 
       if (dateRange) {
         query = query
@@ -144,56 +183,91 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
           .lte('created_at', dateRange.end);
       }
 
-      const { data, error } = await query;
+      const { data: leads, error } = await query;
+      if (error) throw error;
 
-      if (error) {
-        console.error('Error fetching source performance:', error);
-        throw error;
-      }
+      const sourceMap = new Map<string, {
+        name: string;
+        type: string;
+        total: number;
+        contacted: number;
+        qualified: number;
+        quoted: number;
+        won: number;
+        lost: number;
+        total_value: number;
+        total_days_to_close: number;
+        closed_count: number;
+      }>();
 
-      // Group by source_id
-      const sourceMetrics = data.reduce((acc, lead) => {
+      leads?.forEach((lead: any) => {
         const sourceId = lead.source_id || 'unknown';
-        
-        if (!acc[sourceId]) {
-          acc[sourceId] = {
-            source: sourceId,
+        const sourceName = lead.lead_sources?.name || 'Unknown Source';
+        const sourceType = lead.lead_sources?.type || 'unknown';
+
+        if (!sourceMap.has(sourceId)) {
+          sourceMap.set(sourceId, {
+            name: sourceName,
+            type: sourceType,
             total: 0,
+            contacted: 0,
+            qualified: 0,
+            quoted: 0,
             won: 0,
             lost: 0,
-            in_progress: 0,
-            conversion_rate: 0,
             total_value: 0,
-            avg_score: 0,
-            scores: [],
-          };
+            total_days_to_close: 0,
+            closed_count: 0,
+          });
         }
 
-        acc[sourceId].total++;
-        if (lead.status === 'won') acc[sourceId].won++;
-        if (lead.status === 'lost') acc[sourceId].lost++;
-        if (['contacted', 'qualified', 'quoted', 'nurturing'].includes(lead.status)) {
-          acc[sourceId].in_progress++;
+        const stats = sourceMap.get(sourceId)!;
+        stats.total++;
+
+        if (['contacted', 'qualified', 'quoted', 'won'].includes(lead.status)) {
+          stats.contacted++;
         }
-        acc[sourceId].total_value += lead.current_premium || 0;
-        acc[sourceId].scores.push(lead.lead_score || 0);
-
-        return acc;
-      }, {} as Record<string, any>);
-
-      // Calculate rates
-      const sourceArray = Object.values(sourceMetrics).map((metrics: any) => {
-        metrics.conversion_rate = metrics.total > 0 
-          ? (metrics.won / metrics.total) * 100 
-          : 0;
-        metrics.avg_score = metrics.scores.length > 0
-          ? metrics.scores.reduce((a: number, b: number) => a + b, 0) / metrics.scores.length
-          : 0;
-        delete metrics.scores;
-        return metrics;
+        if (['qualified', 'quoted', 'won'].includes(lead.status)) {
+          stats.qualified++;
+        }
+        if (['quoted', 'won'].includes(lead.status)) {
+          stats.quoted++;
+        }
+        if (lead.status === 'won') {
+          stats.won++;
+          stats.total_value += lead.estimated_premium || 0;
+          
+          if (lead.converted_at && lead.created_at) {
+            const daysToClose = (new Date(lead.converted_at).getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24);
+            stats.total_days_to_close += daysToClose;
+            stats.closed_count++;
+          }
+        }
+        if (lead.status === 'lost') {
+          stats.lost++;
+        }
       });
 
-      return sourceArray.sort((a, b) => b.total - a.total);
+      const results: LeadSourcePerformance[] = Array.from(sourceMap.entries()).map(
+        ([source_id, stats]) => ({
+          source_id,
+          source_name: stats.name,
+          source_type: stats.type,
+          total_leads: stats.total,
+          contacted: stats.contacted,
+          qualified: stats.qualified,
+          quoted: stats.quoted,
+          won: stats.won,
+          lost: stats.lost,
+          conversion_rate: stats.total > 0 ? (stats.won / stats.total) * 100 : 0,
+          win_rate: stats.quoted > 0 ? (stats.won / stats.quoted) * 100 : 0,
+          total_value: stats.total_value,
+          avg_value: stats.won > 0 ? stats.total_value / stats.won : 0,
+          avg_days_to_close: stats.closed_count > 0 ? stats.total_days_to_close / stats.closed_count : 0,
+        })
+      );
+
+      return results.sort((a, b) => b.total_leads - a.total_leads);
     },
   });
 }
@@ -298,18 +372,41 @@ export function useLeadScoreDistribution() {
   });
 }
 
-export function usePipelineVelocity() {
-  return useQuery({
-    queryKey: ['pipeline-velocity'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('status, created_at, last_contact_at, converted_at, updated_at');
+export interface PipelineVelocity {
+  stage: string;
+  avg_time_in_stage_days: number;
+  lead_count: number;
+  conversion_to_next: number;
+}
 
-      if (error) {
-        console.error('Error fetching velocity:', error);
-        throw error;
+export function usePipelineVelocity(dateRange?: { start: string; end: string }) {
+  return useQuery({
+    queryKey: ['pipeline-velocity', dateRange],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) throw new Error('No account membership found');
+
+      let query = supabase
+        .from('leads')
+        .select('status, created_at, last_contact_at, converted_at, updated_at')
+        .eq('account_id', membership.account_id);
+
+      if (dateRange) {
+        query = query
+          .gte('created_at', dateRange.start)
+          .lte('created_at', dateRange.end);
       }
+
+      const { data, error } = await query;
+      if (error) throw error;
 
       const wonLeads = data.filter(l => l.status === 'won' && l.converted_at);
       
@@ -321,7 +418,6 @@ export function usePipelineVelocity() {
           }, 0) / wonLeads.length
         : 0;
 
-      // Calculate average time in each stage (rough estimation based on status)
       const newLeads = data.filter(l => l.status === 'new');
       const contactedLeads = data.filter(l => l.status === 'contacted');
       const qualifiedLeads = data.filter(l => l.status === 'qualified');
@@ -373,13 +469,50 @@ export function usePipelineVelocity() {
   });
 }
 
+export interface ProducerPerformance {
+  producer_id: string;
+  producer_name: string;
+  total_assigned: number;
+  contacted: number;
+  qualified: number;
+  quoted: number;
+  won: number;
+  lost: number;
+  conversion_rate: number;
+  win_rate: number;
+  total_value: number;
+  avg_response_time_hours: number;
+}
+
 export function useProducerPerformance(dateRange?: { start: string; end: string }) {
   return useQuery({
     queryKey: ['producer-performance', dateRange],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) throw new Error('No account membership found');
+
       let query = supabase
         .from('leads')
-        .select('assigned_to, status, lead_score, estimated_premium, created_at, insurance_types');
+        .select(`
+          assigned_to,
+          status,
+          estimated_premium,
+          created_at,
+          last_contact_at,
+          profiles!leads_assigned_to_fkey (
+            full_name
+          )
+        `)
+        .eq('account_id', membership.account_id)
+        .not('assigned_to', 'is', null);
 
       if (dateRange) {
         query = query
@@ -387,51 +520,86 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
           .lte('created_at', dateRange.end);
       }
 
-      const { data, error } = await query;
+      const { data: leads, error } = await query;
+      if (error) throw error;
 
-      if (error) {
-        console.error('Error fetching producer performance:', error);
-        throw error;
-      }
+      const producerMap = new Map<string, {
+        name: string;
+        total: number;
+        contacted: number;
+        qualified: number;
+        quoted: number;
+        won: number;
+        lost: number;
+        total_value: number;
+        total_response_time: number;
+        response_count: number;
+      }>();
 
-      // Get unique producers
-      const producerIds = Array.from(new Set(data.map(l => l.assigned_to).filter(Boolean)));
+      leads?.forEach((lead: any) => {
+        const producerId = lead.assigned_to;
+        const producerName = lead.profiles?.full_name || 'Unknown';
 
-      // Fetch producer profiles
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', producerIds);
+        if (!producerMap.has(producerId)) {
+          producerMap.set(producerId, {
+            name: producerName,
+            total: 0,
+            contacted: 0,
+            qualified: 0,
+            quoted: 0,
+            won: 0,
+            lost: 0,
+            total_value: 0,
+            total_response_time: 0,
+            response_count: 0,
+          });
+        }
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const stats = producerMap.get(producerId)!;
+        stats.total++;
 
-      // Calculate metrics per producer
-      const producerMetrics = producerIds.map(producerId => {
-        const producerLeads = data.filter(l => l.assigned_to === producerId);
-        const wonLeads = producerLeads.filter(l => l.status === 'won');
-        const profile = profileMap.get(producerId);
-
-        return {
-          producer_id: producerId,
-          producer_name: profile?.full_name || 'Unknown',
-          avatar_url: profile?.avatar_url,
-          total_leads: producerLeads.length,
-          won_leads: wonLeads.length,
-          lost_leads: producerLeads.filter(l => l.status === 'lost').length,
-          active_leads: producerLeads.filter(l => 
-            ['new', 'contacted', 'qualified', 'quoted', 'nurturing'].includes(l.status)
-          ).length,
-          win_rate: producerLeads.length > 0 
-            ? (wonLeads.length / producerLeads.length) * 100 
-            : 0,
-          avg_lead_score: producerLeads.length > 0
-            ? producerLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / producerLeads.length
-            : 0,
-          total_value: wonLeads.reduce((sum, l) => sum + (l.estimated_premium || 0), 0),
-        };
+        if (['contacted', 'qualified', 'quoted', 'won'].includes(lead.status)) {
+          stats.contacted++;
+          
+          if (lead.last_contact_at && lead.created_at) {
+            const responseTime = (new Date(lead.last_contact_at).getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60);
+            stats.total_response_time += responseTime;
+            stats.response_count++;
+          }
+        }
+        if (['qualified', 'quoted', 'won'].includes(lead.status)) {
+          stats.qualified++;
+        }
+        if (['quoted', 'won'].includes(lead.status)) {
+          stats.quoted++;
+        }
+        if (lead.status === 'won') {
+          stats.won++;
+          stats.total_value += lead.estimated_premium || 0;
+        }
+        if (lead.status === 'lost') {
+          stats.lost++;
+        }
       });
 
-      return producerMetrics.sort((a, b) => b.won_leads - a.won_leads);
+      const results: ProducerPerformance[] = Array.from(producerMap.entries()).map(
+        ([producer_id, stats]) => ({
+          producer_id,
+          producer_name: stats.name,
+          total_assigned: stats.total,
+          contacted: stats.contacted,
+          qualified: stats.qualified,
+          quoted: stats.quoted,
+          won: stats.won,
+          lost: stats.lost,
+          conversion_rate: stats.total > 0 ? (stats.won / stats.total) * 100 : 0,
+          win_rate: stats.quoted > 0 ? (stats.won / stats.quoted) * 100 : 0,
+          total_value: stats.total_value,
+          avg_response_time_hours: stats.response_count > 0 ? stats.total_response_time / stats.response_count : 0,
+        })
+      );
+
+      return results.sort((a, b) => b.total_value - a.total_value);
     },
   });
 }

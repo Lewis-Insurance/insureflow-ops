@@ -35,9 +35,7 @@ export function SourcePerformanceChart({ dateRange }: { dateRange?: { start: str
   // Format source names for display
   const formattedData = sourceData?.map(item => ({
     ...item,
-    sourceName: item.source.split('_').map((word: string) => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' '),
+    displayName: item.source_name,
   }));
 
   return (
@@ -53,7 +51,7 @@ export function SourcePerformanceChart({ dateRange }: { dateRange?: { start: str
           <BarChart data={formattedData}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
-              dataKey="sourceName" 
+              dataKey="displayName" 
               className="text-xs"
               angle={-45}
               textAnchor="end"
@@ -73,7 +71,7 @@ export function SourcePerformanceChart({ dateRange }: { dateRange?: { start: str
               }}
             />
             <Legend />
-            <Bar dataKey="total" fill="#3b82f6" name="Total Leads">
+            <Bar dataKey="total_leads" fill="#3b82f6" name="Total Leads">
               {formattedData?.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
@@ -92,15 +90,15 @@ export function SourcePerformanceChart({ dateRange }: { dateRange?: { start: str
                 <th className="text-right py-2">Total</th>
                 <th className="text-right py-2">Won</th>
                 <th className="text-right py-2">Conv. Rate</th>
-                <th className="text-right py-2">Avg Score</th>
-                <th className="text-right py-2">Value</th>
+                <th className="text-right py-2">Avg Value</th>
+                <th className="text-right py-2">Total Value</th>
               </tr>
             </thead>
             <tbody>
               {formattedData?.map((source, index) => (
-                <tr key={source.source} className="border-b">
-                  <td className="py-2 font-medium">{source.sourceName}</td>
-                  <td className="text-right">{source.total}</td>
+                <tr key={source.source_id} className="border-b">
+                  <td className="py-2 font-medium">{source.displayName}</td>
+                  <td className="text-right">{source.total_leads}</td>
                   <td className="text-right text-green-600">{source.won}</td>
                   <td className="text-right">
                     <span className={
@@ -111,7 +109,7 @@ export function SourcePerformanceChart({ dateRange }: { dateRange?: { start: str
                       {source.conversion_rate.toFixed(1)}%
                     </span>
                   </td>
-                  <td className="text-right">{source.avg_score.toFixed(0)}</td>
+                  <td className="text-right">${source.avg_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                   <td className="text-right">${source.total_value.toLocaleString()}</td>
                 </tr>
               ))}
