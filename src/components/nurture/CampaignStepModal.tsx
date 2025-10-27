@@ -8,10 +8,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMessageTemplates } from '@/integrations/supabase/hooks/useNurtureCampaigns';
 import { Mail, MessageSquare, CheckSquare, Webhook } from 'lucide-react';
 
@@ -34,41 +34,40 @@ interface CampaignStepModalProps {
 }
 
 export function CampaignStepModal({ open, onOpenChange, step, onSave }: CampaignStepModalProps) {
-  const [formData, setFormData] = useState<CampaignStep | null>(null);
+  const [localStep, setLocalStep] = useState<CampaignStep | null>(null);
 
+  // Fetch templates based on channel
   const { data: emailTemplates } = useMessageTemplates('email');
   const { data: smsTemplates } = useMessageTemplates('sms');
 
   useEffect(() => {
     if (step) {
-      setFormData(step);
+      setLocalStep({ ...step });
+    } else {
+      setLocalStep(null);
     }
   }, [step]);
 
   const handleSave = () => {
-    if (formData) {
-      onSave(formData);
+    if (localStep) {
+      onSave(localStep);
       onOpenChange(false);
     }
   };
 
-  const updateFormData = (updates: Partial<CampaignStep>) => {
-    if (formData) {
-      setFormData({ ...formData, ...updates });
+  const updateField = (field: keyof CampaignStep, value: any) => {
+    if (localStep) {
+      setLocalStep({ ...localStep, [field]: value });
     }
   };
 
-  const getAvailableTemplates = () => {
-    if (formData?.channel === 'email') return emailTemplates || [];
-    if (formData?.channel === 'sms') return smsTemplates || [];
-    return [];
-  };
+  if (!localStep) return null;
 
-  if (!formData) return null;
+  const templates = localStep.channel === 'email' ? emailTemplates : smsTemplates;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configure Campaign Step</DialogTitle>
           <DialogDescription>
@@ -76,36 +75,27 @@ export function CampaignStepModal({ open, onOpenChange, step, onSave }: Campaign
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Delay Settings */}
-          <div className="space-y-3">
-            <Label>Wait Time</Label>
-            <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-6 py-4">
+          {/* Delay Configuration */}
+          <div className="space-y-4">
+            <Label>Wait Time Before Execution</Label>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="delay-value" className="text-sm text-muted-foreground">
-                  Duration
-                </Label>
+                <Label className="text-sm">Value</Label>
                 <Input
-                  id="delay-value"
                   type="number"
                   min="0"
-                  value={formData.delay_value}
-                  onChange={(e) =>
-                    updateFormData({ delay_value: parseInt(e.target.value) || 0 })
-                  }
+                  value={localStep.delay_value}
+                  onChange={(e) => updateField('delay_value', parseInt(e.target.value) || 0)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="delay-unit" className="text-sm text-muted-foreground">
-                  Unit
-                </Label>
+                <Label className="text-sm">Unit</Label>
                 <Select
-                  value={formData.delay_unit}
-                  onValueChange={(value) =>
-                    updateFormData({ delay_unit: value as any })
-                  }
+                  value={localStep.delay_unit}
+                  onValueChange={(value: any) => updateField('delay_unit', value)}
                 >
-                  <SelectTrigger id="delay-unit">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -118,121 +108,169 @@ export function CampaignStepModal({ open, onOpenChange, step, onSave }: Campaign
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Wait {formData.delay_value} {formData.delay_unit} before executing this step
+              Wait {localStep.delay_value} {localStep.delay_unit} before executing this step
             </p>
           </div>
 
           {/* Channel Selection */}
-          <div className="space-y-3">
-            <Label>Communication Channel</Label>
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { value: 'email', icon: Mail, label: 'Email' },
-                { value: 'sms', icon: MessageSquare, label: 'SMS' },
-                { value: 'task', icon: CheckSquare, label: 'Task' },
-                { value: 'webhook', icon: Webhook, label: 'Webhook' },
-              ].map(({ value, icon: Icon, label }) => (
-                <button
-                  key={value}
-                  onClick={() => updateFormData({ channel: value as any, template_id: null })}
-                  className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors ${
-                    formData.channel === value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-sm font-medium">{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="space-y-4">
+            <Label>Channel</Label>
+            <Tabs
+              value={localStep.channel}
+              onValueChange={(value: any) => {
+                updateField('channel', value);
+                updateField('template_id', null); // Reset template when channel changes
+              }}
+            >
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="email">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="sms">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  SMS
+                </TabsTrigger>
+                <TabsTrigger value="task">
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Task
+                </TabsTrigger>
+                <TabsTrigger value="webhook">
+                  <Webhook className="h-4 w-4 mr-2" />
+                  Webhook
+                </TabsTrigger>
+              </TabsList>
 
-          {/* Template Selection for Email/SMS */}
-          {(formData.channel === 'email' || formData.channel === 'sms') && (
-            <div className="space-y-3">
-              <Label>Message Template</Label>
-              <Select
-                value={formData.template_id || ''}
-                onValueChange={(value) => updateFormData({ template_id: value || null })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a template..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableTemplates().map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                  {getAvailableTemplates().length === 0 && (
-                    <SelectItem value="none" disabled>
-                      No templates available
-                    </SelectItem>
+              <TabsContent value="email" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email Template</Label>
+                  <Select
+                    value={localStep.template_id || ''}
+                    onValueChange={(value) => updateField('template_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select email template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates?.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {templates?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No email templates found. Create one first.
+                    </p>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                </div>
+              </TabsContent>
 
-          {/* Task Configuration */}
-          {formData.channel === 'task' && (
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="task-title">Task Title</Label>
-                <Input
-                  id="task-title"
-                  placeholder="e.g., Follow up with lead"
-                  value={formData.action_data?.title || ''}
-                  onChange={(e) =>
-                    updateFormData({
-                      action_data: { ...formData.action_data, title: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="task-description">Task Description</Label>
-                <Textarea
-                  id="task-description"
-                  placeholder="Describe what needs to be done..."
-                  value={formData.action_data?.description || ''}
-                  onChange={(e) =>
-                    updateFormData({
-                      action_data: { ...formData.action_data, description: e.target.value },
-                    })
-                  }
-                />
-              </div>
-            </div>
-          )}
+              <TabsContent value="sms" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>SMS Template</Label>
+                  <Select
+                    value={localStep.template_id || ''}
+                    onValueChange={(value) => updateField('template_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select SMS template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates?.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {templates?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No SMS templates found. Create one first.
+                    </p>
+                  )}
+                </div>
+              </TabsContent>
 
-          {/* Webhook Configuration */}
-          {formData.channel === 'webhook' && (
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="webhook-url">Webhook URL</Label>
-                <Input
-                  id="webhook-url"
-                  type="url"
-                  placeholder="https://example.com/webhook"
-                  value={formData.action_data?.url || ''}
-                  onChange={(e) =>
-                    updateFormData({
-                      action_data: { ...formData.action_data, url: e.target.value },
-                    })
-                  }
-                />
-              </div>
-            </div>
-          )}
+              <TabsContent value="task" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Task Title</Label>
+                  <Input
+                    placeholder="e.g., Follow up with lead"
+                    value={localStep.action_data?.task_title || ''}
+                    onChange={(e) =>
+                      updateField('action_data', {
+                        ...localStep.action_data,
+                        task_title: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Task Description</Label>
+                  <Input
+                    placeholder="Task details..."
+                    value={localStep.action_data?.task_description || ''}
+                    onChange={(e) =>
+                      updateField('action_data', {
+                        ...localStep.action_data,
+                        task_description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="webhook" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Webhook URL</Label>
+                  <Input
+                    type="url"
+                    placeholder="https://..."
+                    value={localStep.action_data?.webhook_url || ''}
+                    onChange={(e) =>
+                      updateField('action_data', {
+                        ...localStep.action_data,
+                        webhook_url: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>HTTP Method</Label>
+                  <Select
+                    value={localStep.action_data?.webhook_method || 'POST'}
+                    onValueChange={(value) =>
+                      updateField('action_data', {
+                        ...localStep.action_data,
+                        webhook_method: value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GET">GET</SelectItem>
+                      <SelectItem value="POST">POST</SelectItem>
+                      <SelectItem value="PUT">PUT</SelectItem>
+                      <SelectItem value="PATCH">PATCH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save Step</Button>
+          <Button onClick={handleSave}>
+            Save Step
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
