@@ -7,7 +7,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Ticket, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw } from 'lucide-react';
 import { NavItem } from './NavItem';
+import { NavGroup } from './NavGroup';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
+import { SidebarMenu } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
@@ -54,164 +56,145 @@ function AppLayoutContent({ children }: AppLayoutProps) {
           </SidebarHeader>
           
           <SidebarContent>
-            <div className="flex flex-col space-y-1 px-3">
-              <NavItem 
-                icon={LayoutDashboard} 
-                label="My Dashboard" 
-                to="/dashboard" 
-              />
-              <NavItem 
-                icon={BarChart3} 
-                label="Agency Dashboard" 
-                to="/dashboard/agency"
-                badge={profile?.role === 'admin' ? 'Admin' : undefined}
-              />
-              <NavItem 
-                icon={UserPlus} 
-                label="Leads" 
-                to="/leads" 
-              />
-              <NavItem 
-                icon={Mail} 
-                label="Campaigns" 
-                to="/campaigns" 
-                badge="New"
-              />
-              <NavItem 
-                icon={Users} 
-                label="CRM" 
-                to="/crm" 
-              />
-              <NavItem 
-                icon={Users} 
-                label="Customers" 
-                to="/customers" 
-              />
-              <NavItem 
-                icon={FileText} 
-                label="Policies" 
-                to="/policies" 
-              />
-              <NavItem 
-                icon={Calendar} 
-                label="Renewals" 
-                to="/renewals" 
-              />
-              <NavItem 
-                icon={RefreshCw} 
-                label="AO Renewals" 
-                to="/ao-renewals" 
-                badge="New"
-              />
-              <NavItem 
-                icon={Brain} 
-                label="Renewal Intelligence" 
-                to="/renewals/intelligence" 
-                badge="AI"
-              />
-              <NavItem 
-                icon={Phone} 
-                label="Calls" 
-                to="/calls" 
-              />
-              <NavItem 
-                icon={MessageSquare} 
-                label="SMS" 
-                to="/sms" 
-              />
-              <NavItem 
-                icon={CheckSquare} 
-                label="Tasks" 
-                to="/tasks" 
-              />
-              <NavItem 
-                icon={Ticket} 
-                label="Service Tickets" 
-                to="/tickets" 
-              />
-              <NavItem 
-                icon={Radio} 
-                label="Command Center" 
-                to="/command-center" 
-              />
-              <NavItem
-                icon={Target}
-                label="Executive"
-                to="/executive"
-              />
-              <NavItem
-                icon={TrendingUp}
-                label="Analytics"
-                to="/analytics"
-              />
-              <NavItem
-                icon={Building2}
-                label="Carriers"
-                to="/carriers"
-              />
-              <NavItem
-                icon={Heart}
-                label="Customer Success"
-                to="/customer-success"
-              />
-              <NavItem
-                icon={Shield}
-                label="Retention"
-                to="/retention"
-              />
-              <NavItem
-                icon={DollarSign}
-                label="Financial"
-                to="/financial"
-              />
-              <NavItem
-                icon={Bot}
-                label="AI Insights"
-                to="/ai-insights"
-              />
-              <NavItem
-                icon={Database}
-                label="Document Intelligence"
-                to="/document-intelligence"
-              />
-              <NavItem
-                icon={Brain}
-                label="AI Brain"
-                to="/ai-brain"
-              />
-              <NavItem
-                icon={BookMarked}
-                label="Knowledge Manager"
-                to="/knowledge-manager"
-              />
-              <NavItem
-                icon={Scale}
-                label="Compare Quotes"
-                to="/comparison"
-              />
-              <NavItem
-                icon={Briefcase}
-                label="Workspace"
-                to="/workspace"
-              />
-              <NavItem 
-                icon={BarChart3} 
-                label="Reports" 
-                to="/reports" 
-              />
-              <NavItem 
-                icon={Sliders} 
-                label="Customization" 
-                to="/customization"
-                badge="New"
-              />
-              {profile?.role === 'admin' && (
+            <div className="flex flex-col space-y-1 px-1">
+              {/* Top Level Items */}
+              <SidebarMenu>
                 <NavItem 
-                  icon={Shield} 
-                  label="Admin" 
-                  to="/admin" 
+                  icon={LayoutDashboard} 
+                  label="My Dashboard" 
+                  to="/dashboard" 
                 />
-              )}
+                <NavItem 
+                  icon={UserPlus} 
+                  label="Leads" 
+                  to="/leads" 
+                />
+              </SidebarMenu>
+
+              {/* CRM Group */}
+              <NavGroup label="CRM" defaultOpen={true}>
+                <NavItem 
+                  icon={Users} 
+                  label="Customers" 
+                  to="/customers" 
+                />
+                <NavItem 
+                  icon={FileText} 
+                  label="Policies" 
+                  to="/policies" 
+                />
+                <NavItem 
+                  icon={Calendar} 
+                  label="Renewals" 
+                  to="/renewals" 
+                />
+                <NavItem 
+                  icon={Brain} 
+                  label="Renewal Intelligence" 
+                  to="/renewals/intelligence" 
+                  badge="AI"
+                />
+                <NavItem 
+                  icon={Phone} 
+                  label="Calls" 
+                  to="/calls" 
+                />
+                <NavItem 
+                  icon={MessageSquare} 
+                  label="SMS" 
+                  to="/sms" 
+                />
+                <NavItem 
+                  icon={Ticket} 
+                  label="Service Tickets" 
+                  to="/tickets" 
+                />
+              </NavGroup>
+
+              {/* Command Center Group */}
+              <NavGroup label="Command Center" defaultOpen={false}>
+                <NavItem 
+                  icon={BarChart3} 
+                  label="Agency Dashboard" 
+                  to="/dashboard/agency"
+                />
+                <NavItem
+                  icon={Target}
+                  label="Executive"
+                  to="/executive"
+                />
+                <NavItem
+                  icon={TrendingUp}
+                  label="Analytics"
+                  to="/analytics"
+                />
+                <NavItem
+                  icon={Shield}
+                  label="Retention"
+                  to="/retention"
+                />
+                <NavItem
+                  icon={DollarSign}
+                  label="Financial"
+                  to="/financial"
+                />
+                <NavItem
+                  icon={Brain}
+                  label="AI Brain"
+                  to="/ai-brain"
+                />
+                <NavItem
+                  icon={BookMarked}
+                  label="Knowledge Manager"
+                  to="/knowledge-manager"
+                />
+                <NavItem 
+                  icon={BarChart3} 
+                  label="Reports" 
+                  to="/reports" 
+                />
+                <NavItem 
+                  icon={Sliders} 
+                  label="Customization" 
+                  to="/customization"
+                />
+                <NavItem
+                  icon={Heart}
+                  label="Customer Success"
+                  to="/customer-success"
+                />
+                <NavItem 
+                  icon={Radio} 
+                  label="Command Center" 
+                  to="/command-center" 
+                />
+              </NavGroup>
+
+              {/* Additional Items */}
+              <SidebarMenu>
+                <NavItem 
+                  icon={CheckSquare} 
+                  label="Tasks" 
+                  to="/tasks" 
+                />
+                <NavItem 
+                  icon={Mail} 
+                  label="Campaigns" 
+                  to="/campaigns" 
+                />
+                <NavItem
+                  icon={Building2}
+                  label="Carriers"
+                  to="/carriers"
+                />
+                {profile?.role === 'admin' && (
+                  <NavItem 
+                    icon={Shield} 
+                    label="Admin" 
+                    to="/admin" 
+                  />
+                )}
+              </SidebarMenu>
             </div>
           </SidebarContent>
           
