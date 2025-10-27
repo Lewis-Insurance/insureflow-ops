@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Car, Home, Building2, Heart, Umbrella, Key, Plus } from "lucide-react";
+import { Car, Home, Building2, Heart, Umbrella, Key, Plus, FileText } from "lucide-react";
 import { InsuranceDetailsModal } from "../InsuranceDetailsModal";
-import { type InsuranceType } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
+import { QuoteDocumentModal } from "./QuoteDocumentModal";
+import { type InsuranceType, useLeadInsuranceDetails } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
+import { useGenerateQuoteDoc } from "@/hooks/useGenerateQuoteDoc";
 
 interface InsuranceDetailsPanelProps {
   leadId: string;
@@ -12,6 +14,9 @@ interface InsuranceDetailsPanelProps {
 
 export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: InsuranceDetailsPanelProps) => {
   const [selectedType, setSelectedType] = useState<InsuranceType | null>(null);
+  const [showQuoteDoc, setShowQuoteDoc] = useState(false);
+  const [quoteDocData, setQuoteDocData] = useState<any>(null);
+  const generateQuoteDoc = useGenerateQuoteDoc();
 
   const insuranceOptions = [
     { type: 'auto' as InsuranceType, label: 'Auto', icon: Car, enabled: insuranceTypes.includes('auto') },
@@ -24,31 +29,73 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
 
   const enabledOptions = insuranceOptions.filter(opt => opt.enabled);
 
+  const handleGenerateQuoteDoc = async (type: InsuranceType, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const result = await generateQuoteDoc.mutateAsync({
+        leadId,
+        insuranceType: type,
+      });
+      setQuoteDocData(result);
+      setShowQuoteDoc(true);
+    } catch (error) {
+      console.error('Error generating quote doc:', error);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Insurance Details</h3>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {enabledOptions.map(({ type, label, icon: Icon }) => (
-          <Card
-            key={type}
-            className="p-4 cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => setSelectedType(type)}
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Icon className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">{label}</p>
-                <p className="text-xs text-muted-foreground">Click to add/edit</p>
-              </div>
-              <Plus className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {enabledOptions.map(({ type, label, icon: Icon }) => {
+          const InsuranceDetailsComponent = () => {
+            const { data: details } = useLeadInsuranceDetails(leadId, type);
+            return (
+              <Card
+                key={type}
+                className="p-4 hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {details ? 'Details saved' : 'Click to add'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setSelectedType(type)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    {details ? 'Edit' : 'Add'} Details
+                  </Button>
+                  {details && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={(e) => handleGenerateQuoteDoc(type, e)}
+                      disabled={generateQuoteDoc.isPending}
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Generate Doc
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          };
+          return <InsuranceDetailsComponent key={type} />;
+        })}
       </div>
 
       {enabledOptions.length === 0 && (
@@ -63,6 +110,19 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
           insuranceType={selectedType}
           isOpen={!!selectedType}
           onClose={() => setSelectedType(null)}
+        />
+      )}
+
+      {showQuoteDoc && quoteDocData && (
+        <QuoteDocumentModal
+          isOpen={showQuoteDoc}
+          onClose={() => {
+            setShowQuoteDoc(false);
+            setQuoteDocData(null);
+          }}
+          quoteDocument={quoteDocData.quoteDocument}
+          leadInfo={quoteDocData.leadInfo}
+          isLoading={generateQuoteDoc.isPending}
         />
       )}
     </div>

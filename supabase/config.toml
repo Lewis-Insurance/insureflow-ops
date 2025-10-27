@@ -109,3 +109,6 @@ verify_jwt = true
 
 [functions.admin-create-user]
 verify_jwt = true
+
+[functions.generate-insurance-quote-doc]
+verify_jwt = true
