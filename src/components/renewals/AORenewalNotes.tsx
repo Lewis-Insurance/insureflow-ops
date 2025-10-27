@@ -34,24 +34,27 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ao_renewal_notes" as any)
-        .select(`
-          id,
-          content,
-          created_at,
-          created_by,
-          profiles:created_by(full_name)
-        `)
+        .select("*")
         .eq("renewal_id", renewalId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // Fetch user names for all notes
+      const userIds = [...new Set(data?.map((note: any) => note.created_by) || [])];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map((p) => [p.id, p.full_name]) || []);
 
       return (data || []).map((note: any) => ({
         id: note.id,
         content: note.content,
         created_at: note.created_at,
         created_by: note.created_by,
-        user_name: note.profiles?.full_name || "Unknown User",
+        user_name: profileMap.get(note.created_by) || "Unknown User",
       }));
     },
   });
