@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useNurtureCampaigns, useDeleteNurtureCampaign, useToggleCampaignActive } from '@/integrations/supabase/hooks/useNurtureCampaigns';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, PlayCircle, PauseCircle, Mail, MessageSquare, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, PlayCircle, PauseCircle, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,32 @@ export default function CampaignsPage() {
   const deleteCampaign = useDeleteNurtureCampaign();
   const toggleActive = useToggleCampaignActive();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleRunProcessor = async () => {
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('nurture-campaign-processor', {
+        body: {},
+      });
+
+      if (error) throw error;
+
+      const result = data as any;
+      toast({
+        title: 'Success',
+        description: `Enrolled ${result.total_enrolled} leads across ${result.campaigns_processed} campaigns`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to run processor',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -71,10 +98,20 @@ export default function CampaignsPage() {
               Automated multi-step campaigns to engage and convert leads
             </p>
           </div>
-          <Button onClick={() => navigate('/campaigns/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Campaign
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleRunProcessor}
+              disabled={isProcessing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
+              Run Processor Now
+            </Button>
+            <Button onClick={() => navigate('/campaigns/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Campaign
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -91,7 +128,7 @@ export default function CampaignsPage() {
         ) : campaigns?.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Mail className="h-12 w-12 text-muted-foreground mb-4" />
+              <RefreshCw className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No campaigns yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Create your first nurture campaign to automate lead engagement

@@ -710,57 +710,64 @@ export type Database = {
       }
       campaign_enrollments: {
         Row: {
+          account_id: string
           campaign_id: string
           completed_at: string | null
+          converted: boolean
           converted_at: string | null
           current_step: number | null
-          emails_clicked: number | null
-          emails_opened: number | null
-          emails_sent: number | null
           enrolled_at: string | null
           id: string
+          last_activity_at: string | null
+          last_execution_at: string | null
           lead_id: string
-          next_step_at: string | null
-          sms_responded: number | null
-          sms_sent: number | null
+          metadata: Json | null
+          next_action_at: string | null
+          next_execution_at: string | null
           status: string
-          unsubscribed_at: string | null
         }
         Insert: {
+          account_id: string
           campaign_id: string
           completed_at?: string | null
+          converted?: boolean
           converted_at?: string | null
           current_step?: number | null
-          emails_clicked?: number | null
-          emails_opened?: number | null
-          emails_sent?: number | null
           enrolled_at?: string | null
           id?: string
+          last_activity_at?: string | null
+          last_execution_at?: string | null
           lead_id: string
-          next_step_at?: string | null
-          sms_responded?: number | null
-          sms_sent?: number | null
+          metadata?: Json | null
+          next_action_at?: string | null
+          next_execution_at?: string | null
           status?: string
-          unsubscribed_at?: string | null
         }
         Update: {
+          account_id?: string
           campaign_id?: string
           completed_at?: string | null
+          converted?: boolean
           converted_at?: string | null
           current_step?: number | null
-          emails_clicked?: number | null
-          emails_opened?: number | null
-          emails_sent?: number | null
           enrolled_at?: string | null
           id?: string
+          last_activity_at?: string | null
+          last_execution_at?: string | null
           lead_id?: string
-          next_step_at?: string | null
-          sms_responded?: number | null
-          sms_sent?: number | null
+          metadata?: Json | null
+          next_action_at?: string | null
+          next_execution_at?: string | null
           status?: string
-          unsubscribed_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "campaign_enrollments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "campaign_enrollments_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -770,6 +777,82 @@ export type Database = {
           },
           {
             foreignKeyName: "campaign_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_step_executions: {
+        Row: {
+          campaign_id: string
+          channel: string
+          created_at: string | null
+          enrollment_id: string
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          scheduled_at: string
+          scheduled_for: string
+          status: string
+          step_number: number
+          step_order: number
+          template_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          channel: string
+          created_at?: string | null
+          enrollment_id: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          scheduled_at: string
+          scheduled_for?: string
+          status?: string
+          step_number: number
+          step_order?: number
+          template_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          channel?: string
+          created_at?: string | null
+          enrollment_id?: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          scheduled_at?: string
+          scheduled_for?: string
+          status?: string
+          step_number?: number
+          step_order?: number
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_step_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_step_executions_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_step_executions_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -3623,6 +3706,65 @@ export type Database = {
         }
         Relationships: []
       }
+      message_templates: {
+        Row: {
+          account_id: string
+          active: boolean | null
+          body: string
+          category: string | null
+          channel: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          subject: string | null
+          updated_at: string | null
+          usage_count: number
+          variables: Json | null
+        }
+        Insert: {
+          account_id: string
+          active?: boolean | null
+          body: string
+          category?: string | null
+          channel: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          subject?: string | null
+          updated_at?: string | null
+          usage_count?: number
+          variables?: Json | null
+        }
+        Update: {
+          account_id?: string
+          active?: boolean | null
+          body?: string
+          category?: string | null
+          channel?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          subject?: string | null
+          updated_at?: string | null
+          usage_count?: number
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mgas: {
         Row: {
           address_line1: string | null
@@ -3778,66 +3920,65 @@ export type Database = {
       }
       nurture_campaigns: {
         Row: {
-          completed_count: number | null
-          converted_count: number | null
+          account_id: string
+          active: boolean
+          completion_count: number | null
+          conversion_count: number | null
+          conversion_rate: number
           created_at: string | null
           created_by: string | null
-          currently_enrolled: number | null
           description: string | null
-          enrollment_conditions: Json
+          ended_at: string | null
+          enrollment_count: number | null
           id: string
-          is_active: boolean | null
           name: string
+          started_at: string | null
           steps: Json
-          total_enrolled: number | null
-          unsubscribed_count: number | null
+          trigger_conditions: Json
           updated_at: string | null
         }
         Insert: {
-          completed_count?: number | null
-          converted_count?: number | null
+          account_id: string
+          active?: boolean
+          completion_count?: number | null
+          conversion_count?: number | null
+          conversion_rate?: number
           created_at?: string | null
           created_by?: string | null
-          currently_enrolled?: number | null
           description?: string | null
-          enrollment_conditions: Json
+          ended_at?: string | null
+          enrollment_count?: number | null
           id?: string
-          is_active?: boolean | null
           name: string
-          steps: Json
-          total_enrolled?: number | null
-          unsubscribed_count?: number | null
+          started_at?: string | null
+          steps?: Json
+          trigger_conditions?: Json
           updated_at?: string | null
         }
         Update: {
-          completed_count?: number | null
-          converted_count?: number | null
+          account_id?: string
+          active?: boolean
+          completion_count?: number | null
+          conversion_count?: number | null
+          conversion_rate?: number
           created_at?: string | null
           created_by?: string | null
-          currently_enrolled?: number | null
           description?: string | null
-          enrollment_conditions?: Json
+          ended_at?: string | null
+          enrollment_count?: number | null
           id?: string
-          is_active?: boolean | null
           name?: string
+          started_at?: string | null
           steps?: Json
-          total_enrolled?: number | null
-          unsubscribed_count?: number | null
+          trigger_conditions?: Json
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "nurture_campaigns_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "nurture_campaigns_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "producer_lead_stats"
-            referencedColumns: ["producer_id"]
-          },
-          {
-            foreignKeyName: "nurture_campaigns_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -6474,6 +6615,10 @@ export type Database = {
         Returns: number
       }
       calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
+      check_campaign_trigger_match: {
+        Args: { p_campaign_id: string; p_lead_id: string }
+        Returns: boolean
+      }
       claim_jobs_for_worker: {
         Args: { p_batch_size?: number }
         Returns: {
@@ -6798,8 +6943,16 @@ export type Database = {
         Returns: boolean
       }
       has_sms_consent: { Args: { target_contact_id: string }; Returns: boolean }
+      increment_campaign_enrollment: {
+        Args: { campaign_id: string }
+        Returns: undefined
+      }
       increment_campaign_touchpoints: {
         Args: { campaign_id: string }
+        Returns: undefined
+      }
+      increment_template_usage: {
+        Args: { template_id: string }
         Returns: undefined
       }
       insureds_search_v1: {
@@ -7004,6 +7157,10 @@ export type Database = {
       update_account_secure: {
         Args: { account_data: Json; account_id: string }
         Returns: Json
+      }
+      update_campaign_conversion_rate: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
       }
       upsert_membership: {
         Args: { p_account: string; p_role?: string; p_user: string }
