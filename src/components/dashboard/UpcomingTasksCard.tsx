@@ -22,6 +22,10 @@ export function UpcomingTasksCard() {
 
   useEffect(() => {
     fetchUpcomingTasks();
+
+    const onTasksUpdated = () => fetchUpcomingTasks();
+    window.addEventListener('tasks:updated', onTasksUpdated as EventListener);
+    return () => window.removeEventListener('tasks:updated', onTasksUpdated as EventListener);
   }, []);
 
   const fetchUpcomingTasks = async () => {

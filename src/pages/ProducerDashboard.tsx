@@ -33,6 +33,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Link } from 'react-router-dom';
+import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
+import QuickAddTaskBar from '@/components/tasks/QuickAddTaskBar';
 
 export default function ProducerDashboard() {
   const { user } = useAuth();
@@ -85,6 +87,12 @@ export default function ProducerDashboard() {
             Activity
           </Button>
         </div>
+      </div>
+
+      {/* Quick Add + Upcoming Tasks */}
+      <div className="space-y-4">
+        <QuickAddTaskBar />
+        <UpcomingTasksCard />
       </div>
 
       {/* Today's Goal Card - Prominent */}
