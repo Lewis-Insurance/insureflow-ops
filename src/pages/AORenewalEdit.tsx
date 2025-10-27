@@ -299,11 +299,11 @@ export default function AORenewalEdit() {
           </Card>
         </form>
 
-        {/* Notes Section */}
-        {renewal && <AORenewalNotes renewalId={renewal.id} />}
-
         {/* Contact Log Section */}
         {renewal && <AORenewalContactLog renewalId={renewal.id} />}
+
+        {/* Notes Section */}
+        {renewal && <AORenewalNotes renewalId={renewal.id} />}
 
         {/* Task Modal */}
         {renewal && (
