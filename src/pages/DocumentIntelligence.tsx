@@ -15,6 +15,7 @@ import { useDocumentIntelligence } from '@/hooks/useDocumentIntelligence';
 import { useToast } from '@/hooks/use-toast';
 import { AdvancedFilters, DocumentFilters } from '@/components/document-intelligence/AdvancedFilters';
 import { SavedViews } from '@/components/document-intelligence/SavedViews';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function DocumentIntelligence() {
   const { toast } = useToast();
@@ -71,17 +72,61 @@ export default function DocumentIntelligence() {
   };
 
   const handleSearchResultClick = async (result: any) => {
-    // Find the document by ID from the search result
-    const doc = documents.find(d => d.id === result.id || d.name === result.document);
+    // Try to match in-memory list first
+    let doc = documents.find(d => d.id === result.id || d.name === result.document);
     if (doc) {
       await viewDocument(doc);
-    } else {
-      toast({
-        title: "Document not found",
-        description: "Unable to open this document",
-        variant: "destructive",
-      });
+      return;
     }
+
+    // Fallback: query Supabase by name/filename to resolve the document
+    try {
+      const searchText = String(result.document || '').trim();
+      if (searchText) {
+        let { data: found, error } = await supabase
+          .from('documents')
+          .select('*')
+          .ilike('name', `%${searchText}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!found) {
+          const alt = await supabase
+            .from('documents')
+            .select('*')
+            .ilike('filename', `%${searchText}%`)
+            .limit(1)
+            .maybeSingle();
+          if (alt.error) throw alt.error;
+          found = alt.data || null;
+        }
+
+        if (found) {
+          const processed: any = {
+            id: found.id,
+            name: found.name || found.filename || 'Untitled',
+            category: found.category || 'other',
+            size: found.size_bytes ? `${(found.size_bytes / 1024).toFixed(2)} KB` : 'Unknown',
+            uploadDate: found.uploaded_at || found.created_at,
+            status: 'processed',
+            storage_path: found.storage_path,
+            storage_bucket: found.storage_bucket,
+          };
+          await viewDocument(processed);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to resolve search result to a document:', e);
+    }
+
+    toast({
+      title: "Document not found",
+      description: "Unable to open this document",
+      variant: "destructive",
+    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,9 +139,13 @@ export default function DocumentIntelligence() {
     }
   };
 
-  const onSearch = () => {
+  const onSearch = async () => {
     if (searchQuery.trim()) {
-      handleSearch(searchQuery);
+      // Ensure documents are loaded so AI can reference them
+      if (documents.length === 0) {
+        await refetch(filters);
+      }
+      await handleSearch(searchQuery);
     }
   };
 
