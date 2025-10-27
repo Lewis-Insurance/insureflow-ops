@@ -595,6 +595,8 @@ UMBRELLA INSURANCE - Extract and return this JSON structure:
 
 RENTERS INSURANCE - Extract and return this JSON structure:
 {
+  "carrier": <string - carrier/company name>,
+  "expiration_date": <string YYYY-MM-DD format>,
   "property": { 
     "address": <string>,
     "type": <string>,
@@ -613,6 +615,90 @@ RENTERS INSURANCE - Extract and return this JSON structure:
     "valuable_items": <boolean>,
     "valuable_items_description": <string>
   }
+}
+
+BOAT INSURANCE - Extract and return this JSON structure:
+{
+  "carrier": <string - carrier/company name>,
+  "expiration_date": <string YYYY-MM-DD format>,
+  "vessel": { 
+    "type": <string - e.g., "Sailboat", "Powerboat">,
+    "year": <number>,
+    "make": <string>,
+    "model": <string>,
+    "length_feet": <number>,
+    "hull_id": <string>,
+    "engine_type": <string>,
+    "horsepower": <number>,
+    "number_of_engines": <number>,
+    "value": <number>,
+    "agreed_value": <boolean>,
+    "primary_use": <string>,
+    "navigation_area": <string>,
+    "storage_location": <string>,
+    "trailer_included": <boolean>
+  },
+  "operator": { 
+    "name": <string>,
+    "experience_years": <number>,
+    "safety_course": <boolean>
+  },
+  "claims_last_5_years": <number>
+}
+
+MOTORCYCLE INSURANCE - Extract and return this JSON structure:
+{
+  "carrier": <string - carrier/company name>,
+  "expiration_date": <string YYYY-MM-DD format>,
+  "motorcycle": { 
+    "year": <number>,
+    "make": <string>,
+    "model": <string>,
+    "vin": <string>,
+    "type": <string - e.g., "Sport", "Cruiser", "Touring">,
+    "engine_size_cc": <number>,
+    "custom_parts_value": <number>,
+    "anti_theft_device": <boolean>,
+    "storage_location": <string>,
+    "annual_mileage": <number>,
+    "primary_use": <string>
+  },
+  "rider": { 
+    "name": <string>,
+    "dob": <string>,
+    "license_number": <string>,
+    "years_experience": <number>,
+    "msf_course": <boolean>,
+    "accidents_last_3_years": <number>,
+    "violations_last_3_years": <number>
+  }
+}
+
+RV INSURANCE - Extract and return this JSON structure:
+{
+  "carrier": <string - carrier/company name>,
+  "expiration_date": <string YYYY-MM-DD format>,
+  "rv": { 
+    "type": <string - e.g., "Class A", "Class B", "Class C", "Fifth Wheel">,
+    "year": <number>,
+    "make": <string>,
+    "model": <string>,
+    "vin": <string>,
+    "length_feet": <number>,
+    "value": <number>,
+    "agreed_value": <boolean>,
+    "primary_use": <string>,
+    "full_timer": <boolean>,
+    "towing_vehicle": <string>,
+    "storage_location": <string>,
+    "total_mileage": <number>,
+    "annual_mileage": <number>,
+    "slide_outs": <number>,
+    "awnings": <number>,
+    "solar_panels": <boolean>,
+    "satellite_dish": <boolean>
+  },
+  "claims_last_5_years": <number>
 }
 
 IMPORTANT: Return ONLY the JSON object for the specific insurance type - no markdown, no code blocks, no explanatory text. Just pure JSON.`;

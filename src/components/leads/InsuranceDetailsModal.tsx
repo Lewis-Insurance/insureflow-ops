@@ -16,6 +16,9 @@ import { CommercialInsuranceForm } from "./insurance/CommercialInsuranceForm";
 import { LifeInsuranceForm } from "./insurance/LifeInsuranceForm";
 import { UmbrellaInsuranceForm } from "./insurance/UmbrellaInsuranceForm";
 import { RentersInsuranceForm } from "./insurance/RentersInsuranceForm";
+import { BoatInsuranceForm } from "./insurance/BoatInsuranceForm";
+import { MotorcycleInsuranceForm } from "./insurance/MotorcycleInsuranceForm";
+import { RVInsuranceForm } from "./insurance/RVInsuranceForm";
 import { DocumentUploadZone } from "./DocumentUploadZone";
 import {
   useLeadInsuranceDetails,
@@ -99,6 +102,12 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
         return <UmbrellaInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'renters':
         return <RentersInsuranceForm leadId={leadId} onSuccess={onClose} />;
+      case 'boat':
+        return <BoatInsuranceForm leadId={leadId} onSuccess={onClose} />;
+      case 'motorcycle':
+        return <MotorcycleInsuranceForm leadId={leadId} onSuccess={onClose} />;
+      case 'rv':
+        return <RVInsuranceForm leadId={leadId} onSuccess={onClose} />;
       default:
         return <div>Unsupported insurance type</div>;
     }

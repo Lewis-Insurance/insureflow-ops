@@ -133,6 +133,8 @@ export type RentersInsuranceDetails = {
   id?: string;
   lead_id: string;
   account_id?: string;
+  current_carrier?: string;
+  expiration_date?: string;
   rental_address?: string;
   property_type?: string;
   square_footage?: number;
@@ -150,7 +152,89 @@ export type RentersInsuranceDetails = {
   extracted_data?: Record<string, any>;
 };
 
-export type InsuranceType = 'auto' | 'home' | 'commercial' | 'life' | 'umbrella' | 'renters';
+export type BoatInsuranceDetails = {
+  id?: string;
+  lead_id: string;
+  account_id?: string;
+  current_carrier?: string;
+  expiration_date?: string;
+  vessel_type?: string;
+  year_built?: number;
+  make?: string;
+  model?: string;
+  length_feet?: number;
+  hull_id?: string;
+  engine_type?: string;
+  engine_horsepower?: number;
+  number_of_engines?: number;
+  vessel_value?: number;
+  agreed_value?: boolean;
+  primary_use?: string;
+  navigation_area?: string;
+  storage_location?: string;
+  trailer_included?: boolean;
+  operator_name?: string;
+  operator_experience_years?: number;
+  boating_safety_course?: boolean;
+  claims_last_5_years?: number;
+  uploaded_document_id?: string;
+  document_url?: string;
+  extracted_data?: Record<string, any>;
+};
+
+export type MotorcycleInsuranceDetails = {
+  id?: string;
+  lead_id: string;
+  account_id?: string;
+  current_carrier?: string;
+  expiration_date?: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  vin?: string;
+  motorcycle_type?: string;
+  engine_size_cc?: number;
+  custom_parts_value?: number;
+  anti_theft_device?: boolean;
+  storage_location?: string;
+  annual_mileage?: number;
+  primary_use?: string;
+  uploaded_document_id?: string;
+  document_url?: string;
+  extracted_data?: Record<string, any>;
+};
+
+export type RVInsuranceDetails = {
+  id?: string;
+  lead_id: string;
+  account_id?: string;
+  current_carrier?: string;
+  expiration_date?: string;
+  rv_type?: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  vin?: string;
+  length_feet?: number;
+  rv_value?: number;
+  agreed_value?: boolean;
+  primary_use?: string;
+  full_timer?: boolean;
+  towing_vehicle?: string;
+  storage_location?: string;
+  total_mileage?: number;
+  annual_mileage?: number;
+  slide_outs?: number;
+  awnings?: number;
+  solar_panels?: boolean;
+  satellite_dish?: boolean;
+  claims_last_5_years?: number;
+  uploaded_document_id?: string;
+  document_url?: string;
+  extracted_data?: Record<string, any>;
+};
+
+export type InsuranceType = 'auto' | 'home' | 'commercial' | 'life' | 'umbrella' | 'renters' | 'boat' | 'motorcycle' | 'rv';
 
 const TABLE_MAP: Record<InsuranceType, string> = {
   auto: 'lead_auto_insurance',
@@ -159,6 +243,9 @@ const TABLE_MAP: Record<InsuranceType, string> = {
   life: 'lead_life_insurance',
   umbrella: 'lead_umbrella_insurance',
   renters: 'lead_renters_insurance',
+  boat: 'lead_boat_insurance',
+  motorcycle: 'lead_motorcycle_insurance',
+  rv: 'lead_rv_insurance',
 };
 
 // Hook to fetch insurance details for a lead
@@ -399,11 +486,81 @@ function mapExtractedDataToFields(
     case 'renters':
       return {
         ...baseData,
+        current_carrier: extractedData.carrier,
+        expiration_date: extractedData.expiration_date,
         rental_address: extractedData.property?.address,
         property_type: extractedData.property?.type,
         personal_property_coverage: extractedData.coverage?.personal_property,
         liability_coverage: extractedData.coverage?.liability,
         deductible: extractedData.coverage?.deductible,
+      };
+
+    case 'boat':
+      return {
+        ...baseData,
+        current_carrier: extractedData.carrier,
+        expiration_date: extractedData.expiration_date,
+        vessel_type: extractedData.vessel?.type,
+        year_built: extractedData.vessel?.year,
+        make: extractedData.vessel?.make,
+        model: extractedData.vessel?.model,
+        length_feet: extractedData.vessel?.length_feet,
+        hull_id: extractedData.vessel?.hull_id,
+        engine_type: extractedData.vessel?.engine_type,
+        engine_horsepower: extractedData.vessel?.horsepower,
+        number_of_engines: extractedData.vessel?.number_of_engines,
+        vessel_value: extractedData.vessel?.value,
+        agreed_value: extractedData.vessel?.agreed_value,
+        primary_use: extractedData.vessel?.primary_use,
+        navigation_area: extractedData.vessel?.navigation_area,
+        storage_location: extractedData.vessel?.storage_location,
+        trailer_included: extractedData.vessel?.trailer_included,
+        operator_name: extractedData.operator?.name,
+        operator_experience_years: extractedData.operator?.experience_years,
+        boating_safety_course: extractedData.operator?.safety_course,
+      };
+
+    case 'motorcycle':
+      return {
+        ...baseData,
+        current_carrier: extractedData.carrier,
+        expiration_date: extractedData.expiration_date,
+        year: extractedData.motorcycle?.year,
+        make: extractedData.motorcycle?.make,
+        model: extractedData.motorcycle?.model,
+        vin: extractedData.motorcycle?.vin,
+        motorcycle_type: extractedData.motorcycle?.type,
+        engine_size_cc: extractedData.motorcycle?.engine_size_cc,
+        custom_parts_value: extractedData.motorcycle?.custom_parts_value,
+        anti_theft_device: extractedData.motorcycle?.anti_theft_device,
+        storage_location: extractedData.motorcycle?.storage_location,
+        annual_mileage: extractedData.motorcycle?.annual_mileage,
+        primary_use: extractedData.motorcycle?.primary_use,
+      };
+
+    case 'rv':
+      return {
+        ...baseData,
+        current_carrier: extractedData.carrier,
+        expiration_date: extractedData.expiration_date,
+        rv_type: extractedData.rv?.type,
+        year: extractedData.rv?.year,
+        make: extractedData.rv?.make,
+        model: extractedData.rv?.model,
+        vin: extractedData.rv?.vin,
+        length_feet: extractedData.rv?.length_feet,
+        rv_value: extractedData.rv?.value,
+        agreed_value: extractedData.rv?.agreed_value,
+        primary_use: extractedData.rv?.primary_use,
+        full_timer: extractedData.rv?.full_timer,
+        towing_vehicle: extractedData.rv?.towing_vehicle,
+        storage_location: extractedData.rv?.storage_location,
+        total_mileage: extractedData.rv?.total_mileage,
+        annual_mileage: extractedData.rv?.annual_mileage,
+        slide_outs: extractedData.rv?.slide_outs,
+        awnings: extractedData.rv?.awnings,
+        solar_panels: extractedData.rv?.solar_panels,
+        satellite_dish: extractedData.rv?.satellite_dish,
       };
 
     default:
