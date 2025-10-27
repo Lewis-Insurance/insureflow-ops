@@ -37,15 +37,34 @@ export function QuotesAnalyticsTab() {
     };
   }, [analytics]);
 
-  const carrierComparisonData = useMemo(() => 
-    analytics.map(a => ({
-      carrier: a.carrier,
-      avgAnnualPremium: Number(a.avg_annual_premium?.toFixed(2) || 0),
-      totalQuotes: a.total_quotes,
-      denialRate: Number(a.denial_rate_pct || 0),
-    })),
-    [analytics]
-  );
+  const carrierComparisonData = useMemo(() => {
+    // Find Auto-Owners baseline
+    const autoOwnersData = analytics.find(a => 
+      a.carrier.toLowerCase().includes('auto-owners') || 
+      a.carrier.toLowerCase().includes('auto owners')
+    );
+
+    const autoOwnersBaseline = autoOwnersData?.avg_annual_premium 
+      ? Number(autoOwnersData.avg_annual_premium) 
+      : null;
+
+    // Enhanced comparison data with Auto-Owners delta
+    return analytics.map(a => {
+      const annualPremium = Number(a.avg_annual_premium || 0);
+      const delta = autoOwnersBaseline 
+        ? ((annualPremium - autoOwnersBaseline) / autoOwnersBaseline * 100) 
+        : 0;
+      
+      return {
+        carrier: a.carrier,
+        avgAnnualPremium: annualPremium,
+        totalQuotes: a.total_quotes,
+        denialRate: Number(a.denial_rate_pct || 0),
+        deltaVsAutoOwners: delta,
+        savingsVsAutoOwners: autoOwnersBaseline ? (autoOwnersBaseline - annualPremium) : 0,
+      };
+    });
+  }, [analytics]);
 
   const quoteStatusData = useMemo(() => 
     analytics.map(a => ({
@@ -250,37 +269,65 @@ export function QuotesAnalyticsTab() {
                 <TableHead className="text-right">Denial Rate</TableHead>
                 <TableHead className="text-right">Avg Premium</TableHead>
                 <TableHead className="text-right">Avg Annual</TableHead>
+                <TableHead className="text-right">vs Auto-Owners</TableHead>
                 <TableHead className="text-right">6-mo / 12-mo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {analytics.map((row) => (
-                <TableRow key={row.carrier}>
-                  <TableCell className="font-medium">{row.carrier}</TableCell>
-                  <TableCell className="text-right">{row.total_quotes}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="secondary">{row.quoted_count}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="destructive">{row.denied_count}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="default">{row.selected_count}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {Number(row.denial_rate_pct || 0).toFixed(1)}%
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(Number(row.avg_premium))}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(Number(row.avg_annual_premium))}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {row.six_month_count} / {row.twelve_month_count}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {carrierComparisonData.map((row) => {
+                const analytics_row = analytics.find(a => a.carrier === row.carrier);
+                const isAutoOwners = row.carrier.toLowerCase().includes('auto-owners') || 
+                                    row.carrier.toLowerCase().includes('auto owners');
+                
+                return (
+                  <TableRow key={row.carrier}>
+                    <TableCell className="font-medium">{row.carrier}</TableCell>
+                    <TableCell className="text-right">{row.totalQuotes}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="secondary">{analytics_row?.quoted_count}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="destructive">{analytics_row?.denied_count}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="default">{analytics_row?.selected_count}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {row.denialRate.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(analytics_row?.avg_premium))}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(row.avgAnnualPremium)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isAutoOwners ? (
+                        <Badge variant="outline">Baseline</Badge>
+                      ) : row.savingsVsAutoOwners > 0 ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <TrendingDown className="h-3 w-3 text-green-600" />
+                          <span className="text-green-600 font-medium">
+                            {formatCurrency(row.savingsVsAutoOwners)} ({row.deltaVsAutoOwners.toFixed(1)}%)
+                          </span>
+                        </div>
+                      ) : row.savingsVsAutoOwners < 0 ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <TrendingUp className="h-3 w-3 text-red-600" />
+                          <span className="text-red-600 font-medium">
+                            {formatCurrency(Math.abs(row.savingsVsAutoOwners))} ({Math.abs(row.deltaVsAutoOwners).toFixed(1)}%)
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {analytics_row?.six_month_count} / {analytics_row?.twelve_month_count}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
