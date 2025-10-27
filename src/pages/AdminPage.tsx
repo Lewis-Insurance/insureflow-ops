@@ -52,18 +52,14 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Users
             </TabsTrigger>
-            <TabsTrigger value="carriers" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Carriers
-            </TabsTrigger>
-            <TabsTrigger value="mgas" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              MGAs
+            <TabsTrigger value="contacts" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Contacts
             </TabsTrigger>
             <TabsTrigger value="business-types" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
@@ -87,12 +83,19 @@ export default function AdminPage() {
             <UserManagement />
           </TabsContent>
 
-          <TabsContent value="carriers" className="space-y-6">
-            <CarrierManagementTab />
-          </TabsContent>
-
-          <TabsContent value="mgas" className="space-y-6">
-            <MGAManagementTab />
+          <TabsContent value="contacts" className="space-y-6">
+            <Tabs defaultValue="mgas" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="mgas">MGAs</TabsTrigger>
+                <TabsTrigger value="carriers">Carriers</TabsTrigger>
+              </TabsList>
+              <TabsContent value="mgas">
+                <MGAManagementTab />
+              </TabsContent>
+              <TabsContent value="carriers">
+                <CarrierManagementTab />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="business-types" className="space-y-6">
