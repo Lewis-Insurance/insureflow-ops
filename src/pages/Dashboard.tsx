@@ -9,6 +9,7 @@ import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
 import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
 import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
 import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
+import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -37,6 +38,11 @@ const DashboardContent = React.memo(() => {
       {/* AI Knowledge Search */}
       <ErrorBoundary level="component">
         <AIKnowledgeSearch />
+      </ErrorBoundary>
+
+      {/* Upcoming Tasks */}
+      <ErrorBoundary level="component">
+        <UpcomingTasksCard />
       </ErrorBoundary>
       
       {/* Tab Navigation */}
