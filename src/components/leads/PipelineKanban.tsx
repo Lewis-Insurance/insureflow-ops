@@ -3,14 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLeads, useMoveLeadToStage, type Lead } from "@/hooks/useLeads";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Phone, Mail, Calendar, DollarSign } from "lucide-react";
+import { Phone, Mail, Calendar, DollarSign, TrendingUp, Users, Target } from "lucide-react";
 import { format } from "date-fns";
+import { useLeadMetrics } from "@/hooks/useLeadAnalytics";
 
 const STAGES = [
   { id: 'new', label: 'New Leads', color: 'bg-blue-500' },
   { id: 'contacted', label: 'Contacted', color: 'bg-yellow-500' },
   { id: 'qualified', label: 'Qualified', color: 'bg-purple-500' },
   { id: 'quoted', label: 'Quoted', color: 'bg-orange-500' },
+  { id: 'nurturing', label: 'Nurturing', color: 'bg-gray-500' },
   { id: 'won', label: 'Won', color: 'bg-green-500' },
 ];
 
@@ -164,6 +166,7 @@ const KanbanColumn = ({
 
 export const PipelineKanban = ({ filters }: { filters?: any }) => {
   const { data: leads, isLoading } = useLeads(filters);
+  const { data: metrics } = useLeadMetrics();
   const moveLeadStage = useMoveLeadToStage();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
 
@@ -210,6 +213,63 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
 
   return (
     <div className="space-y-4">
+      {/* Pipeline Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Pipeline</p>
+                <h3 className="text-2xl font-bold">{leads?.length || 0}</h3>
+              </div>
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pipeline Value</p>
+                <h3 className="text-2xl font-bold">
+                  ${((metrics?.total_pipeline_value || 0) / 1000).toFixed(0)}K
+                </h3>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Avg Lead Score</p>
+                <h3 className="text-2xl font-bold">
+                  {metrics?.average_score?.toFixed(0) || 0}
+                </h3>
+              </div>
+              <Target className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Conversion Rate</p>
+                <h3 className="text-2xl font-bold">
+                  {metrics?.conversion_rate?.toFixed(1) || 0}%
+                </h3>
+              </div>
+              <TrendingUp className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Sales Pipeline</h2>
         <p className="text-sm text-muted-foreground">

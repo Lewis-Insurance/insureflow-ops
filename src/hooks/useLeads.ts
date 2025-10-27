@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import type { Database } from '@/integrations/supabase/types';
 
 // Types
@@ -204,29 +205,74 @@ export function useUpdateLead() {
   });
 }
 
-// Move lead to stage
+// Move lead to stage with task auto-creation
 export function useMoveLeadToStage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ leadId, newStatus }: { leadId: string; newStatus: string }) => {
-      const { data, error } = await supabase
+      // Update lead status
+      const { data: lead, error } = await supabase
         .from('leads')
         .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId)
-        .select()
+        .select('*, assigned_to, first_name, last_name')
         .single();
 
       if (error) throw error;
-      return data;
+
+      // Auto-create tasks based on stage transition
+      const taskTemplates: Record<string, { title: string; description: string; priority: string }> = {
+        contacted: {
+          title: 'Follow up on initial contact',
+          description: `Follow up with ${lead.first_name} ${lead.last_name} after initial contact`,
+          priority: 'medium'
+        },
+        qualified: {
+          title: 'Prepare quote for qualified lead',
+          description: `Prepare and send quote to ${lead.first_name} ${lead.last_name}`,
+          priority: 'high'
+        },
+        quoted: {
+          title: 'Follow up on quote',
+          description: `Follow up with ${lead.first_name} ${lead.last_name} on quote sent`,
+          priority: 'high'
+        },
+        nurturing: {
+          title: 'Nurture lead relationship',
+          description: `Continue building relationship with ${lead.first_name} ${lead.last_name}`,
+          priority: 'low'
+        }
+      };
+
+      // Create task if template exists for this stage
+      if (taskTemplates[newStatus] && lead.assigned_to) {
+        const template = taskTemplates[newStatus];
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + (newStatus === 'quoted' ? 2 : 7)); // 2 days for quoted, 7 for others
+
+        await supabase.from('tasks').insert({
+          title: template.title,
+          description: template.description,
+          priority: template.priority as 'low' | 'medium' | 'high' | 'urgent',
+          status: 'pending',
+          due_at: dueDate.toISOString(),
+          assignee_id: lead.assigned_to,
+          created_by: user?.id
+        });
+      }
+
+      return lead;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leads-by-stage'] });
-      toast.success('Lead status updated');
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Lead status updated and task created');
     },
     onError: (error: Error) => {
       toast.error(`Failed to update status: ${error.message}`);

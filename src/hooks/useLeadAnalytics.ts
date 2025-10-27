@@ -10,6 +10,7 @@ export interface LeadMetrics {
   quoted_leads: number;
   won_leads: number;
   lost_leads: number;
+  nurturing_leads: number;
   conversion_rate: number;
   average_score: number;
   total_pipeline_value: number;
@@ -42,6 +43,7 @@ export function useLeadMetrics(dateRange?: { start: string; end: string }) {
         quoted_leads: allLeads.filter(l => l.status === 'quoted').length,
         won_leads: allLeads.filter(l => l.status === 'won').length,
         lost_leads: allLeads.filter(l => l.status === 'lost').length,
+        nurturing_leads: allLeads.filter(l => l.status === 'nurturing').length,
         conversion_rate: allLeads.length > 0 
           ? (allLeads.filter(l => l.status === 'won').length / allLeads.length) * 100 
           : 0,
@@ -49,8 +51,8 @@ export function useLeadMetrics(dateRange?: { start: string; end: string }) {
           ? allLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / allLeads.length
           : 0,
         total_pipeline_value: allLeads
-          .filter(l => ['qualified', 'quoted', 'pending'].includes(l.status))
-          .reduce((sum, l) => sum + (l.estimated_premium || 0), 0),
+          .filter(l => ['qualified', 'quoted', 'nurturing'].includes(l.status))
+          .reduce((sum, l) => sum + (l.current_premium || 0), 0),
       };
 
       return metrics;
@@ -82,13 +84,13 @@ export function useConversionFunnel(dateRange?: { start: string; end: string }) 
       // Calculate funnel stages
       const total = data.length;
       const contacted = data.filter(l => 
-        ['contacted', 'qualified', 'quoted', 'pending', 'won'].includes(l.status)
+        ['contacted', 'qualified', 'quoted', 'nurturing', 'won'].includes(l.status)
       ).length;
       const qualified = data.filter(l => 
-        ['qualified', 'quoted', 'pending', 'won'].includes(l.status)
+        ['qualified', 'quoted', 'nurturing', 'won'].includes(l.status)
       ).length;
       const quoted = data.filter(l => 
-        ['quoted', 'pending', 'won'].includes(l.status)
+        ['quoted', 'nurturing', 'won'].includes(l.status)
       ).length;
       const won = data.filter(l => l.status === 'won').length;
 
@@ -134,7 +136,7 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
     queryFn: async () => {
       let query = supabase
         .from('leads')
-        .select('source_id, status, lead_score, estimated_premium, created_at');
+        .select('source_id, status, lead_score, current_premium, created_at');
 
       if (dateRange) {
         query = query
@@ -170,10 +172,10 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
         acc[sourceId].total++;
         if (lead.status === 'won') acc[sourceId].won++;
         if (lead.status === 'lost') acc[sourceId].lost++;
-        if (['contacted', 'qualified', 'quoted', 'pending'].includes(lead.status)) {
+        if (['contacted', 'qualified', 'quoted', 'nurturing'].includes(lead.status)) {
           acc[sourceId].in_progress++;
         }
-        acc[sourceId].total_value += lead.estimated_premium || 0;
+        acc[sourceId].total_value += lead.current_premium || 0;
         acc[sourceId].scores.push(lead.lead_score || 0);
 
         return acc;
@@ -303,7 +305,7 @@ export function usePipelineVelocity() {
       const { data, error } = await supabase
         .from('leads')
         .select('status, created_at, last_contact_at, converted_at')
-        .in('status', ['contacted', 'qualified', 'quoted', 'pending', 'won']);
+        .in('status', ['contacted', 'qualified', 'quoted', 'nurturing', 'won']);
 
       if (error) {
         console.error('Error fetching velocity:', error);
