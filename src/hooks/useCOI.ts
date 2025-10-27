@@ -6,7 +6,6 @@ export interface COI {
   id: string;
   account_id: string;
   policy_id?: string;
-  ticket_id?: string;
   certificate_number: string;
   certificate_holder_name: string;
   certificate_holder_address?: any;
@@ -27,23 +26,23 @@ export interface COI {
   updated_at: string;
 }
 
-export function useCOI(ticketId?: string) {
+export function useCOI(accountId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: cois, isLoading } = useQuery({
-    queryKey: ['cois', ticketId],
+    queryKey: ['cois', accountId],
     queryFn: async () => {
-      if (!ticketId) return [];
+      if (!accountId) return [];
       const { data, error } = await supabase
         .from('certificates_of_insurance')
         .select('*')
-        .eq('ticket_id', ticketId)
+        .eq('account_id', accountId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as COI[];
     },
-    enabled: !!ticketId,
+    enabled: !!accountId,
   });
 
   const createCOI = useMutation({
@@ -57,7 +56,7 @@ export function useCOI(ticketId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cois', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['cois', accountId] });
       toast({ title: 'COI created successfully' });
     },
     onError: (error: any) => {
@@ -81,7 +80,7 @@ export function useCOI(ticketId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cois', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['cois', accountId] });
       toast({ title: 'COI updated successfully' });
     },
     onError: (error: any) => {

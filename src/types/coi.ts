@@ -47,7 +47,7 @@ export interface GenerationProgress {
 
 // Batch generation types
 export interface BatchCOIItem {
-  ticketId: string;
+  accountId: string;
   coiId: string;
   data: any; // COIPDFData
 }

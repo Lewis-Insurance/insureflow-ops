@@ -44,8 +44,6 @@ const CustomerSuccessPage = React.lazy(() => import("./pages/CustomerSuccessPage
 const RetentionPage = React.lazy(() => import("./pages/RetentionPage"));
 const FinancialPage = React.lazy(() => import("./pages/FinancialPage"));
 const AIInsightsPage = React.lazy(() => import("./pages/AIInsightsPage"));
-const TicketsPage = React.lazy(() => import("./pages/TicketsPage"));
-const TicketDetail = React.lazy(() => import("./pages/TicketDetail"));
 const COIGenerator = React.lazy(() => import("./pages/COIGenerator"));
 const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
@@ -383,23 +381,7 @@ const App = () => (
                 }
               />
               <Route
-                path="/tickets"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TicketsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/tickets/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TicketDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/tickets/:ticketId/coi"
+                path="/coi-generator"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <COIGenerator />

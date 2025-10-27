@@ -162,7 +162,7 @@ export function useCOIGeneration() {
   };
 
   const performGeneration = async (
-    ticketId: string,
+    accountId: string,
     coiId: string,
     coiData: COIPDFData,
     exportOptions?: Partial<ExportOptions>,
@@ -296,17 +296,7 @@ export function useCOIGeneration() {
         coi_generated_by: user?.id || null,
       };
 
-      const { error: ticketError } = await supabase
-        .from('tickets')
-        .update({
-          metadata: coiMetadata,
-        })
-        .eq('id', ticketId);
-
-      if (ticketError) {
-        console.error('Ticket update error:', ticketError);
-        // Don't throw - COI was created successfully, ticket metadata is optional
-      }
+      // Step 3: Log successful generation (metadata stored in COI record)
 
       // Step 4: Completed
       updateProgress({
@@ -476,7 +466,7 @@ export function useCOIGeneration() {
 
       try {
         const url = await generateAndAttachCOI(
-          item.ticketId,
+          item.accountId,
           item.coiId,
           item.data
         );
@@ -681,7 +671,7 @@ export function useCOIGeneration() {
     const tasks = coiDataList.map((item, index) => async () => {
       try {
         const url = await generateAndAttachCOI(
-          item.ticketId,
+          item.accountId,
           item.coiId,
           item.data
         );

@@ -15,13 +15,17 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, Download, Send, Sparkles } from 'lucide-react';
 
 export default function COIGenerator() {
-  const { ticketId } = useParams<{ ticketId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { cois, createCOI, updateCOI } = useCOI(ticketId);
+  const searchParams = new URLSearchParams(window.location.search);
+  const accountId = searchParams.get('accountId');
+  const policyId = searchParams.get('policyId');
+  
+  const { cois, createCOI, updateCOI } = useCOI();
   const { generateAndAttachCOI, downloadCOI } = useCOIGeneration();
   
-  const [ticket, setTicket] = useState<any>(null);
+  const [account, setAccount] = useState<any>(null);
+  const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     certificate_holder_name: '',
@@ -40,42 +44,52 @@ export default function COIGenerator() {
   });
 
   useEffect(() => {
-    if (!ticketId) return;
+    if (!accountId) return;
     
-    const fetchTicket = async () => {
-      const { data, error } = await supabase
-        .from('tickets')
-        .select(`
-          *,
-          accounts(id, name, address_line1, city, state, zip_code),
-          policies(id, carrier, policy_number, effective_date, expiration_date)
-        `)
-        .eq('id', ticketId)
+    const fetchData = async () => {
+      const { data: accountData, error: accountError } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', accountId)
         .single();
 
-      if (error) {
-        toast({ title: 'Error loading ticket', description: error.message, variant: 'destructive' });
+      if (accountError) {
+        toast({ title: 'Error loading account', description: accountError.message, variant: 'destructive' });
         return;
       }
-      setTicket(data);
+      setAccount(accountData);
+
+      if (policyId) {
+        const { data: policyData, error: policyError } = await supabase
+          .from('policies')
+          .select('*')
+          .eq('id', policyId)
+          .single();
+
+        if (policyError) {
+          toast({ title: 'Error loading policy', description: policyError.message, variant: 'destructive' });
+          return;
+        }
+        setPolicy(policyData);
+      }
     };
 
-    fetchTicket();
-  }, [ticketId, toast]);
+    fetchData();
+  }, [accountId, policyId, toast]);
 
   const handleGenerateWithAI = async () => {
-    if (!ticket) return;
+    if (!account) return;
     
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-coi-data', {
         body: {
           ticketData: {
-            subject: ticket.subject,
-            description: ticket.description,
+            subject: 'COI Request',
+            description: 'Generate Certificate of Insurance',
           },
-          accountData: ticket.accounts,
-          policyData: ticket.policies?.[0] || null,
+          accountData: account,
+          policyData: policy || null,
         },
       });
 
@@ -111,12 +125,11 @@ export default function COIGenerator() {
   };
 
   const handleSaveDraft = async () => {
-    if (!ticketId || !ticket) return;
+    if (!accountId || !account) return;
     
     try {
       await createCOI({
-        ticket_id: ticketId,
-        account_id: ticket.account_id,
+        account_id: accountId,
         certificate_holder_name: formData.certificate_holder_name,
         certificate_holder_address: { text: formData.certificate_holder_address },
         effective_date: formData.effective_date,
@@ -132,7 +145,7 @@ export default function COIGenerator() {
   };
 
   const handleGeneratePDF = async () => {
-    if (!ticket || !formData.certificate_holder_name) {
+    if (!account || !formData.certificate_holder_name) {
       toast({
         title: 'Missing Information',
         description: 'Please fill in required fields before generating PDF',
@@ -146,8 +159,7 @@ export default function COIGenerator() {
 
       // First, save the COI to get a certificate number
       const savedCOI = await createCOI({
-        ticket_id: ticketId!,
-        account_id: ticket.account_id,
+        account_id: accountId!,
         certificate_holder_name: formData.certificate_holder_name,
         certificate_holder_address: { text: formData.certificate_holder_address },
         effective_date: formData.effective_date,
@@ -160,7 +172,7 @@ export default function COIGenerator() {
 
       // Generate and attach PDF using the hook
       const publicUrl = await generateAndAttachCOI(
-        ticketId!,
+        accountId!,
         savedCOI.id,
         {
           certificate_number: savedCOI.certificate_number,
@@ -171,8 +183,8 @@ export default function COIGenerator() {
           coverage_details: formData.coverage_details,
           additional_insureds: formData.additional_insureds ? ['Holder as additional insured'] : undefined,
           special_provisions: formData.special_provisions,
-          account: ticket.accounts,
-          policy: ticket.policies?.[0],
+          account: account,
+          policy: policy,
         }
       );
 
@@ -193,14 +205,14 @@ export default function COIGenerator() {
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate(`/tickets/${ticketId}`)}>
+            <Button variant="ghost" onClick={() => navigate('/customers')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Ticket
+              Back to Customers
             </Button>
             <div>
               <h1 className="text-3xl font-bold">Certificate of Insurance Generator</h1>
               <p className="text-muted-foreground">
-                {ticket?.accounts?.name || 'Loading...'}
+                {account?.name || 'Loading...'}
               </p>
             </div>
           </div>
