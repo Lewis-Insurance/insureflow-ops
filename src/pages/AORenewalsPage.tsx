@@ -389,7 +389,11 @@ export default function AORenewalsPage() {
                   </TableHeader>
                   <TableBody>
                     {renewals.map((renewal) => (
-                      <TableRow key={renewal.id}>
+                      <TableRow 
+                        key={renewal.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/ao-renewals/${renewal.id}/edit`)}
+                      >
                         <TableCell className="font-medium">
                           {renewal.customer_name}
                         </TableCell>
@@ -407,7 +411,7 @@ export default function AORenewalsPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(renewal.status)}</TableCell>
                         <TableCell>{getPriorityBadge(renewal.priority)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
