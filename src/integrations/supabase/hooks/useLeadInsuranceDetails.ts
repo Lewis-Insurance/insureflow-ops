@@ -345,10 +345,21 @@ function mapExtractedDataToFields(
         property_type: extractedData.property?.type,
         year_built: extractedData.property?.year_built,
         square_footage: extractedData.property?.square_footage,
+        construction_type: extractedData.property?.construction_type,
+        roof_type: extractedData.property?.roof_type,
+        roof_age: extractedData.property?.roof_age,
+        number_of_stories: extractedData.property?.stories,
         dwelling_coverage: extractedData.coverage?.dwelling,
         personal_property_coverage: extractedData.coverage?.personal_property,
         liability_coverage: extractedData.coverage?.liability,
         deductible: extractedData.coverage?.deductible,
+        alarm_system: extractedData.features?.alarm_system || false,
+        sprinkler_system: extractedData.features?.sprinkler_system || false,
+        swimming_pool: extractedData.features?.swimming_pool || false,
+        trampoline: extractedData.features?.trampoline || false,
+        dogs: extractedData.features?.dogs || false,
+        dog_breed: extractedData.features?.dog_breed || '',
+        claims_last_5_years: extractedData.claims_last_5_years,
       };
 
     case 'commercial':

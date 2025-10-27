@@ -450,47 +450,172 @@ serve(async (req) => {
     if (type === 'insurance_extraction' || analysisType === 'insurance_extraction') {
       const { documentType, extractionType } = requestBody;
       
-      systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents based on the insurance type.
+      systemPrompt = `You are an expert insurance document analyzer specializing in extracting data from insurance declarations pages and policy documents.
+
+CRITICAL INSTRUCTIONS:
+- Look for ALL variations of field names (e.g., "BUILT:", "Year Built:", "Construction Year:")
+- Extract numeric values from coverage tables and premium summaries
+- Convert all dollar amounts to numbers (remove $, commas)
+- For boolean fields (alarm_system, etc.), default to false unless explicitly stated
+- Always extract the complete property address if present
+- Return data in the EXACT nested structure specified below
 
 INSURANCE TYPE EXTRACTION RULES:
 
-AUTO INSURANCE - Extract:
-- vehicle: { year, make, model, vin, usage }
-- driver: { name, dob, license_number }
-- coverage: { liability_limits (e.g., "100/300/100"), collision_deductible, comprehensive_deductible, uninsured_motorist, rental_reimbursement }
-- accidents_last_3_years, violations_last_3_years
+AUTO INSURANCE - Extract and return this JSON structure:
+{
+  "vehicle": { 
+    "year": <number>,
+    "make": <string>,
+    "model": <string>,
+    "vin": <string>,
+    "usage": <string>
+  },
+  "driver": { 
+    "name": <string>,
+    "dob": <string>,
+    "license_number": <string>
+  },
+  "coverage": { 
+    "liability_limits": <string>,
+    "collision_deductible": <number>,
+    "comprehensive_deductible": <number>,
+    "uninsured_motorist": <string>,
+    "rental_reimbursement": <boolean>
+  },
+  "accidents_last_3_years": <number>,
+  "violations_last_3_years": <number>
+}
 
-HOME INSURANCE - Extract:
-- property: { address, type (e.g., "Single Family", "Condo"), year_built, square_footage, construction_type, roof_type, roof_age, stories }
-- coverage: { dwelling, personal_property, liability, deductible, loss_of_use }
-- features: { alarm_system, sprinkler_system, swimming_pool, trampoline, dogs, dog_breed }
-- claims_last_5_years
+HOME INSURANCE - Extract and return this JSON structure (look for fields like "DWELLING", "Coverage A", "BUILT:", "ROOF AGE:", "CONST:", etc.):
+{
+  "property": { 
+    "address": <string - complete address from "NAMED INSURED AND ADDRESS" or property location>,
+    "type": <string - e.g., "Single Family", "Condo" - look for "OCC:" field or property type>,
+    "year_built": <number - look for "BUILT:", "Year Built:", or similar>,
+    "square_footage": <number - if available>,
+    "construction_type": <string - look for "CONST:", "Construction:", "Construction Type:">,
+    "roof_type": <string - look for "ROOF SURFACE:", "Roof Type:", etc.>,
+    "roof_age": <number - look for "ROOF AGE:", "Roof Age:">,
+    "stories": <number - look for "# FAMILIES:", "Number of Stories:">
+  },
+  "coverage": { 
+    "dwelling": <number - look for "A. DWELLING", "Coverage A", "Dwelling Coverage">,
+    "personal_property": <number - look for "C. PERSONAL PROPERTY", "Coverage C", "Personal Property">,
+    "liability": <number - look for "E. PERSONAL LIABILITY", "Personal Liability", "Liability Coverage">,
+    "deductible": <number - look for "ALL OTHER PERILS DEDUCTIBLE", "Deductible", etc.>,
+    "loss_of_use": <number - look for "D. LOSS OF USE", "Loss of Use", "Additional Living Expense">
+  },
+  "features": { 
+    "alarm_system": <boolean>,
+    "sprinkler_system": <boolean>,
+    "swimming_pool": <boolean>,
+    "trampoline": <boolean>,
+    "dogs": <boolean>,
+    "dog_breed": <string if dogs present>
+  },
+  "claims_last_5_years": <number - if mentioned>
+}
 
-COMMERCIAL INSURANCE - Extract:
-- business: { name, type, industry, years_in_business, revenue, employees }
-- coverage_types: { general_liability, property_coverage, workers_comp, commercial_auto, professional_liability, cyber_liability }
-- coverage: { liability_limit, property_value, payroll_amount }
-- business_description, number_of_vehicles
+COMMERCIAL INSURANCE - Extract and return this JSON structure:
+{
+  "business": { 
+    "name": <string>,
+    "type": <string>,
+    "industry": <string>,
+    "years_in_business": <number>,
+    "revenue": <number>,
+    "employees": <number>
+  },
+  "coverage_types": { 
+    "general_liability": <boolean>,
+    "property_coverage": <boolean>,
+    "workers_comp": <boolean>,
+    "commercial_auto": <boolean>,
+    "professional_liability": <boolean>,
+    "cyber_liability": <boolean>
+  },
+  "coverage": { 
+    "liability_limit": <number>,
+    "property_value": <number>,
+    "payroll_amount": <number>
+  },
+  "business_description": <string>,
+  "number_of_vehicles": <number>
+}
 
-LIFE INSURANCE - Extract:
-- insured: { name, dob, age, gender, tobacco_use, height_inches, weight_lbs }
-- coverage: { type (e.g., "Term", "Whole Life"), amount, term_length (in years) }
-- health: { conditions (array), medications (array), family_history }
-- beneficiary: { name, relationship }
+LIFE INSURANCE - Extract and return this JSON structure:
+{
+  "insured": { 
+    "name": <string>,
+    "dob": <string>,
+    "age": <number>,
+    "gender": <string>,
+    "tobacco_use": <boolean>,
+    "height_inches": <number>,
+    "weight_lbs": <number>
+  },
+  "coverage": { 
+    "type": <string>,
+    "amount": <number>,
+    "term_length": <number>
+  },
+  "health": { 
+    "conditions": <array of strings>,
+    "medications": <array of strings>,
+    "family_history": <string>
+  },
+  "beneficiary": { 
+    "name": <string>,
+    "relationship": <string>
+  }
+}
 
-UMBRELLA INSURANCE - Extract:
-- coverage: { amount, auto_liability_limits, home_liability_limits }
-- underlying: { vehicles, properties, watercraft, recreational_vehicles, rental_property }
-- drivers: { number_of_drivers, teen_drivers }
+UMBRELLA INSURANCE - Extract and return this JSON structure:
+{
+  "coverage": { 
+    "amount": <number>,
+    "auto_liability_limits": <string>,
+    "home_liability_limits": <string>
+  },
+  "underlying": { 
+    "vehicles": <number>,
+    "properties": <number>,
+    "watercraft": <number>,
+    "recreational_vehicles": <number>,
+    "rental_property": <number>
+  },
+  "drivers": { 
+    "number_of_drivers": <number>,
+    "teen_drivers": <number>
+  }
+}
 
-RENTERS INSURANCE - Extract:
-- property: { address, type, square_footage }
-- coverage: { personal_property, liability, deductible, loss_of_use }
-- features: { alarm_system, pets, pet_type, valuable_items, valuable_items_description }
+RENTERS INSURANCE - Extract and return this JSON structure:
+{
+  "property": { 
+    "address": <string>,
+    "type": <string>,
+    "square_footage": <number>
+  },
+  "coverage": { 
+    "personal_property": <number>,
+    "liability": <number>,
+    "deductible": <number>,
+    "loss_of_use": <number>
+  },
+  "features": { 
+    "alarm_system": <boolean>,
+    "pets": <boolean>,
+    "pet_type": <string>,
+    "valuable_items": <boolean>,
+    "valuable_items_description": <string>
+  }
+}
 
-Return ONLY a JSON object matching the structure above for the specific insurance type. No markdown, no code blocks, just pure JSON.`;
+IMPORTANT: Return ONLY the JSON object for the specific insurance type - no markdown, no code blocks, no explanatory text. Just pure JSON.`;
 
-      userPrompt = message || `Extract ${documentType || 'insurance'} information from the document as structured JSON. Focus on the specific fields for this insurance type.`;
+      userPrompt = message || `Extract ${documentType || 'insurance'} information from the document. Return your response as a JSON object with this structure: { "extracted": { <the extracted data in the format specified for ${documentType} insurance> } }`;
     } else if (type === 'business_insights') {
       systemPrompt = `You are an AI business analyst for insurance agencies. Analyze metrics and generate actionable insights.`;
       userPrompt = message || 'Analyze the business metrics and provide actionable insights.';
