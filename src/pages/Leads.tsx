@@ -16,7 +16,8 @@ import { PipelineKanban } from "@/components/leads/PipelineKanban";
 import { ProducerSalesDashboard } from "@/components/leads/ProducerSalesDashboard";
 import { QuickLeadCapture } from "@/components/leads/QuickLeadCapture";
 import { LeadDetailView } from "@/components/leads/LeadDetailView";
-import { LayoutGrid, BarChart3, Users, Search, Filter } from "lucide-react";
+import { LeadListView } from "@/components/leads/LeadListView";
+import { LayoutGrid, BarChart3, Users, Search, Filter, List } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -105,8 +106,12 @@ export default function Leads() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="pipeline" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsTrigger value="list">
+              <List className="mr-2 h-4 w-4" />
+              List
+            </TabsTrigger>
             <TabsTrigger value="pipeline">
               <LayoutGrid className="mr-2 h-4 w-4" />
               Pipeline
@@ -120,6 +125,10 @@ export default function Leads() {
               My Dashboard
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="list" className="mt-6">
+            <LeadListView />
+          </TabsContent>
 
           <TabsContent value="pipeline" className="mt-6">
             <PipelineKanban filters={filters} />
