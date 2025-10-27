@@ -155,18 +155,17 @@ async function scoreLeads(supabaseClient: any, leadIds?: string[]) {
     });
     
     // Batch update all lead scores
-    const { error: updateError } = await supabaseClient
-      .from('leads')
-      .upsert(
-        updates.map(u => ({
-          id: u.id,
-          lead_score: u.lead_score,
+    for (const update of updates) {
+      const { error: updateError } = await supabaseClient
+        .from('leads')
+        .update({
+          lead_score: update.lead_score,
           updated_at: new Date().toISOString(),
-        })),
-        { onConflict: 'id' }
-      );
-    
-    if (updateError) throw updateError;
+        })
+        .eq('id', update.id);
+      
+      if (updateError) throw updateError;
+    }
     
     return {
       success: true,
