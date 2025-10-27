@@ -376,6 +376,13 @@ export type Database = {
             foreignKeyName: "ao_renewal_contact_log_renewal_id_fkey"
             columns: ["renewal_id"]
             isOneToOne: false
+            referencedRelation: "ao_quotes_comparison"
+            referencedColumns: ["renewal_id"]
+          },
+          {
+            foreignKeyName: "ao_renewal_contact_log_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
             referencedRelation: "ao_renewals"
             referencedColumns: ["id"]
           },
@@ -409,6 +416,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ao_renewal_notes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_quotes_comparison"
+            referencedColumns: ["renewal_id"]
+          },
+          {
+            foreignKeyName: "ao_renewal_notes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ao_renewal_quotes: {
+        Row: {
+          carrier: string
+          created_at: string
+          created_by: string
+          denial_reason: string | null
+          document_url: string | null
+          id: string
+          notes: string | null
+          premium: number
+          renewal_id: string
+          status: string
+          term_months: number
+          updated_at: string
+        }
+        Insert: {
+          carrier: string
+          created_at?: string
+          created_by: string
+          denial_reason?: string | null
+          document_url?: string | null
+          id?: string
+          notes?: string | null
+          premium: number
+          renewal_id: string
+          status?: string
+          term_months: number
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string
+          created_at?: string
+          created_by?: string
+          denial_reason?: string | null
+          document_url?: string | null
+          id?: string
+          notes?: string | null
+          premium?: number
+          renewal_id?: string
+          status?: string
+          term_months?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ao_renewal_quotes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_quotes_comparison"
+            referencedColumns: ["renewal_id"]
+          },
+          {
+            foreignKeyName: "ao_renewal_quotes_renewal_id_fkey"
             columns: ["renewal_id"]
             isOneToOne: false
             referencedRelation: "ao_renewals"
@@ -6840,6 +6914,52 @@ export type Database = {
       }
     }
     Views: {
+      ao_quotes_analytics: {
+        Row: {
+          avg_annual_premium: number | null
+          avg_premium: number | null
+          carrier: string | null
+          denial_rate_pct: number | null
+          denied_count: number | null
+          max_premium: number | null
+          min_premium: number | null
+          quoted_count: number | null
+          selected_count: number | null
+          six_month_count: number | null
+          total_quotes: number | null
+          twelve_month_count: number | null
+        }
+        Relationships: []
+      }
+      ao_quotes_comparison: {
+        Row: {
+          annualized_premium: number | null
+          ao_premium: number | null
+          current_carrier: string | null
+          customer_name: string | null
+          policy_number: string | null
+          premium_difference: number | null
+          quote_carrier: string | null
+          quote_date: string | null
+          quote_premium: number | null
+          quote_status: string | null
+          renewal_id: string | null
+          savings_pct: number | null
+          term_months: number | null
+        }
+        Relationships: []
+      }
+      ao_quotes_denial_analysis: {
+        Row: {
+          avg_attempted_premium: number | null
+          carrier: string | null
+          denial_count: number | null
+          denial_reason: string | null
+          first_denial: string | null
+          last_denial: string | null
+        }
+        Relationships: []
+      }
       ao_renewals_monthly_forecast: {
         Row: {
           high_priority_count: number | null

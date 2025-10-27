@@ -15,6 +15,7 @@ import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskMod
 import { useProfiles } from '@/hooks/useProfiles';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
+import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -298,6 +299,14 @@ export default function AORenewalEdit() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Quotes Section */}
+        {renewal && (
+          <AORenewalQuotes 
+            renewalId={renewal.id} 
+            currentPremium={renewal.current_premium}
+          />
+        )}
 
         {/* Contact Log Section */}
         {renewal && <AORenewalContactLog renewalId={renewal.id} />}

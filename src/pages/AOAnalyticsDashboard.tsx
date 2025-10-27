@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { KPICards } from "@/components/ao-renewals/analytics/KPICards";
@@ -12,6 +13,7 @@ import { StatusTimelineChart } from "@/components/ao-renewals/analytics/StatusTi
 import { TopPerformersTable } from "@/components/ao-renewals/analytics/TopPerformersTable";
 import { ConversionMetrics } from "@/components/ao-renewals/analytics/ConversionMetrics";
 import { ExportButton } from "@/components/ao-renewals/analytics/ExportButton";
+import { QuotesAnalyticsTab } from "@/components/ao-renewals/analytics/QuotesAnalyticsTab";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -40,6 +42,9 @@ export default function AOAnalyticsDashboard() {
     queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
     queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
     queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
+    queryClient.invalidateQueries({ queryKey: ["ao-quotes-analytics"] });
+    queryClient.invalidateQueries({ queryKey: ["ao-quotes-comparison"] });
+    queryClient.invalidateQueries({ queryKey: ["ao-quotes-denial-analysis"] });
     toast({
       title: "Refreshed",
       description: "Analytics data has been updated",
@@ -75,29 +80,43 @@ export default function AOAnalyticsDashboard() {
         {/* KPI Cards */}
         {kpiData && <KPICards data={kpiData} isLoading={kpiLoading} />}
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PipelineFunnelChart data={pipelineData as any || []} isLoading={pipelineLoading} />
-          <PriorityDistributionChart data={priorityData as any || []} isLoading={priorityLoading} />
-        </div>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="pipeline" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="pipeline">Renewals Pipeline</TabsTrigger>
+            <TabsTrigger value="quotes">Quote Analytics</TabsTrigger>
+          </TabsList>
 
-        {/* Monthly Forecast - Full Width */}
-        <MonthlyForecastChart data={forecastData as any || []} isLoading={forecastLoading} />
+          <TabsContent value="pipeline" className="space-y-6 mt-6">
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PipelineFunnelChart data={pipelineData as any || []} isLoading={pipelineLoading} />
+              <PriorityDistributionChart data={priorityData as any || []} isLoading={priorityLoading} />
+            </div>
 
-        {/* Premium Analytics */}
-        <PremiumAnalytics data={renewalsData || []} isLoading={renewalsLoading} />
+            {/* Monthly Forecast - Full Width */}
+            <MonthlyForecastChart data={forecastData as any || []} isLoading={forecastLoading} />
 
-        {/* Status Timeline */}
-        <StatusTimelineChart data={renewalsData || []} isLoading={renewalsLoading} />
+            {/* Premium Analytics */}
+            <PremiumAnalytics data={renewalsData || []} isLoading={renewalsLoading} />
 
-        {/* Conversion Metrics */}
-        <ConversionMetrics data={renewalsData || []} isLoading={renewalsLoading} />
+            {/* Status Timeline */}
+            <StatusTimelineChart data={renewalsData || []} isLoading={renewalsLoading} />
 
-        {/* Top Performers Table */}
-        <TopPerformersTable data={renewalsData || []} isLoading={renewalsLoading} />
+            {/* Conversion Metrics */}
+            <ConversionMetrics data={renewalsData || []} isLoading={renewalsLoading} />
 
-        {/* At-Risk Renewals Table */}
-        <AtRiskRenewalsTable data={atRiskData as any || []} isLoading={atRiskLoading} />
+            {/* Top Performers Table */}
+            <TopPerformersTable data={renewalsData || []} isLoading={renewalsLoading} />
+
+            {/* At-Risk Renewals Table */}
+            <AtRiskRenewalsTable data={atRiskData as any || []} isLoading={atRiskLoading} />
+          </TabsContent>
+
+          <TabsContent value="quotes" className="mt-6">
+            <QuotesAnalyticsTab />
+          </TabsContent>
+        </Tabs>
 
         {/* Footer */}
         <div className="flex items-center justify-between text-sm text-muted-foreground pt-4 border-t">
