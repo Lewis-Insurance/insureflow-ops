@@ -40,43 +40,6 @@ export function ActionConfigModal({
   const [delayMinutes, setDelayMinutes] = useState(0);
   const [config, setConfig] = useState<any>({});
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{action ? 'Edit' : 'Add'} Action</DialogTitle>
-          <DialogDescription>Configure action settings</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Action Type</Label>
-            <Select value={actionType} onValueChange={setActionType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="send_email">Send Email</SelectItem>
-                <SelectItem value="send_sms">Send SMS</SelectItem>
-                <SelectItem value="create_task">Create Task</SelectItem>
-                <SelectItem value="add_tag">Add Tag</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Config (JSON)</Label>
-            <Textarea value={JSON.stringify(config)} onChange={(e) => setConfig(JSON.parse(e.target.value || '{}'))} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={async () => {
-            await createAction.mutateAsync({ rule_id: ruleId, action_type: actionType, action_order: nextOrder, action_config: config, conditions: {}, delay_minutes: delayMinutes, is_active: true });
-            onOpenChange(false);
-          }}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
   useEffect(() => {
     if (action) {
       setActionType(action.action_type);
