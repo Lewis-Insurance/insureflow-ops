@@ -66,6 +66,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/dashboard" 
                 />
                 <NavItem 
+                  icon={RefreshCw} 
+                  label="AO Renewals" 
+                  to="/ao-renewals" 
+                />
+                <NavItem 
                   icon={UserPlus} 
                   label="Leads" 
                   to="/leads" 
@@ -88,11 +93,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={Calendar} 
                   label="Renewals" 
                   to="/renewals" 
-                />
-                <NavItem 
-                  icon={RefreshCw} 
-                  label="AO Renewals" 
-                  to="/ao-renewals" 
                 />
                 <NavItem 
                   icon={Brain} 
