@@ -10,13 +10,7 @@ import { AccountList } from '@/components/crm/AccountList';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { SavedViewsManager } from '@/components/crm/SavedViewsManager';
 import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
-import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
-import { CSVImport } from '@/components/crm/CSVImport';
-import { SecurityStatus } from '@/components/crm/SecurityStatus';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
-import { AuditLogViewer } from '@/components/crm/AuditLogViewer';
-import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
-import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
 import { RecentlyAccessed } from '@/components/crm/RecentlyAccessed';
 import { LeadList } from '@/components/crm/LeadList';
 import { LeadAnalyticsDashboard } from '@/components/crm/LeadAnalyticsDashboard';
@@ -312,31 +306,6 @@ const CRMContent = memo(() => {
                 </CardContent>
               </Card>
             </ErrorBoundary>
-
-            {/* Data Quality Tools */}
-            <div className="grid gap-6 md:grid-cols-3">
-              <ErrorBoundary level="component">
-                <DuplicateDetection onMergeComplete={handleRefreshAccounts} />
-              </ErrorBoundary>
-              <ErrorBoundary level="component">
-                <CSVImport onImportComplete={handleRefreshAccounts} />
-              </ErrorBoundary>
-              <ErrorBoundary level="component">
-                <SecurityStatus />
-              </ErrorBoundary>
-            </div>
-
-            {/* Advanced Import/Export System */}
-            <ErrorBoundary level="component">
-              <AdvancedImportSystem onImportComplete={handleRefreshAccounts} />
-            </ErrorBoundary>
-
-            {/* Enhanced Audit System for Staff/Admin */}
-            {canViewAuditLogs && (
-              <ErrorBoundary level="component">
-                <EnhancedAuditViewer />
-              </ErrorBoundary>
-            )}
 
             {/* Search and Filters */}
             <ErrorBoundary level="component">

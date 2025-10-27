@@ -13,6 +13,10 @@ import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagemen
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { LeadScoringAdmin } from '@/components/leads/LeadScoringAdmin';
+import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
+import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
+import { SecurityStatus } from '@/components/crm/SecurityStatus';
+import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
@@ -52,7 +56,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Users
@@ -64,6 +68,10 @@ export default function AdminPage() {
             <TabsTrigger value="business-types" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Business Types
+            </TabsTrigger>
+            <TabsTrigger value="data-management" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Data Management
             </TabsTrigger>
             <TabsTrigger value="task-templates" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -111,6 +119,56 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent>
                 <BusinessTypeManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="data-management" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Duplicate Detection</CardTitle>
+                <CardDescription>
+                  Find and manage duplicate customer records
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DuplicateDetection onMergeComplete={() => {}} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>CSV Data Import</CardTitle>
+                <CardDescription>
+                  Import customer data from CSV files with advanced mapping
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AdvancedImportSystem onImportComplete={() => {}} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Security Model Status</CardTitle>
+                <CardDescription>
+                  View system security configuration and RLS policies
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SecurityStatus />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Enhanced Audit Trail</CardTitle>
+                <CardDescription>
+                  View detailed audit logs of all system activities
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EnhancedAuditViewer />
               </CardContent>
             </Card>
           </TabsContent>
