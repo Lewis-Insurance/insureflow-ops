@@ -1,141 +1,169 @@
-import { useState } from 'react';
-import { ConversionFunnelChart } from './ConversionFunnelChart';
-import { SourcePerformanceChart } from './SourcePerformanceChart';
-import { LeadTrendsChart } from './LeadTrendsChart';
-import { ScoreDistributionChart } from './ScoreDistributionChart';
-import { useLeadMetrics, usePipelineVelocity } from '@/hooks/useLeadAnalytics';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Download, TrendingUp, Clock, Target } from 'lucide-react';
-import { subDays } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLeads } from "@/hooks/useLeads";
+import { TrendingUp, Users, Target, DollarSign } from "lucide-react";
+import { useMemo } from "react";
 
-export function LeadAnalyticsDashboard() {
-  const [dateRange, setDateRange] = useState<{ start: string; end: string } | undefined>();
-  const { data: metrics } = useLeadMetrics(dateRange);
-  const { data: velocity } = usePipelineVelocity();
+export const LeadAnalyticsDashboard = () => {
+  const { data: leads, isLoading } = useLeads();
 
-  const quickDateRanges = [
-    { label: 'Last 7 days', getValue: () => ({ start: subDays(new Date(), 7).toISOString(), end: new Date().toISOString() }) },
-    { label: 'Last 30 days', getValue: () => ({ start: subDays(new Date(), 30).toISOString(), end: new Date().toISOString() }) },
-    { label: 'Last 90 days', getValue: () => ({ start: subDays(new Date(), 90).toISOString(), end: new Date().toISOString() }) },
-    { label: 'This year', getValue: () => ({ start: new Date(new Date().getFullYear(), 0, 1).toISOString(), end: new Date().toISOString() }) },
-  ];
+  const metrics = useMemo(() => {
+    if (!leads) return null;
+
+    const total = leads.length;
+    const newLeads = leads.filter(l => l.status === 'new').length;
+    const contacted = leads.filter(l => l.status === 'contacted').length;
+    const qualified = leads.filter(l => l.status === 'qualified').length;
+    const quoted = leads.filter(l => l.status === 'quoted').length;
+    const won = leads.filter(l => l.status === 'won').length;
+    const lost = leads.filter(l => l.status === 'lost').length;
+
+    const conversionRate = total > 0 ? ((won / total) * 100).toFixed(1) : '0';
+    const avgScore = total > 0 
+      ? (leads.reduce((sum, l) => sum + l.lead_score, 0) / total).toFixed(0)
+      : '0';
+
+    const estimatedValue = leads
+      .filter(l => l.current_premium)
+      .reduce((sum, l) => sum + (l.current_premium || 0), 0);
+
+    return {
+      total,
+      newLeads,
+      contacted,
+      qualified,
+      quoted,
+      won,
+      lost,
+      conversionRate,
+      avgScore,
+      estimatedValue,
+    };
+  }, [leads]);
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(8)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="pb-2">
+              <div className="h-4 bg-muted rounded w-24"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-muted rounded w-16"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!metrics) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Header with Filters */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Lead Analytics</h2>
-          <p className="text-muted-foreground">
-            Comprehensive insights into your lead pipeline performance
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Quick Date Ranges */}
-          <div className="flex gap-2">
-            {quickDateRanges.map((range) => (
-              <Button
-                key={range.label}
-                variant="outline"
-                size="sm"
-                onClick={() => setDateRange(range.getValue())}
-              >
-                {range.label}
-              </Button>
-            ))}
-            {dateRange && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDateRange(undefined)}
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Total Leads */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {metrics.newLeads} new this month
+            </p>
+          </CardContent>
+        </Card>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Conversion Rate */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics?.conversion_rate.toFixed(1)}%
-            </div>
+            <div className="text-2xl font-bold">{metrics.conversionRate}%</div>
             <p className="text-xs text-muted-foreground">
-              {metrics?.won_leads} of {metrics?.total_leads} leads won
+              {metrics.won} won / {metrics.total} total
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Time to Win</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {velocity?.overall || 0} days
-            </div>
-            <p className="text-xs text-muted-foreground">
-              From new lead to closed deal
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${metrics?.total_pipeline_value.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Active qualified leads
-            </p>
-          </CardContent>
-        </Card>
-
+        {/* Average Lead Score */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Lead Score</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics?.average_score.toFixed(0)}/100
-            </div>
+            <div className="text-2xl font-bold">{metrics.avgScore}/100</div>
             <p className="text-xs text-muted-foreground">
               Quality indicator
             </p>
           </CardContent>
         </Card>
+
+        {/* Pipeline Value */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${metrics.estimatedValue.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Estimated annual premium
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ConversionFunnelChart dateRange={dateRange} />
-        <LeadTrendsChart />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <SourcePerformanceChart dateRange={dateRange} />
-        </div>
-        <ScoreDistributionChart />
-      </div>
+      {/* Pipeline Stages */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Pipeline Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              { label: 'New', count: metrics.newLeads, color: 'bg-blue-500' },
+              { label: 'Contacted', count: metrics.contacted, color: 'bg-yellow-500' },
+              { label: 'Qualified', count: metrics.qualified, color: 'bg-purple-500' },
+              { label: 'Quoted', count: metrics.quoted, color: 'bg-orange-500' },
+              { label: 'Won', count: metrics.won, color: 'bg-green-500' },
+              { label: 'Lost', count: metrics.lost, color: 'bg-red-500' },
+            ].map((stage) => (
+              <div key={stage.label} className="flex items-center">
+                <div className="w-24 text-sm font-medium">{stage.label}</div>
+                <div className="flex-1 mx-4">
+                  <div className="h-8 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${stage.color} flex items-center justify-end px-2`}
+                      style={{
+                        width: `${metrics.total > 0 ? (stage.count / metrics.total) * 100 : 0}%`,
+                      }}
+                    >
+                      {stage.count > 0 && (
+                        <span className="text-xs font-semibold text-white">
+                          {stage.count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-16 text-right text-sm text-muted-foreground">
+                  {metrics.total > 0
+                    ? ((stage.count / metrics.total) * 100).toFixed(0)
+                    : 0}%
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
