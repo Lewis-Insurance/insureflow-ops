@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, CheckSquare } from 'lucide-react';
 import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority, type AORenewal } from '@/hooks/useAORenewals';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
+import { useProfiles } from '@/hooks/useProfiles';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ export default function AORenewalEdit() {
   
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
+  const { profiles } = useProfiles();
   
   const [showTaskModal, setShowTaskModal] = useState(false);
 
@@ -212,12 +214,22 @@ export default function AORenewalEdit() {
 
                 <div>
                   <Label htmlFor="assigned_to">Assigned To</Label>
-                  <Input
-                    id="assigned_to"
+                  <Select
                     value={formData.assigned_to}
-                    onChange={(e) => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
-                    placeholder="Assigned producer or user"
-                  />
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a user" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background">
+                      <SelectItem value="">Unassigned</SelectItem>
+                      {profiles?.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.full_name || 'Unknown User'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
