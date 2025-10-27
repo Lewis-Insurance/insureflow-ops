@@ -96,7 +96,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
-        status: data.status || null,
+        status: data.status && data.status !== 'no_change' ? data.status : null,
         notes: data.notes.trim(),
         created_by: user.id,
       });
@@ -209,12 +209,12 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
             </div>
             <div>
               <Label htmlFor="status">Update Status</Label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status || undefined} onValueChange={(v) => setStatus(v === 'no_change' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
                 <SelectContent className="bg-background">
-                  <SelectItem value="">No change</SelectItem>
+                  <SelectItem value="no_change">No change</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
                   <SelectItem value="quoted">Quoted</SelectItem>
