@@ -17,7 +17,6 @@ import { ProducerSalesDashboard } from "@/components/leads/ProducerSalesDashboar
 import { QuickLeadCapture } from "@/components/leads/QuickLeadCapture";
 import { LeadDetailView } from "@/components/leads/LeadDetailView";
 import { LeadListView } from "@/components/leads/LeadListView";
-import { LeadScoringAdmin } from "@/components/leads/LeadScoringAdmin";
 import { TeamPipelineView } from "@/components/leads/TeamPipelineView";
 import { TimelineView } from "@/components/leads/TimelineView";
 import { LayoutGrid, BarChart3, Users, Search, Filter, List, TrendingUp } from "lucide-react";
@@ -147,14 +146,7 @@ export default function Leads() {
           </TabsList>
 
           <TabsContent value="list" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <LeadListView />
-              </div>
-              <div className="space-y-6">
-                <LeadScoringAdmin />
-              </div>
-            </div>
+            <LeadListView />
           </TabsContent>
 
           <TabsContent value="pipeline" className="mt-6">
