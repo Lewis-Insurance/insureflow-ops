@@ -14,6 +14,7 @@ import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
 import { AIAssistantProvider, useAIAssistantContext } from '@/contexts/AIAssistantContext';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -241,6 +242,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
             <div className="flex h-14 items-center justify-between px-4">
               <SidebarTrigger />
               <div className="flex items-center gap-2">
+                <ThemeToggle />
                 <Button
                   variant="outline"
                   size="sm"
