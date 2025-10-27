@@ -37,7 +37,7 @@ const leadSchema = z.object({
   zip: z.string().trim().max(10, 'ZIP code too long').optional(),
   source_id: z.string().optional(),
   insurance_types: z.array(z.string()).min(1, 'Select at least one insurance type'),
-  decision_timeframe: z.string().optional(),
+  decision_timeframe: z.enum(['immediate', '1_3_months', '3_6_months', '6_12_months', 'just_shopping']).optional(),
   current_carrier: z.string().trim().max(100, 'Carrier name too long').optional(),
   current_premium: z.string().max(20, 'Invalid premium amount').optional(),
   notes: z.string().trim().max(2000, 'Notes too long (max 2000 characters)').optional(),

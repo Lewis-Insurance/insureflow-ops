@@ -44,7 +44,7 @@ const leadSchema = z.object({
   insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
-  decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush']).optional(),
+  decision_timeframe: z.enum(['immediate', '1_3_months', '3_6_months', '6_12_months', 'just_shopping']).optional(),
   notes: z.string().optional(),
 });
 
@@ -321,10 +321,10 @@ export const QuickLeadCapture = () => {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="immediate">Immediate (ASAP)</SelectItem>
-                      <SelectItem value="30_days">Within 30 days</SelectItem>
-                      <SelectItem value="60_days">Within 60 days</SelectItem>
-                      <SelectItem value="90_days">Within 90 days</SelectItem>
-                      <SelectItem value="no_rush">No rush / Just shopping</SelectItem>
+                      <SelectItem value="1_3_months">1-3 months</SelectItem>
+                      <SelectItem value="3_6_months">3-6 months</SelectItem>
+                      <SelectItem value="6_12_months">6-12 months</SelectItem>
+                      <SelectItem value="just_shopping">Just shopping</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
