@@ -90,6 +90,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/renewals" 
                 />
                 <NavItem 
+                  icon={RefreshCw} 
+                  label="AO Renewals" 
+                  to="/ao-renewals" 
+                />
+                <NavItem 
                   icon={Brain} 
                   label="Renewal Intelligence" 
                   to="/renewals/intelligence" 
