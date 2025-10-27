@@ -110,6 +110,22 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                       </p>
                     )}
 
+                    {/* Customer & Policy Info */}
+                    {task.metadata && (
+                      <div className="flex flex-wrap gap-1">
+                        {((task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name) && (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {(task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name}
+                          </Badge>
+                        )}
+                        {((task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number) && (
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {(task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {task.due_at && (
                         <div className="flex items-center gap-1">

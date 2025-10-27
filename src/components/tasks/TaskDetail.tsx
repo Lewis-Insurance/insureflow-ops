@@ -270,6 +270,51 @@ export function TaskDetail({ open, onOpenChange, task, onEdit, onUpdate }: TaskD
 
               {/* Task Details */}
               <div className="grid grid-cols-2 gap-4 text-sm">
+                {/* Customer & Policy Info from metadata */}
+                {task.metadata && (
+                  <>
+                    {(task.metadata as any).renewal_customer_name && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-xs text-muted-foreground">Customer</div>
+                          <div className="font-medium">{(task.metadata as any).renewal_customer_name}</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(task.metadata as any).renewal_policy_number && (
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-xs text-muted-foreground">Policy Number</div>
+                          <div className="font-medium">{(task.metadata as any).renewal_policy_number}</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(task.metadata as any).customer_name && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-xs text-muted-foreground">Customer</div>
+                          <div className="font-medium">{(task.metadata as any).customer_name}</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(task.metadata as any).policy_number && (
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-xs text-muted-foreground">Policy Number</div>
+                          <div className="font-medium">{(task.metadata as any).policy_number}</div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 {task.due_at && (
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />

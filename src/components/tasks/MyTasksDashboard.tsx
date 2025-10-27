@@ -193,6 +193,22 @@ export function MyTasksDashboard() {
             </p>
           )}
 
+          {/* Customer & Policy Info from metadata */}
+          {task.metadata && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {((task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name) && (
+                <Badge variant="secondary" className="font-normal">
+                  {(task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name}
+                </Badge>
+              )}
+              {((task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number) && (
+                <Badge variant="outline" className="font-normal">
+                  Policy: {(task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number}
+                </Badge>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             {task.due_at && (
               <div className="flex items-center gap-1">

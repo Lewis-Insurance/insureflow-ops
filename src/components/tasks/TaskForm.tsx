@@ -7,11 +7,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Task, TaskCategory, TaskPriority, TaskStatus } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+
 const TZ = 'America/New_York';
 interface TaskFormProps {
   open: boolean;
@@ -35,6 +38,15 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Customer/Policy selection state
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
 
   // Get current user ID
   useEffect(() => {
@@ -69,6 +81,10 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         assignee_id: currentUserId || undefined,
         notes: '',
       });
+      // Reset customer/policy selection for new tasks
+      setSelectedCustomer(null);
+      setSelectedPolicy(null);
+      setCustomerSearch('');
     }
   }, [task, open, currentUserId]);
 
@@ -88,6 +104,62 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
     setStaffMembers(data || []);
   };
 
+  // Search customers
+  useEffect(() => {
+    const searchCustomers = async () => {
+      if (customerSearch.length < 2) {
+        setCustomers([]);
+        return;
+      }
+
+      setLoadingCustomers(true);
+      try {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('id, name, email, phone')
+          .or(`name.ilike.%${customerSearch}%,email.ilike.%${customerSearch}%,phone.ilike.%${customerSearch}%`)
+          .limit(10);
+
+        if (!error) {
+          setCustomers(data || []);
+        }
+      } catch (error) {
+        console.error('Error searching customers:', error);
+      } finally {
+        setLoadingCustomers(false);
+      }
+    };
+
+    const debounce = setTimeout(searchCustomers, 300);
+    return () => clearTimeout(debounce);
+  }, [customerSearch]);
+
+  // Load policies when customer is selected
+  useEffect(() => {
+    const loadPolicies = async () => {
+      if (!selectedCustomer?.id) {
+        setPolicies([]);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('policies')
+          .select('id, policy_number, policy_type, carrier')
+          .eq('account_id', selectedCustomer.id)
+          .order('policy_number');
+
+        if (!error) {
+          setPolicies(data || []);
+        }
+      } catch (error) {
+        console.error('Error loading policies:', error);
+      }
+    };
+
+    loadPolicies();
+  }, [selectedCustomer]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -96,8 +168,30 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
       const payload: any = { ...formData };
       if (accountId) {
         payload.account_id = accountId;
+      } else if (selectedCustomer) {
+        payload.account_id = selectedCustomer.id;
       }
+      
+      // Add customer and policy info to metadata
+      if (selectedCustomer || selectedPolicy) {
+        payload.metadata = {
+          ...payload.metadata,
+          customer_name: selectedCustomer?.name,
+          customer_email: selectedCustomer?.email,
+          customer_phone: selectedCustomer?.phone,
+          policy_number: selectedPolicy?.policy_number,
+          policy_type: selectedPolicy?.policy_type,
+          carrier: selectedPolicy?.carrier,
+        };
+      }
+      
       await onSubmit(payload);
+      
+      // Reset form
+      setSelectedCustomer(null);
+      setSelectedPolicy(null);
+      setCustomerSearch('');
+      
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -112,6 +206,130 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Customer Selection */}
+          {!accountId && (
+            <div>
+              <Label>Customer / Account</Label>
+              {selectedCustomer ? (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                  <div className="flex-1">
+                    <div className="font-medium">{selectedCustomer.name}</div>
+                    {selectedCustomer.email && (
+                      <div className="text-sm text-muted-foreground">{selectedCustomer.email}</div>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setSelectedPolicy(null);
+                      setPolicies([]);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      <Search className="mr-2 h-4 w-4" />
+                      Search for customer...
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search by name, email, or phone..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                      />
+                      <CommandList>
+                        {loadingCustomers ? (
+                          <CommandEmpty>Searching...</CommandEmpty>
+                        ) : customers.length === 0 && customerSearch.length >= 2 ? (
+                          <CommandEmpty>No customers found</CommandEmpty>
+                        ) : customers.length === 0 ? (
+                          <CommandEmpty>Type to search customers</CommandEmpty>
+                        ) : (
+                          <CommandGroup>
+                            {customers.map((customer) => (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.id}
+                                onSelect={() => {
+                                  setSelectedCustomer(customer);
+                                  setCustomerSearchOpen(false);
+                                }}
+                              >
+                                <div>
+                                  <div className="font-medium">{customer.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {customer.email || customer.phone}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
+
+          {/* Policy Selection */}
+          {selectedCustomer && policies.length > 0 && (
+            <div>
+              <Label>Policy (Optional)</Label>
+              {selectedPolicy ? (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                  <div className="flex-1">
+                    <div className="font-medium">{selectedPolicy.policy_number}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {selectedPolicy.policy_type} - {selectedPolicy.carrier}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedPolicy(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={selectedPolicy?.id}
+                  onValueChange={(value) => {
+                    const policy = policies.find(p => p.id === value);
+                    setSelectedPolicy(policy);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a policy" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background">
+                    {policies.map((policy) => (
+                      <SelectItem key={policy.id} value={policy.id}>
+                        {policy.policy_number} - {policy.policy_type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
           <div>
             <Label htmlFor="title">Title *</Label>
             <Input
