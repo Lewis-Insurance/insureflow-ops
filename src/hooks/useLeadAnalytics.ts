@@ -436,13 +436,38 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
   });
 }
 
-export function useInsuranceTypePerformance(dateRange?: { start: string; end: string }) {
+export interface InsuranceTypePerformance {
+  type: string;
+  total: number;
+  won: number;
+  lost: number;
+  win_rate: number;
+  total_value: number;
+  avg_value: number;
+}
+
+export function useInsuranceTypePerformance(
+  dateRange?: { start: string; end: string }
+) {
   return useQuery({
     queryKey: ['insurance-type-performance', dateRange],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get user's account
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) throw new Error('No account membership found');
+
       let query = supabase
         .from('leads')
-        .select('insurance_types, status, estimated_premium, created_at');
+        .select('insurance_types, status, estimated_premium')
+        .eq('account_id', membership.account_id);
 
       if (dateRange) {
         query = query
@@ -450,48 +475,60 @@ export function useInsuranceTypePerformance(dateRange?: { start: string; end: st
           .lte('created_at', dateRange.end);
       }
 
-      const { data, error } = await query;
+      const { data: leads, error } = await query;
 
-      if (error) {
-        console.error('Error fetching insurance type performance:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      const typeMetrics: Record<string, any> = {};
+      // Aggregate by insurance type
+      const typeMap = new Map<string, {
+        total: number;
+        won: number;
+        lost: number;
+        total_value: number;
+      }>();
 
-      data.forEach(lead => {
-        const types = lead.insurance_types || [];
+      leads?.forEach((lead) => {
+        // Handle insurance_types as array
+        const types = Array.isArray(lead.insurance_types) 
+          ? lead.insurance_types 
+          : lead.insurance_types 
+            ? [lead.insurance_types] 
+            : [];
+
         types.forEach((type: string) => {
-          if (!typeMetrics[type]) {
-            typeMetrics[type] = {
-              type,
-              total: 0,
-              won: 0,
-              lost: 0,
-              in_progress: 0,
-              win_rate: 0,
-              total_value: 0,
-            };
+          if (!type) return;
+
+          if (!typeMap.has(type)) {
+            typeMap.set(type, { total: 0, won: 0, lost: 0, total_value: 0 });
           }
 
-          typeMetrics[type].total++;
+          const stats = typeMap.get(type)!;
+          stats.total++;
+
           if (lead.status === 'won') {
-            typeMetrics[type].won++;
-            typeMetrics[type].total_value += lead.estimated_premium || 0;
-          }
-          if (lead.status === 'lost') typeMetrics[type].lost++;
-          if (['contacted', 'qualified', 'quoted', 'nurturing'].includes(lead.status)) {
-            typeMetrics[type].in_progress++;
+            stats.won++;
+            stats.total_value += lead.estimated_premium || 0;
+          } else if (lead.status === 'lost') {
+            stats.lost++;
           }
         });
       });
 
-      const typeArray = Object.values(typeMetrics).map((metrics: any) => ({
-        ...metrics,
-        win_rate: metrics.total > 0 ? (metrics.won / metrics.total) * 100 : 0,
-      }));
+      // Convert to array and calculate metrics
+      const results: InsuranceTypePerformance[] = Array.from(typeMap.entries()).map(
+        ([type, stats]) => ({
+          type,
+          total: stats.total,
+          won: stats.won,
+          lost: stats.lost,
+          win_rate: stats.total > 0 ? (stats.won / stats.total) * 100 : 0,
+          total_value: stats.total_value,
+          avg_value: stats.won > 0 ? stats.total_value / stats.won : 0,
+        })
+      );
 
-      return typeArray.sort((a, b) => b.total - a.total);
+      // Sort by total leads descending
+      return results.sort((a, b) => b.total - a.total);
     },
   });
 }
