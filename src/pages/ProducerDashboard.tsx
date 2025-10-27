@@ -34,7 +34,7 @@ import {
 import { Link } from 'react-router-dom';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import QuickAddTaskBar from '@/components/tasks/QuickAddTaskBar';
-import { CustomerSearchWidget, PolicySearchWidget, UpcomingRenewalsWidget } from '@/components/dashboard/WorkspaceWidgets';
+import { CustomerSearchWidget, PolicySearchWidget, UpcomingRenewalsWidget, WorkspaceWidgets } from '@/components/dashboard/WorkspaceWidgets';
 
 export default function ProducerDashboard() {
   const { user } = useAuth();
@@ -89,12 +89,8 @@ export default function ProducerDashboard() {
               <UpcomingTasksCard />
             </div>
 
-            {/* Widgets Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <CustomerSearchWidget />
-              <PolicySearchWidget />
-              <UpcomingRenewalsWidget />
-            </div>
+            {/* Widgets Grid - includes pending follow-ups, customer search, policy search, renewals */}
+            <WorkspaceWidgets />
           </TabsContent>
 
           {/* Sales Tab */}

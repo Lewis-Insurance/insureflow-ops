@@ -3718,6 +3718,82 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_followup_confirmations: {
+        Row: {
+          assigned_to: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          created_by: string | null
+          estimated_effective_date: string | null
+          id: string
+          insurance_types: string[] | null
+          lead_email: string | null
+          lead_id: string
+          lead_name: string
+          lead_phone: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_effective_date?: string | null
+          id?: string
+          insurance_types?: string[] | null
+          lead_email?: string | null
+          lead_id: string
+          lead_name: string
+          lead_phone?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_effective_date?: string | null
+          id?: string
+          insurance_types?: string[] | null
+          lead_email?: string | null
+          lead_id?: string
+          lead_name?: string
+          lead_phone?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_followup_confirmations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_followup_confirmations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_followup_confirmations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_score_history: {
         Row: {
           created_at: string
@@ -3919,6 +3995,7 @@ export type Database = {
           custom_fields: Json | null
           decision_timeframe: string | null
           email: string | null
+          estimated_effective_date: string | null
           estimated_premium: number | null
           first_name: string
           id: string
@@ -3969,6 +4046,7 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          estimated_effective_date?: string | null
           estimated_premium?: number | null
           first_name: string
           id?: string
@@ -4019,6 +4097,7 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          estimated_effective_date?: string | null
           estimated_premium?: number | null
           first_name?: string
           id?: string

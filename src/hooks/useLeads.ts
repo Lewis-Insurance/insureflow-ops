@@ -183,6 +183,13 @@ export function useUpdateLead() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: LeadUpdate & { id: string }) => {
+      // First fetch the current lead to check if status is changing to "Lost"
+      const { data: currentLead } = await supabase
+        .from('leads')
+        .select('status, first_name, last_name, email, phone, insurance_types, assigned_to, estimated_effective_date')
+        .eq('id', id)
+        .single();
+
       const { data, error } = await supabase
         .from('leads')
         .update(updates)
@@ -191,12 +198,35 @@ export function useUpdateLead() {
         .single();
 
       if (error) throw error;
+
+      // If status changed to "Lost", create a follow-up confirmation
+      if (updates.status === 'lost' && currentLead?.status !== 'lost') {
+        const { error: confirmationError } = await supabase
+          .from('lead_followup_confirmations')
+          .insert({
+            lead_id: id,
+            lead_name: `${currentLead.first_name} ${currentLead.last_name}`,
+            lead_email: currentLead.email,
+            lead_phone: currentLead.phone,
+            insurance_types: currentLead.insurance_types,
+            assigned_to: currentLead.assigned_to,
+            estimated_effective_date: currentLead.estimated_effective_date,
+            status: 'pending',
+          });
+
+        if (confirmationError) {
+          console.error('Failed to create follow-up confirmation:', confirmationError);
+          // Don't throw error - the lead update was successful
+        }
+      }
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead', data.id] });
       queryClient.invalidateQueries({ queryKey: ['leads-by-stage'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-followup-confirmations'] });
       toast.success('Lead updated successfully');
     },
     onError: (error: Error) => {

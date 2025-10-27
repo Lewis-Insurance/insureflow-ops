@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { format, addDays, startOfDay, endOfDay } from 'date-fns';
+import { useEffect } from 'react';
+import { PendingFollowupsWidget } from './PendingFollowupsWidget';
 
 export function CustomerSearchWidget() {
   const [search, setSearch] = useState('');
@@ -233,5 +235,18 @@ export function UpcomingRenewalsWidget() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function WorkspaceWidgets() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="md:col-span-2 lg:col-span-3">
+        <PendingFollowupsWidget />
+      </div>
+      <CustomerSearchWidget />
+      <PolicySearchWidget />
+      <UpcomingRenewalsWidget />
+    </div>
   );
 }

@@ -111,6 +111,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       current_carrier: lead.current_carrier || "",
       current_premium: lead.current_premium?.toString() || "",
       decision_timeframe: (lead.decision_timeframe as any) || undefined,
+      estimated_effective_date: (lead as any).estimated_effective_date || "",
       notes: lead.notes || "",
       status: lead.status as any,
     } : undefined,
