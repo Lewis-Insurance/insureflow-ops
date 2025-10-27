@@ -114,18 +114,21 @@ const KnowledgeManager = () => {
     }
   };
 
-  // Handle file upload (CSV or PDF)
+  // Handle file upload (CSV, PDF, or Images)
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const isPdf = file.name.toLowerCase().endsWith('.pdf');
-    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    const fileName = file.name.toLowerCase();
+    const isPdf = fileName.endsWith('.pdf');
+    const isCsv = fileName.endsWith('.csv');
+    const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+                    fileName.endsWith('.png') || fileName.endsWith('.webp');
 
-    if (!isPdf && !isCsv) {
+    if (!isPdf && !isCsv && !isImage) {
       toast({
         title: "Invalid File",
-        description: "Please upload a CSV or PDF file",
+        description: "Please upload a CSV, PDF, or image file (JPG, PNG, WEBP)",
         variant: "destructive",
       });
       return;
@@ -133,34 +136,39 @@ const KnowledgeManager = () => {
 
     setUploadedFileName(file.name);
 
-    if (isPdf) {
-      // Handle PDF upload
+    if (isPdf || isImage) {
+      // Handle PDF or Image upload with OCR
       setIsProcessingPdf(true);
       try {
         const formData = new FormData();
         formData.append('file', file);
         
-        const { data, error } = await supabase.functions.invoke('parse-pdf-knowledge', {
+        toast({
+          title: isImage ? "Processing Image..." : "Processing PDF...",
+          description: "Using AI to extract knowledge from your document",
+        });
+
+        const { data, error } = await supabase.functions.invoke('parse-document-ocr', {
           body: formData
         });
 
         if (error) throw error;
         
         if (!data.success) {
-          throw new Error(data.error || 'Failed to parse PDF');
+          throw new Error(data.error || 'Failed to parse document');
         }
 
-        const { entries } = data;
+        const { entries, metadata } = data;
         
         toast({
-          title: "PDF Parsed Successfully",
-          description: `Extracted ${entries.length} knowledge entries from ${data.totalPages} pages`,
+          title: "Document Parsed Successfully",
+          description: `Extracted ${entries.length} knowledge entries using AI OCR`,
         });
         
         // Convert to CSV format for existing import logic
         const csvLines = ['product_line,topic,question,answer_short,answer_canonical,tags,carrier,program,jurisdiction'];
         entries.forEach((entry: any) => {
-          const tags = Array.isArray(entry.tags) ? entry.tags.join('|') : entry.tags;
+          const tags = Array.isArray(entry.tags) ? entry.tags.split(',').join('|') : entry.tags;
           const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
           csvLines.push([
             escapeCsv(entry.category || 'general'),
@@ -169,18 +177,18 @@ const KnowledgeManager = () => {
             escapeCsv(entry.content.substring(0, 200)),
             escapeCsv(entry.content),
             tags,
-            'ALL',
+            entry.carrier || 'ALL',
             '',
-            'FL'
+            entry.jurisdiction || 'FL'
           ].join(','));
         });
         
         setCsvContent(csvLines.join('\n'));
       } catch (error: any) {
-        console.error('PDF parsing error:', error);
+        console.error('Document parsing error:', error);
         toast({
-          title: "PDF Parsing Failed",
-          description: error.message || 'Failed to parse PDF file',
+          title: "Document Parsing Failed",
+          description: error.message || 'Failed to parse document',
           variant: "destructive",
         });
         setUploadedFileName('');
@@ -315,7 +323,7 @@ const KnowledgeManager = () => {
             <div>
               <CardTitle>Knowledge Management Center</CardTitle>
               <CardDescription>
-                Add and manage insurance knowledge for your AI Brain
+                Add and manage insurance knowledge for your AI Brain. Upload documents, screenshots, or CSV files.
               </CardDescription>
             </div>
             <div className="flex space-x-2">
@@ -331,6 +339,14 @@ const KnowledgeManager = () => {
           </div>
         </CardHeader>
       </Card>
+
+      {/* OCR Feature Notice */}
+      <Alert>
+        <Brain className="h-4 w-4" />
+        <AlertDescription>
+          <strong>AI-Powered OCR:</strong> Upload screenshots or photos of documents, and our AI will automatically extract and structure the knowledge for you.
+        </AlertDescription>
+      </Alert>
 
       {/* Knowledge Gaps Alert */}
       {topGaps.length > 0 && (
@@ -662,7 +678,7 @@ const KnowledgeManager = () => {
             {/* File Upload Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium">Upload CSV or PDF File</label>
+                <label className="text-sm font-medium">Upload CSV, PDF, or Image File</label>
                 {uploadedFileName && (
                   <Badge variant="secondary" className="text-xs">
                     <FileText className="w-3 h-3 mr-1" />
@@ -674,7 +690,7 @@ const KnowledgeManager = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.pdf"
+                  accept=".csv,.pdf,.jpg,.jpeg,.png,.webp"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -686,7 +702,7 @@ const KnowledgeManager = () => {
                   disabled={isProcessingPdf}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {isProcessingPdf ? 'Processing PDF...' : 'Choose CSV or PDF File'}
+                  {isProcessingPdf ? 'Processing Document...' : 'Choose File (CSV, PDF, or Image)'}
                 </Button>
                 {uploadedFileName && (
                   <Button
@@ -724,7 +740,7 @@ const KnowledgeManager = () => {
                   setUploadedFileName('');
                 }}
                 placeholder={importTable === 'kb_entries' 
-                  ? 'Upload a PDF/CSV file or paste CSV data here...' 
+                  ? 'Upload a file (PDF, Image, CSV) or paste CSV data here...' 
                   : 'Paste CSV data for knowledge sources...'}
                 key={importTable}
                 rows={12}
