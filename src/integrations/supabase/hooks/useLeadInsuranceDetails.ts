@@ -259,19 +259,21 @@ export const useUploadInsuranceDocument = (leadId: string, insuranceType: Insura
         'ai-document-analysis',
         {
           body: {
-            documentUrl: publicUrl,
+            type: 'insurance_extraction',
             documentType: insuranceType,
             extractionType: 'insurance_quote',
+            documentPaths: [filePath],
           },
         }
       );
 
       if (analysisError) throw analysisError;
 
+      const extracted = (analysisData as any)?.extracted ?? analysisData;
       return {
         documentUrl: publicUrl,
         documentPath: filePath,
-        extractedData: analysisData,
+        extractedData: extracted,
       };
     },
     onSuccess: (data, file) => {
