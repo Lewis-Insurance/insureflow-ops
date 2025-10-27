@@ -59,20 +59,29 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
   }, [existingRule, open]);
 
   const handleSave = async () => {
-    const ruleData = {
-      name,
-      description,
-      trigger_type: triggerType,
-      applies_to: appliesTo,
-      is_active: isActive,
-      priority,
-      trigger_conditions: {},
-      account_id: '', // Will be set by the hook
-    };
-
     if (ruleId) {
+      // Update existing rule
+      const ruleData = {
+        name,
+        description,
+        trigger_type: triggerType,
+        applies_to: appliesTo,
+        is_active: isActive,
+        priority,
+        trigger_conditions: {},
+      };
       await updateRule.mutateAsync({ id: ruleId, updates: ruleData });
     } else {
+      // Create new rule - account_id will be set by the hook
+      const ruleData = {
+        name,
+        description,
+        trigger_type: triggerType,
+        applies_to: appliesTo,
+        is_active: isActive,
+        priority,
+        trigger_conditions: {},
+      };
       await createRule.mutateAsync(ruleData as any);
     }
     
