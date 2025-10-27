@@ -7,6 +7,7 @@ import { PipelineFunnelChart } from "@/components/ao-renewals/analytics/Pipeline
 import { PriorityDistributionChart } from "@/components/ao-renewals/analytics/PriorityDistributionChart";
 import { MonthlyForecastChart } from "@/components/ao-renewals/analytics/MonthlyForecastChart";
 import { AtRiskRenewalsTable } from "@/components/ao-renewals/analytics/AtRiskRenewalsTable";
+import { PremiumAnalytics } from "@/components/ao-renewals/analytics/PremiumAnalytics";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -14,6 +15,7 @@ import {
   useAOMonthlyForecast,
   useAOAtRiskRenewals,
 } from "@/hooks/useAOAnalytics";
+import { useAORenewals } from "@/hooks/useAORenewals";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
@@ -26,6 +28,7 @@ export default function AOAnalyticsDashboard() {
   const { data: priorityData, isLoading: priorityLoading } = useAOPriorityData();
   const { data: forecastData, isLoading: forecastLoading } = useAOMonthlyForecast();
   const { data: atRiskData, isLoading: atRiskLoading } = useAOAtRiskRenewals();
+  const { data: renewalsData, isLoading: renewalsLoading } = useAORenewals();
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
@@ -87,6 +90,9 @@ export default function AOAnalyticsDashboard() {
 
         {/* Monthly Forecast - Full Width */}
         <MonthlyForecastChart data={forecastData as any || []} isLoading={forecastLoading} />
+
+        {/* Premium Analytics */}
+        <PremiumAnalytics data={renewalsData || []} isLoading={renewalsLoading} />
 
         {/* At-Risk Renewals Table */}
         <AtRiskRenewalsTable data={atRiskData as any || []} isLoading={atRiskLoading} />
