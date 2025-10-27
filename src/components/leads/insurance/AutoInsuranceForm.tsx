@@ -10,12 +10,12 @@ import { toast } from "sonner";
 
 interface AutoInsuranceFormProps {
   leadId: string;
-  onSave?: () => void;
+  onSuccess?: () => void;
 }
 
 export const AutoInsuranceForm: React.FC<AutoInsuranceFormProps> = ({
   leadId,
-  onSave,
+  onSuccess,
 }) => {
   const { data: vehicles = [], isLoading: vehiclesLoading } = useAutoVehicles(leadId);
   const { data: drivers = [], isLoading: driversLoading } = useAutoDrivers(leadId);
@@ -99,7 +99,7 @@ export const AutoInsuranceForm: React.FC<AutoInsuranceFormProps> = ({
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={onSave} disabled={vehicles.length === 0 || drivers.length === 0}>
+        <Button onClick={onSuccess} disabled={vehicles.length === 0 || drivers.length === 0}>
           Continue
         </Button>
       </div>

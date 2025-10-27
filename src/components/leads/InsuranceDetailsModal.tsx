@@ -88,17 +88,17 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
   const renderForm = () => {
     switch (insuranceType) {
       case 'auto':
-        return <AutoInsuranceForm leadId={leadId} />;
+        return <AutoInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'home':
-        return <HomeInsuranceForm leadId={leadId} />;
+        return <HomeInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'commercial':
-        return <CommercialInsuranceForm leadId={leadId} />;
+        return <CommercialInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'life':
-        return <LifeInsuranceForm leadId={leadId} />;
+        return <LifeInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'umbrella':
-        return <UmbrellaInsuranceForm leadId={leadId} />;
+        return <UmbrellaInsuranceForm leadId={leadId} onSuccess={onClose} />;
       case 'renters':
-        return <RentersInsuranceForm leadId={leadId} />;
+        return <RentersInsuranceForm leadId={leadId} onSuccess={onClose} />;
       default:
         return <div>Unsupported insurance type</div>;
     }

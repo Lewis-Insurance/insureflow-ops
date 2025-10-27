@@ -11,9 +11,10 @@ import { useEffect, useState } from "react";
 
 interface CommercialInsuranceFormProps {
   leadId: string;
+  onSuccess?: () => void;
 }
 
-export const CommercialInsuranceForm = ({ leadId }: CommercialInsuranceFormProps) => {
+export const CommercialInsuranceForm = ({ leadId, onSuccess }: CommercialInsuranceFormProps) => {
   const { data: details, isLoading } = useLeadInsuranceDetails(leadId, 'commercial');
   const saveDetails = useSaveLeadInsuranceDetails('commercial');
   const uploadDoc = useUploadInsuranceDocument(leadId, 'commercial');
@@ -29,7 +30,11 @@ export const CommercialInsuranceForm = ({ leadId }: CommercialInsuranceFormProps
   }, [details, reset]);
 
   const onSubmit = (data: CommercialInsuranceDetails) => {
-    saveDetails.mutate({ ...data, lead_id: leadId });
+    saveDetails.mutate({ ...data, lead_id: leadId }, {
+      onSuccess: () => {
+        onSuccess?.();
+      }
+    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
