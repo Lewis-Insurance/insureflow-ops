@@ -68,35 +68,18 @@ export function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, created_at')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) throw profilesError;
-
-      // Get emails from auth.users
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
       
-      if (authError) throw authError;
+      // Call edge function to list all users
+      const { data, error } = await supabase.functions.invoke('admin-list-users');
+      
+      if (error) throw error;
 
-      const authUsers = authData?.users || [];
-
-      // Combine profile and auth data
-      const combinedUsers = profiles?.map(profile => {
-        const authUser = authUsers.find(u => u.id === profile.id);
-        return {
-          ...profile,
-          email: authUser?.email || 'N/A',
-        };
-      }) || [];
-
-      setUsers(combinedUsers);
+      setUsers(data.users || []);
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch users',
+        description: error.message || 'Failed to fetch users',
         variant: 'destructive',
       });
     } finally {
