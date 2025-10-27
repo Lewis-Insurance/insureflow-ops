@@ -38,17 +38,23 @@ export const useAddAutoDriver = () => {
 
   return useMutation({
     mutationFn: async (driver: AutoDriver) => {
+      // Clean up empty date strings
+      const cleanDriver = {
+        ...driver,
+        driver_dob: driver.driver_dob && driver.driver_dob.trim() !== '' ? driver.driver_dob : null,
+      };
+
       // If setting as primary, unset other primary drivers
-      if (driver.is_primary) {
+      if (cleanDriver.is_primary) {
         await (supabase as any)
           .from('lead_auto_drivers')
           .update({ is_primary: false })
-          .eq('lead_id', driver.lead_id);
+          .eq('lead_id', cleanDriver.lead_id);
       }
 
       const { data, error } = await (supabase as any)
         .from('lead_auto_drivers')
-        .insert(driver)
+        .insert(cleanDriver)
         .select()
         .single();
 
@@ -71,18 +77,24 @@ export const useUpdateAutoDriver = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...driver }: AutoDriver & { id: string }) => {
+      // Clean up empty date strings
+      const cleanDriver = {
+        ...driver,
+        driver_dob: driver.driver_dob && driver.driver_dob.trim() !== '' ? driver.driver_dob : null,
+      };
+
       // If setting as primary, unset other primary drivers
-      if (driver.is_primary) {
+      if (cleanDriver.is_primary) {
         await (supabase as any)
           .from('lead_auto_drivers')
           .update({ is_primary: false })
-          .eq('lead_id', driver.lead_id)
+          .eq('lead_id', cleanDriver.lead_id)
           .neq('id', id);
       }
 
       const { data, error } = await (supabase as any)
         .from('lead_auto_drivers')
-        .update(driver)
+        .update(cleanDriver)
         .eq('id', id)
         .select()
         .single();
