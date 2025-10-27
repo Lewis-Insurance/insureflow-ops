@@ -34,7 +34,7 @@ export const useRescoreLeads = () => {
 
 // Hook to get score explanation
 export const getScoreBreakdown = (lead: {
-  insurance_needs?: string[];
+  insurance_types?: string[];
   current_premium?: number | null;
   decision_timeframe?: string | null;
   email?: string | null;
@@ -53,7 +53,7 @@ export const getScoreBreakdown = (lead: {
   };
 
   // Insurance Needs (0-25)
-  const needs = lead.insurance_needs || [];
+  const needs = lead.insurance_types || [];
   if (needs.includes('commercial')) {
     breakdown.insuranceNeeds = 25;
   } else if (needs.length >= 3) {

@@ -88,9 +88,9 @@ const LeadCard = ({ lead, onDragStart }: { lead: Lead & any; onDragStart: (lead:
           </div>
         )}
 
-        {lead.insurance_needs && lead.insurance_needs.length > 0 && (
+        {lead.insurance_types && lead.insurance_types.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {lead.insurance_needs.slice(0, 3).map((need: string) => (
+            {lead.insurance_types.slice(0, 3).map((need: string) => (
               <Badge key={need} variant="secondary" className="text-xs">
                 {need}
               </Badge>

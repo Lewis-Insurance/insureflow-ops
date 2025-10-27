@@ -74,7 +74,7 @@ const leadSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
   source_id: z.string().optional(),
-  insurance_needs: z.array(z.string()).optional(),
+  insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
   decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush']).optional(),
@@ -106,7 +106,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       email: lead.email || "",
       phone: lead.phone || "",
       source_id: lead.source_id || "",
-      insurance_needs: lead.insurance_types || [],
+      insurance_types: lead.insurance_types || [],
       current_carrier: lead.current_carrier || "",
       current_premium: lead.current_premium?.toString() || "",
       decision_timeframe: (lead.decision_timeframe as any) || undefined,
@@ -511,7 +511,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
 
                 <FormField
                   control={form.control}
-                  name="insurance_needs"
+                  name="insurance_types"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Insurance Needs</FormLabel>

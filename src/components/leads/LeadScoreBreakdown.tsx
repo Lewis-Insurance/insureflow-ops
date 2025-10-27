@@ -14,7 +14,7 @@ import {
 interface LeadScoreBreakdownProps {
   lead: {
     lead_score: number;
-    insurance_needs?: string[];
+    insurance_types?: string[];
     current_premium?: number | null;
     decision_timeframe?: string | null;
     email?: string | null;

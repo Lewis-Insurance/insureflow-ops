@@ -39,7 +39,7 @@ const leadSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
   source_id: z.string().optional(),
-  insurance_needs: z.array(z.string()).optional(),
+  insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
   decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush']).optional(),
@@ -69,7 +69,7 @@ export const QuickLeadCapture = () => {
       last_name: "",
       email: "",
       phone: "",
-      insurance_needs: [],
+      insurance_types: [],
       notes: "",
     },
   });
@@ -195,7 +195,7 @@ export const QuickLeadCapture = () => {
 
             <FormField
               control={form.control}
-              name="insurance_needs"
+              name="insurance_types"
               render={() => (
                 <FormItem>
                   <FormLabel>Insurance Needs</FormLabel>
@@ -204,7 +204,7 @@ export const QuickLeadCapture = () => {
                       <FormField
                         key={type.value}
                         control={form.control}
-                        name="insurance_needs"
+                        name="insurance_types"
                         render={({ field }) => {
                           return (
                             <FormItem
