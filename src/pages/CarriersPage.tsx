@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pencil, Plus, Building2, Trash2, Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,9 +20,11 @@ interface Carrier {
   name: string;
   naic?: string;
   agency_code?: string;
-  contact_name?: string;
+  underwriting_contact_name?: string;
+  underwriting_contact_phone?: string;
+  marketing_contact_name?: string;
+  marketing_contact_phone?: string;
   contact_email?: string;
-  contact_phone?: string;
   main_phone?: string;
   address_line1?: string;
   city?: string;
@@ -36,9 +39,11 @@ interface CarrierFormData {
   name: string;
   naic: string;
   agency_code: string;
-  contact_name: string;
+  underwriting_contact_name: string;
+  underwriting_contact_phone: string;
+  marketing_contact_name: string;
+  marketing_contact_phone: string;
   contact_email: string;
-  contact_phone: string;
   main_phone: string;
   address_line1: string;
   city: string;
@@ -51,9 +56,11 @@ const initialFormData: CarrierFormData = {
   name: '',
   naic: '',
   agency_code: '',
-  contact_name: '',
+  underwriting_contact_name: '',
+  underwriting_contact_phone: '',
+  marketing_contact_name: '',
+  marketing_contact_phone: '',
   contact_email: '',
-  contact_phone: '',
   main_phone: '',
   address_line1: '',
   city: '',
@@ -158,9 +165,11 @@ export default function CarriersPage() {
       name: carrier.name || '',
       naic: carrier.naic || '',
       agency_code: carrier.agency_code || '',
-      contact_name: carrier.contact_name || '',
+      underwriting_contact_name: carrier.underwriting_contact_name || '',
+      underwriting_contact_phone: carrier.underwriting_contact_phone || '',
+      marketing_contact_name: carrier.marketing_contact_name || '',
+      marketing_contact_phone: carrier.marketing_contact_phone || '',
       contact_email: carrier.contact_email || '',
-      contact_phone: carrier.contact_phone || '',
       main_phone: carrier.main_phone || '',
       address_line1: carrier.address_line1 || '',
       city: carrier.city || '',
@@ -237,8 +246,8 @@ export default function CarriersPage() {
                       <TableHead>NAIC</TableHead>
                       <TableHead>Agency Code</TableHead>
                       <TableHead>Commission Rate</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Location</TableHead>
+                      <TableHead>Underwriting Contact</TableHead>
+                      <TableHead>Marketing Contact</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -259,29 +268,25 @@ export default function CarriersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1 text-sm">
-                            <div className="font-medium">{carrier.contact_name || 'N/A'}</div>
-                            {carrier.contact_email && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Mail className="h-3 w-3" />
-                                {carrier.contact_email}
-                              </div>
-                            )}
-                            {carrier.contact_phone && (
+                            <div className="font-medium">{carrier.underwriting_contact_name || 'N/A'}</div>
+                            {carrier.underwriting_contact_phone && (
                               <div className="flex items-center gap-1 text-muted-foreground">
                                 <Phone className="h-3 w-3" />
-                                {carrier.contact_phone}
+                                {carrier.underwriting_contact_phone}
                               </div>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {carrier.city && carrier.state ? (
-                            <div className="text-sm">
-                              {carrier.city}, {carrier.state}
-                            </div>
-                          ) : (
-                            'N/A'
-                          )}
+                          <div className="space-y-1 text-sm">
+                            <div className="font-medium">{carrier.marketing_contact_name || 'N/A'}</div>
+                            {carrier.marketing_contact_phone && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Phone className="h-3 w-3" />
+                                {carrier.marketing_contact_phone}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -367,15 +372,56 @@ export default function CarriersPage() {
                 </div>
               </div>
 
+              <Tabs defaultValue="underwriting" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="underwriting">Underwriting Contact</TabsTrigger>
+                  <TabsTrigger value="marketing">Marketing Rep Contact</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="underwriting" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="underwriting_contact_name">Contact Name</Label>
+                      <Input
+                        id="underwriting_contact_name"
+                        value={formData.underwriting_contact_name}
+                        onChange={(e) => setFormData({ ...formData, underwriting_contact_name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="underwriting_contact_phone">Contact Phone</Label>
+                      <Input
+                        id="underwriting_contact_phone"
+                        value={formData.underwriting_contact_phone}
+                        onChange={(e) => setFormData({ ...formData, underwriting_contact_phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="marketing" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="marketing_contact_name">Contact Name</Label>
+                      <Input
+                        id="marketing_contact_name"
+                        value={formData.marketing_contact_name}
+                        onChange={(e) => setFormData({ ...formData, marketing_contact_name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="marketing_contact_phone">Contact Phone</Label>
+                      <Input
+                        id="marketing_contact_phone"
+                        value={formData.marketing_contact_phone}
+                        onChange={(e) => setFormData({ ...formData, marketing_contact_phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contact_name">Contact Name</Label>
-                  <Input
-                    id="contact_name"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                  />
-                </div>
                 <div>
                   <Label htmlFor="contact_email">Contact Email</Label>
                   <Input
@@ -383,17 +429,6 @@ export default function CarriersPage() {
                     type="email"
                     value={formData.contact_email}
                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contact_phone">Contact Phone</Label>
-                  <Input
-                    id="contact_phone"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
                   />
                 </div>
                 <div>
