@@ -48,6 +48,7 @@ const methodLabels = {
 export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
   const [contactDate, setContactDate] = useState(new Date().toISOString().split("T")[0]);
   const [contactMethod, setContactMethod] = useState<string>("phone");
+  const [status, setStatus] = useState<string>("");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -87,7 +88,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
 
   // Add contact log mutation
   const addLogMutation = useMutation({
-    mutationFn: async (data: { contact_date: string; contact_method: string; notes: string }) => {
+    mutationFn: async (data: { contact_date: string; contact_method: string; status: string; notes: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -95,6 +96,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
+        status: data.status || null,
         notes: data.notes.trim(),
         created_by: user.id,
       });
@@ -108,6 +110,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       setNotes("");
       setContactDate(new Date().toISOString().split("T")[0]);
       setContactMethod("phone");
+      setStatus("");
       toast({
         title: "Success",
         description: "Contact logged successfully",
@@ -127,6 +130,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
     addLogMutation.mutate({
       contact_date: contactDate,
       contact_method: contactMethod,
+      status,
       notes,
     });
   };
@@ -157,7 +161,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       <CardContent className="space-y-4">
         {/* Add Contact Log Form */}
         <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label htmlFor="contact_date">Contact Date</Label>
               <Input
@@ -200,6 +204,23 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                     </div>
                   </SelectItem>
                   <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Update Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No change" />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="">No change</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="quoted">Quoted</SelectItem>
+                  <SelectItem value="renewed">Renewed</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
