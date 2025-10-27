@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const { data: campaigns, error: campaignsError } = await supabase
       .from('nurture_campaigns')
       .select('id, name, trigger_conditions, account_id')
-      .eq('status', 'active');
+      .eq('active', true);
 
     if (campaignsError) {
       console.error('❌ Error fetching campaigns:', campaignsError);
