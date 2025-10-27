@@ -527,14 +527,6 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                     </div>
                   )}
 
-                  {lead.decision_timeframe && (
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Decision Timeframe</Label>
-                      <p className="text-sm font-medium mt-1 capitalize">
-                        {lead.decision_timeframe.replace(/_/g, ' ')}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 

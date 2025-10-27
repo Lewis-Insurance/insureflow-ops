@@ -77,7 +77,6 @@ const leadSchema = z.object({
   insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
-  decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush', 'just_shopping']).optional(),
   estimated_effective_date: z.string().optional(),
   notes: z.string().optional(),
   status: z.enum(['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'nurturing']),
@@ -110,7 +109,6 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       insurance_types: lead.insurance_types || [],
       current_carrier: lead.current_carrier || "",
       current_premium: lead.current_premium?.toString() || "",
-      decision_timeframe: (lead.decision_timeframe as any) || undefined,
       estimated_effective_date: (lead as any).estimated_effective_date || "",
       notes: lead.notes || "",
       status: lead.status as any,
@@ -375,14 +373,6 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                       </div>
                     </div>
                   )}
-                  {lead.decision_timeframe && (
-                    <div>
-                      <p className="text-sm font-medium">Decision Timeframe</p>
-                      <p className="text-sm text-muted-foreground">
-                        {lead.decision_timeframe.replace('_', ' ')}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -559,31 +549,6 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="decision_timeframe"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Decision Timeframe</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="immediate">Immediate</SelectItem>
-                          <SelectItem value="30_days">Within 30 days</SelectItem>
-                          <SelectItem value="60_days">Within 60 days</SelectItem>
-                          <SelectItem value="90_days">Within 90 days</SelectItem>
-                          <SelectItem value="no_rush">No rush</SelectItem>
-                          <SelectItem value="just_shopping">Just shopping</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
