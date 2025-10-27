@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/popover';
 import { format, subDays } from 'date-fns';
 import { CalendarIcon, Download, BarChart3 } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 // Import all analytics components
 import { InsuranceTypePerformance } from '@/components/leads/analytics/InsuranceTypePerformance';
@@ -60,20 +61,23 @@ export default function LeadAnalyticsDashboard() {
 
   if (!user) {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-muted-foreground">
-              Loading account information...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <AppLayout>
+        <div className="p-8">
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">
+                Loading account information...
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <AppLayout>
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -181,5 +185,6 @@ export default function LeadAnalyticsDashboard() {
         </TabsContent>
       </Tabs>
     </div>
+    </AppLayout>
   );
 }
