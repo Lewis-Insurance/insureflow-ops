@@ -25,6 +25,7 @@ const RenewalIntelligencePage = React.lazy(() => import("./pages/RenewalIntellig
 const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
+const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
 const MessageNew = React.lazy(() => import("./pages/MessageNew"));
@@ -208,6 +209,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AORenewalEdit />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/ao-renewals/analytics" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AOAnalyticsDashboard />
                   </ErrorBoundary>
                 } 
               />

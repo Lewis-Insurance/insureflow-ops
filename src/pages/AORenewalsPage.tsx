@@ -189,6 +189,10 @@ export default function AORenewalsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/ao-renewals/analytics")}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Analytics
+            </Button>
             <Button variant="outline" onClick={() => {}}>
               <Download className="h-4 w-4 mr-2" />
               Export
