@@ -18,11 +18,11 @@ export function NavItem({ icon: Icon, label, to, badge }: NavItemProps) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive}>
-        <Link to={to} className={cn("flex items-center space-x-2 w-full")}>
-          <Icon className="h-4 w-4" />
-          <span className="flex-1">{label}</span>
+        <Link to={to} className={cn("flex items-center gap-2 w-full")}>
+          <Icon className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate">{label}</span>
           {badge && (
-            <Badge variant="secondary" className="ml-auto text-xs">
+            <Badge variant="secondary" className="shrink-0 text-xs h-5 min-w-5 flex items-center justify-center">
               {badge}
             </Badge>
           )}
