@@ -78,11 +78,11 @@ export function ActionConfigModal({
         return (
           <>
             <div className="space-y-2">
-              <Label>Email Template</Label>
+              <Label>From Name</Label>
               <Input
-                placeholder="Template ID or name"
-                value={config.template_id || ''}
-                onChange={(e) => setConfig({ ...config, template_id: e.target.value })}
+                placeholder="Your Company Name"
+                value={config.from_name || ''}
+                onChange={(e) => setConfig({ ...config, from_name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -92,6 +92,18 @@ export function ActionConfigModal({
                 value={config.subject || ''}
                 onChange={(e) => setConfig({ ...config, subject: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Email Body</Label>
+              <Textarea
+                placeholder="Email content... You can use variables like {{lead.first_name}}, {{lead.email}}, etc."
+                value={config.body || ''}
+                onChange={(e) => setConfig({ ...config, body: e.target.value })}
+                rows={8}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use &#123;&#123;variable&#125;&#125; for dynamic values
+              </p>
             </div>
           </>
         );

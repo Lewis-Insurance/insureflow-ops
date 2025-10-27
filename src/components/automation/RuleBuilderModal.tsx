@@ -81,7 +81,7 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {ruleId ? 'Edit Automation Rule' : 'Create Automation Rule'}
@@ -91,13 +91,11 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="config" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="config">Configuration</TabsTrigger>
-            <TabsTrigger value="actions">Actions</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="config" className="space-y-4">
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left Column - Configuration */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Configuration</h3>
+            
             {/* Rule Name */}
             <div className="space-y-2">
               <Label htmlFor="name">Rule Name *</Label>
@@ -186,9 +184,11 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
                 onCheckedChange={setIsActive}
               />
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="actions">
+          {/* Right Column - Actions */}
+          <div className="space-y-4 border-l pl-6">
+            <h3 className="text-lg font-semibold">Actions</h3>
             {ruleId ? (
               <ActionBuilder ruleId={ruleId} />
             ) : (
@@ -196,10 +196,10 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
                 Save the rule first to add actions
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
 
-        <div className="flex justify-end gap-2 pt-4">
+        <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
