@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useQuotesAnalytics, useDenialAnalysis } from '@/hooks/useAORenewalQuotes';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,44 +10,94 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
 export function QuotesAnalyticsTab() {
-  const { data: analytics = [], isLoading: analyticsLoading } = useQuotesAnalytics();
-  const { data: denialData = [], isLoading: denialsLoading } = useDenialAnalysis();
+  const { data: analytics = [], isLoading: analyticsLoading, error: analyticsError } = useQuotesAnalytics();
+  const { data: denialData = [], isLoading: denialsLoading, error: denialsError } = useDenialAnalysis();
+
+  // Memoize expensive calculations
+  const analyticsMetrics = useMemo(() => {
+    if (!analytics.length) return null;
+
+    const sortedByPremium = [...analytics].sort((a, b) => 
+      (Number(a.avg_annual_premium) || 0) - (Number(b.avg_annual_premium) || 0)
+    );
+    
+    const sortedByVolume = [...analytics].sort((a, b) => 
+      (b.total_quotes || 0) - (a.total_quotes || 0)
+    );
+    
+    const sortedByDenial = [...analytics].sort((a, b) => 
+      (Number(b.denial_rate_pct) || 0) - (Number(a.denial_rate_pct) || 0)
+    );
+
+    return {
+      bestCarrier: sortedByPremium[0],
+      worstCarrier: sortedByPremium[sortedByPremium.length - 1],
+      highestVolumeCarrier: sortedByVolume[0],
+      highestDenialCarrier: sortedByDenial[0],
+    };
+  }, [analytics]);
+
+  const carrierComparisonData = useMemo(() => 
+    analytics.map(a => ({
+      carrier: a.carrier,
+      avgAnnualPremium: Number(a.avg_annual_premium?.toFixed(2) || 0),
+      totalQuotes: a.total_quotes,
+      denialRate: Number(a.denial_rate_pct || 0),
+    })),
+    [analytics]
+  );
+
+  const quoteStatusData = useMemo(() => 
+    analytics.map(a => ({
+      name: a.carrier,
+      quoted: a.quoted_count,
+      denied: a.denied_count,
+      selected: a.selected_count,
+    })),
+    [analytics]
+  );
+
+  const denialReasonData = useMemo(() => 
+    denialData.reduce((acc, curr) => {
+      const existing = acc.find(item => item.name === curr.denial_reason);
+      if (existing) {
+        existing.value += curr.denial_count;
+      } else {
+        acc.push({ name: curr.denial_reason, value: curr.denial_count });
+      }
+      return acc;
+    }, [] as Array<{ name: string; value: number }>),
+    [denialData]
+  );
+
+  // Error handling
+  if (analyticsError || denialsError) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-destructive">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+            <p>Failed to load analytics. Please try again.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (analyticsLoading || denialsLoading) {
     return <div className="text-center py-8">Loading analytics...</div>;
   }
 
-  // Prepare chart data
-  const carrierComparisonData = analytics.map(a => ({
-    carrier: a.carrier,
-    avgAnnualPremium: Number(a.avg_annual_premium?.toFixed(2) || 0),
-    totalQuotes: a.total_quotes,
-    denialRate: Number(a.denial_rate_pct || 0),
-  }));
-
-  const quoteStatusData = analytics.map(a => ({
-    name: a.carrier,
-    quoted: a.quoted_count,
-    denied: a.denied_count,
-    selected: a.selected_count,
-  }));
-
-  const denialReasonData = denialData.reduce((acc, curr) => {
-    const existing = acc.find(item => item.name === curr.denial_reason);
-    if (existing) {
-      existing.value += curr.denial_count;
-    } else {
-      acc.push({ name: curr.denial_reason, value: curr.denial_count });
-    }
-    return acc;
-  }, [] as Array<{ name: string; value: number }>);
-
-  // Find best and worst performers
-  const sortedByPremium = [...analytics].sort((a, b) => 
-    (Number(a.avg_annual_premium) || 0) - (Number(b.avg_annual_premium) || 0)
-  );
-  const bestCarrier = sortedByPremium[0];
-  const worstCarrier = sortedByPremium[sortedByPremium.length - 1];
+  // Empty state
+  if (!analytics.length) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <p>No quote data available yet. Start adding quotes to see analytics.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -60,9 +111,9 @@ export function QuotesAnalyticsTab() {
             <div className="flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-green-600" />
               <div>
-                <div className="text-2xl font-bold">{bestCarrier?.carrier || 'N/A'}</div>
+                <div className="text-2xl font-bold">{analyticsMetrics?.bestCarrier?.carrier || 'N/A'}</div>
                 <div className="text-sm text-muted-foreground">
-                  {bestCarrier && formatCurrency(Number(bestCarrier.avg_annual_premium))} avg annual
+                  {analyticsMetrics?.bestCarrier && formatCurrency(Number(analyticsMetrics.bestCarrier.avg_annual_premium))} avg annual
                 </div>
               </div>
             </div>
@@ -78,10 +129,10 @@ export function QuotesAnalyticsTab() {
               <CheckCircle className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold">
-                  {analytics[0]?.carrier || 'N/A'}
+                  {analyticsMetrics?.highestVolumeCarrier?.carrier || 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {analytics[0]?.total_quotes || 0} quotes
+                  {analyticsMetrics?.highestVolumeCarrier?.total_quotes || 0} quotes
                 </div>
               </div>
             </div>
@@ -97,10 +148,10 @@ export function QuotesAnalyticsTab() {
               <XCircle className="h-5 w-5 text-destructive" />
               <div>
                 <div className="text-2xl font-bold">
-                  {[...analytics].sort((a, b) => (Number(b.denial_rate_pct) || 0) - (Number(a.denial_rate_pct) || 0))[0]?.carrier || 'N/A'}
+                  {analyticsMetrics?.highestDenialCarrier?.carrier || 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {[...analytics].sort((a, b) => (Number(b.denial_rate_pct) || 0) - (Number(a.denial_rate_pct) || 0))[0]?.denial_rate_pct?.toFixed(1)}% denial rate
+                  {analyticsMetrics?.highestDenialCarrier?.denial_rate_pct?.toFixed(1)}% denial rate
                 </div>
               </div>
             </div>
