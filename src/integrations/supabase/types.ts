@@ -6921,10 +6921,12 @@ export type Database = {
           carrier: string | null
           denial_rate_pct: number | null
           denied_count: number | null
+          expired_count: number | null
           max_premium: number | null
           min_premium: number | null
           quoted_count: number | null
           selected_count: number | null
+          selection_rate_pct: number | null
           six_month_count: number | null
           total_quotes: number | null
           twelve_month_count: number | null
@@ -6933,18 +6935,17 @@ export type Database = {
       }
       ao_quotes_comparison: {
         Row: {
-          annualized_premium: number | null
-          ao_premium: number | null
-          current_carrier: string | null
-          customer_name: string | null
+          auto_owners_premium: number | null
+          carrier: string | null
+          insured_name: string | null
           policy_number: string | null
-          premium_difference: number | null
-          quote_carrier: string | null
+          quote_annual_premium: number | null
           quote_date: string | null
           quote_premium: number | null
-          quote_status: string | null
           renewal_id: string | null
+          savings: number | null
           savings_pct: number | null
+          status: string | null
           term_months: number | null
         }
         Relationships: []
