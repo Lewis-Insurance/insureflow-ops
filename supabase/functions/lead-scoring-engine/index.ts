@@ -112,7 +112,7 @@ async function scoreLeads(supabaseClient: any, leadIds?: string[]) {
       .from('leads')
       .select(`
         id,
-        insurance_needs,
+        insurance_types,
         current_premium,
         decision_timeframe,
         email,
@@ -137,7 +137,7 @@ async function scoreLeads(supabaseClient: any, leadIds?: string[]) {
     // Calculate scores for all leads
     const updates = leads.map((lead: any) => {
       const factors: LeadScoringFactors = {
-        insuranceNeeds: lead.insurance_needs || [],
+        insuranceNeeds: lead.insurance_types || [],
         currentPremium: lead.current_premium,
         decisionTimeframe: lead.decision_timeframe,
         hasEmail: !!lead.email,
