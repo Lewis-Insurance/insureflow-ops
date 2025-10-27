@@ -12,6 +12,7 @@ import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
 import { UserManagement } from '@/components/admin/UserManagement';
+import { LeadScoringAdmin } from '@/components/leads/LeadScoringAdmin';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
@@ -51,7 +52,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Users
@@ -71,6 +72,10 @@ export default function AdminPage() {
             <TabsTrigger value="task-templates" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Task Templates
+            </TabsTrigger>
+            <TabsTrigger value="lead-scoring" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Lead Scoring
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -109,6 +114,10 @@ export default function AdminPage() {
 
           <TabsContent value="task-templates" className="space-y-6">
             <TaskTemplateManager />
+          </TabsContent>
+
+          <TabsContent value="lead-scoring" className="space-y-6">
+            <LeadScoringAdmin />
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6">

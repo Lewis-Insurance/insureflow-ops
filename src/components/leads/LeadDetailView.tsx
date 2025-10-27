@@ -44,6 +44,7 @@ import {
   Trash2,
   Edit,
   Save,
+  Edit2,
   X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -593,6 +594,27 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                 </div>
               </form>
             </Form>
+          )}
+
+          {/* Action Buttons at Bottom */}
+          {!isEditing && (
+            <div className="flex gap-2 pt-4 border-t mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+                className="flex-1"
+              >
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit Lead
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </div>
           )}
         </SheetContent>
       </Sheet>
