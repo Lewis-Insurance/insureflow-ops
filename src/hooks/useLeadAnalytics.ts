@@ -304,8 +304,7 @@ export function usePipelineVelocity() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leads')
-        .select('status, created_at, last_contact_at, converted_at')
-        .in('status', ['contacted', 'qualified', 'quoted', 'nurturing', 'won']);
+        .select('status, created_at, last_contact_at, converted_at, updated_at');
 
       if (error) {
         console.error('Error fetching velocity:', error);
@@ -322,16 +321,177 @@ export function usePipelineVelocity() {
           }, 0) / wonLeads.length
         : 0;
 
-      // Calculate time in each stage
+      // Calculate average time in each stage (rough estimation based on status)
+      const newLeads = data.filter(l => l.status === 'new');
+      const contactedLeads = data.filter(l => l.status === 'contacted');
+      const qualifiedLeads = data.filter(l => l.status === 'qualified');
+      const quotedLeads = data.filter(l => l.status === 'quoted');
+
+      const avgTimeInNew = newLeads.length > 0
+        ? newLeads.reduce((sum, l) => {
+            const created = new Date(l.created_at).getTime();
+            const updated = new Date(l.updated_at).getTime();
+            return sum + (updated - created) / (1000 * 60 * 60 * 24);
+          }, 0) / newLeads.length
+        : 0;
+
+      const avgTimeInContacted = contactedLeads.length > 0
+        ? contactedLeads.reduce((sum, l) => {
+            const created = new Date(l.created_at).getTime();
+            const updated = new Date(l.updated_at).getTime();
+            return sum + (updated - created) / (1000 * 60 * 60 * 24);
+          }, 0) / contactedLeads.length
+        : 0;
+
+      const avgTimeInQualified = qualifiedLeads.length > 0
+        ? qualifiedLeads.reduce((sum, l) => {
+            const created = new Date(l.created_at).getTime();
+            const updated = new Date(l.updated_at).getTime();
+            return sum + (updated - created) / (1000 * 60 * 60 * 24);
+          }, 0) / qualifiedLeads.length
+        : 0;
+
+      const avgTimeInQuoted = quotedLeads.length > 0
+        ? quotedLeads.reduce((sum, l) => {
+            const created = new Date(l.created_at).getTime();
+            const updated = new Date(l.updated_at).getTime();
+            return sum + (updated - created) / (1000 * 60 * 60 * 24);
+          }, 0) / quotedLeads.length
+        : 0;
+
       const stageVelocity = {
-        new_to_contacted: 0,
-        contacted_to_qualified: 0,
-        qualified_to_quoted: 0,
-        quoted_to_won: 0,
-        overall: Math.round(avgDaysToWin),
+        new: Math.round(avgTimeInNew * 10) / 10,
+        contacted: Math.round(avgTimeInContacted * 10) / 10,
+        qualified: Math.round(avgTimeInQualified * 10) / 10,
+        quoted: Math.round(avgTimeInQuoted * 10) / 10,
+        overall: Math.round(avgDaysToWin * 10) / 10,
+        leads_per_day: data.length > 0 ? Math.round((data.length / 30) * 10) / 10 : 0,
       };
 
       return stageVelocity;
+    },
+  });
+}
+
+export function useProducerPerformance(dateRange?: { start: string; end: string }) {
+  return useQuery({
+    queryKey: ['producer-performance', dateRange],
+    queryFn: async () => {
+      let query = supabase
+        .from('leads')
+        .select('assigned_to, status, lead_score, estimated_premium, created_at, insurance_types');
+
+      if (dateRange) {
+        query = query
+          .gte('created_at', dateRange.start)
+          .lte('created_at', dateRange.end);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching producer performance:', error);
+        throw error;
+      }
+
+      // Get unique producers
+      const producerIds = Array.from(new Set(data.map(l => l.assigned_to).filter(Boolean)));
+
+      // Fetch producer profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', producerIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Calculate metrics per producer
+      const producerMetrics = producerIds.map(producerId => {
+        const producerLeads = data.filter(l => l.assigned_to === producerId);
+        const wonLeads = producerLeads.filter(l => l.status === 'won');
+        const profile = profileMap.get(producerId);
+
+        return {
+          producer_id: producerId,
+          producer_name: profile?.full_name || 'Unknown',
+          avatar_url: profile?.avatar_url,
+          total_leads: producerLeads.length,
+          won_leads: wonLeads.length,
+          lost_leads: producerLeads.filter(l => l.status === 'lost').length,
+          active_leads: producerLeads.filter(l => 
+            ['new', 'contacted', 'qualified', 'quoted', 'nurturing'].includes(l.status)
+          ).length,
+          win_rate: producerLeads.length > 0 
+            ? (wonLeads.length / producerLeads.length) * 100 
+            : 0,
+          avg_lead_score: producerLeads.length > 0
+            ? producerLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / producerLeads.length
+            : 0,
+          total_value: wonLeads.reduce((sum, l) => sum + (l.estimated_premium || 0), 0),
+        };
+      });
+
+      return producerMetrics.sort((a, b) => b.won_leads - a.won_leads);
+    },
+  });
+}
+
+export function useInsuranceTypePerformance(dateRange?: { start: string; end: string }) {
+  return useQuery({
+    queryKey: ['insurance-type-performance', dateRange],
+    queryFn: async () => {
+      let query = supabase
+        .from('leads')
+        .select('insurance_types, status, estimated_premium, created_at');
+
+      if (dateRange) {
+        query = query
+          .gte('created_at', dateRange.start)
+          .lte('created_at', dateRange.end);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching insurance type performance:', error);
+        throw error;
+      }
+
+      const typeMetrics: Record<string, any> = {};
+
+      data.forEach(lead => {
+        const types = lead.insurance_types || [];
+        types.forEach((type: string) => {
+          if (!typeMetrics[type]) {
+            typeMetrics[type] = {
+              type,
+              total: 0,
+              won: 0,
+              lost: 0,
+              in_progress: 0,
+              win_rate: 0,
+              total_value: 0,
+            };
+          }
+
+          typeMetrics[type].total++;
+          if (lead.status === 'won') {
+            typeMetrics[type].won++;
+            typeMetrics[type].total_value += lead.estimated_premium || 0;
+          }
+          if (lead.status === 'lost') typeMetrics[type].lost++;
+          if (['contacted', 'qualified', 'quoted', 'nurturing'].includes(lead.status)) {
+            typeMetrics[type].in_progress++;
+          }
+        });
+      });
+
+      const typeArray = Object.values(typeMetrics).map((metrics: any) => ({
+        ...metrics,
+        win_rate: metrics.total > 0 ? (metrics.won / metrics.total) * 100 : 0,
+      }));
+
+      return typeArray.sort((a, b) => b.total - a.total);
     },
   });
 }
