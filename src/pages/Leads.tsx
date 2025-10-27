@@ -20,10 +20,11 @@ import { LeadListView } from "@/components/leads/LeadListView";
 import { LeadScoringAdmin } from "@/components/leads/LeadScoringAdmin";
 import { TeamPipelineView } from "@/components/leads/TeamPipelineView";
 import { TimelineView } from "@/components/leads/TimelineView";
-import { LayoutGrid, BarChart3, Users, Search, Filter, List } from "lucide-react";
+import { LayoutGrid, BarChart3, Users, Search, Filter, List, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 import { useDebounce } from "@/hooks/useDebounce";
+import { Link } from "react-router-dom";
 
 export default function Leads() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -57,7 +58,15 @@ export default function Leads() {
               Track and manage your sales pipeline
             </p>
           </div>
-          <QuickLeadCapture />
+          <div className="flex items-center gap-2">
+            <Link to="/leads/analytics">
+              <Button variant="outline">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Advanced Analytics
+              </Button>
+            </Link>
+            <QuickLeadCapture />
+          </div>
         </div>
 
         {/* Search and Filters */}
