@@ -107,6 +107,20 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 />
               </NavGroup>
 
+              {/* Contacts Group */}
+              <NavGroup label="Contacts" defaultOpen={false}>
+                <NavItem 
+                  icon={Building2} 
+                  label="Carriers" 
+                  to="/carriers" 
+                />
+                <NavItem 
+                  icon={Briefcase} 
+                  label="MGAs" 
+                  to="/mgas" 
+                />
+              </NavGroup>
+
               {/* Command Center Group */}
               <NavGroup label="Command Center" defaultOpen={false}>
                 <NavItem 
@@ -177,11 +191,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={Mail} 
                   label="Campaigns" 
                   to="/campaigns" 
-                />
-                <NavItem
-                  icon={Building2}
-                  label="Carriers"
-                  to="/carriers"
                 />
                 {profile?.role === 'admin' && (
                   <NavItem 

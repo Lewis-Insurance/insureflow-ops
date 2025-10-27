@@ -40,6 +40,7 @@ const CommandCenterPage = React.lazy(() => import("./pages/CommandCenterPage"));
 const ExecutivePage = React.lazy(() => import("./pages/ExecutivePage"));
 const AnalyticsPage = React.lazy(() => import("./pages/AnalyticsPage"));
 const CarriersPage = React.lazy(() => import("./pages/CarriersPage"));
+const MGAsPage = React.lazy(() => import("./pages/MGAsPage"));
 const CustomerSuccessPage = React.lazy(() => import("./pages/CustomerSuccessPage"));
 const RetentionPage = React.lazy(() => import("./pages/RetentionPage"));
 const FinancialPage = React.lazy(() => import("./pages/FinancialPage"));
@@ -345,6 +346,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CarriersPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/mgas"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <MGAsPage />
                   </ErrorBoundary>
                 }
               />
