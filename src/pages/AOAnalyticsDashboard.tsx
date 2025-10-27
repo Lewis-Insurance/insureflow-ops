@@ -8,6 +8,7 @@ import { PriorityDistributionChart } from "@/components/ao-renewals/analytics/Pr
 import { MonthlyForecastChart } from "@/components/ao-renewals/analytics/MonthlyForecastChart";
 import { AtRiskRenewalsTable } from "@/components/ao-renewals/analytics/AtRiskRenewalsTable";
 import { PremiumAnalytics } from "@/components/ao-renewals/analytics/PremiumAnalytics";
+import { StatusTimelineChart } from "@/components/ao-renewals/analytics/StatusTimelineChart";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -93,6 +94,9 @@ export default function AOAnalyticsDashboard() {
 
         {/* Premium Analytics */}
         <PremiumAnalytics data={renewalsData || []} isLoading={renewalsLoading} />
+
+        {/* Status Timeline */}
+        <StatusTimelineChart data={renewalsData || []} isLoading={renewalsLoading} />
 
         {/* At-Risk Renewals Table */}
         <AtRiskRenewalsTable data={atRiskData as any || []} isLoading={atRiskLoading} />
