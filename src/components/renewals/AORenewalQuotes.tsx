@@ -12,9 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 interface AORenewalQuotesProps {
   renewalId: string;
   currentPremium?: number | null;
+  currentTermMonths?: 6 | 12 | null;
 }
 
-export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesProps) {
+export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }: AORenewalQuotesProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
   
@@ -37,11 +38,15 @@ export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesPr
     return quote.term_months === 6 ? quote.premium * 2 : quote.premium;
   };
 
-  const calculateSavings = (quote: AORenewalQuote) => {
-    if (!currentPremium) return null;
-    const annualQuote = calculateAnnualPremium(quote);
-    const difference = currentPremium - annualQuote;
-    const percentage = (difference / currentPremium) * 100;
+  const calculateSavings = (quote: AORenewalQuote, currentPremiumValue: number | null, currentTermMonths: 6 | 12 | null) => {
+    if (!currentPremiumValue || !currentTermMonths) return null;
+    
+    // Normalize both to annual premiums
+    const annualAutoOwners = currentTermMonths === 6 ? currentPremiumValue * 2 : currentPremiumValue;
+    const annualQuote = quote.term_months === 6 ? quote.premium * 2 : quote.premium;
+    
+    const difference = annualAutoOwners - annualQuote;
+    const percentage = (difference / annualAutoOwners) * 100;
     return { amount: difference, percentage };
   };
 
@@ -67,6 +72,13 @@ export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesPr
           </Button>
         </CardHeader>
         <CardContent>
+          {!currentTermMonths && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                ⚠️ Please set the Auto-Owners policy term (6-month or 12-month) above to see accurate quote comparisons.
+              </p>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">
               Loading quotes...
@@ -84,7 +96,7 @@ export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesPr
                     <TableHead>Premium</TableHead>
                     <TableHead>Term</TableHead>
                     <TableHead>Annual Premium</TableHead>
-                    {currentPremium && <TableHead>vs Auto-Owners</TableHead>}
+                    {currentPremium && currentTermMonths && <TableHead>vs Auto-Owners</TableHead>}
                     <TableHead>Status</TableHead>
                     <TableHead>Document</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -93,7 +105,7 @@ export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesPr
                 <TableBody>
                   {quotes.map((quote) => {
                     const annualPremium = calculateAnnualPremium(quote);
-                    const savings = calculateSavings(quote);
+                    const savings = calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
 
                     return (
                       <TableRow key={quote.id}>
@@ -101,7 +113,7 @@ export function AORenewalQuotes({ renewalId, currentPremium }: AORenewalQuotesPr
                         <TableCell>{formatCurrency(quote.premium)}</TableCell>
                         <TableCell>{quote.term_months} months</TableCell>
                         <TableCell>{formatCurrency(annualPremium)}</TableCell>
-                        {currentPremium && (
+                        {currentPremium && currentTermMonths && (
                           <TableCell>
                             {savings && (
                               <div className="flex items-center gap-1">

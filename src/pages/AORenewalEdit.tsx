@@ -34,6 +34,7 @@ export default function AORenewalEdit() {
     policy_type: '',
     renewal_date: '',
     current_premium: '',
+    term_months: '' as '' | '6' | '12',
     status: 'pending' as AORenewalStatus,
     priority: 'normal' as AORenewalPriority,
     assigned_to: '',
@@ -48,6 +49,7 @@ export default function AORenewalEdit() {
         policy_type: renewal.policy_type || '',
         renewal_date: renewal.renewal_date ? renewal.renewal_date.split('T')[0] : '',
         current_premium: renewal.current_premium?.toString() || '',
+        term_months: renewal.term_months ? renewal.term_months.toString() as '6' | '12' : '',
         status: renewal.status || 'pending',
         priority: renewal.priority || 'normal',
         assigned_to: renewal.assigned_to || '',
@@ -70,6 +72,7 @@ export default function AORenewalEdit() {
           policy_type: formData.policy_type.trim(),
           renewal_date: formData.renewal_date,
           current_premium: parseFloat(formData.current_premium) || null,
+          term_months: formData.term_months ? parseInt(formData.term_months) as 6 | 12 : null,
           status: formData.status,
           priority: formData.priority,
           assigned_to: formData.assigned_to.trim() || null,
@@ -213,6 +216,23 @@ export default function AORenewalEdit() {
                 </div>
 
                 <div>
+                  <Label htmlFor="term_months">Policy Term</Label>
+                  <Select
+                    value={formData.term_months || "not_set"}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, term_months: value === "not_set" ? '' : value as '6' | '12' }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select term" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background">
+                      <SelectItem value="not_set">Not Set</SelectItem>
+                      <SelectItem value="6">6 Months (Semi-Annual)</SelectItem>
+                      <SelectItem value="12">12 Months (Annual)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
                   <Label htmlFor="assigned_to">Assigned To</Label>
                   <Select
                     value={formData.assigned_to || "unassigned"}
@@ -305,6 +325,7 @@ export default function AORenewalEdit() {
           <AORenewalQuotes 
             renewalId={renewal.id} 
             currentPremium={renewal.current_premium}
+            currentTermMonths={renewal.term_months}
           />
         )}
 

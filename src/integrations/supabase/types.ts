@@ -507,6 +507,7 @@ export type Database = {
           priority: string
           renewal_date: string
           status: string
+          term_months: number | null
           updated_at: string | null
         }
         Insert: {
@@ -525,6 +526,7 @@ export type Database = {
           priority?: string
           renewal_date: string
           status?: string
+          term_months?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -543,6 +545,7 @@ export type Database = {
           priority?: string
           renewal_date?: string
           status?: string
+          term_months?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -6935,18 +6938,21 @@ export type Database = {
       }
       ao_quotes_comparison: {
         Row: {
+          auto_owners_annual_premium: number | null
           auto_owners_premium: number | null
+          auto_owners_term_months: number | null
           carrier: string | null
+          created_at: string | null
+          created_by: string | null
           insured_name: string | null
           policy_number: string | null
           quote_annual_premium: number | null
-          quote_date: string | null
           quote_premium: number | null
+          quote_term_months: number | null
           renewal_id: string | null
           savings: number | null
           savings_pct: number | null
           status: string | null
-          term_months: number | null
         }
         Relationships: []
       }

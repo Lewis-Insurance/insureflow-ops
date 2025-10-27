@@ -23,6 +23,7 @@ export interface AORenewal {
   policy_type: string;
   renewal_date: string;
   current_premium: number | null;
+  term_months: 6 | 12 | null;
   current_carrier: string | null;
   status: AORenewalStatus;
   priority: AORenewalPriority;
@@ -455,6 +456,7 @@ export const useImportAORenewals = () => {
             policy_type: renewal.policy_type,
             renewal_date: renewal.renewal_date,
             current_premium: renewal.current_premium || null,
+            term_months: null, // User will set this manually
             current_carrier: renewal.current_carrier || null,
             status: (renewal.status as AORenewalStatus) || "pending",
             priority: (renewal.priority as AORenewalPriority) || "normal",
