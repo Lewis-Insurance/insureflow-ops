@@ -23,6 +23,7 @@ const PoliciesPage = React.lazy(() => import("./pages/PoliciesPage"));
 const RenewalsPage = React.lazy(() => import("./pages/RenewalsPage"));
 const RenewalIntelligencePage = React.lazy(() => import("./pages/RenewalIntelligencePage"));
 const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
+const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
 const MessageNew = React.lazy(() => import("./pages/MessageNew"));
@@ -186,6 +187,14 @@ const App = () => (
                 } 
               />
               <Route 
+                path="/ao-renewals" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AORenewalsPage />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
                 path="/ao-renewals/import" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
@@ -193,7 +202,7 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
-              <Route 
+              <Route
                 path="/policies/:policyId"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
