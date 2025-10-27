@@ -154,12 +154,29 @@ export function useLeadsByStage() {
 // Create lead mutation
 export function useCreateLead() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (leadData: LeadInsert) => {
+      // Get user's default account if account_id not provided
+      let accountId = leadData.account_id;
+      
+      if (!accountId && user?.id) {
+        const { data: membership } = await supabase
+          .from('account_memberships')
+          .select('account_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+        
+        if (membership) {
+          accountId = membership.account_id;
+        }
+      }
+
       const { data, error } = await supabase
         .from('leads')
-        .insert([leadData])
+        .insert([{ ...leadData, account_id: accountId }])
         .select()
         .single();
 
