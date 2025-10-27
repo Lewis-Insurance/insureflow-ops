@@ -3,18 +3,17 @@ import {
   FileText, Upload, Search, Brain, Database, 
   TrendingUp, FileSearch, Sparkles, ChevronRight,
   AlertCircle, Loader2, Filter, Download, Eye, 
-  Trash2, Shield, RefreshCw, ArrowLeft, ScanLine
+  Trash2, Shield, RefreshCw, ScanLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useNavigate } from 'react-router-dom';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useDocumentIntelligence } from '@/hooks/useDocumentIntelligence';
 import { useToast } from '@/hooks/use-toast';
 
 export default function DocumentIntelligence() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -72,59 +71,47 @@ export default function DocumentIntelligence() {
   }, [documents.length, insights.length, generateInsights]);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="p-2 bg-gradient-to-r from-primary to-primary/80 rounded-lg">
-                <Brain className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Document Intelligence Hub</h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <ScanLine className="h-3.5 w-3.5" />
-                  Enhanced OCR + AI analysis for policies and documents
-                </p>
-              </div>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-r from-primary to-primary/80 rounded-lg">
+              <Brain className="w-6 h-6 text-primary-foreground" />
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{documents.length}</span> Documents
-              </div>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Documents
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.docx,.txt,.doc,.jpg,.jpeg,.png"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Document Intelligence Hub</h1>
+              <p className="text-muted-foreground flex items-center gap-1.5">
+                <ScanLine className="h-3.5 w-3.5" />
+                Enhanced OCR + AI analysis for policies and documents
+              </p>
             </div>
           </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{documents.length}</span> Documents
+            </div>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Documents
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,.doc,.jpg,.jpeg,.png"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="relative">
+        {/* Search Bar */}
+        <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               type="text"
@@ -143,11 +130,11 @@ export default function DocumentIntelligence() {
               <Sparkles className="w-4 h-4 mr-2" />
               AI Search
             </Button>
-          </div>
-          
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <div className="mt-4 space-y-2">
+        </div>
+        
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="mt-4 space-y-2">
               {searchResults.map(result => (
                 <Card key={result.id} className="bg-accent/50">
                   <CardContent className="p-3">
@@ -168,14 +155,11 @@ export default function DocumentIntelligence() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
 
-      {/* Tabs */}
-      <div className="container mx-auto px-4 py-4">
+        {/* Tabs */}
         <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
           {['documents', 'insights', 'analytics'].map(tab => (
             <Button
@@ -188,11 +172,8 @@ export default function DocumentIntelligence() {
             </Button>
           ))}
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 pb-8">
-        {/* Upload Progress with Batch Queue Status */}
+        {/* Main Content */}
         {uploading && (
           <Card className="mb-4 border-primary/50 bg-primary/5">
             <CardContent className="p-4">
@@ -225,14 +206,13 @@ export default function DocumentIntelligence() {
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+            )}
+          </CardContent>
+        </Card>
         )}
 
-        {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div>
+          <>
             {/* Filters */}
             <div className="flex items-center space-x-4 mb-4">
               <select
@@ -347,14 +327,13 @@ export default function DocumentIntelligence() {
                     Upload Documents
                   </Button>
                 </CardContent>
-              </Card>
+            </Card>
             )}
-          </div>
+          </>
         )}
 
-        {/* Insights Tab */}
         {activeTab === 'insights' && (
-          <div>
+          <>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">AI-Generated Insights</h2>
               <Button
@@ -401,13 +380,12 @@ export default function DocumentIntelligence() {
                   <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No insights available</h3>
                   <p className="text-muted-foreground">Upload documents to generate AI-powered insights</p>
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
             )}
-          </div>
+          </>
         )}
 
-        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <Card>
             <CardHeader>
@@ -440,6 +418,6 @@ export default function DocumentIntelligence() {
           </Card>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
