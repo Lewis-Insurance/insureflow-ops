@@ -22,7 +22,6 @@ export function useProfiles() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, role, is_staff')
-        .in('role', ['staff', 'admin'])
         .order('full_name');
 
       if (error) throw error;
