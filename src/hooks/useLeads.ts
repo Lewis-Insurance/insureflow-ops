@@ -269,8 +269,8 @@ export function useMoveLeadToStage() {
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId)
-        .select('*, assigned_to, first_name, last_name')
-        .single();
+        .select('id, status, assigned_to, first_name, last_name')
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -397,7 +397,7 @@ export function useBulkMoveLeads() {
         .from('leads')
         .update({ status: newStatus })
         .in('id', leadIds)
-        .select();
+        .select('id, status');
 
       if (error) throw error;
       return data;

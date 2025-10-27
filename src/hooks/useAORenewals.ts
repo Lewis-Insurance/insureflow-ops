@@ -321,7 +321,7 @@ export const useUpdateAORenewalStatus = () => {
         .from("ao_renewals")
         .update({ status })
         .eq("id", id)
-        .select()
+        .select('id, status, customer_name, policy_number')
         .single();
 
       if (error) throw error;
