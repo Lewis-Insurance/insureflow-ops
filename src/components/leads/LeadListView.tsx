@@ -58,7 +58,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { LeadDetailPanel } from './LeadDetailPanel';
+import { LeadDetailView } from './LeadDetailView';
 import { useUpdateLead, useDeleteLead } from '@/hooks/useLeads';
 import { toast } from 'sonner';
 
@@ -77,7 +77,7 @@ export function LeadListView() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
   const [pageSize, setPageSize] = useState(25);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
 
   // Filters
@@ -395,7 +395,7 @@ export function LeadListView() {
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() => {
-                    setSelectedLead(lead);
+                    setSelectedLeadId(lead.id);
                     setDetailPanelOpen(true);
                   }}
                 >
@@ -689,7 +689,7 @@ export function LeadListView() {
                         ) {
                           return;
                         }
-                        setSelectedLead(row.original);
+                        setSelectedLeadId(row.original.id);
                         setDetailPanelOpen(true);
                       }}
                     >
@@ -762,9 +762,9 @@ export function LeadListView() {
         </CardContent>
       </Card>
 
-      {/* Lead Detail Panel */}
-      <LeadDetailPanel
-        lead={selectedLead}
+      {/* Lead Detail View */}
+      <LeadDetailView
+        leadId={selectedLeadId}
         open={detailPanelOpen}
         onOpenChange={setDetailPanelOpen}
       />
