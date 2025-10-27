@@ -32,6 +32,8 @@ import { useCreateLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { Plus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InsuranceDetailsModal } from "./InsuranceDetailsModal";
+import type { InsuranceType } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
 
 const leadSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -59,6 +61,9 @@ const INSURANCE_TYPES = [
 
 export const QuickLeadCapture = () => {
   const [open, setOpen] = useState(false);
+  const [createdLeadId, setCreatedLeadId] = useState<string | null>(null);
+  const [activeInsuranceModal, setActiveInsuranceModal] = useState<InsuranceType | null>(null);
+  const [selectedInsuranceTypes, setSelectedInsuranceTypes] = useState<string[]>([]);
   const createLead = useCreateLead();
   const { data: sources } = useLeadSources();
 
@@ -83,11 +88,44 @@ export const QuickLeadCapture = () => {
     };
 
     createLead.mutate(leadData as any, {
-      onSuccess: () => {
-        setOpen(false);
-        form.reset();
+      onSuccess: (newLead) => {
+        setCreatedLeadId(newLead.id);
+        setSelectedInsuranceTypes(data.insurance_types || []);
+        
+        // Open first insurance modal if any types selected
+        if (data.insurance_types && data.insurance_types.length > 0) {
+          setActiveInsuranceModal(data.insurance_types[0] as InsuranceType);
+        } else {
+          // No insurance types, close immediately
+          setOpen(false);
+          form.reset();
+          setCreatedLeadId(null);
+        }
       },
     });
+  };
+
+  const handleInsuranceModalClose = () => {
+    if (!createdLeadId || !selectedInsuranceTypes.length) {
+      setActiveInsuranceModal(null);
+      return;
+    }
+
+    // Find next insurance type to show
+    const currentIndex = selectedInsuranceTypes.indexOf(activeInsuranceModal!);
+    const nextIndex = currentIndex + 1;
+
+    if (nextIndex < selectedInsuranceTypes.length) {
+      // Show next insurance type modal
+      setActiveInsuranceModal(selectedInsuranceTypes[nextIndex] as InsuranceType);
+    } else {
+      // All done, close everything
+      setActiveInsuranceModal(null);
+      setOpen(false);
+      form.reset();
+      setCreatedLeadId(null);
+      setSelectedInsuranceTypes([]);
+    }
   };
 
   return (
@@ -328,6 +366,16 @@ export const QuickLeadCapture = () => {
           </form>
         </Form>
       </DialogContent>
+
+      {/* Insurance Details Modals */}
+      {createdLeadId && activeInsuranceModal && (
+        <InsuranceDetailsModal
+          leadId={createdLeadId}
+          insuranceType={activeInsuranceModal}
+          isOpen={true}
+          onClose={handleInsuranceModalClose}
+        />
+      )}
     </Dialog>
   );
 };
