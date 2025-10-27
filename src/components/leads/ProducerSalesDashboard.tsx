@@ -30,8 +30,9 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 export const ProducerSalesDashboard = ({
   producerId,
   producerName = "Producer",
-}: ProducerSalesDashboardProps) => {
-  const { data: allLeads } = useLeads({ assigned_to: producerId });
+  filters,
+}: ProducerSalesDashboardProps & { filters?: any }) => {
+  const { data: allLeads } = useLeads({ ...filters, assigned_to: producerId });
 
   const metrics = useMemo(() => {
     if (!allLeads) return null;

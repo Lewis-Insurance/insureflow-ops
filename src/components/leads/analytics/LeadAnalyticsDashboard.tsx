@@ -3,8 +3,8 @@ import { useLeads } from "@/hooks/useLeads";
 import { TrendingUp, Users, Target, DollarSign } from "lucide-react";
 import { useMemo } from "react";
 
-export const LeadAnalyticsDashboard = () => {
-  const { data: leads, isLoading } = useLeads();
+export const LeadAnalyticsDashboard = ({ filters }: { filters?: any }) => {
+  const { data: leads, isLoading } = useLeads(filters);
 
   const metrics = useMemo(() => {
     if (!leads) return null;

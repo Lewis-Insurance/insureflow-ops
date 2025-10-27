@@ -162,8 +162,8 @@ const KanbanColumn = ({
   );
 };
 
-export const PipelineKanban = () => {
-  const { data: leads, isLoading } = useLeads();
+export const PipelineKanban = ({ filters }: { filters?: any }) => {
+  const { data: leads, isLoading } = useLeads(filters);
   const moveLeadStage = useMoveLeadToStage();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
 
