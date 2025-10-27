@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Trash2, ExternalLink, TrendingDown, TrendingUp } from 'lucide-react';
+import { Plus, FileText, Trash2, ExternalLink, TrendingDown, TrendingUp, Pencil } from 'lucide-react';
 import { useAORenewalQuotes, useDeleteAORenewalQuote, type AORenewalQuote } from '@/hooks/useAORenewalQuotes';
 import { AddQuoteModal } from './AddQuoteModal';
+import { EditQuoteModal } from './EditQuoteModal';
 import { formatCurrency } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,6 +18,7 @@ interface AORenewalQuotesProps {
 
 export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }: AORenewalQuotesProps) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editQuote, setEditQuote] = useState<AORenewalQuote | null>(null);
   const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
   
   const { data: quotes = [], isLoading } = useAORenewalQuotes(renewalId);
@@ -161,14 +163,23 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(quote.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditQuote(quote)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(quote.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -191,11 +202,19 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
         </CardContent>
       </Card>
 
-      <AddQuoteModal
+      <AddQuoteModal 
         open={showAddModal}
         onOpenChange={setShowAddModal}
         renewalId={renewalId}
       />
+
+      {editQuote && (
+        <EditQuoteModal 
+          open={!!editQuote}
+          onOpenChange={(open) => !open && setEditQuote(null)}
+          quote={editQuote}
+        />
+      )}
 
       <AlertDialog open={!!deleteQuoteId} onOpenChange={() => setDeleteQuoteId(null)}>
         <AlertDialogContent>

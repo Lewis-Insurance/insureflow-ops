@@ -101,10 +101,12 @@ export function useUpdateAORenewalQuote() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ao-renewal-quotes'] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-quotes', data.renewal_id] });
       queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
       queryClient.invalidateQueries({ queryKey: ['ao-quotes-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['ao-quotes-comparison'] });
+      queryClient.invalidateQueries({ queryKey: ['ao-quotes-denial-analysis'] });
       toast({
         title: 'Success',
         description: 'Quote updated successfully',
