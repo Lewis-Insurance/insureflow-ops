@@ -80,6 +80,14 @@ export const HomeInsuranceForm = ({ leadId, onSuccess }: HomeInsuranceFormProps)
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="current_carrier">Current Carrier</Label>
+            <Input id="current_carrier" {...register('current_carrier')} />
+          </div>
+          <div>
+            <Label htmlFor="expiration_date">Expiration Date</Label>
+            <Input id="expiration_date" type="date" {...register('expiration_date')} />
+          </div>
           <div className="md:col-span-2">
             <Label htmlFor="property_address">Property Address</Label>
             <Input id="property_address" {...register('property_address')} />

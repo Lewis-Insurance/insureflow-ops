@@ -2617,6 +2617,101 @@ export type Database = {
         }
         Relationships: []
       }
+      extracted_home_insurance: {
+        Row: {
+          account_id: string | null
+          carrier: string | null
+          claims_last_5_years: number | null
+          construction_type: string | null
+          created_at: string | null
+          deductible: number | null
+          document_path: string
+          dwelling_coverage: number | null
+          effective_date: string | null
+          expiration_date: string | null
+          extraction_confidence: number | null
+          hurricane_deductible: number | null
+          id: string
+          liability_coverage: number | null
+          number_of_stories: number | null
+          personal_property: number | null
+          policy_number: string | null
+          property_address: string | null
+          property_type: string | null
+          raw_extraction: Json | null
+          roof_age: number | null
+          roof_type: string | null
+          square_footage: number | null
+          updated_at: string | null
+          user_id: string | null
+          year_built: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          carrier?: string | null
+          claims_last_5_years?: number | null
+          construction_type?: string | null
+          created_at?: string | null
+          deductible?: number | null
+          document_path: string
+          dwelling_coverage?: number | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          extraction_confidence?: number | null
+          hurricane_deductible?: number | null
+          id?: string
+          liability_coverage?: number | null
+          number_of_stories?: number | null
+          personal_property?: number | null
+          policy_number?: string | null
+          property_address?: string | null
+          property_type?: string | null
+          raw_extraction?: Json | null
+          roof_age?: number | null
+          roof_type?: string | null
+          square_footage?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          year_built?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          carrier?: string | null
+          claims_last_5_years?: number | null
+          construction_type?: string | null
+          created_at?: string | null
+          deductible?: number | null
+          document_path?: string
+          dwelling_coverage?: number | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          extraction_confidence?: number | null
+          hurricane_deductible?: number | null
+          id?: string
+          liability_coverage?: number | null
+          number_of_stories?: number | null
+          personal_property?: number | null
+          policy_number?: string | null
+          property_address?: string | null
+          property_type?: string | null
+          raw_extraction?: Json | null
+          roof_age?: number | null
+          roof_type?: string | null
+          square_footage?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          year_built?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_home_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extracted_policies: {
         Row: {
           account_id: string | null
@@ -3658,10 +3753,12 @@ export type Database = {
           account_id: string | null
           annual_mileage: number | null
           created_at: string | null
+          current_carrier: string | null
           current_collision_deductible: number | null
           current_comprehensive_deductible: number | null
           current_liability_limits: string | null
           document_url: string | null
+          expiration_date: string | null
           extracted_data: Json | null
           id: string
           lead_id: string
@@ -3685,10 +3782,12 @@ export type Database = {
           account_id?: string | null
           annual_mileage?: number | null
           created_at?: string | null
+          current_carrier?: string | null
           current_collision_deductible?: number | null
           current_comprehensive_deductible?: number | null
           current_liability_limits?: string | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           id?: string
           lead_id: string
@@ -3712,10 +3811,12 @@ export type Database = {
           account_id?: string | null
           annual_mileage?: number | null
           created_at?: string | null
+          current_carrier?: string | null
           current_collision_deductible?: number | null
           current_comprehensive_deductible?: number | null
           current_liability_limits?: string | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           id?: string
           lead_id?: string
@@ -3767,8 +3868,10 @@ export type Database = {
           business_type: string | null
           commercial_auto: boolean | null
           created_at: string | null
+          current_carrier: string | null
           cyber_liability: boolean | null
           document_url: string | null
+          expiration_date: string | null
           extracted_data: Json | null
           general_liability: boolean | null
           id: string
@@ -3794,8 +3897,10 @@ export type Database = {
           business_type?: string | null
           commercial_auto?: boolean | null
           created_at?: string | null
+          current_carrier?: string | null
           cyber_liability?: boolean | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           general_liability?: boolean | null
           id?: string
@@ -3821,8 +3926,10 @@ export type Database = {
           business_type?: string | null
           commercial_auto?: boolean | null
           created_at?: string | null
+          current_carrier?: string | null
           cyber_liability?: boolean | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           general_liability?: boolean | null
           id?: string
@@ -4014,11 +4121,13 @@ export type Database = {
           claims_last_5_years: number | null
           construction_type: string | null
           created_at: string | null
+          current_carrier: string | null
           deductible: number | null
           document_url: string | null
           dog_breed: string | null
           dogs: boolean | null
           dwelling_coverage: number | null
+          expiration_date: string | null
           extracted_data: Json | null
           id: string
           lead_id: string
@@ -4044,11 +4153,13 @@ export type Database = {
           claims_last_5_years?: number | null
           construction_type?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           deductible?: number | null
           document_url?: string | null
           dog_breed?: string | null
           dogs?: boolean | null
           dwelling_coverage?: number | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           id?: string
           lead_id: string
@@ -4074,11 +4185,13 @@ export type Database = {
           claims_last_5_years?: number | null
           construction_type?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           deductible?: number | null
           document_url?: string | null
           dog_breed?: string | null
           dogs?: boolean | null
           dwelling_coverage?: number | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           id?: string
           lead_id?: string
@@ -4129,7 +4242,9 @@ export type Database = {
           coverage_amount: number | null
           coverage_type: string | null
           created_at: string | null
+          current_carrier: string | null
           document_url: string | null
+          expiration_date: string | null
           extracted_data: Json | null
           family_history: string | null
           gender: string | null
@@ -4154,7 +4269,9 @@ export type Database = {
           coverage_amount?: number | null
           coverage_type?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           family_history?: string | null
           gender?: string | null
@@ -4179,7 +4296,9 @@ export type Database = {
           coverage_amount?: number | null
           coverage_type?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           family_history?: string | null
           gender?: string | null
@@ -4226,8 +4345,10 @@ export type Database = {
           account_id: string | null
           alarm_system: boolean | null
           created_at: string | null
+          current_carrier: string | null
           deductible: number | null
           document_url: string | null
+          expiration_date: string | null
           extracted_data: Json | null
           has_pets: boolean | null
           id: string
@@ -4248,8 +4369,10 @@ export type Database = {
           account_id?: string | null
           alarm_system?: boolean | null
           created_at?: string | null
+          current_carrier?: string | null
           deductible?: number | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           has_pets?: boolean | null
           id?: string
@@ -4270,8 +4393,10 @@ export type Database = {
           account_id?: string | null
           alarm_system?: boolean | null
           created_at?: string | null
+          current_carrier?: string | null
           deductible?: number | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           has_pets?: boolean | null
           id?: string
@@ -4500,8 +4625,10 @@ export type Database = {
           account_id: string | null
           auto_liability_limits: string | null
           created_at: string | null
+          current_carrier: string | null
           desired_coverage_amount: number | null
           document_url: string | null
+          expiration_date: string | null
           extracted_data: Json | null
           has_recreational_vehicles: boolean | null
           has_watercraft: boolean | null
@@ -4520,8 +4647,10 @@ export type Database = {
           account_id?: string | null
           auto_liability_limits?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           desired_coverage_amount?: number | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           has_recreational_vehicles?: boolean | null
           has_watercraft?: boolean | null
@@ -4540,8 +4669,10 @@ export type Database = {
           account_id?: string | null
           auto_liability_limits?: string | null
           created_at?: string | null
+          current_carrier?: string | null
           desired_coverage_amount?: number | null
           document_url?: string | null
+          expiration_date?: string | null
           extracted_data?: Json | null
           has_recreational_vehicles?: boolean | null
           has_watercraft?: boolean | null

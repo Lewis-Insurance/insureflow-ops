@@ -33,6 +33,8 @@ export type HomeInsuranceDetails = {
   id?: string;
   lead_id: string;
   account_id?: string;
+  current_carrier?: string;
+  expiration_date?: string;
   property_address?: string;
   property_type?: string;
   year_built?: number;
@@ -343,6 +345,8 @@ function mapExtractedDataToFields(
     case 'home':
       return {
         ...baseData,
+        current_carrier: extractedData.carrier,
+        expiration_date: extractedData.expiration_date,
         property_address: extractedData.property?.address,
         property_type: extractedData.property?.type,
         year_built: extractedData.property?.year_built,

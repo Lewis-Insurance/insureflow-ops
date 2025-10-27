@@ -489,6 +489,8 @@ AUTO INSURANCE - Extract and return this JSON structure:
 
 HOME INSURANCE - Extract and return this JSON structure (look for fields like "DWELLING", "Coverage A", "BUILT:", "ROOF AGE:", "CONST:", etc.):
 {
+  "carrier": <string - look for carrier/company name at the top of the document>,
+  "expiration_date": <string YYYY-MM-DD format - look for "EXP:", "Expiration Date:", "Policy Period Ends:">,
   "property": { 
     "address": <string - complete address from "NAMED INSURED AND ADDRESS" or property location>,
     "type": <string - e.g., "Single Family", "Condo" - look for "OCC:" field or property type>,
