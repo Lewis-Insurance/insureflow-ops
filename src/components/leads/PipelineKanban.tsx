@@ -1,301 +1,232 @@
-// src/components/leads/PipelineKanban.tsx
-import { useState } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { useLeadsByStage, useMoveLeadToStage } from '@/hooks/useLeads';
-import { LeadCard } from './LeadCard';
-import { LeadDetailPanel } from './LeadDetailPanel';
-import { Lead, LeadStatus } from '@/types/leads';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  AlertCircle, 
-  MessageSquare, 
-  CheckCircle2, 
-  FileText, 
-  Clock, 
-  Trophy, 
-  XCircle,
-  Sparkles 
-} from 'lucide-react';
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useLeads, useMoveLeadToStage, type Lead } from "@/hooks/useLeads";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Phone, Mail, Calendar, DollarSign } from "lucide-react";
+import { format } from "date-fns";
 
-const STAGE_CONFIG: Record<LeadStatus, { 
-  title: string; 
-  color: string; 
-  icon: any;
-  description: string;
-}> = {
-  new: {
-    title: 'New Leads',
-    color: 'bg-blue-500',
-    icon: Sparkles,
-    description: 'Fresh leads awaiting contact',
-  },
-  contacted: {
-    title: 'Contacted',
-    color: 'bg-purple-500',
-    icon: MessageSquare,
-    description: 'Initial contact made',
-  },
-  qualified: {
-    title: 'Qualified',
-    color: 'bg-indigo-500',
-    icon: CheckCircle2,
-    description: 'Qualified and ready for quote',
-  },
-  quoted: {
-    title: 'Quoted',
-    color: 'bg-amber-500',
-    icon: FileText,
-    description: 'Quote provided',
-  },
-  won: {
-    title: 'Won',
-    color: 'bg-green-500',
-    icon: Trophy,
-    description: 'Successfully converted',
-  },
-  lost: {
-    title: 'Lost',
-    color: 'bg-red-500',
-    icon: XCircle,
-    description: 'Opportunity lost',
-  },
-  nurturing: {
-    title: 'Nurturing',
-    color: 'bg-teal-500',
-    icon: AlertCircle,
-    description: 'Long-term follow-up',
-  },
+const STAGES = [
+  { id: 'new', label: 'New Leads', color: 'bg-blue-500' },
+  { id: 'contacted', label: 'Contacted', color: 'bg-yellow-500' },
+  { id: 'qualified', label: 'Qualified', color: 'bg-purple-500' },
+  { id: 'quoted', label: 'Quoted', color: 'bg-orange-500' },
+  { id: 'won', label: 'Won', color: 'bg-green-500' },
+];
+
+const LeadCard = ({ lead, onDragStart }: { lead: Lead & any; onDragStart: (lead: Lead) => void }) => {
+  return (
+    <Card
+      draggable
+      onDragStart={() => onDragStart(lead)}
+      className="cursor-move hover:shadow-md transition-shadow"
+    >
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h4 className="font-semibold text-sm">
+              {lead.first_name} {lead.last_name}
+            </h4>
+            {lead.source && (
+              <Badge variant="outline" className="mt-1">
+                {lead.source.name}
+              </Badge>
+            )}
+          </div>
+          <Badge
+            variant="secondary"
+            className={`${
+              lead.lead_score >= 80
+                ? 'bg-green-100 text-green-800'
+                : lead.lead_score >= 60
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {lead.lead_score}
+          </Badge>
+        </div>
+
+        <div className="space-y-2 text-xs text-muted-foreground">
+          {lead.email && (
+            <div className="flex items-center gap-2">
+              <Mail className="h-3 w-3" />
+              <span className="truncate">{lead.email}</span>
+            </div>
+          )}
+          {lead.phone && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3" />
+              <span>{lead.phone}</span>
+            </div>
+          )}
+          {lead.current_premium && (
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-3 w-3" />
+              <span>${lead.current_premium.toLocaleString()}/yr</span>
+            </div>
+          )}
+          {lead.created_at && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3 w-3" />
+              <span>{format(new Date(lead.created_at), 'MMM d, yyyy')}</span>
+            </div>
+          )}
+        </div>
+
+        {lead.assigned && (
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={lead.assigned.avatar_url} />
+              <AvatarFallback className="text-xs">
+                {lead.assigned.full_name?.charAt(0) || '?'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-xs text-muted-foreground truncate">
+              {lead.assigned.full_name}
+            </span>
+          </div>
+        )}
+
+        {lead.insurance_needs && lead.insurance_needs.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {lead.insurance_needs.slice(0, 3).map((need: string) => (
+              <Badge key={need} variant="secondary" className="text-xs">
+                {need}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 };
 
-export function PipelineKanban({ onLeadClick }: { onLeadClick?: (leadId: string) => void }) {
-  const { data: leadsByStage, isLoading } = useLeadsByStage();
-  const moveLeadToStage = useMoveLeadToStage();
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+const KanbanColumn = ({
+  stage,
+  leads,
+  onDrop,
+  onDragStart,
+}: {
+  stage: typeof STAGES[0];
+  leads: (Lead & any)[];
+  onDrop: (status: Lead['status']) => void;
+  onDragStart: (lead: Lead) => void;
+}) => {
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId } = result;
-
-    // Dropped outside the list
-    if (!destination) return;
-
-    // Dropped in the same position
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) {
-      return;
-    }
-
-    const newStatus = destination.droppableId as LeadStatus;
-    
-    moveLeadToStage.mutate({
-      leadId: draggableId,
-      newStatus,
-    });
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
   };
 
-  const handleLeadClick = (lead: Lead) => {
-    onLeadClick?.(lead.id);
-    setSelectedLead(lead);
-    setDetailPanelOpen(true);
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    onDrop(stage.id as Lead['status']);
+  };
+
+  return (
+    <div
+      className="flex-1 min-w-[300px]"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <Card className={isDragOver ? 'ring-2 ring-primary' : ''}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${stage.color}`}></div>
+              {stage.label}
+            </CardTitle>
+            <Badge variant="secondary">{leads.length}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto">
+          {leads.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} onDragStart={onDragStart} />
+          ))}
+          {leads.length === 0 && (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No leads in this stage
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export const PipelineKanban = () => {
+  const { data: leads, isLoading } = useLeads();
+  const moveLeadStage = useMoveLeadToStage();
+  const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
+
+  const handleDragStart = (lead: Lead) => {
+    setDraggedLead(lead);
+  };
+
+  const handleDrop = (status: Lead['status']) => {
+    if (!draggedLead) return;
+
+    moveLeadStage.mutate({
+      leadId: draggedLead.id,
+      newStatus: status,
+    });
+
+    setDraggedLead(null);
   };
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[...Array(3)].map((_, j) => (
-                  <Skeleton key={j} className="h-24 w-full" />
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {STAGES.map((stage) => (
+          <div key={stage.id} className="flex-1 min-w-[300px]">
+            <Card>
+              <CardHeader>
+                <div className="h-4 bg-muted rounded w-24 animate-pulse"></div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         ))}
       </div>
     );
   }
 
-  const activeStages: LeadStatus[] = ['new', 'contacted', 'qualified', 'quoted'];
-  const outcomeStages: LeadStatus[] = ['won', 'lost', 'nurturing'];
+  const leadsByStage = STAGES.map((stage) => ({
+    ...stage,
+    leads: leads?.filter((lead) => lead.status === stage.id) || [],
+  }));
 
   return (
-    <>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="space-y-6">
-          {/* Active Pipeline */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Active Pipeline</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {activeStages.map((stage) => {
-                const config = STAGE_CONFIG[stage];
-                const leads = leadsByStage?.[stage] || [];
-                const totalValue = leads.reduce((sum, lead) => sum + (lead.estimated_premium || 0), 0);
-                const Icon = config.icon;
-
-                return (
-                  <Droppable key={stage} droppableId={stage}>
-                    {(provided, snapshot) => (
-                      <Card
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={snapshot.isDraggingOver ? 'ring-2 ring-primary' : ''}
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded ${config.color} text-white`}>
-                                <Icon className="h-4 w-4" />
-                              </div>
-                              <CardTitle className="text-sm font-semibold">
-                                {config.title}
-                              </CardTitle>
-                            </div>
-                            <Badge variant="secondary" className="ml-2">
-                              {leads.length}
-                            </Badge>
-                          </div>
-                          {totalValue > 0 && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              ${totalValue.toLocaleString()} pipeline
-                            </p>
-                          )}
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <ScrollArea className="h-[calc(100vh-280px)]">
-                            <div className="space-y-2 pr-4">
-                              {leads.map((lead, index) => (
-                                <Draggable
-                                  key={lead.id}
-                                  draggableId={lead.id}
-                                  index={index}
-                                >
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      onClick={() => handleLeadClick(lead as any)}
-                                    >
-                                      <LeadCard
-                                        lead={lead as any}
-                                        isDragging={snapshot.isDragging}
-                                      />
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                              {leads.length === 0 && (
-                                <div className="text-center py-8 text-muted-foreground text-sm">
-                                  No leads in this stage
-                                </div>
-                              )}
-                            </div>
-                          </ScrollArea>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </Droppable>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Outcome Stages */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Outcomes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {outcomeStages.map((stage) => {
-                const config = STAGE_CONFIG[stage];
-                const leads = leadsByStage?.[stage] || [];
-                const Icon = config.icon;
-
-                return (
-                  <Droppable key={stage} droppableId={stage}>
-                    {(provided, snapshot) => (
-                      <Card
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={snapshot.isDraggingOver ? 'ring-2 ring-primary' : ''}
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded ${config.color} text-white`}>
-                                <Icon className="h-4 w-4" />
-                              </div>
-                              <CardTitle className="text-sm font-semibold">
-                                {config.title}
-                              </CardTitle>
-                            </div>
-                            <Badge variant="secondary">{leads.length}</Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <ScrollArea className="h-[300px]">
-                            <div className="space-y-2 pr-4">
-                              {leads.slice(0, 10).map((lead, index) => (
-                                <Draggable
-                                  key={lead.id}
-                                  draggableId={lead.id}
-                                  index={index}
-                                >
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      onClick={() => handleLeadClick(lead as any)}
-                                    >
-                                      <LeadCard
-                                        lead={lead as any}
-                                        isDragging={snapshot.isDragging}
-                                        compact
-                                      />
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                              {leads.length === 0 && (
-                                <div className="text-center py-8 text-muted-foreground text-sm">
-                                  No leads
-                                </div>
-                              )}
-                              {leads.length > 10 && (
-                                <p className="text-xs text-muted-foreground text-center py-2">
-                                  +{leads.length - 10} more
-                                </p>
-                              )}
-                            </div>
-                          </ScrollArea>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </Droppable>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </DragDropContext>
-
-      {/* Lead Detail Panel */}
-      <LeadDetailPanel
-        lead={selectedLead}
-        open={detailPanelOpen}
-        onOpenChange={setDetailPanelOpen}
-      />
-    </>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Sales Pipeline</h2>
+        <p className="text-sm text-muted-foreground">
+          Drag and drop leads between stages
+        </p>
+      </div>
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {leadsByStage.map((stage) => (
+          <KanbanColumn
+            key={stage.id}
+            stage={stage}
+            leads={stage.leads}
+            onDrop={handleDrop}
+            onDragStart={handleDragStart}
+          />
+        ))}
+      </div>
+    </div>
   );
-}
+};
