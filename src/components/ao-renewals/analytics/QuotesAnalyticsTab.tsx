@@ -49,21 +49,24 @@ export function QuotesAnalyticsTab() {
       : null;
 
     // Enhanced comparison data with Auto-Owners delta
-    return analytics.map(a => {
-      const annualPremium = Number(a.avg_annual_premium || 0);
-      const delta = autoOwnersBaseline 
-        ? ((annualPremium - autoOwnersBaseline) / autoOwnersBaseline * 100) 
-        : 0;
-      
-      return {
-        carrier: a.carrier,
-        avgAnnualPremium: annualPremium,
-        totalQuotes: a.total_quotes,
-        denialRate: Number(a.denial_rate_pct || 0),
-        deltaVsAutoOwners: delta,
-        savingsVsAutoOwners: autoOwnersBaseline ? (autoOwnersBaseline - annualPremium) : 0,
-      };
-    });
+    return {
+      baseline: autoOwnersBaseline,
+      data: analytics.map(a => {
+        const annualPremium = Number(a.avg_annual_premium || 0);
+        const delta = autoOwnersBaseline 
+          ? ((annualPremium - autoOwnersBaseline) / autoOwnersBaseline * 100) 
+          : 0;
+        
+        return {
+          carrier: a.carrier,
+          avgAnnualPremium: annualPremium,
+          totalQuotes: a.total_quotes,
+          denialRate: Number(a.denial_rate_pct || 0),
+          deltaVsAutoOwners: delta,
+          savingsVsAutoOwners: autoOwnersBaseline ? (autoOwnersBaseline - annualPremium) : 0,
+        };
+      })
+    };
   }, [analytics]);
 
   const quoteStatusData = useMemo(() => 
@@ -121,7 +124,7 @@ export function QuotesAnalyticsTab() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Best Average Rate</CardTitle>
@@ -176,6 +179,31 @@ export function QuotesAnalyticsTab() {
             </div>
           </CardContent>
         </Card>
+
+        {carrierComparisonData.baseline && (
+          <Card className="border-primary">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Auto-Owners Baseline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="text-2xl font-bold">
+                  {formatCurrency(carrierComparisonData.baseline)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Average annual premium
+                </div>
+                {analyticsMetrics?.bestCarrier && (
+                  <div className="text-sm font-medium text-green-600 flex items-center gap-1">
+                    <TrendingDown className="h-4 w-4" />
+                    Save {formatCurrency(carrierComparisonData.baseline - Number(analyticsMetrics.bestCarrier.avg_annual_premium))} 
+                    {' '}with {analyticsMetrics.bestCarrier.carrier}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Average Premium Comparison Chart */}
@@ -186,7 +214,7 @@ export function QuotesAnalyticsTab() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={carrierComparisonData}>
+            <BarChart data={carrierComparisonData.data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="carrier" angle={-45} textAnchor="end" height={100} />
               <YAxis />
@@ -274,7 +302,7 @@ export function QuotesAnalyticsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {carrierComparisonData.map((row) => {
+              {carrierComparisonData.data.map((row) => {
                 const analytics_row = analytics.find(a => a.carrier === row.carrier);
                 const isAutoOwners = row.carrier.toLowerCase().includes('auto-owners') || 
                                     row.carrier.toLowerCase().includes('auto owners');
