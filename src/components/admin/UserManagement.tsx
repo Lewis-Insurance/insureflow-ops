@@ -52,6 +52,7 @@ export function UserManagement() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState('customer');
   const [isCreating, setIsCreating] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,12 +103,12 @@ export function UserManagement() {
     setIsCreating(true);
 
     try {
-      const { data, error } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: fullName,
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email,
+          password,
+          fullName,
+          role,
         },
       });
 
@@ -122,6 +123,7 @@ export function UserManagement() {
       setEmail('');
       setPassword('');
       setFullName('');
+      setRole('customer');
       
       // Refresh user list
       fetchUsers();
@@ -304,6 +306,20 @@ export function UserManagement() {
                 disabled={isCreating}
                 minLength={8}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select value={role} onValueChange={setRole} disabled={isCreating}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Button type="submit" disabled={isCreating} className="w-full">

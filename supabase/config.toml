@@ -100,3 +100,9 @@ verify_jwt = true
 
 [functions.nurture-campaign-processor]
 verify_jwt = false
+
+[functions.admin-list-users]
+verify_jwt = true
+
+[functions.admin-create-user]
+verify_jwt = true
