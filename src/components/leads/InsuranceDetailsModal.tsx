@@ -48,9 +48,6 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
     setUploadedFile(file);
   };
 
-  const handleClearFile = () => {
-    setUploadedFile(null);
-  };
 
   const handleUploadAndExtract = async () => {
     if (!uploadedFile) {
@@ -133,8 +130,6 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
             <div className="space-y-4">
               <DocumentUploadZone
                 onFileSelect={handleFileSelect}
-                currentFile={uploadedFile}
-                onClearFile={handleClearFile}
                 acceptedTypes={['.pdf', '.jpg', '.jpeg', '.png', '.docx']}
                 maxSizeMB={20}
               />
@@ -160,11 +155,11 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
                 </Button>
               )}
 
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+              <div className="p-4 bg-muted/50 border border-border rounded-lg">
+                <h4 className="font-medium mb-2">
                   Supported Documents:
                 </h4>
-                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Current insurance declarations page (Dec Page)</li>
                   <li>• Previous insurance quotes</li>
                   <li>• Policy documents</li>

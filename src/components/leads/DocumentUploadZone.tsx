@@ -1,62 +1,28 @@
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { FileUp, X, AlertCircle } from "lucide-react";
+import { FileUp, File, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DocumentUploadZoneProps {
   onFileSelect: (file: File) => void;
   acceptedTypes?: string[];
   maxSizeMB?: number;
-  currentFile?: File | null;
-  onClearFile?: () => void;
 }
 
-export const DocumentUploadZone = ({
+export const DocumentUploadZone: React.FC<DocumentUploadZoneProps> = ({
   onFileSelect,
-  acceptedTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.docx'],
+  acceptedTypes = ['.pdf', '.jpg', '.jpeg', '.png'],
   maxSizeMB = 10,
-  currentFile,
-  onClearFile,
-}: DocumentUploadZoneProps) => {
-  const [error, setError] = useState<string | null>(null);
+}) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: any[]) => {
-      setError(null);
-
-      if (rejectedFiles.length > 0) {
-        const rejection = rejectedFiles[0];
-        if (rejection.errors[0]?.code === 'file-too-large') {
-          setError(`File is too large. Maximum size is ${maxSizeMB}MB.`);
-        } else if (rejection.errors[0]?.code === 'file-invalid-type') {
-          setError(`Invalid file type. Accepted types: ${acceptedTypes.join(', ')}`);
-        } else {
-          setError('File upload failed. Please try again.');
-        }
-        return;
-      }
-
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        
-        // Additional validation
-        if (file.size > maxSizeMB * 1024 * 1024) {
-          setError(`File is too large. Maximum size is ${maxSizeMB}MB.`);
-          return;
-        }
-
-        // Validate file name length
-        if (file.name.length > 255) {
-          setError('File name is too long. Please rename the file and try again.');
-          return;
-        }
-
-        onFileSelect(file);
-      }
-    },
-    [onFileSelect, maxSizeMB, acceptedTypes]
-  );
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setSelectedFile(file);
+      onFileSelect(file);
+    }
+  }, [onFileSelect]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -68,22 +34,18 @@ export const DocumentUploadZone = ({
         '.png': ['image/png'],
         '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
       };
-      return { ...acc, ...Object.fromEntries(mimeTypes[type]?.map(m => [m, [type]]) || []) };
+      return { ...acc, ...mimeTypes[type] };
     }, {}),
     maxSize: maxSizeMB * 1024 * 1024,
     multiple: false,
   });
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  const clearFile = () => {
+    setSelectedFile(null);
   };
 
   return (
-    <div className="space-y-3">
+    <div className="w-full">
       <div
         {...getRootProps()}
         className={cn(
@@ -91,50 +53,42 @@ export const DocumentUploadZone = ({
           isDragActive
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50",
-          error && "border-destructive"
+          selectedFile && "border-primary bg-primary/5"
         )}
       >
         <input {...getInputProps()} />
-        <FileUp className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-        <p className="text-sm font-medium mb-1">
-          {isDragActive ? "Drop the file here" : "Drag & drop a document here"}
-        </p>
-        <p className="text-xs text-muted-foreground mb-2">or click to browse</p>
-        <p className="text-xs text-muted-foreground">
-          Accepted: {acceptedTypes.join(', ')} (max {maxSizeMB}MB)
-        </p>
+        <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        {isDragActive ? (
+          <p className="text-lg font-medium">Drop the file here...</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-lg font-medium">
+              Drag & drop a document here, or click to select
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Accepted formats: {acceptedTypes.join(', ')} (max {maxSizeMB}MB)
+            </p>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {currentFile && (
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+      {selectedFile && (
+        <div className="mt-4 p-4 bg-muted rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FileUp className="h-5 w-5 text-primary" />
+            <File className="h-8 w-8 text-primary" />
             <div>
-              <p className="text-sm font-medium">{currentFile.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatFileSize(currentFile.size)}
+              <p className="font-medium">{selectedFile.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
           </div>
-          {onClearFile && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClearFile();
-                setError(null);
-              }}
-              className="p-1 hover:bg-background rounded-full transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            onClick={clearFile}
+            className="p-1 hover:bg-background rounded-full transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       )}
     </div>
