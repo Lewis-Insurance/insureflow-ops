@@ -448,42 +448,49 @@ serve(async (req) => {
 
     // Build prompts based on action/type
     if (type === 'insurance_extraction' || analysisType === 'insurance_extraction') {
-      systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents.
+      const { documentType, extractionType } = requestBody;
+      
+      systemPrompt = `You are an expert insurance document analyzer. Extract and structure key information from insurance documents based on the insurance type.
 
-Return the extracted data in valid JSON format with this exact structure:
-{
-  "extracted": {
-    "type": "quote" or "policy" or "declaration",
-    "carrier": "Carrier name",
-    "policyNumber": "Policy number if available",
-    "insuredName": "Name of insured",
-    "effectiveDate": "YYYY-MM-DD",
-    "expirationDate": "YYYY-MM-DD",
-    "term": "12 months" or similar,
-    "coverages": [
-      { "type": "Coverage name", "limit": "Amount", "deductible": "Amount", "premium": number, "notes": "optional" }
-    ],
-    "premiums": [
-      { "type": "Premium type", "amount": number, "frequency": "annual" }
-    ],
-    "totalPremium": number,
-    "vehicles": [],
-    "properties": []
-  }
-}
+INSURANCE TYPE EXTRACTION RULES:
 
-STRICT EXTRACTION RULES:
-- Never set a coverage "limit" to values like "YES/NO", "Y/N", or boolean. Those indicate a checkbox selection only.
-- If a checkbox indicates a coverage is present, locate the corresponding numeric limit(s) elsewhere in the document (tables, schedules, declarations) and return those numbers.
-- Recognize abbreviations: BI = Bodily Injury, PD = Property Damage, PIP = Personal Injury Protection, UM = Uninsured Motorist, COMP = Comprehensive, COLL = Collision, CSL = Combined Single Limit.
-- For Auto Liability:
-  • Split limits (e.g., "50/100/50"): first two are BI (per person/per accident), third is PD. Keep the exact string format.
-  • If noted as CSL or Combined Single Limit, set type to "Liability CSL" and use that numeric amount.
-- For PIP/MedPay: return the numeric amount (e.g., "$10,000"). If only work loss/extra benefits are indicated, include that in "notes" and still provide the base numeric amount if present.
-- If, after searching the document text, no numeric limit can be found for a selected coverage, omit the "limit" field and set "notes": "Included (numeric limit not specified)".
+AUTO INSURANCE - Extract:
+- vehicle: { year, make, model, vin, usage }
+- driver: { name, dob, license_number }
+- coverage: { liability_limits (e.g., "100/300/100"), collision_deductible, comprehensive_deductible, uninsured_motorist, rental_reimbursement }
+- accidents_last_3_years, violations_last_3_years
 
-CRITICAL: You must return ONLY the JSON object above. No markdown formatting, no code blocks, no explanations - just pure JSON.`;
-      userPrompt = message || 'Extract all key information from these insurance documents and return as structured JSON.';
+HOME INSURANCE - Extract:
+- property: { address, type (e.g., "Single Family", "Condo"), year_built, square_footage, construction_type, roof_type, roof_age, stories }
+- coverage: { dwelling, personal_property, liability, deductible, loss_of_use }
+- features: { alarm_system, sprinkler_system, swimming_pool, trampoline, dogs, dog_breed }
+- claims_last_5_years
+
+COMMERCIAL INSURANCE - Extract:
+- business: { name, type, industry, years_in_business, revenue, employees }
+- coverage_types: { general_liability, property_coverage, workers_comp, commercial_auto, professional_liability, cyber_liability }
+- coverage: { liability_limit, property_value, payroll_amount }
+- business_description, number_of_vehicles
+
+LIFE INSURANCE - Extract:
+- insured: { name, dob, age, gender, tobacco_use, height_inches, weight_lbs }
+- coverage: { type (e.g., "Term", "Whole Life"), amount, term_length (in years) }
+- health: { conditions (array), medications (array), family_history }
+- beneficiary: { name, relationship }
+
+UMBRELLA INSURANCE - Extract:
+- coverage: { amount, auto_liability_limits, home_liability_limits }
+- underlying: { vehicles, properties, watercraft, recreational_vehicles, rental_property }
+- drivers: { number_of_drivers, teen_drivers }
+
+RENTERS INSURANCE - Extract:
+- property: { address, type, square_footage }
+- coverage: { personal_property, liability, deductible, loss_of_use }
+- features: { alarm_system, pets, pet_type, valuable_items, valuable_items_description }
+
+Return ONLY a JSON object matching the structure above for the specific insurance type. No markdown, no code blocks, just pure JSON.`;
+
+      userPrompt = message || `Extract ${documentType || 'insurance'} information from the document as structured JSON. Focus on the specific fields for this insurance type.`;
     } else if (type === 'business_insights') {
       systemPrompt = `You are an AI business analyst for insurance agencies. Analyze metrics and generate actionable insights.`;
       userPrompt = message || 'Analyze the business metrics and provide actionable insights.';

@@ -1,6 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutoInsuranceForm } from "./AutoInsuranceForm";
 import { HomeInsuranceForm } from "./HomeInsuranceForm";
+import { CommercialInsuranceForm } from "./CommercialInsuranceForm";
+import { LifeInsuranceForm } from "./LifeInsuranceForm";
+import { UmbrellaInsuranceForm } from "./UmbrellaInsuranceForm";
+import { RentersInsuranceForm } from "./RentersInsuranceForm";
 import { Car, Home, Building2, Heart, Umbrella, Key } from "lucide-react";
 
 interface InsuranceDetailsPanelProps {
@@ -74,22 +78,22 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
         )}
         {hasCommercial && (
           <TabsContent value="commercial">
-            <div className="p-4 text-muted-foreground">Commercial insurance form coming soon...</div>
+            <CommercialInsuranceForm leadId={leadId} />
           </TabsContent>
         )}
         {hasLife && (
           <TabsContent value="life">
-            <div className="p-4 text-muted-foreground">Life insurance form coming soon...</div>
+            <LifeInsuranceForm leadId={leadId} />
           </TabsContent>
         )}
         {hasUmbrella && (
           <TabsContent value="umbrella">
-            <div className="p-4 text-muted-foreground">Umbrella insurance form coming soon...</div>
+            <UmbrellaInsuranceForm leadId={leadId} />
           </TabsContent>
         )}
         {hasRenters && (
           <TabsContent value="renters">
-            <div className="p-4 text-muted-foreground">Renters insurance form coming soon...</div>
+            <RentersInsuranceForm leadId={leadId} />
           </TabsContent>
         )}
       </Tabs>
