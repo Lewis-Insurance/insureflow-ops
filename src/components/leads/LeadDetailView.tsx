@@ -77,7 +77,7 @@ const leadSchema = z.object({
   insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
-  decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush']).optional(),
+  decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush', 'just_shopping']).optional(),
   notes: z.string().optional(),
   status: z.enum(['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'nurturing']),
 });
@@ -575,6 +575,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                           <SelectItem value="60_days">Within 60 days</SelectItem>
                           <SelectItem value="90_days">Within 90 days</SelectItem>
                           <SelectItem value="no_rush">No rush</SelectItem>
+                          <SelectItem value="just_shopping">Just shopping</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
