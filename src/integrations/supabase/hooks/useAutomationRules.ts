@@ -91,13 +91,17 @@ export const useCreateAutomationRule = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: membership } = await supabase
+      const { data: memberships } = await supabase
         .from('account_memberships')
         .select('account_id')
         .eq('user_id', user.id)
-        .single();
+        .limit(1);
 
-      if (!membership) throw new Error('No account membership found');
+      if (!memberships || memberships.length === 0) {
+        throw new Error('No account membership found');
+      }
+
+      const membership = memberships[0];
 
       const { data, error } = await supabase
         .from('automation_rules')
