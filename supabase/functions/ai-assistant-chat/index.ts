@@ -57,9 +57,9 @@ serve(async (req) => {
                 type: "string",
                 description: "Search term for lead name, email, or phone"
               },
-              status: {
+                status: {
                 type: "string",
-                enum: ["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"],
+                enum: ["new", "contacted", "qualified", "quoted", "pending", "won", "lost"],
                 description: "Filter by lead status"
               },
               limit: {
@@ -140,7 +140,7 @@ serve(async (req) => {
               },
               status: {
                 type: "string",
-                enum: ["pending", "in_progress", "completed", "cancelled"],
+                enum: ["upcoming", "in_progress", "completed", "lost"],
                 description: "Filter by renewal status"
               },
               days_until_renewal: {
@@ -225,6 +225,86 @@ serve(async (req) => {
             additionalProperties: false
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_quotes",
+          description: "Search and retrieve quote information. Use this to find quotes, check quote status, or get pricing details.",
+          parameters: {
+            type: "object",
+            properties: {
+              search_query: {
+                type: "string",
+                description: "Search term for customer name or quote details"
+              },
+              status: {
+                type: "string",
+                enum: ["draft", "pending", "sent", "accepted", "rejected", "expired"],
+                description: "Filter by quote status"
+              },
+              line_of_business: {
+                type: "string",
+                description: "Filter by insurance type (e.g., auto, home, life)"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of results to return (default: 10)"
+              }
+            },
+            additionalProperties: false
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_contacts",
+          description: "Search and retrieve contact information. Use this to find specific contacts associated with accounts.",
+          parameters: {
+            type: "object",
+            properties: {
+              search_query: {
+                type: "string",
+                description: "Search term for contact name, email, or phone"
+              },
+              account_id: {
+                type: "string",
+                description: "Filter by specific account ID"
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of results to return (default: 10)"
+              }
+            },
+            additionalProperties: false
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_dashboard_summary",
+          description: "Get aggregated dashboard metrics like task counts, upcoming renewals, policy expirations, and key statistics.",
+          parameters: {
+            type: "object",
+            properties: {
+              include_tasks: {
+                type: "boolean",
+                description: "Include task statistics"
+              },
+              include_renewals: {
+                type: "boolean",
+                description: "Include renewal statistics"
+              },
+              include_policies: {
+                type: "boolean",
+                description: "Include policy statistics"
+              }
+            },
+            additionalProperties: false
+          }
+        }
       }
     ];
 
@@ -236,13 +316,26 @@ serve(async (req) => {
 - Policy renewals
 - Auto-Owners renewals
 - Tasks and assignments
+- Quotes
+- Contacts
+- Dashboard metrics and summaries
 
 When a user asks about any of these topics, use the appropriate tool to fetch real data from the database. Always:
 1. Use the tools to get accurate, current information
 2. Provide specific details from the data you retrieve
-3. Format responses in a clear, professional manner
-4. If you need to search for something, use the appropriate tool
-5. Be helpful and proactive in suggesting relevant information
+3. Format responses in a clear, professional manner with clickable links
+4. Create markdown links to records using these URL patterns:
+   - Leads: [Lead Name](/leads?id={id})
+   - Customers: [Customer Name](/customers/{id})
+   - Policies: [Policy Number](/policies/{id})
+   - Renewals: [Renewal](/renewals/{id})
+   - AO Renewals: [AO Renewal](/ao-renewals/{id}/edit)
+   - Tasks: [Task Title](/tasks)
+   - Quotes: [Quote](/quotes)
+5. When showing lists, provide key information and links for easy navigation
+6. If you need to search for something, use the appropriate tool
+7. Be helpful and proactive in suggesting relevant information
+8. For numerical data, format currency with $ and dates in a readable format
 
 Current user context: ${context ? JSON.stringify(context) : 'General assistant'}`;
 
@@ -291,15 +384,26 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 .select('*')
                 .limit(args.limit || 10);
 
-              if (accountId) query = query.eq('account_id', accountId);
               if (args.status) query = query.eq('status', args.status);
               if (args.search_query) {
                 query = query.or(`first_name.ilike.%${args.search_query}%,last_name.ilike.%${args.search_query}%,email.ilike.%${args.search_query}%,phone.ilike.%${args.search_query}%`);
               }
 
-              const { data, error } = await query;
+              const { data, error } = await query.order('created_at', { ascending: false });
               if (error) throw error;
-              result = data;
+              
+              // Format results with URLs
+              result = data?.map(lead => ({
+                id: lead.id,
+                name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
+                email: lead.email,
+                phone: lead.phone,
+                status: lead.status,
+                source: lead.source,
+                score: lead.score,
+                url: `/leads?id=${lead.id}`,
+                summary: `${lead.first_name || ''} ${lead.last_name || ''} - ${lead.status} - Score: ${lead.score || 0}`
+              })) || [];
               break;
             }
 
@@ -315,28 +419,69 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 query = query.or(`name.ilike.%${args.search_query}%,email.ilike.%${args.search_query}%,phone.ilike.%${args.search_query}%`);
               }
 
-              const { data, error } = await query;
+              const { data, error } = await query.order('created_at', { ascending: false });
               if (error) throw error;
-              result = data;
+              
+              // Format results with URLs
+              result = data?.map(account => ({
+                id: account.id,
+                name: account.name,
+                email: account.email,
+                phone: account.phone,
+                account_type: account.account_type,
+                url: `/customers/${account.id}`,
+                summary: `${account.name} - ${account.account_type || 'N/A'}`
+              })) || [];
               break;
             }
 
             case 'search_policies': {
-              let query = supabase
+              // First get policies
+              let policyQuery = supabase
                 .from('policies')
-                .select('*, accounts(name)')
+                .select('*')
                 .limit(args.limit || 10);
 
-              if (accountId) query = query.eq('account_id', accountId);
-              if (args.policy_number) query = query.eq('policy_number', args.policy_number);
-              if (args.policy_type) query = query.eq('line_of_business', args.policy_type);
+              if (args.policy_number) policyQuery = policyQuery.eq('policy_number', args.policy_number);
+              if (args.policy_type) policyQuery = policyQuery.eq('line_of_business', args.policy_type);
               if (args.search_query) {
-                query = query.or(`policy_number.ilike.%${args.search_query}%,carrier.ilike.%${args.search_query}%`);
+                policyQuery = policyQuery.or(`policy_number.ilike.%${args.search_query}%,carrier.ilike.%${args.search_query}%`);
               }
 
-              const { data, error } = await query;
-              if (error) throw error;
-              result = data;
+              const { data: policies, error: policyError } = await policyQuery.order('created_at', { ascending: false });
+              if (policyError) throw policyError;
+
+              // Get account associations for these policies
+              const policyIds = policies?.map(p => p.id) || [];
+              let accountNames: Record<string, string> = {};
+              
+              if (policyIds.length > 0) {
+                const { data: associations } = await supabase
+                  .from('policies_accounts')
+                  .select('policy_id, accounts(name)')
+                  .in('policy_id', policyIds);
+                
+                associations?.forEach(assoc => {
+                  if (assoc.policy_id && assoc.accounts) {
+                    accountNames[assoc.policy_id] = (assoc.accounts as any).name;
+                  }
+                });
+              }
+
+              // Format results with URLs
+              result = policies?.map(policy => ({
+                id: policy.id,
+                policy_number: policy.policy_number,
+                carrier: policy.carrier,
+                line_of_business: policy.line_of_business,
+                premium: policy.premium,
+                effective_date: policy.effective_date,
+                expiration_date: policy.expiration_date,
+                status: policy.status,
+                account_name: accountNames[policy.id] || 'Unknown',
+                url: `/policies/${policy.id}`,
+                summary: `${policy.policy_number} - ${policy.carrier} - ${policy.line_of_business || 'N/A'} - $${policy.premium || 0}`
+              })) || [];
               break;
             }
 
@@ -346,7 +491,6 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 .select('*')
                 .limit(args.limit || 10);
 
-              if (accountId) query = query.eq('account_id', accountId);
               if (args.status) query = query.eq('status', args.status);
               if (args.search_query) {
                 query = query.or(`policy_number.ilike.%${args.search_query}%`);
@@ -357,9 +501,20 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 query = query.lte('renewal_date', futureDate.toISOString());
               }
 
-              const { data, error } = await query;
+              const { data, error } = await query.order('renewal_date', { ascending: true });
               if (error) throw error;
-              result = data;
+              
+              // Format results with URLs
+              result = data?.map(renewal => ({
+                id: renewal.id,
+                policy_number: renewal.policy_number,
+                carrier: renewal.carrier,
+                renewal_date: renewal.renewal_date,
+                status: renewal.status,
+                current_premium: renewal.current_premium,
+                url: `/renewals/${renewal.id}`,
+                summary: `${renewal.policy_number} - ${renewal.carrier} - Due: ${renewal.renewal_date}`
+              })) || [];
               break;
             }
 
@@ -370,16 +525,28 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 .is('deleted_at', null)
                 .limit(args.limit || 10);
 
-              if (accountId) query = query.eq('account_id', accountId);
               if (args.status) query = query.eq('status', args.status);
               if (args.priority) query = query.eq('priority', args.priority);
               if (args.search_query) {
                 query = query.or(`customer_name.ilike.%${args.search_query}%,policy_number.ilike.%${args.search_query}%`);
               }
 
-              const { data, error } = await query;
+              const { data, error } = await query.order('renewal_date', { ascending: true });
               if (error) throw error;
-              result = data;
+              
+              // Format results with URLs
+              result = data?.map(aoRenewal => ({
+                id: aoRenewal.id,
+                customer_name: aoRenewal.customer_name,
+                policy_number: aoRenewal.policy_number,
+                renewal_date: aoRenewal.renewal_date,
+                status: aoRenewal.status,
+                priority: aoRenewal.priority,
+                current_premium: aoRenewal.current_premium,
+                quote_count: aoRenewal.ao_renewal_quotes?.length || 0,
+                url: `/ao-renewals/${aoRenewal.id}/edit`,
+                summary: `${aoRenewal.customer_name} - ${aoRenewal.policy_number} - ${aoRenewal.status} - Priority: ${aoRenewal.priority}`
+              })) || [];
               break;
             }
 
@@ -389,7 +556,6 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 .select('*, profiles(full_name)')
                 .limit(args.limit || 10);
 
-              if (accountId) query = query.eq('account_id', accountId);
               if (args.status) query = query.eq('status', args.status);
               if (args.priority) query = query.eq('priority', args.priority);
               if (args.assigned_to) query = query.eq('assignee_id', args.assigned_to);
@@ -402,9 +568,156 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                 query = query.or(`title.ilike.%${args.search_query}%,description.ilike.%${args.search_query}%`);
               }
 
+              const { data, error } = await query.order('due_at', { ascending: true });
+              if (error) throw error;
+              
+              // Format results with URLs
+              result = data?.map(task => ({
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                priority: task.priority,
+                due_at: task.due_at,
+                assignee: task.profiles?.full_name || 'Unassigned',
+                url: `/tasks`,
+                summary: `${task.title} - ${task.status} - Priority: ${task.priority} - Due: ${task.due_at || 'No due date'}`
+              })) || [];
+              break;
+            }
+
+            case 'search_quotes': {
+              let query = supabase
+                .from('quotes')
+                .select('*, accounts(name), carriers(name)')
+                .limit(args.limit || 10);
+
+              if (args.status) query = query.eq('status', args.status);
+              if (args.line_of_business) query = query.eq('line_of_business', args.line_of_business);
+              if (args.search_query) {
+                query = query.or(`quote_number.ilike.%${args.search_query}%`);
+              }
+
               const { data, error } = await query.order('created_at', { ascending: false });
               if (error) throw error;
-              result = data;
+              
+              // Format results with URLs
+              result = data?.map(quote => ({
+                id: quote.id,
+                quote_number: quote.quote_number,
+                account_name: (quote.accounts as any)?.name || 'Unknown',
+                carrier: (quote.carriers as any)?.name || quote.carrier_id,
+                line_of_business: quote.line_of_business,
+                premium: quote.premium,
+                status: quote.status,
+                url: `/quotes`,
+                summary: `${quote.quote_number || 'Quote'} - ${(quote.accounts as any)?.name} - $${quote.premium || 0}`
+              })) || [];
+              break;
+            }
+
+            case 'search_contacts': {
+              let query = supabase
+                .from('contacts')
+                .select('*, accounts(name)')
+                .limit(args.limit || 10);
+
+              if (args.account_id) query = query.eq('account_id', args.account_id);
+              if (args.search_query) {
+                query = query.or(`first_name.ilike.%${args.search_query}%,last_name.ilike.%${args.search_query}%,email.ilike.%${args.search_query}%,phone.ilike.%${args.search_query}%`);
+              }
+
+              const { data, error } = await query.order('created_at', { ascending: false });
+              if (error) throw error;
+              
+              // Format results with URLs
+              result = data?.map(contact => ({
+                id: contact.id,
+                name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+                email: contact.email,
+                phone: contact.phone,
+                account_name: (contact.accounts as any)?.name || 'Unknown',
+                account_id: contact.account_id,
+                url: `/customers/${contact.account_id}`,
+                summary: `${contact.first_name} ${contact.last_name} - ${(contact.accounts as any)?.name}`
+              })) || [];
+              break;
+            }
+
+            case 'get_dashboard_summary': {
+              const summaryData: any = {};
+
+              if (args.include_tasks !== false) {
+                const { data: taskStats } = await supabase
+                  .from('tasks')
+                  .select('status, priority')
+                  .in('status', ['pending', 'in_progress']);
+                
+                const overdueTasks = await supabase
+                  .from('tasks')
+                  .select('id')
+                  .lt('due_at', new Date().toISOString())
+                  .eq('status', 'pending');
+
+                summaryData.tasks = {
+                  total_active: taskStats?.length || 0,
+                  overdue: overdueTasks.data?.length || 0,
+                  by_priority: {
+                    high: taskStats?.filter(t => t.priority === 'high').length || 0,
+                    medium: taskStats?.filter(t => t.priority === 'medium').length || 0,
+                    low: taskStats?.filter(t => t.priority === 'low').length || 0
+                  }
+                };
+              }
+
+              if (args.include_renewals !== false) {
+                const thirtyDaysFromNow = new Date();
+                thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+                const { data: upcomingRenewals } = await supabase
+                  .from('renewals')
+                  .select('id, renewal_date, current_premium')
+                  .lte('renewal_date', thirtyDaysFromNow.toISOString())
+                  .gte('renewal_date', new Date().toISOString())
+                  .in('status', ['upcoming', 'in_progress']);
+
+                const { data: aoUpcomingRenewals } = await supabase
+                  .from('ao_renewals')
+                  .select('id, renewal_date, current_premium')
+                  .lte('renewal_date', thirtyDaysFromNow.toISOString())
+                  .gte('renewal_date', new Date().toISOString())
+                  .is('deleted_at', null);
+
+                summaryData.renewals = {
+                  upcoming_30_days: (upcomingRenewals?.length || 0) + (aoUpcomingRenewals?.length || 0),
+                  total_premium_at_risk: (upcomingRenewals?.reduce((sum, r) => sum + (r.current_premium || 0), 0) || 0) +
+                                        (aoUpcomingRenewals?.reduce((sum, r) => sum + (r.current_premium || 0), 0) || 0)
+                };
+              }
+
+              if (args.include_policies !== false) {
+                const ninetyDaysFromNow = new Date();
+                ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
+                const { data: expiringPolicies } = await supabase
+                  .from('policies')
+                  .select('id, expiration_date, premium')
+                  .lte('expiration_date', ninetyDaysFromNow.toISOString())
+                  .gte('expiration_date', new Date().toISOString());
+
+                const { data: allPolicies } = await supabase
+                  .from('policies')
+                  .select('premium')
+                  .eq('status', 'active');
+
+                summaryData.policies = {
+                  expiring_90_days: expiringPolicies?.length || 0,
+                  total_active: allPolicies?.length || 0,
+                  total_premium: allPolicies?.reduce((sum, p) => sum + (p.premium || 0), 0) || 0
+                };
+              }
+
+              result = summaryData;
               break;
             }
 
