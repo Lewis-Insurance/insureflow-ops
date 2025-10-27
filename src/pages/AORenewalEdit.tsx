@@ -84,8 +84,6 @@ export default function AORenewalEdit() {
         title: 'Success',
         description: 'Renewal updated successfully',
       });
-      
-      navigate('/ao-renewals');
     } catch (error) {
       toast({
         title: 'Error',
