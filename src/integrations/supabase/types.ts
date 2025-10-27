@@ -6901,6 +6901,7 @@ export type Database = {
         Args: { batch_id: string; field_mapping?: Json; import_type?: string }
         Returns: Json
       }
+      rescore_leads: { Args: { lead_ids?: string[] }; Returns: Json }
       scan_for_duplicates: {
         Args: { entity_type?: string; similarity_threshold?: number }
         Returns: Json
