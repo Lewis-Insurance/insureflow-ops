@@ -64,18 +64,61 @@ export function useDocumentIntelligence() {
   const [processingStatus, setProcessingStatus] = useState('');
   const [activeBatches, setActiveBatches] = useState<BatchStatus[]>([]);
 
-  // Fetch documents from database
-  const fetchDocuments = useCallback(async () => {
+  // Fetch documents from database with filters
+  const fetchDocuments = useCallback(async (filters?: {
+    searchText?: string;
+    uploadedBy?: string[];
+    accountId?: string[];
+    policyId?: string[];
+    category?: string[];
+    dateFrom?: Date;
+    dateTo?: Date;
+  }) => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get all documents accessible to the user
-      const { data, error } = await supabase
+      // Build query
+      let query = supabase
         .from('documents')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
+
+      // Apply filters
+      if (filters?.uploadedBy && filters.uploadedBy.length > 0) {
+        query = query.in('uploaded_by', filters.uploadedBy);
+      }
+      
+      if (filters?.accountId && filters.accountId.length > 0) {
+        query = query.in('account_id', filters.accountId);
+      }
+      
+      if (filters?.policyId && filters.policyId.length > 0) {
+        query = query.in('policy_id', filters.policyId);
+      }
+      
+      if (filters?.category && filters.category.length > 0) {
+        query = query.in('category', filters.category as any);
+      }
+      
+      if (filters?.dateFrom) {
+        query = query.gte('created_at', filters.dateFrom.toISOString());
+      }
+      
+      if (filters?.dateTo) {
+        const endOfDay = new Date(filters.dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', endOfDay.toISOString());
+      }
+
+      // Text search
+      if (filters?.searchText && filters.searchText.trim()) {
+        query = query.or(`name.ilike.%${filters.searchText}%,filename.ilike.%${filters.searchText}%`);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -452,7 +495,7 @@ export function useDocumentIntelligence() {
   }, [toast, fetchDocuments]);
 
   useEffect(() => {
-    fetchDocuments();
+    fetchDocuments(undefined); // Load all documents initially
   }, [fetchDocuments]);
 
   return {

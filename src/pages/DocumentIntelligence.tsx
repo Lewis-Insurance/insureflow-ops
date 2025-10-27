@@ -3,15 +3,18 @@ import {
   FileText, Upload, Search, Brain, Database, 
   TrendingUp, FileSearch, Sparkles, ChevronRight,
   AlertCircle, Loader2, Filter, Download, Eye, 
-  Trash2, Shield, RefreshCw, ScanLine
+  Trash2, Shield, RefreshCw, ScanLine, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useDocumentIntelligence } from '@/hooks/useDocumentIntelligence';
 import { useToast } from '@/hooks/use-toast';
+import { AdvancedFilters, DocumentFilters } from '@/components/document-intelligence/AdvancedFilters';
+import { SavedViews } from '@/components/document-intelligence/SavedViews';
 
 export default function DocumentIntelligence() {
   const { toast } = useToast();
@@ -32,21 +35,54 @@ export default function DocumentIntelligence() {
     viewDocument,
     downloadDocument,
     deleteDocument,
+    refetch,
   } = useDocumentIntelligence();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('documents');
-  const [filters, setFilters] = useState({
-    type: 'all',
-    dateRange: 'all',
-    status: 'all'
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<DocumentFilters>({
+    searchText: ''
   });
 
-  const filteredDocuments = documents.filter(doc => {
-    if (filters.type !== 'all' && doc.category !== filters.type) return false;
-    if (filters.status !== 'all' && doc.status !== filters.status) return false;
-    return true;
-  });
+  // Apply filters whenever they change
+  useEffect(() => {
+    refetch(filters);
+  }, [filters, refetch]);
+
+  const handleFiltersChange = (newFilters: DocumentFilters) => {
+    setFilters(newFilters);
+  };
+
+  const handleLoadView = (viewFilters: DocumentFilters) => {
+    setFilters(viewFilters);
+    toast({
+      title: "View Loaded",
+      description: "Filters applied successfully",
+    });
+  };
+
+  const handleSaveView = (name: string) => {
+    // This will be handled by SavedViews component
+    toast({
+      title: "View Saved",
+      description: `"${name}" has been saved`,
+    });
+  };
+
+  const handleSearchResultClick = async (result: any) => {
+    // Find the document by ID from the search result
+    const doc = documents.find(d => d.id === result.id || d.name === result.document);
+    if (doc) {
+      await viewDocument(doc);
+    } else {
+      toast({
+        title: "Document not found",
+        description: "Unable to open this document",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -135,8 +171,12 @@ export default function DocumentIntelligence() {
         {/* Search Results */}
         {searchResults.length > 0 && (
           <div className="mt-4 space-y-2">
-              {searchResults.map(result => (
-                <Card key={result.id} className="bg-accent/50">
+            {searchResults.map(result => (
+                <Card 
+                  key={result.id} 
+                  className="bg-accent/50 cursor-pointer hover:bg-accent/70 transition-colors"
+                  onClick={() => handleSearchResultClick(result)}
+                >
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -174,6 +214,29 @@ export default function DocumentIntelligence() {
         </div>
 
         {/* Main Content */}
+
+        {/* Saved Views */}
+        <SavedViews onLoadView={handleLoadView} />
+
+        {/* Advanced Filters */}
+        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+          <div className="flex items-center justify-between mb-4">
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="w-4 h-4 mr-2" />
+                Advanced Filters
+                <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
+            <AdvancedFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onSaveView={handleSaveView}
+            />
+          </CollapsibleContent>
+        </Collapsible>
         {uploading && (
           <Card className="mb-4 border-primary/50 bg-primary/5">
             <CardContent className="p-4">
@@ -213,35 +276,10 @@ export default function DocumentIntelligence() {
 
         {activeTab === 'documents' && (
           <>
-            {/* Filters */}
-            <div className="flex items-center space-x-4 mb-4">
-              <select
-                value={filters.type}
-                onChange={(e) => setFilters({...filters, type: e.target.value})}
-                className="px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              >
-                <option value="all">All Types</option>
-                <option value="policy">Policies</option>
-                <option value="claim">Claims</option>
-                <option value="contract">Contracts</option>
-                <option value="other">Other</option>
-              </select>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters({...filters, status: e.target.value})}
-                className="px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              >
-                <option value="all">All Status</option>
-                <option value="processed">Processed</option>
-                <option value="processing">Processing</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-
             {/* Document Grid */}
-            {filteredDocuments.length > 0 ? (
+            {documents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredDocuments.map(doc => (
+                {documents.map(doc => (
                   <Card key={doc.id} className="hover:shadow-lg transition-all duration-200 cursor-pointer">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-3">
