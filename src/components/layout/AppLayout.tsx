@@ -77,6 +77,28 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 />
               </SidebarMenu>
 
+              {/* Lewis AI Group */}
+              <NavGroup label="Lewis AI" defaultOpen={false}>
+                <NavItem
+                  icon={Scale}
+                  label="Quote Comparison"
+                  to="/comparison"
+                  badge="AI"
+                />
+                <NavItem
+                  icon={FileQuestion}
+                  label="Document Intelligence"
+                  to="/document-intelligence"
+                  badge="AI"
+                />
+                <NavItem 
+                  icon={Brain} 
+                  label="Renewal Intelligence" 
+                  to="/renewals/intelligence" 
+                  badge="AI"
+                />
+              </NavGroup>
+
               {/* CRM Group */}
               <NavGroup label="CRM" defaultOpen={true}>
                 <NavItem 
@@ -93,12 +115,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={Calendar} 
                   label="Renewals" 
                   to="/renewals" 
-                />
-                <NavItem 
-                  icon={Brain} 
-                  label="Renewal Intelligence" 
-                  to="/renewals/intelligence" 
-                  badge="AI"
                 />
                 <NavItem 
                   icon={Phone} 
@@ -163,22 +179,10 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Knowledge Manager"
                   to="/knowledge-manager"
                 />
-                <NavItem
-                  icon={Scale}
-                  label="Quote Comparison"
-                  to="/comparison"
-                  badge="AI"
-                />
-                <NavItem
-                  icon={FileQuestion}
-                  label="Document Intelligence"
-                  to="/document-intelligence"
-                  badge="AI"
-                />
                 <NavItem 
                   icon={BarChart3} 
                   label="Reports" 
-                  to="/reports" 
+                  to="/reports"
                 />
                 <NavItem 
                   icon={Sliders} 
