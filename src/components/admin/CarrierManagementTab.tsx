@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Plus, Building2, Users, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Pencil, Plus, Building2, Users, Trash2, UserCheck, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Carrier {
@@ -18,9 +19,10 @@ interface Carrier {
   name: string;
   naic?: string;
   agency_code?: string;
-  contact_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
+  underwriting_contact_name?: string;
+  underwriting_contact_phone?: string;
+  marketing_contact_name?: string;
+  marketing_contact_phone?: string;
   main_phone?: string;
   address_line1?: string;
   city?: string;
@@ -35,9 +37,10 @@ interface CarrierFormData {
   name: string;
   naic: string;
   agency_code: string;
-  contact_name: string;
-  contact_email: string;
-  contact_phone: string;
+  underwriting_contact_name: string;
+  underwriting_contact_phone: string;
+  marketing_contact_name: string;
+  marketing_contact_phone: string;
   main_phone: string;
   address_line1: string;
   city: string;
@@ -50,9 +53,10 @@ const initialFormData: CarrierFormData = {
   name: '',
   naic: '',
   agency_code: '',
-  contact_name: '',
-  contact_email: '',
-  contact_phone: '',
+  underwriting_contact_name: '',
+  underwriting_contact_phone: '',
+  marketing_contact_name: '',
+  marketing_contact_phone: '',
   main_phone: '',
   address_line1: '',
   city: '',
@@ -142,9 +146,10 @@ export function CarrierManagementTab() {
       name: carrier.name || '',
       naic: carrier.naic || '',
       agency_code: carrier.agency_code || '',
-      contact_name: carrier.contact_name || '',
-      contact_email: carrier.contact_email || '',
-      contact_phone: carrier.contact_phone || '',
+      underwriting_contact_name: carrier.underwriting_contact_name || '',
+      underwriting_contact_phone: carrier.underwriting_contact_phone || '',
+      marketing_contact_name: carrier.marketing_contact_name || '',
+      marketing_contact_phone: carrier.marketing_contact_phone || '',
       main_phone: carrier.main_phone || '',
       address_line1: carrier.address_line1 || '',
       city: carrier.city || '',
@@ -231,8 +236,12 @@ export function CarrierManagementTab() {
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div>{carrier.contact_name || 'N/A'}</div>
-                      <div className="text-muted-foreground">{carrier.contact_email || 'N/A'}</div>
+                      <div className="font-medium">Underwriting:</div>
+                      <div>{carrier.underwriting_contact_name || 'N/A'}</div>
+                      <div className="text-muted-foreground">{carrier.underwriting_contact_phone || 'N/A'}</div>
+                      <div className="font-medium mt-2">Marketing:</div>
+                      <div>{carrier.marketing_contact_name || 'N/A'}</div>
+                      <div className="text-muted-foreground">{carrier.marketing_contact_phone || 'N/A'}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -313,35 +322,66 @@ export function CarrierManagementTab() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="contact_name">Contact Name</Label>
-                <Input
-                  id="contact_name"
-                  value={formData.contact_name}
-                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="contact_email">Contact Email</Label>
-                <Input
-                  id="contact_email"
-                  type="email"
-                  value={formData.contact_email}
-                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                />
-              </div>
-            </div>
+            <Tabs defaultValue="underwriting" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="underwriting" className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4" />
+                  Underwriting Contact
+                </TabsTrigger>
+                <TabsTrigger value="marketing" className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  Marketing Rep Contact
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="underwriting" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="underwriting_contact_name">Contact Name</Label>
+                    <Input
+                      id="underwriting_contact_name"
+                      value={formData.underwriting_contact_name}
+                      onChange={(e) => setFormData({ ...formData, underwriting_contact_name: e.target.value })}
+                      placeholder="Underwriting contact name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="underwriting_contact_phone">Contact Phone</Label>
+                    <Input
+                      id="underwriting_contact_phone"
+                      value={formData.underwriting_contact_phone}
+                      onChange={(e) => setFormData({ ...formData, underwriting_contact_phone: e.target.value })}
+                      placeholder="(555) 555-5555"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="marketing" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="marketing_contact_name">Contact Name</Label>
+                    <Input
+                      id="marketing_contact_name"
+                      value={formData.marketing_contact_name}
+                      onChange={(e) => setFormData({ ...formData, marketing_contact_name: e.target.value })}
+                      placeholder="Marketing rep name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="marketing_contact_phone">Contact Phone</Label>
+                    <Input
+                      id="marketing_contact_phone"
+                      value={formData.marketing_contact_phone}
+                      onChange={(e) => setFormData({ ...formData, marketing_contact_phone: e.target.value })}
+                      placeholder="(555) 555-5555"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="contact_phone">Contact Phone</Label>
-                <Input
-                  id="contact_phone"
-                  value={formData.contact_phone}
-                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                />
-              </div>
               <div>
                 <Label htmlFor="main_phone">Main Phone</Label>
                 <Input

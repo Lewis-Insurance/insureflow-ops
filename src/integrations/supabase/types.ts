@@ -1251,10 +1251,14 @@ export type Database = {
           default_commission_rate: number | null
           id: string
           main_phone: string | null
+          marketing_contact_name: string | null
+          marketing_contact_phone: string | null
           naic: string | null
           name: string
           portals: Json | null
           state: string | null
+          underwriting_contact_name: string | null
+          underwriting_contact_phone: string | null
           updated_at: string
           zip_code: string | null
         }
@@ -1275,10 +1279,14 @@ export type Database = {
           default_commission_rate?: number | null
           id?: string
           main_phone?: string | null
+          marketing_contact_name?: string | null
+          marketing_contact_phone?: string | null
           naic?: string | null
           name: string
           portals?: Json | null
           state?: string | null
+          underwriting_contact_name?: string | null
+          underwriting_contact_phone?: string | null
           updated_at?: string
           zip_code?: string | null
         }
@@ -1299,10 +1307,14 @@ export type Database = {
           default_commission_rate?: number | null
           id?: string
           main_phone?: string | null
+          marketing_contact_name?: string | null
+          marketing_contact_phone?: string | null
           naic?: string | null
           name?: string
           portals?: Json | null
           state?: string | null
+          underwriting_contact_name?: string | null
+          underwriting_contact_phone?: string | null
           updated_at?: string
           zip_code?: string | null
         }
