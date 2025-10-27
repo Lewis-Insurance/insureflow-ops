@@ -337,6 +337,57 @@ export type Database = {
           },
         ]
       }
+      ao_renewals: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          current_carrier: string | null
+          current_premium: number | null
+          custom_data: Json | null
+          customer_name: string
+          id: string
+          notes: string | null
+          policy_number: string
+          policy_type: string
+          priority: string | null
+          renewal_date: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          current_carrier?: string | null
+          current_premium?: number | null
+          custom_data?: Json | null
+          customer_name: string
+          id?: string
+          notes?: string | null
+          policy_number: string
+          policy_type: string
+          priority?: string | null
+          renewal_date: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          current_carrier?: string | null
+          current_premium?: number | null
+          custom_data?: Json | null
+          customer_name?: string
+          id?: string
+          notes?: string | null
+          policy_number?: string
+          policy_type?: string
+          priority?: string | null
+          renewal_date?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assignment_rules: {
         Row: {
           account_id: string
@@ -925,6 +976,13 @@ export type Database = {
             foreignKeyName: "campaign_enrollments_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
           },
@@ -995,6 +1053,13 @@ export type Database = {
             columns: ["enrollment_id"]
             isOneToOne: false
             referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_step_executions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
             referencedColumns: ["id"]
           },
           {
@@ -3358,6 +3423,13 @@ export type Database = {
             foreignKeyName: "lead_activities_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
           },
@@ -3400,6 +3472,13 @@ export type Database = {
             columns: ["assignment_rule_id"]
             isOneToOne: false
             referencedRelation: "assignment_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_assignments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
             referencedColumns: ["id"]
           },
           {
@@ -3513,7 +3592,84 @@ export type Database = {
             foreignKeyName: "lead_score_history_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_score_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_source_costs: {
+        Row: {
+          account_id: string
+          conversion_count: number
+          cost_per_acquisition: number | null
+          cost_per_lead: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          lead_count: number
+          lead_source_id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          total_cost: number
+        }
+        Insert: {
+          account_id: string
+          conversion_count?: number
+          cost_per_acquisition?: number | null
+          cost_per_lead?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          lead_count?: number
+          lead_source_id: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          total_cost: number
+        }
+        Update: {
+          account_id?: string
+          conversion_count?: number
+          cost_per_acquisition?: number | null
+          cost_per_lead?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          lead_count?: number
+          lead_source_id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          total_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_source_costs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_source_costs_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_source_performance"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "lead_source_costs_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -3521,12 +3677,15 @@ export type Database = {
       lead_sources: {
         Row: {
           account_id: string
+          cost_currency: string | null
           cost_per_lead: number | null
+          cost_tracking_enabled: boolean | null
           created_at: string | null
           created_by: string | null
           description: string | null
           id: string
           is_active: boolean | null
+          monthly_cost: number | null
           name: string
           total_conversions: number | null
           total_leads: number | null
@@ -3536,12 +3695,15 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          cost_currency?: string | null
           cost_per_lead?: number | null
+          cost_tracking_enabled?: boolean | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          monthly_cost?: number | null
           name: string
           total_conversions?: number | null
           total_leads?: number | null
@@ -3551,12 +3713,15 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          cost_currency?: string | null
           cost_per_lead?: number | null
+          cost_tracking_enabled?: boolean | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          monthly_cost?: number | null
           name?: string
           total_conversions?: number | null
           total_leads?: number | null
@@ -3582,6 +3747,7 @@ export type Database = {
           assigned_at: string | null
           assigned_to: string | null
           city: string | null
+          conversion_value: number | null
           converted_account_id: string | null
           converted_at: string | null
           created_at: string | null
@@ -3621,6 +3787,7 @@ export type Database = {
           time_in_current_stage_hours: number | null
           total_pipeline_time_hours: number | null
           updated_at: string | null
+          won_at: string | null
           zip_code: string | null
         }
         Insert: {
@@ -3630,6 +3797,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
+          conversion_value?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
           created_at?: string | null
@@ -3669,6 +3837,7 @@ export type Database = {
           time_in_current_stage_hours?: number | null
           total_pipeline_time_hours?: number | null
           updated_at?: string | null
+          won_at?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -3678,6 +3847,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
+          conversion_value?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
           created_at?: string | null
@@ -3717,6 +3887,7 @@ export type Database = {
           time_in_current_stage_hours?: number | null
           total_pipeline_time_hours?: number | null
           updated_at?: string | null
+          won_at?: string | null
           zip_code?: string | null
         }
         Relationships: [
@@ -4592,6 +4763,13 @@ export type Database = {
             columns: ["from_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stage_transitions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
             referencedColumns: ["id"]
           },
           {
@@ -6187,6 +6365,13 @@ export type Database = {
             foreignKeyName: "tasks_related_lead_id_fkey"
             columns: ["related_lead_id"]
             isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_related_lead_id_fkey"
+            columns: ["related_lead_id"]
+            isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
           },
@@ -6654,6 +6839,49 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_conversion_analytics: {
+        Row: {
+          account_id: string | null
+          conversion_day_of_week: number | null
+          conversion_hour: number | null
+          conversion_month: string | null
+          conversion_value: number | null
+          conversion_week: string | null
+          converted_at: string | null
+          created_at: string | null
+          days_to_conversion: number | null
+          days_to_win: number | null
+          id: string | null
+          lead_score: number | null
+          source_id: string | null
+          source_name: string | null
+          status: string | null
+          won_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_source_performance"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "leads_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
             referencedColumns: ["id"]
           },
         ]
