@@ -35,14 +35,14 @@ const DashboardContent = React.memo(() => {
         </div>
       </div>
 
-      {/* AI Knowledge Search */}
-      <ErrorBoundary level="component">
-        <AIKnowledgeSearch />
-      </ErrorBoundary>
-
       {/* Upcoming Tasks */}
       <ErrorBoundary level="component">
         <UpcomingTasksCard />
+      </ErrorBoundary>
+      
+      {/* AI Knowledge Search */}
+      <ErrorBoundary level="component">
+        <AIKnowledgeSearch />
       </ErrorBoundary>
       
       {/* Tab Navigation */}
