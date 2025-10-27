@@ -1,11 +1,9 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AutoInsuranceForm } from "./AutoInsuranceForm";
-import { HomeInsuranceForm } from "./HomeInsuranceForm";
-import { CommercialInsuranceForm } from "./CommercialInsuranceForm";
-import { LifeInsuranceForm } from "./LifeInsuranceForm";
-import { UmbrellaInsuranceForm } from "./UmbrellaInsuranceForm";
-import { RentersInsuranceForm } from "./RentersInsuranceForm";
-import { Car, Home, Building2, Heart, Umbrella, Key } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Car, Home, Building2, Heart, Umbrella, Key, Plus } from "lucide-react";
+import { InsuranceDetailsModal } from "../InsuranceDetailsModal";
+import { type InsuranceType } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
 
 interface InsuranceDetailsPanelProps {
   leadId: string;
@@ -13,90 +11,60 @@ interface InsuranceDetailsPanelProps {
 }
 
 export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: InsuranceDetailsPanelProps) => {
-  const hasAuto = insuranceTypes.includes('auto');
-  const hasHome = insuranceTypes.includes('home');
-  const hasCommercial = insuranceTypes.includes('commercial');
-  const hasLife = insuranceTypes.includes('life');
-  const hasUmbrella = insuranceTypes.includes('umbrella');
-  const hasRenters = insuranceTypes.includes('renters');
+  const [selectedType, setSelectedType] = useState<InsuranceType | null>(null);
 
-  // Default to showing auto if no types specified
-  const defaultTab = hasAuto ? 'auto' : hasHome ? 'home' : hasCommercial ? 'commercial' : hasLife ? 'life' : hasUmbrella ? 'umbrella' : hasRenters ? 'renters' : 'auto';
+  const insuranceOptions = [
+    { type: 'auto' as InsuranceType, label: 'Auto', icon: Car, enabled: insuranceTypes.includes('auto') },
+    { type: 'home' as InsuranceType, label: 'Home', icon: Home, enabled: insuranceTypes.includes('home') },
+    { type: 'commercial' as InsuranceType, label: 'Commercial', icon: Building2, enabled: insuranceTypes.includes('commercial') },
+    { type: 'life' as InsuranceType, label: 'Life', icon: Heart, enabled: insuranceTypes.includes('life') },
+    { type: 'umbrella' as InsuranceType, label: 'Umbrella', icon: Umbrella, enabled: insuranceTypes.includes('umbrella') },
+    { type: 'renters' as InsuranceType, label: 'Renters', icon: Key, enabled: insuranceTypes.includes('renters') },
+  ];
+
+  const enabledOptions = insuranceOptions.filter(opt => opt.enabled);
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Insurance Details</h3>
-      <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          {hasAuto && (
-            <TabsTrigger value="auto" className="flex items-center gap-2">
-              <Car className="h-4 w-4" />
-              Auto
-            </TabsTrigger>
-          )}
-          {hasHome && (
-            <TabsTrigger value="home" className="flex items-center gap-2">
-              <Home className="h-4 w-4" />
-              Home
-            </TabsTrigger>
-          )}
-          {hasCommercial && (
-            <TabsTrigger value="commercial" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Commercial
-            </TabsTrigger>
-          )}
-          {hasLife && (
-            <TabsTrigger value="life" className="flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              Life
-            </TabsTrigger>
-          )}
-          {hasUmbrella && (
-            <TabsTrigger value="umbrella" className="flex items-center gap-2">
-              <Umbrella className="h-4 w-4" />
-              Umbrella
-            </TabsTrigger>
-          )}
-          {hasRenters && (
-            <TabsTrigger value="renters" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              Renters
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Insurance Details</h3>
+      </div>
 
-        {hasAuto && (
-          <TabsContent value="auto">
-            <AutoInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-        {hasHome && (
-          <TabsContent value="home">
-            <HomeInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-        {hasCommercial && (
-          <TabsContent value="commercial">
-            <CommercialInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-        {hasLife && (
-          <TabsContent value="life">
-            <LifeInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-        {hasUmbrella && (
-          <TabsContent value="umbrella">
-            <UmbrellaInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-        {hasRenters && (
-          <TabsContent value="renters">
-            <RentersInsuranceForm leadId={leadId} />
-          </TabsContent>
-        )}
-      </Tabs>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {enabledOptions.map(({ type, label, icon: Icon }) => (
+          <Card
+            key={type}
+            className="p-4 cursor-pointer hover:bg-accent transition-colors"
+            onClick={() => setSelectedType(type)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">Click to add/edit</p>
+              </div>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {enabledOptions.length === 0 && (
+        <Card className="p-6 text-center">
+          <p className="text-muted-foreground">No insurance types selected for this lead</p>
+        </Card>
+      )}
+
+      {selectedType && (
+        <InsuranceDetailsModal
+          leadId={leadId}
+          insuranceType={selectedType}
+          isOpen={!!selectedType}
+          onClose={() => setSelectedType(null)}
+        />
+      )}
     </div>
   );
 };
