@@ -210,10 +210,15 @@ export function useMoveLeadToStage() {
 
   return useMutation({
     mutationFn: async ({ leadId, newStatus }: { leadId: string; newStatus: string }) => {
-      const { data, error } = await supabase.rpc('move_lead_to_stage', {
-        p_lead_id: leadId,
-        p_new_status: newStatus
-      });
+      const { data, error } = await supabase
+        .from('leads')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
