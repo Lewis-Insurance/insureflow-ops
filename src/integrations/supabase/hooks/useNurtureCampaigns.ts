@@ -782,6 +782,253 @@ export const useIncrementTemplateUsage = () => {
 };
 
 // ============================================================================
+// CAMPAIGN UTILITY HOOKS
+// ============================================================================
+
+/**
+ * Duplicate an existing campaign
+ */
+export const useDuplicateCampaign = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (campaignId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Fetch original campaign
+      const { data: original, error: fetchError } = await supabase
+        .from('nurture_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Create duplicate with "(Copy)" suffix
+      const { data, error } = await supabase
+        .from('nurture_campaigns')
+        .insert({
+          account_id: (original as any).account_id,
+          name: `${(original as any).name} (Copy)`,
+          description: (original as any).description,
+          trigger_conditions: (original as any).trigger_conditions,
+          steps: (original as any).steps,
+          status: 'draft', // Start as draft
+          created_by: user.id,
+        } as any)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nurture-campaigns'] });
+      toast({
+        title: 'Success',
+        description: 'Campaign duplicated successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+/**
+ * Get analytics summary for all campaigns
+ */
+export const useCampaignsAnalyticsSummary = () => {
+  return useQuery({
+    queryKey: ['campaigns-analytics-summary'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) throw new Error('No account membership found');
+
+      // Break type chain to avoid deep instantiation
+      const queryBuilder: any = supabase.from('nurture_campaigns');
+      const { data, error } = await queryBuilder
+        .select('*')
+        .eq('account_id', membership.account_id);
+
+      if (error) throw error;
+
+      const campaigns = data || [];
+
+      // Calculate summary metrics
+      const totalEnrollments = campaigns.reduce((sum: number, c: any) => sum + (c.enrollment_count || 0), 0);
+      const totalCompletions = campaigns.reduce((sum: number, c: any) => sum + (c.completion_count || 0), 0);
+      const totalConversions = campaigns.reduce((sum: number, c: any) => sum + (c.conversion_count || 0), 0);
+
+      return {
+        total_campaigns: campaigns.length,
+        active_campaigns: campaigns.filter((c: any) => c.status === 'active').length,
+        draft_campaigns: campaigns.filter((c: any) => c.status === 'draft').length,
+        paused_campaigns: campaigns.filter((c: any) => c.status === 'paused').length,
+        total_enrollments: totalEnrollments,
+        total_completions: totalCompletions,
+        total_conversions: totalConversions,
+        completion_rate: totalEnrollments > 0 ? (totalCompletions / totalEnrollments * 100) : 0,
+        conversion_rate: totalEnrollments > 0 ? (totalConversions / totalEnrollments * 100) : 0,
+        avg_enrollments_per_campaign: campaigns.length > 0 ? totalEnrollments / campaigns.length : 0,
+      };
+    },
+  });
+};
+
+/**
+ * Test if a lead matches campaign trigger conditions
+ */
+export const useTestCampaignConditions = () => {
+  return useMutation({
+    mutationFn: async ({ campaignId, leadId }: { campaignId: string; leadId: string }) => {
+      // Fetch campaign conditions
+      const { data: campaign, error: campaignError } = await supabase
+        .from('nurture_campaigns')
+        .select('trigger_conditions')
+        .eq('id', campaignId)
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      // Fetch lead data
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('*, lead_tags(tag:tags(name))')
+        .eq('id', leadId)
+        .single();
+
+      if (leadError) throw leadError;
+
+      const conditions = (campaign as any).trigger_conditions || {};
+      const leadData = lead as any;
+      
+      // Test conditions
+      let matches = true;
+      const reasons: string[] = [];
+
+      // Check lead status
+      if (conditions.lead_status && conditions.lead_status.length > 0) {
+        if (!conditions.lead_status.includes(leadData.status)) {
+          matches = false;
+          reasons.push(`Lead status "${leadData.status}" not in ${conditions.lead_status.join(', ')}`);
+        }
+      }
+
+      // Check lead score range
+      if (conditions.lead_score_min !== undefined || conditions.lead_score_max !== undefined) {
+        const score = leadData.lead_score || 0;
+        const min = conditions.lead_score_min || 0;
+        const max = conditions.lead_score_max || 100;
+        
+        if (score < min || score > max) {
+          matches = false;
+          reasons.push(`Lead score ${score} not in range ${min}-${max}`);
+        }
+      }
+
+      // Check insurance types
+      if (conditions.insurance_types && conditions.insurance_types.length > 0) {
+        const leadTypes = leadData.insurance_types || [];
+        const hasMatch = conditions.insurance_types.some((type: string) => leadTypes.includes(type));
+        
+        if (!hasMatch) {
+          matches = false;
+          reasons.push(`No matching insurance types`);
+        }
+      }
+
+      // Check tags
+      if (conditions.tags && conditions.tags.length > 0) {
+        const leadTags = (leadData.lead_tags || []).map((lt: any) => lt.tag?.name);
+        const hasMatch = conditions.tags.some((tag: string) => leadTags.includes(tag));
+        
+        if (!hasMatch) {
+          matches = false;
+          reasons.push(`No matching tags`);
+        }
+      }
+
+      return {
+        matches,
+        reasons: reasons.length > 0 ? reasons.join('; ') : 'All conditions met',
+        lead_data: {
+          status: leadData.status,
+          score: leadData.lead_score,
+          insurance_types: leadData.insurance_types,
+          tags: (leadData.lead_tags || []).map((lt: any) => lt.tag?.name),
+        },
+      };
+    },
+  });
+};
+
+/**
+ * Get campaign performance analytics
+ */
+export const useCampaignAnalytics = (campaignId: string | undefined) => {
+  return useQuery({
+    queryKey: ['campaign-analytics', campaignId],
+    queryFn: async () => {
+      if (!campaignId) return null;
+
+      // Get campaign data
+      const { data: campaign, error: campaignError } = await supabase
+        .from('nurture_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      // Get enrollments
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('campaign_enrollments')
+        .select('status, enrolled_at, completed_at, converted')
+        .eq('campaign_id', campaignId);
+
+      if (enrollmentsError) throw enrollmentsError;
+
+      const enrollmentsData = enrollments as any[];
+      const campaignData = campaign as any;
+
+      return {
+        campaign_id: campaignId,
+        campaign_name: campaignData.name,
+        status: campaignData.status,
+        enrollment_count: campaignData.enrollment_count || 0,
+        completion_count: campaignData.completion_count || 0,
+        conversion_count: campaignData.conversion_count || 0,
+        active_enrollments: enrollmentsData.filter(e => e.status === 'active').length,
+        completed_enrollments: enrollmentsData.filter(e => e.status === 'completed').length,
+        converted_enrollments: enrollmentsData.filter(e => e.converted).length,
+        completion_rate: enrollmentsData.length > 0 
+          ? (enrollmentsData.filter(e => e.status === 'completed').length / enrollmentsData.length * 100)
+          : 0,
+        conversion_rate: enrollmentsData.length > 0
+          ? (enrollmentsData.filter(e => e.converted).length / enrollmentsData.length * 100)
+          : 0,
+      };
+    },
+    enabled: !!campaignId,
+  });
+};
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
