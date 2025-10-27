@@ -18,6 +18,8 @@ import { QuickLeadCapture } from "@/components/leads/QuickLeadCapture";
 import { LeadDetailView } from "@/components/leads/LeadDetailView";
 import { LeadListView } from "@/components/leads/LeadListView";
 import { LeadScoringAdmin } from "@/components/leads/LeadScoringAdmin";
+import { TeamPipelineView } from "@/components/leads/TeamPipelineView";
+import { TimelineView } from "@/components/leads/TimelineView";
 import { LayoutGrid, BarChart3, Users, Search, Filter, List } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
@@ -108,7 +110,7 @@ export default function Leads() {
         </Card>
 
         <Tabs defaultValue="list" className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
             <TabsTrigger value="list">
               <List className="mr-2 h-4 w-4" />
               List
@@ -116,6 +118,14 @@ export default function Leads() {
             <TabsTrigger value="pipeline">
               <LayoutGrid className="mr-2 h-4 w-4" />
               Pipeline
+            </TabsTrigger>
+            <TabsTrigger value="team">
+              <Users className="mr-2 h-4 w-4" />
+              Team
+            </TabsTrigger>
+            <TabsTrigger value="timeline">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Timeline
             </TabsTrigger>
             <TabsTrigger value="analytics">
               <BarChart3 className="mr-2 h-4 w-4" />
@@ -140,6 +150,14 @@ export default function Leads() {
 
           <TabsContent value="pipeline" className="mt-6">
             <PipelineKanban filters={filters} />
+          </TabsContent>
+
+          <TabsContent value="team" className="mt-6">
+            <TeamPipelineView />
+          </TabsContent>
+
+          <TabsContent value="timeline" className="mt-6">
+            <TimelineView />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">
