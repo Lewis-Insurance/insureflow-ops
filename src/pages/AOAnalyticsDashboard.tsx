@@ -10,6 +10,7 @@ import { AtRiskRenewalsTable } from "@/components/ao-renewals/analytics/AtRiskRe
 import { PremiumAnalytics } from "@/components/ao-renewals/analytics/PremiumAnalytics";
 import { StatusTimelineChart } from "@/components/ao-renewals/analytics/StatusTimelineChart";
 import { TopPerformersTable } from "@/components/ao-renewals/analytics/TopPerformersTable";
+import { ConversionMetrics } from "@/components/ao-renewals/analytics/ConversionMetrics";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -98,6 +99,9 @@ export default function AOAnalyticsDashboard() {
 
         {/* Status Timeline */}
         <StatusTimelineChart data={renewalsData || []} isLoading={renewalsLoading} />
+
+        {/* Conversion Metrics */}
+        <ConversionMetrics data={renewalsData || []} isLoading={renewalsLoading} />
 
         {/* Top Performers Table */}
         <TopPerformersTable data={renewalsData || []} isLoading={renewalsLoading} />
