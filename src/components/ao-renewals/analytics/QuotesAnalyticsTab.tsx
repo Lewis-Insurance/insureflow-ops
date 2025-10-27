@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { TrendingDown, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
@@ -206,21 +206,50 @@ export function QuotesAnalyticsTab() {
         )}
       </div>
 
-      {/* Average Premium Comparison Chart */}
+      {/* Premium Comparison vs Auto-Owners */}
       <Card>
         <CardHeader>
-          <CardTitle>Average Annual Premium by Carrier</CardTitle>
-          <CardDescription>Compare average annual premiums across carriers</CardDescription>
+          <CardTitle>Premium Comparison vs Auto-Owners</CardTitle>
+          <CardDescription>See how carriers stack up against the baseline</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={carrierComparisonData.data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="carrier" angle={-45} textAnchor="end" height={100} />
-              <YAxis />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip 
+                formatter={(value, name) => {
+                  if (name === '% vs Auto-Owners') return `${Number(value).toFixed(1)}%`;
+                  return formatCurrency(Number(value));
+                }}
+              />
               <Legend />
-              <Bar dataKey="avgAnnualPremium" fill="#0088FE" name="Avg Annual Premium" />
+              
+              {/* Baseline reference line */}
+              {carrierComparisonData.baseline && (
+                <ReferenceLine 
+                  yAxisId="left"
+                  y={carrierComparisonData.baseline} 
+                  stroke="#888" 
+                  strokeDasharray="3 3" 
+                  label="Auto-Owners Baseline"
+                />
+              )}
+              
+              <Bar 
+                yAxisId="left"
+                dataKey="avgAnnualPremium" 
+                fill="#0088FE" 
+                name="Avg Annual Premium" 
+              />
+              <Bar 
+                yAxisId="right"
+                dataKey="deltaVsAutoOwners" 
+                fill="#FF8042" 
+                name="% vs Auto-Owners" 
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
