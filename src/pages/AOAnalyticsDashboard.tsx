@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { KPICards } from "@/components/ao-renewals/analytics/KPICards";
 import { PipelineFunnelChart } from "@/components/ao-renewals/analytics/PipelineFunnelChart";
@@ -11,6 +11,7 @@ import { PremiumAnalytics } from "@/components/ao-renewals/analytics/PremiumAnal
 import { StatusTimelineChart } from "@/components/ao-renewals/analytics/StatusTimelineChart";
 import { TopPerformersTable } from "@/components/ao-renewals/analytics/TopPerformersTable";
 import { ConversionMetrics } from "@/components/ao-renewals/analytics/ConversionMetrics";
+import { ExportButton } from "@/components/ao-renewals/analytics/ExportButton";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -45,14 +46,6 @@ export default function AOAnalyticsDashboard() {
     });
   };
 
-  const handleExport = () => {
-    // TODO: Implement CSV export
-    toast({
-      title: "Export",
-      description: "Export functionality coming soon",
-    });
-  };
-
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -75,10 +68,7 @@ export default function AOAnalyticsDashboard() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <ExportButton data={renewalsData || []} filename="ao-renewals-analytics" />
           </div>
         </div>
 
