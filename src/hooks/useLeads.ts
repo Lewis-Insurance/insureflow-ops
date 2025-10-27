@@ -183,16 +183,35 @@ export function useUpdateLead() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: LeadUpdate & { id: string }) => {
-      // First fetch the current lead to check if status is changing to "Lost"
-      const { data: currentLead } = await supabase
+      // Fetch the current lead and all columns so we can adapt to schema differences
+      const { data: currentLead, error: fetchError } = await supabase
         .from('leads')
-        .select('status, first_name, last_name, email, phone, insurance_types, assigned_to, estimated_effective_date')
+        .select('*')
         .eq('id', id)
         .single();
 
+      if (fetchError) throw fetchError;
+
+      // Map status to whichever column exists in DB
+      const statusKey = ['status', 'lead_status', 'pipeline_stage', 'stage'].find((k) => currentLead && k in currentLead) as string | undefined;
+      const dbUpdates: any = { ...updates };
+
+      // Remove deprecated fields
+      delete dbUpdates.decision_timeframe;
+
+      if ('status' in dbUpdates) {
+        if (statusKey && statusKey !== 'status') {
+          dbUpdates[statusKey] = (dbUpdates as any).status;
+          delete (dbUpdates as any).status;
+        } else if (!statusKey) {
+          // If no status-like column exists, don't attempt to update it
+          delete (dbUpdates as any).status;
+        }
+      }
+
       const { data, error } = await supabase
         .from('leads')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
