@@ -94,3 +94,6 @@ verify_jwt = true
 
 [functions.renewal-risk-batch]
 verify_jwt = false
+
+[functions.lead-scoring-engine]
+verify_jwt = true
