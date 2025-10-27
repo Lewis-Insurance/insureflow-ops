@@ -78,6 +78,7 @@ const leadSchema = z.object({
   current_carrier: z.string().optional(),
   current_premium: z.string().optional(),
   decision_timeframe: z.enum(['immediate', '30_days', '60_days', '90_days', 'no_rush', 'just_shopping']).optional(),
+  estimated_effective_date: z.string().optional(),
   notes: z.string().optional(),
   status: z.enum(['new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'nurturing']),
 });
@@ -578,6 +579,20 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                           <SelectItem value="just_shopping">Just shopping</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="estimated_effective_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estimated Effective Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
