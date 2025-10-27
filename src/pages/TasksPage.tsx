@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,11 @@ import { TaskAnalyticsDashboard } from '@/components/tasks/TaskAnalyticsDashboar
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { LayoutGrid, Calendar, User, BarChart3, Plus } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 export default function TasksPage() {
+  const [searchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
   const [activeTab, setActiveTab] = useState('my-tasks');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { createTask } = useTasks();
@@ -57,7 +60,7 @@ export default function TasksPage() {
           </TabsList>
 
           <TabsContent value="my-tasks" className="mt-6">
-            <MyTasksDashboard />
+            <MyTasksDashboard defaultFilter={filterParam} />
           </TabsContent>
 
           <TabsContent value="kanban" className="mt-6">

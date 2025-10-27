@@ -99,7 +99,7 @@ export function UpcomingTasksCard() {
     );
   };
 
-  const renderTaskList = (taskList: Task[], emptyMessage: string) => {
+  const renderTaskList = (taskList: Task[], emptyMessage: string, filterParam: string) => {
     if (loading) {
       return (
         <div className="py-8 text-center text-muted-foreground">
@@ -124,7 +124,7 @@ export function UpcomingTasksCard() {
           <div
             key={task.id}
             className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-            onClick={() => navigate('/tasks')}
+            onClick={() => navigate(`/tasks?filter=${filterParam}`)}
           >
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
@@ -217,13 +217,13 @@ export function UpcomingTasksCard() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="today" className="mt-4">
-            {renderTaskList(tasks.today, 'No tasks due today! 🎉')}
+            {renderTaskList(tasks.today, 'No tasks due today! 🎉', 'today')}
           </TabsContent>
           <TabsContent value="tomorrow" className="mt-4">
-            {renderTaskList(tasks.tomorrow, 'No tasks due tomorrow.')}
+            {renderTaskList(tasks.tomorrow, 'No tasks due tomorrow.', 'tomorrow')}
           </TabsContent>
           <TabsContent value="week" className="mt-4">
-            {renderTaskList(tasks.thisWeek, 'No tasks due this week.')}
+            {renderTaskList(tasks.thisWeek, 'No tasks due this week.', 'week')}
           </TabsContent>
         </Tabs>
       </CardContent>

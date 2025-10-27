@@ -11,9 +11,14 @@ import { addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatInTimeZone } from 'date-fns-tz';
 const TZ = 'America/New_York';
-export function MyTasksDashboard() {
+
+interface MyTasksDashboardProps {
+  defaultFilter?: string | null;
+}
+
+export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) {
   const { tasks, loading, fetchTasks, backfillAssignmentsForUser, backfillDueDatesForUser } = useTasks();
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState(defaultFilter || 'all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -31,6 +36,13 @@ export function MyTasksDashboard() {
     };
     getCurrentUser();
   }, []);
+
+  // Update activeTab when defaultFilter changes
+  useEffect(() => {
+    if (defaultFilter) {
+      setActiveTab(defaultFilter);
+    }
+  }, [defaultFilter]);
 
   useEffect(() => {
     // Fetch tasks assigned to the current user
