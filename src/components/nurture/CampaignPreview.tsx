@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Mail, MessageSquare, CheckSquare, Webhook, Clock, Filter } from 'lucide-react';
+import { Mail, MessageSquare, CheckSquare, Webhook, Clock, ArrowDown } from 'lucide-react';
 
 interface CampaignStep {
   step_number: number;
@@ -18,176 +18,92 @@ interface CampaignPreviewProps {
   steps: CampaignStep[];
 }
 
-export function CampaignPreview({
-  name,
-  description,
-  triggerConditions,
-  steps,
-}: CampaignPreviewProps) {
-  const getChannelIcon = (channel: string) => {
-    const icons = {
-      email: <Mail className="h-4 w-4" />,
-      sms: <MessageSquare className="h-4 w-4" />,
-      task: <CheckSquare className="h-4 w-4" />,
-      webhook: <Webhook className="h-4 w-4" />,
-    };
-    return icons[channel as keyof typeof icons] || null;
-  };
-
-  const getTriggerSummary = () => {
-    const parts: string[] = [];
-
-    if (triggerConditions.lead_status?.length > 0) {
-      parts.push(`Status: ${triggerConditions.lead_status.join(', ')}`);
-    }
-
-    if (
-      triggerConditions.lead_score_min !== undefined ||
-      triggerConditions.lead_score_max !== undefined
-    ) {
-      const min = triggerConditions.lead_score_min || 0;
-      const max = triggerConditions.lead_score_max || 100;
-      parts.push(`Score: ${min}-${max}`);
-    }
-
-    if (triggerConditions.tags?.length > 0) {
-      parts.push(`Tags: ${triggerConditions.tags.length}`);
-    }
-
-    return parts.length > 0 ? parts.join(' • ') : 'No triggers set';
-  };
-
-  const calculateTotalTime = () => {
-    let totalMinutes = 0;
-
-    steps.forEach((step) => {
-      switch (step.delay_unit) {
-        case 'minutes':
-          totalMinutes += step.delay_value;
-          break;
-        case 'hours':
-          totalMinutes += step.delay_value * 60;
-          break;
-        case 'days':
-          totalMinutes += step.delay_value * 24 * 60;
-          break;
-        case 'weeks':
-          totalMinutes += step.delay_value * 7 * 24 * 60;
-          break;
-      }
-    });
-
-    if (totalMinutes < 60) {
-      return `${totalMinutes} minutes`;
-    } else if (totalMinutes < 24 * 60) {
-      return `${Math.floor(totalMinutes / 60)} hours`;
-    } else {
-      return `${Math.floor(totalMinutes / (24 * 60))} days`;
-    }
-  };
-
+export function CampaignPreview({ name, description, triggerConditions, steps }: CampaignPreviewProps) {
   return (
-    <Card className="sticky top-6">
+    <Card className="sticky top-4">
       <CardHeader>
-        <CardTitle className="text-lg">Campaign Preview</CardTitle>
-        <CardDescription>Overview of your nurture sequence</CardDescription>
+        <CardTitle>Campaign Preview</CardTitle>
+        <CardDescription>How your campaign will execute</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Campaign Name */}
+      <CardContent className="space-y-4">
+        {/* Campaign Info */}
         <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">Campaign Name</p>
-          <p className="font-medium">{name || 'Untitled Campaign'}</p>
+          <h3 className="font-semibold mb-2">{name || 'Untitled Campaign'}</h3>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
-
-        {/* Description */}
-        {description && (
-          <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">Description</p>
-            <p className="text-sm">{description}</p>
-          </div>
-        )}
 
         <Separator />
 
         {/* Trigger Conditions */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium">Enrollment Triggers</p>
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm">Enrollment Triggers</h4>
+          <div className="space-y-2">
+            {triggerConditions.lead_status?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {triggerConditions.lead_status.map((status: string) => (
+                  <Badge key={status} variant="outline" className="text-xs">
+                    {status}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {(triggerConditions.lead_score_min || triggerConditions.lead_score_max) && (
+              <p className="text-xs text-muted-foreground">
+                Score: {triggerConditions.lead_score_min || 0} - {triggerConditions.lead_score_max || 100}
+              </p>
+            )}
+            {triggerConditions.insurance_types?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {triggerConditions.insurance_types.map((type: string) => (
+                  <Badge key={type} variant="secondary" className="text-xs">
+                    {type}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">{getTriggerSummary()}</p>
         </div>
 
         <Separator />
 
-        {/* Campaign Steps */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium">Campaign Steps</p>
-            <Badge variant="secondary">{steps.length} steps</Badge>
-          </div>
-
+        {/* Steps Timeline */}
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Campaign Flow</h4>
           {steps.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No steps added</p>
+            <p className="text-xs text-muted-foreground">No steps configured</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {steps.map((step, index) => (
-                <div key={index} className="relative pl-6 pb-3">
-                  {/* Timeline connector */}
-                  {index < steps.length - 1 && (
-                    <div className="absolute left-2 top-6 bottom-0 w-px bg-border" />
-                  )}
-
-                  {/* Step content */}
-                  <div className="relative">
-                    <div className="absolute -left-6 top-0 w-4 h-4 rounded-full bg-primary" />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        {getChannelIcon(step.channel)}
-                        <span className="text-sm font-medium capitalize">{step.channel}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <div key={index} className="space-y-2">
+                  <div className="flex items-start gap-2 text-xs">
+                    <div className="mt-1">
+                      {step.channel === 'email' && <Mail className="h-3 w-3" />}
+                      {step.channel === 'sms' && <MessageSquare className="h-3 w-3" />}
+                      {step.channel === 'task' && <CheckSquare className="h-3 w-3" />}
+                      {step.channel === 'webhook' && <Webhook className="h-3 w-3" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        Step {step.step_number}: {step.channel.toUpperCase()}
+                      </p>
+                      <p className="text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         Wait {step.delay_value} {step.delay_unit}
-                      </div>
+                      </p>
                     </div>
                   </div>
+                  {index < steps.length - 1 && (
+                    <div className="pl-2">
+                      <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
-
-        {/* Summary Stats */}
-        {steps.length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Duration</span>
-                <span className="font-medium">{calculateTotalTime()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Email Steps</span>
-                <span className="font-medium">
-                  {steps.filter((s) => s.channel === 'email').length}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">SMS Steps</span>
-                <span className="font-medium">
-                  {steps.filter((s) => s.channel === 'sms').length}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Task Steps</span>
-                <span className="font-medium">
-                  {steps.filter((s) => s.channel === 'task').length}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
       </CardContent>
     </Card>
   );
