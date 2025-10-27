@@ -337,6 +337,47 @@ export type Database = {
           },
         ]
       }
+      ao_renewal_contact_log: {
+        Row: {
+          contact_date: string
+          contact_method: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string
+          renewal_id: string
+          updated_at: string
+        }
+        Insert: {
+          contact_date: string
+          contact_method: string
+          created_at?: string
+          created_by: string
+          id?: string
+          notes: string
+          renewal_id: string
+          updated_at?: string
+        }
+        Update: {
+          contact_date?: string
+          contact_method?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string
+          renewal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ao_renewal_contact_log_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ao_renewal_notes: {
         Row: {
           content: string

@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
+import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -300,6 +301,9 @@ export default function AORenewalEdit() {
 
         {/* Notes Section */}
         {renewal && <AORenewalNotes renewalId={renewal.id} />}
+
+        {/* Contact Log Section */}
+        {renewal && <AORenewalContactLog renewalId={renewal.id} />}
 
         {/* Task Modal */}
         {renewal && (
