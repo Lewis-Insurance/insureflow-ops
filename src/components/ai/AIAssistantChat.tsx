@@ -319,6 +319,57 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         ? { contextType: context.type, contextId: context.id, contextName: context.name, contextMetadata: context.metadata }
         : undefined;
 
+      // For regular chat without documents, use the new data-aware assistant
+      if (documentsWithContent.length === 0 && !context?.metadata?.documentId) {
+        const { data: assistantData, error: assistantError } = await supabase.functions.invoke('ai-assistant-chat', {
+          body: { 
+            messages: recentMessages.map(m => ({ 
+              role: m.role, 
+              content: m.content + (m === userMessage ? knowledgeBaseContext : '')
+            })),
+            context: contextPayload 
+          }
+        });
+
+        if (signal.aborted) return;
+
+        if (assistantError) throw assistantError;
+        
+        const responseContent = assistantData.content + kbSourceAttribution;
+        
+        // Add assistant response to messages
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date(),
+        };
+        
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Save to database
+        if (conversationId) {
+          await supabase.from('ai_messages').insert({
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: responseContent,
+            metadata: {
+              kb_record_id: kbRecordId,
+              tool_calls_made: assistantData.tool_calls_made || 0
+            } as any,
+          });
+
+          // Update conversation timestamp
+          await supabase
+            .from('ai_conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+        }
+
+        setAttachedDocs([]);
+        return;
+      }
+
+      // For document analysis, use the streaming document analysis function
       // Stream the response from the edge function
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(

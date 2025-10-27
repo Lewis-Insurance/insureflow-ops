@@ -71,6 +71,9 @@ verify_jwt = true
 [functions.ai-document-analysis]
 verify_jwt = true
 
+[functions.ai-assistant-chat]
+verify_jwt = true
+
 [functions.ai-ticket-automation]
 verify_jwt = true
 
