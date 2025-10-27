@@ -472,6 +472,152 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_actions: {
+        Row: {
+          action_config: Json
+          action_order: number
+          action_type: string
+          conditions: Json | null
+          created_at: string | null
+          delay_minutes: number | null
+          id: string
+          is_active: boolean | null
+          rule_id: string
+        }
+        Insert: {
+          action_config?: Json
+          action_order?: number
+          action_type: string
+          conditions?: Json | null
+          created_at?: string | null
+          delay_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          rule_id: string
+        }
+        Update: {
+          action_config?: Json
+          action_order?: number
+          action_type?: string
+          conditions?: Json | null
+          created_at?: string | null
+          delay_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          rule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_actions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_executions: {
+        Row: {
+          action_id: string | null
+          action_result: Json | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          rule_id: string
+          status: string
+          trigger_data: Json | null
+        }
+        Insert: {
+          action_id?: string | null
+          action_result?: Json | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          rule_id: string
+          status?: string
+          trigger_data?: Json | null
+        }
+        Update: {
+          action_id?: string | null
+          action_result?: Json | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          rule_id?: string
+          status?: string
+          trigger_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "automation_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_rules: {
+        Row: {
+          account_id: string
+          applies_to: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          priority: number | null
+          trigger_conditions: Json | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          applies_to: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          priority?: number | null
+          trigger_conditions?: Json | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          applies_to?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          priority?: number | null
+          trigger_conditions?: Json | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bulk_actions: {
         Row: {
           action_type: string
@@ -7049,6 +7195,15 @@ export type Database = {
       pick_enum_label: {
         Args: { candidates: string[]; enum_type: unknown }
         Returns: string
+      }
+      process_automation_rules: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_trigger_data?: Json
+          p_trigger_type: string
+        }
+        Returns: Json
       }
       process_csv_batch: {
         Args: { batch_id: string; field_mapping?: Json; import_type?: string }

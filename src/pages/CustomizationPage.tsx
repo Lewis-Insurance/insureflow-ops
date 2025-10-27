@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomFieldsManager } from '@/components/crm/CustomFieldsManager';
-import { AutomationRulesManager } from '@/components/crm/AutomationRulesManager';
+import { AutomationRulesManager } from '@/components/automation/AutomationRulesManager';
 import { Settings, Sliders, Zap, Database } from 'lucide-react';
 
 export default function CustomizationPage() {
@@ -10,11 +10,6 @@ export default function CustomizationPage() {
   const [policyFields, setPolicyFields] = useState([]);
   const [accountFields, setAccountFields] = useState([]);
   const [renewalFields, setRenewalFields] = useState([]);
-
-  const [leadRules, setLeadRules] = useState([]);
-  const [policyRules, setPolicyRules] = useState([]);
-  const [accountRules, setAccountRules] = useState([]);
-  const [renewalRules, setRenewalRules] = useState([]);
 
   return (
     <AppLayout>
@@ -87,60 +82,7 @@ export default function CustomizationPage() {
           </TabsContent>
 
           <TabsContent value="automation" className="space-y-6">
-            <Tabs defaultValue="leads" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="leads">Leads</TabsTrigger>
-                <TabsTrigger value="policies">Policies</TabsTrigger>
-                <TabsTrigger value="accounts">Accounts</TabsTrigger>
-                <TabsTrigger value="renewals">Renewals</TabsTrigger>
-                <TabsTrigger value="global">Global Rules</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="leads">
-                <AutomationRulesManager
-                  entityType="lead"
-                  rules={leadRules}
-                  onRulesChange={setLeadRules}
-                />
-              </TabsContent>
-
-              <TabsContent value="policies">
-                <AutomationRulesManager
-                  entityType="policy"
-                  rules={policyRules}
-                  onRulesChange={setPolicyRules}
-                />
-              </TabsContent>
-
-              <TabsContent value="accounts">
-                <AutomationRulesManager
-                  entityType="account"
-                  rules={accountRules}
-                  onRulesChange={setAccountRules}
-                />
-              </TabsContent>
-
-              <TabsContent value="renewals">
-                <AutomationRulesManager
-                  entityType="renewal"
-                  rules={renewalRules}
-                  onRulesChange={setRenewalRules}
-                />
-              </TabsContent>
-
-              <TabsContent value="global">
-                <AutomationRulesManager
-                  rules={[...leadRules, ...policyRules, ...accountRules, ...renewalRules]}
-                  onRulesChange={(rules) => {
-                    // Distribute rules back to appropriate entity types
-                    setLeadRules(rules.filter(r => r.entityTypes.includes('lead')));
-                    setPolicyRules(rules.filter(r => r.entityTypes.includes('policy')));
-                    setAccountRules(rules.filter(r => r.entityTypes.includes('account')));
-                    setRenewalRules(rules.filter(r => r.entityTypes.includes('renewal')));
-                  }}
-                />
-              </TabsContent>
-            </Tabs>
+            <AutomationRulesManager />
           </TabsContent>
         </Tabs>
 
