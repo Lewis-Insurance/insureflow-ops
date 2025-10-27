@@ -215,14 +215,14 @@ export default function AORenewalEdit() {
                 <div>
                   <Label htmlFor="assigned_to">Assigned To</Label>
                   <Select
-                    value={formData.assigned_to}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value }))}
+                    value={formData.assigned_to || "unassigned"}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === "unassigned" ? "" : value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a user" />
                     </SelectTrigger>
                     <SelectContent className="bg-background">
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {profiles?.map((profile) => (
                         <SelectItem key={profile.id} value={profile.id}>
                           {profile.full_name || 'Unknown User'}
