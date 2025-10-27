@@ -52,6 +52,8 @@ const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
 const AgencyDashboard = React.lazy(() => import("./pages/AgencyDashboard"));
 const SchemaCheckPage = React.lazy(() => import("./pages/SchemaCheckPage"));
 const CustomizationPage = React.lazy(() => import("./pages/CustomizationPage"));
+const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
+const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -405,11 +407,35 @@ const App = () => (
                   </ErrorBoundary>
                 }
               />
-              <Route
+              <Route 
                 path="/comparison-report/:id"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <ComparisonReportPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/campaigns"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CampaignsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/campaigns/new"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CampaignBuilderPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/campaigns/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CampaignBuilderPage />
                   </ErrorBoundary>
                 }
               />

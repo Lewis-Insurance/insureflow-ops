@@ -175,7 +175,7 @@ export function CampaignBuilder() {
           title: 'Success',
           description: 'Campaign created successfully',
         });
-        navigate(`/nurture/campaigns/${result.id}`);
+        navigate(`/campaigns/${result.id}`);
       }
     } catch (error) {
       console.error('Error saving campaign:', error);
@@ -197,7 +197,7 @@ export function CampaignBuilder() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/nurture/campaigns')}
+            onClick={() => navigate('/campaigns')}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
