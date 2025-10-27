@@ -8,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority } from '@/hooks/useAORenewals';
+import { ArrowLeft, Loader2, CheckSquare } from 'lucide-react';
+import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority, type AORenewal } from '@/hooks/useAORenewals';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,8 @@ export default function AORenewalEdit() {
   
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
+  
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -131,12 +134,20 @@ export default function AORenewalEdit() {
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-semibold">Edit Renewal</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-semibold">Edit Renewal</h1>
+          </div>
+          {renewal && (
+            <Button variant="outline" onClick={() => setShowTaskModal(true)}>
+              <CheckSquare className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -287,6 +298,15 @@ export default function AORenewalEdit() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Task Modal */}
+        {renewal && (
+          <AddAORenewalTaskModal
+            open={showTaskModal}
+            onOpenChange={setShowTaskModal}
+            renewal={renewal}
+          />
+        )}
       </div>
     </AppLayout>
   );

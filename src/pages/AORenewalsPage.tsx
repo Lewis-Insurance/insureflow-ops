@@ -61,8 +61,10 @@ import {
   type AORenewalStatus,
   type AORenewalPriority,
   type AORenewalFilters,
+  type AORenewal,
 } from "@/hooks/useAORenewals";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 
 export default function AORenewalsPage() {
   const navigate = useNavigate();
@@ -71,6 +73,7 @@ export default function AORenewalsPage() {
   const [filters, setFilters] = useState<AORenewalFilters>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
 
   // Queries
   const { data: renewals = [], isLoading } = useAORenewals(filters);
@@ -422,6 +425,12 @@ export default function AORenewalsPage() {
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
+                                onClick={() => setTaskRenewal(renewal)}
+                              >
+                                Create Task
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
                                 onClick={() =>
                                   handleStatusChange(renewal.id, "contacted")
                                 }
@@ -478,6 +487,15 @@ export default function AORenewalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Task Modal */}
+      {taskRenewal && (
+        <AddAORenewalTaskModal
+          open={!!taskRenewal}
+          onOpenChange={(open) => !open && setTaskRenewal(null)}
+          renewal={taskRenewal}
+        />
+      )}
     </AppLayout>
   );
 }
