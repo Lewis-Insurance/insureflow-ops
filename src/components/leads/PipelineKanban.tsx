@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, Mail, Calendar, DollarSign, TrendingUp, Users, Target } from "lucide-react";
 import { format } from "date-fns";
 import { useLeadMetrics } from "@/hooks/useLeadAnalytics";
+import { LeadDetailView } from "./LeadDetailView";
 
 const STAGES = [
   { id: 'new', label: 'New Leads', color: 'bg-blue-500' },
@@ -16,12 +17,51 @@ const STAGES = [
   { id: 'won', label: 'Won', color: 'bg-green-500' },
 ];
 
-const LeadCard = ({ lead, onDragStart }: { lead: Lead & any; onDragStart: (lead: Lead) => void }) => {
+const LeadCard = ({ 
+  lead, 
+  onDragStart, 
+  onClick 
+}: { 
+  lead: Lead & any; 
+  onDragStart: (lead: Lead) => void;
+  onClick: (lead: Lead) => void;
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setDragStartPos({ x: e.clientX, y: e.clientY });
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (dragStartPos) {
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - dragStartPos.x, 2) + Math.pow(e.clientY - dragStartPos.y, 2)
+      );
+      if (distance > 5) {
+        setIsDragging(true);
+      }
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDragging) {
+      onClick(lead);
+    }
+    setDragStartPos(null);
+    setIsDragging(false);
+  };
+
   return (
     <Card
       draggable
       onDragStart={() => onDragStart(lead)}
-      className="cursor-move hover:shadow-md transition-shadow"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onClick={handleClick}
+      className="cursor-pointer hover:shadow-md transition-shadow"
     >
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between">
@@ -109,11 +149,13 @@ const KanbanColumn = ({
   leads,
   onDrop,
   onDragStart,
+  onLeadClick,
 }: {
   stage: typeof STAGES[0];
   leads: (Lead & any)[];
   onDrop: (status: Lead['status']) => void;
   onDragStart: (lead: Lead) => void;
+  onLeadClick: (lead: Lead) => void;
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -151,7 +193,12 @@ const KanbanColumn = ({
         </CardHeader>
         <CardContent className="space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto">
           {leads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} onDragStart={onDragStart} />
+            <LeadCard 
+              key={lead.id} 
+              lead={lead} 
+              onDragStart={onDragStart} 
+              onClick={onLeadClick}
+            />
           ))}
           {leads.length === 0 && (
             <div className="text-center py-8 text-sm text-muted-foreground">
@@ -169,6 +216,7 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
   const { data: metrics } = useLeadMetrics();
   const moveLeadStage = useMoveLeadToStage();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const handleDragStart = (lead: Lead) => {
     setDraggedLead(lead);
@@ -183,6 +231,10 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
     });
 
     setDraggedLead(null);
+  };
+
+  const handleLeadClick = (lead: Lead) => {
+    setSelectedLeadId(lead.id);
   };
 
   if (isLoading) {
@@ -284,9 +336,17 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
             leads={stage.leads}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
+            onLeadClick={handleLeadClick}
           />
         ))}
       </div>
+
+      {/* Lead Detail View */}
+      <LeadDetailView
+        leadId={selectedLeadId}
+        open={!!selectedLeadId}
+        onOpenChange={(open) => !open && setSelectedLeadId(null)}
+      />
     </div>
   );
 };
