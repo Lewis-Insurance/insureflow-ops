@@ -57,21 +57,34 @@ export function AdvancedFilters({ filters, onFiltersChange, onSaveView }: Advanc
       if (customerData) {
         setCustomers(customerData.map(c => ({ id: c.id, name: c.name })));
       }
+    };
 
-      // Fetch policies
-      const { data: policyData } = await supabase
+    fetchFilterData();
+  }, []);
+
+  // Fetch policies based on selected customers
+  useEffect(() => {
+    const fetchPolicies = async () => {
+      let query = supabase
         .from('policies')
-        .select('id, policy_number')
+        .select('id, policy_number, account_id')
         .order('policy_number')
         .limit(100);
+
+      // Filter by selected customers if any
+      if (filters.accountId && filters.accountId.length > 0) {
+        query = query.in('account_id', filters.accountId);
+      }
+
+      const { data: policyData } = await query;
       
       if (policyData) {
         setPolicies(policyData.map(p => ({ id: p.id, policy_number: p.policy_number })));
       }
     };
 
-    fetchFilterData();
-  }, []);
+    fetchPolicies();
+  }, [filters.accountId]);
 
   const updateFilter = (key: keyof DocumentFilters, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
