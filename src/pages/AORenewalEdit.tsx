@@ -13,6 +13,7 @@ import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalP
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { useProfiles } from '@/hooks/useProfiles';
+import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +34,6 @@ export default function AORenewalEdit() {
     current_premium: '',
     status: 'pending' as AORenewalStatus,
     priority: 'normal' as AORenewalPriority,
-    notes: '',
     assigned_to: '',
     last_contact_date: '',
   });
@@ -48,7 +48,6 @@ export default function AORenewalEdit() {
         current_premium: renewal.current_premium?.toString() || '',
         status: renewal.status || 'pending',
         priority: renewal.priority || 'normal',
-        notes: renewal.notes || '',
         assigned_to: renewal.assigned_to || '',
         last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
       });
@@ -71,7 +70,6 @@ export default function AORenewalEdit() {
           current_premium: parseFloat(formData.current_premium) || null,
           status: formData.status,
           priority: formData.priority,
-          notes: formData.notes.trim() || null,
           assigned_to: formData.assigned_to.trim() || null,
           last_contact_date: formData.last_contact_date || null,
         },
@@ -281,17 +279,6 @@ export default function AORenewalEdit() {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Add any relevant notes..."
-                  rows={4}
-                />
-              </div>
-
               <div className="flex gap-2 pt-4">
                 <Button
                   type="button"
@@ -310,6 +297,9 @@ export default function AORenewalEdit() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Notes Section */}
+        {renewal && <AORenewalNotes renewalId={renewal.id} />}
 
         {/* Task Modal */}
         {renewal && (

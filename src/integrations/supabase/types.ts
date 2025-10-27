@@ -337,54 +337,95 @@ export type Database = {
           },
         ]
       }
+      ao_renewal_notes: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          renewal_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          renewal_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          renewal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ao_renewal_notes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_renewals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ao_renewals: {
         Row: {
+          account_id: string | null
           assigned_to: string | null
-          created_at: string
+          created_at: string | null
           current_carrier: string | null
           current_premium: number | null
           custom_data: Json | null
           customer_name: string
           id: string
+          last_contact_date: string | null
           notes: string | null
           policy_number: string
-          policy_type: string
-          priority: string | null
+          policy_type: string | null
+          priority: string
           renewal_date: string
-          status: string | null
-          updated_at: string
+          status: string
+          updated_at: string | null
         }
         Insert: {
+          account_id?: string | null
           assigned_to?: string | null
-          created_at?: string
+          created_at?: string | null
           current_carrier?: string | null
           current_premium?: number | null
           custom_data?: Json | null
           customer_name: string
           id?: string
+          last_contact_date?: string | null
           notes?: string | null
           policy_number: string
-          policy_type: string
-          priority?: string | null
+          policy_type?: string | null
+          priority?: string
           renewal_date: string
-          status?: string | null
-          updated_at?: string
+          status?: string
+          updated_at?: string | null
         }
         Update: {
+          account_id?: string | null
           assigned_to?: string | null
-          created_at?: string
+          created_at?: string | null
           current_carrier?: string | null
           current_premium?: number | null
           custom_data?: Json | null
           customer_name?: string
           id?: string
+          last_contact_date?: string | null
           notes?: string | null
           policy_number?: string
-          policy_type?: string
-          priority?: string | null
+          policy_type?: string | null
+          priority?: string
           renewal_date?: string
-          status?: string | null
-          updated_at?: string
+          status?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -6755,6 +6796,36 @@ export type Database = {
       }
     }
     Views: {
+      ao_renewals_monthly_forecast: {
+        Row: {
+          high_priority_count: number | null
+          month: string | null
+          pending_count: number | null
+          renewal_count: number | null
+          total_premium: number | null
+        }
+        Relationships: []
+      }
+      ao_renewals_pipeline_summary: {
+        Row: {
+          avg_premium: number | null
+          count: number | null
+          earliest_renewal: string | null
+          latest_renewal: string | null
+          status: string | null
+          total_premium: number | null
+        }
+        Relationships: []
+      }
+      ao_renewals_priority_summary: {
+        Row: {
+          avg_premium: number | null
+          count: number | null
+          priority: string | null
+          total_premium: number | null
+        }
+        Relationships: []
+      }
       at_risk_renewals: {
         Row: {
           account_id: string | null
@@ -7182,6 +7253,19 @@ export type Database = {
         }[]
       }
       get_renewal_intelligence_summary: { Args: never; Returns: Json }
+      get_upcoming_ao_renewals: {
+        Args: { days_ahead?: number }
+        Returns: {
+          current_premium: number
+          customer_name: string
+          days_until_renewal: number
+          id: string
+          policy_number: string
+          priority: string
+          renewal_date: string
+          status: string
+        }[]
+      }
       get_user_claims: {
         Args: never
         Returns: {
