@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
 import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,9 +23,48 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
 
-  // Fetch analysis results after completion
-  const { data: analysisData, isLoading: isLoadingAnalysis } = useDocumentAnalysisQuery(completedAnalysisId);
+  // Fetch analysis data when completedAnalysisId is set
+  useEffect(() => {
+    const fetchAnalysisData = async () => {
+      if (!completedAnalysisId) return;
+
+      console.log('Fetching analysis data for ID:', completedAnalysisId);
+      setIsLoadingAnalysis(true);
+
+      try {
+        const { data, error } = await supabase
+          .from('document_analysis')
+          .select('*')
+          .eq('id', completedAnalysisId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching analysis:', error);
+          setErrorMessage(`Failed to load analysis: ${error.message}`);
+          return;
+        }
+
+        if (!data) {
+          console.warn('No analysis data found for ID:', completedAnalysisId);
+          setErrorMessage('Analysis not found. Please try again.');
+          return;
+        }
+
+        console.log('Analysis data loaded:', data);
+        setAnalysisData(data);
+      } catch (err: any) {
+        console.error('Fetch error:', err);
+        setErrorMessage(`Failed to load results: ${err.message}`);
+      } finally {
+        setIsLoadingAnalysis(false);
+      }
+    };
+
+    fetchAnalysisData();
+  }, [completedAnalysisId]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
