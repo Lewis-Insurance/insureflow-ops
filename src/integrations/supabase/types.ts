@@ -7931,29 +7931,89 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_documents: {
+        Row: {
+          created_at: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          parsed_doc_id: string | null
+          role: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          parsed_doc_id?: string | null
+          role?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          parsed_doc_id?: string | null
+          role?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_documents_parsed_doc_id_fkey"
+            columns: ["parsed_doc_id"]
+            isOneToOne: false
+            referencedRelation: "parsed_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
+          analysis_output: Json | null
+          client_name: string | null
           created_at: string
           created_by: string
           description: string | null
           id: string
           name: string
+          notes: string | null
+          status: string | null
+          task_type: string | null
           updated_at: string
         }
         Insert: {
+          analysis_output?: Json | null
+          client_name?: string | null
           created_at?: string
           created_by: string
           description?: string | null
           id?: string
           name: string
+          notes?: string | null
+          status?: string | null
+          task_type?: string | null
           updated_at?: string
         }
         Update: {
+          analysis_output?: Json | null
+          client_name?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
           id?: string
           name?: string
+          notes?: string | null
+          status?: string | null
+          task_type?: string | null
           updated_at?: string
         }
         Relationships: []
