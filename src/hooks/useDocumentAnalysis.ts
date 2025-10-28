@@ -99,16 +99,25 @@ export const useDocumentAnalysis = () => {
     } catch (error) {
       console.error('[Document Analysis] Error:', error);
       
+      // Extract the full error message
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      
       toast({
         title: 'Analysis Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: errorMessage,
         variant: 'destructive',
       });
 
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      // Throw the error so it can be caught by the caller
+      throw new Error(errorMessage);
     } finally {
       setIsAnalyzing(false);
       setProgress(0);

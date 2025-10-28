@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useDocumentUploadAndAnalysis, AnalysisMode } from '@/hooks/useDocumentAnalysis';
 
 interface DocumentUploadWithAnalysisProps {
@@ -17,6 +18,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('all');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const { 
     uploadAndAnalyze, 
@@ -37,6 +39,8 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const handleUpload = async () => {
     if (!selectedFile) return;
 
+    setErrorMessage(null); // Clear previous errors
+
     try {
       const result = await uploadAndAnalyze({
         file: selectedFile,
@@ -53,8 +57,21 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
       }
 
       setSelectedFile(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
+      
+      // Extract and display the full error message
+      let errorText = 'An unknown error occurred';
+      
+      if (error?.message) {
+        errorText = error.message;
+      } else if (typeof error === 'string') {
+        errorText = error;
+      } else if (error?.error) {
+        errorText = error.error;
+      }
+      
+      setErrorMessage(errorText);
     }
   };
 
@@ -73,6 +90,16 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {errorMessage && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Analysis Error</AlertTitle>
+            <AlertDescription className="mt-2 text-sm whitespace-pre-wrap">
+              {errorMessage}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <label className="text-sm font-medium">Analysis Mode</label>
           <Select
