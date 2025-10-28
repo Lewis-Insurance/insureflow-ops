@@ -336,8 +336,16 @@ serve(async (req) => {
       throw new Error('Azure OpenAI credentials not configured');
     }
 
+    // Debug logging before Azure OpenAI call
+    const openaiBase = AZURE_OPENAI_ENDPOINT.replace(/\/$/, '');
+    const openaiUrl = `${openaiBase}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+    console.log('[Azure OpenAI Debug] Endpoint:', AZURE_OPENAI_ENDPOINT);
+    console.log('[Azure OpenAI Debug] Deployment:', AZURE_OPENAI_DEPLOYMENT);
+    console.log('[Azure OpenAI Debug] Full URL:', openaiUrl);
+    console.log('[Azure OpenAI Debug] API key exists:', !!AZURE_OPENAI_KEY);
+
     const aiResponse = await fetch(
-      `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
+      openaiUrl,
       {
         method: 'POST',
         headers: {
