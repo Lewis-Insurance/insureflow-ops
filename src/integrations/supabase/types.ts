@@ -2254,6 +2254,72 @@ export type Database = {
         }
         Relationships: []
       }
+      document_analyses: {
+        Row: {
+          account_id: string | null
+          analysis_data: Json
+          analyzed_at: string
+          carrier: string | null
+          created_at: string
+          created_by: string | null
+          document_hash: string
+          extracted_text: string | null
+          filename: string
+          id: string
+          insured_name: string | null
+          policy_id: string | null
+          policy_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          analysis_data?: Json
+          analyzed_at?: string
+          carrier?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_hash: string
+          extracted_text?: string | null
+          filename: string
+          id?: string
+          insured_name?: string | null
+          policy_id?: string | null
+          policy_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          analysis_data?: Json
+          analyzed_at?: string
+          carrier?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_hash?: string
+          extracted_text?: string | null
+          filename?: string
+          id?: string
+          insured_name?: string | null
+          policy_id?: string | null
+          policy_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_analyses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_analyses_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_processing_queue: {
         Row: {
           account_id: string

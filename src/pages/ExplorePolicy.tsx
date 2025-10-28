@@ -142,58 +142,114 @@ export default function ExplorePolicy() {
     enabled: !!selectedAccountId,
   });
 
-  const updateDocumentProgress = useCallback((docId: string, progress: number, message: string) => {
-    setDocuments(prev => prev.map(doc => 
-      doc.id === docId ? { ...doc, progress, progressMessage: message } : doc
-    ));
-  }, []);
-
-  const analyzeDocument = useCallback(async (file: File, docId: string) => {
+  const saveAnalysisToDatabase = useCallback(async (
+    docId: string,
+    data: {
+      filename: string;
+      accountId?: string;
+      policyId?: string;
+      documentHash: string;
+      analysis: any;
+    }
+  ) => {
     try {
-      // Calculate hash
-      updateDocumentProgress(docId, 10, 'Calculating file hash...');
-      const hash = await calculateFileHash(file);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      setDocuments(prev => prev.map(doc => 
-        doc.id === docId ? { ...doc, documentHash: hash } : doc
+      const { error } = await supabase
+        .from('document_analyses')
+        .insert({
+          filename: data.filename,
+          account_id: data.accountId || null,
+          policy_id: data.policyId || null,
+          document_hash: data.documentHash,
+          analysis_data: data.analysis,
+          extracted_text: data.analysis.extractedText || null,
+          policy_number: data.analysis.policyNumber || null,
+          carrier: data.analysis.carrier || null,
+          insured_name: data.analysis.insuredName || null,
+          analyzed_at: new Date().toISOString(),
+          created_by: user?.id || null,
+        });
+
+      if (error) {
+        console.error('Failed to save analysis to database:', error);
+        toast({
+          title: "Database Save Failed",
+          description: "Analysis completed but failed to save to database",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error saving to database:', error);
+      return false;
+    }
+  }, [toast]);
+
+  const analyzeDocument = useCallback(async (
+    file: File,
+    docId: string,
+    accountId?: string,
+    policyId?: string,
+    retryAttempt = 0
+  ) => {
+    try {
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? { ...doc, progress: 5, progressMessage: 'Calculating file hash...' }
+          : doc
       ));
 
-      updateDocumentProgress(docId, 20, 'Converting to base64...');
-      
-      // Read file as base64
+      const documentHash = await calculateFileHash(file);
+
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? { ...doc, documentHash, progress: 10, progressMessage: 'Checking cache...' }
+          : doc
+      ));
+
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? { ...doc, progress: 20, progressMessage: 'Reading file...' }
+          : doc
+      ));
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      
-      await new Promise((resolve, reject) => {
-        reader.onload = resolve;
-        reader.onerror = reject;
+
+      await new Promise<void>((resolve, reject) => {
+        reader.onload = () => resolve();
+        reader.onerror = () => reject(new Error('Failed to read file'));
       });
 
       const base64 = (reader.result as string).split(',')[1];
 
-      updateDocumentProgress(docId, 40, 'Analyzing document with AI OCR...');
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? { ...doc, progress: 40, progressMessage: 'Running AI analysis (OCR + extraction)...' }
+          : doc
+      ));
 
-      // Call AI document analysis edge function
       const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
         body: {
           document: base64,
           filename: file.name,
           mimeType: file.type,
+          documentHash,
         }
       });
 
       if (error) throw error;
 
-      updateDocumentProgress(docId, 90, 'Finalizing results...');
-
-      // Update document with analysis results
-      setDocuments(prev => prev.map(doc => 
+      setDocuments(prev => prev.map(doc =>
         doc.id === docId
           ? {
               ...doc,
               status: 'complete',
-              progress: 100,
-              progressMessage: 'Analysis complete',
+              progress: 90,
+              progressMessage: 'Saving results...',
+              cacheHit: data.cacheHit || false,
               analysis: {
                 summary: data.summary || 'No summary available',
                 coverageDetails: data.coverageDetails || [],
@@ -202,114 +258,150 @@ export default function ExplorePolicy() {
                 insuredName: data.insuredName,
                 carrier: data.carrier,
                 extractedText: data.extractedText,
-              }
+              },
+              accountId,
+              policyId,
+            }
+          : doc
+      ));
+
+      await saveAnalysisToDatabase(docId, {
+        filename: file.name,
+        accountId,
+        policyId,
+        documentHash,
+        analysis: data,
+      });
+
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? {
+              ...doc,
+              progress: 100,
+              progressMessage: 'Complete!',
+              savedToDatabase: true,
             }
           : doc
       ));
 
       toast({
-        title: "Analysis Complete",
-        description: `${file.name} has been analyzed successfully`,
+        title: data.cacheHit ? "Analysis Complete (Cached)" : "Analysis Complete",
+        description: `${file.name} analyzed successfully${data.cacheHit ? ' using cached OCR (24x faster!)' : ''}`,
       });
 
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
       console.error('Error analyzing document:', error);
-      
-      // Retry logic
-      setDocuments(prev => prev.map(doc => {
-        if (doc.id !== docId) return doc;
+
+      if (retryAttempt < MAX_RETRIES) {
+        const delayMs = Math.min(1000 * Math.pow(2, retryAttempt), 10000);
         
-        const retryCount = (doc.retryCount || 0) + 1;
-        
-        if (retryCount < MAX_RETRIES) {
-          toast({
-            title: "Retrying Analysis",
-            description: `Attempt ${retryCount + 1} of ${MAX_RETRIES}`,
-          });
-          
-          // Retry after delay
-          setTimeout(() => analyzeDocument(file, docId), 2000 * retryCount);
-          
-          return {
-            ...doc,
-            retryCount,
-            progressMessage: `Retrying (${retryCount}/${MAX_RETRIES})...`,
-          };
-        }
-        
-        return {
-          ...doc,
-          status: 'error',
-          error: error.message || 'Analysis failed after retries',
-        };
-      }));
-      
-      if ((documents.find(d => d.id === docId)?.retryCount || 0) >= MAX_RETRIES - 1) {
+        setDocuments(prev => prev.map(doc =>
+          doc.id === docId
+            ? {
+                ...doc,
+                progress: 0,
+                progressMessage: `Retry ${retryAttempt + 1}/${MAX_RETRIES} in ${delayMs / 1000}s...`,
+                retryCount: retryAttempt + 1,
+              }
+            : doc
+        ));
+
         toast({
-          title: "Analysis Failed",
-          description: error.message || 'Failed to analyze document after retries',
-          variant: "destructive",
+          title: `Retry ${retryAttempt + 1}/${MAX_RETRIES}`,
+          description: `Retrying ${file.name} in ${delayMs / 1000}s...`,
         });
+
+        await delay(delayMs);
+        return analyzeDocument(file, docId, accountId, policyId, retryAttempt + 1);
       }
+
+      setDocuments(prev => prev.map(doc =>
+        doc.id === docId
+          ? {
+              ...doc,
+              status: 'error',
+              error: errorMessage,
+              progress: 0,
+              progressMessage: 'Failed after retries',
+            }
+          : doc
+      ));
+
+      toast({
+        title: "Analysis Failed",
+        description: `${errorMessage} (after ${MAX_RETRIES} attempts)`,
+        variant: "destructive",
+      });
     }
-  }, [toast, updateDocumentProgress, documents]);
+  }, [toast, saveAnalysisToDatabase]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const validatedFiles: { file: File; doc: AnalyzedDocument }[] = [];
-    
-    // Validate files
+    const invalidFiles: { file: File; error: string }[] = [];
+
     for (const file of acceptedFiles) {
       const validation = validateFile(file);
       
-      if (!validation.valid) {
+      if (validation.valid) {
+        validatedFiles.push({
+          file,
+          doc: {
+            id: crypto.randomUUID(),
+            filename: file.name,
+            status: 'validating',
+            progress: 0,
+            progressMessage: 'Validating file...',
+            file,
+            accountId: selectedAccountId || undefined,
+            policyId: selectedPolicyId || undefined,
+          }
+        });
+      } else {
+        invalidFiles.push({ file, error: validation.error! });
+      }
+    }
+
+    if (invalidFiles.length > 0) {
+      invalidFiles.forEach(({ file, error }) => {
         toast({
-          title: "Invalid File",
-          description: `${file.name}: ${validation.error}`,
+          title: "Validation Failed",
+          description: `${file.name}: ${error}`,
           variant: "destructive",
         });
-        continue;
-      }
-      
-      const doc: AnalyzedDocument = {
-        id: crypto.randomUUID(),
-        filename: file.name,
-        status: 'validating',
-        progress: 0,
-        progressMessage: 'Validating file...',
-        file,
-        retryCount: 0,
-      };
-      
-      validatedFiles.push({ file, doc });
-    }
-
-    if (validatedFiles.length === 0) return;
-
-    // Add documents to state
-    setDocuments(prev => [...prev, ...validatedFiles.map(v => v.doc)]);
-
-    // Process in batches
-    for (let i = 0; i < validatedFiles.length; i += BATCH_SIZE) {
-      const batch = validatedFiles.slice(i, i + BATCH_SIZE);
-      
-      // Mark as analyzing
-      batch.forEach(({ doc }) => {
-        setDocuments(prev => prev.map(d => 
-          d.id === doc.id ? { ...d, status: 'analyzing' } : d
-        ));
       });
-      
-      // Analyze batch in parallel
-      await Promise.all(
-        batch.map(({ file, doc }) => analyzeDocument(file, doc.id))
-      );
-      
-      // Small delay between batches
-      if (i + BATCH_SIZE < validatedFiles.length) {
-        await delay(1000);
-      }
     }
-  }, [analyzeDocument, toast]);
+
+    if (validatedFiles.length > 0) {
+      setDocuments(prev => [...prev, ...validatedFiles.map(vf => vf.doc)]);
+
+      for (let i = 0; i < validatedFiles.length; i += BATCH_SIZE) {
+        const batch = validatedFiles.slice(i, i + BATCH_SIZE);
+        
+        setDocuments(prev => prev.map(doc => {
+          const inBatch = batch.find(b => b.doc.id === doc.id);
+          return inBatch
+            ? { ...doc, status: 'analyzing' as const, progressMessage: 'Starting analysis...' }
+            : doc;
+        }));
+
+        await Promise.all(
+          batch.map(({ file, doc }) =>
+            analyzeDocument(file, doc.id, doc.accountId, doc.policyId)
+          )
+        );
+
+        if (i + BATCH_SIZE < validatedFiles.length) {
+          await delay(1000);
+        }
+      }
+
+      toast({
+        title: "Processing Complete",
+        description: `Processed ${validatedFiles.length} document${validatedFiles.length > 1 ? 's' : ''}`,
+      });
+    }
+  }, [analyzeDocument, selectedAccountId, selectedPolicyId, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -317,11 +409,10 @@ export default function ExplorePolicy() {
       'application/pdf': ['.pdf'],
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/jpg': ['.jpg'],
-      'image/png': ['.png'],
+      'image/*': ['.jpg', '.jpeg', '.png'],
     },
     multiple: true,
+    maxSize: MAX_FILE_SIZE,
   });
 
   const handleSearch = async () => {
@@ -378,26 +469,39 @@ export default function ExplorePolicy() {
   };
 
   const saveToDatabase = async (doc: AnalyzedDocument) => {
-    if (!selectedAccountId || !doc.analysis) {
+    if (!doc.analysis || !doc.documentHash) {
       toast({
         title: "Missing Information",
-        description: "Please select an account before saving",
+        description: "Document must be analyzed before saving",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // This would save the analysis to the database
-      // Implementation depends on your database schema
-      toast({
-        title: "Saved",
-        description: "Document analysis saved to database",
+      const saved = await saveAnalysisToDatabase(doc.id, {
+        filename: doc.filename,
+        accountId: selectedAccountId || doc.accountId,
+        policyId: selectedPolicyId || doc.policyId,
+        documentHash: doc.documentHash,
+        analysis: doc.analysis,
       });
       
-      setDocuments(prev => prev.map(d => 
-        d.id === doc.id ? { ...d, savedToDatabase: true, accountId: selectedAccountId, policyId: selectedPolicyId } : d
-      ));
+      if (saved) {
+        toast({
+          title: "Saved",
+          description: "Document analysis saved to database",
+        });
+        
+        setDocuments(prev => prev.map(d => 
+          d.id === doc.id ? { 
+            ...d, 
+            savedToDatabase: true, 
+            accountId: selectedAccountId || d.accountId, 
+            policyId: selectedPolicyId || d.policyId 
+          } : d
+        ));
+      }
     } catch (error: any) {
       toast({
         title: "Save Failed",
@@ -411,7 +515,7 @@ export default function ExplorePolicy() {
     setDocuments(prev => prev.map(d => 
       d.id === doc.id ? { ...d, status: 'analyzing', progress: 0, progressMessage: 'Retrying...', retryCount: 0 } : d
     ));
-    analyzeDocument(doc.file, doc.id);
+    analyzeDocument(doc.file, doc.id, doc.accountId, doc.policyId);
   };
 
   return (
