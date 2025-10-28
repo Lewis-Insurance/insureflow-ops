@@ -78,14 +78,15 @@ serve(async (req) => {
 
     const docBuffer = await docData.arrayBuffer();
     
-    // Call Azure Document Intelligence
-    const analyzeEndpoint = `${AZURE_DOC_INTEL_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`;
+    // Call Azure Document Intelligence (v4 GA)
+    const analyzeEndpoint = `${AZURE_DOC_INTEL_ENDPOINT}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2024-07-31`;
     
     const analyzeResponse = await fetch(analyzeEndpoint, {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
-        'Content-Type': 'application/octet-stream'
+        'Content-Type': 'application/octet-stream',
+        'Accept': 'application/json'
       },
       body: docBuffer
     });
@@ -96,7 +97,7 @@ serve(async (req) => {
     }
 
     // Get the operation location to poll for results
-    const operationLocation = analyzeResponse.headers.get('Operation-Location');
+    const operationLocation = analyzeResponse.headers.get('Operation-Location') || analyzeResponse.headers.get('operation-location');
     if (!operationLocation) {
       throw new Error('No operation location returned from Azure');
     }
@@ -106,14 +107,15 @@ serve(async (req) => {
     // Poll for results
     let ocrText = '';
     let attempts = 0;
-    const maxAttempts = 30; // 30 seconds max wait
+    const maxAttempts = 45; // up to ~45 seconds max wait
     
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
       
       const resultResponse = await fetch(operationLocation, {
         headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY
+          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
+          'Accept': 'application/json'
         }
       });
 
@@ -124,11 +126,20 @@ serve(async (req) => {
       const result = await resultResponse.json();
       
       if (result.status === 'succeeded') {
-        // Extract text from all pages
-        const pages = result.analyzeResult?.pages || [];
-        const lines = pages.flatMap((page: any) => page.lines || []);
-        ocrText = lines.map((line: any) => line.content).join('\n');
-        console.log(`[OCR] Extracted ${ocrText.length} characters`);
+        const analyze = result.analyzeResult || {};
+        // Prefer the unified content field if available
+        if (analyze.content && typeof analyze.content === 'string' && analyze.content.length > 0) {
+          ocrText = analyze.content;
+        } else {
+          // Fallback to lines/paragraphs
+          const pages = analyze.pages || [];
+          const lines = pages.flatMap((page: any) => page.lines || []);
+          ocrText = lines.map((line: any) => line.content).join('\n');
+          if ((!ocrText || ocrText.length < 10) && Array.isArray(analyze.paragraphs)) {
+            ocrText = analyze.paragraphs.map((p: any) => p.content).join('\n');
+          }
+        }
+        console.log(`[OCR] Extracted ${ocrText?.length ?? 0} characters`);
         break;
       } else if (result.status === 'failed') {
         throw new Error('Azure Document Intelligence analysis failed');
@@ -207,9 +218,7 @@ ${ocrText}
 Return ONLY the JSON object, no other text.`
           }
         ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-        max_tokens: 4000
+        response_format: { type: 'json_object' }
       }),
     });
 
