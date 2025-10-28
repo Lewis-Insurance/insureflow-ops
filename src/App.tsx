@@ -47,6 +47,7 @@ const FinancialPage = React.lazy(() => import("./pages/FinancialPage"));
 const AIInsightsPage = React.lazy(() => import("./pages/AIInsightsPage"));
 const COIGenerator = React.lazy(() => import("./pages/COIGenerator"));
 const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
+const DocumentAnalysisPage = React.lazy(() => import("./pages/DocumentAnalysisPage"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
 const KnowledgeManagerPage = React.lazy(() => import("./pages/KnowledgeManagerPage"));
 const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison"));
@@ -403,6 +404,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <DocumentIntelligence />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/analyze-documents"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <DocumentAnalysisPage />
                   </ErrorBoundary>
                 }
               />
