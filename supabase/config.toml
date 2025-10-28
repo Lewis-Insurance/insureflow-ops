@@ -139,3 +139,6 @@ verify_jwt = false
 
 [functions.create_workspace]
 verify_jwt = true
+
+[functions.on_parse_complete]
+verify_jwt = false
