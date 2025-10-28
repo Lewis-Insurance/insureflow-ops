@@ -87,9 +87,21 @@ serve(async (req) => {
       throw new Error('Azure Document Intelligence credentials not configured');
     }
 
+    // Debug logging before API call
+    const fullUrl = `${AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`;
+    console.log('[Azure OCR Debug] Complete URL:', fullUrl);
+    console.log('[Azure OCR Debug] Endpoint value:', AZURE_ENDPOINT);
+    console.log('[Azure OCR Debug] API Key exists:', !!AZURE_API_KEY);
+    console.log('[Azure OCR Debug] API Key length:', AZURE_API_KEY?.length || 0);
+    console.log('[Azure OCR Debug] Headers to be sent:', {
+      'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': `[${AZURE_API_KEY?.substring(0, 8)}...]`
+    });
+    console.log('[Azure OCR Debug] Base64 file size:', base64File.length, 'characters');
+
     // Start analysis
     const analyzeResponse = await fetch(
-      `${AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`,
+      fullUrl,
       {
         method: 'POST',
         headers: {
@@ -102,8 +114,12 @@ serve(async (req) => {
       }
     );
 
+    console.log('[Azure OCR] Response status:', analyzeResponse.status);
+    console.log('[Azure OCR] Response headers:', Object.fromEntries(analyzeResponse.headers.entries()));
+
     if (!analyzeResponse.ok) {
       const errorText = await analyzeResponse.text();
+      console.error('[Azure OCR] Error response body:', errorText);
       throw new Error(`Azure OCR failed: ${analyzeResponse.status} - ${errorText}`);
     }
 
