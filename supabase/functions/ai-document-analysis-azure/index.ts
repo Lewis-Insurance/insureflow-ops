@@ -41,25 +41,54 @@ serve(async (req) => {
       .update({ processing_status: 'processing' })
       .eq('document_id', document_id);
 
-    // STEP 1: Start async OCR
+    // STEP 1: Start async OCR with diagnostics
     console.log('[OCR] Starting async analysis...');
-    
-    const startResponse = await fetch(
-      `${AZURE_ENDPOINT}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2023-07-31`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        },
-        body: JSON.stringify({ urlSource: document_url })
-      }
-    );
+    console.log('[OCR] Endpoint:', AZURE_ENDPOINT);
+    console.log('[OCR] Document URL:', document_url);
 
-    if (!startResponse.ok) {
-      const errorText = await startResponse.text();
-      throw new Error(`Start failed: ${startResponse.status} - ${errorText}`);
+    const apiVersions = [
+      '2023-07-31',
+      '2024-02-29-preview',
+      '2023-10-31-preview',
+      '2024-07-31-preview'
+    ];
+
+    let startResponse: Response | null = null;
+    let workingVersion: string | null = null;
+
+    for (const version of apiVersions) {
+      const url = `${AZURE_ENDPOINT}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=${version}`;
+      console.log(`[OCR] Trying version ${version}...`);
+      console.log(`[OCR] Full URL: ${url}`);
+
+      try {
+        startResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+          },
+          body: JSON.stringify({ urlSource: document_url })
+        });
+
+        if (startResponse.ok) {
+          workingVersion = version;
+          console.log(`[OCR] ✅ Version ${version} works!`);
+          break;
+        } else {
+          const errorText = await startResponse.text();
+          console.log(`[OCR] ❌ Version ${version} failed: ${startResponse.status} - ${errorText}`);
+        }
+      } catch (error: any) {
+        console.log(`[OCR] ❌ Version ${version} error: ${error.message}`);
+      }
     }
+
+    if (!startResponse || !startResponse.ok) {
+      throw new Error('All API versions failed. Check your Azure endpoint URL.');
+    }
+
+    console.log(`[OCR] Using API version: ${workingVersion}`);
 
     const operationLocation = startResponse.headers.get('Operation-Location');
     if (!operationLocation) {
