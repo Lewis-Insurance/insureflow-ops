@@ -19,6 +19,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useAnalyzeDocument } from '@/hooks/useDocumentAnalysis';
+import { DocumentAnalysisDisplay } from '@/components/DocumentAnalysisDisplay';
 import {
   FileText,
   Upload,
@@ -100,13 +102,6 @@ const validateFile = (file: File): { valid: boolean; error?: string } => {
   return { valid: true };
 };
 
-const calculateFileHash = async (file: File): Promise<string> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function ExplorePolicy() {
@@ -118,6 +113,9 @@ export default function ExplorePolicy() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('');
+  const [uploadedDocumentIds, setUploadedDocumentIds] = useState<Map<string, string>>(new Map());
+
+  const analyzeDocumentMutation = useAnalyzeDocument();
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
@@ -146,51 +144,6 @@ export default function ExplorePolicy() {
     enabled: !!selectedAccountId,
   });
 
-  const saveAnalysisToDatabase = useCallback(async (
-    docId: string,
-    data: {
-      filename: string;
-      accountId?: string;
-      policyId?: string;
-      documentHash: string;
-      analysis: any;
-    }
-  ) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('document_analyses')
-        .insert({
-          filename: data.filename,
-          account_id: data.accountId || null,
-          policy_id: data.policyId || null,
-          document_hash: data.documentHash,
-          analysis_data: data.analysis,
-          extracted_text: data.analysis.extractedText || null,
-          policy_number: data.analysis.policyNumber || null,
-          carrier: data.analysis.carrier || null,
-          insured_name: data.analysis.insuredName || null,
-          analyzed_at: new Date().toISOString(),
-          created_by: user?.id || null,
-        });
-
-      if (error) {
-        console.error('Failed to save analysis to database:', error);
-        toast({
-          title: "Database Save Failed",
-          description: "Analysis completed but failed to save to database",
-          variant: "destructive",
-        });
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error saving to database:', error);
-      return false;
-    }
-  }, [toast]);
-
   const analyzeDocument = useCallback(async (
     file: File,
     docId: string,
@@ -201,97 +154,56 @@ export default function ExplorePolicy() {
     try {
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
-          ? { ...doc, progress: 5, progressMessage: 'Calculating file hash...' }
+          ? { ...doc, progress: 10, progressMessage: 'Uploading to storage...' }
           : doc
       ));
 
-      const documentHash = await calculateFileHash(file);
+      // Upload file to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const filePath = `policy-documents/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          contentType: file.type,
+          cacheControl: '3600',
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
 
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
-          ? { ...doc, documentHash, progress: 10, progressMessage: 'Checking cache...' }
+          ? { ...doc, progress: 30, progressMessage: 'Starting AI analysis...' }
           : doc
       ));
 
-      setDocuments(prev => prev.map(doc =>
-        doc.id === docId
-          ? { ...doc, progress: 20, progressMessage: 'Reading file...' }
-          : doc
-      ));
-
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-
-      await new Promise<void>((resolve, reject) => {
-        reader.onload = () => resolve();
-        reader.onerror = () => reject(new Error('Failed to read file'));
+      // Trigger analysis using the new hook
+      await analyzeDocumentMutation.mutateAsync({
+        document_url: publicUrl,
+        document_id: docId,
+        file_name: file.name,
+        account_id: accountId || '',
       });
 
-      const base64 = (reader.result as string).split(',')[1];
-
-      setDocuments(prev => prev.map(doc =>
-        doc.id === docId
-          ? { ...doc, progress: 40, progressMessage: 'Running AI analysis (OCR + extraction)...' }
-          : doc
-      ));
-
-      const { data, error } = await supabase.functions.invoke('ai-document-analysis', {
-        body: {
-          document: base64,
-          filename: file.name,
-          mimeType: file.type,
-          documentHash,
-        }
-      });
-
-      if (error) throw error;
+      // Store mapping for displaying results
+      setUploadedDocumentIds(prev => new Map(prev).set(docId, docId));
 
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
           ? {
               ...doc,
               status: 'complete',
-              progress: 90,
-              progressMessage: 'Saving results...',
-              cacheHit: data.cacheHit || false,
-              analysis: {
-                summary: data.summary || 'No summary available',
-                coverageDetails: data.coverageDetails || [],
-                keyDates: data.keyDates || [],
-                policyNumber: data.policyNumber,
-                insuredName: data.insuredName,
-                carrier: data.carrier,
-                extractedText: data.extractedText,
-              },
-              accountId,
-              policyId,
-            }
-          : doc
-      ));
-
-      await saveAnalysisToDatabase(docId, {
-        filename: file.name,
-        accountId,
-        policyId,
-        documentHash,
-        analysis: data,
-      });
-
-      setDocuments(prev => prev.map(doc =>
-        doc.id === docId
-          ? {
-              ...doc,
               progress: 100,
-              progressMessage: 'Complete!',
-              savedToDatabase: true,
+              progressMessage: 'Analysis complete! View results below.',
             }
           : doc
       ));
-
-      toast({
-        title: data.cacheHit ? "Analysis Complete (Cached)" : "Analysis Complete",
-        description: `${file.name} analyzed successfully${data.cacheHit ? ' using cached OCR (24x faster!)' : ''}`,
-      });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
@@ -338,7 +250,7 @@ export default function ExplorePolicy() {
         variant: "destructive",
       });
     }
-  }, [toast, saveAnalysisToDatabase]);
+  }, [toast, analyzeDocumentMutation]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const validatedFiles: { file: File; doc: AnalyzedDocument }[] = [];
@@ -626,49 +538,6 @@ export default function ExplorePolicy() {
     };
   }, [documents]);
 
-  const saveToDatabase = async (doc: AnalyzedDocument) => {
-    if (!doc.analysis || !doc.documentHash) {
-      toast({
-        title: "Missing Information",
-        description: "Document must be analyzed before saving",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const saved = await saveAnalysisToDatabase(doc.id, {
-        filename: doc.filename,
-        accountId: selectedAccountId || doc.accountId,
-        policyId: selectedPolicyId || doc.policyId,
-        documentHash: doc.documentHash,
-        analysis: doc.analysis,
-      });
-      
-      if (saved) {
-        toast({
-          title: "Saved",
-          description: "Document analysis saved to database",
-        });
-        
-        setDocuments(prev => prev.map(d => 
-          d.id === doc.id ? { 
-            ...d, 
-            savedToDatabase: true, 
-            accountId: selectedAccountId || d.accountId, 
-            policyId: selectedPolicyId || d.policyId 
-          } : d
-        ));
-      }
-    } catch (error: any) {
-      toast({
-        title: "Save Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const retryAnalysis = (doc: AnalyzedDocument) => {
     setDocuments(prev => prev.map(d => 
       d.id === doc.id ? { ...d, status: 'analyzing', progress: 0, progressMessage: 'Retrying...', retryCount: 0 } : d
@@ -908,15 +777,6 @@ export default function ExplorePolicy() {
                             <FileSpreadsheet className="w-4 h-4 mr-2" />
                             CSV
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => saveToDatabase(selectedDoc)}
-                            disabled={selectedDoc.savedToDatabase}
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            {selectedDoc.savedToDatabase ? 'Saved' : 'Save to DB'}
-                          </Button>
                         </>
                       )}
                       {selectedDoc.status === 'error' && (
@@ -1117,6 +977,17 @@ export default function ExplorePolicy() {
                         )}
                       </TabsContent>
                     </Tabs>
+
+                    {/* New Database-Backed Analysis */}
+                    {uploadedDocumentIds.has(selectedDoc.id) && (
+                      <div className="mt-6 pt-6 border-t">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <Database className="w-5 h-5" />
+                          Structured Analysis (Database)
+                        </h3>
+                        <DocumentAnalysisDisplay documentId={selectedDoc.id} />
+                      </div>
+                    )}
                     </div>
                   )}
                 </CardContent>
