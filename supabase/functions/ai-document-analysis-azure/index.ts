@@ -28,7 +28,9 @@ serve(async (req) => {
       document_id, 
       file_name,
       account_id,
-      user_id 
+      user_id,
+      focus_region = 'smart',
+      page_range
     } = await req.json();
     
     documentId = document_id;
@@ -141,65 +143,126 @@ serve(async (req) => {
 
     console.log(`[Azure OCR] Success! Extracted ${ocrResult.analyzeResult.pages?.length || 0} pages`);
 
-    // Step 3: SMART PAGE SELECTION
+    // Step 3: ENHANCED PAGE SELECTION
     const allPages = ocrResult.analyzeResult.pages || [];
     const totalPages = allPages.length;
-    console.log(`[Page Selection] Document has ${totalPages} pages`);
+    console.log(`[Page Selection] Document has ${totalPages} pages, focus_region: ${focus_region}`);
 
     let selectedPageText = '';
     let importantPageIndices: number[] = [];
+    let selectionMethod = '';
     
     if (totalPages <= 10) {
       // Small doc: use all pages
       console.log('[Page Selection] Small document, using all pages');
       selectedPageText = ocrResult.analyzeResult.content || '';
+      selectionMethod = 'all_pages';
     } else {
-      // Large doc: smart selection
-      console.log('[Page Selection] Large document, using smart selection');
+      // Large doc: apply focus region logic
+      console.log(`[Page Selection] Large document (${totalPages} pages), using focus region: ${focus_region}`);
       
-      // First, scan first 20 pages for important keywords
-      const scanPages = allPages.slice(0, Math.min(20, totalPages));
+      let pagesToProcess: any[] = [];
       
-      scanPages.forEach((page: any, index: number) => {
-        const pageText = (page.lines || [])
-          .map((line: any) => line.content || '')
-          .join(' ')
-          .toUpperCase();
-        
-        const hasKeyword = IMPORTANT_KEYWORDS.some(keyword => 
-          pageText.includes(keyword)
-        );
-        
-        if (hasKeyword) {
-          importantPageIndices.push(index);
-        }
-      });
-
-      console.log(`[Page Selection] Found ${importantPageIndices.length} important pages:`, importantPageIndices);
-
-      // If we found important pages, use those
-      if (importantPageIndices.length > 0) {
-        const selectedPages = importantPageIndices
-          .slice(0, 10) // Limit to first 10 important pages
-          .map(index => allPages[index]);
-        
-        selectedPageText = selectedPages
-          .map((page: any) => 
-            (page.lines || []).map((line: any) => line.content || '').join('\n')
-          )
-          .join('\n\n');
+      switch (focus_region) {
+        case 'smart':
+          // Smart keyword detection
+          const scanPages = allPages.slice(0, Math.min(20, totalPages));
+          scanPages.forEach((page: any, index: number) => {
+            const pageText = (page.lines || [])
+              .map((line: any) => line.content || '')
+              .join(' ')
+              .toUpperCase();
+            
+            const hasKeyword = IMPORTANT_KEYWORDS.some(keyword => 
+              pageText.includes(keyword)
+            );
+            
+            if (hasKeyword) {
+              importantPageIndices.push(index);
+            }
+          });
           
-        console.log(`[Page Selection] Using ${selectedPages.length} important pages`);
-      } else {
-        // Fallback: use first 10 pages
-        console.log('[Page Selection] No keywords found, using first 10 pages');
-        const firstTenPages = allPages.slice(0, 10);
-        selectedPageText = firstTenPages
-          .map((page: any) => 
-            (page.lines || []).map((line: any) => line.content || '').join('\n')
-          )
-          .join('\n\n');
+          if (importantPageIndices.length > 0) {
+            pagesToProcess = importantPageIndices
+              .slice(0, 10)
+              .map(index => allPages[index]);
+            selectionMethod = `smart_${importantPageIndices.length}_keywords`;
+          } else {
+            pagesToProcess = allPages.slice(0, 10);
+            selectionMethod = 'smart_fallback_first_10';
+          }
+          break;
+          
+        case 'front':
+          pagesToProcess = allPages.slice(0, 10);
+          selectionMethod = 'front_10_pages';
+          break;
+          
+        case 'middle':
+          const middleStart = Math.floor(totalPages / 2) - 5;
+          pagesToProcess = allPages.slice(middleStart, middleStart + 10);
+          selectionMethod = 'middle_10_pages';
+          break;
+          
+        case 'end':
+          pagesToProcess = allPages.slice(-10);
+          selectionMethod = 'end_10_pages';
+          break;
+          
+        case 'first_third':
+          const firstThirdEnd = Math.ceil(totalPages / 3);
+          pagesToProcess = allPages.slice(0, Math.min(firstThirdEnd, 10));
+          selectionMethod = `first_third_${pagesToProcess.length}_pages`;
+          break;
+          
+        case 'middle_third':
+          const thirdSize = Math.ceil(totalPages / 3);
+          const middleThirdStart = thirdSize;
+          pagesToProcess = allPages.slice(middleThirdStart, Math.min(middleThirdStart + 10, middleThirdStart + thirdSize));
+          selectionMethod = `middle_third_${pagesToProcess.length}_pages`;
+          break;
+          
+        case 'last_third':
+          const lastThirdStart = Math.floor(totalPages * 2 / 3);
+          pagesToProcess = allPages.slice(lastThirdStart, Math.min(lastThirdStart + 10, totalPages));
+          selectionMethod = `last_third_${pagesToProcess.length}_pages`;
+          break;
+          
+        case 'custom':
+          if (page_range && typeof page_range === 'string') {
+            // Parse custom range like "5-15" or "1,3,5,7"
+            if (page_range.includes('-')) {
+              const [start, end] = page_range.split('-').map((n: string) => parseInt(n.trim()));
+              const startIdx = Math.max(0, start - 1);
+              const endIdx = Math.min(totalPages, end);
+              pagesToProcess = allPages.slice(startIdx, endIdx);
+              selectionMethod = `custom_${startIdx + 1}_to_${endIdx}`;
+            } else {
+              const pageNumbers = page_range.split(',').map((n: string) => parseInt(n.trim()));
+              pagesToProcess = pageNumbers
+                .filter((n: number) => n > 0 && n <= totalPages)
+                .map((n: number) => allPages[n - 1]);
+              selectionMethod = `custom_pages_${pageNumbers.join('_')}`;
+            }
+          } else {
+            // Fallback to first 10 if custom range invalid
+            pagesToProcess = allPages.slice(0, 10);
+            selectionMethod = 'custom_fallback_first_10';
+          }
+          break;
+          
+        default:
+          pagesToProcess = allPages.slice(0, 10);
+          selectionMethod = 'default_first_10';
       }
+      
+      selectedPageText = pagesToProcess
+        .map((page: any) => 
+          (page.lines || []).map((line: any) => line.content || '').join('\n')
+        )
+        .join('\n\n');
+        
+      console.log(`[Page Selection] Method: ${selectionMethod}, Pages: ${pagesToProcess.length}`);
     }
 
     const charCount = selectedPageText.length;
@@ -338,6 +401,7 @@ Return valid JSON only with this EXACT structure:
         ocr_text: selectedPageText,
         structured_data: structuredData,
         pages_processed: totalPages,
+        selection_method: selectionMethod,
         pages_analyzed: importantPageIndices.length > 0 ? importantPageIndices.length : Math.min(10, totalPages)
       }),
       { 
