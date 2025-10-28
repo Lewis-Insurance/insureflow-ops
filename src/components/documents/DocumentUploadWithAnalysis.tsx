@@ -5,7 +5,8 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useDocumentUploadAndAnalysis, AnalysisMode } from '@/hooks/useDocumentAnalysis';
+import { useDocumentUploadAndAnalysis, AnalysisMode, useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
+import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
 
 interface DocumentUploadWithAnalysisProps {
   accountId?: string;
@@ -19,6 +20,8 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [completedAnalysisId, setCompletedAnalysisId] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
   
   const { 
     uploadAndAnalyze, 
@@ -28,6 +31,9 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     analysisProgress,
     isProcessing 
   } = useDocumentUploadAndAnalysis();
+
+  // Fetch analysis results after completion
+  const { data: analysisData, isLoading: isLoadingAnalysis } = useDocumentAnalysisQuery(completedAnalysisId);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,7 +45,10 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    setErrorMessage(null); // Clear previous errors
+    setErrorMessage(null);
+    setCompletedAnalysisId(null);
+    const fileName = selectedFile.name;
+    setUploadedFileName(fileName);
 
     try {
       const result = await uploadAndAnalyze({
@@ -52,6 +61,11 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         }
       });
 
+      // Set the analysis ID to trigger results display
+      if (result.analysis?.analysis_id) {
+        setCompletedAnalysisId(result.analysis.analysis_id);
+      }
+
       if (onComplete) {
         onComplete(result);
       }
@@ -60,7 +74,6 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     } catch (error: any) {
       console.error('Upload error:', error);
       
-      // Extract and display the full error message
       let errorText = 'An unknown error occurred';
       
       if (error?.message) {
@@ -75,11 +88,59 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     }
   };
 
+  const handleNewUpload = () => {
+    setCompletedAnalysisId(null);
+    setSelectedFile(null);
+    setErrorMessage(null);
+    setUploadedFileName('');
+  };
+
   const totalProgress = isUploading 
     ? uploadProgress 
     : isAnalyzing 
     ? analysisProgress 
     : 0;
+
+  // Show results if analysis is complete
+  if (completedAnalysisId && analysisData) {
+    // Parse analysis_result from JSONB
+    const analysisResult = typeof analysisData.analysis_result === 'object' && analysisData.analysis_result !== null
+      ? analysisData.analysis_result as any
+      : {};
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Analysis Complete</CardTitle>
+              <Button onClick={handleNewUpload} variant="outline">
+                Analyze Another Document
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+        
+        <DocumentAnalysisDisplay
+          analysisResult={analysisResult}
+          ocrText={analysisData.ocr_text || ''}
+          fileName={uploadedFileName || analysisData.file_name || 'Document'}
+        />
+      </div>
+    );
+  }
+
+  // Show loading state while fetching results
+  if (completedAnalysisId && isLoadingAnalysis) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading analysis results...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
