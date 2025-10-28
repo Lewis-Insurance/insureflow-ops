@@ -74,21 +74,17 @@ serve(async (req) => {
       throw new Error(`Failed to download document: ${downloadError?.message || 'Unknown error'}`);
     }
 
+    // Convert to base64 using standard encoding (no stack overflow)
     const documentBuffer = await fileData.arrayBuffer();
-    console.log(`[Download] Downloaded ${documentBuffer.byteLength} bytes`);
-
-    // Convert to base64 in chunks to avoid stack overflow
     const uint8Array = new Uint8Array(documentBuffer);
-    const chunkSize = 32768; // 32KB chunks
-    let base64Document = '';
 
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.slice(i, i + chunkSize);
-      const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
-      base64Document += btoa(chunkString);
-    }
+    console.log(`[Download] Downloaded ${documentBuffer.byteLength} bytes, encoding to base64...`);
 
-    console.log(`[Download] Converted to base64 (${base64Document.length} chars)`);
+    // Use Array.from method for safe base64 encoding
+    const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+    const base64Document = btoa(binaryString);
+
+    console.log(`[Download] Encoded to base64 (${base64Document.length} chars)`);
 
     // Determine content type
     const contentType = file_name.toLowerCase().endsWith('.pdf') 
