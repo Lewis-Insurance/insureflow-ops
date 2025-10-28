@@ -54,6 +54,7 @@ const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison
 const WorkspacePage = React.lazy(() => import("./pages/WorkspacePage"));
 const WorkspaceListPage = React.lazy(() => import("./pages/WorkspaceListPage"));
 const ComparisonReportPage = React.lazy(() => import("./pages/ComparisonReportPage"));
+const ComparisonPage = React.lazy(() => import("./pages/ComparisonPage"));
 const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
 const AgencyDashboard = React.lazy(() => import("./pages/AgencyDashboard"));
 const SchemaCheckPage = React.lazy(() => import("./pages/SchemaCheckPage"));
@@ -420,6 +421,22 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <DocumentAnalysisPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/comparison"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ComparisonPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/comparison/:sessionId"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ComparisonPage />
                   </ErrorBoundary>
                 }
               />
