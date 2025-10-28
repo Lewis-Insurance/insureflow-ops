@@ -11,9 +11,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  let documentId: string | null = null;
 
   try {
-    let documentId: string | null = null;
     const { 
       document_url, 
       document_id, 
