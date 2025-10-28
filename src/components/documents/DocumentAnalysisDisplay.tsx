@@ -55,7 +55,7 @@ export const DocumentAnalysisDisplay: React.FC<DocumentAnalysisDisplayProps> = (
   ocrText,
   fileName
 }) => {
-  const [isOcrExpanded, setIsOcrExpanded] = useState(false);
+  const [isOcrExpanded, setIsOcrExpanded] = useState(true);
 
   return (
     <div className="space-y-6">
@@ -247,6 +247,23 @@ export const DocumentAnalysisDisplay: React.FC<DocumentAnalysisDisplayProps> = (
         </CardContent>
       </Card>
 
+      {/* Debug: Raw Analysis Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Debug: Raw Analysis Data</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium mb-2 hover:text-primary transition-colors">
+              View JSON
+            </summary>
+            <pre className="text-xs p-4 bg-muted rounded-lg overflow-auto max-h-96">
+              {JSON.stringify(analysisResult, null, 2)}
+            </pre>
+          </details>
+        </CardContent>
+      </Card>
+
       {/* OCR Text (Collapsible) */}
       {ocrText && (
         <Card>
@@ -254,7 +271,7 @@ export const DocumentAnalysisDisplay: React.FC<DocumentAnalysisDisplayProps> = (
             <CardHeader>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between p-0 hover:bg-transparent">
-                  <CardTitle>Extracted Text (OCR)</CardTitle>
+                  <CardTitle>Extracted Text (OCR) - {ocrText.length.toLocaleString()} characters</CardTitle>
                   <ChevronDown className={`h-5 w-5 transition-transform ${isOcrExpanded ? 'rotate-180' : ''}`} />
                 </Button>
               </CollapsibleTrigger>
