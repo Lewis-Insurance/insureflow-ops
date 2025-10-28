@@ -28,12 +28,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
-        headers: { Authorization: authHeader }
-      }
+        headers: { Authorization: authHeader },
+      },
     });
 
     // Get authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
       throw new Error("User not authenticated");
     }
@@ -63,9 +66,7 @@ serve(async (req) => {
       role: d.role || null,
     }));
 
-    const { error: docError } = await supabase
-      .from("workspace_documents")
-      .insert(docsToInsert);
+    const { error: docError } = await supabase.from("workspace_documents").insert(docsToInsert);
 
     if (docError) throw docError;
 
@@ -75,26 +76,23 @@ serve(async (req) => {
 
     console.log("ENV CHECK", {
       apiKeyStart: PARSEUR_API_KEY?.substring(0, 6),
-      mailboxId: PARSEUR_MAILBOX_ID
+      mailboxId: PARSEUR_MAILBOX_ID,
     });
 
     if (PARSEUR_API_KEY && PARSEUR_MAILBOX_ID) {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            const parseurResp = await fetch(
-              `https://api.parseur.com/v2/mailboxes/${PARSEUR_MAILBOX_ID}/documents`,
-              {
-                method: "POST",
-                headers: {
-                  "Authorization": `Bearer ${PARSEUR_API_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  file_url: d.file_url,
-                }),
-              }
-            );
+            const parseurResp = await fetch(`https://api.parseur.com/v2/mailboxes/${PARSEUR_MAILBOX_ID}/documents/`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${PARSEUR_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                file_url: d.file_url,
+              }),
+            });
 
             if (!parseurResp.ok) {
               console.error("Parseur API error:", await parseurResp.text());
@@ -110,15 +108,15 @@ serve(async (req) => {
 
     console.log(`Workspace ${workspace.id} created with ${documents.length} documents.`);
 
-    return new Response(
-      JSON.stringify({ success: true, workspace }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    );
+    return new Response(JSON.stringify({ success: true, workspace }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (err) {
     console.error("Create Workspace error:", err);
-    return new Response(
-      JSON.stringify({ success: false, error: err.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
