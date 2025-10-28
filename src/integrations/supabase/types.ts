@@ -2325,6 +2325,7 @@ export type Database = {
           account_id: string | null
           analysis_result: Json | null
           carrier_name: string | null
+          completed_at: string | null
           confidence_score: number | null
           coverages: Json | null
           created_at: string | null
@@ -2338,6 +2339,7 @@ export type Database = {
           id: string
           insured_items: Json | null
           insured_name: string | null
+          ocr_text: string | null
           payment_frequency: string | null
           policy_number: string | null
           policy_type: string | null
@@ -2350,6 +2352,7 @@ export type Database = {
           account_id?: string | null
           analysis_result?: Json | null
           carrier_name?: string | null
+          completed_at?: string | null
           confidence_score?: number | null
           coverages?: Json | null
           created_at?: string | null
@@ -2363,6 +2366,7 @@ export type Database = {
           id?: string
           insured_items?: Json | null
           insured_name?: string | null
+          ocr_text?: string | null
           payment_frequency?: string | null
           policy_number?: string | null
           policy_type?: string | null
@@ -2375,6 +2379,7 @@ export type Database = {
           account_id?: string | null
           analysis_result?: Json | null
           carrier_name?: string | null
+          completed_at?: string | null
           confidence_score?: number | null
           coverages?: Json | null
           created_at?: string | null
@@ -2388,6 +2393,7 @@ export type Database = {
           id?: string
           insured_items?: Json | null
           insured_name?: string | null
+          ocr_text?: string | null
           payment_frequency?: string | null
           policy_number?: string | null
           policy_type?: string | null
