@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { document_url, document_id, file_name, account_id, user_id } = await req.json();
+    const { document_id, file_name, account_id, user_id } = await req.json();
     
     console.log('========================================');
     console.log('SIMPLE PDF ANALYSIS - START');
@@ -37,15 +37,42 @@ serve(async (req) => {
       .update({ processing_status: 'processing' })
       .eq('document_id', document_id);
 
-    // STEP 1: Download PDF
+    // STEP 1: Download PDF from Supabase Storage
     console.log('----------------------------------------');
     console.log('STEP 1: Downloading PDF from storage');
     console.log('----------------------------------------');
-    console.log('URL:', document_url);
+    console.log('Document ID:', document_id);
 
-    const pdfResponse = await fetch(document_url);
+    // Get the file path from the documents table
+    const { data: docData, error: docError } = await supabase
+      .from('documents')
+      .select('storage_path, storage_bucket')
+      .eq('id', document_id)
+      .maybeSingle();
+
+    if (docError || !docData) {
+      throw new Error(`Could not find document: ${docError?.message || 'Not found'}`);
+    }
+
+    console.log('File path:', docData.storage_path);
+    console.log('Bucket:', docData.storage_bucket || 'documents');
+
+    const bucketName = docData.storage_bucket || 'documents';
+    
+    // Create a signed URL (valid for 1 hour)
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(docData.storage_path, 3600);
+
+    if (signedUrlError || !signedUrlData) {
+      throw new Error(`Failed to create signed URL: ${signedUrlError?.message || 'Unknown error'}`);
+    }
+
+    console.log('Signed URL created');
+
+    const pdfResponse = await fetch(signedUrlData.signedUrl);
     if (!pdfResponse.ok) {
-      throw new Error(`Failed to download PDF: ${pdfResponse.status}`);
+      throw new Error(`Failed to download PDF: ${pdfResponse.status} - ${await pdfResponse.text()}`);
     }
 
     const pdfBuffer = await pdfResponse.arrayBuffer();

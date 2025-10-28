@@ -3,7 +3,6 @@ import { supabase } from '../client';
 import { useToast } from '@/hooks/use-toast';
 
 interface AnalyzeDocumentParams {
-  document_url: string;
   document_id: string;
   file_name: string;
   account_id?: string;
@@ -62,7 +61,6 @@ export const useDocumentAnalysisSimple = () => {
 
       const { data, error } = await supabase.functions.invoke('ai-document-analysis-simple', {
         body: {
-          document_url: params.document_url,
           document_id: params.document_id,
           file_name: params.file_name,
           account_id: params.account_id,

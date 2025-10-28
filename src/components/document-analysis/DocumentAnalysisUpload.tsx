@@ -102,9 +102,9 @@ export function DocumentAnalysisUpload() {
         'ai-document-analysis-simple',
         {
           body: {
-            document_url: publicUrl,
             document_id: docData.id,
             file_name: file.name,
+            account_id: null,
             user_id: userId,
           },
         }
