@@ -7,23 +7,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface DocumentAnalysisRequest {
+  document_url: string;
+  document_id: string;
+  file_name: string;
+  account_id?: string;
+  user_id: string;
+  analysis_mode?: 'parse' | 'summarize' | 'classify' | 'insights' | 'workflow' | 'all';
+  workflow_context?: Record<string, any>;
+}
+
+interface WorkflowTrigger {
+  trigger_type: string;
+  trigger_reason: string;
+  confidence: number;
+  recommended_actions: string[];
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  metadata: Record<string, any>;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  
   let documentId: string | null = null;
 
   try {
+    const requestData: DocumentAnalysisRequest = await req.json();
     const { 
       document_url, 
       document_id, 
       file_name,
       account_id,
-      user_id 
-    } = await req.json();
+      user_id,
+      analysis_mode = 'all',
+      workflow_context = {}
+    } = requestData;
+    
     documentId = document_id;
 
-    console.log('[Document Analysis] Starting:', file_name);
+    console.log('[Azure Analysis] Starting:', file_name, 'Mode:', analysis_mode);
 
     // Initialize Supabase
     const supabase = createClient(
@@ -50,151 +74,126 @@ serve(async (req) => {
       throw insertError;
     }
 
-    // Step 1: Extract text with Azure Document Intelligence
-    console.log('[OCR] Starting Azure Document Intelligence...');
+    // ============================================
+    // STEP 1: Azure Document Intelligence OCR
+    // ============================================
+    console.log('[Azure OCR] Starting Document Intelligence...');
     
-    const AZURE_DOC_INTEL_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
-    const AZURE_DOC_INTEL_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT');
+    const AZURE_DOC_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT');
+    const AZURE_DOC_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
     
-    if (!AZURE_DOC_INTEL_KEY || !AZURE_DOC_INTEL_ENDPOINT) {
+    if (!AZURE_DOC_ENDPOINT || !AZURE_DOC_KEY) {
       throw new Error('Azure Document Intelligence credentials not configured');
     }
 
-    // Extract path from URL
+    // Download document from Supabase Storage
     const urlPath = document_url.split('/storage/v1/object/public/')[1];
     if (!urlPath) {
       throw new Error('Invalid document URL format');
     }
 
-    // Download document using Supabase client
     const { data: docData, error: downloadError } = await supabase.storage
       .from(urlPath.split('/')[0])
       .download(urlPath.split('/').slice(1).join('/'));
 
     if (downloadError || !docData) {
-      console.error('[Download] Error:', downloadError);
       throw new Error(`Failed to download document: ${downloadError?.message || 'Unknown error'}`);
     }
 
     const docBuffer = await docData.arrayBuffer();
+    const docBlob = new Uint8Array(docBuffer);
+
+    // Submit document for analysis
+    const analyzeUrl = `${AZURE_DOC_ENDPOINT}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31`;
     
-    // Call Azure Document Intelligence (v4 GA) with robust endpoint/model fallback
-    const base = AZURE_DOC_INTEL_ENDPOINT.replace(/\/$/, '');
-    const candidateEndpoints = [
-      `${base}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2024-07-31`,
-      `${base}/documentintelligence/documentModels/prebuilt-document:analyze?api-version=2024-07-31`,
-      `${base}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2024-07-31`,
-      `${base}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2024-07-31`,
-    ];
+    const submitResponse = await fetch(analyzeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY,
+      },
+      body: docBlob
+    });
 
-    let analyzeResponse: Response | null = null;
-    let chosenEndpoint = '';
-    for (const ep of candidateEndpoints) {
-      console.log(`[OCR] Trying Azure endpoint: ${ep}`);
-      const resp = await fetch(ep, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
-          'Content-Type': 'application/octet-stream',
-          'Accept': 'application/json'
-        },
-        body: docBuffer
-      });
-      if (resp.ok && (resp.status === 200 || resp.status === 202)) {
-        analyzeResponse = resp;
-        chosenEndpoint = ep;
-        break;
-      } else {
-        const errorPreview = await resp.text().catch(() => '');
-        console.warn(`[OCR] Azure endpoint failed (${resp.status}): ${ep} - ${errorPreview?.slice(0, 400)}`);
-      }
+    if (!submitResponse.ok) {
+      const errorText = await submitResponse.text();
+      throw new Error(`Azure OCR submission error: ${submitResponse.status} - ${errorText}`);
     }
 
-    if (!analyzeResponse) {
-      throw new Error('Azure Document Intelligence error: no valid endpoint responded (tried documentintelligence/formrecognizer with prebuilt-read/document)');
-    }
-    console.log(`[OCR] Using Azure endpoint: ${chosenEndpoint}`);
-
-    // Get the operation location to poll for results
-    const operationLocation = analyzeResponse.headers.get('Operation-Location') || analyzeResponse.headers.get('operation-location');
+    const operationLocation = submitResponse.headers.get('operation-location');
     if (!operationLocation) {
       throw new Error('No operation location returned from Azure');
     }
 
-    console.log('[OCR] Polling for results...');
-    
-    // Poll for results
-    let ocrText = '';
+    console.log('[Azure OCR] Polling for results...');
+
+    // Poll for OCR results
     let attempts = 0;
-    const maxAttempts = 45; // up to ~45 seconds max wait
-    
+    const maxAttempts = 60;
+    let analysisResult: any = null;
+
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const resultResponse = await fetch(operationLocation, {
+        method: 'GET',
         headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
-          'Accept': 'application/json'
+          'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY,
         }
       });
 
       if (!resultResponse.ok) {
-        throw new Error(`Failed to get results: ${resultResponse.status}`);
+        const errorText = await resultResponse.text();
+        throw new Error(`Azure OCR polling error: ${resultResponse.status} - ${errorText}`);
       }
 
       const result = await resultResponse.json();
       
       if (result.status === 'succeeded') {
-        const analyze = result.analyzeResult || {};
-        // Prefer the unified content field if available
-        if (analyze.content && typeof analyze.content === 'string' && analyze.content.length > 0) {
-          ocrText = analyze.content;
-        } else {
-          // Fallback to lines/paragraphs
-          const pages = analyze.pages || [];
-          const lines = pages.flatMap((page: any) => page.lines || []);
-          ocrText = lines.map((line: any) => line.content).join('\n');
-          if ((!ocrText || ocrText.length < 10) && Array.isArray(analyze.paragraphs)) {
-            ocrText = analyze.paragraphs.map((p: any) => p.content).join('\n');
-          }
-        }
-        console.log(`[OCR] Extracted ${ocrText?.length ?? 0} characters`);
+        analysisResult = result.analyzeResult;
+        console.log('[Azure OCR] Complete');
         break;
       } else if (result.status === 'failed') {
-        throw new Error('Azure Document Intelligence analysis failed');
+        throw new Error(`Azure OCR failed: ${JSON.stringify(result.error || 'Unknown error')}`);
       }
       
       attempts++;
     }
 
-    if (!ocrText || ocrText.length < 50) {
-      throw new Error('OCR extracted insufficient text from document');
+    if (!analysisResult) {
+      throw new Error('Azure OCR timed out');
     }
 
-    // Step 2: Parse with Azure OpenAI
-    console.log('[AI] Parsing with Azure OpenAI...');
+    // Extract text
+    let ocrText = analysisResult.content || '';
+    if (!ocrText && analysisResult.pages) {
+      ocrText = analysisResult.pages
+        .map((page: any) => page.lines?.map((line: any) => line.content).join('\n') || '')
+        .join('\n\n');
+    }
+
+    if (!ocrText || ocrText.length < 50) {
+      throw new Error('Insufficient text extracted from document');
+    }
+
+    console.log(`[Azure OCR] Extracted ${ocrText.length} characters`);
+
+    // ============================================
+    // STEP 2: Azure OpenAI Analysis
+    // ============================================
+    console.log('[Azure OpenAI] Starting analysis...');
     
-    const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
     const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
-    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME');
+    const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'gpt-4';
     
-    if (!AZURE_OPENAI_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
+    if (!AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_KEY) {
       throw new Error('Azure OpenAI credentials not configured');
     }
 
-    const openaiEndpoint = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-08-01-preview`;
-
-    const aiResponse = await fetch(openaiEndpoint, {
-      method: 'POST',
-      headers: {
-        'api-key': AZURE_OPENAI_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'system',
-            content: `You are an insurance document parser. Extract structured data from insurance policies and quotes.
+    // Build system prompt based on analysis mode
+    const systemPrompts: Record<string, string> = {
+      parse: `You are an insurance document parser. Extract structured data from insurance policies and quotes.
 
 Return ONLY valid JSON with this exact structure:
 {
@@ -225,54 +224,219 @@ Return ONLY valid JSON with this exact structure:
     }
   ],
   "confidence_score": number (0-100)
+}`,
+
+      summarize: `You are an insurance document summarizer. Create concise, actionable summaries of insurance documents.
+
+Return ONLY valid JSON with this structure:
+{
+  "executive_summary": "2-3 sentence overview",
+  "key_points": ["point 1", "point 2", "point 3"],
+  "coverage_summary": "Brief description of main coverages",
+  "important_dates": {
+    "effective_date": "YYYY-MM-DD or null",
+    "expiration_date": "YYYY-MM-DD or null",
+    "renewal_date": "YYYY-MM-DD or null"
+  },
+  "financial_summary": {
+    "total_premium": number or null,
+    "payment_terms": "string"
+  },
+  "action_items": ["action 1", "action 2"],
+  "risk_flags": ["flag 1", "flag 2"]
+}`,
+
+      classify: `You are an insurance document classifier. Classify and categorize insurance documents.
+
+Return ONLY valid JSON with this structure:
+{
+  "document_type": "policy|quote|renewal|claim|certificate|endorsement|other",
+  "insurance_type": "auto|home|commercial|life|umbrella|workers_comp|professional_liability|other",
+  "business_type": "personal_lines|commercial_lines|specialty",
+  "urgency": "low|medium|high|urgent",
+  "requires_action": boolean,
+  "tags": ["tag1", "tag2", "tag3"],
+  "confidence": number (0-100),
+  "reasoning": "Brief explanation of classification"
+}`,
+
+      insights: `You are an insurance analytics expert. Generate actionable insights from insurance documents.
+
+Return ONLY valid JSON with this structure:
+{
+  "coverage_adequacy": {
+    "rating": "insufficient|adequate|good|excellent",
+    "gaps": ["gap 1", "gap 2"],
+    "recommendations": ["rec 1", "rec 2"]
+  },
+  "cost_analysis": {
+    "competitiveness": "expensive|market_rate|competitive|bargain",
+    "potential_savings": number or null,
+    "savings_opportunities": ["opp 1", "opp 2"]
+  },
+  "risk_assessment": {
+    "risk_level": "low|medium|high|critical",
+    "risk_factors": ["factor 1", "factor 2"],
+    "mitigation_strategies": ["strategy 1", "strategy 2"]
+  },
+  "cross_sell_opportunities": [
+    {
+      "product": "string",
+      "reason": "string",
+      "priority": "low|medium|high"
+    }
+  ],
+  "renewal_insights": {
+    "renewal_likelihood": "low|medium|high",
+    "retention_strategies": ["strategy 1", "strategy 2"]
+  }
+}`,
+
+      workflow: `You are an insurance workflow automation expert. Analyze documents and recommend workflow actions.
+
+Return ONLY valid JSON with this structure:
+{
+  "triggers": [
+    {
+      "trigger_type": "create_task|send_email|create_opportunity|schedule_review|assign_agent|update_status|alert_manager",
+      "trigger_reason": "string explaining why",
+      "confidence": number (0-100),
+      "recommended_actions": ["action 1", "action 2"],
+      "priority": "low|medium|high|urgent",
+      "metadata": {
+        "task_title": "string or null",
+        "due_date": "YYYY-MM-DD or null",
+        "assigned_to": "string or null",
+        "email_template": "string or null",
+        "opportunity_type": "string or null"
+      }
+    }
+  ],
+  "automation_confidence": number (0-100),
+  "manual_review_required": boolean,
+  "manual_review_reason": "string or null"
 }`
-          },
-          {
-            role: 'user',
-            content: `Parse this insurance document and extract all information. Be thorough and accurate.
+    };
 
-DOCUMENT TEXT:
-${ocrText}
+    // All mode combines everything
+    const systemPrompt = analysis_mode === 'all' 
+      ? `You are a comprehensive insurance document analysis AI. Analyze the document thoroughly and provide:
+1. Structured data extraction (policy details)
+2. Executive summary
+3. Classification
+4. Insights and recommendations
+5. Workflow automation triggers
 
-Return ONLY the JSON object, no other text.`
-          }
+Return ONLY valid JSON with this structure:
+{
+  "parsed_data": ${systemPrompts.parse.split('Return ONLY valid JSON with this exact structure:\n')[1]},
+  "summary": ${systemPrompts.summarize.split('Return ONLY valid JSON with this structure:\n')[1]},
+  "classification": ${systemPrompts.classify.split('Return ONLY valid JSON with this structure:\n')[1]},
+  "insights": ${systemPrompts.insights.split('Return ONLY valid JSON with this structure:\n')[1]},
+  "workflow": ${systemPrompts.workflow.split('Return ONLY valid JSON with this structure:\n')[1]}
+}`
+      : systemPrompts[analysis_mode];
+
+    // Prepare user message
+    let userMessage = `Analyze this insurance document:\n\n${ocrText}`;
+    if (Object.keys(workflow_context).length > 0) {
+      userMessage += `\n\nContext: ${JSON.stringify(workflow_context, null, 2)}`;
+    }
+    userMessage += '\n\nReturn ONLY the JSON object, no other text.';
+
+    // Call Azure OpenAI
+    const openaiUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+    
+    const openaiResponse = await fetch(openaiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': AZURE_OPENAI_KEY,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
         ],
-        response_format: { type: 'json_object' },
-        max_tokens: 2000,
-        temperature: 0.1
-      }),
+        temperature: 0.1,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' }
+      })
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('[Azure OpenAI] Error:', errorText);
-      throw new Error(`Azure OpenAI API error: ${aiResponse.status} - ${errorText}`);
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      throw new Error(`Azure OpenAI error: ${openaiResponse.status} - ${errorText}`);
     }
 
-    const aiData = await aiResponse.json();
-    const parsedData = JSON.parse(aiData.choices[0].message.content);
+    const openaiData = await openaiResponse.json();
+    const analysisData = JSON.parse(openaiData.choices[0].message.content);
 
-    console.log('[AI] Parsing complete:', parsedData.carrier_name || 'Unknown carrier');
+    console.log('[Azure OpenAI] Analysis complete');
 
-    // Step 3: Update database with parsed data
+    // ============================================
+    // STEP 3: Process Workflow Triggers
+    // ============================================
+    let workflowResults: any[] = [];
+    
+    if (analysis_mode === 'workflow' || analysis_mode === 'all') {
+      const triggers = analysis_mode === 'all' 
+        ? analysisData.workflow?.triggers || []
+        : analysisData.triggers || [];
+
+      console.log(`[Workflow] Processing ${triggers.length} triggers`);
+
+      for (const trigger of triggers) {
+        try {
+          const result = await processWorkflowTrigger(supabase, trigger, {
+            document_id,
+            account_id: normalizedAccountId,
+            user_id,
+            file_name
+          });
+          workflowResults.push(result);
+        } catch (error) {
+          console.error('[Workflow] Trigger failed:', error);
+          workflowResults.push({
+            trigger_type: trigger.trigger_type,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+    }
+
+    // ============================================
+    // STEP 4: Update Database
+    // ============================================
+    
+    // Extract parsed data for database fields
+    const parsedData = analysis_mode === 'all' ? analysisData.parsed_data : analysisData;
+    
+    const updateData: any = {
+      raw_ocr_text: ocrText,
+      processing_status: 'complete',
+      updated_at: new Date().toISOString(),
+      // Store full analysis result
+      analysis_result: analysisData
+    };
+
+    // Add parsed fields if available
+    if (parsedData.carrier_name) updateData.carrier_name = parsedData.carrier_name;
+    if (parsedData.policy_number) updateData.policy_number = parsedData.policy_number;
+    if (parsedData.policy_type) updateData.policy_type = parsedData.policy_type;
+    if (parsedData.insured_name) updateData.insured_name = parsedData.insured_name;
+    if (parsedData.effective_date) updateData.effective_date = parsedData.effective_date;
+    if (parsedData.expiration_date) updateData.expiration_date = parsedData.expiration_date;
+    if (parsedData.total_premium) updateData.total_premium = parsedData.total_premium;
+    if (parsedData.payment_frequency) updateData.payment_frequency = parsedData.payment_frequency;
+    if (parsedData.coverages) updateData.coverages = parsedData.coverages;
+    if (parsedData.insured_items) updateData.insured_items = parsedData.insured_items;
+    if (parsedData.confidence_score) updateData.confidence_score = parsedData.confidence_score;
+
     const { data: updatedRecord, error: updateError } = await supabase
       .from('document_analysis')
-      .update({
-        carrier_name: parsedData.carrier_name,
-        policy_number: parsedData.policy_number,
-        policy_type: parsedData.policy_type,
-        insured_name: parsedData.insured_name,
-        effective_date: parsedData.effective_date,
-        expiration_date: parsedData.expiration_date,
-        total_premium: parsedData.total_premium,
-        payment_frequency: parsedData.payment_frequency,
-        coverages: parsedData.coverages || [],
-        insured_items: parsedData.insured_items || [],
-        raw_ocr_text: ocrText,
-        confidence_score: parsedData.confidence_score || 85,
-        processing_status: 'complete',
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', analysisRecord.id)
       .select()
       .single();
@@ -282,13 +446,16 @@ Return ONLY the JSON object, no other text.`
       throw updateError;
     }
 
-    console.log('[Document Analysis] Complete:', updatedRecord.id);
+    console.log('[Azure Analysis] Complete:', updatedRecord.id);
 
     return new Response(
       JSON.stringify({
         success: true,
         analysis_id: updatedRecord.id,
-        data: updatedRecord
+        mode: analysis_mode,
+        data: updatedRecord,
+        analysis: analysisData,
+        workflow_results: workflowResults.length > 0 ? workflowResults : undefined
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -297,9 +464,9 @@ Return ONLY the JSON object, no other text.`
     );
 
   } catch (error) {
-    console.error('[Document Analysis] Error:', error);
+    console.error('[Azure Analysis] Error:', error);
     
-    // Try to update record with error using the documentId captured earlier
+    // Try to update record with error
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -332,3 +499,162 @@ Return ONLY the JSON object, no other text.`
     );
   }
 });
+
+// ============================================
+// Workflow Trigger Processing
+// ============================================
+
+async function processWorkflowTrigger(
+  supabase: any,
+  trigger: WorkflowTrigger,
+  context: { document_id: string; account_id: string | null; user_id: string; file_name: string }
+): Promise<any> {
+  
+  const { trigger_type, metadata, priority, recommended_actions } = trigger;
+  
+  console.log(`[Workflow] Processing ${trigger_type} with priority ${priority}`);
+
+  switch (trigger_type) {
+    case 'create_task':
+      return await createTask(supabase, metadata, context, priority, recommended_actions);
+    
+    case 'send_email':
+      return await sendEmail(supabase, metadata, context);
+    
+    case 'create_opportunity':
+      return await createOpportunity(supabase, metadata, context, priority);
+    
+    case 'schedule_review':
+      return await scheduleReview(supabase, metadata, context);
+    
+    case 'assign_agent':
+      return await assignAgent(supabase, metadata, context);
+    
+    case 'update_status':
+      return await updateStatus(supabase, metadata, context);
+    
+    case 'alert_manager':
+      return await alertManager(supabase, metadata, context, priority);
+    
+    default:
+      console.warn(`[Workflow] Unknown trigger type: ${trigger_type}`);
+      return { trigger_type, success: false, error: 'Unknown trigger type' };
+  }
+}
+
+async function createTask(
+  supabase: any, 
+  metadata: any, 
+  context: any, 
+  priority: string,
+  recommended_actions: string[]
+): Promise<any> {
+  
+  const dueDate = metadata.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      title: metadata.task_title || `Review document: ${context.file_name}`,
+      description: recommended_actions.join('\n'),
+      category: 'policy_review',
+      priority: priority,
+      status: 'pending',
+      due_at: dueDate,
+      assignee_id: metadata.assigned_to || null,
+      account_id: context.account_id,
+      metadata: {
+        document_id: context.document_id,
+        automation_trigger: true
+      }
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  
+  return { trigger_type: 'create_task', success: true, task_id: data.id };
+}
+
+async function sendEmail(supabase: any, metadata: any, context: any): Promise<any> {
+  // Placeholder - implement email sending logic
+  console.log('[Workflow] Email sending not yet implemented');
+  return { trigger_type: 'send_email', success: true, note: 'Queued for sending' };
+}
+
+async function createOpportunity(
+  supabase: any, 
+  metadata: any, 
+  context: any,
+  priority: string
+): Promise<any> {
+  
+  if (!context.account_id) {
+    return { trigger_type: 'create_opportunity', success: false, error: 'No account_id' };
+  }
+
+  const { data, error } = await supabase
+    .from('opportunities')
+    .insert({
+      account_id: context.account_id,
+      title: `Cross-sell: ${metadata.opportunity_type || 'Product'}`,
+      description: `AI-identified opportunity from document analysis`,
+      stage: 'qualification',
+      priority: priority,
+      created_by: context.user_id,
+      metadata: {
+        document_id: context.document_id,
+        automation_trigger: true,
+        opportunity_type: metadata.opportunity_type
+      }
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  
+  return { trigger_type: 'create_opportunity', success: true, opportunity_id: data.id };
+}
+
+async function scheduleReview(supabase: any, metadata: any, context: any): Promise<any> {
+  // Create a task for scheduling review
+  return await createTask(
+    supabase, 
+    { ...metadata, task_title: `Schedule policy review: ${context.file_name}` },
+    context,
+    'medium',
+    ['Schedule review meeting', 'Prepare review materials']
+  );
+}
+
+async function assignAgent(supabase: any, metadata: any, context: any): Promise<any> {
+  // Placeholder - implement agent assignment logic
+  console.log('[Workflow] Agent assignment not yet implemented');
+  return { trigger_type: 'assign_agent', success: true, note: 'Assignment queued' };
+}
+
+async function updateStatus(supabase: any, metadata: any, context: any): Promise<any> {
+  // Placeholder - implement status update logic
+  console.log('[Workflow] Status update not yet implemented');
+  return { trigger_type: 'update_status', success: true, note: 'Status updated' };
+}
+
+async function alertManager(
+  supabase: any, 
+  metadata: any, 
+  context: any, 
+  priority: string
+): Promise<any> {
+  // Create urgent task for manager
+  return await createTask(
+    supabase,
+    { 
+      ...metadata, 
+      task_title: `⚠️ MANAGER ALERT: ${context.file_name}`,
+      assignee_id: metadata.manager_id || null
+    },
+    context,
+    'urgent',
+    ['Review immediately', 'Take corrective action']
+  );
+}
