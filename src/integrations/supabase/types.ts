@@ -5535,6 +5535,53 @@ export type Database = {
           },
         ]
       }
+      parsed_documents: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          document_type: string | null
+          file_name: string | null
+          id: string
+          parsed_data: Json
+          parseur_document_id: string | null
+          source: string | null
+          source_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          file_name?: string | null
+          id?: string
+          parsed_data: Json
+          parseur_document_id?: string | null
+          source?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          file_name?: string | null
+          id?: string
+          parsed_data?: Json
+          parseur_document_id?: string | null
+          source?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parsed_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number

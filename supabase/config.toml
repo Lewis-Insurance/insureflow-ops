@@ -130,3 +130,6 @@ verify_jwt = true
 
 [functions.ai-document-analysis-simple]
 verify_jwt = true
+
+[functions.parseur-webhook]
+verify_jwt = false
