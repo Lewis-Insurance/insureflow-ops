@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getSupabaseJwtPayload } from "https://esm.sh/@supabase/auth-helpers-shared@0.6.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,17 +10,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Extract JWT from the Authorization header
-    const authHeader = req.headers.get("authorization")?.split("Bearer ")[1];
-    let user_id: string | null = null;
-
-    if (authHeader) {
-      try {
-        const payload = getSupabaseJwtPayload(authHeader);
-        user_id = payload?.sub ?? null;
-      } catch (e) {
-        console.warn("JWT parse failed:", e);
-      }
+    // Get Authorization header
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      throw new Error("Missing authorization header");
     }
 
     // Parse body
@@ -31,10 +23,20 @@ serve(async (req) => {
       throw new Error("Missing required fields: task_type or documents[]");
     }
 
-    // Init Supabase
+    // Init Supabase with Authorization header to get user context
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    // Get authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error("User not authenticated");
+    }
 
     // Create workspace
     const { data: workspace, error: wsError } = await supabase
@@ -44,7 +46,7 @@ serve(async (req) => {
         description: notes || null,
         task_type,
         status: "idle",
-        created_by: user_id,
+        created_by: user.id,
         client_name: client_name || null,
         notes: notes || null,
       })
