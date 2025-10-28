@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,11 +33,15 @@ serve(async (req) => {
       throw new Error('Azure credentials not configured');
     }
 
+    // Generate a proper UUID for the document analysis record
+    const documentAnalysisId = crypto.randomUUID();
+    
     // Create analysis record
     const normalizedAccountId = account_id && String(account_id).trim() !== '' ? account_id : null;
     const { data: analysisRecord, error: insertError } = await supabase
       .from('document_analysis')
       .insert({
+        id: documentAnalysisId,
         document_id,
         file_name,
         account_id: normalizedAccountId,
@@ -257,7 +262,7 @@ Use null for missing values. Respond with ONLY the JSON, no explanation.`;
     return new Response(
       JSON.stringify({
         success: true,
-        analysis_id: analysisRecord.id,
+        analysis_id: documentAnalysisId,
         ocr_length: ocrText.length,
         analysis: analysisResult
       }),
