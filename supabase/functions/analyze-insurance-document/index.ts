@@ -55,13 +55,23 @@ serve(async (req) => {
       throw new Error('GOOGLE_CLOUD_VISION_API_KEY not configured');
     }
 
-    // Download document
-    const docResponse = await fetch(document_url);
-    if (!docResponse.ok) {
-      throw new Error(`Failed to download document: ${docResponse.statusText}`);
+    // Extract path from URL (remove the base URL part)
+    const urlPath = document_url.split('/storage/v1/object/public/')[1];
+    if (!urlPath) {
+      throw new Error('Invalid document URL format');
     }
 
-    const docBuffer = await docResponse.arrayBuffer();
+    // Download document using Supabase client
+    const { data: docData, error: downloadError } = await supabase.storage
+      .from(urlPath.split('/')[0]) // bucket name
+      .download(urlPath.split('/').slice(1).join('/')); // file path
+
+    if (downloadError || !docData) {
+      console.error('[Download] Error:', downloadError);
+      throw new Error(`Failed to download document: ${downloadError?.message || 'Unknown error'}`);
+    }
+
+    const docBuffer = await docData.arrayBuffer();
     const base64Doc = btoa(String.fromCharCode(...new Uint8Array(docBuffer)));
 
     // Call Google Vision API
