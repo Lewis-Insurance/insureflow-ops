@@ -89,6 +89,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Workspace"
                   to="/workspace"
                 />
+                <NavItem 
+                  icon={Brain} 
+                  label="Renewal Intelligence" 
+                  to="/renewals/intelligence" 
+                  badge="AI"
+                />
               </NavGroup>
 
               {/* Lewis AI Group */}
@@ -109,12 +115,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={FileQuestion}
                   label="Document Intelligence"
                   to="/document-intelligence"
-                  badge="AI"
-                />
-                <NavItem 
-                  icon={Brain} 
-                  label="Renewal Intelligence" 
-                  to="/renewals/intelligence" 
                   badge="AI"
                 />
               </NavGroup>
