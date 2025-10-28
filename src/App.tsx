@@ -62,6 +62,7 @@ const CustomizationPage = React.lazy(() => import("./pages/CustomizationPage"));
 const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
 const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
 const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
+const LewiAI = React.lazy(() => import("./pages/LewiAI"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -517,6 +518,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CampaignBuilderPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/lewi-ai"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <LewiAI />
                   </ErrorBoundary>
                 }
               />
