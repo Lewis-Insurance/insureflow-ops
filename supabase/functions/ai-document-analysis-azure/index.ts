@@ -104,43 +104,27 @@ serve(async (req) => {
 
     console.log('[Document] Size:', fileBuffer.byteLength, 'bytes');
 
-    // Step 2: Start OCR with Azure Document Intelligence (try multiple API versions)
-    console.log('[Azure OCR] Starting Document Intelligence...');
+    // Step 2: Start OCR with Azure Document Intelligence (FIXED API VERSION)
+    console.log('[Azure OCR] Starting Document Intelligence with API version 2023-07-31...');
+    
+    const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31`;
+    console.log('[Azure OCR] URL:', analyzeUrl);
 
-    const apiVersions = ['2023-07-31', '2024-02-29-preview', '2023-10-31-preview'];
-    let analyzeResponse;
-    let successfulVersion = null;
-
-    for (const apiVersion of apiVersions) {
-      const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=${apiVersion}`;
-      console.log(`[Azure OCR] Trying API version: ${apiVersion}`);
-      console.log(`[Azure OCR] URL: ${analyzeUrl}`);
-      
-      analyzeResponse = await fetch(analyzeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        },
-        body: JSON.stringify({
-          base64Source: base64File
-        })
-      });
-
-      if (analyzeResponse.ok) {
-        successfulVersion = apiVersion;
-        console.log(`[Azure OCR] Success with version: ${apiVersion}`);
-        break;
-      } else {
-        const errorText = await analyzeResponse.text();
-        console.log(`[Azure OCR] Version ${apiVersion} failed: ${analyzeResponse.status} - ${errorText}`);
-      }
-    }
+    const analyzeResponse = await fetch(analyzeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+      },
+      body: JSON.stringify({
+        base64Source: base64File
+      })
+    });
 
     if (!analyzeResponse.ok) {
       const errorText = await analyzeResponse.text();
-      console.error('[Azure OCR Error] All versions failed. Last error:', errorText);
-      throw new Error(`Azure OCR failed with all API versions: ${analyzeResponse.status} - ${errorText}`);
+      console.error('[Azure OCR Error]:', errorText);
+      throw new Error(`Azure OCR failed: ${analyzeResponse.status} - ${errorText}`);
     }
 
     const operationLocation = analyzeResponse.headers.get('Operation-Location');
