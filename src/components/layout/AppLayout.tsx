@@ -78,7 +78,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               </SidebarMenu>
 
               {/* Lewi AI Group */}
-              <NavGroup label="Lewi AI" defaultOpen={false}>
+              <NavGroup label="Lewi AI" defaultOpen={true}>
                 <NavItem
                   icon={Sparkles}
                   label="Lewi AI Home"

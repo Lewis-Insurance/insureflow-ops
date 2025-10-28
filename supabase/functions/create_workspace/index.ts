@@ -38,10 +38,18 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
+    // Create workspace with better naming
+    const workspaceName = title 
+      ? title 
+      : task_type
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+
     const { data: workspace, error: wsError } = await supabase
       .from("workspaces")
       .insert({
-        name: title || task_type,
+        name: workspaceName,
         description: notes || null,
         task_type,
         status: "idle",
