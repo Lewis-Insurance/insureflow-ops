@@ -16,13 +16,11 @@ serve(async (req) => {
     
     console.log('[Azure Analysis] Starting:', file_name);
 
-    // Initialize Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get Azure credentials
     const AZURE_DOC_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')?.replace(/\/$/, '');
     const AZURE_DOC_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
     const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.replace(/\/$/, '');
@@ -51,9 +49,28 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    console.log('[Azure OCR] Starting Document Intelligence...');
+    console.log('[Download] Fetching document from storage...');
 
-    // Step 1: Start Azure Document Intelligence analysis
+    // Download document from Supabase Storage
+    const documentResponse = await fetch(document_url);
+    if (!documentResponse.ok) {
+      throw new Error(`Failed to download document: ${documentResponse.status}`);
+    }
+
+    const documentBlob = await documentResponse.blob();
+    const documentBuffer = await documentBlob.arrayBuffer();
+    const base64Document = btoa(String.fromCharCode(...new Uint8Array(documentBuffer)));
+
+    console.log(`[Download] Got ${documentBuffer.byteLength} bytes, converted to base64`);
+
+    // Determine content type
+    const contentType = file_name.toLowerCase().endsWith('.pdf') 
+      ? 'application/pdf' 
+      : 'image/jpeg';
+
+    console.log('[Azure OCR] Sending to Document Intelligence...');
+
+    // Start Azure Document Intelligence with base64 content
     const analyzeResponse = await fetch(
       `${AZURE_DOC_ENDPOINT}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2024-02-29-preview`,
       {
@@ -62,29 +79,30 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY,
         },
-        body: JSON.stringify({ urlSource: document_url }),
+        body: JSON.stringify({
+          base64Source: base64Document
+        }),
       }
     );
 
     if (!analyzeResponse.ok) {
       const errorText = await analyzeResponse.text();
+      console.error('[Azure OCR] Error:', errorText);
       throw new Error(`Azure Document Intelligence failed: ${analyzeResponse.status} - ${errorText}`);
     }
 
     const operationLocation = analyzeResponse.headers.get('operation-location');
-    if (!operationLocation) {
-      throw new Error('No operation-location header returned');
-    }
+    if (!operationLocation) throw new Error('No operation-location header');
 
-    console.log('[Azure OCR] Waiting for results...');
+    console.log('[Azure OCR] Polling for results...');
 
-    // Step 2: Poll for results
+    // Poll for results
     let ocrResult;
     let attempts = 0;
-    const maxAttempts = 60; // 60 seconds max
+    const maxAttempts = 30;
 
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
       
       const resultResponse = await fetch(operationLocation, {
         headers: { 'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY },
@@ -95,70 +113,70 @@ serve(async (req) => {
       }
 
       const result = await resultResponse.json();
+      console.log(`[Azure OCR] Status: ${result.status} (attempt ${attempts + 1}/${maxAttempts})`);
       
       if (result.status === 'succeeded') {
         ocrResult = result;
+        console.log(`[Azure OCR] Success!`);
         break;
       } else if (result.status === 'failed') {
-        throw new Error('Azure Document Intelligence failed to process document');
+        throw new Error(`Azure Document Intelligence failed: ${JSON.stringify(result.error || {})}`);
       }
       
       attempts++;
     }
 
     if (!ocrResult) {
-      throw new Error('OCR processing timed out');
+      throw new Error('OCR timeout - processing took too long');
     }
 
-    // Extract text from OCR result
+    // Extract text
     const ocrText = ocrResult.analyzeResult?.content || '';
     console.log(`[Azure OCR] Extracted ${ocrText.length} characters`);
 
-    // Update with OCR text
+    if (ocrText.length === 0) {
+      throw new Error('No text extracted from document - may be an image without text');
+    }
+
     await supabase
       .from('document_analysis')
       .update({ ocr_text: ocrText })
       .eq('id', analysisRecord.id);
 
-    // Step 3: Analyze with Azure OpenAI
+    // AI Analysis
     console.log('[Azure OpenAI] Analyzing document...');
 
-    const analysisPrompt = `You are an insurance document analyst. Analyze this insurance document and extract key information.
+    const analysisPrompt = `Analyze this insurance document and extract key information.
 
-Document text:
-${ocrText.substring(0, 50000)}
+Document Text:
+${ocrText.substring(0, 40000)}
 
-Extract the following in JSON format:
+Extract and return ONLY valid JSON with this structure:
 {
-  "document_type": "auto_policy|home_policy|commercial_policy|quote|dec_page|other",
+  "document_type": "auto_policy|home_policy|commercial_policy|quote|dec_page|certificate|other",
   "carrier": "insurance company name",
-  "policy_number": "policy number if found",
-  "insured_name": "name of insured",
-  "effective_date": "YYYY-MM-DD",
-  "expiration_date": "YYYY-MM-DD",
+  "policy_number": "policy or quote number",
+  "insured_name": "name of insured party",
+  "effective_date": "YYYY-MM-DD or null",
+  "expiration_date": "YYYY-MM-DD or null",
   "premium": {
-    "total": number,
-    "frequency": "annual|semi-annual|quarterly|monthly"
+    "total": number or null,
+    "frequency": "annual|semi-annual|quarterly|monthly|null"
   },
   "coverages": [
-    {
-      "type": "coverage type",
-      "limit": "limit amount",
-      "deductible": "deductible amount"
-    }
+    {"type": "coverage name", "limit": "limit", "deductible": "deductible"}
   ],
   "vehicles": [
-    {
-      "year": "year",
-      "make": "make",
-      "model": "model",
-      "vin": "VIN"
-    }
+    {"year": "year", "make": "make", "model": "model", "vin": "VIN"}
   ],
-  "key_details": ["list", "of", "important", "details"]
+  "property": {
+    "address": "property address",
+    "type": "property type"
+  },
+  "key_details": ["important", "information", "list"]
 }
 
-Respond ONLY with valid JSON. If information is not found, use null.`;
+Use null for missing values. Respond with ONLY the JSON, no explanation.`;
 
     const openaiResponse = await fetch(
       `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
@@ -170,37 +188,42 @@ Respond ONLY with valid JSON. If information is not found, use null.`;
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: 'You are an expert insurance document analyst. Always respond with valid JSON only.' },
+            { role: 'system', content: 'You are an expert insurance document analyst. Always respond with valid JSON only, no markdown.' },
             { role: 'user', content: analysisPrompt }
           ],
           temperature: 0.1,
-          max_tokens: 2000,
+          max_tokens: 2500,
+          response_format: { type: 'json_object' }
         }),
       }
     );
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
+      console.error('[Azure OpenAI] Error:', errorText);
       throw new Error(`Azure OpenAI failed: ${openaiResponse.status} - ${errorText}`);
     }
 
     const openaiResult = await openaiResponse.json();
     const analysisText = openaiResult.choices[0]?.message?.content || '{}';
     
-    // Parse JSON response
     let analysisResult;
     try {
-      // Remove markdown code blocks if present
       const cleanedText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       analysisResult = JSON.parse(cleanedText);
+      console.log('[Azure OpenAI] Successfully parsed analysis');
     } catch (e) {
-      console.error('[Azure OpenAI] Failed to parse JSON:', e);
-      analysisResult = { error: 'Failed to parse AI response', raw: analysisText };
+      console.error('[Parse Error]:', e);
+      analysisResult = { 
+        error: 'Failed to parse AI response', 
+        raw: analysisText.substring(0, 1000),
+        document_type: 'unknown',
+        extracted_text_length: ocrText.length
+      };
     }
 
     console.log('[Azure Analysis] Complete!');
 
-    // Final update
     await supabase
       .from('document_analysis')
       .update({
@@ -221,9 +244,13 @@ Respond ONLY with valid JSON. If information is not found, use null.`;
     );
 
   } catch (error: any) {
-    console.error('[Azure Analysis] Error:', error);
+    console.error('[Azure Analysis] Error:', error.message);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
