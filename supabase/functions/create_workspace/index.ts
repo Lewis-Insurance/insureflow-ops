@@ -37,6 +37,7 @@ serve(async (req) => {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
+
     if (userError || !user) {
       throw new Error("User not authenticated");
     }
@@ -67,7 +68,6 @@ serve(async (req) => {
     }));
 
     const { error: docError } = await supabase.from("workspace_documents").insert(docsToInsert);
-
     if (docError) throw docError;
 
     // Send files to Parseur for automatic parsing
@@ -83,22 +83,31 @@ serve(async (req) => {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            const formData = new FormData();
-            formData.append("mailbox", PARSEUR_MAILBOX_ID);
-            formData.append("file_url", d.file_url);
-
-            const parseurResp = await fetch("https://api.parseur.com/parser_url/", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${PARSEUR_API_KEY}`,
-              },
-              body: formData,
-            });
+            // Parseur API expects JSON body with 'url' field
+            const parseurResp = await fetch(
+              `https://api.parseur.com/mailbox/${PARSEUR_MAILBOX_ID}/document`,
+              {
+                method: "POST",
+                headers: {
+                  "Authorization": `Token ${PARSEUR_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  url: d.file_url,
+                }),
+              }
+            );
 
             if (!parseurResp.ok) {
-              console.error("Parseur API error:", await parseurResp.text());
+              const errorText = await parseurResp.text();
+              console.error("Parseur API error:", {
+                status: parseurResp.status,
+                statusText: parseurResp.statusText,
+                body: errorText,
+              });
             } else {
-              console.log(`Sent ${d.file_name} to Parseur successfully`);
+              const parseurData = await parseurResp.json();
+              console.log(`Sent ${d.file_name} to Parseur successfully`, parseurData);
             }
           } catch (err) {
             console.error(`Failed to send ${d.file_name} to Parseur:`, err);
