@@ -48,17 +48,47 @@ interface DocumentAnalysisDisplayProps {
   analysisResult: AnalysisResult;
   ocrText: string;
   fileName: string;
+  totalPages?: number;
+  pagesAnalyzed?: string;
 }
 
 export const DocumentAnalysisDisplay: React.FC<DocumentAnalysisDisplayProps> = ({
   analysisResult,
   ocrText,
-  fileName
+  fileName,
+  totalPages,
+  pagesAnalyzed
 }) => {
   const [isOcrExpanded, setIsOcrExpanded] = useState(true);
 
   return (
     <div className="space-y-6">
+      {/* Page Analysis Info */}
+      {(totalPages || pagesAnalyzed) && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Document Analysis</span>
+              </div>
+              <div className="flex items-center gap-4">
+                {totalPages && (
+                  <span className="text-muted-foreground">
+                    Total Pages: <span className="font-semibold text-foreground">{totalPages}</span>
+                  </span>
+                )}
+                {pagesAnalyzed && (
+                  <span className="text-muted-foreground">
+                    Analyzed: <span className="font-semibold text-foreground">{pagesAnalyzed}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Analysis Results */}
       <Card>
         <CardHeader>

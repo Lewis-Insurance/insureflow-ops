@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +27,8 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const [uploadProgress, setUploadProgress] = useState(0);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+  const [focusRegion, setFocusRegion] = useState<string>('smart');
+  const [customPageRange, setCustomPageRange] = useState<string>('');
 
   // Fetch analysis data when completedAnalysisId is set
   useEffect(() => {
@@ -143,10 +147,12 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         {
           body: {
             document_url: publicUrl,
-            document_id: documentRecord.id,  // Pass UUID, not file path
+            document_id: documentRecord.id,
             file_name: fileName,
             account_id: accountId || null,
-            user_id: user?.id
+            user_id: user?.id,
+            focus_region: focusRegion,
+            page_range: focusRegion === 'custom' ? customPageRange : null
           }
         }
       );
@@ -182,6 +188,8 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     setSelectedFile(null);
     setErrorMessage(null);
     setUploadedFileName('');
+    setFocusRegion('smart');
+    setCustomPageRange('');
   };
 
   const getProgressMessage = () => {
@@ -222,6 +230,8 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           analysisResult={analysisResult}
           ocrText={analysisData.ocr_text || ''}
           fileName={uploadedFileName || analysisData.file_name || 'Document'}
+          totalPages={analysisData.total_pages}
+          pagesAnalyzed={analysisData.pages_analyzed}
         />
       </div>
     );
@@ -247,7 +257,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           Upload insurance documents for AI-powered analysis
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {errorMessage && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -258,6 +268,57 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           </Alert>
         )}
 
+        {/* Focus Region Selector */}
+        <div className="space-y-3">
+          <Label htmlFor="focus-region" className="text-base font-semibold">
+            Document Focus Region
+          </Label>
+          <Select value={focusRegion} onValueChange={setFocusRegion} disabled={isProcessing}>
+            <SelectTrigger id="focus-region">
+              <SelectValue placeholder="Select focus region" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="smart">Smart (Auto-detect important pages)</SelectItem>
+              <SelectItem value="front">Front (Pages 1-10)</SelectItem>
+              <SelectItem value="middle">Middle (Centered 10 pages)</SelectItem>
+              <SelectItem value="end">End (Last 10 pages)</SelectItem>
+              <SelectItem value="first_third">First Third</SelectItem>
+              <SelectItem value="middle_third">Middle Third</SelectItem>
+              <SelectItem value="last_third">Last Third</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {focusRegion === 'custom' && (
+            <div className="space-y-2">
+              <Label htmlFor="page-range" className="text-sm">
+                Page Range (e.g., "5-15")
+              </Label>
+              <Input
+                id="page-range"
+                type="text"
+                placeholder="5-15"
+                value={customPageRange}
+                onChange={(e) => setCustomPageRange(e.target.value)}
+                disabled={isProcessing}
+              />
+            </div>
+          )}
+          
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              {focusRegion === 'smart' && 'Automatically detects declaration pages with coverage information'}
+              {focusRegion === 'front' && 'Analyzes the first 10 pages of the document'}
+              {focusRegion === 'middle' && 'Analyzes 10 pages from the center of the document'}
+              {focusRegion === 'end' && 'Analyzes the last 10 pages of the document'}
+              {focusRegion === 'first_third' && 'Analyzes up to 20 pages from the first third'}
+              {focusRegion === 'middle_third' && 'Analyzes up to 20 pages from the middle third'}
+              {focusRegion === 'last_third' && 'Analyzes up to 20 pages from the last third'}
+              {focusRegion === 'custom' && 'Specify exact page numbers to analyze (e.g., "5-15")'}
+            </AlertDescription>
+          </Alert>
+        </div>
 
         <div className="border-2 border-dashed rounded-lg p-8 text-center">
           {selectedFile ? (
