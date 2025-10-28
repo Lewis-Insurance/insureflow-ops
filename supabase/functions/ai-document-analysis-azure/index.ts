@@ -52,20 +52,18 @@ serve(async (req) => {
     console.log('[Download] Fetching document from storage...');
 
     // Parse the storage path from the URL
-    // URL format: https://{project}.supabase.co/storage/v1/object/public/documents/{path}
-    // OR: https://{project}.supabase.co/storage/v1/object/authenticated/documents/{path}
     const urlParts = document_url.split('/storage/v1/object/');
     if (urlParts.length !== 2) {
       throw new Error('Invalid document URL format');
     }
 
     const pathParts = urlParts[1].split('/');
-    const bucketName = pathParts[1]; // 'documents'
-    const filePath = pathParts.slice(2).join('/'); // rest of the path
+    const bucketName = pathParts[1];
+    const filePath = pathParts.slice(2).join('/');
 
     console.log(`[Download] Bucket: ${bucketName}, Path: ${filePath}`);
 
-    // Download from Supabase Storage with authentication
+    // Download from Supabase Storage
     const { data: fileData, error: downloadError } = await supabase
       .storage
       .from(bucketName)
@@ -77,9 +75,20 @@ serve(async (req) => {
     }
 
     const documentBuffer = await fileData.arrayBuffer();
-    const base64Document = btoa(String.fromCharCode(...new Uint8Array(documentBuffer)));
+    console.log(`[Download] Downloaded ${documentBuffer.byteLength} bytes`);
 
-    console.log(`[Download] Got ${documentBuffer.byteLength} bytes, converted to base64`);
+    // Convert to base64 in chunks to avoid stack overflow
+    const uint8Array = new Uint8Array(documentBuffer);
+    const chunkSize = 32768; // 32KB chunks
+    let base64Document = '';
+
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
+      base64Document += btoa(chunkString);
+    }
+
+    console.log(`[Download] Converted to base64 (${base64Document.length} chars)`);
 
     // Determine content type
     const contentType = file_name.toLowerCase().endsWith('.pdf') 
