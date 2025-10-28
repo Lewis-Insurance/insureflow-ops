@@ -136,3 +136,6 @@ verify_jwt = false
 
 [functions.lewi_analyze]
 verify_jwt = false
+
+[functions.create_workspace]
+verify_jwt = true
