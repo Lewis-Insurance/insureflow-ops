@@ -128,5 +128,5 @@ verify_jwt = true
 [functions.ai-document-analysis-azure]
 verify_jwt = true
 
-[functions.simple-pdf-analysis]
+[functions.ai-document-analysis-simple]
 verify_jwt = true

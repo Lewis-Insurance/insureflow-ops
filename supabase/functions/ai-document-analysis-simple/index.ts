@@ -221,6 +221,7 @@ Return ONLY the JSON object, no other text.`;
         document_id,
         page_count: pageCount,
         text_length: fullText.length,
+        ocr_text: fullText,
         analysis: analysisResult
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

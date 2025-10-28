@@ -97,17 +97,15 @@ export function DocumentAnalysisUpload() {
       setUploading(false);
       setAnalyzing(true);
 
-      // Step 3: Call Azure analysis edge function
+      // Step 3: Call simple PDF analysis edge function
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-        'ai-document-analysis-azure',
+        'ai-document-analysis-simple',
         {
           body: {
             document_url: publicUrl,
             document_id: docData.id,
             file_name: file.name,
             user_id: userId,
-            focus_region: focusRegion,
-            page_range: focusRegion === 'custom' ? customRange : null,
           },
         }
       );
@@ -118,12 +116,23 @@ export function DocumentAnalysisUpload() {
         throw new Error(analysisData.error || 'Analysis failed');
       }
 
-      setResult(analysisData);
+      // Format response to match expected structure
+      const formattedResult = {
+        success: true,
+        analysis_id: analysisData.document_id,
+        ocr_text: analysisData.ocr_text || '',
+        structured_data: analysisData.analysis,
+        total_pages: analysisData.page_count,
+        pages_analyzed: `1-${analysisData.page_count}`,
+        focus_region: 'all',
+      };
+
+      setResult(formattedResult);
       setAnalyzing(false);
 
       toast({
         title: 'Analysis Complete',
-        description: `Analyzed ${analysisData.pages_analyzed} of ${analysisData.total_pages} pages`,
+        description: `Analyzed all ${analysisData.page_count} pages`,
       });
 
     } catch (error: any) {
@@ -220,7 +229,7 @@ export function DocumentAnalysisUpload() {
             {analyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {!uploading && !analyzing && <Upload className="mr-2 h-4 w-4" />}
             {uploading && 'Uploading...'}
-            {analyzing && 'Analyzing with Azure AI...'}
+            {analyzing && 'Analyzing with AI...'}
             {!uploading && !analyzing && 'Upload & Analyze'}
           </Button>
         </CardContent>
