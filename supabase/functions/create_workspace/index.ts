@@ -75,7 +75,8 @@ serve(async (req) => {
     const PARSEUR_MAILBOX_ID = Deno.env.get("PARSEUR_MAILBOX_ID");
 
     console.log("ENV CHECK", {
-      apiKeyStart: PARSEUR_API_KEY?.substring(0, 6),
+      apiKeyPresent: !!PARSEUR_API_KEY,
+      apiKeyLength: PARSEUR_API_KEY?.length,
       mailboxId: PARSEUR_MAILBOX_ID,
     });
 
@@ -83,37 +84,39 @@ serve(async (req) => {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            // Parseur API expects JSON body with 'url' field
-            const parseurResp = await fetch(
-              `https://api.parseur.com/mailbox/${PARSEUR_MAILBOX_ID}/document`,
-              {
-                method: "POST",
-                headers: {
-                  "Authorization": `Token ${PARSEUR_API_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  url: d.file_url,
-                }),
-              }
-            );
+            // OPTION 1: Use Parseur's document upload endpoint
+            // The correct endpoint is /parser (singular, not /mailbox/{id}/document)
+            const parseurResp = await fetch("https://api.parseur.com/parser", {
+              method: "POST",
+              headers: {
+                "Authorization": `Token ${PARSEUR_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                mailbox_id: PARSEUR_MAILBOX_ID,
+                url: d.file_url,
+              }),
+            });
 
+            const responseText = await parseurResp.text();
+            
             if (!parseurResp.ok) {
-              const errorText = await parseurResp.text();
               console.error("Parseur API error:", {
                 status: parseurResp.status,
                 statusText: parseurResp.statusText,
-                body: errorText,
+                body: responseText,
+                file: d.file_name,
               });
             } else {
-              const parseurData = await parseurResp.json();
-              console.log(`Sent ${d.file_name} to Parseur successfully`, parseurData);
+              console.log(`Sent ${d.file_name} to Parseur successfully:`, responseText);
             }
           } catch (err) {
             console.error(`Failed to send ${d.file_name} to Parseur:`, err);
           }
         }
       }
+    } else {
+      console.warn("Parseur credentials not configured - skipping document parsing");
     }
 
     console.log(`Workspace ${workspace.id} created with ${documents.length} documents.`);
