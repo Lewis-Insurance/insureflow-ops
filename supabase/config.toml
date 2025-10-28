@@ -115,3 +115,6 @@ verify_jwt = true
 
 [functions.generate-insurance-quote-doc]
 verify_jwt = true
+
+[functions.ocr-document]
+verify_jwt = true
