@@ -2323,6 +2323,7 @@ export type Database = {
       document_analysis: {
         Row: {
           account_id: string | null
+          analysis_result: Json | null
           carrier_name: string | null
           confidence_score: number | null
           coverages: Json | null
@@ -2347,6 +2348,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          analysis_result?: Json | null
           carrier_name?: string | null
           confidence_score?: number | null
           coverages?: Json | null
@@ -2371,6 +2373,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          analysis_result?: Json | null
           carrier_name?: string | null
           confidence_score?: number | null
           coverages?: Json | null
