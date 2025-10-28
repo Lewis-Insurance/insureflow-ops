@@ -1,14 +1,14 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Smart page selection for insurance documents
+// Keywords for smart page detection
 const IMPORTANT_KEYWORDS = [
   'DECLARATIONS', 'DECLARATION', 'DEC PAGE',
   'COVERAGE', 'COVERAGES', 'LIMITS', 'PREMIUM', 'DEDUCTIBLE',
@@ -30,19 +30,24 @@ serve(async (req) => {
       file_name,
       account_id,
       user_id,
-      focus_region = 'smart', // 'smart', 'front', 'middle', 'end', 'first_third', 'middle_third', 'last_third', 'custom'
-      page_range = null // For custom like "2-5" or "15-25"
+      focus_region = 'smart',
+      page_range = null
     } = await req.json();
     
     documentId = document_id;
 
     console.log('[Azure Document Analysis] Starting:', file_name);
+    console.log('[Focus Region]:', focus_region);
 
     // Initialize Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Create initial record
     const normalizedAccountId = account_id && String(account_id).trim() !== '' ? account_id : null;
@@ -63,63 +68,62 @@ serve(async (req) => {
       throw insertError;
     }
 
-    // Step 1: Get document from storage
-    console.log('[Azure OCR] Fetching document from storage...');
-    
-    const { data: downloadData, error: downloadError } = await supabase
-      .storage
-      .from('documents')
-      .download(document_url.split('/documents/')[1]);
-
-    if (downloadError) throw downloadError;
-
-    const fileBuffer = await downloadData.arrayBuffer();
-    const uint8Array = new Uint8Array(fileBuffer);
-    const base64File = base64Encode(uint8Array);
-
-    // Step 2: Start OCR with Azure Document Intelligence
-    console.log('[Azure OCR] Starting Document Intelligence...');
-    
+    // Get Azure credentials
     const AZURE_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT');
     const AZURE_API_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
     
     if (!AZURE_ENDPOINT || !AZURE_API_KEY) {
-      throw new Error('Azure Document Intelligence credentials not configured');
+      throw new Error('Azure Document Intelligence credentials not configured. Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY');
     }
 
-    // Debug logging before API call
-    const fullUrl = `${AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`;
-    console.log('[Azure OCR Debug] Complete URL:', fullUrl);
-    console.log('[Azure OCR Debug] Endpoint value:', AZURE_ENDPOINT);
-    console.log('[Azure OCR Debug] API Key exists:', !!AZURE_API_KEY);
-    console.log('[Azure OCR Debug] API Key length:', AZURE_API_KEY?.length || 0);
-    console.log('[Azure OCR Debug] Headers to be sent:', {
-      'Content-Type': 'application/json',
-      'Ocp-Apim-Subscription-Key': `[${AZURE_API_KEY?.substring(0, 8)}...]`
+    // Remove trailing slash if present
+    const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
+
+    // Step 1: Get document from storage
+    console.log('[Azure OCR] Fetching document from storage...');
+    
+    const urlParts = document_url.split('/documents/');
+    if (urlParts.length !== 2) {
+      throw new Error('Invalid document URL format');
+    }
+    
+    const storagePath = urlParts[1];
+    
+    const { data: downloadData, error: downloadError } = await supabase
+      .storage
+      .from('documents')
+      .download(storagePath);
+
+    if (downloadError) {
+      console.error('[Storage Download Error]:', downloadError);
+      throw new Error(`Failed to download document: ${downloadError.message}`);
+    }
+
+    const fileBuffer = await downloadData.arrayBuffer();
+    const base64File = base64Encode(new Uint8Array(fileBuffer));
+
+    console.log('[Document] Size:', fileBuffer.byteLength, 'bytes');
+
+    // Step 2: Start OCR with Azure Document Intelligence
+    console.log('[Azure OCR] Starting Document Intelligence...');
+    
+    const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`;
+    console.log('[Azure OCR] URL:', analyzeUrl);
+
+    const analyzeResponse = await fetch(analyzeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+      },
+      body: JSON.stringify({
+        base64Source: base64File
+      })
     });
-    console.log('[Azure OCR Debug] Base64 file size:', base64File.length, 'characters');
-
-    // Start analysis
-    const analyzeResponse = await fetch(
-      fullUrl,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        },
-        body: JSON.stringify({
-          base64Source: base64File
-        })
-      }
-    );
-
-    console.log('[Azure OCR] Response status:', analyzeResponse.status);
-    console.log('[Azure OCR] Response headers:', Object.fromEntries(analyzeResponse.headers.entries()));
 
     if (!analyzeResponse.ok) {
       const errorText = await analyzeResponse.text();
-      console.error('[Azure OCR] Error response body:', errorText);
+      console.error('[Azure OCR Error]:', errorText);
       throw new Error(`Azure OCR failed: ${analyzeResponse.status} - ${errorText}`);
     }
 
@@ -128,11 +132,12 @@ serve(async (req) => {
       throw new Error('No operation location returned from Azure');
     }
 
+    console.log('[Azure OCR] Operation started, polling for results...');
+
     // Poll for results
-    console.log('[Azure OCR] Polling for results...');
     let ocrResult;
     let attempts = 0;
-    const maxAttempts = 60; // 2 minutes max
+    const maxAttempts = 60;
 
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -143,119 +148,104 @@ serve(async (req) => {
         }
       });
 
+      if (!resultResponse.ok) {
+        console.error('[Azure Poll Error]:', await resultResponse.text());
+        throw new Error(`Azure polling failed: ${resultResponse.status}`);
+      }
+
       const result = await resultResponse.json();
       
       if (result.status === 'succeeded') {
         ocrResult = result;
+        console.log('[Azure OCR] Success!');
         break;
       } else if (result.status === 'failed') {
-        throw new Error('Azure OCR failed: ' + JSON.stringify(result.error));
+        throw new Error('Azure OCR failed: ' + JSON.stringify(result.error || result));
       }
       
       attempts++;
+      console.log(`[Azure OCR] Polling attempt ${attempts}/${maxAttempts}, status: ${result.status}`);
     }
 
     if (!ocrResult) {
       throw new Error('Azure OCR timed out after 2 minutes');
     }
 
-    console.log(`[Azure OCR] Success! Extracted ${ocrResult.analyzeResult.pages?.length || 0} pages`);
-
-    // Step 3: INTELLIGENT PAGE SELECTION WITH THIRDS
+    // Step 3: INTELLIGENT PAGE SELECTION
     const allPages = ocrResult.analyzeResult.pages || [];
     const totalPages = allPages.length;
     console.log(`[Page Selection] Document has ${totalPages} pages, focus: ${focus_region}`);
 
     let selectedPages: any[] = [];
-    let selectedPageText = '';
     let pageRangeUsed = '';
 
-    // Determine which pages to analyze based on focus_region
     switch (focus_region) {
       case 'front':
-        console.log('[Page Selection] Using FRONT pages (1-10)');
         selectedPages = allPages.slice(0, Math.min(10, totalPages));
         pageRangeUsed = `1-${Math.min(10, totalPages)}`;
         break;
         
       case 'middle':
-        console.log('[Page Selection] Using MIDDLE pages (centered)');
         const middlePoint = Math.floor(totalPages / 2);
         const middleStart = Math.max(0, middlePoint - 5);
         const middleEnd = Math.min(middlePoint + 5, totalPages);
         selectedPages = allPages.slice(middleStart, middleEnd);
         pageRangeUsed = `${middleStart + 1}-${middleEnd}`;
-        console.log(`[Page Selection] Middle pages ${pageRangeUsed} (centered at page ${middlePoint})`);
         break;
         
       case 'end':
-        console.log('[Page Selection] Using END pages (last 10)');
         const endStart = Math.max(0, totalPages - 10);
         selectedPages = allPages.slice(endStart);
         pageRangeUsed = `${endStart + 1}-${totalPages}`;
         break;
         
       case 'first_third':
-        console.log('[Page Selection] Using FIRST THIRD');
         const firstThirdEnd = Math.floor(totalPages / 3);
-        const firstThirdLimit = Math.min(firstThirdEnd, 20); // Max 20 pages
+        const firstThirdLimit = Math.min(firstThirdEnd, 20);
         selectedPages = allPages.slice(0, firstThirdLimit);
         pageRangeUsed = `1-${firstThirdLimit}`;
-        console.log(`[Page Selection] First third: pages ${pageRangeUsed}`);
         break;
         
       case 'middle_third':
-        console.log('[Page Selection] Using MIDDLE THIRD');
         const thirdSize = Math.floor(totalPages / 3);
         const middleThirdStart = thirdSize;
-        const middleThirdEnd = Math.min(thirdSize * 2, thirdSize + 20); // Max 20 pages
+        const middleThirdEnd = Math.min(thirdSize * 2, thirdSize + 20);
         selectedPages = allPages.slice(middleThirdStart, middleThirdEnd);
         pageRangeUsed = `${middleThirdStart + 1}-${middleThirdEnd}`;
-        console.log(`[Page Selection] Middle third: pages ${pageRangeUsed}`);
         break;
         
       case 'last_third':
-        console.log('[Page Selection] Using LAST THIRD');
         const lastThirdStart = Math.floor((totalPages / 3) * 2);
-        const lastThirdActualStart = Math.max(lastThirdStart, totalPages - 20); // Max 20 pages
+        const lastThirdActualStart = Math.max(lastThirdStart, totalPages - 20);
         selectedPages = allPages.slice(lastThirdActualStart);
         pageRangeUsed = `${lastThirdActualStart + 1}-${totalPages}`;
-        console.log(`[Page Selection] Last third: pages ${pageRangeUsed}`);
         break;
         
       case 'custom':
         if (page_range) {
-          console.log(`[Page Selection] Using CUSTOM range: ${page_range}`);
           try {
-            const [start, end] = page_range.split('-').map(n => parseInt(n.trim()));
-            if (isNaN(start) || isNaN(end) || start < 1 || end > totalPages || start > end) {
-              throw new Error('Invalid page range');
+            const [start, end] = page_range.split('-').map((n: string) => parseInt(n.trim()));
+            if (start >= 1 && end <= totalPages && start <= end) {
+              selectedPages = allPages.slice(start - 1, end);
+              pageRangeUsed = `${start}-${end}`;
+            } else {
+              throw new Error('Invalid range');
             }
-            const startIndex = start - 1; // Convert to 0-based
-            const endIndex = Math.min(end, totalPages);
-            selectedPages = allPages.slice(startIndex, endIndex);
-            pageRangeUsed = `${start}-${endIndex}`;
           } catch (e) {
-            console.log('[Page Selection] Invalid custom range, falling back to smart');
-            focus_region = 'smart'; // Fallback to smart
+            console.log('[Page Selection] Invalid custom range, using smart');
+            focus_region = 'smart';
           }
         } else {
-          console.log('[Page Selection] Custom selected but no range provided, falling back to smart');
-          focus_region = 'smart'; // Fallback
+          focus_region = 'smart';
         }
         break;
         
       case 'smart':
       default:
-        console.log('[Page Selection] Using SMART detection');
-        
         if (totalPages <= 10) {
-          // Small doc: use all pages
           selectedPages = allPages;
           pageRangeUsed = `1-${totalPages}`;
-          console.log('[Page Selection] Small document, using all pages');
         } else {
-          // Large doc: scan for important pages
           const scanPages = allPages.slice(0, Math.min(20, totalPages));
           const importantPageIndices: number[] = [];
           
@@ -274,16 +264,11 @@ serve(async (req) => {
             }
           });
 
-          console.log(`[Page Selection] Found ${importantPageIndices.length} important pages:`, importantPageIndices);
-
           if (importantPageIndices.length > 0) {
             const selectedIndices = importantPageIndices.slice(0, 10);
             selectedPages = selectedIndices.map(index => allPages[index]);
             pageRangeUsed = selectedIndices.map(i => i + 1).join(', ');
-            console.log(`[Page Selection] Using important pages: ${pageRangeUsed}`);
           } else {
-            // Fallback: first 10 pages
-            console.log('[Page Selection] No keywords found, using first 10 pages');
             selectedPages = allPages.slice(0, 10);
             pageRangeUsed = '1-10';
           }
@@ -291,20 +276,8 @@ serve(async (req) => {
         break;
     }
 
-    // Handle custom fallback case
-    if (focus_region === 'smart' && !pageRangeUsed) {
-      // This handles the fallback from custom to smart
-      if (totalPages <= 10) {
-        selectedPages = allPages;
-        pageRangeUsed = `1-${totalPages}`;
-      } else {
-        selectedPages = allPages.slice(0, 10);
-        pageRangeUsed = '1-10';
-      }
-    }
-
     // Extract text from selected pages
-    selectedPageText = selectedPages
+    const selectedPageText = selectedPages
       .map((page: any) => 
         (page.lines || []).map((line: any) => line.content || '').join('\n')
       )
@@ -313,7 +286,6 @@ serve(async (req) => {
     const charCount = selectedPageText.length;
     console.log(`[Page Selection] Selected ${selectedPages.length} pages (${pageRangeUsed}), ${charCount} characters`);
 
-    // Update database with OCR results
     await supabase
       .from('document_analysis')
       .update({ 
@@ -336,16 +308,10 @@ serve(async (req) => {
       throw new Error('Azure OpenAI credentials not configured');
     }
 
-    // Debug logging before Azure OpenAI call
-    const openaiBase = AZURE_OPENAI_ENDPOINT.replace(/\/$/, '');
-    const openaiUrl = `${openaiBase}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
-    console.log('[Azure OpenAI Debug] Endpoint:', AZURE_OPENAI_ENDPOINT);
-    console.log('[Azure OpenAI Debug] Deployment:', AZURE_OPENAI_DEPLOYMENT);
-    console.log('[Azure OpenAI Debug] Full URL:', openaiUrl);
-    console.log('[Azure OpenAI Debug] API key exists:', !!AZURE_OPENAI_KEY);
+    const cleanOpenAIEndpoint = AZURE_OPENAI_ENDPOINT.endsWith('/') ? AZURE_OPENAI_ENDPOINT.slice(0, -1) : AZURE_OPENAI_ENDPOINT;
 
     const aiResponse = await fetch(
-      openaiUrl,
+      `${cleanOpenAIEndpoint}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
       {
         method: 'POST',
         headers: {
@@ -356,90 +322,40 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: `You are an expert at extracting structured data from insurance documents. 
-Extract ALL coverage information, premium amounts, vehicle/property details, and policy information.
-
-For AUTO INSURANCE, look for:
-- Bodily Injury (BI): often shown as split limits like "50/100" or CSL like "$300,000"
-- Property Damage (PD): like "$50,000" or "$100,000"
-- Personal Injury Protection (PIP): like "$10,000"
-- Uninsured Motorist (UM/UIM): split limits or CSL
-- Comprehensive (COMP): deductible like "$500"
-- Collision (COLL): deductible like "$500"
-
-For HOME INSURANCE, look for:
-- Dwelling Coverage (Coverage A)
-- Personal Property (Coverage C)
-- Liability (Coverage E)
-- Medical Payments (Coverage F)
-
-Return valid JSON only with this EXACT structure:
-{
-  "document_type": "auto_policy" | "home_policy" | "commercial_policy" | "unknown",
-  "carrier": "string",
-  "policy_number": "string",
-  "insured_name": "string",
-  "effective_date": "YYYY-MM-DD",
-  "expiration_date": "YYYY-MM-DD",
-  "premium": {
-    "total": number,
-    "frequency": "annual" | "semi-annual" | "quarterly" | "monthly"
-  },
-  "coverages": [
-    {
-      "type": "string",
-      "limit": "string",
-      "deductible": "string",
-      "premium": number
-    }
-  ],
-  "vehicles": [
-    {
-      "year": number,
-      "make": "string",
-      "model": "string",
-      "vin": "string"
-    }
-  ],
-  "property": {
-    "type": "string",
-    "address": "string"
-  },
-  "key_details": ["string"]
-}`
+              content: `You are an expert at extracting structured data from insurance documents. Extract ALL coverage information, premium amounts, vehicle/property details, and policy information. Return ONLY valid JSON with no additional text.`
             },
             {
               role: 'user',
-              content: `Extract ALL insurance information from this document. Focus on coverages, premiums, and policy details:\n\n${selectedPageText.slice(0, 50000)}`
+              content: `Extract ALL insurance information from this document:\n\n${selectedPageText.slice(0, 50000)}`
             }
           ],
           max_tokens: 2000,
-          temperature: 0.1
+          temperature: 0.1,
+          response_format: { type: "json_object" }
         })
       }
     );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
+      console.error('[Azure OpenAI Error]:', errorText);
       throw new Error(`Azure OpenAI failed: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiResult = await aiResponse.json();
     const aiContent = aiResult.choices?.[0]?.message?.content || '{}';
     
-    // Parse JSON
     let structuredData;
     try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      structuredData = JSON.parse(jsonMatch ? jsonMatch[0] : aiContent);
+      structuredData = JSON.parse(aiContent);
     } catch (e) {
       console.error('[AI Parse Error]:', e);
-      structuredData = { error: 'Failed to parse AI response' };
+      structuredData = { error: 'Failed to parse AI response', raw: aiContent };
     }
 
-    console.log('[AI Extraction] Complete:', JSON.stringify(structuredData, null, 2));
+    console.log('[AI Extraction] Complete');
 
-    // Step 5: Save results
+    // Save results
     await supabase
       .from('document_analysis')
       .update({ 
@@ -455,7 +371,7 @@ Return valid JSON only with this EXACT structure:
         analysis_id: analysisRecord.id,
         ocr_text: selectedPageText,
         structured_data: structuredData,
-        pages_processed: totalPages,
+        total_pages: totalPages,
         pages_analyzed: pageRangeUsed,
         focus_region: focus_region
       }),
@@ -468,7 +384,6 @@ Return valid JSON only with this EXACT structure:
   } catch (error) {
     console.error('[Document Analysis] Error:', error);
     
-    // Update status to failed
     if (documentId) {
       try {
         const supabase = createClient(
