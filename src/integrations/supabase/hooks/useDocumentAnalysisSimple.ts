@@ -1,0 +1,105 @@
+import { useMutation } from '@tanstack/react-query';
+import { supabase } from '../client';
+import { useToast } from '@/hooks/use-toast';
+
+interface AnalyzeDocumentParams {
+  document_url: string;
+  document_id: string;
+  file_name: string;
+  account_id?: string;
+  user_id: string;
+}
+
+interface AnalysisResult {
+  success: boolean;
+  document_id: string;
+  page_count: number;
+  text_length: number;
+  ocr_text: string;
+  analysis: {
+    policy_number: string;
+    insured_name: string;
+    carrier: string;
+    document_type: string;
+    effective_date: string | null;
+    expiration_date: string | null;
+    coverages: Array<{
+      name: string;
+      limit: string;
+      deductible: string;
+      premium: string;
+    }>;
+    vehicles: Array<{
+      year: string;
+      make: string;
+      model: string;
+      vin: string;
+    }>;
+    property: {
+      type: string;
+      address: string;
+    };
+    premium: {
+      total: string;
+      frequency: string;
+    };
+    key_details: string[];
+  };
+}
+
+export const useDocumentAnalysisSimple = () => {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (params: AnalyzeDocumentParams): Promise<AnalysisResult> => {
+      console.log('Calling ai-document-analysis-simple edge function...');
+      console.log('Parameters:', {
+        document_id: params.document_id,
+        file_name: params.file_name,
+        account_id: params.account_id,
+        user_id: params.user_id
+      });
+
+      const { data, error } = await supabase.functions.invoke('ai-document-analysis-simple', {
+        body: {
+          document_url: params.document_url,
+          document_id: params.document_id,
+          file_name: params.file_name,
+          account_id: params.account_id,
+          user_id: params.user_id
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Analysis failed: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        console.error('Analysis failed:', data);
+        throw new Error(data?.error || 'Analysis failed');
+      }
+
+      console.log('✅ Analysis successful!');
+      console.log('Page count:', data.page_count);
+      console.log('Text length:', data.text_length);
+      console.log('Coverages found:', data.analysis?.coverages?.length || 0);
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Analysis Complete",
+        description: `Extracted data from ${data.page_count} pages with ${data.analysis?.coverages?.length || 0} coverages found.`,
+      });
+    },
+    onError: (error: Error) => {
+      console.error('Analysis mutation error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+};
