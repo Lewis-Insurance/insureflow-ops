@@ -13,6 +13,7 @@ export interface Workspace {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  creator_name?: string;
 }
 
 export interface WorkspaceDocument {
@@ -78,10 +79,27 @@ export const useActiveWorkspaces = () => {
         .from("workspaces")
         .select("*")
         .eq("created_by", user.id)
-        .in("status", ["idle", "processing"]) // Include both idle and processing
+        .in("status", ["idle", "processing"])
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      
+      // Fetch profiles for all unique creator IDs
+      if (data && data.length > 0) {
+        const creatorIds = [...new Set(data.map(ws => ws.created_by))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", creatorIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]));
+        
+        return data.map(ws => ({
+          ...ws,
+          creator_name: profileMap.get(ws.created_by) || "Unknown User"
+        })) as Workspace[];
+      }
+      
       return data as Workspace[];
     },
   });
@@ -103,6 +121,23 @@ export const useCompletedWorkspaces = () => {
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
+      
+      // Fetch profiles for all unique creator IDs
+      if (data && data.length > 0) {
+        const creatorIds = [...new Set(data.map(ws => ws.created_by))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", creatorIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]));
+        
+        return data.map(ws => ({
+          ...ws,
+          creator_name: profileMap.get(ws.created_by) || "Unknown User"
+        })) as Workspace[];
+      }
+      
       return data as Workspace[];
     },
   });

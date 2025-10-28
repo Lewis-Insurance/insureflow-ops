@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useActiveWorkspaces, useCompletedWorkspaces, useWorkspaceSubscription, type Workspace } from "@/hooks/useWorkspaces";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileText, CheckCircle2, XCircle, Clock, Search, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -68,13 +69,14 @@ const WorkspacePage = () => {
   const uniqueTaskTypes = Array.from(new Set(allWorkspaces.map(w => w.task_type)));
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Workspace</h1>
-        <p className="text-muted-foreground">
-          Monitor your quote comparison jobs and review completed analyses
-        </p>
-      </div>
+    <AppLayout>
+      <div className="container mx-auto py-8 space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold">Workspace</h1>
+          <p className="text-muted-foreground">
+            Monitor your quote comparison jobs and review completed analyses
+          </p>
+        </div>
 
       {/* Search and Filters */}
       <Card>
@@ -180,7 +182,8 @@ const WorkspacePage = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
@@ -252,7 +255,7 @@ function WorkspaceItem({ workspace, showActions }: WorkspaceItemProps) {
             {/* User (Created By) */}
             <div>
               <span className="text-muted-foreground">User:</span>{" "}
-              <span className="font-medium text-xs truncate">{workspace.created_by.substring(0, 8)}...</span>
+              <span className="font-medium">{workspace.creator_name || "Unknown"}</span>
             </div>
 
             {/* Last Updated */}

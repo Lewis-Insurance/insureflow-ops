@@ -7938,6 +7938,7 @@ export type Database = {
           file_url: string | null
           id: string
           parsed_doc_id: string | null
+          parseur_document_id: string | null
           role: string | null
           workspace_id: string | null
         }
@@ -7947,6 +7948,7 @@ export type Database = {
           file_url?: string | null
           id?: string
           parsed_doc_id?: string | null
+          parseur_document_id?: string | null
           role?: string | null
           workspace_id?: string | null
         }
@@ -7956,6 +7958,7 @@ export type Database = {
           file_url?: string | null
           id?: string
           parsed_doc_id?: string | null
+          parseur_document_id?: string | null
           role?: string | null
           workspace_id?: string | null
         }
@@ -7982,10 +7985,12 @@ export type Database = {
           client_name: string | null
           created_at: string
           created_by: string
+          customer_id: string | null
           description: string | null
           id: string
           name: string
           notes: string | null
+          policy_id: string | null
           status: string | null
           task_type: string | null
           updated_at: string
@@ -7995,10 +8000,12 @@ export type Database = {
           client_name?: string | null
           created_at?: string
           created_by: string
+          customer_id?: string | null
           description?: string | null
           id?: string
           name: string
           notes?: string | null
+          policy_id?: string | null
           status?: string | null
           task_type?: string | null
           updated_at?: string
@@ -8008,15 +8015,32 @@ export type Database = {
           client_name?: string | null
           created_at?: string
           created_by?: string
+          customer_id?: string | null
           description?: string | null
           id?: string
           name?: string
           notes?: string | null
+          policy_id?: string | null
           status?: string | null
           task_type?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

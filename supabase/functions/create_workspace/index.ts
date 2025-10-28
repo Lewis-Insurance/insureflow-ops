@@ -15,7 +15,7 @@ serve(async (req) => {
       throw new Error("Missing authorization header");
     }
 
-    const { title, task_type, client_name, notes, documents } = await req.json();
+    const { title, task_type, client_name, notes, documents, customer_id, policy_id } = await req.json();
 
     if (!task_type || !documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Missing required fields: task_type or documents[]");
@@ -56,6 +56,8 @@ serve(async (req) => {
         created_by: user.id,
         client_name: client_name || null,
         notes: notes || null,
+        customer_id: customer_id || null,
+        policy_id: policy_id || null,
       })
       .select()
       .single();

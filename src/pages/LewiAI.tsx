@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,6 +20,47 @@ export default function LewiAIPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [policies, setPolicies] = useState<Array<{ id: string; policy_number: string }>>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [selectedPolicy, setSelectedPolicy] = useState<string>("");
+
+  // Fetch customers
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, name")
+        .order("name");
+      
+      if (!error && data) {
+        setCustomers(data);
+      }
+    };
+    fetchCustomers();
+  }, []);
+
+  // Fetch policies for selected customer
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setPolicies([]);
+      setSelectedPolicy("");
+      return;
+    }
+
+    const fetchPolicies = async () => {
+      const { data, error } = await supabase
+        .from("policies")
+        .select("id, policy_number")
+        .eq("account_id", selectedCustomer)
+        .order("policy_number");
+      
+      if (!error && data) {
+        setPolicies(data);
+      }
+    };
+    fetchPolicies();
+  }, [selectedCustomer]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) setFiles(Array.from(e.target.files));
@@ -57,13 +99,20 @@ export default function LewiAIPage() {
         }
       }
 
+      // Get customer name if selected
+      const customerName = selectedCustomer 
+        ? customers.find(c => c.id === selectedCustomer)?.name 
+        : undefined;
+
       // Create workspace via Edge Function
       const { data, error } = await supabase.functions.invoke("create_workspace", {
         body: {
-          title: `${taskType} workspace`,
           task_type: taskType,
+          client_name: customerName,
           notes,
           documents: uploadedFiles,
+          customer_id: selectedCustomer || undefined,
+          policy_id: selectedPolicy || undefined,
         },
       });
 
@@ -92,6 +141,8 @@ export default function LewiAIPage() {
     setShowModal(true);
     setFiles([]);
     setNotes("");
+    setSelectedCustomer("");
+    setSelectedPolicy("");
   };
 
   return (
@@ -154,6 +205,40 @@ export default function LewiAIPage() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer">Customer / Insured</Label>
+                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a customer (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedCustomer && (
+                <div className="space-y-2">
+                  <Label htmlFor="policy">Policy</Label>
+                  <Select value={selectedPolicy} onValueChange={setSelectedPolicy}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a policy (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {policies.map((policy) => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.policy_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="files">Documents</Label>
                 <Input
