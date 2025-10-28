@@ -74,9 +74,8 @@ serve(async (req) => {
     const PARSEUR_API_KEY = Deno.env.get("PARSEUR_API_KEY");
     const PARSEUR_MAILBOX_ID = Deno.env.get("PARSEUR_MAILBOX_ID");
 
-    console.log("ENV CHECK", {
+    console.log("Parseur config check", {
       apiKeyPresent: !!PARSEUR_API_KEY,
-      apiKeyLength: PARSEUR_API_KEY?.length,
       mailboxId: PARSEUR_MAILBOX_ID,
     });
 
@@ -84,19 +83,44 @@ serve(async (req) => {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            // OPTION 1: Use Parseur's document upload endpoint
-            // The correct endpoint is /parser (singular, not /mailbox/{id}/document)
-            const parseurResp = await fetch("https://api.parseur.com/parser", {
-              method: "POST",
-              headers: {
-                "Authorization": `Token ${PARSEUR_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                mailbox_id: PARSEUR_MAILBOX_ID,
-                url: d.file_url,
-              }),
-            });
+            console.log(`Fetching file from: ${d.file_url}`);
+
+            // Step 1: Fetch the file from Supabase Storage
+            const fileResponse = await fetch(d.file_url);
+            if (!fileResponse.ok) {
+              throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
+            }
+
+            const fileBlob = await fileResponse.blob();
+            const fileName = d.file_name || "document.pdf";
+
+            console.log(`File fetched: ${fileName}, size: ${fileBlob.size} bytes`);
+
+            // Step 2: Create FormData with the file
+            const formData = new FormData();
+            formData.append("file", fileBlob, fileName);
+
+            // Optional: Add custom metadata to track this upload
+            formData.append("metadata", JSON.stringify({
+              workspace_id: workspace.id,
+              task_type: task_type,
+              client_name: client_name || null,
+            }));
+
+            // Step 3: Upload to Parseur
+            // Correct endpoint: /parser/{mailbox_id}/upload
+            // Correct auth: Just the API key in Authorization header (no "Token" or "Bearer")
+            const parseurResp = await fetch(
+              `https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload`,
+              {
+                method: "POST",
+                headers: {
+                  "Authorization": PARSEUR_API_KEY,
+                  // Don't set Content-Type - FormData sets it automatically with boundary
+                },
+                body: formData,
+              }
+            );
 
             const responseText = await parseurResp.text();
             
@@ -105,10 +129,31 @@ serve(async (req) => {
                 status: parseurResp.status,
                 statusText: parseurResp.statusText,
                 body: responseText,
-                file: d.file_name,
+                file: fileName,
               });
             } else {
-              console.log(`Sent ${d.file_name} to Parseur successfully:`, responseText);
+              // Parse the response to get DocumentID
+              try {
+                const parseurData = JSON.parse(responseText);
+                console.log(`✓ Sent ${fileName} to Parseur successfully:`, {
+                  message: parseurData.message,
+                  attachments: parseurData.attachments,
+                });
+
+                // Optional: Store DocumentID for later correlation
+                if (parseurData.attachments && parseurData.attachments.length > 0) {
+                  const documentId = parseurData.attachments[0].DocumentID;
+                  console.log(`DocumentID for tracking: ${documentId}`);
+                  
+                  // You could update the workspace_documents table with this ID
+                  // await supabase.from("workspace_documents")
+                  //   .update({ parseur_document_id: documentId })
+                  //   .eq("file_url", d.file_url)
+                  //   .eq("workspace_id", workspace.id);
+                }
+              } catch (parseErr) {
+                console.log(`✓ Sent ${fileName} to Parseur (raw response):`, responseText);
+              }
             }
           } catch (err) {
             console.error(`Failed to send ${d.file_name} to Parseur:`, err);
