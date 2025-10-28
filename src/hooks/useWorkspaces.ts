@@ -66,9 +66,25 @@ export const useWorkspacesByStatus = (status: Workspace["status"]) => {
   });
 };
 
-// Fetch active workspaces (processing)
+// Fetch active workspaces (idle + processing)
 export const useActiveWorkspaces = () => {
-  return useWorkspacesByStatus("processing");
+  return useQuery({
+    queryKey: ["workspaces", "active"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("*")
+        .eq("created_by", user.id)
+        .in("status", ["idle", "processing"]) // Include both idle and processing
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Workspace[];
+    },
+  });
 };
 
 // Fetch completed workspaces
