@@ -72,7 +72,18 @@ serve(async (req) => {
     }
 
     const docBuffer = await docData.arrayBuffer();
-    const base64Doc = btoa(String.fromCharCode(...new Uint8Array(docBuffer)));
+    
+    // Convert to base64 in chunks to avoid stack overflow on large files
+    const uint8Array = new Uint8Array(docBuffer);
+    const chunkSize = 8192;
+    let binaryString = '';
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    const base64Doc = btoa(binaryString);
 
     // Call Google Vision API
     const visionResponse = await fetch(
@@ -245,15 +256,12 @@ Return ONLY the JSON object, no other text.`
   } catch (error) {
     console.error('[Document Analysis] Error:', error);
     
-    // Try to update record with error
+    // Try to update record with error using the document_id from the initial request
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
-      
-      const body = await req.json();
-      const { document_id } = body;
       
       if (document_id) {
         await supabase
