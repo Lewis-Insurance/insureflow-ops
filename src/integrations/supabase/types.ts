@@ -2320,6 +2320,89 @@ export type Database = {
           },
         ]
       }
+      document_analysis: {
+        Row: {
+          account_id: string | null
+          carrier_name: string | null
+          confidence_score: number | null
+          coverages: Json | null
+          created_at: string | null
+          created_by: string | null
+          document_id: string | null
+          effective_date: string | null
+          error_message: string | null
+          expiration_date: string | null
+          extracted_data: Json | null
+          file_name: string
+          id: string
+          insured_items: Json | null
+          insured_name: string | null
+          payment_frequency: string | null
+          policy_number: string | null
+          policy_type: string | null
+          processing_status: string | null
+          raw_ocr_text: string | null
+          total_premium: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          carrier_name?: string | null
+          confidence_score?: number | null
+          coverages?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          effective_date?: string | null
+          error_message?: string | null
+          expiration_date?: string | null
+          extracted_data?: Json | null
+          file_name: string
+          id?: string
+          insured_items?: Json | null
+          insured_name?: string | null
+          payment_frequency?: string | null
+          policy_number?: string | null
+          policy_type?: string | null
+          processing_status?: string | null
+          raw_ocr_text?: string | null
+          total_premium?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          carrier_name?: string | null
+          confidence_score?: number | null
+          coverages?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          effective_date?: string | null
+          error_message?: string | null
+          expiration_date?: string | null
+          extracted_data?: Json | null
+          file_name?: string
+          id?: string
+          insured_items?: Json | null
+          insured_name?: string | null
+          payment_frequency?: string | null
+          policy_number?: string | null
+          policy_type?: string | null
+          processing_status?: string | null
+          raw_ocr_text?: string | null
+          total_premium?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_processing_queue: {
         Row: {
           account_id: string
