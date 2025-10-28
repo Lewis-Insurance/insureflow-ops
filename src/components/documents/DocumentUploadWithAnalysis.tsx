@@ -95,6 +95,23 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     setUploadedFileName('');
   };
 
+  const getProgressMessage = () => {
+    if (isUploading) {
+      if (uploadProgress < 30) return 'Uploading document...';
+      if (uploadProgress < 80) return 'Storing in secure storage...';
+      return 'Upload complete!';
+    }
+    if (isAnalyzing) {
+      if (analysisProgress < 40) return 'Extracting text with OCR...';
+      if (analysisProgress < 80) return 'Analyzing with AI...';
+      return 'Finalizing analysis...';
+    }
+    if (completedAnalysisId && isLoadingAnalysis) {
+      return 'Loading results...';
+    }
+    return '';
+  };
+
   const totalProgress = isUploading 
     ? uploadProgress 
     : isAnalyzing 
@@ -228,14 +245,17 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         </div>
 
         {isProcessing && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {isUploading ? 'Uploading...' : 'Analyzing...'}
+              <span className="text-muted-foreground font-medium">
+                {getProgressMessage()}
               </span>
-              <span className="font-medium">{totalProgress}%</span>
+              <span className="font-semibold">{totalProgress}%</span>
             </div>
-            <Progress value={totalProgress} />
+            <Progress value={totalProgress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              This may take 30-60 seconds for large documents
+            </p>
           </div>
         )}
 
@@ -247,7 +267,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           {isProcessing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {isUploading ? 'Uploading...' : 'Analyzing...'}
+              {getProgressMessage()}
             </>
           ) : (
             <>
