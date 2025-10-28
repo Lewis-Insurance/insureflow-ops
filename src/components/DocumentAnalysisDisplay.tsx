@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useDocumentAnalysis } from '@/hooks/useDocumentAnalysis';
+import { useDocumentAnalysisByDocumentId } from '@/hooks/useDocumentAnalysis';
 import { Loader2, FileText, Building2, Calendar, DollarSign, Shield, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ interface DocumentAnalysisDisplayProps {
 }
 
 export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayProps) => {
-  const { data: analysis, isLoading, error } = useDocumentAnalysis(documentId);
+  const { data: analysis, isLoading, error } = useDocumentAnalysisByDocumentId(documentId);
 
   if (isLoading || analysis?.processing_status === 'pending') {
     return (
@@ -136,7 +136,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
       </Card>
 
       {/* Coverage Details */}
-      {analysis.coverages && analysis.coverages.length > 0 && (
+      {analysis.coverages && Array.isArray(analysis.coverages) && analysis.coverages.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {analysis.coverages.map((coverage, index) => (
+              {(analysis.coverages as any[]).map((coverage: any, index: number) => (
                 <div key={index} className="flex justify-between items-start border-b pb-2 last:border-0">
                   <div>
                     <div className="font-medium">{coverage.type}</div>
@@ -168,14 +168,14 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
       )}
 
       {/* Insured Items */}
-      {analysis.insured_items && analysis.insured_items.length > 0 && (
+      {analysis.insured_items && Array.isArray(analysis.insured_items) && analysis.insured_items.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Insured Items</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {analysis.insured_items.map((item, index) => (
+              {(analysis.insured_items as any[]).map((item: any, index: number) => (
                 <div key={index} className="p-3 border rounded-lg">
                   {item.type === 'vehicle' && (
                     <div>

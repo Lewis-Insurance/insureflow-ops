@@ -19,7 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { useAnalyzeDocument } from '@/hooks/useDocumentAnalysis';
+import { useDocumentAnalysis } from '@/hooks/useDocumentAnalysis';
 import { DocumentAnalysisDisplay } from '@/components/DocumentAnalysisDisplay';
 import {
   FileText,
@@ -115,7 +115,7 @@ export default function ExplorePolicy() {
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('');
   const [uploadedDocumentIds, setUploadedDocumentIds] = useState<Map<string, string>>(new Map());
 
-  const analyzeDocumentMutation = useAnalyzeDocument();
+  const { analyzeDocument: analyzeDocumentMutation } = useDocumentAnalysis();
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
@@ -184,11 +184,12 @@ export default function ExplorePolicy() {
       ));
 
       // Trigger analysis using the new hook
-      await analyzeDocumentMutation.mutateAsync({
-        document_url: publicUrl,
-        document_id: docId,
-        file_name: file.name,
-        account_id: accountId || '',
+      const result = await analyzeDocumentMutation({
+        documentUrl: publicUrl,
+        documentId: docId,
+        fileName: file.name,
+        accountId: accountId || '',
+        userId: (await supabase.auth.getUser()).data.user?.id || '',
       });
 
       // Store mapping for displaying results
