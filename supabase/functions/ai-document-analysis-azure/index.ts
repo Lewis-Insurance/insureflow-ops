@@ -88,25 +88,124 @@ serve(async (req) => {
     
     const storagePath = urlParts[1];
 
-    // Step 2: Start OCR with Azure Document Intelligence using signed URL
+    // Helper function for retry with exponential backoff
+    async function retryWithBackoff<T>(
+      fn: () => Promise<T>,
+      maxRetries: number = 3,
+      baseDelay: number = 1000
+    ): Promise<T> {
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          lastError = error as Error;
+          
+          if (attempt < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, attempt);
+            console.log(`[Retry] Attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      throw lastError || new Error('Retry failed');
+    }
+
+    // Helper function to process a single page range with OCR
+    async function processPageRange(
+      signedUrl: string,
+      pageRange: string,
+      totalPages: number
+    ): Promise<any> {
+      console.log(`[Azure OCR] Processing pages ${pageRange} of ${totalPages}...`);
+      
+      const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31&pages=${pageRange}`;
+      
+      return retryWithBackoff(async () => {
+        const analyzeResponse = await fetch(analyzeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+          },
+          body: JSON.stringify({
+            urlSource: signedUrl
+          })
+        });
+
+        if (!analyzeResponse.ok) {
+          const errorText = await analyzeResponse.text();
+          console.error('[Azure OCR Error]:', errorText);
+          throw new Error(`Azure OCR failed: ${analyzeResponse.status} - ${errorText}`);
+        }
+
+        const operationLocation = analyzeResponse.headers.get('Operation-Location');
+        if (!operationLocation) {
+          throw new Error('No operation location returned from Azure');
+        }
+
+        // Poll for results
+        let attempts = 0;
+        const maxAttempts = 60;
+
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const resultResponse = await fetch(operationLocation, {
+            headers: {
+              'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+            }
+          });
+
+          if (!resultResponse.ok) {
+            console.error('[Azure Poll Error]:', await resultResponse.text());
+            throw new Error(`Azure polling failed: ${resultResponse.status}`);
+          }
+
+          const result = await resultResponse.json();
+          
+          if (result.status === 'succeeded') {
+            console.log(`[Azure OCR] Pages ${pageRange} completed successfully`);
+            return result;
+          } else if (result.status === 'failed') {
+            throw new Error('Azure OCR failed: ' + JSON.stringify(result.error || result));
+          }
+          
+          attempts++;
+          
+          if (attempts % 5 === 0) {
+            console.log(`[Azure OCR] Polling pages ${pageRange}: attempt ${attempts}/${maxAttempts}, status: ${result.status}`);
+          }
+        }
+
+        throw new Error(`Azure OCR timed out for pages ${pageRange} after 2 minutes`);
+      });
+    }
+
+    // Step 2: Get initial document info to determine page count
     console.log('[Azure OCR] Starting Document Intelligence with API version 2023-07-31...');
 
     // Get a signed URL that Azure can access directly
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('documents')
-      .createSignedUrl(storagePath, 3600); // 1 hour expiry
+      .createSignedUrl(storagePath, 7200); // 2 hour expiry for large documents
 
     if (signedUrlError) {
       console.error('[Signed URL Error]:', signedUrlError);
       throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
     }
 
-    console.log('[Azure OCR] Using signed URL method for large document');
+    console.log('[Azure OCR] Processing document with chunked approach for large files...');
+    
+    // First, do a full document analysis to get the total page count
+    // We'll use the first chunk result to determine total pages
+    console.log('[Azure OCR] Getting total page count...');
+    
     const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31`;
-    console.log('[Azure OCR] Analyze URL:', analyzeUrl);
-
-    // Use urlSource instead of base64Source for better large file handling
-    const analyzeResponse = await fetch(analyzeUrl, {
+    
+    const initialAnalyze = await fetch(analyzeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -117,23 +216,22 @@ serve(async (req) => {
       })
     });
 
-    if (!analyzeResponse.ok) {
-      const errorText = await analyzeResponse.text();
+    if (!initialAnalyze.ok) {
+      const errorText = await initialAnalyze.text();
       console.error('[Azure OCR Error]:', errorText);
-      throw new Error(`Azure OCR failed: ${analyzeResponse.status} - ${errorText}`);
+      throw new Error(`Azure OCR failed: ${initialAnalyze.status} - ${errorText}`);
     }
 
-    const operationLocation = analyzeResponse.headers.get('Operation-Location');
+    const operationLocation = initialAnalyze.headers.get('Operation-Location');
     if (!operationLocation) {
       throw new Error('No operation location returned from Azure');
     }
 
-    console.log('[Azure OCR] Operation started, polling for results...');
-
-    // Poll for results
-    let ocrResult;
+    // Poll for initial results to get page count
+    let totalPages = 0;
     let attempts = 0;
     const maxAttempts = 60;
+    let initialOcrResult = null;
 
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -152,23 +250,83 @@ serve(async (req) => {
       const result = await resultResponse.json();
       
       if (result.status === 'succeeded') {
-        ocrResult = result;
-        console.log('[Azure OCR] Success!');
+        totalPages = result.analyzeResult?.pages?.length || 0;
+        initialOcrResult = result;
+        console.log(`[Azure OCR] Document has ${totalPages} total pages`);
         break;
       } else if (result.status === 'failed') {
         throw new Error('Azure OCR failed: ' + JSON.stringify(result.error || result));
       }
       
       attempts++;
-      console.log(`[Azure OCR] Polling attempt ${attempts}/${maxAttempts}, status: ${result.status}`);
+      
+      if (attempts % 5 === 0) {
+        console.log(`[Azure OCR] Initial analysis: attempt ${attempts}/${maxAttempts}, status: ${result.status}`);
+      }
     }
 
-    if (!ocrResult) {
-      throw new Error('Azure OCR timed out after 2 minutes');
+    if (totalPages === 0 || !initialOcrResult) {
+      throw new Error('Failed to determine document page count');
+    }
+
+    // For large documents (>30 pages), process in chunks
+    let ocrResult;
+    let allPages;
+    
+    if (totalPages > 30) {
+      console.log(`[Azure OCR] Large document detected (${totalPages} pages), processing in chunks...`);
+
+      // Process in chunks of 20 pages
+      const CHUNK_SIZE = 20;
+      const chunks: string[] = [];
+      
+      for (let startPage = 1; startPage <= totalPages; startPage += CHUNK_SIZE) {
+        const endPage = Math.min(startPage + CHUNK_SIZE - 1, totalPages);
+        chunks.push(`${startPage}-${endPage}`);
+      }
+      
+      console.log(`[Azure OCR] Will process ${chunks.length} chunks: ${chunks.join(', ')}`);
+
+      // Process all chunks in parallel (with concurrency limit)
+      const CONCURRENCY_LIMIT = 3; // Process 3 chunks at a time
+      const allResults: any[] = [];
+      
+      for (let i = 0; i < chunks.length; i += CONCURRENCY_LIMIT) {
+        const chunkBatch = chunks.slice(i, i + CONCURRENCY_LIMIT);
+        console.log(`[Azure OCR] Processing batch: ${chunkBatch.join(', ')}`);
+        
+        const batchResults = await Promise.all(
+          chunkBatch.map(chunk => processPageRange(signedUrlData.signedUrl, chunk, totalPages))
+        );
+        
+        allResults.push(...batchResults);
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + CONCURRENCY_LIMIT < chunks.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Combine all pages from all results
+      console.log('[Azure OCR] Combining results from all chunks...');
+      allPages = allResults.flatMap(result => result.analyzeResult?.pages || []);
+      
+      ocrResult = {
+        analyzeResult: {
+          pages: allPages,
+          ...allResults[0]?.analyzeResult // Keep other metadata from first result
+        }
+      };
+      
+      console.log(`[Azure OCR] Successfully combined ${allPages.length} pages from ${allResults.length} chunks`);
+    } else {
+      // Document already processed, use the result from initial analysis
+      console.log('[Azure OCR] Document is small enough, using single-pass result');
+      allPages = initialOcrResult.analyzeResult?.pages || [];
+      ocrResult = { analyzeResult: { pages: allPages, ...initialOcrResult.analyzeResult } };
     }
 
     // Step 3: INTELLIGENT PAGE SELECTION
-    const allPages = ocrResult.analyzeResult.pages || [];
     const totalPages = allPages.length;
     console.log(`[Page Selection] Document has ${totalPages} pages, focus: ${focus_region}`);
 
