@@ -35,6 +35,7 @@ import {
   Download,
   FileJson,
   FileSpreadsheet,
+  MessageSquare,
 } from 'lucide-react';
 
 interface AnalyzedDocument {
@@ -944,14 +945,82 @@ export default function ExplorePolicy() {
                   )}
 
                   {selectedDoc.status === 'complete' && selectedDoc.analysis && (
-                    <Tabs defaultValue="summary" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="summary">Summary</TabsTrigger>
-                        <TabsTrigger value="coverage">Coverage</TabsTrigger>
-                        <TabsTrigger value="search">Search</TabsTrigger>
-                      </TabsList>
+                    <div className="space-y-4">
+                      {/* Ask Questions Section - Always Visible */}
+                      <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-primary" />
+                            <CardTitle className="text-base">Ask Questions About This Document</CardTitle>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="e.g., What is the deductible for general liability? Who is the insured?"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                              className="flex-1"
+                            />
+                            <Button onClick={handleSearch} disabled={isSearching || !searchQuery.trim()}>
+                              {isSearching ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                              <span className="ml-2 hidden sm:inline">Search</span>
+                            </Button>
+                          </div>
+                          
+                          {/* Search Results */}
+                          {searchResults.length > 0 && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-medium">Results ({searchResults.length})</p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSearchQuery('');
+                                    setSearchResults([]);
+                                  }}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <ScrollArea className="h-[200px]">
+                                <div className="space-y-2">
+                                  {searchResults.map((result, idx) => (
+                                    <Card key={idx} className="bg-background">
+                                      <CardContent className="p-3">
+                                        <p className="text-sm mb-1 font-medium">{result.text}</p>
+                                        {result.context && (
+                                          <p className="text-xs text-muted-foreground">
+                                            ...{result.context}...
+                                          </p>
+                                        )}
+                                        <Badge variant="outline" className="text-xs mt-2">
+                                          Relevance: {result.relevance}%
+                                        </Badge>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
 
-                      <TabsContent value="summary" className="space-y-4">
+                      {/* Tabs for Document Details */}
+                      <Tabs defaultValue="summary" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="summary">Summary</TabsTrigger>
+                          <TabsTrigger value="coverage">Coverage</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="summary" className="space-y-4">
                         <div>
                           <h3 className="text-sm font-semibold mb-2">Document Summary</h3>
                           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1024,53 +1093,8 @@ export default function ExplorePolicy() {
                           </div>
                         )}
                       </TabsContent>
-
-                      <TabsContent value="search" className="space-y-4">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Search document text..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                          />
-                          <Button onClick={handleSearch} disabled={isSearching}>
-                            {isSearching ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Search className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
-
-                        <ScrollArea className="h-[400px]">
-                          {searchResults.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                              {searchQuery ? 'No results found' : 'Enter a search query'}
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              {searchResults.map((result, idx) => (
-                                <Card key={idx}>
-                                  <CardContent className="p-3">
-                                    <p className="text-sm mb-1">{result.text}</p>
-                                    {result.context && (
-                                      <p className="text-xs text-muted-foreground">
-                                        ...{result.context}...
-                                      </p>
-                                    )}
-                                    <div className="flex items-center justify-between mt-2">
-                                      <Badge variant="outline" className="text-xs">
-                                        Relevance: {result.relevance}%
-                                      </Badge>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
-                        </ScrollArea>
-                      </TabsContent>
                     </Tabs>
+                    </div>
                   )}
                 </CardContent>
               </Card>
