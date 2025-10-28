@@ -2340,6 +2340,7 @@ export type Database = {
           insured_items: Json | null
           insured_name: string | null
           ocr_text: string | null
+          pages_analyzed: string | null
           payment_frequency: string | null
           policy_number: string | null
           policy_type: string | null
@@ -2367,6 +2368,7 @@ export type Database = {
           insured_items?: Json | null
           insured_name?: string | null
           ocr_text?: string | null
+          pages_analyzed?: string | null
           payment_frequency?: string | null
           policy_number?: string | null
           policy_type?: string | null
@@ -2394,6 +2396,7 @@ export type Database = {
           insured_items?: Json | null
           insured_name?: string | null
           ocr_text?: string | null
+          pages_analyzed?: string | null
           payment_frequency?: string | null
           policy_number?: string | null
           policy_type?: string | null

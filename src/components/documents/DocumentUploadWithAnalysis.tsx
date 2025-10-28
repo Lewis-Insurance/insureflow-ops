@@ -28,6 +28,19 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   const [focusRegion, setFocusRegion] = useState<string>('smart');
   const [customPageRange, setCustomPageRange] = useState<string>('');
 
+  // Load saved focus region preference from localStorage
+  useEffect(() => {
+    const savedFocusRegion = localStorage.getItem('document_focus_region');
+    if (savedFocusRegion) {
+      setFocusRegion(savedFocusRegion);
+    }
+  }, []);
+
+  // Save focus region preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('document_focus_region', focusRegion);
+  }, [focusRegion]);
+
   // Fetch analysis data when completedAnalysisId is set
   useEffect(() => {
     const fetchAnalysisData = async () => {
@@ -222,6 +235,16 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
               </Button>
             </div>
           </CardHeader>
+          {(analysisData.total_pages || analysisData.pages_analyzed) && (
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">
+                  Analyzed pages <span className="font-semibold text-foreground">{analysisData.pages_analyzed || 'N/A'}</span> of <span className="font-semibold text-foreground">{analysisData.total_pages || 'N/A'}</span> total pages
+                </span>
+              </div>
+            </CardContent>
+          )}
         </Card>
         
         <DocumentAnalysisDisplay
