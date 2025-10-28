@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { CustomerCombobox } from "@/components/ui/customer-combobox";
 
 export default function LewiAIPage() {
   const navigate = useNavigate();
@@ -20,25 +21,9 @@ export default function LewiAIPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [policies, setPolicies] = useState<Array<{ id: string; policy_number: string }>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [selectedPolicy, setSelectedPolicy] = useState<string>("");
-
-  // Fetch customers
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id, name")
-        .order("name");
-      
-      if (!error && data) {
-        setCustomers(data);
-      }
-    };
-    fetchCustomers();
-  }, []);
 
   // Fetch policies for selected customer
   useEffect(() => {
@@ -99,16 +84,10 @@ export default function LewiAIPage() {
         }
       }
 
-      // Get customer name if selected
-      const customerName = selectedCustomer 
-        ? customers.find(c => c.id === selectedCustomer)?.name 
-        : undefined;
-
       // Create workspace via Edge Function
       const { data, error } = await supabase.functions.invoke("create_workspace", {
         body: {
           task_type: taskType,
-          client_name: customerName,
           notes,
           documents: uploadedFiles,
           customer_id: selectedCustomer || undefined,
@@ -207,18 +186,11 @@ export default function LewiAIPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer / Insured</Label>
-                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a customer (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CustomerCombobox 
+                  value={selectedCustomer}
+                  onChange={setSelectedCustomer}
+                  placeholder="Select a customer (optional)"
+                />
               </div>
 
               {selectedCustomer && (
