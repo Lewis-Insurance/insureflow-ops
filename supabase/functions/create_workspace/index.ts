@@ -76,7 +76,9 @@ serve(async (req) => {
 
     console.log("Parseur config check", {
       apiKeyPresent: !!PARSEUR_API_KEY,
+      apiKeyStart: PARSEUR_API_KEY?.substring(0, 8),
       mailboxId: PARSEUR_MAILBOX_ID,
+      mailboxIdType: typeof PARSEUR_MAILBOX_ID,
     });
 
     if (PARSEUR_API_KEY && PARSEUR_MAILBOX_ID) {
@@ -100,27 +102,36 @@ serve(async (req) => {
             const formData = new FormData();
             formData.append("file", fileBlob, fileName);
 
-            // Optional: Add custom metadata to track this upload
-            formData.append("metadata", JSON.stringify({
+            // Optional: Add custom metadata
+            const metadata = {
               workspace_id: workspace.id,
               task_type: task_type,
               client_name: client_name || null,
-            }));
+            };
+
+            // Add metadata as query params (Parseur supports this)
+            const queryParams = new URLSearchParams();
+            Object.entries(metadata).forEach(([key, value]) => {
+              if (value !== null) {
+                queryParams.append(key, String(value));
+              }
+            });
 
             // Step 3: Upload to Parseur
-            // Correct endpoint: /parser/{mailbox_id}/upload
-            // Correct auth: Just the API key in Authorization header (no "Token" or "Bearer")
-            const parseurResp = await fetch(
-              `https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload`,
-              {
-                method: "POST",
-                headers: {
-                  "Authorization": PARSEUR_API_KEY,
-                  // Don't set Content-Type - FormData sets it automatically with boundary
-                },
-                body: formData,
-              }
-            );
+            // CRITICAL: Authorization must be "Token <API_KEY>" with space
+            const parseurUrl = `https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload?${queryParams.toString()}`;
+            
+            console.log(`Uploading to Parseur: ${parseurUrl}`);
+
+            const parseurResp = await fetch(parseurUrl, {
+              method: "POST",
+              headers: {
+                // IMPORTANT: Use "Token" prefix, not "Bearer" or just raw key
+                "Authorization": `Token ${PARSEUR_API_KEY}`,
+                // Don't set Content-Type - FormData sets it automatically with boundary
+              },
+              body: formData,
+            });
 
             const responseText = await parseurResp.text();
             
@@ -130,6 +141,7 @@ serve(async (req) => {
                 statusText: parseurResp.statusText,
                 body: responseText,
                 file: fileName,
+                url: parseurUrl,
               });
             } else {
               // Parse the response to get DocumentID
@@ -140,12 +152,13 @@ serve(async (req) => {
                   attachments: parseurData.attachments,
                 });
 
-                // Optional: Store DocumentID for later correlation
+                // Store DocumentID for later correlation with parsed results
                 if (parseurData.attachments && parseurData.attachments.length > 0) {
                   const documentId = parseurData.attachments[0].DocumentID;
                   console.log(`DocumentID for tracking: ${documentId}`);
                   
-                  // You could update the workspace_documents table with this ID
+                  // Optional: Update the workspace_documents table with DocumentID
+                  // Uncomment if you added a parseur_document_id column
                   // await supabase.from("workspace_documents")
                   //   .update({ parseur_document_id: documentId })
                   //   .eq("file_url", d.file_url)
