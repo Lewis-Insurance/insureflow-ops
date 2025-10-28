@@ -56,8 +56,8 @@ serve(async (req) => {
         created_by: user.id,
         client_name: client_name || null,
         notes: notes || null,
-        customer_id: customer_id || null,
-        policy_id: policy_id || null,
+        ...(customer_id ? { customer_id } : {}),
+        ...(policy_id ? { policy_id } : {}),
       })
       .select()
       .single();
