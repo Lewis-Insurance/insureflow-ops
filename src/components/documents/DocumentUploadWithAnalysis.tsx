@@ -47,47 +47,65 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
 
     try {
       console.log('=== STARTING UPLOAD ===');
+      setUploadProgress(20);
       
       // Step 1: Upload to Supabase Storage
-      setUploadProgress(20);
-      const { data: { user } } = await supabase.auth.getUser();
-      const filePath = `${user?.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.pdf`;
-      
+      const filePath = `${Date.now()}-${fileName}`;
       const { data: uploadData, error: uploadError } = await supabase
         .storage
-        .from('customer-docs')
+        .from('documents')
         .upload(filePath, selectedFile);
 
       if (uploadError) throw uploadError;
 
       setUploadProgress(40);
-
+      
       // Step 2: Get public URL
       const { data: { publicUrl } } = supabase
         .storage
-        .from('customer-docs')
+        .from('documents')
         .getPublicUrl(filePath);
 
       console.log('File uploaded:', publicUrl);
       setUploadProgress(50);
 
-      // Step 3: Call Azure analysis
-      console.log('[Document Analysis] Calling ai-document-analysis-azure with:', {
-        document_url: publicUrl,
-        document_id: uploadData.path,
-        file_name: fileName,
-        account_id: accountId || null,
-        user_id: user?.id
-      });
+      // Step 3: Get current user
+      const { data: { user } } = await supabase.auth.getUser();
 
       setUploadProgress(60);
 
+      // Step 4: Create document record in database
+      const { data: documentRecord, error: docError } = await supabase
+        .from('documents')
+        .insert({
+          filename: fileName,
+          kind: 'insurance_document',
+          storage_path: uploadData.path,
+          storage_bucket: 'documents',
+          account_id: accountId || null,
+          uploaded_by: user?.id,
+          mime_type: selectedFile.type,
+          size_bytes: selectedFile.size,
+          file_size: selectedFile.size
+        })
+        .select()
+        .single();
+
+      if (docError) throw docError;
+
+      console.log('Document record created:', documentRecord.id);
+      setUploadProgress(70);
+
+      // Step 5: Call Azure analysis with proper document UUID
+      console.log('Calling ai-document-analysis-azure...');
+      setUploadProgress(80);
+      
       const { data: analysisResult, error: analysisError } = await supabase.functions.invoke(
         'ai-document-analysis-azure',
         {
           body: {
             document_url: publicUrl,
-            document_id: uploadData.path,
+            document_id: documentRecord.id,  // Pass UUID, not file path
             file_name: fileName,
             account_id: accountId || null,
             user_id: user?.id
@@ -95,17 +113,17 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         }
       );
 
-      console.log('[Document Analysis] Response:', analysisResult);
-      setUploadProgress(80);
+      console.log('Analysis result:', analysisResult);
 
       if (analysisError) throw analysisError;
+
+      setUploadProgress(100);
 
       if (analysisResult?.analysis_id) {
         console.log('Setting analysis ID:', analysisResult.analysis_id);
         setCompletedAnalysisId(analysisResult.analysis_id);
-        setUploadProgress(100);
       } else {
-        throw new Error('No analysis_id returned from edge function');
+        throw new Error('No analysis_id returned');
       }
 
       if (onComplete) {
