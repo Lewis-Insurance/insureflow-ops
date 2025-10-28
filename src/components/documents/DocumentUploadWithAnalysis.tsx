@@ -5,8 +5,9 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useDocumentUploadAndAnalysis, AnalysisMode, useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
+import { useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
 import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentUploadWithAnalysisProps {
   accountId?: string;
@@ -18,19 +19,11 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   onComplete
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('all');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedAnalysisId, setCompletedAnalysisId] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
-  
-  const { 
-    uploadAndAnalyze, 
-    isUploading, 
-    uploadProgress, 
-    isAnalyzing, 
-    analysisProgress,
-    isProcessing 
-  } = useDocumentUploadAndAnalysis();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch analysis results after completion
   const { data: analysisData, isLoading: isLoadingAnalysis } = useDocumentAnalysisQuery(completedAnalysisId);
@@ -47,48 +40,84 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
 
     setErrorMessage(null);
     setCompletedAnalysisId(null);
+    setIsProcessing(true);
+    setUploadProgress(0);
     const fileName = selectedFile.name;
     setUploadedFileName(fileName);
 
     try {
-      const result = await uploadAndAnalyze({
-        file: selectedFile,
-        accountId: accountId,
-        analysisMode: analysisMode,
-        workflowContext: {
-          source: 'manual_upload',
-          account_id: accountId
-        }
+      console.log('=== STARTING UPLOAD ===');
+      
+      // Step 1: Upload to Supabase Storage
+      setUploadProgress(20);
+      const { data: { user } } = await supabase.auth.getUser();
+      const filePath = `${user?.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.pdf`;
+      
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('customer-docs')
+        .upload(filePath, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      setUploadProgress(40);
+
+      // Step 2: Get public URL
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from('customer-docs')
+        .getPublicUrl(filePath);
+
+      console.log('File uploaded:', publicUrl);
+      setUploadProgress(50);
+
+      // Step 3: Call Azure analysis
+      console.log('[Document Analysis] Calling ai-document-analysis-azure with:', {
+        document_url: publicUrl,
+        document_id: uploadData.path,
+        file_name: fileName,
+        account_id: accountId || null,
+        user_id: user?.id
       });
 
-      console.log('Upload result:', result);
-      console.log('Analysis object:', result.analysis);
-      console.log('Analysis ID:', result.analysis?.analysis_id);
+      setUploadProgress(60);
 
-      // Set the analysis ID to trigger results display
-      if (result.analysis?.analysis_id) {
-        setCompletedAnalysisId(result.analysis.analysis_id);
+      const { data: analysisResult, error: analysisError } = await supabase.functions.invoke(
+        'ai-document-analysis-azure',
+        {
+          body: {
+            document_url: publicUrl,
+            document_id: uploadData.path,
+            file_name: fileName,
+            account_id: accountId || null,
+            user_id: user?.id
+          }
+        }
+      );
+
+      console.log('[Document Analysis] Response:', analysisResult);
+      setUploadProgress(80);
+
+      if (analysisError) throw analysisError;
+
+      if (analysisResult?.analysis_id) {
+        console.log('Setting analysis ID:', analysisResult.analysis_id);
+        setCompletedAnalysisId(analysisResult.analysis_id);
+        setUploadProgress(100);
+      } else {
+        throw new Error('No analysis_id returned from edge function');
       }
 
       if (onComplete) {
-        onComplete(result);
+        onComplete(analysisResult);
       }
 
       setSelectedFile(null);
     } catch (error: any) {
       console.error('Upload error:', error);
-      
-      let errorText = 'An unknown error occurred';
-      
-      if (error?.message) {
-        errorText = error.message;
-      } else if (typeof error === 'string') {
-        errorText = error;
-      } else if (error?.error) {
-        errorText = error.error;
-      }
-      
-      setErrorMessage(errorText);
+      setErrorMessage(error?.message || 'Upload failed');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -100,14 +129,11 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   };
 
   const getProgressMessage = () => {
-    if (isUploading) {
+    if (isProcessing) {
       if (uploadProgress < 30) return 'Uploading document...';
-      if (uploadProgress < 80) return 'Storing in secure storage...';
-      return 'Upload complete!';
-    }
-    if (isAnalyzing) {
-      if (analysisProgress < 40) return 'Extracting text with OCR...';
-      if (analysisProgress < 80) return 'Analyzing with AI...';
+      if (uploadProgress < 50) return 'Storing in secure storage...';
+      if (uploadProgress < 70) return 'Extracting text with OCR...';
+      if (uploadProgress < 90) return 'Analyzing with AI...';
       return 'Finalizing analysis...';
     }
     if (completedAnalysisId && isLoadingAnalysis) {
@@ -115,12 +141,6 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     }
     return '';
   };
-
-  const totalProgress = isUploading 
-    ? uploadProgress 
-    : isAnalyzing 
-    ? analysisProgress 
-    : 0;
 
   // Show results if analysis is complete
   if (completedAnalysisId && analysisData) {
@@ -182,26 +202,6 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           </Alert>
         )}
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Analysis Mode</label>
-          <Select
-            value={analysisMode}
-            onValueChange={(value) => setAnalysisMode(value as AnalysisMode)}
-            disabled={isProcessing}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Complete Analysis (Recommended)</SelectItem>
-              <SelectItem value="parse">Parse Data Only</SelectItem>
-              <SelectItem value="summarize">Summarize Document</SelectItem>
-              <SelectItem value="classify">Classify Document</SelectItem>
-              <SelectItem value="insights">Generate Insights</SelectItem>
-              <SelectItem value="workflow">Workflow Automation</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         <div className="border-2 border-dashed rounded-lg p-8 text-center">
           {selectedFile ? (
@@ -254,9 +254,9 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
               <span className="text-muted-foreground font-medium">
                 {getProgressMessage()}
               </span>
-              <span className="font-semibold">{totalProgress}%</span>
+              <span className="font-semibold">{uploadProgress}%</span>
             </div>
-            <Progress value={totalProgress} className="h-2" />
+            <Progress value={uploadProgress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
               This may take 30-60 seconds for large documents
             </p>
