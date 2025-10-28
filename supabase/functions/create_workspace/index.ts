@@ -73,6 +73,11 @@ serve(async (req) => {
     const PARSEUR_API_KEY = Deno.env.get("PARSEUR_API_KEY");
     const PARSEUR_MAILBOX_ID = Deno.env.get("PARSEUR_MAILBOX_ID");
 
+    console.log("ENV CHECK", {
+      apiKeyStart: PARSEUR_API_KEY?.substring(0, 6),
+      mailboxId: PARSEUR_MAILBOX_ID
+    });
+
     if (PARSEUR_API_KEY && PARSEUR_MAILBOX_ID) {
       for (const d of documents) {
         if (d.file_url) {
