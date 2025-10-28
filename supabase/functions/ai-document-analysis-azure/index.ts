@@ -61,8 +61,8 @@ serve(async (req) => {
       '2024-07-31-preview'
     ];
 
-    let startResponse: Response | null = null;
-    let workingVersion: string | null = null;
+    let startResponse = null;
+    let workingVersion = null;
 
     for (const version of apiVersions) {
       const fullUrl = `${AZURE_ENDPOINT}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=${version}`;
@@ -88,6 +88,9 @@ serve(async (req) => {
           workingVersion = version;
           console.log(`✅ SUCCESS with version ${version}`);
           
+          // Parse back for operation location
+          const responseData = JSON.parse(responseText);
+          
           // Check for operation location in headers
           const operationLocation = startResponse.headers.get('Operation-Location');
           if (operationLocation) {
@@ -98,7 +101,7 @@ serve(async (req) => {
             console.log('STEP 2: Polling for OCR completion');
             console.log('----------------------------------------');
 
-            let result: any = null;
+            let result = null;
             let attempts = 0;
 
             while (attempts < 60 && !result) {
@@ -221,7 +224,7 @@ Return ONLY valid JSON:
             const aiData = await aiResponse.json();
             const aiContent = aiData.choices[0].message.content;
             
-            let analysisResult: any;
+            let analysisResult;
             try {
               const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
               analysisResult = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
@@ -264,14 +267,14 @@ Return ONLY valid JSON:
         } else {
           console.log(`❌ Version ${version} failed: ${startResponse.status}`);
         }
-      } catch (error: any) {
+      } catch (error) {
         console.log(`❌ Version ${version} error: ${error.message}`);
       }
     }
 
     throw new Error('All API versions failed. Check your Azure endpoint configuration.');
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('========================================');
     console.error('ERROR:', error.message);
     console.error('========================================');
