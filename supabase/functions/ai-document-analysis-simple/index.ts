@@ -64,7 +64,7 @@ serve(async (req) => {
       .from(bucketName)
       .createSignedUrl(docData.storage_path, 3600);
 
-    if (signedUrlError || !signedUrlData) {
+    if (signedUrlError || !signedUrlData?.signedUrl) {
       throw new Error(`Failed to create signed URL: ${signedUrlError?.message || 'Unknown error'}`);
     }
 
@@ -72,7 +72,8 @@ serve(async (req) => {
 
     const pdfResponse = await fetch(signedUrlData.signedUrl);
     if (!pdfResponse.ok) {
-      throw new Error(`Failed to download PDF: ${pdfResponse.status} - ${await pdfResponse.text()}`);
+      const errorText = await pdfResponse.text();
+      throw new Error(`Failed to download PDF: ${pdfResponse.status} - ${errorText}`);
     }
 
     const pdfBuffer = await pdfResponse.arrayBuffer();
