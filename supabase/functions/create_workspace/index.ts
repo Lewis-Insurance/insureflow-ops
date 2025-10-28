@@ -83,13 +83,14 @@ serve(async (req) => {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            const parseurResp = await fetch(`https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload`, {
+            const parseurResp = await fetch("https://api.parseur.com/parser/", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${PARSEUR_API_KEY}`,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
+                mailbox: PARSEUR_MAILBOX_ID,
                 file_url: d.file_url,
               }),
             });
