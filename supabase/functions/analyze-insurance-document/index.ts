@@ -13,6 +13,7 @@ serve(async (req) => {
   }
 
   try {
+    let documentId: string | null = null;
     const { 
       document_url, 
       document_id, 
@@ -20,6 +21,7 @@ serve(async (req) => {
       account_id,
       user_id 
     } = await req.json();
+    documentId = document_id;
 
     console.log('[Document Analysis] Starting:', file_name);
 
@@ -30,12 +32,13 @@ serve(async (req) => {
     );
 
     // Create initial record
+    const normalizedAccountId = account_id && String(account_id).trim() !== '' ? account_id : null;
     const { data: analysisRecord, error: insertError } = await supabase
       .from('document_analysis')
       .insert({
         document_id,
         file_name,
-        account_id,
+        account_id: normalizedAccountId,
         created_by: user_id,
         processing_status: 'pending'
       })
@@ -85,21 +88,32 @@ serve(async (req) => {
     
     const base64Doc = btoa(binaryString);
 
-    // Call Google Vision API
-    const visionResponse = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    // Call Google Vision API (use files:annotate for PDFs)
+    const isPdf = file_name?.toLowerCase().endsWith('.pdf');
+    const visionEndpoint = isPdf
+      ? `https://vision.googleapis.com/v1/files:annotate?key=${GOOGLE_VISION_API_KEY}`
+      : `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
+
+    const visionBody = isPdf
+      ? {
+          requests: [{
+            inputConfig: { content: base64Doc, mimeType: 'application/pdf' },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
+          }]
+        }
+      : {
           requests: [{
             image: { content: base64Doc },
             features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
             imageContext: { languageHints: ['en'] }
           }]
-        })
-      }
-    );
+        };
+
+    const visionResponse = await fetch(visionEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(visionBody)
+    });
 
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
@@ -255,14 +269,14 @@ Return ONLY the JSON object, no other text.`
   } catch (error) {
     console.error('[Document Analysis] Error:', error);
     
-    // Try to update record with error using the document_id from the initial request
+    // Try to update record with error using the documentId captured earlier
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
       
-      if (document_id) {
+      if (documentId) {
         await supabase
           .from('document_analysis')
           .update({
@@ -270,7 +284,7 @@ Return ONLY the JSON object, no other text.`
             error_message: error instanceof Error ? error.message : 'Unknown error',
             updated_at: new Date().toISOString()
           })
-          .eq('document_id', document_id);
+          .eq('document_id', documentId);
       }
     } catch (dbError) {
       console.error('[Database] Failed to log error:', dbError);
