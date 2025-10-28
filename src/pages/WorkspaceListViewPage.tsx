@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDistanceToNow } from "date-fns";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
-const WorkspacePage = () => {
+const WorkspaceListViewPage = () => {
+  const navigate = useNavigate();
   // Enable real-time updates
   useWorkspaceSubscription();
 
@@ -149,7 +151,7 @@ const WorkspacePage = () => {
           ) : (
             <div className="space-y-4">
               {filteredActive.map((workspace) => (
-                <WorkspaceItem key={workspace.id} workspace={workspace} />
+                <WorkspaceItem key={workspace.id} workspace={workspace} onClick={() => navigate(`/workspace/${workspace.id}`)} />
               ))}
             </div>
           )}
@@ -176,7 +178,7 @@ const WorkspacePage = () => {
           ) : (
             <div className="space-y-4">
               {filteredCompleted.map((workspace) => (
-                <WorkspaceItem key={workspace.id} workspace={workspace} showActions />
+                <WorkspaceItem key={workspace.id} workspace={workspace} onClick={() => navigate(`/workspace/${workspace.id}`)} />
               ))}
             </div>
           )}
@@ -189,10 +191,10 @@ const WorkspacePage = () => {
 
 interface WorkspaceItemProps {
   workspace: Workspace;
-  showActions?: boolean;
+  onClick?: () => void;
 }
 
-function WorkspaceItem({ workspace, showActions }: WorkspaceItemProps) {
+function WorkspaceItem({ workspace, onClick }: WorkspaceItemProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "processing":
@@ -218,14 +220,8 @@ function WorkspaceItem({ workspace, showActions }: WorkspaceItemProps) {
 
   return (
     <div
-      className={`flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors ${
-        showActions ? "cursor-pointer" : ""
-      }`}
-      onClick={() => {
-        if (showActions) {
-          window.location.href = `/workspace/${workspace.id}`;
-        }
-      }}
+      className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+      onClick={onClick}
     >
       <div className="flex items-start gap-4 flex-1">
         {getStatusIcon(workspace.status)}
@@ -279,11 +275,9 @@ function WorkspaceItem({ workspace, showActions }: WorkspaceItemProps) {
         </div>
       </div>
 
-      {showActions && (
-        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-      )}
+      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
     </div>
   );
 }
 
-export default WorkspacePage;
+export default WorkspaceListViewPage;

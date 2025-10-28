@@ -51,8 +51,8 @@ const DocumentAnalysisPage = React.lazy(() => import("./pages/AnalyzeDocumentsPa
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
 const KnowledgeManagerPage = React.lazy(() => import("./pages/KnowledgeManagerPage"));
 const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison"));
-const WorkspacePage = React.lazy(() => import("./pages/WorkspacePage"));
-const WorkspaceListPage = React.lazy(() => import("./pages/WorkspaceListPage"));
+const WorkspaceDetailPage = React.lazy(() => import("./pages/WorkspaceDetailPage"));
+const WorkspaceListViewPage = React.lazy(() => import("./pages/WorkspaceListViewPage"));
 const ComparisonReportPage = React.lazy(() => import("./pages/ComparisonReportPage"));
 const ComparisonPage = React.lazy(() => import("./pages/ComparisonPage"));
 const ProducerDashboard = React.lazy(() => import("./pages/ProducerDashboard"));
@@ -469,7 +469,7 @@ const App = () => (
                 path="/workspace"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <WorkspaceListPage />
+                    <WorkspaceListViewPage />
                   </ErrorBoundary>
                 }
               />
@@ -477,7 +477,7 @@ const App = () => (
                 path="/workspace/:id"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <WorkspacePage />
+                    <WorkspaceDetailPage />
                   </ErrorBoundary>
                 }
               />
