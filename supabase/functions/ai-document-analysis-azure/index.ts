@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -51,7 +52,7 @@ serve(async (req) => {
 
     console.log('[Download] Fetching document from storage...');
 
-    // Parse the storage path from the URL
+    // Parse storage path
     const urlParts = document_url.split('/storage/v1/object/');
     if (urlParts.length !== 2) {
       throw new Error('Invalid document URL format');
@@ -70,21 +71,18 @@ serve(async (req) => {
       .download(filePath);
 
     if (downloadError || !fileData) {
-      console.error('[Download] Error:', downloadError);
-      throw new Error(`Failed to download document: ${downloadError?.message || 'Unknown error'}`);
+      throw new Error(`Failed to download: ${downloadError?.message || 'Unknown error'}`);
     }
 
-    // Convert to base64 using standard encoding (no stack overflow)
-    const documentBuffer = await fileData.arrayBuffer();
-    const uint8Array = new Uint8Array(documentBuffer);
+    // Convert to base64 using Deno's standard library (safe for large files)
+    const arrayBuffer = await fileData.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-    console.log(`[Download] Downloaded ${documentBuffer.byteLength} bytes, encoding to base64...`);
+    console.log(`[Download] Downloaded ${arrayBuffer.byteLength} bytes, encoding...`);
 
-    // Use Array.from method for safe base64 encoding
-    const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
-    const base64Document = btoa(binaryString);
+    const base64Document = base64Encode(uint8Array);
 
-    console.log(`[Download] Encoded to base64 (${base64Document.length} chars)`);
+    console.log(`[Download] Encoded successfully (${base64Document.length} chars)`);
 
     // Determine content type
     const contentType = file_name.toLowerCase().endsWith('.pdf') 
