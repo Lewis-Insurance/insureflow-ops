@@ -225,7 +225,6 @@ Return ONLY the JSON object, no other text.`
         coverages: parsedData.coverages || [],
         insured_items: parsedData.insured_items || [],
         raw_ocr_text: ocrText,
-        extracted_data: parsedData,
         confidence_score: parsedData.confidence_score || 85,
         processing_status: 'complete',
         updated_at: new Date().toISOString()
