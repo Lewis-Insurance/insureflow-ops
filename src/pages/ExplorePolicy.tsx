@@ -420,33 +420,56 @@ export default function ExplorePolicy() {
   });
 
   const handleSearch = async () => {
-    if (!selectedDoc?.analysis?.extractedText || !searchQuery.trim()) return;
+    if (!selectedDoc?.analysis || !searchQuery.trim()) return;
 
     setIsSearching(true);
     setSearchResults([]);
 
     try {
-      // Try semantic search first
-      const { data, error } = await supabase.functions.invoke('ai-brain-rag', {
-        body: {
-          query: searchQuery,
-          context: selectedDoc.analysis.extractedText,
-          documentId: selectedDoc.id,
-          maxResults: 10,
-        }
-      });
+      // Build searchable content from all available analysis data
+      const searchableContent = [
+        selectedDoc.analysis.extractedText || '',
+        selectedDoc.analysis.summary || '',
+        selectedDoc.analysis.policyNumber || '',
+        selectedDoc.analysis.insuredName || '',
+        selectedDoc.analysis.carrier || '',
+        ...selectedDoc.analysis.coverageDetails.map(c => `${c.type} ${c.limit} ${c.deductible} ${c.premium || ''}`),
+        ...selectedDoc.analysis.keyDates.map(d => `${d.label} ${d.date}`),
+      ].join(' ');
 
-      if (!error && data?.results && data.results.length > 0) {
-        setSearchResults(data.results);
+      if (!searchableContent.trim()) {
         toast({
-          title: "Search Complete",
-          description: `Found ${data.results.length} semantic matches`,
+          title: "No Content Available",
+          description: "Document analysis doesn't contain searchable text",
+          variant: "destructive",
         });
+        setIsSearching(false);
         return;
       }
 
-      // Fallback to basic text search
-      const text = selectedDoc.analysis.extractedText.toLowerCase();
+      // Try semantic search first if extractedText is available
+      if (selectedDoc.analysis.extractedText) {
+        const { data, error } = await supabase.functions.invoke('ai-brain-rag', {
+          body: {
+            query: searchQuery,
+            context: selectedDoc.analysis.extractedText,
+            documentId: selectedDoc.id,
+            maxResults: 10,
+          }
+        });
+
+        if (!error && data?.results && data.results.length > 0) {
+          setSearchResults(data.results);
+          toast({
+            title: "Search Complete",
+            description: `Found ${data.results.length} semantic matches`,
+          });
+          return;
+        }
+      }
+
+      // Fallback to basic text search across all content
+      const text = searchableContent.toLowerCase();
       const query = searchQuery.toLowerCase();
       const results: SearchResult[] = [];
       const lines = text.split('\n');
@@ -477,7 +500,7 @@ export default function ExplorePolicy() {
         });
       } else {
         toast({
-          title: "Search Complete (Basic)",
+          title: "Search Complete",
           description: `Found ${results.length} text matches`,
         });
       }
