@@ -17,6 +17,16 @@ serve(async (req) => {
 
     const { title, task_type, client_name, notes, documents, customer_id, policy_id } = await req.json();
 
+    // Log what we received
+    console.log("Received payload:", {
+      title,
+      task_type,
+      client_name,
+      customer_id,
+      policy_id,
+      documents: documents?.length,
+    });
+
     if (!task_type || !documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Missing required fields: task_type or documents[]");
     }
@@ -38,6 +48,40 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
+    // Validate customer_id exists in database if provided
+    let validatedCustomerId = null;
+    if (customer_id) {
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('account_id')
+        .eq('account_id', customer_id)
+        .single();
+      
+      if (!customerError && customer) {
+        validatedCustomerId = customer_id;
+        console.log("✓ Valid customer_id:", customer_id);
+      } else {
+        console.log("⚠ Invalid customer_id, will be omitted:", customer_id);
+      }
+    }
+
+    // Validate policy_id exists in database if provided
+    let validatedPolicyId = null;
+    if (policy_id) {
+      const { data: policy, error: policyError } = await supabase
+        .from('policies')
+        .select('policy_id')
+        .eq('policy_id', policy_id)
+        .single();
+      
+      if (!policyError && policy) {
+        validatedPolicyId = policy_id;
+        console.log("✓ Valid policy_id:", policy_id);
+      } else {
+        console.log("⚠ Invalid policy_id, will be omitted:", policy_id);
+      }
+    }
+
     // Create workspace with better naming
     const workspaceName = title 
       ? title 
@@ -46,7 +90,7 @@ serve(async (req) => {
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
 
-    // Build workspace data, only including valid foreign keys
+    // Build workspace data with only validated foreign keys
     const workspaceData: any = {
       name: workspaceName,
       description: notes || null,
@@ -57,15 +101,16 @@ serve(async (req) => {
       notes: notes || null,
     };
 
-    // Only add customer_id if it's a valid UUID
-    if (customer_id && typeof customer_id === 'string' && customer_id.length === 36) {
-      workspaceData.customer_id = customer_id;
+    // Only include validated foreign keys
+    if (validatedCustomerId) {
+      workspaceData.customer_id = validatedCustomerId;
     }
 
-    // Only add policy_id if it's a valid UUID
-    if (policy_id && typeof policy_id === 'string' && policy_id.length === 36) {
-      workspaceData.policy_id = policy_id;
+    if (validatedPolicyId) {
+      workspaceData.policy_id = validatedPolicyId;
     }
+
+    console.log("Creating workspace with data:", workspaceData);
 
     const { data: workspace, error: wsError } = await supabase
       .from("workspaces")
