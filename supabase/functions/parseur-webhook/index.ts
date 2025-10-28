@@ -46,10 +46,45 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Insert the parsed document
+    // Find the corresponding workspace_document
+    // Parseur should send parseur_document_id or file_name in the payload
+    const parseurDocId = body.parseur_document_id || body.document_id;
+    const fileName = body.file_name;
+
+    console.log("Looking for workspace_document with parseur_document_id:", parseurDocId, "or file_name:", fileName);
+
+    // Try to find by parseur_document_id first, then by file_name
+    let workspaceDocQuery = supabase
+      .from("workspace_documents")
+      .select("id, workspace_id, file_name");
+
+    if (parseurDocId) {
+      workspaceDocQuery = workspaceDocQuery.eq("parseur_document_id", parseurDocId);
+    } else if (fileName) {
+      workspaceDocQuery = workspaceDocQuery.eq("file_name", fileName);
+    } else {
+      throw new Error("Missing parseur_document_id and file_name in webhook payload");
+    }
+
+    const { data: workspaceDoc, error: docError } = await workspaceDocQuery.maybeSingle();
+
+    if (docError) {
+      console.error("Error finding workspace_document:", docError);
+      throw docError;
+    }
+
+    if (!workspaceDoc) {
+      console.error("No workspace_document found for parseur_document_id:", parseurDocId, "or file_name:", fileName);
+      throw new Error("Workspace document not found");
+    }
+
+    console.log("Found workspace_document:", workspaceDoc.id);
+
+    // Insert the parsed document with proper linkage
     const { data, error } = await supabase
       .from("parsed_documents")
       .insert({
+        workspace_document_id: workspaceDoc.id,
         source: "parseur",
         document_type: body.document_type ?? "unknown",
         file_name: body.file_name ?? null,
@@ -63,7 +98,7 @@ serve(async (req) => {
       throw error;
     }
 
-    console.log("Parseur payload stored:", data.id);
+    console.log("✅ Parseur payload stored and linked to workspace_document:", workspaceDoc.id, "parsed_documents id:", data.id);
 
     return new Response(
       JSON.stringify({ success: true, id: data.id }),

@@ -40,8 +40,7 @@ serve(async (req) => {
           file_url,
           role,
           parseur_document_id,
-          parsed_doc_id,
-          parsed_documents (
+          parsed_documents!workspace_document_id (
             id,
             parsed_data,
             document_type
@@ -63,7 +62,9 @@ serve(async (req) => {
     console.log(`Processing workspace ${workspace_id} with ${workspace.workspace_documents?.length || 0} documents`);
 
     // Check if all documents have been parsed by Parseur
-    const unparsedDocs = workspace.workspace_documents?.filter(doc => !doc.parsed_documents) || [];
+    const unparsedDocs = workspace.workspace_documents?.filter(doc => 
+      !doc.parsed_documents || doc.parsed_documents.length === 0
+    ) || [];
     
     if (unparsedDocs.length > 0) {
       console.log(`Waiting for Parseur to parse ${unparsedDocs.length} documents...`);
@@ -84,8 +85,8 @@ serve(async (req) => {
     const documentData = workspace.workspace_documents?.map(doc => ({
       filename: doc.file_name,
       role: doc.role,
-      document_type: doc.parsed_documents?.document_type,
-      parsed_data: doc.parsed_documents?.parsed_data,
+      document_type: doc.parsed_documents?.[0]?.document_type,
+      parsed_data: doc.parsed_documents?.[0]?.parsed_data,
     })) || [];
 
     if (documentData.length === 0) {

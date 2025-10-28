@@ -5547,6 +5547,7 @@ export type Database = {
           source: string | null
           source_url: string | null
           updated_at: string | null
+          workspace_document_id: string | null
         }
         Insert: {
           account_id?: string | null
@@ -5559,6 +5560,7 @@ export type Database = {
           source?: string | null
           source_url?: string | null
           updated_at?: string | null
+          workspace_document_id?: string | null
         }
         Update: {
           account_id?: string | null
@@ -5571,6 +5573,7 @@ export type Database = {
           source?: string | null
           source_url?: string | null
           updated_at?: string | null
+          workspace_document_id?: string | null
         }
         Relationships: [
           {
@@ -5578,6 +5581,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parsed_documents_workspace_document_id_fkey"
+            columns: ["workspace_document_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_documents"
             referencedColumns: ["id"]
           },
         ]
