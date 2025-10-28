@@ -60,14 +60,17 @@ export const AzureDiagnostics = () => {
                 {/* Environment Variables Check */}
                 <div className="space-y-2">
                   <h3 className="font-semibold">Environment Variables</h3>
-                  {Object.entries(results.tests?.env_vars || {}).map(([key, value]: [string, any]) => (
+                  {Object.entries(results.env_check || {}).map(([key, value]: [string, any]) => (
                     <div key={key} className="flex items-center gap-2">
-                      <span className={value ? "text-green-600" : "text-red-600"}>
-                        {value ? "✓" : "✗"}
+                      <span className={value.configured ? "text-green-600" : "text-red-600"}>
+                        {value.configured ? "✓" : "✗"}
                       </span>
                       <span className="text-sm">{key}</span>
-                      {!value && (
+                      {!value.configured && (
                         <span className="text-xs text-red-600">(Missing)</span>
+                      )}
+                      {value.configured && value.value && (
+                        <span className="text-xs text-muted-foreground">{value.value}</span>
                       )}
                     </div>
                   ))}
@@ -76,28 +79,27 @@ export const AzureDiagnostics = () => {
                 {/* Connection Tests */}
                 <div className="space-y-2">
                   <h3 className="font-semibold">Connection Tests</h3>
-                  {Object.entries(results.tests || {}).map(([key, test]: [string, any]) => {
-                    if (key === 'env_vars') return null;
-                    return (
-                      <div key={key} className="p-3 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={test.success ? "text-green-600" : "text-red-600"}>
-                            {test.success ? "✓" : "✗"}
-                          </span>
-                          <span className="font-medium">{key.replace(/_/g, ' ')}</span>
-                        </div>
-                        {test.error && (
-                          <p className="text-xs text-red-600 ml-6">{test.error}</p>
-                        )}
-                        {test.endpoint && (
-                          <p className="text-xs text-muted-foreground ml-6">Endpoint: {test.endpoint}</p>
-                        )}
-                        {test.deployment && (
-                          <p className="text-xs text-muted-foreground ml-6">Deployment: {test.deployment}</p>
-                        )}
+                  {Object.entries(results.tests || {}).map(([key, test]: [string, any]) => (
+                    <div key={key} className="p-3 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={test.success ? "text-green-600" : "text-red-600"}>
+                          {test.success ? "✓" : "✗"}
+                        </span>
+                        <span className="font-medium">{key.replace(/_/g, ' ')}</span>
                       </div>
-                    );
-                  })}
+                      {test.status && (
+                        <p className="text-xs text-muted-foreground ml-6">Status: {test.status}</p>
+                      )}
+                      {test.error && (
+                        <p className="text-xs text-red-600 ml-6 mt-1">{test.error}</p>
+                      )}
+                      {test.details && (
+                        <p className="text-xs text-muted-foreground ml-6 mt-1">
+                          {JSON.stringify(test.details)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Summary */}
