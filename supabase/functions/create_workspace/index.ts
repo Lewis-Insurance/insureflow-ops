@@ -76,40 +76,106 @@ serve(async (req) => {
 
     console.log("Parseur config check", {
       apiKeyPresent: !!PARSEUR_API_KEY,
-      apiKeyStart: PARSEUR_API_KEY?.substring(0, 8),
       mailboxId: PARSEUR_MAILBOX_ID,
-      mailboxIdType: typeof PARSEUR_MAILBOX_ID,
     });
 
     if (PARSEUR_API_KEY && PARSEUR_MAILBOX_ID) {
       for (const d of documents) {
         if (d.file_url) {
           try {
-            console.log(`Fetching file from: ${d.file_url}`);
-
-            // Step 1: Fetch the file from Supabase Storage
-            const fileResponse = await fetch(d.file_url);
-            if (!fileResponse.ok) {
-              throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
-            }
-
-            const fileBlob = await fileResponse.blob();
             const fileName = d.file_name || "document.pdf";
+            console.log(`Processing file: ${fileName} from URL: ${d.file_url}`);
 
-            console.log(`File fetched: ${fileName}, size: ${fileBlob.size} bytes`);
+            let fileBlob: Blob;
+
+            // Step 1: Determine if this is a Supabase Storage URL or external URL
+            const isSupabaseStorage = d.file_url.includes(supabaseUrl) || 
+                                     d.file_url.includes('/storage/v1/object/');
+
+            if (isSupabaseStorage) {
+              // Option A: Extract bucket and path, then download via Supabase SDK
+              console.log("Detected Supabase Storage URL, using authenticated download");
+
+              // Parse the storage URL to extract bucket and path
+              // URL format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
+              // or: https://{project}.supabase.co/storage/v1/object/authenticated/{bucket}/{path}
+              
+              const storageMatch = d.file_url.match(/\/storage\/v1\/object\/(?:public|authenticated|sign)\/([^/]+)\/(.+)/);
+              
+              if (storageMatch) {
+                const bucket = storageMatch[1];
+                const path = storageMatch[2];
+                
+                console.log(`Downloading from bucket: ${bucket}, path: ${path}`);
+
+                // Download using Supabase client (with proper auth)
+                const { data: fileData, error: downloadError } = await supabase.storage
+                  .from(bucket)
+                  .download(path);
+
+                if (downloadError) {
+                  throw new Error(`Failed to download from Supabase Storage: ${downloadError.message}`);
+                }
+
+                fileBlob = fileData;
+                console.log(`File downloaded from Supabase Storage: ${fileBlob.size} bytes`);
+              } else {
+                // Fallback: Try creating a signed URL and downloading
+                console.log("Could not parse storage path, attempting signed URL method");
+                
+                // Try to extract bucket/path another way or use signed URL
+                const urlParts = d.file_url.split('/storage/v1/object/');
+                if (urlParts.length > 1) {
+                  const pathPart = urlParts[1].replace(/^(public|authenticated|sign)\//, '');
+                  const [bucket, ...pathSegments] = pathPart.split('/');
+                  const path = pathSegments.join('/');
+
+                  // Create a signed URL (valid for 60 seconds)
+                  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(path, 60);
+
+                  if (signedUrlError) {
+                    throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+                  }
+
+                  console.log("Fetching via signed URL");
+                  const fileResponse = await fetch(signedUrlData.signedUrl);
+                  
+                  if (!fileResponse.ok) {
+                    throw new Error(`Failed to fetch via signed URL: ${fileResponse.statusText}`);
+                  }
+
+                  fileBlob = await fileResponse.blob();
+                } else {
+                  throw new Error("Could not parse Supabase Storage URL");
+                }
+              }
+            } else {
+              // Option B: External URL - fetch directly
+              console.log("Detected external URL, fetching directly");
+              
+              const fileResponse = await fetch(d.file_url);
+              
+              if (!fileResponse.ok) {
+                throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
+              }
+
+              fileBlob = await fileResponse.blob();
+              console.log(`File fetched: ${fileName}, size: ${fileBlob.size} bytes`);
+            }
 
             // Step 2: Create FormData with the file
             const formData = new FormData();
             formData.append("file", fileBlob, fileName);
 
-            // Optional: Add custom metadata
+            // Optional: Add custom metadata as query params
             const metadata = {
               workspace_id: workspace.id,
               task_type: task_type,
               client_name: client_name || null,
             };
 
-            // Add metadata as query params (Parseur supports this)
             const queryParams = new URLSearchParams();
             Object.entries(metadata).forEach(([key, value]) => {
               if (value !== null) {
@@ -118,7 +184,6 @@ serve(async (req) => {
             });
 
             // Step 3: Upload to Parseur
-            // CRITICAL: Authorization must be "Token <API_KEY>" with space
             const parseurUrl = `https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload?${queryParams.toString()}`;
             
             console.log(`Uploading to Parseur: ${parseurUrl}`);
@@ -126,9 +191,7 @@ serve(async (req) => {
             const parseurResp = await fetch(parseurUrl, {
               method: "POST",
               headers: {
-                // IMPORTANT: Use "Token" prefix, not "Bearer" or just raw key
                 "Authorization": `Token ${PARSEUR_API_KEY}`,
-                // Don't set Content-Type - FormData sets it automatically with boundary
               },
               body: formData,
             });
@@ -141,10 +204,8 @@ serve(async (req) => {
                 statusText: parseurResp.statusText,
                 body: responseText,
                 file: fileName,
-                url: parseurUrl,
               });
             } else {
-              // Parse the response to get DocumentID
               try {
                 const parseurData = JSON.parse(responseText);
                 console.log(`✓ Sent ${fileName} to Parseur successfully:`, {
@@ -152,17 +213,10 @@ serve(async (req) => {
                   attachments: parseurData.attachments,
                 });
 
-                // Store DocumentID for later correlation with parsed results
+                // Store DocumentID for later correlation
                 if (parseurData.attachments && parseurData.attachments.length > 0) {
                   const documentId = parseurData.attachments[0].DocumentID;
                   console.log(`DocumentID for tracking: ${documentId}`);
-                  
-                  // Optional: Update the workspace_documents table with DocumentID
-                  // Uncomment if you added a parseur_document_id column
-                  // await supabase.from("workspace_documents")
-                  //   .update({ parseur_document_id: documentId })
-                  //   .eq("file_url", d.file_url)
-                  //   .eq("workspace_id", workspace.id);
                 }
               } catch (parseErr) {
                 console.log(`✓ Sent ${fileName} to Parseur (raw response):`, responseText);
