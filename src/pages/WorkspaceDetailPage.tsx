@@ -236,10 +236,40 @@ export default function WorkspaceDetailPage() {
                   </div>
                 ) : workspace.analysis_output ? (
                   <ScrollArea className="h-[500px]">
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap bg-muted p-4 rounded-lg">
-                        {JSON.stringify(workspace.analysis_output, null, 2)}
-                      </pre>
+                    <div className="space-y-4">
+                      <div className="bg-muted p-4 rounded-lg">
+                        <h3 className="font-semibold mb-2">Summary</h3>
+                        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                          {typeof workspace.analysis_output === 'object' && 
+                           workspace.analysis_output !== null && 
+                           'summary' in workspace.analysis_output 
+                            ? String(workspace.analysis_output.summary)
+                            : JSON.stringify(workspace.analysis_output, null, 2)}
+                        </div>
+                      </div>
+                      
+                      {typeof workspace.analysis_output === 'object' && 
+                       workspace.analysis_output !== null && 
+                       'documents' in workspace.analysis_output && 
+                       Array.isArray(workspace.analysis_output.documents) && (
+                        <div className="bg-muted p-4 rounded-lg">
+                          <h3 className="font-semibold mb-2">Analyzed Documents</h3>
+                          <ul className="list-disc list-inside space-y-1">
+                            {workspace.analysis_output.documents.map((doc: any, idx: number) => (
+                              <li key={idx} className="text-sm">{String(doc)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {typeof workspace.analysis_output === 'object' && 
+                       workspace.analysis_output !== null && 
+                       'analyzed_at' in workspace.analysis_output && (
+                        <div className="text-xs text-muted-foreground">
+                          Analyzed on {new Date(String(workspace.analysis_output.analyzed_at)).toLocaleString()} 
+                          {'model' in workspace.analysis_output && ` using ${workspace.analysis_output.model}`}
+                        </div>
+                      )}
                     </div>
                   </ScrollArea>
                 ) : (

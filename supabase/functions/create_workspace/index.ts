@@ -238,6 +238,19 @@ serve(async (req) => {
 
     console.log(`\n✓ Workspace ${workspace.id} created with ${documents.length} documents`);
 
+    // Trigger analysis in the background
+    console.log("Triggering background analysis...");
+    fetch(`${supabaseUrl}/functions/v1/analyze-workspace`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ workspace_id: workspace.id }),
+    }).catch(err => {
+      console.error("Failed to trigger analysis:", err);
+    });
+
     return new Response(JSON.stringify({ success: true, workspace }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

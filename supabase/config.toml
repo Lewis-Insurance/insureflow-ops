@@ -142,3 +142,6 @@ verify_jwt = true
 
 [functions.on_parse_complete]
 verify_jwt = false
+
+[functions.analyze-workspace]
+verify_jwt = false
