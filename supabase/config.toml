@@ -124,3 +124,6 @@ verify_jwt = true
 
 [functions.azure-diagnostics]
 verify_jwt = true
+
+[functions.ai-document-analysis-azure]
+verify_jwt = true
