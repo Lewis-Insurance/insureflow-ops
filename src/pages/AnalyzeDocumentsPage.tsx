@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DocumentUploadWithAnalysis } from '@/components/documents/DocumentUploadWithAnalysis';
 import { DocumentAnalysisResults } from '@/components/documents/DocumentAnalysisResults';
+import { AzureDiagnostics } from '@/components/diagnostics/AzureDiagnostics';
 import { useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -23,6 +24,7 @@ export default function AnalyzeDocumentsPage() {
 
         {!analysisId ? (
           <div className="max-w-2xl mx-auto">
+            <AzureDiagnostics />
             <DocumentUploadWithAnalysis />
           </div>
         ) : (
