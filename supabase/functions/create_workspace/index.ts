@@ -67,6 +67,40 @@ serve(async (req) => {
 
     if (docError) throw docError;
 
+    // Send files to Parseur for automatic parsing
+    const PARSEUR_API_KEY = Deno.env.get("PARSEUR_API_KEY");
+    const PARSEUR_MAILBOX_ID = Deno.env.get("PARSEUR_MAILBOX_ID");
+
+    if (PARSEUR_API_KEY && PARSEUR_MAILBOX_ID) {
+      for (const d of documents) {
+        if (d.file_url) {
+          try {
+            const parseurResp = await fetch(
+              `https://api.parseur.com/v2/mailboxes/${PARSEUR_MAILBOX_ID}/documents`,
+              {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${PARSEUR_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  file_url: d.file_url,
+                }),
+              }
+            );
+
+            if (!parseurResp.ok) {
+              console.error("Parseur API error:", await parseurResp.text());
+            } else {
+              console.log(`Sent ${d.file_name} to Parseur successfully`);
+            }
+          } catch (err) {
+            console.error(`Failed to send ${d.file_name} to Parseur:`, err);
+          }
+        }
+      }
+    }
+
     console.log(`Workspace ${workspace.id} created with ${documents.length} documents.`);
 
     return new Response(
