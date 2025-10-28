@@ -234,6 +234,16 @@ export const DocumentAnalysisDisplay: React.FC<DocumentAnalysisDisplayProps> = (
               </ul>
             </div>
           )}
+
+          {/* Debug: Show Raw Analysis */}
+          <details className="text-xs border-t pt-4">
+            <summary className="cursor-pointer font-medium hover:text-primary transition-colors">
+              View Raw Analysis Data
+            </summary>
+            <pre className="mt-2 p-4 bg-muted rounded-lg overflow-auto max-h-96">
+              {JSON.stringify(analysisResult, null, 2)}
+            </pre>
+          </details>
         </CardContent>
       </Card>
 
