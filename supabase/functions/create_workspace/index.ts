@@ -46,19 +46,30 @@ serve(async (req) => {
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
 
+    // Build workspace data, only including valid foreign keys
+    const workspaceData: any = {
+      name: workspaceName,
+      description: notes || null,
+      task_type,
+      status: "idle",
+      created_by: user.id,
+      client_name: client_name || null,
+      notes: notes || null,
+    };
+
+    // Only add customer_id if it's a valid UUID
+    if (customer_id && typeof customer_id === 'string' && customer_id.length === 36) {
+      workspaceData.customer_id = customer_id;
+    }
+
+    // Only add policy_id if it's a valid UUID
+    if (policy_id && typeof policy_id === 'string' && policy_id.length === 36) {
+      workspaceData.policy_id = policy_id;
+    }
+
     const { data: workspace, error: wsError } = await supabase
       .from("workspaces")
-      .insert({
-        name: workspaceName,
-        description: notes || null,
-        task_type,
-        status: "idle",
-        created_by: user.id,
-        client_name: client_name || null,
-        notes: notes || null,
-        ...(customer_id ? { customer_id } : {}),
-        ...(policy_id ? { policy_id } : {}),
-      })
+      .insert(workspaceData)
       .select()
       .single();
 
