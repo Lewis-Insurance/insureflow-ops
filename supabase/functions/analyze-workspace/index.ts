@@ -19,23 +19,35 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    const visionApiKey = Deno.env.get("GOOGLE_CLOUD_VISION_API_KEY");
+    const azureOpenAIEndpoint = Deno.env.get("AZURE_OPENAI_ENDPOINT");
+    const azureOpenAIKey = Deno.env.get("AZURE_OPENAI_KEY");
+    const azureDeployment = Deno.env.get("AZURE_OPENAI_DEPLOYMENT") || "gpt-4o";
 
-    if (!lovableApiKey) {
-      throw new Error("LOVABLE_API_KEY not configured");
-    }
-
-    if (!visionApiKey) {
-      throw new Error("GOOGLE_CLOUD_VISION_API_KEY not configured");
+    if (!azureOpenAIEndpoint || !azureOpenAIKey) {
+      throw new Error("Azure OpenAI credentials not configured");
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch workspace and documents
+    // Fetch workspace and documents with parsed data
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
-      .select("*, workspace_documents(*)")
+      .select(`
+        *,
+        workspace_documents (
+          id,
+          file_name,
+          file_url,
+          role,
+          parseur_document_id,
+          parsed_doc_id,
+          parsed_documents (
+            id,
+            parsed_data,
+            document_type
+          )
+        )
+      `)
       .eq("id", workspace_id)
       .single();
 
@@ -50,133 +62,108 @@ serve(async (req) => {
 
     console.log(`Processing workspace ${workspace_id} with ${workspace.workspace_documents?.length || 0} documents`);
 
-    // Extract text from each document using OCR
-    const documentContents: Array<{ filename: string; content: string }> = [];
-
-    for (const doc of workspace.workspace_documents || []) {
-      if (!doc.file_url) continue;
-
-      try {
-        console.log(`Extracting text from: ${doc.file_name}`);
-        
-        // Download the document
-        const docResponse = await fetch(doc.file_url);
-        
-        if (!docResponse.ok) {
-          console.error(`Failed to fetch ${doc.file_name}: ${docResponse.status}`);
-          continue;
-        }
-
-        const blob = await docResponse.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        const base64Content = btoa(
-          String.fromCharCode(...new Uint8Array(arrayBuffer))
-        );
-
-        // Use Google Cloud Vision API for OCR
-        console.log(`Running OCR on ${doc.file_name}...`);
-        
-        const visionResponse = await fetch(
-          `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              requests: [
-                {
-                  image: { content: base64Content },
-                  features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
-                },
-              ],
-            }),
-          }
-        );
-
-        if (!visionResponse.ok) {
-          const errorText = await visionResponse.text();
-          console.error(`Vision API error for ${doc.file_name}:`, visionResponse.status, errorText);
-          continue;
-        }
-
-        const visionData = await visionResponse.json();
-        const extractedText = visionData.responses?.[0]?.fullTextAnnotation?.text || "";
-
-        if (!extractedText) {
-          console.warn(`No text extracted from ${doc.file_name}`);
-          documentContents.push({
-            filename: doc.file_name || "unknown",
-            content: `[No text could be extracted from this document]`,
-          });
-        } else {
-          documentContents.push({
-            filename: doc.file_name || "unknown",
-            content: extractedText,
-          });
-          console.log(`✓ Extracted ${extractedText.length} characters from ${doc.file_name}`);
-        }
-      } catch (err) {
-        console.error(`Error processing ${doc.file_name}:`, err);
-        documentContents.push({
-          filename: doc.file_name || "unknown",
-          content: `[Error extracting text: ${err.message}]`,
-        });
-      }
+    // Check if all documents have been parsed by Parseur
+    const unparsedDocs = workspace.workspace_documents?.filter(doc => !doc.parsed_documents) || [];
+    
+    if (unparsedDocs.length > 0) {
+      console.log(`Waiting for Parseur to parse ${unparsedDocs.length} documents...`);
+      
+      // Update status back to idle and add helpful message
+      await supabase
+        .from("workspaces")
+        .update({ 
+          status: "idle",
+          updated_at: new Date().toISOString() 
+        })
+        .eq("id", workspace_id);
+      
+      throw new Error(`Still waiting for Parseur to parse ${unparsedDocs.length} document(s). The analysis will automatically start when parsing completes.`);
     }
 
-    if (documentContents.length === 0) {
-      throw new Error("No documents could be processed");
+    // Collect parsed data from all documents
+    const documentData = workspace.workspace_documents?.map(doc => ({
+      filename: doc.file_name,
+      role: doc.role,
+      document_type: doc.parsed_documents?.document_type,
+      parsed_data: doc.parsed_documents?.parsed_data,
+    })) || [];
+
+    if (documentData.length === 0) {
+      throw new Error("No documents with parsed data found");
     }
+
+    console.log(`All ${documentData.length} documents have been parsed. Starting Azure OpenAI analysis...`);
 
     // Build analysis prompt based on task type
     let systemPrompt = "";
     let userPrompt = "";
 
     if (workspace.task_type === "policy_explore") {
-      systemPrompt = `You are an expert insurance policy analyst. Analyze the provided policy documents and extract key information.
+      systemPrompt = `You are an expert insurance policy analyst. Analyze the provided parsed policy data and provide comprehensive insights.
 
 Focus on:
 - Policy holder information
 - Coverage types and limits
-- Premium amounts
+- Premium amounts and payment terms
 - Deductibles
 - Key terms and conditions
 - Important dates (effective date, expiration, renewal)
 - Any notable exclusions or special provisions
+- Risk assessment and recommendations
 
-Provide a comprehensive summary in a clear, structured format with specific details.`;
+Provide a clear, structured summary with specific details and actionable insights.`;
 
-      userPrompt = `Analyze the following insurance policy document(s):\n\n${documentContents.map(d => `=== ${d.filename} ===\n${d.content}\n`).join("\n\n")}`;
+      userPrompt = `Analyze the following insurance policy data:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
+
     } else if (workspace.task_type === "coverage_comparison") {
-      systemPrompt = `You are an expert at comparing insurance policies. Analyze multiple policy documents and provide a detailed comparison.
+      systemPrompt = `You are an expert at comparing insurance policies. Analyze multiple parsed policy documents and provide a detailed comparison.
 
 Focus on:
-- Coverage differences between policies (be specific about limits and types)
+- Side-by-side coverage comparison (be specific about limits and types)
 - Premium comparisons (show exact amounts from each policy)
 - Deductible variations
-- Coverage limits (compare side-by-side)
-- Strengths and weaknesses of each policy
-- Clear recommendations for the best option based on coverage and value
+- Coverage gaps (what one policy has that others don't)
+- Value analysis (which policy provides better coverage for the price)
+- Clear recommendations for the customer
 
-Present the comparison in a clear, structured format with tables or side-by-side comparisons.`;
+Present the comparison in a structured format with tables where appropriate.`;
 
-      userPrompt = `Compare the following insurance policy documents in detail:\n\n${documentContents.map(d => `=== ${d.filename} ===\n${d.content}\n`).join("\n\n")}
+      userPrompt = `Compare the following insurance policy documents:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'Option'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide a comprehensive comparison highlighting key differences in coverage, premiums, and value. Make a clear recommendation.`;
 
-Provide a comprehensive comparison highlighting key differences in coverage, premiums, and value.`;
+    } else if (workspace.task_type === "contract_review") {
+      systemPrompt = `You are an expert at reviewing insurance contracts and certificates. Cross-reference the provided documents and identify any discrepancies, compliance issues, or areas of concern.
+
+Focus on:
+- Accuracy of certificate information vs. underlying policies
+- Coverage compliance with contract requirements
+- Missing or inadequate coverages
+- Policy limits matching requirements
+- Named insured and additional insured accuracy
+- Dates and renewal alignment
+- Any red flags or concerns that need attention
+
+Provide clear findings with specific references to the documents.`;
+
+      userPrompt = `Review and cross-reference the following insurance documents:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide detailed findings on accuracy, compliance, and any concerns.`;
+
     } else {
-      systemPrompt = "You are a helpful AI assistant analyzing insurance documents. Provide detailed insights and summaries.";
-      userPrompt = `Analyze these documents and provide detailed insights:\n\n${documentContents.map(d => `=== ${d.filename} ===\n${d.content}\n`).join("\n\n")}`;
+      systemPrompt = "You are an expert insurance document analyst. Provide detailed insights and analysis of the provided insurance data.";
+      userPrompt = `Analyze these insurance documents:\n\n${documentData.map(d => `=== ${d.filename} ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
     }
 
-    // Call Lovable AI for analysis
-    console.log("Calling Lovable AI for analysis...");
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Call Azure OpenAI for analysis
+    console.log("Calling Azure OpenAI for analysis...");
+    
+    const cleanEndpoint = azureOpenAIEndpoint.replace(/\/$/, "");
+    const azureUrl = `${cleanEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=2024-02-15-preview`;
+
+    const aiResponse = await fetch(azureUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
         "Content-Type": "application/json",
+        "api-key": azureOpenAIKey,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -188,27 +175,29 @@ Provide a comprehensive comparison highlighting key differences in coverage, pre
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI API error:", aiResponse.status, errorText);
-      throw new Error(`AI analysis failed: ${aiResponse.status}`);
+      console.error("Azure OpenAI error:", aiResponse.status, errorText);
+      throw new Error(`Azure OpenAI analysis failed: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
     const analysis = aiData.choices[0].message.content;
 
-    console.log("✓ AI analysis complete");
+    console.log("✓ Azure OpenAI analysis complete");
     console.log(`Analysis length: ${analysis.length} characters`);
 
     // Store the analysis result
     const analysisOutput = {
       task_type: workspace.task_type,
       analyzed_at: new Date().toISOString(),
-      documents: documentContents.map(d => ({
+      documents: documentData.map(d => ({
         filename: d.filename,
-        text_length: d.content.length,
+        role: d.role,
+        document_type: d.document_type,
+        has_parsed_data: !!d.parsed_data,
       })),
       summary: analysis,
-      model: "google/gemini-2.5-flash",
-      extracted_text_total: documentContents.reduce((sum, d) => sum + d.content.length, 0),
+      model: `azure/${azureDeployment}`,
+      source: "parseur + azure_openai",
     };
 
     await supabase
@@ -227,7 +216,7 @@ Provide a comprehensive comparison highlighting key differences in coverage, pre
         success: true, 
         workspace_id,
         analysis: analysisOutput,
-        documents_processed: documentContents.length,
+        documents_processed: documentData.length,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
