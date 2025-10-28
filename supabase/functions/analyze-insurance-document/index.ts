@@ -78,23 +78,42 @@ serve(async (req) => {
 
     const docBuffer = await docData.arrayBuffer();
     
-    // Call Azure Document Intelligence (v4 GA)
-    const analyzeEndpoint = `${AZURE_DOC_INTEL_ENDPOINT}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2024-07-31`;
-    
-    const analyzeResponse = await fetch(analyzeEndpoint, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
-        'Content-Type': 'application/octet-stream',
-        'Accept': 'application/json'
-      },
-      body: docBuffer
-    });
+    // Call Azure Document Intelligence (v4 GA) with robust endpoint/model fallback
+    const base = AZURE_DOC_INTEL_ENDPOINT.replace(/\/$/, '');
+    const candidateEndpoints = [
+      `${base}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2024-07-31`,
+      `${base}/documentintelligence/documentModels/prebuilt-document:analyze?api-version=2024-07-31`,
+      `${base}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2024-07-31`,
+      `${base}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2024-07-31`,
+    ];
 
-    if (!analyzeResponse.ok) {
-      const errorText = await analyzeResponse.text();
-      throw new Error(`Azure Document Intelligence error: ${analyzeResponse.status} - ${errorText}`);
+    let analyzeResponse: Response | null = null;
+    let chosenEndpoint = '';
+    for (const ep of candidateEndpoints) {
+      console.log(`[OCR] Trying Azure endpoint: ${ep}`);
+      const resp = await fetch(ep, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
+          'Content-Type': 'application/octet-stream',
+          'Accept': 'application/json'
+        },
+        body: docBuffer
+      });
+      if (resp.ok && (resp.status === 200 || resp.status === 202)) {
+        analyzeResponse = resp;
+        chosenEndpoint = ep;
+        break;
+      } else {
+        const errorPreview = await resp.text().catch(() => '');
+        console.warn(`[OCR] Azure endpoint failed (${resp.status}): ${ep} - ${errorPreview?.slice(0, 400)}`);
+      }
     }
+
+    if (!analyzeResponse) {
+      throw new Error('Azure Document Intelligence error: no valid endpoint responded (tried documentintelligence/formrecognizer with prebuilt-read/document)');
+    }
+    console.log(`[OCR] Using Azure endpoint: ${chosenEndpoint}`);
 
     // Get the operation location to poll for results
     const operationLocation = analyzeResponse.headers.get('Operation-Location') || analyzeResponse.headers.get('operation-location');
@@ -218,7 +237,9 @@ ${ocrText}
 Return ONLY the JSON object, no other text.`
           }
         ],
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        max_tokens: 2000,
+        temperature: 0.1
       }),
     });
 
