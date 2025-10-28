@@ -51,14 +51,32 @@ serve(async (req) => {
 
     console.log('[Download] Fetching document from storage...');
 
-    // Download document from Supabase Storage
-    const documentResponse = await fetch(document_url);
-    if (!documentResponse.ok) {
-      throw new Error(`Failed to download document: ${documentResponse.status}`);
+    // Parse the storage path from the URL
+    // URL format: https://{project}.supabase.co/storage/v1/object/public/documents/{path}
+    // OR: https://{project}.supabase.co/storage/v1/object/authenticated/documents/{path}
+    const urlParts = document_url.split('/storage/v1/object/');
+    if (urlParts.length !== 2) {
+      throw new Error('Invalid document URL format');
     }
 
-    const documentBlob = await documentResponse.blob();
-    const documentBuffer = await documentBlob.arrayBuffer();
+    const pathParts = urlParts[1].split('/');
+    const bucketName = pathParts[1]; // 'documents'
+    const filePath = pathParts.slice(2).join('/'); // rest of the path
+
+    console.log(`[Download] Bucket: ${bucketName}, Path: ${filePath}`);
+
+    // Download from Supabase Storage with authentication
+    const { data: fileData, error: downloadError } = await supabase
+      .storage
+      .from(bucketName)
+      .download(filePath);
+
+    if (downloadError || !fileData) {
+      console.error('[Download] Error:', downloadError);
+      throw new Error(`Failed to download document: ${downloadError?.message || 'Unknown error'}`);
+    }
+
+    const documentBuffer = await fileData.arrayBuffer();
     const base64Document = btoa(String.fromCharCode(...new Uint8Array(documentBuffer)));
 
     console.log(`[Download] Got ${documentBuffer.byteLength} bytes, converted to base64`);
