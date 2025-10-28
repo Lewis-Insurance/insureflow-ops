@@ -1,7 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,8 +78,8 @@ serve(async (req) => {
     // Remove trailing slash if present
     const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
 
-    // Step 1: Get document from storage
-    console.log('[Azure OCR] Fetching document from storage...');
+    // Step 1: Get storage path
+    console.log('[Azure OCR] Preparing document from storage...');
     
     const urlParts = document_url.split('/documents/');
     if (urlParts.length !== 2) {
@@ -88,28 +87,25 @@ serve(async (req) => {
     }
     
     const storagePath = urlParts[1];
-    
-    const { data: downloadData, error: downloadError } = await supabase
-      .storage
-      .from('documents')
-      .download(storagePath);
 
-    if (downloadError) {
-      console.error('[Storage Download Error]:', downloadError);
-      throw new Error(`Failed to download document: ${downloadError.message}`);
+    // Step 2: Start OCR with Azure Document Intelligence using signed URL
+    console.log('[Azure OCR] Starting Document Intelligence with API version 2023-07-31...');
+
+    // Get a signed URL that Azure can access directly
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(storagePath, 3600); // 1 hour expiry
+
+    if (signedUrlError) {
+      console.error('[Signed URL Error]:', signedUrlError);
+      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
     }
 
-    const fileBuffer = await downloadData.arrayBuffer();
-    const base64File = base64Encode(new Uint8Array(fileBuffer));
-
-    console.log('[Document] Size:', fileBuffer.byteLength, 'bytes');
-
-    // Step 2: Start OCR with Azure Document Intelligence (FIXED API VERSION)
-    console.log('[Azure OCR] Starting Document Intelligence with API version 2023-07-31...');
-    
+    console.log('[Azure OCR] Using signed URL method for large document');
     const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31`;
-    console.log('[Azure OCR] URL:', analyzeUrl);
+    console.log('[Azure OCR] Analyze URL:', analyzeUrl);
 
+    // Use urlSource instead of base64Source for better large file handling
     const analyzeResponse = await fetch(analyzeUrl, {
       method: 'POST',
       headers: {
@@ -117,7 +113,7 @@ serve(async (req) => {
         'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
       },
       body: JSON.stringify({
-        base64Source: base64File
+        urlSource: signedUrlData.signedUrl
       })
     });
 
