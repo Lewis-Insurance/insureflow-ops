@@ -50,15 +50,17 @@ serve(async (req) => {
       throw insertError;
     }
 
-    // Step 1: OCR with Google Vision
-    console.log('[OCR] Starting Google Vision OCR...');
+    // Step 1: Extract text with Azure Document Intelligence
+    console.log('[OCR] Starting Azure Document Intelligence...');
     
-    const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
-    if (!GOOGLE_VISION_API_KEY) {
-      throw new Error('GOOGLE_CLOUD_VISION_API_KEY not configured');
+    const AZURE_DOC_INTEL_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
+    const AZURE_DOC_INTEL_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT');
+    
+    if (!AZURE_DOC_INTEL_KEY || !AZURE_DOC_INTEL_ENDPOINT) {
+      throw new Error('Azure Document Intelligence credentials not configured');
     }
 
-    // Extract path from URL (remove the base URL part)
+    // Extract path from URL
     const urlPath = document_url.split('/storage/v1/object/public/')[1];
     if (!urlPath) {
       throw new Error('Invalid document URL format');
@@ -66,8 +68,8 @@ serve(async (req) => {
 
     // Download document using Supabase client
     const { data: docData, error: downloadError } = await supabase.storage
-      .from(urlPath.split('/')[0]) // bucket name
-      .download(urlPath.split('/').slice(1).join('/')); // file path
+      .from(urlPath.split('/')[0])
+      .download(urlPath.split('/').slice(1).join('/'));
 
     if (downloadError || !docData) {
       console.error('[Download] Error:', downloadError);
@@ -76,75 +78,89 @@ serve(async (req) => {
 
     const docBuffer = await docData.arrayBuffer();
     
-    // Convert to base64 in chunks to avoid stack overflow on large files
-    const uint8Array = new Uint8Array(docBuffer);
-    const chunkSize = 8192;
-    let binaryString = '';
+    // Call Azure Document Intelligence
+    const analyzeEndpoint = `${AZURE_DOC_INTEL_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview`;
     
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.slice(i, i + chunkSize);
-      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    const base64Doc = btoa(binaryString);
-
-    // Call Google Vision API (use files:annotate for PDFs)
-    const isPdf = file_name?.toLowerCase().endsWith('.pdf');
-    const visionEndpoint = isPdf
-      ? `https://vision.googleapis.com/v1/files:annotate?key=${GOOGLE_VISION_API_KEY}`
-      : `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
-
-    const visionBody = isPdf
-      ? {
-          requests: [{
-            inputConfig: { content: base64Doc, mimeType: 'application/pdf' },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
-          }]
-        }
-      : {
-          requests: [{
-            image: { content: base64Doc },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-            imageContext: { languageHints: ['en'] }
-          }]
-        };
-
-    const visionResponse = await fetch(visionEndpoint, {
+    const analyzeResponse = await fetch(analyzeEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(visionBody)
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: docBuffer
     });
 
-    if (!visionResponse.ok) {
-      const errorText = await visionResponse.text();
-      throw new Error(`Vision API error: ${visionResponse.status} - ${errorText}`);
+    if (!analyzeResponse.ok) {
+      const errorText = await analyzeResponse.text();
+      throw new Error(`Azure Document Intelligence error: ${analyzeResponse.status} - ${errorText}`);
     }
 
-    const visionData = await visionResponse.json();
-    const ocrText = visionData.responses[0]?.fullTextAnnotation?.text || '';
+    // Get the operation location to poll for results
+    const operationLocation = analyzeResponse.headers.get('Operation-Location');
+    if (!operationLocation) {
+      throw new Error('No operation location returned from Azure');
+    }
+
+    console.log('[OCR] Polling for results...');
     
+    // Poll for results
+    let ocrText = '';
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds max wait
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      
+      const resultResponse = await fetch(operationLocation, {
+        headers: {
+          'Ocp-Apim-Subscription-Key': AZURE_DOC_INTEL_KEY
+        }
+      });
+
+      if (!resultResponse.ok) {
+        throw new Error(`Failed to get results: ${resultResponse.status}`);
+      }
+
+      const result = await resultResponse.json();
+      
+      if (result.status === 'succeeded') {
+        // Extract text from all pages
+        const pages = result.analyzeResult?.pages || [];
+        const lines = pages.flatMap((page: any) => page.lines || []);
+        ocrText = lines.map((line: any) => line.content).join('\n');
+        console.log(`[OCR] Extracted ${ocrText.length} characters`);
+        break;
+      } else if (result.status === 'failed') {
+        throw new Error('Azure Document Intelligence analysis failed');
+      }
+      
+      attempts++;
+    }
+
     if (!ocrText || ocrText.length < 50) {
       throw new Error('OCR extracted insufficient text from document');
     }
 
-    console.log(`[OCR] Extracted ${ocrText.length} characters`);
-
-    // Step 2: Parse with Gemini AI
-    console.log('[AI] Parsing with Gemini...');
+    // Step 2: Parse with Azure OpenAI
+    console.log('[AI] Parsing with Azure OpenAI...');
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+    const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME');
+    
+    if (!AZURE_OPENAI_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
+      throw new Error('Azure OpenAI credentials not configured');
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const openaiEndpoint = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-08-01-preview`;
+
+    const aiResponse = await fetch(openaiEndpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'api-key': AZURE_OPENAI_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -192,31 +208,15 @@ Return ONLY the JSON object, no other text.`
           }
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.1
+        temperature: 0.1,
+        max_tokens: 4000
       }),
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ 
-            success: false,
-            error: 'Rate limit exceeded. Please try again later.' 
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ 
-            success: false,
-            error: 'AI credits exhausted. Please add credits to continue.' 
-          }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
       const errorText = await aiResponse.text();
-      throw new Error(`AI API error: ${aiResponse.status} - ${errorText}`);
+      console.error('[Azure OpenAI] Error:', errorText);
+      throw new Error(`Azure OpenAI API error: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
