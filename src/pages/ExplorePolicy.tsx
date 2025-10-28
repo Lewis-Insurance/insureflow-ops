@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,9 @@ import {
   Save,
   RefreshCw,
   Database,
+  Download,
+  FileJson,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface AnalyzedDocument {
@@ -419,24 +422,47 @@ export default function ExplorePolicy() {
     if (!selectedDoc?.analysis?.extractedText || !searchQuery.trim()) return;
 
     setIsSearching(true);
+    setSearchResults([]);
+
     try {
+      // Try semantic search first
+      const { data, error } = await supabase.functions.invoke('ai-brain-rag', {
+        body: {
+          query: searchQuery,
+          context: selectedDoc.analysis.extractedText,
+          documentId: selectedDoc.id,
+          maxResults: 10,
+        }
+      });
+
+      if (!error && data?.results && data.results.length > 0) {
+        setSearchResults(data.results);
+        toast({
+          title: "Search Complete",
+          description: `Found ${data.results.length} semantic matches`,
+        });
+        return;
+      }
+
+      // Fallback to basic text search
       const text = selectedDoc.analysis.extractedText.toLowerCase();
       const query = searchQuery.toLowerCase();
-      
       const results: SearchResult[] = [];
       const lines = text.split('\n');
-      
+
       lines.forEach((line, index) => {
         if (line.includes(query)) {
-          const relevance = (line.match(new RegExp(query, 'gi')) || []).length * 100;
-          const contextStart = Math.max(0, index - 1);
-          const contextEnd = Math.min(lines.length, index + 2);
-          const context = lines.slice(contextStart, contextEnd).join(' ');
+          const matches = (line.match(new RegExp(query, 'gi')) || []).length;
+          const relevance = Math.min(matches * 20, 100);
           
+          const contextStart = Math.max(0, index - 1);
+          const contextEnd = Math.min(lines.length - 1, index + 1);
+          const context = lines.slice(contextStart, contextEnd + 1).join(' ');
+
           results.push({
             text: line.trim(),
-            relevance: Math.min(relevance, 100),
-            context: context.substring(0, 200),
+            relevance,
+            context: context.trim(),
           });
         }
       });
@@ -448,16 +474,95 @@ export default function ExplorePolicy() {
           title: "No Results",
           description: "No matches found in the document",
         });
+      } else {
+        toast({
+          title: "Search Complete (Basic)",
+          description: `Found ${results.length} text matches`,
+        });
       }
     } catch (error) {
       console.error('Search error:', error);
       toast({
         title: "Search Failed",
-        description: "Failed to search document",
+        description: error instanceof Error ? error.message : "Failed to search document",
         variant: "destructive",
       });
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const exportAnalysis = (doc: AnalyzedDocument, format: 'json' | 'csv' = 'json') => {
+    if (!doc.analysis) {
+      toast({
+        title: "Export Failed",
+        description: "No analysis data available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (format === 'json') {
+        const exportData = {
+          filename: doc.filename,
+          analyzedAt: new Date().toISOString(),
+          accountId: doc.accountId,
+          policyId: doc.policyId,
+          cacheHit: doc.cacheHit,
+          documentHash: doc.documentHash,
+          policyNumber: doc.analysis.policyNumber,
+          carrier: doc.analysis.carrier,
+          insuredName: doc.analysis.insuredName,
+          summary: doc.analysis.summary,
+          coverageDetails: doc.analysis.coverageDetails,
+          keyDates: doc.analysis.keyDates,
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+          type: 'application/json'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${doc.filename.replace(/\.[^/.]+$/, '')}-analysis.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (format === 'csv') {
+        const headers = ['Coverage Type', 'Limit', 'Deductible', 'Premium'];
+        const rows = doc.analysis.coverageDetails.map(c => [
+          c.type,
+          c.limit,
+          c.deductible,
+          c.premium || 'N/A'
+        ]);
+
+        const csv = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${doc.filename.replace(/\.[^/.]+$/, '')}-coverage.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      toast({
+        title: "Export Complete",
+        description: `Analysis exported as ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to export",
+        variant: "destructive",
+      });
     }
   };
 
@@ -466,7 +571,36 @@ export default function ExplorePolicy() {
     if (selectedDoc?.id === docId) {
       setSelectedDoc(null);
     }
+    toast({
+      title: "Document Removed",
+      description: "Document removed from list",
+    });
   };
+
+  const retryDocument = (docId: string) => {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc) return;
+
+    setDocuments(prev => prev.map(d =>
+      d.id === docId
+        ? { ...d, status: 'analyzing' as const, progress: 0, error: undefined, retryCount: 0 }
+        : d
+    ));
+
+    analyzeDocument(doc.file, docId, doc.accountId, doc.policyId);
+  };
+
+  useEffect(() => {
+    return () => {
+      documents.forEach(doc => {
+        try {
+          URL.revokeObjectURL(URL.createObjectURL(doc.file));
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      });
+    };
+  }, [documents]);
 
   const saveToDatabase = async (doc: AnalyzedDocument) => {
     if (!doc.analysis || !doc.documentHash) {
@@ -733,21 +867,39 @@ export default function ExplorePolicy() {
                     </div>
                     <div className="flex items-center gap-2">
                       {selectedDoc.status === 'complete' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => saveToDatabase(selectedDoc)}
-                          disabled={selectedDoc.savedToDatabase}
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          {selectedDoc.savedToDatabase ? 'Saved' : 'Save to DB'}
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportAnalysis(selectedDoc, 'json')}
+                          >
+                            <FileJson className="w-4 h-4 mr-2" />
+                            JSON
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportAnalysis(selectedDoc, 'csv')}
+                          >
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                            CSV
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => saveToDatabase(selectedDoc)}
+                            disabled={selectedDoc.savedToDatabase}
+                          >
+                            <Save className="w-4 h-4 mr-2" />
+                            {selectedDoc.savedToDatabase ? 'Saved' : 'Save to DB'}
+                          </Button>
+                        </>
                       )}
                       {selectedDoc.status === 'error' && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => retryAnalysis(selectedDoc)}
+                          onClick={() => retryDocument(selectedDoc.id)}
                         >
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Retry
@@ -783,7 +935,7 @@ export default function ExplorePolicy() {
                         <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
                         <p className="text-sm font-medium mb-2">Analysis Failed</p>
                         <p className="text-xs text-muted-foreground mb-4">{selectedDoc.error}</p>
-                        <Button onClick={() => retryAnalysis(selectedDoc)}>
+                        <Button onClick={() => retryDocument(selectedDoc.id)}>
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Retry Analysis
                         </Button>
