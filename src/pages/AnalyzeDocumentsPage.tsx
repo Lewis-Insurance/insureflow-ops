@@ -1,5 +1,6 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DocumentAnalysisUpload } from '@/components/document-analysis/DocumentAnalysisUpload';
+import { StorageDiagnostics } from '@/components/document-analysis/StorageDiagnostics';
 
 export default function AnalyzeDocumentsPage() {
   return (
@@ -9,7 +10,10 @@ export default function AnalyzeDocumentsPage() {
         <p className="text-muted-foreground mb-8">
           Upload and analyze insurance documents with AI
         </p>
-        <DocumentAnalysisUpload />
+        <div className="space-y-6">
+          <DocumentAnalysisUpload />
+          <StorageDiagnostics />
+        </div>
       </div>
     </AppLayout>
   );
