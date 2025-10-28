@@ -10,16 +10,32 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { title, task_type, user_id, client_name, notes, documents } = await req.json();
+    const { title, task_type, client_name, notes, documents } = await req.json();
 
     if (!task_type || !documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Missing required fields: task_type or documents[]");
     }
 
+    // Get user from JWT token
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing authorization header");
+    }
+
     // Connect to Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    // Get authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error("User not authenticated");
+    }
 
     // Create workspace
     const { data: workspace, error: wsError } = await supabase
@@ -29,7 +45,7 @@ serve(async (req) => {
         description: notes || null,
         task_type,
         status: "idle",
-        created_by: user_id || null,
+        created_by: user.id,
         client_name: client_name || null,
         notes: notes || null,
       })
