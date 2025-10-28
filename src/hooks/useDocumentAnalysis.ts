@@ -62,28 +62,34 @@ export const useDocumentAnalysis = () => {
     try {
       setProgress(30);
       
+      const requestBody = {
+        document_url: options.documentUrl,
+        document_id: options.documentId,
+        file_name: options.fileName,
+        account_id: options.accountId || null,
+        user_id: options.userId
+      };
+
+      console.log('[Document Analysis] Calling ai-document-analysis-azure with:', requestBody);
+      
       const { data, error } = await supabase.functions.invoke(
-        'analyze-insurance-document',
+        'ai-document-analysis-azure',
         {
-          body: {
-            document_url: options.documentUrl,
-            document_id: options.documentId,
-            file_name: options.fileName,
-            account_id: options.accountId,
-            user_id: options.userId,
-            analysis_mode: options.analysisMode || 'all',
-            workflow_context: options.workflowContext || {}
-          }
+          body: requestBody
         }
       );
+
+      console.log('[Document Analysis] Response:', { data, error });
 
       setProgress(90);
 
       if (error) {
+        console.error('[Document Analysis] Supabase function error:', error);
         throw error;
       }
 
       if (!data?.success) {
+        console.error('[Document Analysis] Function returned failure:', data);
         throw new Error(data?.error || 'Analysis failed');
       }
 
