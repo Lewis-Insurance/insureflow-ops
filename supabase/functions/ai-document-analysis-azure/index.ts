@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper: Wait/sleep function
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 serve(async (req) => {
@@ -16,10 +15,11 @@ serve(async (req) => {
   }
 
   try {
-    const { document_url, document_id, file_name, account_id, user_id } = await req.json();
+    const { document_url, document_id, file_name } = await req.json();
     
-    console.log('=== STARTING AZURE ANALYSIS (ASYNC MODE) ===');
+    console.log('=== AZURE ANALYSIS START ===');
     console.log('File:', file_name);
+    console.log('Document ID:', document_id);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -33,182 +33,131 @@ serve(async (req) => {
     const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME');
 
     if (!AZURE_ENDPOINT || !AZURE_API_KEY) {
-      throw new Error('Azure Document Intelligence not configured');
+      throw new Error('Azure credentials missing');
     }
 
-    // Remove trailing slash
-    const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
-
-    // Update status
     await supabase
       .from('document_analysis')
       .update({ processing_status: 'processing' })
       .eq('document_id', document_id);
 
-    // ===== STEP 1: START ASYNC OCR (ALL PAGES) =====
-    console.log('STEP 1: Starting ASYNC Azure OCR for all pages...');
+    // STEP 1: Start async OCR
+    console.log('[OCR] Starting async analysis...');
     
-    const startAnalyzeResponse = await fetch(
-      `${cleanEndpoint}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2023-07-31`,
+    const startResponse = await fetch(
+      `${AZURE_ENDPOINT}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=2023-07-31`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
         },
-        body: JSON.stringify({
-          urlSource: document_url
-          // No page limit - process ALL pages
-        })
+        body: JSON.stringify({ urlSource: document_url })
       }
     );
 
-    if (!startAnalyzeResponse.ok) {
-      const errorText = await startAnalyzeResponse.text();
-      throw new Error(`Azure start analyze failed: ${startAnalyzeResponse.status} - ${errorText}`);
+    if (!startResponse.ok) {
+      const errorText = await startResponse.text();
+      throw new Error(`Start failed: ${startResponse.status} - ${errorText}`);
     }
 
-    // Get the operation location to poll for results
-    const operationLocation = startAnalyzeResponse.headers.get('Operation-Location');
+    const operationLocation = startResponse.headers.get('Operation-Location');
     if (!operationLocation) {
-      throw new Error('No Operation-Location header returned from Azure');
+      throw new Error('No Operation-Location header');
     }
 
-    console.log('✅ OCR job started. Polling for results...');
-    console.log('Operation URL:', operationLocation);
+    console.log('[OCR] Job started, polling...');
 
-    // ===== STEP 2: POLL FOR RESULTS (up to 5 minutes) =====
-    let ocrResult = null;
+    // STEP 2: Poll for completion
+    let result: any = null;
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutes (5 second intervals)
 
-    while (attempts < maxAttempts) {
+    while (attempts < 60 && !result) {
       attempts++;
-      await sleep(5000); // Wait 5 seconds between polls
-
-      console.log(`Polling attempt ${attempts}/${maxAttempts}...`);
+      await sleep(5000);
+      
+      console.log(`[OCR] Poll ${attempts}/60...`);
 
       const pollResponse = await fetch(operationLocation, {
-        method: 'GET',
-        headers: {
-          'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        }
+        headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
       });
 
       if (!pollResponse.ok) {
-        const errorText = await pollResponse.text();
-        throw new Error(`Polling failed: ${pollResponse.status} - ${errorText}`);
+        const err = await pollResponse.text();
+        throw new Error(`Poll failed: ${pollResponse.status} - ${err}`);
       }
 
       const pollData = await pollResponse.json();
-      console.log('Status:', pollData.status);
-
+      
       if (pollData.status === 'succeeded') {
-        ocrResult = pollData.analyzeResult;
-        console.log('✅ OCR completed successfully!');
+        result = pollData.analyzeResult;
+        console.log('[OCR] ✅ Complete!');
         break;
       } else if (pollData.status === 'failed') {
-        throw new Error(`Azure OCR failed: ${JSON.stringify(pollData.error)}`);
+        throw new Error(`OCR failed: ${JSON.stringify(pollData.error)}`);
       }
-      
-      // Status is still "running" - continue polling
     }
 
-    if (!ocrResult) {
-      throw new Error('OCR timed out after 5 minutes');
+    if (!result) {
+      throw new Error('OCR timeout');
     }
 
-    // ===== STEP 3: EXTRACT TEXT FROM ALL PAGES =====
-    console.log('STEP 3: Extracting text from all pages...');
+    // STEP 3: Extract all text
+    console.log('[Text] Extracting from all pages...');
     
     let fullText = '';
-    let pageCount = 0;
+    const pageCount = result.pages?.length || 0;
 
-    if (ocrResult.pages) {
-      pageCount = ocrResult.pages.length;
-      console.log(`Processing ${pageCount} pages...`);
-
-      for (const page of ocrResult.pages) {
+    if (result.pages) {
+      for (const page of result.pages) {
         if (page.lines) {
-          const pageText = page.lines.map((line: any) => line.content).join('\n');
-          fullText += pageText + '\n\n--- PAGE BREAK ---\n\n';
+          fullText += page.lines.map((line: any) => line.content).join('\n');
+          fullText += '\n\n--- PAGE BREAK ---\n\n';
         }
       }
     }
 
-    console.log(`✅ Extracted ${fullText.length} characters from ${pageCount} pages`);
+    console.log(`[Text] ✅ ${fullText.length} chars from ${pageCount} pages`);
 
     if (fullText.length === 0) {
-      throw new Error('No text extracted from document');
+      throw new Error('No text extracted');
     }
 
-    // ===== STEP 4: AI ANALYSIS =====
-    console.log('STEP 4: Analyzing with Azure OpenAI...');
+    // STEP 4: AI Analysis
+    console.log('[AI] Analyzing document...');
 
     if (!AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_KEY || !AZURE_OPENAI_DEPLOYMENT) {
       throw new Error('Azure OpenAI not configured');
     }
 
-    const cleanOpenAIEndpoint = AZURE_OPENAI_ENDPOINT.endsWith('/') ? AZURE_OPENAI_ENDPOINT.slice(0, -1) : AZURE_OPENAI_ENDPOINT;
+    const prompt = `Analyze this ${pageCount}-page insurance document. Extract ALL information as JSON.
 
-    const analysisPrompt = `You are an expert insurance document analyzer. This is a ${pageCount}-page insurance policy document.
+DOCUMENT (ALL ${pageCount} PAGES):
+${fullText.substring(0, 100000)}
 
-IMPORTANT: Search through ALL ${pageCount} pages for coverage information. Coverage details are often on pages 60+.
-
-FULL DOCUMENT TEXT (ALL ${pageCount} PAGES):
-${fullText.slice(0, 100000)}
-
-Extract ALL information in JSON format:
+Return JSON with:
 {
-  "policy_number": "string",
-  "insured_name": "string",
-  "carrier": "string",
+  "policy_number": "",
+  "insured_name": "",
+  "carrier": "",
   "document_type": "auto_policy|home_policy|commercial_policy",
   "effective_date": "YYYY-MM-DD",
   "expiration_date": "YYYY-MM-DD",
   "coverages": [
-    {
-      "name": "Coverage name",
-      "limit": "Amount",
-      "deductible": "Amount",
-      "premium": "Amount"
-    }
+    {"name": "", "limit": "", "deductible": "", "premium": ""}
   ],
   "vehicles": [
-    {
-      "year": "string",
-      "make": "string",
-      "model": "string",
-      "vin": "string"
-    }
+    {"year": "", "make": "", "model": "", "vin": ""}
   ],
-  "property": {
-    "address": "string",
-    "type": "string"
-  },
-  "premium": {
-    "total": "string",
-    "frequency": "monthly|annual|semi-annual"
-  },
-  "key_details": ["array of important facts"]
+  "property": {"address": "", "type": ""},
+  "premium": {"total": "", "frequency": ""},
+  "key_details": []
 }
 
-Search the ENTIRE document for:
-- Bodily Injury (BI)
-- Property Damage (PD)
-- Personal Injury Protection (PIP)
-- Uninsured/Underinsured Motorist (UM/UIM)
-- Comprehensive (COMP)
-- Collision (COLL)
-- Medical Payments
-- Rental coverage
-- Roadside assistance
-- ANY amendments or endorsements
-
-Return ONLY valid JSON.`;
+Search ALL pages for coverages: BI, PD, PIP, UM/UIM, COMP, COLL, Medical, Rental, Roadside.`;
 
     const aiResponse = await fetch(
-      `${cleanOpenAIEndpoint}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
+      `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
       {
         method: 'POST',
         headers: {
@@ -217,14 +166,8 @@ Return ONLY valid JSON.`;
         },
         body: JSON.stringify({
           messages: [
-            {
-              role: 'system',
-              content: 'You are an expert insurance document analyzer. Extract data as valid JSON.'
-            },
-            {
-              role: 'user',
-              content: analysisPrompt
-            }
+            { role: 'system', content: 'Extract insurance data as JSON.' },
+            { role: 'user', content: prompt }
           ],
           temperature: 0.1,
           max_tokens: 4000
@@ -234,87 +177,52 @@ Return ONLY valid JSON.`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      throw new Error(`Azure OpenAI failed: ${aiResponse.status} - ${errorText}`);
+      throw new Error(`AI failed: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices[0].message.content;
     
-    // Parse JSON response
-    let analysisResult;
+    let analysisResult: any;
     try {
       const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysisResult = JSON.parse(jsonMatch[0]);
-      } else {
-        analysisResult = JSON.parse(aiContent);
-      }
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', aiContent);
+      analysisResult = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
+    } catch {
       throw new Error('AI returned invalid JSON');
     }
 
-    console.log('✅ Analysis complete:', JSON.stringify(analysisResult, null, 2));
+    console.log('[AI] ✅ Analysis complete');
 
-    // ===== STEP 5: SAVE RESULTS =====
-    const { error: updateError } = await supabase
+    // STEP 5: Save
+    await supabase
       .from('document_analysis')
       .update({
         processing_status: 'completed',
         ocr_text: fullText,
-        structured_data: analysisResult,
-        total_pages: pageCount,
-        pages_analyzed: `1-${pageCount}`,
-        ocr_char_count: fullText.length,
-        completed_at: new Date().toISOString()
+        analysis_result: analysisResult,
+        page_count: pageCount,
+        processed_at: new Date().toISOString()
       })
       .eq('document_id', document_id);
 
-    if (updateError) {
-      console.error('Failed to save results:', updateError);
-      throw updateError;
-    }
+    console.log('=== SUCCESS ===');
 
     return new Response(
       JSON.stringify({
         success: true,
-        analysis_id: document_id,
-        ocr_text: fullText,
-        structured_data: analysisResult,
-        total_pages: pageCount,
-        pages_analyzed: `1-${pageCount}`,
-        focus_region: 'all'
+        document_id,
+        page_count: pageCount,
+        text_length: fullText.length,
+        analysis: analysisResult
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('ERROR:', error.message);
     
-    // Update document status to failed
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      
-      await supabase
-        .from('document_analysis')
-        .update({ 
-          processing_status: 'failed',
-          error_message: error.message
-        })
-        .eq('document_id', document_id);
-    } catch (updateError) {
-      console.error('Failed to update status:', updateError);
-    }
-    
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message,
-        details: error.toString()
-      }),
+      JSON.stringify({ error: error.message }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
