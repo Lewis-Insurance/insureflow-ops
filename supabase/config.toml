@@ -118,3 +118,6 @@ verify_jwt = true
 
 [functions.ocr-document]
 verify_jwt = true
+
+[functions.analyze-insurance-document]
+verify_jwt = true
