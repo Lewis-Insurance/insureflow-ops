@@ -11,6 +11,7 @@ export interface Workspace {
   created_by: string;
   client_name: string | null;
   notes: string | null;
+  analysis_output: any;
   created_at: string;
   updated_at: string;
   creator_name?: string;
@@ -289,6 +290,38 @@ export const useDeleteWorkspace = () => {
         title: "Failed to delete workspace",
         description: error.message,
         variant: "destructive",
+      });
+    },
+  });
+};
+
+// Trigger analysis mutation
+export const useTriggerAnalysis = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (workspaceId: string) => {
+      const { data, error } = await supabase.functions.invoke('analyze-workspace', {
+        body: { workspace_id: workspaceId },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, workspaceId) => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      toast({
+        title: 'Analysis Started',
+        description: 'Your documents are being analyzed.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Analysis Failed',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
