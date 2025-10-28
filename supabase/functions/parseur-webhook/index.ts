@@ -13,6 +13,31 @@ serve(async (req) => {
   }
 
   try {
+    // Verify API key from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    const expectedSecret = Deno.env.get("PARSEUR_WEBHOOK_SECRET");
+
+    if (!expectedSecret) {
+      console.error("PARSEUR_WEBHOOK_SECRET not configured");
+      return new Response(
+        JSON.stringify({ success: false, error: "Webhook not configured" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Extract token from "Bearer <token>" format
+    const providedToken = authHeader?.replace(/^Bearer\s+/i, "");
+
+    if (!providedToken || providedToken !== expectedSecret) {
+      console.error("Invalid or missing API key");
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+
+    console.log("✅ API key verified");
+
     // Parseur sends JSON payloads by default
     const body = await req.json();
 
