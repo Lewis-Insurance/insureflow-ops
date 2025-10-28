@@ -25,22 +25,77 @@ serve(async (req) => {
 
     switch (action) {
       case 'ocr':
-        systemPrompt = `You are an advanced OCR system specialized in insurance documents. Extract ALL text accurately from images, including:
-1. Typed and handwritten text
-2. Tables and structured data
-3. Headers, footers, and metadata
-4. Policy numbers, dates, amounts
-5. Signatures and stamps (describe location)
+        // Use Google Vision API directly for OCR
+        if (!imageData) {
+          throw new Error('No image data provided for OCR');
+        }
 
-Return structured JSON with:
-- extracted_text: full text content
-- document_type: detected type (policy, claim, certificate, etc.)
-- key_fields: {policy_number, insured_name, dates, amounts}
-- confidence: 0-100 score
-- tables: array of detected tables
-- language: detected language`;
+        const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
+        if (!GOOGLE_VISION_API_KEY) {
+          throw new Error('GOOGLE_CLOUD_VISION_API_KEY not configured');
+        }
+
+        console.log('Using Google Vision API for OCR');
+
+        // Extract base64 content from data URL if needed
+        let base64Content = imageData;
+        if (imageData.startsWith('data:')) {
+          base64Content = imageData.split(',')[1];
+        }
+
+        const visionResponse = await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requests: [{
+                image: { content: base64Content },
+                features: [
+                  { type: 'DOCUMENT_TEXT_DETECTION' },
+                  { type: 'TEXT_DETECTION' }
+                ],
+                imageContext: {
+                  languageHints: ['en']
+                }
+              }]
+            })
+          }
+        );
+
+        if (!visionResponse.ok) {
+          const errorText = await visionResponse.text();
+          console.error('Vision API error:', visionResponse.status, errorText);
+          throw new Error(`Vision API error: ${visionResponse.status}`);
+        }
+
+        const visionData = await visionResponse.json();
+        const fullText = visionData.responses[0]?.fullTextAnnotation?.text || '';
+        const textAnnotations = visionData.responses[0]?.textAnnotations || [];
         
-        userPrompt = `Extract all text and data from this insurance document image. Be thorough and accurate.`;
+        const ocrResult = {
+          success: true,
+          ocr: {
+            extracted_text: fullText,
+            document_type: 'insurance_document',
+            key_fields: {},
+            confidence: 90,
+            tables: [],
+            language: 'en'
+          },
+          raw_text: fullText,
+          text_length: fullText.length
+        };
+
+        console.log(`OCR complete: ${fullText.length} characters extracted`);
+
+        return new Response(
+          JSON.stringify(ocrResult),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
         break;
 
       case 'search':

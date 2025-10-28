@@ -24,9 +24,12 @@ serve(async (req) => {
       );
     }
 
+    // Get API keys
+    const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    
+    if (!GOOGLE_VISION_API_KEY) {
+      throw new Error("GOOGLE_CLOUD_VISION_API_KEY is not configured");
     }
 
     const fileName = file.name.toLowerCase();
@@ -44,31 +47,112 @@ serve(async (req) => {
       );
     }
 
-    // Convert file to base64 for AI processing
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
-    // Determine media type
-    let mediaType = 'image/jpeg';
-    if (fileName.endsWith('.png')) mediaType = 'image/png';
-    else if (fileName.endsWith('.webp')) mediaType = 'image/webp';
-    else if (fileName.endsWith('.pdf')) mediaType = 'application/pdf';
-
     console.log(`Processing ${isImage ? 'image' : 'PDF'}: ${file.name}`);
 
-    // Use Lovable AI to extract knowledge from the document
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert at extracting insurance knowledge from documents. Extract structured knowledge entries that can be used in a knowledge base.
+    // Convert file to base64
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+    // Step 1: Extract text using Google Vision API
+    console.log('Extracting text with Google Vision API...');
+    let extractedText = '';
+
+    if (isPdf) {
+      // Use files:annotate for PDFs
+      const visionResponse = await fetch(
+        `https://vision.googleapis.com/v1/files:annotate?key=${GOOGLE_VISION_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{
+              inputConfig: {
+                content: base64,
+                mimeType: 'application/pdf'
+              },
+              features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
+            }]
+          })
+        }
+      );
+
+      if (!visionResponse.ok) {
+        const errorText = await visionResponse.text();
+        console.error('Vision API error:', errorText);
+        throw new Error(`Vision API error: ${visionResponse.status}`);
+      }
+
+      const visionData = await visionResponse.json();
+      
+      // Extract text from nested responses (PDF pages)
+      if (visionData.responses?.[0]?.responses) {
+        extractedText = visionData.responses[0].responses
+          .map((r: any, i: number) => {
+            const text = r.fullTextAnnotation?.text || '';
+            return text ? `=== Page ${i + 1} ===\n${text}` : '';
+          })
+          .filter((t: string) => t)
+          .join('\n\n');
+      } else if (visionData.responses?.[0]?.fullTextAnnotation?.text) {
+        extractedText = visionData.responses[0].fullTextAnnotation.text;
+      }
+    } else {
+      // Use images:annotate for images
+      const visionResponse = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{
+              image: { content: base64 },
+              features: [
+                { type: 'DOCUMENT_TEXT_DETECTION' },
+                { type: 'TEXT_DETECTION' }
+              ],
+              imageContext: {
+                languageHints: ['en']
+              }
+            }]
+          })
+        }
+      );
+
+      if (!visionResponse.ok) {
+        const errorText = await visionResponse.text();
+        console.error('Vision API error:', errorText);
+        throw new Error(`Vision API error: ${visionResponse.status}`);
+      }
+
+      const visionData = await visionResponse.json();
+      extractedText = visionData.responses[0]?.fullTextAnnotation?.text || '';
+    }
+
+    if (!extractedText) {
+      throw new Error('No text extracted from document');
+    }
+
+    console.log(`Google Vision OCR complete: ${extractedText.length} characters extracted`);
+
+    // Step 2: Use Lovable AI to structure the extracted knowledge
+    let entries: any[] = [];
+    let metadata: any = {};
+
+    if (LOVABLE_API_KEY) {
+      console.log('Structuring knowledge with Lovable AI...');
+
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert at extracting insurance knowledge from documents. Extract structured knowledge entries that can be used in a knowledge base.
 
 For each distinct piece of information, create a knowledge entry with:
 - title: A clear, concise title (question format preferred)
@@ -87,81 +171,79 @@ Focus on actionable information like:
 - Important dates or deadlines
 
 Return your response as a JSON array of knowledge entries.`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: isImage 
-                  ? "Extract all insurance knowledge from this document screenshot. Include policy details, coverage information, procedures, and any other relevant information."
-                  : "Extract all insurance knowledge from this PDF document. Parse all pages and extract policy details, coverage information, procedures, and any other relevant information."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mediaType};base64,${base64}`
-                }
-              }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_knowledge",
-              description: "Extract structured knowledge entries from the document",
-              parameters: {
-                type: "object",
-                properties: {
-                  entries: {
-                    type: "array",
-                    items: {
+            },
+            {
+              role: "user",
+              content: `Extract all insurance knowledge from this document text:\n\n${extractedText.substring(0, 50000)}`
+            }
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "extract_knowledge",
+                description: "Extract structured knowledge entries from the document",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    entries: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          title: { 
+                            type: "string",
+                            description: "Clear title for the knowledge entry, preferably in question format"
+                          },
+                          content: { 
+                            type: "string",
+                            description: "Detailed content, answer, or explanation"
+                          },
+                          category: { 
+                            type: "string",
+                            enum: ["policies", "claims", "products", "regulations", "procedures", "faqs"],
+                            description: "Category of the knowledge"
+                          },
+                          tags: { 
+                            type: "string",
+                            description: "Comma-separated relevant tags"
+                          }
+                        },
+                        required: ["title", "content", "category", "tags"]
+                      }
+                    },
+                    document_metadata: {
                       type: "object",
                       properties: {
-                        title: { 
-                          type: "string",
-                          description: "Clear title for the knowledge entry, preferably in question format"
-                        },
-                        content: { 
-                          type: "string",
-                          description: "Detailed content, answer, or explanation"
-                        },
-                        category: { 
-                          type: "string",
-                          enum: ["policies", "claims", "products", "regulations", "procedures", "faqs"],
-                          description: "Category of the knowledge"
-                        },
-                        tags: { 
-                          type: "string",
-                          description: "Comma-separated relevant tags"
-                        }
-                      },
-                      required: ["title", "content", "category", "tags"]
+                        document_type: { type: "string" },
+                        carrier: { type: "string" },
+                        policy_number: { type: "string" },
+                        effective_date: { type: "string" }
+                      }
                     }
                   },
-                  document_metadata: {
-                    type: "object",
-                    properties: {
-                      document_type: { type: "string" },
-                      carrier: { type: "string" },
-                      policy_number: { type: "string" },
-                      effective_date: { type: "string" }
-                    }
-                  }
-                },
-                required: ["entries"]
+                  required: ["entries"]
+                }
               }
             }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "extract_knowledge" } }
-      }),
-    });
+          ],
+          tool_choice: { type: "function", function: { name: "extract_knowledge" } }
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
+      if (aiResponse.ok) {
+        const aiResult = await aiResponse.json();
+        console.log("AI Response received");
+        
+        // Extract the tool call result
+        const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall && toolCall.function?.arguments) {
+          const extractedData = JSON.parse(toolCall.function.arguments);
+          entries = extractedData.entries || [];
+          metadata = extractedData.document_metadata || {};
+          console.log(`Extracted ${entries.length} knowledge entries`);
+        }
+      } else if (aiResponse.status === 429) {
         return new Response(
           JSON.stringify({ 
             success: false,
@@ -169,8 +251,7 @@ Return your response as a JSON array of knowledge entries.`
           }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-      }
-      if (aiResponse.status === 402) {
+      } else if (aiResponse.status === 402) {
         return new Response(
           JSON.stringify({ 
             success: false,
@@ -179,25 +260,7 @@ Return your response as a JSON array of knowledge entries.`
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errorText);
-      throw new Error("AI processing failed");
     }
-
-    const aiResult = await aiResponse.json();
-    console.log("AI Response:", JSON.stringify(aiResult, null, 2));
-    
-    // Extract the tool call result
-    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || !toolCall.function?.arguments) {
-      throw new Error("No structured data returned from AI");
-    }
-
-    const extractedData = JSON.parse(toolCall.function.arguments);
-    const entries = extractedData.entries || [];
-    const metadata = extractedData.document_metadata || {};
-
-    console.log(`Extracted ${entries.length} knowledge entries`);
 
     // Add source information to each entry
     const enrichedEntries = entries.map((entry: any) => ({
@@ -210,11 +273,14 @@ Return your response as a JSON array of knowledge entries.`
     return new Response(
       JSON.stringify({ 
         success: true,
+        extracted_text: extractedText,
+        text_length: extractedText.length,
         entries: enrichedEntries,
         metadata: {
           fileName: file.name,
           fileType: isImage ? 'image' : 'pdf',
           totalEntries: enrichedEntries.length,
+          extractionMethod: 'Google Vision OCR',
           ...metadata
         }
       }),
