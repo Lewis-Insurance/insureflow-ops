@@ -87,7 +87,7 @@ serve(async (req) => {
             formData.append("mailbox", PARSEUR_MAILBOX_ID);
             formData.append("file_url", d.file_url);
 
-            const parseurResp = await fetch("https://api.parseur.com/parser/", {
+            const parseurResp = await fetch("https://api.parseur.com/parser_url/", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${PARSEUR_API_KEY}`,
