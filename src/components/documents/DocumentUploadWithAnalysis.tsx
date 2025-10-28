@@ -61,6 +61,10 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         }
       });
 
+      console.log('Upload result:', result);
+      console.log('Analysis object:', result.analysis);
+      console.log('Analysis ID:', result.analysis?.analysis_id);
+
       // Set the analysis ID to trigger results display
       if (result.analysis?.analysis_id) {
         setCompletedAnalysisId(result.analysis.analysis_id);
