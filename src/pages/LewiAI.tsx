@@ -106,12 +106,17 @@ export default function LewiAIPage() {
           throw new Error(`Failed to upload ${file.name} to storage: ${uploadError.message}`);
         }
 
-        // Get public URL for the file
-        const { data: { publicUrl } } = supabase.storage
+        // Generate a signed URL (valid for 1 hour) so Make.com can download the file
+        const { data: signedUrlData, error: urlError } = await supabase.storage
           .from('workspace-documents')
-          .getPublicUrl(fileName);
+          .createSignedUrl(fileName, 3600); // 3600 seconds = 1 hour
 
-        console.log(`Sending ${file.name} URL to Make webhook...`);
+        if (urlError || !signedUrlData) {
+          console.error('Error creating signed URL:', urlError);
+          throw new Error(`Failed to create signed URL for ${file.name}`);
+        }
+
+        console.log(`Sending ${file.name} signed URL to Make webhook...`);
 
         // Send file URL to Make webhook - Make.com will download the binary file
         const response = await fetch(MAKE_WEBHOOK_URL, {
@@ -127,7 +132,7 @@ export default function LewiAIPage() {
             file: {
               name: file.name,
               mime: file.type,
-              url: publicUrl,
+              url: signedUrlData.signedUrl,
             },
             notes: notes || null,
             customer_id: selectedCustomer || null,
