@@ -30,9 +30,11 @@ serve(async (req) => {
 
     const parseurId = doc.id;
     const workspaceId = doc.metadata?.workspace_id;
-    const fileName = doc.metadata?.file_name;
-    const parsedData = doc.data || {};
+    const fileName = doc.metadata?.file_name || doc.file_name;
+    const parsedData = doc.data || doc.parsed_data || {};
     const documentType = doc.document_type || doc.name || "unknown";
+    const sourceUrl = doc.source_url || null;
+    const accountId = doc.account_id || doc.metadata?.account_id || null;
 
     if (!parseurId) throw new Error("Missing Parseur document ID");
 
@@ -68,6 +70,9 @@ serve(async (req) => {
         parsed_data: parsedData,
         document_type: documentType || "unknown",
         source: "parseur",
+        file_name: fileName || null,
+        source_url: sourceUrl,
+        account_id: accountId,
       });
 
     if (insertError) throw insertError;
