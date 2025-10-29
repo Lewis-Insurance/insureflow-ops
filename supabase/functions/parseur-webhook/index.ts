@@ -6,109 +6,84 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// --- MAIN HANDLER ---
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Verify API key from Authorization header
-    const authHeader = req.headers.get("Authorization");
-    const expectedSecret = Deno.env.get("PARSEUR_WEBHOOK_SECRET");
+    const payload = await req.json();
+    console.log("Received Parseur webhook:", JSON.stringify(payload, null, 2));
 
-    if (!expectedSecret) {
-      console.error("PARSEUR_WEBHOOK_SECRET not configured");
-      return new Response(
-        JSON.stringify({ success: false, error: "Webhook not configured" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
+    const doc = payload?.document;
+    if (!doc) throw new Error("Missing document data in Parseur webhook");
 
-    // Extract token from "Bearer <token>" format
-    const providedToken = authHeader?.replace(/^Bearer\s+/i, "");
+    const parseurId = doc.id;
+    const workspaceId = doc.metadata?.workspace_id; // from upload metadata
+    const parsedData = doc.data || {};
+    const documentType = doc.document_type || doc.name || "unknown";
 
-    if (!providedToken || providedToken !== expectedSecret) {
-      console.error("Invalid or missing API key");
-      return new Response(
-        JSON.stringify({ success: false, error: "Unauthorized" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
-      );
-    }
+    if (!parseurId) throw new Error("Missing Parseur document ID");
+    if (!workspaceId) throw new Error("Missing workspace_id metadata from Parseur");
 
-    console.log("✅ API key verified");
-
-    // Parseur sends JSON payloads by default
-    const body = await req.json();
-
-    // Connect to Supabase with service key
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Find the corresponding workspace_document
-    // Parseur should send parseur_document_id or file_name in the payload
-    const parseurDocId = body.parseur_document_id || body.document_id;
-    const fileName = body.file_name;
-
-    console.log("Looking for workspace_document with parseur_document_id:", parseurDocId, "or file_name:", fileName);
-
-    // Try to find by parseur_document_id first, then by file_name
-    let workspaceDocQuery = supabase
+    // 1️⃣ Find the related workspace_document using parseur_document_id or workspace_id
+    const { data: workspaceDoc, error: docError } = await supabase
       .from("workspace_documents")
-      .select("id, workspace_id, file_name");
+      .select("id, file_name, workspace_id")
+      .or(`parseur_document_id.eq.${parseurId},workspace_id.eq.${workspaceId}`)
+      .limit(1)
+      .single();
 
-    if (parseurDocId) {
-      workspaceDocQuery = workspaceDocQuery.eq("parseur_document_id", parseurDocId);
-    } else if (fileName) {
-      workspaceDocQuery = workspaceDocQuery.eq("file_name", fileName);
-    } else {
-      throw new Error("Missing parseur_document_id and file_name in webhook payload");
+    if (docError || !workspaceDoc) {
+      console.error("No matching workspace_document found:", docError);
+      return new Response(JSON.stringify({ success: false, error: "No matching document" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
-    const { data: workspaceDoc, error: docError } = await workspaceDocQuery.maybeSingle();
+    console.log(`Matched document: ${workspaceDoc.file_name} → ${workspaceDoc.id}`);
 
-    if (docError) {
-      console.error("Error finding workspace_document:", docError);
-      throw docError;
-    }
-
-    if (!workspaceDoc) {
-      console.error("No workspace_document found for parseur_document_id:", parseurDocId, "or file_name:", fileName);
-      throw new Error("Workspace document not found");
-    }
-
-    console.log("Found workspace_document:", workspaceDoc.id);
-
-    // Insert the parsed document with proper linkage
-    const { data, error } = await supabase
+    // 2️⃣ Insert parsed data
+    const { data: parsedRow, error: insertError } = await supabase
       .from("parsed_documents")
       .insert({
         workspace_document_id: workspaceDoc.id,
-        source: "parseur",
-        document_type: body.document_type ?? "unknown",
-        file_name: body.file_name ?? null,
-        parsed_data: body,
+        parseur_document_id: parseurId,
+        document_type: documentType,
+        parsed_data: parsedData,
+        source: "parseur_webhook",
+        workspace_id: workspaceDoc.workspace_id,
       })
       .select()
       .single();
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      throw error;
-    }
+    if (insertError) throw insertError;
 
-    console.log("✅ Parseur payload stored and linked to workspace_document:", workspaceDoc.id, "parsed_documents id:", data.id);
+    console.log(`✓ Parsed data inserted: ${parsedRow.id}`);
 
-    return new Response(
-      JSON.stringify({ success: true, id: data.id }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    );
+    // 3️⃣ Optionally update workspace status to trigger analysis pipeline
+    await supabase
+      .from("workspaces")
+      .update({
+        status: "ready_for_analysis",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", workspaceDoc.workspace_id);
+
+    console.log(`Workspace ${workspaceDoc.workspace_id} marked ready_for_analysis`);
+
+    return new Response(JSON.stringify({ success: true, parsed_id: parsedRow.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (err) {
     console.error("Webhook error:", err);
-    return new Response(
-      JSON.stringify({ success: false, error: err.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
