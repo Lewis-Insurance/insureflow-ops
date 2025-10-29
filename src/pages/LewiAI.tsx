@@ -122,10 +122,15 @@ export default function LewiAIPage() {
           },
           body: JSON.stringify({
             workspace_id: workspaceId,
-            file_name: file.name,
-            file_url: publicUrl,
             task_type: taskType || "policy_explore",
             role: "input",
+            file: {
+              name: file.name,
+              mime: file.type,
+              url: publicUrl,
+            },
+            notes: notes || null,
+            customer_id: selectedCustomer || null,
           }),
         });
 
