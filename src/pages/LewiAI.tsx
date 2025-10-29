@@ -128,6 +128,12 @@ export default function LewiAIPage() {
             url: publicUrl,
             file_name: file.name,
             mime_type: file.type,
+            // Backward compatibility for Make mappings expecting file.url
+            file: {
+              name: file.name,
+              mime: file.type,
+              url: publicUrl,
+            },
             notes: notes || null,
             customer_id: selectedCustomer || null,
           }),
