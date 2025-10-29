@@ -71,7 +71,7 @@ export default function LewiAIPage() {
           name: taskType === "policy_explore" ? "Policy Explore" : "Coverage Comparison",
           task_type: taskType,
           notes: notes || null,
-          customer_id: selectedCustomer || null,
+          account_id: selectedCustomer || null,
           policy_id: selectedPolicy || null,
           created_by: session.session?.user.id,
           status: "processing",

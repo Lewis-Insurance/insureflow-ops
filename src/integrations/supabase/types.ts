@@ -2323,7 +2323,11 @@ export type Database = {
       document_analysis: {
         Row: {
           account_id: string | null
+          agency_code: string | null
+          ai_analysis: Json | null
+          analysis_error: string | null
           analysis_result: Json | null
+          analysis_status: string | null
           carrier_name: string | null
           completed_at: string | null
           confidence_score: number | null
@@ -2339,19 +2343,27 @@ export type Database = {
           id: string
           insured_items: Json | null
           insured_name: string | null
+          issued_date: string | null
           ocr_text: string | null
           pages_analyzed: string | null
+          parseur_data: Json | null
           payment_frequency: string | null
+          policy_id: string | null
           policy_number: string | null
           policy_type: string | null
           processing_status: string | null
           raw_ocr_text: string | null
           total_premium: number | null
           updated_at: string | null
+          vehicles: Json | null
         }
         Insert: {
           account_id?: string | null
+          agency_code?: string | null
+          ai_analysis?: Json | null
+          analysis_error?: string | null
           analysis_result?: Json | null
+          analysis_status?: string | null
           carrier_name?: string | null
           completed_at?: string | null
           confidence_score?: number | null
@@ -2367,19 +2379,27 @@ export type Database = {
           id?: string
           insured_items?: Json | null
           insured_name?: string | null
+          issued_date?: string | null
           ocr_text?: string | null
           pages_analyzed?: string | null
+          parseur_data?: Json | null
           payment_frequency?: string | null
+          policy_id?: string | null
           policy_number?: string | null
           policy_type?: string | null
           processing_status?: string | null
           raw_ocr_text?: string | null
           total_premium?: number | null
           updated_at?: string | null
+          vehicles?: Json | null
         }
         Update: {
           account_id?: string | null
+          agency_code?: string | null
+          ai_analysis?: Json | null
+          analysis_error?: string | null
           analysis_result?: Json | null
+          analysis_status?: string | null
           carrier_name?: string | null
           completed_at?: string | null
           confidence_score?: number | null
@@ -2395,15 +2415,19 @@ export type Database = {
           id?: string
           insured_items?: Json | null
           insured_name?: string | null
+          issued_date?: string | null
           ocr_text?: string | null
           pages_analyzed?: string | null
+          parseur_data?: Json | null
           payment_frequency?: string | null
+          policy_id?: string | null
           policy_number?: string | null
           policy_type?: string | null
           processing_status?: string | null
           raw_ocr_text?: string | null
           total_premium?: number | null
           updated_at?: string | null
+          vehicles?: Json | null
         }
         Relationships: [
           {
@@ -2488,6 +2512,7 @@ export type Database = {
           account_id: string | null
           category: Database["public"]["Enums"]["document_category"] | null
           created_at: string
+          dropbox_id: string | null
           file_missing: boolean
           file_size: number | null
           filename: string
@@ -2511,6 +2536,7 @@ export type Database = {
           account_id?: string | null
           category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
+          dropbox_id?: string | null
           file_missing?: boolean
           file_size?: number | null
           filename: string
@@ -2534,6 +2560,7 @@ export type Database = {
           account_id?: string | null
           category?: Database["public"]["Enums"]["document_category"] | null
           created_at?: string
+          dropbox_id?: string | null
           file_missing?: boolean
           file_size?: number | null
           filename?: string
@@ -7981,11 +8008,11 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          account_id: string | null
           analysis_output: Json | null
           client_name: string | null
           created_at: string
           created_by: string
-          customer_id: string | null
           description: string | null
           id: string
           name: string
@@ -7996,11 +8023,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           analysis_output?: Json | null
           client_name?: string | null
           created_at?: string
           created_by: string
-          customer_id?: string | null
           description?: string | null
           id?: string
           name: string
@@ -8011,11 +8038,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           analysis_output?: Json | null
           client_name?: string | null
           created_at?: string
           created_by?: string
-          customer_id?: string | null
           description?: string | null
           id?: string
           name?: string
@@ -8027,10 +8054,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "workspaces_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "workspaces_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
