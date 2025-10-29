@@ -174,16 +174,20 @@ export function useDashboardMetrics(producerId?: string) {
       let monthlyGoal = 100; // Default goal
       
       if (producerId) {
-        const { data: goals } = await supabase
-          .from('producer_goals')
-          .select('*')
-          .eq('producer_id', producerId)
-          .eq('month', format(today, 'yyyy-MM'))
-          .single();
-        
-        if (goals) {
-          dailyGoal = goals.daily_target || 5;
-          monthlyGoal = goals.monthly_target || 100;
+        try {
+          const { data: goals, error: goalsError } = await supabase
+            .from('producer_goals')
+            .select('*')
+            .eq('producer_id', producerId)
+            .eq('month', format(today, 'yyyy-MM'))
+            .maybeSingle();
+          
+          if (!goalsError && goals) {
+            dailyGoal = goals.daily_target || 5;
+            monthlyGoal = goals.monthly_target || 100;
+          }
+        } catch (error) {
+          console.log('Producer goals not available, using defaults');
         }
       }
 

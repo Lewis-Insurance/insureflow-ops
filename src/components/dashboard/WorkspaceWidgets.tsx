@@ -90,9 +90,7 @@ export function PolicySearchWidget() {
           id, 
           policy_number, 
           line_of_business,
-          policies_accounts!inner(
-            accounts(id, name)
-          ),
+          accounts!inner(id, name),
           carriers(name)
         `)
         .or(`policy_number.ilike.%${search}%,line_of_business.ilike.%${search}%`)
@@ -170,9 +168,7 @@ export function UpcomingRenewalsWidget() {
           expiration_date,
           line_of_business,
           premium,
-          policies_accounts!inner(
-            accounts(id, name)
-          ),
+          accounts!inner(id, name),
           carriers(name)
         `)
         .gte('expiration_date', startOfDay(now).toISOString())
@@ -210,7 +206,7 @@ export function UpcomingRenewalsWidget() {
         ) : (
           <div className="space-y-3">
             {renewals.map((renewal: any) => {
-              const account = renewal.policies_accounts?.[0]?.accounts;
+              const account = renewal.accounts;
               return (
                 <div
                   key={renewal.id}
