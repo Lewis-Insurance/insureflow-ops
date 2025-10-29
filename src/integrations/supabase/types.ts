@@ -7947,7 +7947,6 @@ export type Database = {
           file_name: string | null
           file_url: string | null
           id: string
-          parsed_doc_id: string | null
           parseur_document_id: string | null
           role: string | null
           workspace_id: string | null
@@ -7957,7 +7956,6 @@ export type Database = {
           file_name?: string | null
           file_url?: string | null
           id?: string
-          parsed_doc_id?: string | null
           parseur_document_id?: string | null
           role?: string | null
           workspace_id?: string | null
@@ -7967,19 +7965,11 @@ export type Database = {
           file_name?: string | null
           file_url?: string | null
           id?: string
-          parsed_doc_id?: string | null
           parseur_document_id?: string | null
           role?: string | null
           workspace_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "workspace_documents_parsed_doc_id_fkey"
-            columns: ["parsed_doc_id"]
-            isOneToOne: false
-            referencedRelation: "parsed_documents"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "workspace_documents_workspace_id_fkey"
             columns: ["workspace_id"]

@@ -23,7 +23,7 @@ export interface WorkspaceDocument {
   file_name: string | null;
   file_url: string | null;
   role: string | null;
-  parsed_doc_id: string | null;
+  parseur_document_id: string | null;
   created_at: string;
 }
 
