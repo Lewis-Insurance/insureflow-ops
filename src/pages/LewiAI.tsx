@@ -63,46 +63,62 @@ export default function LewiAIPage() {
 
     setLoading(true);
     try {
-      // Upload files to Supabase Storage
-      const uploadedFiles: any[] = [];
-      for (const file of files) {
-        const { data, error } = await supabase.storage
-          .from("documents")
-          .upload(`${Date.now()}-${file.name}`, file, { upsert: true });
-        
-        if (error) throw error;
-        
-        if (data) {
-          const { data: publicUrl } = supabase.storage
-            .from("documents")
-            .getPublicUrl(data.path);
-          uploadedFiles.push({
-            file_name: file.name,
-            file_url: publicUrl.publicUrl,
-            role: "input",
-          });
-        }
-      }
-
-      // Create workspace via Edge Function
-      const { data, error } = await supabase.functions.invoke("create_workspace", {
-        body: {
+      // Step 1: Create workspace record first
+      const { data: session } = await supabase.auth.getSession();
+      const { data: workspace, error: workspaceError } = await supabase
+        .from("workspaces")
+        .insert({
+          name: taskType === "policy_explore" ? "Policy Explore" : "Coverage Comparison",
           task_type: taskType,
-          notes,
-          documents: uploadedFiles,
-          customer_id: selectedCustomer || undefined,
-          policy_id: selectedPolicy || undefined,
-        },
-      });
+          notes: notes || null,
+          customer_id: selectedCustomer || null,
+          policy_id: selectedPolicy || null,
+          created_by: session.session?.user.id,
+          status: "idle",
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (workspaceError) throw workspaceError;
+
+      const workspaceId = workspace.id;
+      console.log("Created workspace:", workspaceId);
+
+      // Step 2: Upload each file to Make webhook
+      const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/your-webhook-id"; // TODO: Replace with actual webhook URL
+      const MAKE_API_KEY = "08031996";
+
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("workspace_id", workspaceId);
+        formData.append("file_name", file.name);
+        formData.append("task_type", taskType || "policy_explore");
+        formData.append("role", "input");
+
+        console.log(`Uploading ${file.name} to Make webhook...`);
+
+        const response = await fetch(MAKE_WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "x-make-apikey": MAKE_API_KEY,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name} to Make webhook`);
+        }
+
+        console.log(`Successfully uploaded ${file.name}`);
+      }
 
       toast({
         title: "Workspace created",
         description: "Your documents are being analyzed.",
       });
 
-      navigate(`/workspace/${data.workspace.id}`);
+      navigate(`/workspace/${workspaceId}`);
     } catch (error) {
       console.error("Error creating workspace:", error);
       toast({
