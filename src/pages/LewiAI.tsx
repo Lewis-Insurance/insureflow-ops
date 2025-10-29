@@ -111,14 +111,18 @@ export default function LewiAIPage() {
           .from('workspace-documents')
           .getPublicUrl(fileName);
 
-        // Read file content and convert to base64
-        const fileBuffer = await file.arrayBuffer();
-        const base64Content = btoa(
-          new Uint8Array(fileBuffer).reduce(
-            (data, byte) => data + String.fromCharCode(byte),
-            ''
-          )
-        );
+        // Read file content and convert to base64 using FileReader
+        const base64Content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64String = reader.result as string;
+            // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
+            const base64Data = base64String.split(',')[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
         console.log(`Sending ${file.name} with content to Make webhook...`);
 
