@@ -31,9 +31,34 @@ serve(async (req) => {
 
     // Convert file to ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
-    
+
+    // Determine target folder
+    const providedFolder = (formData.get('folderPath') as string) || '';
+    const folderPath = providedFolder || '/LEWI AI';
+    const dropboxPath = `${folderPath.endsWith('/') ? folderPath.slice(0, -1) : folderPath}/${fileName}`;
+
+    // Ensure folder exists (best-effort)
+    try {
+      const createFolderResp = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DROPBOX_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path: folderPath, autorename: false }),
+      });
+      if (!createFolderResp.ok) {
+        const txt = await createFolderResp.text();
+        // Ignore conflict (folder already exists)
+        if (!txt.includes('path/conflict/folder')) {
+          console.log('Dropbox create_folder_v2 skipped/failed (non-fatal):', txt);
+        }
+      }
+    } catch (e) {
+      console.log('Dropbox create_folder_v2 error (non-fatal):', e);
+    }
+
     // Upload to Dropbox
-    const dropboxPath = `/LEWI AI/${fileName}`;
     const uploadResponse = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
@@ -52,7 +77,7 @@ serve(async (req) => {
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       console.error('Dropbox upload error:', errorText);
-      throw new Error(`Failed to upload file: ${uploadResponse.status}`);
+      throw new Error(`Dropbox upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
     const dropboxFile = await uploadResponse.json();
@@ -70,6 +95,8 @@ serve(async (req) => {
       .from('documents')
       .insert({
         name: fileName,
+        filename: fileName,
+        kind: 'uploaded',
         dropbox_id: dropboxId,
         mime_type: file.type,
         file_size: file.size,
