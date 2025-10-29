@@ -111,7 +111,8 @@ export default function LewiAIPage() {
           .from('workspace-documents')
           .getPublicUrl(fileName);
 
-        console.log(`Sending ${file.name} public URL to Make webhook...`);
+        console.log(`File: ${file.name}`);
+        console.log(`Public URL being sent: ${publicUrl}`);
 
         // Send file URL to Make webhook - Make.com will download the binary file
         const response = await fetch(MAKE_WEBHOOK_URL, {
