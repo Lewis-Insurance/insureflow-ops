@@ -85,7 +85,7 @@ export default function LewiAIPage() {
       console.log("Created workspace:", workspaceId);
 
       // Step 2: Upload each file to Make webhook
-      const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/your-webhook-id"; // TODO: Replace with actual webhook URL
+      const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/ksoxnvvls2vogx41d1se9qrunwhil2b6";
       const MAKE_API_KEY = "08031996";
 
       for (const file of files) {
