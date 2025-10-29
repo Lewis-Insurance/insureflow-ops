@@ -246,13 +246,14 @@ serve(async (req) => {
 
           const metadata = {
             workspace_id: workspace.id,
-            task_type: task_type,
+            file_name: fileName,
+            task_type,
           };
 
           const queryParams = new URLSearchParams();
-          Object.entries(metadata).forEach(([key, value]) => {
-            if (value !== null) queryParams.append(key, String(value));
-          });
+          for (const [k, v] of Object.entries(metadata)) {
+            if (v) queryParams.append(k, v);
+          }
 
           const parseurUrl = `https://api.parseur.com/parser/${PARSEUR_MAILBOX_ID}/upload?${queryParams.toString()}`;
           console.log(`Uploading to Parseur: ${parseurUrl}`);
@@ -277,6 +278,17 @@ serve(async (req) => {
             try {
               const parseurData = JSON.parse(responseText);
               console.log(`✓ Parseur upload successful:`, parseurData);
+              
+              // Update workspace_document with parseur_document_id
+              if (parseurData?.attachments?.[0]?.DocumentID) {
+                const parseurDocId = parseurData.attachments[0].DocumentID;
+                await supabase
+                  .from("workspace_documents")
+                  .update({ parseur_document_id: parseurDocId })
+                  .eq("workspace_id", workspace.id)
+                  .eq("file_name", fileName);
+                console.log(`✓ Stored parseur_document_id: ${parseurDocId}`);
+              }
             } catch {
               console.log(`✓ Parseur upload successful (raw):`, responseText.substring(0, 200));
             }
