@@ -53,16 +53,17 @@ serve(async (req) => {
 
     console.log(`✓ Parsed data linked to workspace_document ${workspaceDoc.id}`);
 
-    // Update workspace status to trigger analysis pipeline
-    await supabase
-      .from("workspaces")
-      .update({
-        status: "ready_for_analysis",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", workspaceDoc.workspace_id);
+    // Trigger the analyzer automatically
+    await fetch(`${supabaseUrl}/functions/v1/analyze-workspace`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({ workspace_id: workspaceDoc.workspace_id }),
+    });
 
-    console.log(`Workspace ${workspaceDoc.workspace_id} marked ready_for_analysis`);
+    console.log(`Triggered analysis for workspace ${workspaceDoc.workspace_id}`);
 
     return new Response(JSON.stringify({ success: true, workspace_id: workspaceDoc.workspace_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
