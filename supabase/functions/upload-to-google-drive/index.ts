@@ -12,9 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const DROPBOX_ACCESS_TOKEN = Deno.env.get('DROPBOX_ACCESS_TOKEN');
-    if (!DROPBOX_ACCESS_TOKEN) {
-      throw new Error('DROPBOX_ACCESS_TOKEN not configured');
+    const GOOGLE_DRIVE_API_KEY = Deno.env.get('GOOGLE_DRIVE_API_KEY');
+    const GOOGLE_DRIVE_FOLDER_ID = Deno.env.get('GOOGLE_DRIVE_FOLDER_ID');
+    
+    if (!GOOGLE_DRIVE_API_KEY) {
+      throw new Error('GOOGLE_DRIVE_API_KEY not configured');
     }
 
     const formData = await req.formData();
@@ -27,63 +29,53 @@ serve(async (req) => {
       throw new Error('No file provided');
     }
 
-    console.log(`Uploading ${fileName} to Dropbox...`);
+    console.log(`Uploading ${fileName} to Google Drive...`);
 
     // Convert file to ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
 
-    // Determine target folder
-    const providedFolder = (formData.get('folderPath') as string) || '';
-    const folderPath = providedFolder || '/LEWI AI';
-    const dropboxPath = `${folderPath.endsWith('/') ? folderPath.slice(0, -1) : folderPath}/${fileName}`;
+    // Create metadata
+    const metadata = {
+      name: fileName,
+      mimeType: file.type,
+      ...(GOOGLE_DRIVE_FOLDER_ID && { parents: [GOOGLE_DRIVE_FOLDER_ID] })
+    };
 
-    // Ensure folder exists (best-effort)
-    try {
-      const createFolderResp = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${DROPBOX_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path: folderPath, autorename: false }),
-      });
-      if (!createFolderResp.ok) {
-        const txt = await createFolderResp.text();
-        // Ignore conflict (folder already exists)
-        if (!txt.includes('path/conflict/folder')) {
-          console.log('Dropbox create_folder_v2 skipped/failed (non-fatal):', txt);
-        }
-      }
-    } catch (e) {
-      console.log('Dropbox create_folder_v2 error (non-fatal):', e);
-    }
+    // Create form data for Google Drive
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
 
-    // Upload to Dropbox
-    const uploadResponse = await fetch('https://content.dropboxapi.com/2/files/upload', {
+    const multipartRequestBody =
+      delimiter +
+      'Content-Type: application/json\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      `Content-Type: ${file.type}\r\n` +
+      'Content-Transfer-Encoding: base64\r\n\r\n' +
+      btoa(String.fromCharCode(...new Uint8Array(fileBuffer))) +
+      closeDelimiter;
+
+    // Upload to Google Drive
+    const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DROPBOX_ACCESS_TOKEN}`,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: dropboxPath,
-          mode: 'add',
-          autorename: true,
-          mute: false,
-        }),
+        'Authorization': `Bearer ${GOOGLE_DRIVE_API_KEY}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
       },
-      body: fileBuffer,
+      body: multipartRequestBody,
     });
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
-      console.error('Dropbox upload error:', errorText);
-      throw new Error(`Dropbox upload failed: ${uploadResponse.status} - ${errorText}`);
+      console.error('Google Drive upload error:', errorText);
+      throw new Error(`Google Drive upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
-    const dropboxFile = await uploadResponse.json();
-    const dropboxId = dropboxFile.id;
+    const driveFile = await uploadResponse.json();
+    const driveId = driveFile.id;
 
-    console.log(`File uploaded to Dropbox with ID: ${dropboxId}`);
+    console.log(`File uploaded to Google Drive with ID: ${driveId}`);
 
     // Store metadata in Supabase
     const supabaseClient = createClient(
@@ -97,12 +89,12 @@ serve(async (req) => {
         name: fileName,
         filename: fileName,
         kind: 'uploaded',
-        dropbox_id: dropboxId,
+        google_drive_id: driveId,
         mime_type: file.type,
         file_size: file.size,
         account_id: accountId || null,
         policy_id: policyId || null,
-        storage_path: `dropbox://${dropboxId}`,
+        storage_path: `drive://${driveId}`,
       })
       .select()
       .single();
@@ -120,7 +112,7 @@ serve(async (req) => {
     const analysisResponse = await supabaseClient.functions.invoke('ai-document-analysis', {
       body: {
         documentId: document.id,
-        dropboxId: dropboxId,
+        driveId: driveId,
         fileName: fileName,
         accountId: accountId || null,
       }
@@ -135,7 +127,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         documentId: document.id,
-        dropboxId: dropboxId,
+        driveId: driveId,
         fileName: fileName,
         analysisTriggered: !analysisResponse.error,
       }),
