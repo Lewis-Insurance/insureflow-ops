@@ -19,6 +19,8 @@ serve(async (req) => {
     const parseurId = doc.id;
     const parsedData = doc.data || {};
     const documentType = doc.document_type || doc.name || "unknown";
+    const metadata = doc.metadata || {};
+    const fileName = metadata.file_name;
 
     if (!parseurId) throw new Error("Missing Parseur document ID");
 
@@ -26,10 +28,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    console.log(`Looking up workspace_document for Parseur ID: ${parseurId}, file: ${fileName}`);
+
     // Look up the correct workspace_document
     const { data: workspaceDoc, error: docError } = await supabase
       .from("workspace_documents")
-      .select("id, workspace_id")
+      .select("id, workspace_id, file_name")
       .eq("parseur_document_id", parseurId)
       .single();
 
@@ -37,6 +41,8 @@ serve(async (req) => {
       console.error("No workspace_document found for Parseur ID:", parseurId);
       throw new Error("No matching document found in workspace_documents");
     }
+
+    console.log(`Found workspace_document: ${workspaceDoc.id} (${workspaceDoc.file_name})`);
 
     // Insert parsed data and link it
     const { error: insertError } = await supabase
