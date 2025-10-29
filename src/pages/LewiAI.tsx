@@ -111,9 +111,18 @@ export default function LewiAIPage() {
           .from('workspace-documents')
           .getPublicUrl(fileName);
 
-        console.log(`Sending ${file.name} metadata to Make webhook...`);
+        // Read file content and convert to base64
+        const fileBuffer = await file.arrayBuffer();
+        const base64Content = btoa(
+          new Uint8Array(fileBuffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ''
+          )
+        );
 
-        // Send file metadata to Make webhook
+        console.log(`Sending ${file.name} with content to Make webhook...`);
+
+        // Send file with base64 content to Make webhook
         const response = await fetch(MAKE_WEBHOOK_URL, {
           method: "POST",
           headers: {
@@ -128,6 +137,7 @@ export default function LewiAIPage() {
               name: file.name,
               mime: file.type,
               url: publicUrl,
+              content: base64Content,
             },
             notes: notes || null,
             customer_id: selectedCustomer || null,
