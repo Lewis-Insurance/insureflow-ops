@@ -17,54 +17,43 @@ serve(async (req) => {
     if (!doc) throw new Error("Missing document data in Parseur webhook");
 
     const parseurId = doc.id;
-    const workspaceId = doc.metadata?.workspace_id; // from upload metadata
     const parsedData = doc.data || {};
     const documentType = doc.document_type || doc.name || "unknown";
 
     if (!parseurId) throw new Error("Missing Parseur document ID");
-    if (!workspaceId) throw new Error("Missing workspace_id metadata from Parseur");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1️⃣ Find the related workspace_document using parseur_document_id or workspace_id
+    // Look up the correct workspace_document
     const { data: workspaceDoc, error: docError } = await supabase
       .from("workspace_documents")
-      .select("id, file_name, workspace_id")
-      .or(`parseur_document_id.eq.${parseurId},workspace_id.eq.${workspaceId}`)
-      .limit(1)
+      .select("id, workspace_id")
+      .eq("parseur_document_id", parseurId)
       .single();
 
     if (docError || !workspaceDoc) {
-      console.error("No matching workspace_document found:", docError);
-      return new Response(JSON.stringify({ success: false, error: "No matching document" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404,
-      });
+      console.error("No workspace_document found for Parseur ID:", parseurId);
+      throw new Error("No matching document found in workspace_documents");
     }
 
-    console.log(`Matched document: ${workspaceDoc.file_name} → ${workspaceDoc.id}`);
-
-    // 2️⃣ Insert parsed data
-    const { data: parsedRow, error: insertError } = await supabase
+    // Insert parsed data and link it
+    const { error: insertError } = await supabase
       .from("parsed_documents")
       .insert({
         workspace_document_id: workspaceDoc.id,
         parseur_document_id: parseurId,
-        document_type: documentType,
         parsed_data: parsedData,
+        document_type: documentType || "unknown",
         source: "parseur_webhook",
-        workspace_id: workspaceDoc.workspace_id,
-      })
-      .select()
-      .single();
+      });
 
     if (insertError) throw insertError;
 
-    console.log(`✓ Parsed data inserted: ${parsedRow.id}`);
+    console.log(`✓ Parsed data linked to workspace_document ${workspaceDoc.id}`);
 
-    // 3️⃣ Optionally update workspace status to trigger analysis pipeline
+    // Update workspace status to trigger analysis pipeline
     await supabase
       .from("workspaces")
       .update({
@@ -75,7 +64,7 @@ serve(async (req) => {
 
     console.log(`Workspace ${workspaceDoc.workspace_id} marked ready_for_analysis`);
 
-    return new Response(JSON.stringify({ success: true, parsed_id: parsedRow.id }), {
+    return new Response(JSON.stringify({ success: true, workspace_id: workspaceDoc.workspace_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
