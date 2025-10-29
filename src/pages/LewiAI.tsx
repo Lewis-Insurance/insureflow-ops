@@ -111,22 +111,9 @@ export default function LewiAIPage() {
           .from('workspace-documents')
           .getPublicUrl(fileName);
 
-        // Read file content and convert to base64 using FileReader
-        const base64Content = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64String = reader.result as string;
-            // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
-            const base64Data = base64String.split(',')[1];
-            resolve(base64Data);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        console.log(`Sending ${file.name} URL to Make webhook...`);
 
-        console.log(`Sending ${file.name} with content to Make webhook...`);
-
-        // Send file with base64 content to Make webhook
+        // Send file URL to Make webhook - Make.com will download the binary file
         const response = await fetch(MAKE_WEBHOOK_URL, {
           method: "POST",
           headers: {
@@ -141,7 +128,6 @@ export default function LewiAIPage() {
               name: file.name,
               mime: file.type,
               url: publicUrl,
-              content: base64Content,
             },
             notes: notes || null,
             customer_id: selectedCustomer || null,
