@@ -10,6 +10,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Validate API key from header
+    const apiKey = req.headers.get("x-make-apikey");
+    const expectedApiKey = Deno.env.get("PARSEUR_WEBHOOK_API_KEY");
+    
+    if (expectedApiKey && apiKey !== expectedApiKey) {
+      console.error("Invalid API key");
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
     const payload = await req.json();
     console.log("Received Parseur webhook:", JSON.stringify(payload, null, 2));
 
