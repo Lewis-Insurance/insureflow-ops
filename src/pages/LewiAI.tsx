@@ -99,7 +99,7 @@ export default function LewiAIPage() {
         const { data: uploadResult, error: uploadError } = await supabase.functions.invoke<{
           success: boolean;
           documentId: string;
-          googleDriveId: string;
+          dropboxId: string;
           fileName: string;
           analysisTriggered: boolean;
           error?: string;
@@ -120,16 +120,16 @@ export default function LewiAIPage() {
 
         uploadedDocuments.push({
           documentId: uploadResult.documentId,
-          googleDriveId: uploadResult.googleDriveId,
+          dropboxId: uploadResult.dropboxId,
           fileName: uploadResult.fileName,
         });
 
-        console.log(`Successfully uploaded ${file.name} (Drive ID: ${uploadResult.googleDriveId})`);
+        console.log(`Successfully uploaded ${file.name} (Dropbox ID: ${uploadResult.dropboxId})`);
       }
 
       // Update workspace with document references in notes field
       const docSummary = uploadedDocuments
-        .map(d => `${d.fileName} (Drive ID: ${d.googleDriveId})`)
+        .map(d => `${d.fileName} (Dropbox ID: ${d.dropboxId})`)
         .join('\n');
       
       await supabase
@@ -141,7 +141,7 @@ export default function LewiAIPage() {
 
       toast({
         title: "Workspace created",
-        description: "Your documents are uploaded to Google Drive and being analyzed.",
+        description: "Your documents are uploaded to Dropbox and being analyzed.",
       });
 
       navigate(`/workspace/${workspaceId}`);
