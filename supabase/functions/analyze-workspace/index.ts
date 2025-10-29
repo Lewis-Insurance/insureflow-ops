@@ -40,7 +40,7 @@ serve(async (req) => {
           file_url,
           role,
           parseur_document_id,
-          parsed_documents!workspace_document_id (
+          parsed_documents (
             id,
             parsed_data,
             document_type
