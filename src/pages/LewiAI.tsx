@@ -84,33 +84,56 @@ export default function LewiAIPage() {
       const workspaceId = workspace.id;
       console.log("Created workspace:", workspaceId);
 
-      // Step 2: Upload each file to Make webhook
+      // Step 2: Upload files to Supabase storage and send URLs to Make webhook
       const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/ksoxnvvls2vogx41d1se9qrunwhil2b6";
       const MAKE_API_KEY = "08031996";
 
       for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("workspace_id", workspaceId);
-        formData.append("file_name", file.name);
-        formData.append("task_type", taskType || "policy_explore");
-        formData.append("role", "input");
+        // Upload file to Supabase storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${workspaceId}/${Date.now()}_${file.name}`;
+        
+        console.log(`Uploading ${file.name} to Supabase storage...`);
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('workspace-documents')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-        console.log(`Uploading ${file.name} to Make webhook...`);
+        if (uploadError) {
+          throw new Error(`Failed to upload ${file.name} to storage: ${uploadError.message}`);
+        }
 
+        // Get public URL for the file
+        const { data: { publicUrl } } = supabase.storage
+          .from('workspace-documents')
+          .getPublicUrl(fileName);
+
+        console.log(`Sending ${file.name} metadata to Make webhook...`);
+
+        // Send file metadata to Make webhook
         const response = await fetch(MAKE_WEBHOOK_URL, {
           method: "POST",
           headers: {
             "x-make-apikey": MAKE_API_KEY,
+            "Content-Type": "application/json",
           },
-          body: formData,
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            file_name: file.name,
+            file_url: publicUrl,
+            task_type: taskType || "policy_explore",
+            role: "input",
+          }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name} to Make webhook`);
+          throw new Error(`Failed to send ${file.name} to Make webhook`);
         }
 
-        console.log(`Successfully uploaded ${file.name}`);
+        console.log(`Successfully processed ${file.name}`);
       }
 
       toast({
