@@ -74,7 +74,7 @@ export default function LewiAIPage() {
           customer_id: selectedCustomer || null,
           policy_id: selectedPolicy || null,
           created_by: session.session?.user.id,
-          status: "idle",
+          status: "processing",
         })
         .select()
         .single();
@@ -84,71 +84,64 @@ export default function LewiAIPage() {
       const workspaceId = workspace.id;
       console.log("Created workspace:", workspaceId);
 
-      // Step 2: Upload files to Supabase storage and send URLs to Make webhook
-      const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/ksoxnvvls2vogx41d1se9qrunwhil2b6";
-      const MAKE_API_KEY = "08031996";
+      // Step 2: Upload files to Google Drive
+      const uploadedDocuments = [];
 
       for (const file of files) {
-        // Upload file to Supabase storage
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${workspaceId}/${Date.now()}_${file.name}`;
+        console.log(`Uploading ${file.name} to Google Drive...`);
         
-        console.log(`Uploading ${file.name} to Supabase storage...`);
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('workspace-documents')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('fileName', file.name);
+        formData.append('accountId', selectedCustomer || '');
+        formData.append('policyId', selectedPolicy || '');
+
+        const { data: uploadResult, error: uploadError } = await supabase.functions.invoke<{
+          success: boolean;
+          documentId: string;
+          googleDriveId: string;
+          fileName: string;
+          analysisTriggered: boolean;
+          error?: string;
+        }>(
+          'upload-to-google-drive',
+          {
+            body: formData,
+          }
+        );
 
         if (uploadError) {
-          throw new Error(`Failed to upload ${file.name} to storage: ${uploadError.message}`);
+          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
         }
 
-        // Get public URL for the file (bucket is public, no auth needed)
-        const { data: { publicUrl } } = supabase.storage
-          .from('workspace-documents')
-          .getPublicUrl(fileName);
+        if (!uploadResult?.success) {
+          throw new Error(`Failed to upload ${file.name}: ${uploadResult?.error || 'Unknown error'}`);
+        }
 
-        console.log(`File: ${file.name}`);
-        console.log(`Public URL being sent: ${publicUrl}`);
-
-        // Send file URL to Make webhook - Make.com will download the binary file
-        const response = await fetch(MAKE_WEBHOOK_URL, {
-          method: "POST",
-          headers: {
-            "x-make-apikey": MAKE_API_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            task_type: taskType || "policy_explore",
-            role: "input",
-            url: publicUrl,
-            file_name: file.name,
-            mime_type: file.type,
-            // Backward compatibility for Make mappings expecting file.url
-            file: {
-              name: file.name,
-              mime: file.type,
-              url: publicUrl,
-            },
-            notes: notes || null,
-            customer_id: selectedCustomer || null,
-          }),
+        uploadedDocuments.push({
+          documentId: uploadResult.documentId,
+          googleDriveId: uploadResult.googleDriveId,
+          fileName: uploadResult.fileName,
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to send ${file.name} to Make webhook`);
-        }
-
-        console.log(`Successfully processed ${file.name}`);
+        console.log(`Successfully uploaded ${file.name} (Drive ID: ${uploadResult.googleDriveId})`);
       }
+
+      // Update workspace with document references in notes field
+      const docSummary = uploadedDocuments
+        .map(d => `${d.fileName} (Drive ID: ${d.googleDriveId})`)
+        .join('\n');
+      
+      await supabase
+        .from("workspaces")
+        .update({
+          notes: `${notes ? notes + '\n\n' : ''}Documents uploaded:\n${docSummary}`
+        })
+        .eq("id", workspaceId);
 
       toast({
         title: "Workspace created",
-        description: "Your documents are being analyzed.",
+        description: "Your documents are uploaded to Google Drive and being analyzed.",
       });
 
       navigate(`/workspace/${workspaceId}`);

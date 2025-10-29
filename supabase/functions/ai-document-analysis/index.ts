@@ -388,7 +388,7 @@ serve(async (req) => {
       
       const { data: docData, error: docError } = await supabase
         .from('documents')
-        .select('id, name, kind, category, mime_type, storage_path, storage_bucket')
+        .select('id, name, kind, category, mime_type, storage_path, storage_bucket, google_drive_id')
         .eq('id', context.metadata.documentId)
         .single();
 
@@ -406,24 +406,83 @@ serve(async (req) => {
         );
       }
 
-      const bucket = docData.storage_bucket || 'documents';
-      const { data: fileData, error: storageError } = await supabase.storage
-        .from(bucket)
-        .download(docData.storage_path);
-
-      let docContent = `[Document: ${docData.name}, Type: ${docData.mime_type || 'unknown'}]`;
+      let fileData: Blob;
       
-      if (storageError) {
-        console.error('Storage error:', storageError);
-        throw new DocumentFetchError(
-          `Failed to download document: ${storageError.message}`,
-          docData.storage_path
+      // Check if document is stored in Google Drive
+      if (docData.storage_path?.startsWith('google-drive://') || docData.google_drive_id) {
+        console.log('Fetching document from Google Drive...');
+        const driveId = docData.google_drive_id || docData.storage_path.replace('google-drive://', '');
+        const GOOGLE_DRIVE_API_KEY = Deno.env.get('GOOGLE_DRIVE_API_KEY');
+        
+        if (!GOOGLE_DRIVE_API_KEY) {
+          throw new ConfigurationError('GOOGLE_DRIVE_API_KEY not configured');
+        }
+
+        // Fetch file from Google Drive
+        const driveResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${driveId}?alt=media&key=${GOOGLE_DRIVE_API_KEY}`,
+          {
+            method: 'GET',
+          }
         );
+
+        if (!driveResponse.ok) {
+          const errorText = await driveResponse.text();
+          console.error('Google Drive fetch error:', errorText);
+          throw new DocumentFetchError(
+            `Failed to fetch from Google Drive: ${driveResponse.status}`,
+            driveId
+          );
+        }
+
+        fileData = await driveResponse.blob();
+        console.log(`✓ Fetched ${docData.name} from Google Drive (${fileData.size} bytes)`);
+        
+      } else {
+        // Fetch from Supabase Storage
+        const bucket = docData.storage_bucket || 'documents';
+        const { data: storageFileData, error: storageError } = await supabase.storage
+          .from(bucket)
+          .download(docData.storage_path);
+
+        if (storageError) {
+          console.error('Storage error:', storageError);
+          throw new DocumentFetchError(
+            `Failed to download document: ${storageError.message}`,
+            docData.storage_path
+          );
+        }
+
+        if (!storageFileData) {
+          throw new DocumentFetchError(
+            `No file data returned for: ${docData.storage_path}`,
+            docData.storage_path
+          );
+        }
+
+        fileData = storageFileData;
+        console.log(`✓ Fetched ${docData.name} from Supabase Storage (${fileData.size} bytes)`);
       }
 
+      // Process the document content
+      let docContent = `[Document: ${docData.name}, Type: ${docData.mime_type || 'unknown'}]`;
+      
       if (fileData) {
         if (docData.mime_type?.includes('text/') || docData.mime_type?.includes('json')) {
           docContent = await fileData.text();
+        } else if (docData.mime_type?.includes('pdf') || docData.mime_type?.includes('image')) {
+          // Extract text using OCR
+          console.log('Extracting text from binary document...');
+          const extractResult = await extractTextFromBlob(fileData, docData.mime_type, {
+            maxPages: 60,
+            headerFooterFilter: true
+          });
+          
+          docContent = extractResult.pages
+            .map(p => `=== Page ${p.page} ===\n${p.text}`)
+            .join('\n\n');
+          
+          console.log(`✓ Extracted ${docContent.length} characters from ${docData.name}`);
         } else {
           docContent += '\n[Binary file - visual analysis would be needed]';
         }

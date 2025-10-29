@@ -145,3 +145,6 @@ verify_jwt = false
 
 [functions.analyze-workspace]
 verify_jwt = false
+
+[functions.upload-to-google-drive]
+verify_jwt = true

@@ -154,54 +154,53 @@ export default function ExplorePolicy() {
     try {
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
-          ? { ...doc, progress: 10, progressMessage: 'Uploading to storage...' }
+          ? { ...doc, progress: 10, progressMessage: 'Uploading to Google Drive...' }
           : doc
       ));
 
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `policy-documents/${fileName}`;
+      // Upload to Google Drive
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', file.name);
+      formData.append('accountId', accountId || '');
+      formData.append('policyId', policyId || '');
 
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          contentType: file.type,
-          cacheControl: '3600',
-        });
+      const { data: uploadResult, error: uploadError } = await supabase.functions.invoke<{
+        success: boolean;
+        documentId: string;
+        googleDriveId: string;
+        fileName: string;
+        analysisTriggered: boolean;
+        error?: string;
+      }>(
+        'upload-to-google-drive',
+        {
+          body: formData,
+        }
+      );
 
       if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Upload failed');
+      }
 
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
-          ? { ...doc, progress: 30, progressMessage: 'Starting AI analysis...' }
+          ? { ...doc, progress: 50, progressMessage: 'Document uploaded. Analysis in progress...' }
           : doc
       ));
 
-      // Trigger analysis using the new hook
-      const result = await analyzeDocumentMutation({
-        documentUrl: publicUrl,
-        documentId: docId,
-        fileName: file.name,
-        accountId: accountId || '',
-        userId: (await supabase.auth.getUser()).data.user?.id || '',
-      });
-
       // Store mapping for displaying results
-      setUploadedDocumentIds(prev => new Map(prev).set(docId, docId));
+      setUploadedDocumentIds(prev => new Map(prev).set(docId, uploadResult.documentId));
 
+      // Mark as complete - analysis results will appear when ready
       setDocuments(prev => prev.map(doc =>
         doc.id === docId
           ? {
               ...doc,
               status: 'complete',
               progress: 100,
-              progressMessage: 'Analysis complete! View results below.',
+              progressMessage: 'Uploaded to Google Drive. Analysis may take a few minutes.',
             }
           : doc
       ));
