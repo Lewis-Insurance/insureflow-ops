@@ -17,10 +17,10 @@ serve(async (req) => {
     if (!doc) throw new Error("Missing document data in Parseur webhook");
 
     const parseurId = doc.id;
+    const workspaceId = doc.metadata?.workspace_id;
+    const fileName = doc.metadata?.file_name;
     const parsedData = doc.data || {};
     const documentType = doc.document_type || doc.name || "unknown";
-    const metadata = doc.metadata || {};
-    const fileName = metadata.file_name;
 
     if (!parseurId) throw new Error("Missing Parseur document ID");
 
@@ -28,21 +28,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log(`Looking up workspace_document for Parseur ID: ${parseurId}, file: ${fileName}`);
+    console.log(`Looking up workspace_document for Parseur ID: ${parseurId}, workspace: ${workspaceId}, file: ${fileName}`);
 
-    // Look up the correct workspace_document
+    // Find the matching workspace_document either by parseurId or by workspace + file_name
     const { data: workspaceDoc, error: docError } = await supabase
       .from("workspace_documents")
-      .select("id, workspace_id, file_name")
-      .eq("parseur_document_id", parseurId)
-      .single();
+      .select("id, workspace_id")
+      .or(`parseur_document_id.eq.${parseurId},and(workspace_id.eq.${workspaceId},file_name.eq.${fileName})`)
+      .maybeSingle();
 
     if (docError || !workspaceDoc) {
-      console.error("No workspace_document found for Parseur ID:", parseurId);
-      throw new Error("No matching document found in workspace_documents");
+      console.error("No matching workspace_document found:", docError);
+      return new Response(JSON.stringify({ success: false, error: "No matching document" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
-    console.log(`Found workspace_document: ${workspaceDoc.id} (${workspaceDoc.file_name})`);
+    console.log(`Found workspace_document: ${workspaceDoc.id}`);
 
     // Insert parsed data and link it
     const { error: insertError } = await supabase
@@ -52,7 +55,7 @@ serve(async (req) => {
         parseur_document_id: parseurId,
         parsed_data: parsedData,
         document_type: documentType || "unknown",
-        source: "parseur_webhook",
+        source: "parseur",
       });
 
     if (insertError) throw insertError;
