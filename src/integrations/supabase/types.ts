@@ -501,7 +501,9 @@ export type Database = {
           customer_name: string
           id: string
           last_contact_date: string | null
+          losses_3yr: number | null
           notes: string | null
+          oldest_in_household: number | null
           policy_number: string
           policy_type: string | null
           priority: string
@@ -520,7 +522,9 @@ export type Database = {
           customer_name: string
           id?: string
           last_contact_date?: string | null
+          losses_3yr?: number | null
           notes?: string | null
+          oldest_in_household?: number | null
           policy_number: string
           policy_type?: string | null
           priority?: string
@@ -539,7 +543,9 @@ export type Database = {
           customer_name?: string
           id?: string
           last_contact_date?: string | null
+          losses_3yr?: number | null
           notes?: string | null
+          oldest_in_household?: number | null
           policy_number?: string
           policy_type?: string | null
           priority?: string

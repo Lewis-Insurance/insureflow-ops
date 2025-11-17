@@ -183,28 +183,32 @@ export default function AORenewalsPage() {
   const handleDownloadTemplate = () => {
     const headers = [
       'NAMED INSURED',
-      'POLICY NUMBER',
       'POLICY TYPE',
+      'POLICY NUMBER',
       'CURRENT CARRIER',
       'RENEWAL DATE',
       'CURRENT PREMIUM',
       'TERM MONTHS',
       'PRIORITY',
       'STATUS',
-      'NOTES'
+      'NOTES',
+      '3 YR # of LOSSES',
+      'OLDEST IN HOUSEHOLD'
     ];
 
     const sampleRow = [
       'John Doe',
+      'Personal Automobile',
       'POL-123456',
-      'Auto',
       'Auto-Owners',
       '2024-12-31',
       '1500',
       '12',
       'high',
       'pending',
-      'Sample notes'
+      'Sample notes',
+      '0',
+      '45'
     ];
 
     const csvContent = [
@@ -449,6 +453,8 @@ export default function AORenewalsPage() {
                       <TableHead>Type</TableHead>
                       <TableHead>Renewal Date</TableHead>
                       <TableHead>Premium</TableHead>
+                      <TableHead>3Y Losses</TableHead>
+                      <TableHead>Oldest Age</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -475,6 +481,12 @@ export default function AORenewalsPage() {
                         </TableCell>
                         <TableCell className="font-medium">
                           {formatCurrency(renewal.current_premium)}
+                        </TableCell>
+                        <TableCell className="text-sm text-center">
+                          {renewal.losses_3yr ?? '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-center">
+                          {renewal.oldest_in_household ?? '-'}
                         </TableCell>
                         <TableCell>{getStatusBadge(renewal.status)}</TableCell>
                         <TableCell>{getPriorityBadge(renewal.priority)}</TableCell>

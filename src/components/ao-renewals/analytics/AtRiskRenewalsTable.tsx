@@ -138,6 +138,8 @@ export function AtRiskRenewalsTable({ data, isLoading }: AtRiskRenewalsTableProp
                 <TableHead>Type</TableHead>
                 <TableHead>Renewal Date</TableHead>
                 <TableHead>Premium</TableHead>
+                <TableHead>3Y Losses</TableHead>
+                <TableHead>Oldest Age</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -169,6 +171,12 @@ export function AtRiskRenewalsTable({ data, isLoading }: AtRiskRenewalsTableProp
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(renewal.current_premium)}
+                    </TableCell>
+                    <TableCell className="text-sm text-center">
+                      {renewal.losses_3yr ?? '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-center">
+                      {renewal.oldest_in_household ?? '-'}
                     </TableCell>
                     <TableCell>{getPriorityBadge(renewal.priority)}</TableCell>
                     <TableCell>{getStatusBadge(renewal.status)}</TableCell>
