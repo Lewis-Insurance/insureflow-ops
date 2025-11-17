@@ -177,6 +177,49 @@ export default function AORenewalsPage() {
     setFilters({ ...filters, search: searchQuery });
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'NAMED INSURED',
+      'POLICY NUMBER',
+      'POLICY TYPE',
+      'CURRENT CARRIER',
+      'RENEWAL DATE',
+      'CURRENT PREMIUM',
+      'TERM MONTHS',
+      'PRIORITY',
+      'STATUS',
+      'NOTES'
+    ];
+
+    const sampleRow = [
+      'John Doe',
+      'POL-123456',
+      'Auto',
+      'Auto-Owners',
+      '2024-12-31',
+      '1500',
+      '12',
+      'high',
+      'pending',
+      'Sample notes'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      sampleRow.join(',')
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ao-renewals-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -192,6 +235,10 @@ export default function AORenewalsPage() {
             <Button variant="outline" onClick={() => navigate("/ao-renewals/analytics")}>
               <TrendingUp className="h-4 w-4 mr-2" />
               Analytics
+            </Button>
+            <Button variant="outline" onClick={handleDownloadTemplate}>
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
             </Button>
             <Button variant="outline" onClick={() => {}}>
               <Download className="h-4 w-4 mr-2" />
