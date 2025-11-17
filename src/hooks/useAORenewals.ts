@@ -376,6 +376,38 @@ export const useBulkUpdateAORenewals = () => {
   });
 };
 
+// Bulk delete all renewals
+export const useBulkDeleteAllAORenewals = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("ao_renewals")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all records
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
+      toast.success("All renewal data cleared successfully");
+    },
+    onError: (error) => {
+      console.error("Error deleting all renewals:", error);
+      toast.error("Failed to clear renewal data");
+    },
+  });
+};
+
 // Bulk import renewals
 export const useImportAORenewals = () => {
   const queryClient = useQueryClient();
