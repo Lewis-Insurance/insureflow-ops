@@ -41,6 +41,8 @@ export function ExportButton({ data, filename = "ao-renewals-analytics" }: Expor
         "Carrier",
         "Status",
         "Priority",
+        "3 Year Losses",
+        "Oldest in Household",
         "Assigned To",
         "Notes",
         "Created At",
@@ -56,6 +58,8 @@ export function ExportButton({ data, filename = "ao-renewals-analytics" }: Expor
         renewal.current_carrier || "",
         renewal.status,
         renewal.priority,
+        renewal.losses_3yr ?? "",
+        renewal.oldest_in_household ?? "",
         renewal.assigned_to || "",
         (renewal.notes || "").replace(/"/g, '""'), // Escape quotes
         formatDate(renewal.created_at || renewal.renewal_date),

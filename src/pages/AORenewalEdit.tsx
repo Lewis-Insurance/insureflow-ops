@@ -39,6 +39,8 @@ export default function AORenewalEdit() {
     priority: 'normal' as AORenewalPriority,
     assigned_to: '',
     last_contact_date: '',
+    losses_3yr: '',
+    oldest_in_household: '',
   });
 
   useEffect(() => {
@@ -54,6 +56,8 @@ export default function AORenewalEdit() {
         priority: renewal.priority || 'normal',
         assigned_to: renewal.assigned_to || '',
         last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
+        losses_3yr: renewal.losses_3yr?.toString() || '',
+        oldest_in_household: renewal.oldest_in_household?.toString() || '',
       });
     }
   }, [renewal]);
@@ -77,6 +81,8 @@ export default function AORenewalEdit() {
           priority: formData.priority,
           assigned_to: formData.assigned_to.trim() || null,
           last_contact_date: formData.last_contact_date || null,
+          losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
+          oldest_in_household: formData.oldest_in_household ? parseInt(formData.oldest_in_household) : null,
         },
       });
 
@@ -295,6 +301,31 @@ export default function AORenewalEdit() {
                     type="date"
                     value={formData.last_contact_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, last_contact_date: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="losses_3yr">3 Year # of Losses</Label>
+                  <Input
+                    id="losses_3yr"
+                    type="number"
+                    min="0"
+                    value={formData.losses_3yr}
+                    onChange={(e) => setFormData(prev => ({ ...prev, losses_3yr: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="oldest_in_household">Oldest in Household</Label>
+                  <Input
+                    id="oldest_in_household"
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={formData.oldest_in_household}
+                    onChange={(e) => setFormData(prev => ({ ...prev, oldest_in_household: e.target.value }))}
+                    placeholder="Age"
                   />
                 </div>
               </div>

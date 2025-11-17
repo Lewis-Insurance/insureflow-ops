@@ -177,6 +177,16 @@ export const AOImportWizard = () => {
               if (!isNaN(premium)) {
                 renewal.current_premium = premium;
               }
+            } else if (headerUpper.includes('3 YR') && headerUpper.includes('LOSS')) {
+              const losses = parseInt(String(value));
+              if (!isNaN(losses)) {
+                renewal.losses_3yr = losses;
+              }
+            } else if (headerUpper.includes('OLDEST IN HOUSEHOLD')) {
+              const age = parseInt(String(value));
+              if (!isNaN(age)) {
+                renewal.oldest_in_household = age;
+              }
             } else if (headerUpper.includes('LOSS')) {
               if (!renewal.custom_data) renewal.custom_data = {};
               renewal.custom_data.loss_count = String(value);
@@ -186,9 +196,6 @@ export const AOImportWizard = () => {
             } else if (headerUpper.includes('SUPPORTING') || headerUpper.includes('HULA')) {
               if (!renewal.custom_data) renewal.custom_data = {};
               renewal.custom_data.supporting_policies = String(value);
-            } else if (headerUpper.includes('OLDEST') || headerUpper.includes('AGE')) {
-              if (!renewal.custom_data) renewal.custom_data = {};
-              renewal.custom_data.oldest_age = String(value);
             } else if (headerUpper.includes('SCORE')) {
               if (!renewal.custom_data) renewal.custom_data = {};
               renewal.custom_data.insurance_score = String(value);

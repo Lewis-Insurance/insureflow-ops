@@ -30,6 +30,8 @@ export interface AORenewal {
   assigned_to: string | null;
   notes: string | null;
   custom_data: AORenewalCustomData | null;
+  losses_3yr: number | null;
+  oldest_in_household: number | null;
   created_at: string;
   updated_at: string;
   last_contact_date: string | null;
@@ -495,6 +497,8 @@ export const useImportAORenewals = () => {
             assigned_to: renewal.assigned_to || null,
             notes: renewal.notes || null,
             custom_data: renewal.custom_data || null,
+            losses_3yr: renewal.losses_3yr || null,
+            oldest_in_household: renewal.oldest_in_household || null,
             last_contact_date: renewal.last_contact_date || null,
           };
 
