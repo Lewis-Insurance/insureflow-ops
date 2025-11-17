@@ -50,6 +50,7 @@ import {
   Clock,
   Users,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -58,6 +59,7 @@ import {
   useAORenewalsStats,
   useUpdateAORenewalStatus,
   useDeleteAORenewal,
+  useBulkDeleteAllAORenewals,
   type AORenewalStatus,
   type AORenewalPriority,
   type AORenewalFilters,
@@ -80,6 +82,7 @@ export default function AORenewalsPage() {
   const { data: stats } = useAORenewalsStats();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const deleteMutation = useDeleteAORenewal();
+  const deleteAllMutation = useBulkDeleteAllAORenewals();
 
   const formatCurrency = (value: number | null) => {
     if (!value) return "$0.00";
@@ -220,6 +223,12 @@ export default function AORenewalsPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleClearAllData = () => {
+    if (window.confirm('Are you sure you want to delete ALL renewal data? This action cannot be undone.')) {
+      deleteAllMutation.mutate();
+    }
+  };
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -239,6 +248,10 @@ export default function AORenewalsPage() {
             <Button variant="outline" onClick={handleDownloadTemplate}>
               <Download className="h-4 w-4 mr-2" />
               Download Template
+            </Button>
+            <Button variant="destructive" onClick={handleClearAllData}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear All Data
             </Button>
             <Button variant="outline" onClick={() => {}}>
               <Download className="h-4 w-4 mr-2" />
