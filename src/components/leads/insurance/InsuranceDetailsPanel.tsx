@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Car, Home, Building2, Heart, Umbrella, Key, Plus, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Car, Home, Building2, Heart, Umbrella, Key, Plus, Eye, Edit3 } from "lucide-react";
 import { InsuranceDetailsModal } from "../InsuranceDetailsModal";
-import { QuoteDocumentModal } from "./QuoteDocumentModal";
+import { InsuranceDetailsViewModal } from "./InsuranceDetailsViewModal";
 import { type InsuranceType, useLeadInsuranceDetails } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
-import { useGenerateQuoteDoc } from "@/hooks/useGenerateQuoteDoc";
 
 interface InsuranceDetailsPanelProps {
   leadId: string;
@@ -14,9 +14,7 @@ interface InsuranceDetailsPanelProps {
 
 export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: InsuranceDetailsPanelProps) => {
   const [selectedType, setSelectedType] = useState<InsuranceType | null>(null);
-  const [showQuoteDoc, setShowQuoteDoc] = useState(false);
-  const [quoteDocData, setQuoteDocData] = useState<any>(null);
-  const generateQuoteDoc = useGenerateQuoteDoc();
+  const [viewType, setViewType] = useState<InsuranceType | null>(null);
 
   const insuranceOptions = [
     { type: 'auto' as InsuranceType, label: 'Auto', icon: Car, enabled: insuranceTypes.includes('auto') },
@@ -29,20 +27,6 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
 
   const enabledOptions = insuranceOptions.filter(opt => opt.enabled);
 
-  const handleGenerateQuoteDoc = async (type: InsuranceType, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const result = await generateQuoteDoc.mutateAsync({
-        leadId,
-        insuranceType: type,
-      });
-      setQuoteDocData(result);
-      setShowQuoteDoc(true);
-    } catch (error) {
-      console.error('Error generating quote doc:', error);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -51,22 +35,84 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {enabledOptions.map(({ type, label, icon: Icon }) => {
-          const InsuranceDetailsComponent = () => {
+          const InsuranceCard = () => {
             const { data: details } = useLeadInsuranceDetails(leadId, type);
+            
+            // Get summary info for commercial
+            const getSummary = () => {
+              if (!details) return null;
+              
+              if (type === 'commercial') {
+                const coverages: string[] = [];
+                if (details.general_liability) coverages.push('GL');
+                if (details.property) coverages.push('Prop');
+                if (details.workers_comp) coverages.push('WC');
+                if (details.professional_liability) coverages.push('Prof');
+                if (details.cyber_liability) coverages.push('Cyber');
+                if (details.commercial_auto) coverages.push('Auto');
+                
+                return {
+                  title: details.business_name || null,
+                  subtitle: coverages.length > 0 ? coverages.join(' • ') : null,
+                };
+              }
+              
+              if (type === 'auto') {
+                return {
+                  title: details.current_carrier || null,
+                  subtitle: details.vehicle_count ? `${details.vehicle_count} vehicle(s)` : null,
+                };
+              }
+              
+              if (type === 'home') {
+                return {
+                  title: details.property_address || null,
+                  subtitle: details.dwelling_coverage ? `$${Number(details.dwelling_coverage).toLocaleString()} coverage` : null,
+                };
+              }
+              
+              if (type === 'life') {
+                return {
+                  title: details.policy_type ? `${details.policy_type} policy` : null,
+                  subtitle: details.coverage_amount ? `$${Number(details.coverage_amount).toLocaleString()} coverage` : null,
+                };
+              }
+              
+              return {
+                title: details.current_carrier || null,
+                subtitle: null,
+              };
+            };
+            
+            const summary = getSummary();
+            
             return (
-              <Card
-                key={type}
-                className="p-4 hover:bg-accent transition-colors"
-              >
-                <div className="flex items-center gap-3 mb-3">
+              <Card className="p-4 hover:bg-accent/50 transition-colors">
+                <div className="flex items-start gap-3 mb-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="font-medium">{label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {details ? 'Details saved' : 'Click to add'}
-                    </p>
+                    {details ? (
+                      <div className="mt-1">
+                        {summary?.title && (
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {summary.title}
+                          </p>
+                        )}
+                        {summary?.subtitle && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {summary.subtitle}
+                          </p>
+                        )}
+                        {!summary?.title && !summary?.subtitle && (
+                          <Badge variant="outline" className="text-xs">Details saved</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Click to add details</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -76,25 +122,36 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
                     className="flex-1"
                     onClick={() => setSelectedType(type)}
                   >
-                    <Plus className="h-3 w-3 mr-1" />
-                    {details ? 'Edit' : 'Add'} Details
+                    {details ? (
+                      <>
+                        <Edit3 className="h-3 w-3 mr-1" />
+                        Edit Details
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Details
+                      </>
+                    )}
                   </Button>
                   {details && (
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={(e) => handleGenerateQuoteDoc(type, e)}
-                      disabled={generateQuoteDoc.isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewType(type);
+                      }}
                     >
-                      <FileText className="h-3 w-3 mr-1" />
-                      Generate Doc
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
                     </Button>
                   )}
                 </div>
               </Card>
             );
           };
-          return <InsuranceDetailsComponent key={type} />;
+          return <InsuranceCard key={type} />;
         })}
       </div>
 
@@ -113,16 +170,12 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
         />
       )}
 
-      {showQuoteDoc && quoteDocData && (
-        <QuoteDocumentModal
-          isOpen={showQuoteDoc}
-          onClose={() => {
-            setShowQuoteDoc(false);
-            setQuoteDocData(null);
-          }}
-          quoteDocument={quoteDocData.quoteDocument}
-          leadInfo={quoteDocData.leadInfo}
-          isLoading={generateQuoteDoc.isPending}
+      {viewType && (
+        <InsuranceDetailsViewModal
+          leadId={leadId}
+          insuranceType={viewType}
+          isOpen={!!viewType}
+          onClose={() => setViewType(null)}
         />
       )}
     </div>
