@@ -28,8 +28,6 @@ export const CommercialInsuranceForm = ({ leadId, onSuccess }: CommercialInsuran
   const propertyCoverage = watch('property_coverage');
   const workersComp = watch('workers_comp');
   const commercialAuto = watch('commercial_auto');
-  const professionalLiability = watch('professional_liability');
-  const cyberLiability = watch('cyber_liability');
 
   useEffect(() => {
     if (details) {
@@ -167,22 +165,6 @@ export const CommercialInsuranceForm = ({ leadId, onSuccess }: CommercialInsuran
               onCheckedChange={(checked) => setValue('commercial_auto', checked === true)}
             />
             <Label htmlFor="commercial_auto">Commercial Auto</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="professional_liability" 
-              checked={professionalLiability === true}
-              onCheckedChange={(checked) => setValue('professional_liability', checked === true)}
-            />
-            <Label htmlFor="professional_liability">Professional Liability (E&O)</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="cyber_liability" 
-              checked={cyberLiability === true}
-              onCheckedChange={(checked) => setValue('cyber_liability', checked === true)}
-            />
-            <Label htmlFor="cyber_liability">Cyber Liability</Label>
           </div>
         </div>
       </Card>
