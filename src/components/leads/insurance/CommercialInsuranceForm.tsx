@@ -21,7 +21,15 @@ export const CommercialInsuranceForm = ({ leadId, onSuccess }: CommercialInsuran
   const autoPopulate = useAutoPopulateFromDocument(leadId, 'commercial');
   const [uploading, setUploading] = useState(false);
 
-  const { register, handleSubmit, reset, setValue } = useForm<CommercialInsuranceDetails>();
+  const { register, handleSubmit, reset, setValue, watch } = useForm<CommercialInsuranceDetails>();
+  
+  // Watch checkbox values
+  const generalLiability = watch('general_liability');
+  const propertyCoverage = watch('property_coverage');
+  const workersComp = watch('workers_comp');
+  const commercialAuto = watch('commercial_auto');
+  const professionalLiability = watch('professional_liability');
+  const cyberLiability = watch('cyber_liability');
 
   useEffect(() => {
     if (details) {
@@ -129,27 +137,51 @@ export const CommercialInsuranceForm = ({ leadId, onSuccess }: CommercialInsuran
         <div className="mt-4 space-y-2">
           <Label className="text-base font-semibold">Coverage Types</Label>
           <div className="flex items-center space-x-2">
-            <Checkbox id="general_liability" {...register('general_liability')} />
+            <Checkbox 
+              id="general_liability" 
+              checked={generalLiability === true}
+              onCheckedChange={(checked) => setValue('general_liability', checked === true)}
+            />
             <Label htmlFor="general_liability">General Liability</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="property_coverage" {...register('property_coverage')} />
+            <Checkbox 
+              id="property_coverage" 
+              checked={propertyCoverage === true}
+              onCheckedChange={(checked) => setValue('property_coverage', checked === true)}
+            />
             <Label htmlFor="property_coverage">Property Coverage</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="workers_comp" {...register('workers_comp')} />
+            <Checkbox 
+              id="workers_comp" 
+              checked={workersComp === true}
+              onCheckedChange={(checked) => setValue('workers_comp', checked === true)}
+            />
             <Label htmlFor="workers_comp">Workers' Compensation</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="commercial_auto" {...register('commercial_auto')} />
+            <Checkbox 
+              id="commercial_auto" 
+              checked={commercialAuto === true}
+              onCheckedChange={(checked) => setValue('commercial_auto', checked === true)}
+            />
             <Label htmlFor="commercial_auto">Commercial Auto</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="professional_liability" {...register('professional_liability')} />
+            <Checkbox 
+              id="professional_liability" 
+              checked={professionalLiability === true}
+              onCheckedChange={(checked) => setValue('professional_liability', checked === true)}
+            />
             <Label htmlFor="professional_liability">Professional Liability (E&O)</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="cyber_liability" {...register('cyber_liability')} />
+            <Checkbox 
+              id="cyber_liability" 
+              checked={cyberLiability === true}
+              onCheckedChange={(checked) => setValue('cyber_liability', checked === true)}
+            />
             <Label htmlFor="cyber_liability">Cyber Liability</Label>
           </div>
         </div>
