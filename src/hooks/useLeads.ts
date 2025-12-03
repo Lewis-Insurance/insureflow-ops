@@ -224,6 +224,14 @@ export function useUpdateLead() {
         }
       });
 
+      // Convert empty strings to null for UUID fields
+      const uuidFields = ['source_id', 'assigned_to', 'account_id'];
+      uuidFields.forEach(field => {
+        if (field in dbUpdates && dbUpdates[field] === '') {
+          dbUpdates[field] = null;
+        }
+      });
+
       if ('status' in dbUpdates) {
         if (statusKey && statusKey !== 'status') {
           dbUpdates[statusKey] = (dbUpdates as any).status;
