@@ -48,8 +48,6 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
                 if (details.general_liability === true) coverages.push('GL');
                 if (details.property_coverage === true) coverages.push('Prop');
                 if (details.workers_comp === true) coverages.push('WC');
-                if (details.professional_liability === true) coverages.push('Prof');
-                if (details.cyber_liability === true) coverages.push('Cyber');
                 if (details.commercial_auto === true) coverages.push('Auto');
                 
                 return {
