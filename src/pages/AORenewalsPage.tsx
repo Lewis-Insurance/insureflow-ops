@@ -253,10 +253,6 @@ export default function AORenewalsPage() {
               <Download className="h-4 w-4 mr-2" />
               Download Template
             </Button>
-            <Button variant="destructive" onClick={handleClearAllData}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear All Data
-            </Button>
             <Button variant="outline" onClick={() => {}}>
               <Download className="h-4 w-4 mr-2" />
               Export
