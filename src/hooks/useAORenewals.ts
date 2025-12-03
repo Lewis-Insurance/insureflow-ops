@@ -431,12 +431,7 @@ export const useImportAORenewals = () => {
         errors: [],
       };
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
+      // No authentication required for ao_renewals imports
 
       for (const renewal of data) {
         try {
