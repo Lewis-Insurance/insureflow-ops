@@ -216,6 +216,14 @@ export function useUpdateLead() {
       // Remove deprecated fields
       delete dbUpdates.decision_timeframe;
 
+      // Convert empty strings to null for date fields
+      const dateFields = ['next_follow_up_date', 'converted_at', 'last_contact_at', 'assigned_at', 'estimated_effective_date', 'won_at', 'stage_entered_at'];
+      dateFields.forEach(field => {
+        if (field in dbUpdates && dbUpdates[field] === '') {
+          dbUpdates[field] = null;
+        }
+      });
+
       if ('status' in dbUpdates) {
         if (statusKey && statusKey !== 'status') {
           dbUpdates[statusKey] = (dbUpdates as any).status;
