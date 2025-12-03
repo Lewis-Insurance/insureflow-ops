@@ -44,43 +44,54 @@ export const InsuranceDetailsViewModal = ({
   const { data: details, isLoading } = useLeadInsuranceDetails(leadId, insuranceType);
   const Icon = ICONS[insuranceType];
 
+  // Helper to render a field if it has a value
+  const renderField = (label: string, value: any, format?: 'currency' | 'number' | 'text') => {
+    if (value === null || value === undefined || value === '' || value === false) return null;
+    
+    let displayValue = value;
+    if (format === 'currency' && typeof value === 'number') {
+      displayValue = `$${value.toLocaleString()}`;
+    } else if (format === 'number' && typeof value === 'number') {
+      displayValue = value.toLocaleString();
+    }
+    
+    return (
+      <div key={label}>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="font-medium">{displayValue}</p>
+      </div>
+    );
+  };
+
   const renderCommercialDetails = (data: any) => {
-    const coverageTypes = [];
-    if (data?.general_liability) coverageTypes.push('General Liability');
-    if (data?.property) coverageTypes.push('Property');
-    if (data?.workers_comp) coverageTypes.push('Workers Comp');
-    if (data?.professional_liability) coverageTypes.push('Professional Liability');
-    if (data?.cyber_liability) coverageTypes.push('Cyber Liability');
-    if (data?.commercial_auto) coverageTypes.push('Commercial Auto');
+    // Only show coverage types that are explicitly true
+    const coverageTypes: string[] = [];
+    if (data?.general_liability === true) coverageTypes.push('General Liability');
+    if (data?.property === true) coverageTypes.push('Property');
+    if (data?.workers_comp === true) coverageTypes.push('Workers Comp');
+    if (data?.professional_liability === true) coverageTypes.push('Professional Liability');
+    if (data?.cyber_liability === true) coverageTypes.push('Cyber Liability');
+    if (data?.commercial_auto === true) coverageTypes.push('Commercial Auto');
+
+    // Define all possible fields with their labels and formats
+    const fields = [
+      { key: 'business_name', label: 'Business Name' },
+      { key: 'industry', label: 'Industry' },
+      { key: 'annual_revenue', label: 'Annual Revenue', format: 'currency' as const },
+      { key: 'employee_count', label: 'Employee Count', format: 'number' as const },
+      { key: 'years_in_business', label: 'Years in Business', format: 'number' as const },
+      { key: 'property_value', label: 'Property Value', format: 'currency' as const },
+      { key: 'current_carrier', label: 'Current Carrier' },
+      { key: 'current_premium', label: 'Current Premium', format: 'currency' as const },
+      { key: 'policy_expiration', label: 'Policy Expiration' },
+      { key: 'business_address', label: 'Business Address' },
+      { key: 'notes', label: 'Notes' },
+    ];
 
     return (
       <div className="space-y-4">
-        {data?.business_name && (
-          <div>
-            <p className="text-sm text-muted-foreground">Business Name</p>
-            <p className="font-medium text-lg">{data.business_name}</p>
-          </div>
-        )}
-        {data?.industry && (
-          <div>
-            <p className="text-sm text-muted-foreground">Industry</p>
-            <p className="font-medium">{data.industry}</p>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-4">
-          {data?.annual_revenue && (
-            <div>
-              <p className="text-sm text-muted-foreground">Annual Revenue</p>
-              <p className="font-medium">${Number(data.annual_revenue).toLocaleString()}</p>
-            </div>
-          )}
-          {data?.employee_count && (
-            <div>
-              <p className="text-sm text-muted-foreground">Employee Count</p>
-              <p className="font-medium">{data.employee_count}</p>
-            </div>
-          )}
-        </div>
+        {fields.map(({ key, label, format }) => renderField(label, data?.[key], format))}
+        
         {coverageTypes.length > 0 && (
           <div>
             <p className="text-sm text-muted-foreground mb-2">Coverage Types</p>
@@ -91,125 +102,99 @@ export const InsuranceDetailsViewModal = ({
             </div>
           </div>
         )}
-        {data?.notes && (
-          <div>
-            <p className="text-sm text-muted-foreground">Notes</p>
-            <p className="text-sm">{data.notes}</p>
-          </div>
-        )}
       </div>
     );
   };
 
-  const renderAutoDetails = (data: any) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {data?.vehicle_count && (
-          <div>
-            <p className="text-sm text-muted-foreground">Vehicles</p>
-            <p className="font-medium">{data.vehicle_count}</p>
-          </div>
-        )}
-        {data?.driver_count && (
-          <div>
-            <p className="text-sm text-muted-foreground">Drivers</p>
-            <p className="font-medium">{data.driver_count}</p>
-          </div>
-        )}
+  const renderAutoDetails = (data: any) => {
+    const fields = [
+      { key: 'vehicle_count', label: 'Vehicles', format: 'number' as const },
+      { key: 'driver_count', label: 'Drivers', format: 'number' as const },
+      { key: 'current_carrier', label: 'Current Carrier' },
+      { key: 'current_premium', label: 'Current Premium', format: 'currency' as const },
+      { key: 'policy_expiration', label: 'Policy Expiration' },
+      { key: 'notes', label: 'Notes' },
+    ];
+    return (
+      <div className="space-y-4">
+        {fields.map(({ key, label, format }) => renderField(label, data?.[key], format))}
       </div>
-      {data?.current_carrier && (
-        <div>
-          <p className="text-sm text-muted-foreground">Current Carrier</p>
-          <p className="font-medium">{data.current_carrier}</p>
-        </div>
-      )}
-      {data?.current_premium && (
-        <div>
-          <p className="text-sm text-muted-foreground">Current Premium</p>
-          <p className="font-medium">${Number(data.current_premium).toLocaleString()}/year</p>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
-  const renderHomeDetails = (data: any) => (
-    <div className="space-y-4">
-      {data?.property_address && (
-        <div>
-          <p className="text-sm text-muted-foreground">Property Address</p>
-          <p className="font-medium">{data.property_address}</p>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-4">
-        {data?.year_built && (
-          <div>
-            <p className="text-sm text-muted-foreground">Year Built</p>
-            <p className="font-medium">{data.year_built}</p>
-          </div>
-        )}
-        {data?.square_feet && (
-          <div>
-            <p className="text-sm text-muted-foreground">Square Feet</p>
-            <p className="font-medium">{Number(data.square_feet).toLocaleString()}</p>
-          </div>
-        )}
-        {data?.dwelling_coverage && (
-          <div>
-            <p className="text-sm text-muted-foreground">Dwelling Coverage</p>
-            <p className="font-medium">${Number(data.dwelling_coverage).toLocaleString()}</p>
-          </div>
-        )}
+  const renderHomeDetails = (data: any) => {
+    const fields = [
+      { key: 'property_address', label: 'Property Address' },
+      { key: 'year_built', label: 'Year Built', format: 'number' as const },
+      { key: 'square_feet', label: 'Square Feet', format: 'number' as const },
+      { key: 'dwelling_coverage', label: 'Dwelling Coverage', format: 'currency' as const },
+      { key: 'personal_property', label: 'Personal Property', format: 'currency' as const },
+      { key: 'liability_coverage', label: 'Liability Coverage', format: 'currency' as const },
+      { key: 'deductible', label: 'Deductible', format: 'currency' as const },
+      { key: 'current_carrier', label: 'Current Carrier' },
+      { key: 'current_premium', label: 'Current Premium', format: 'currency' as const },
+      { key: 'notes', label: 'Notes' },
+    ];
+    return (
+      <div className="space-y-4">
+        {fields.map(({ key, label, format }) => renderField(label, data?.[key], format))}
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderLifeDetails = (data: any) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {data?.coverage_amount && (
-          <div>
-            <p className="text-sm text-muted-foreground">Coverage Amount</p>
-            <p className="font-medium">${Number(data.coverage_amount).toLocaleString()}</p>
-          </div>
-        )}
-        {data?.policy_type && (
-          <div>
-            <p className="text-sm text-muted-foreground">Policy Type</p>
-            <p className="font-medium capitalize">{data.policy_type}</p>
-          </div>
-        )}
+  const renderLifeDetails = (data: any) => {
+    const fields = [
+      { key: 'coverage_amount', label: 'Coverage Amount', format: 'currency' as const },
+      { key: 'policy_type', label: 'Policy Type' },
+      { key: 'beneficiaries', label: 'Beneficiaries' },
+      { key: 'term_length', label: 'Term Length' },
+      { key: 'current_carrier', label: 'Current Carrier' },
+      { key: 'current_premium', label: 'Current Premium', format: 'currency' as const },
+      { key: 'notes', label: 'Notes' },
+    ];
+    return (
+      <div className="space-y-4">
+        {fields.map(({ key, label, format }) => renderField(label, data?.[key], format))}
       </div>
-      {data?.beneficiaries && (
-        <div>
-          <p className="text-sm text-muted-foreground">Beneficiaries</p>
-          <p className="font-medium">{data.beneficiaries}</p>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
-  const renderGenericDetails = (data: any) => (
-    <div className="space-y-4">
-      {data?.current_carrier && (
-        <div>
-          <p className="text-sm text-muted-foreground">Current Carrier</p>
-          <p className="font-medium">{data.current_carrier}</p>
-        </div>
-      )}
-      {data?.current_premium && (
-        <div>
-          <p className="text-sm text-muted-foreground">Current Premium</p>
-          <p className="font-medium">${Number(data.current_premium).toLocaleString()}/year</p>
-        </div>
-      )}
-      {data?.notes && (
-        <div>
-          <p className="text-sm text-muted-foreground">Notes</p>
-          <p className="text-sm">{data.notes}</p>
-        </div>
-      )}
-    </div>
-  );
+  const renderGenericDetails = (data: any) => {
+    // Skip internal fields and booleans, show everything else that has a value
+    const skipFields = ['id', 'lead_id', 'created_at', 'updated_at', 'account_id'];
+    
+    const entries = Object.entries(data || {}).filter(([key, value]) => {
+      if (skipFields.includes(key)) return false;
+      if (value === null || value === undefined || value === '' || value === false) return false;
+      if (typeof value === 'boolean') return false; // Skip boolean fields in generic view
+      return true;
+    });
+
+    const formatLabel = (key: string) => {
+      return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    const formatValue = (key: string, value: any) => {
+      if (typeof value === 'number') {
+        if (key.includes('premium') || key.includes('coverage') || key.includes('value') || key.includes('revenue')) {
+          return `$${value.toLocaleString()}`;
+        }
+        return value.toLocaleString();
+      }
+      return value;
+    };
+
+    return (
+      <div className="space-y-4">
+        {entries.map(([key, value]) => (
+          <div key={key}>
+            <p className="text-sm text-muted-foreground">{formatLabel(key)}</p>
+            <p className="font-medium">{formatValue(key, value)}</p>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const renderDetails = () => {
     if (!details) return <p className="text-muted-foreground">No details saved</p>;

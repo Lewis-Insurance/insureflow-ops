@@ -44,12 +44,13 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
               
               if (type === 'commercial') {
                 const coverages: string[] = [];
-                if (details.general_liability) coverages.push('GL');
-                if (details.property) coverages.push('Prop');
-                if (details.workers_comp) coverages.push('WC');
-                if (details.professional_liability) coverages.push('Prof');
-                if (details.cyber_liability) coverages.push('Cyber');
-                if (details.commercial_auto) coverages.push('Auto');
+                // Only show coverages that are explicitly true
+                if (details.general_liability === true) coverages.push('GL');
+                if (details.property === true) coverages.push('Prop');
+                if (details.workers_comp === true) coverages.push('WC');
+                if (details.professional_liability === true) coverages.push('Prof');
+                if (details.cyber_liability === true) coverages.push('Cyber');
+                if (details.commercial_auto === true) coverages.push('Auto');
                 
                 return {
                   title: details.business_name || null,
