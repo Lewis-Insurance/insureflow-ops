@@ -4749,6 +4749,13 @@ export type Database = {
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
+          },
         ]
       }
       knowledge_base_history: {
@@ -4812,6 +4819,62 @@ export type Database = {
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "knowledge_base_history_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
+          },
+        ]
+      }
+      knowledge_base_queries: {
+        Row: {
+          created_at: string | null
+          helpful: boolean | null
+          id: string
+          knowledge_id: string | null
+          query_text: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          helpful?: boolean | null
+          id?: string
+          knowledge_id?: string | null
+          query_text: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          helpful?: boolean | null
+          id?: string
+          knowledge_id?: string | null
+          query_text?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_queries_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_queries_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_queries_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
+          },
         ]
       }
       knowledge_base_versions: {
@@ -4871,6 +4934,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_versions_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
           },
         ]
       }
@@ -4965,6 +5035,13 @@ export type Database = {
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "knowledge_search_queries_top_result_id_fkey"
+            columns: ["top_result_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
+          },
         ]
       }
       knowledge_usage_logs: {
@@ -5021,6 +5098,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_usage_logs_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
           },
         ]
       }
@@ -5147,6 +5231,72 @@ export type Database = {
           },
         ]
       }
+      lead_auto_drivers: {
+        Row: {
+          accidents_violations: Json | null
+          created_at: string | null
+          date_of_birth: string | null
+          first_name: string
+          gender: string | null
+          id: string
+          last_name: string
+          lead_id: string
+          license_number: string | null
+          license_state: string | null
+          marital_status: string | null
+          relation_to_insured: string | null
+          updated_at: string | null
+          years_licensed: number | null
+        }
+        Insert: {
+          accidents_violations?: Json | null
+          created_at?: string | null
+          date_of_birth?: string | null
+          first_name: string
+          gender?: string | null
+          id?: string
+          last_name: string
+          lead_id: string
+          license_number?: string | null
+          license_state?: string | null
+          marital_status?: string | null
+          relation_to_insured?: string | null
+          updated_at?: string | null
+          years_licensed?: number | null
+        }
+        Update: {
+          accidents_violations?: Json | null
+          created_at?: string | null
+          date_of_birth?: string | null
+          first_name?: string
+          gender?: string | null
+          id?: string
+          last_name?: string
+          lead_id?: string
+          license_number?: string | null
+          license_state?: string | null
+          marital_status?: string | null
+          relation_to_insured?: string | null
+          updated_at?: string | null
+          years_licensed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_auto_drivers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_auto_drivers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_auto_insurance: {
         Row: {
           accidents_last_3_years: number | null
@@ -5252,6 +5402,69 @@ export type Database = {
           },
           {
             foreignKeyName: "lead_auto_insurance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_auto_vehicles: {
+        Row: {
+          annual_mileage: number | null
+          created_at: string | null
+          garage_address: string | null
+          id: string
+          lead_id: string
+          make: string
+          model: string
+          ownership: string | null
+          primary_use: string | null
+          safety_features: Json | null
+          updated_at: string | null
+          vin: string | null
+          year: number
+        }
+        Insert: {
+          annual_mileage?: number | null
+          created_at?: string | null
+          garage_address?: string | null
+          id?: string
+          lead_id: string
+          make: string
+          model: string
+          ownership?: string | null
+          primary_use?: string | null
+          safety_features?: Json | null
+          updated_at?: string | null
+          vin?: string | null
+          year: number
+        }
+        Update: {
+          annual_mileage?: number | null
+          created_at?: string | null
+          garage_address?: string | null
+          id?: string
+          lead_id?: string
+          make?: string
+          model?: string
+          ownership?: string | null
+          primary_use?: string | null
+          safety_features?: Json | null
+          updated_at?: string | null
+          vin?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_auto_vehicles_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversion_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_auto_vehicles_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -6119,6 +6332,7 @@ export type Database = {
           assigned_at: string | null
           assigned_to: string | null
           city: string | null
+          contact_count: number | null
           conversion_value: number | null
           converted_account_id: string | null
           converted_at: string | null
@@ -6129,6 +6343,8 @@ export type Database = {
           custom_fields: Json | null
           decision_timeframe: string | null
           email: string | null
+          email_clicks: number | null
+          email_opens: number | null
           estimated_effective_date: string | null
           estimated_premium: number | null
           first_name: string
@@ -6170,6 +6386,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
+          contact_count?: number | null
           conversion_value?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
@@ -6180,6 +6397,8 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          email_clicks?: number | null
+          email_opens?: number | null
           estimated_effective_date?: string | null
           estimated_premium?: number | null
           first_name: string
@@ -6221,6 +6440,7 @@ export type Database = {
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
+          contact_count?: number | null
           conversion_value?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
@@ -6231,6 +6451,8 @@ export type Database = {
           custom_fields?: Json | null
           decision_timeframe?: string | null
           email?: string | null
+          email_clicks?: number | null
+          email_opens?: number | null
           estimated_effective_date?: string | null
           estimated_premium?: number | null
           first_name?: string
@@ -10271,7 +10493,52 @@ export type Database = {
             referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_usage_stats"
+            referencedColumns: ["knowledge_id"]
+          },
         ]
+      }
+      knowledge_category_stats: {
+        Row: {
+          article_count: number | null
+          avg_helpfulness: number | null
+          category: string | null
+          total_queries: number | null
+        }
+        Relationships: []
+      }
+      knowledge_gap_trends: {
+        Row: {
+          date: string | null
+          query_text: string | null
+          unanswered_count: number | null
+        }
+        Relationships: []
+      }
+      knowledge_search_trends: {
+        Row: {
+          avg_helpfulness: number | null
+          date: string | null
+          query_text: string | null
+          search_count: number | null
+        }
+        Relationships: []
+      }
+      knowledge_usage_stats: {
+        Row: {
+          category: string | null
+          helpfulness_score: number | null
+          knowledge_id: string | null
+          last_accessed_at: string | null
+          query_count: number | null
+          title: string | null
+          unique_users: number | null
+        }
+        Relationships: []
       }
       lead_conversion_analytics: {
         Row: {
