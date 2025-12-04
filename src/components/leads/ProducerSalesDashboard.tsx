@@ -32,10 +32,11 @@ export const ProducerSalesDashboard = ({
   producerName = "Producer",
   filters,
 }: ProducerSalesDashboardProps & { filters?: any }) => {
-  const { data: allLeads } = useLeads({ ...filters, assigned_to: producerId });
+  const { data: leadsResponse, isLoading } = useLeads({ ...filters, assigned_to: producerId });
+  const allLeads = leadsResponse?.data || [];
 
   const metrics = useMemo(() => {
-    if (!allLeads) return null;
+    if (!allLeads || allLeads.length === 0) return null;
 
     const today = startOfDay(new Date());
     const last30Days = subDays(today, 30);

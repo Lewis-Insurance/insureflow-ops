@@ -29,7 +29,8 @@ import { Progress } from '@/components/ui/progress';
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export function TeamPipelineView() {
-  const { data: allLeads = [] } = useLeads();
+  const { data: leadsResponse, isLoading } = useLeads();
+  const allLeads = leadsResponse?.data || [];
   const { data: users = [] } = useUsers();
 
   const teamMetrics = useMemo(() => {

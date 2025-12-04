@@ -49,7 +49,8 @@ interface TimelineEvent {
 }
 
 export function TimelineView() {
-  const { data: allLeads = [] } = useLeads();
+  const { data: leadsResponse, isLoading } = useLeads();
+  const allLeads = leadsResponse?.data || [];
 
   const timelineEvents = useMemo(() => {
     // Create timeline events from leads

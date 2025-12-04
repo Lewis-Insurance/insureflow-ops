@@ -99,10 +99,10 @@ export function LeadListView() {
     return f;
   }, [statusFilter, sourceFilter, scoreFilter]);
 
-  const { data: leadsData = [], isLoading } = useLeads(filters);
-  
+  const { data: leadsResponse, isLoading } = useLeads(filters);
+
   // Cast to Lead[] - API ensures these properties exist with defaults
-  const leads = leadsData as unknown as Lead[];
+  const leads = (leadsResponse?.data || []) as unknown as Lead[];
 
   const columns = useMemo<ColumnDef<Lead>[]>(
     () => [

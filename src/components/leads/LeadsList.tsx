@@ -32,7 +32,8 @@ export function LeadsList({ onLeadSelect, onCreateLead }: LeadsListProps) {
   const [filters, setFilters] = useState<LeadFilters>({});
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: leads = [], isLoading } = useLeads(filters);
+  const { data: leadsResponse, isLoading } = useLeads(filters);
+  const leads = leadsResponse?.data || [];
   const { data: sources = [] } = useLeadSources();
 
   const handleSearchChange = (value: string) => {

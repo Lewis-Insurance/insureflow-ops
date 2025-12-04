@@ -212,7 +212,8 @@ const KanbanColumn = ({
 };
 
 export const PipelineKanban = ({ filters }: { filters?: any }) => {
-  const { data: leads, isLoading } = useLeads(filters);
+  const { data: leadsResponse, isLoading } = useLeads(filters);
+  const leads = leadsResponse?.data || [];
   const { data: metrics } = useLeadMetrics();
   const moveLeadStage = useMoveLeadToStage();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
