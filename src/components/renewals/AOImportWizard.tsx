@@ -126,7 +126,7 @@ export const AOImportWizard = () => {
         }
 
         // Extract headers
-        const headers = (jsonData[headerRowIndex] || []).map((h: any) => String(h).trim());
+        const headers = ((jsonData as any[])[headerRowIndex] || []).map((h: any) => String(h).trim());
         
         // Extract data rows
         const dataRows = jsonData.slice(dataStartIndex);

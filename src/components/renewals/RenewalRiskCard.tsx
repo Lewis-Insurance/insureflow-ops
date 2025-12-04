@@ -82,7 +82,7 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Badge variant={getRiskColor(renewal.risk_level)}>
+            <Badge variant={getRiskColor(renewal.risk_level) as "default" | "destructive" | "outline" | "secondary"}>
               <AlertTriangle className="h-3 w-3 mr-1" />
               {getRiskLabel(renewal.risk_level)} Risk
             </Badge>

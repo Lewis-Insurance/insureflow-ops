@@ -466,7 +466,7 @@ export function FollowUpRulesManager() {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={rule.is_active}
-                      onCheckedChange={() => toggleStatus.mutate(rule.id)}
+                      onCheckedChange={() => toggleStatus.mutate({ id: rule.id, isActive: !rule.is_active })}
                       disabled={toggleStatus.isPending}
                     />
                     <Button

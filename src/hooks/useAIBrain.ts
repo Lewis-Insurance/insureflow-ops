@@ -50,7 +50,7 @@ export function useAIBrain() {
       return {
         shortAnswer: result?.faq_short_answer || 'No answer found',
         fullAnswer: result?.answer_canonical_markdown || null,
-        sources: result?.sources || [],
+        sources: [],
         confidence: result?.confidence || 0,
         fallback: false
       };

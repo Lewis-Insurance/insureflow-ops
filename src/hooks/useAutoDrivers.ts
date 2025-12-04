@@ -20,7 +20,7 @@ export const useAutoDrivers = (leadId: string) => {
     queryKey: ['auto-drivers', leadId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('lead_auto_drivers')
+        .from('lead_auto_drivers' as any)
         .select('*')
         .eq('lead_id', leadId)
         .order('is_primary', { ascending: false })
@@ -47,13 +47,13 @@ export const useAddAutoDriver = () => {
       // If setting as primary, unset other primary drivers
       if (cleanDriver.is_primary) {
         await supabase
-          .from('lead_auto_drivers')
+          .from('lead_auto_drivers' as any)
           .update({ is_primary: false })
           .eq('lead_id', cleanDriver.lead_id);
       }
 
       const { data, error } = await supabase
-        .from('lead_auto_drivers')
+        .from('lead_auto_drivers' as any)
         .insert(cleanDriver)
         .select()
         .single();
@@ -86,14 +86,14 @@ export const useUpdateAutoDriver = () => {
       // If setting as primary, unset other primary drivers
       if (cleanDriver.is_primary) {
         await supabase
-          .from('lead_auto_drivers')
+          .from('lead_auto_drivers' as any)
           .update({ is_primary: false })
           .eq('lead_id', cleanDriver.lead_id)
           .neq('id', id);
       }
 
       const { data, error } = await supabase
-        .from('lead_auto_drivers')
+        .from('lead_auto_drivers' as any)
         .update(cleanDriver)
         .eq('id', id)
         .select()
@@ -119,7 +119,7 @@ export const useDeleteAutoDriver = () => {
   return useMutation({
     mutationFn: async ({ id, leadId }: { id: string; leadId: string }) => {
       const { error } = await supabase
-        .from('lead_auto_drivers')
+        .from('lead_auto_drivers' as any)
         .delete()
         .eq('id', id);
 

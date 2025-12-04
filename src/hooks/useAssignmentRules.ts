@@ -115,7 +115,7 @@ export function useCreateAssignmentRule(accountId: string) {
           account_id: accountId,
           created_by: user.id,
           ...input,
-          conditions: input.conditions,
+          conditions: input.conditions as any,
         })
         .select()
         .single();
@@ -146,7 +146,7 @@ export function useUpdateAssignmentRule(ruleId: string) {
         .from('assignment_rules')
         .update({
           ...input,
-          conditions: input.conditions,
+          conditions: input.conditions as any,
           updated_at: new Date().toISOString(),
         })
         .eq('id', ruleId)

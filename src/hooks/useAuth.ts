@@ -60,7 +60,7 @@ export function useAuth() {
         console.log('Profile loaded successfully:', { 
           id: profileData.id, 
           role: profileData.role, 
-          is_staff: (profileData).is_staff 
+          is_staff: false 
         });
         setProfile({
           ...profileData,
