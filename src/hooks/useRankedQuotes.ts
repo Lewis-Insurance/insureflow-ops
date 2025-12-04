@@ -61,7 +61,7 @@ export function useRankedQuotesByAccount(accountId: string) {
         throw new Error(`Failed to fetch ranked quotes: ${error.message}`);
       }
 
-      return data as RankedQuote[];
+      return (data as any) as RankedQuote[];
     },
     enabled: !!accountId,
     staleTime: 2 * 60 * 1000, // 2 minutes - balance freshness with performance
@@ -96,7 +96,7 @@ export function useQuoteWithDetails(quoteId: string) {
         throw new Error(`Failed to fetch quote: ${error.message}`);
       }
 
-      return data as QuoteWithDetails;
+      return (data as any) as QuoteWithDetails;
     },
     enabled: !!quoteId,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -124,7 +124,7 @@ export function useAllRankedQuotes(filters?: {
       }
 
       if (filters?.lineOfBusiness) {
-        query = query.eq("line_of_business", filters.lineOfBusiness);
+        query = query.eq("line_of_business", filters.lineOfBusiness as any);
       }
 
       const { data, error } = await query.limit(100); // Reasonable limit for performance
@@ -133,7 +133,7 @@ export function useAllRankedQuotes(filters?: {
         throw new Error(`Failed to fetch ranked quotes: ${error.message}`);
       }
 
-      return data as RankedQuote[];
+      return (data as any) as RankedQuote[];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -157,7 +157,7 @@ export function useTopQuotes(limit: number = 10) {
         throw new Error(`Failed to fetch top quotes: ${error.message}`);
       }
 
-      return data as RankedQuote[];
+      return (data as any) as RankedQuote[];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

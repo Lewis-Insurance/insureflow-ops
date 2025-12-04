@@ -18,18 +18,9 @@ export type AutoDriver = {
 export const useAutoDrivers = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-drivers', leadId],
-    queryFn: async () => {
+    queryFn: async (): Promise<AutoDriver[]> => {
       // TABLE DISABLED: lead_auto_drivers does not exist in schema
       return [];
-      const { data, error } = await supabase
-        .from('lead_auto_drivers' as any)
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as AutoDriver[];
     },
     enabled: !!leadId,
   });
@@ -104,7 +95,7 @@ export const useUpdateAutoDriver = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['auto-drivers', data.lead_id] });
       toast.success('Driver updated successfully');
     },

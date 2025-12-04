@@ -106,7 +106,7 @@ export function useKnowledgeHistory(knowledgeId: string | null) {
         .order("version", { ascending: false });
 
       if (error) throw new Error(`Failed to fetch history: ${error.message}`);
-      return data as KnowledgeHistory[];
+      return (data as any) as KnowledgeHistory[];
     },
     enabled: !!knowledgeId,
     staleTime: 30 * 1000, // 30 seconds
@@ -287,7 +287,7 @@ export function useRecentKnowledgeChanges(limit: number = 20) {
         .limit(limit);
 
       if (error) throw new Error(`Failed to fetch recent changes: ${error.message}`);
-      return data as KnowledgeHistory[];
+      return (data as any) as KnowledgeHistory[];
     },
     staleTime: 1 * 60 * 1000, // 1 minute
   });

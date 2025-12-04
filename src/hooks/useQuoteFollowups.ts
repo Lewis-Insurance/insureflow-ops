@@ -93,7 +93,7 @@ export function useQuoteFollowups(quoteId: string) {
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(`Failed to fetch follow-ups: ${error.message}`);
-      return data as FollowupWithDetails[];
+      return (data as any) as FollowupWithDetails[];
     },
     enabled: !!quoteId,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -142,7 +142,7 @@ export function useCreateFollowUpRule() {
     mutationFn: async (rule: Partial<FollowUpRule>) => {
       const { data, error } = await supabase
         .from("quote_followup_rules")
-        .insert(rule)
+        .insert(rule as any)
         .select()
         .single();
 

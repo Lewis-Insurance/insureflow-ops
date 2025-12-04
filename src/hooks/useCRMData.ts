@@ -309,12 +309,12 @@ export function useCRMData() {
 
       // Update local list if present
       setAccounts(prev =>
-        (prev || []).map(a => (a.id === accountId ? (data ) : a))
+        (prev || []).map(a => (a.id === accountId ? (data as any) : a))
       );
 
       // Update Recently Viewed snapshot
       try {
-        updateRecentlyAccessedAccount(data );
+        updateRecentlyAccessedAccount(data as any);
       } catch { /* no-op if not available */ }
 
       // Log account update event (fire-and-forget)
@@ -488,11 +488,11 @@ export function useCRMData() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'accounts' },
         (payload) => {
-          const updatedAccount = payload.new ;
+          const updatedAccount = payload.new as any;
           setAccounts(prev => 
             (prev || []).map(a => (a.id === updatedAccount.id ? updatedAccount : a))
           );
-          updateRecentlyAccessedAccount(updatedAccount);
+          updateRecentlyAccessedAccount(updatedAccount as any);
         }
       )
       .subscribe();

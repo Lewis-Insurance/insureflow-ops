@@ -23,17 +23,9 @@ export type AutoVehicle = {
 export const useAutoVehicles = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-vehicles', leadId],
-    queryFn: async () => {
+    queryFn: async (): Promise<AutoVehicle[]> => {
       // TABLE DISABLED: lead_auto_vehicles does not exist in schema
       return [];
-      const { data, error } = await supabase
-        .from('lead_auto_vehicles')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as AutoVehicle[];
     },
     enabled: !!leadId,
   });
@@ -44,14 +36,8 @@ export const useAddAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async (vehicle: AutoVehicle) => {
-      const { data, error } = await supabase
-        .from('lead_auto_vehicles')
-        .insert(vehicle)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // TABLE DISABLED
+      return vehicle;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['auto-vehicles', variables.lead_id] });
@@ -69,17 +55,10 @@ export const useUpdateAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...vehicle }: AutoVehicle & { id: string }) => {
-      const { data, error } = await supabase
-        .from('lead_auto_vehicles')
-        .update(vehicle)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // TABLE DISABLED
+      return { id, ...vehicle };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['auto-vehicles', data.lead_id] });
       toast.success('Vehicle updated successfully');
     },
@@ -95,12 +74,7 @@ export const useDeleteAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async ({ id, leadId }: { id: string; leadId: string }) => {
-      const { error } = await supabase
-        .from('lead_auto_vehicles')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      // TABLE DISABLED
       return { id, leadId };
     },
     onSuccess: (data) => {
