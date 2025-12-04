@@ -87,8 +87,8 @@ export function useCustomers(accountId?: string) {
           city: customerData.city,
           state: customerData.state,
           zip_code: customerData.postal_code,
-          type: customerData.type,
-          account_status: customerData.status,
+          type: customerData.type as any,
+          account_status: customerData.status as any,
           notes: customerData.notes_summary
         }])
         .select()
@@ -127,8 +127,8 @@ export function useCustomers(accountId?: string) {
           city: updates.city,
           state: updates.state,
           zip_code: updates.postal_code,
-          type: updates. as any) || type,
-          account_status: updates. as any) || status,
+          type: (updates.type as any) || undefined,
+          account_status: (updates.status as any) || undefined,
           notes: updates.notes_summary
         })
         .eq('id', id)

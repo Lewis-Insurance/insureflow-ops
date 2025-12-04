@@ -54,7 +54,7 @@ export function useRecurringTasks() {
     try {
       const { data, error } = await supabase
         .from('task_recurrence_rules')
-        .insertruleData
+        .insert(ruleData as any)
         .select()
         .single();
 
@@ -81,7 +81,7 @@ export function useRecurringTasks() {
     try {
       const { error } = await supabase
         .from('task_recurrence_rules')
-        .updateupdates
+        .update(updates as any)
         .eq('id', ruleId);
 
       if (error) throw error;

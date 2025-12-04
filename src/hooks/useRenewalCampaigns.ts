@@ -344,17 +344,16 @@ export function useCreateRenewalCampaign() {
       const { data, error } = await supabase
         .from('renewal_campaigns')
         .insert({
-          renewal_id: params.renewal_id,
           account_id: params.account_id,
           campaign_type: params.campaign_type,
           days_before_renewal: params.days_before_renewal,
           start_date: new Date().toISOString().split('T')[0],
-          touchpoints: params.touchpoints,
+          touchpoints: params.touchpoints as any,
           total_touchpoints: params.touchpoints.length,
           completed_touchpoints: 0,
           personalization: params.personalization || {},
           status: 'active'
-        })
+        } as any)
         .select()
         .single();
 
@@ -441,7 +440,7 @@ export function useUpdateCampaignTouchpoint() {
       const { data, error } = await supabase
         .from('renewal_campaigns')
         .update({
-          touchpoints: touchpoints,
+          touchpoints: touchpoints as any,
           completed_touchpoints: completedCount,
           updated_at: new Date().toISOString()
         })

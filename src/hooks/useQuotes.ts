@@ -123,9 +123,10 @@ export function useCreateQuote() {
         .from('quotes')
         .insert([{
           ...input,
+          line_of_business: input.line_of_business as any,
           created_by: user.id,
           updated_by: user.id,
-        }])
+        }] as any)
         .select()
         .single();
 

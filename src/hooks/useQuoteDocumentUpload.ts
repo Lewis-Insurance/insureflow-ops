@@ -128,7 +128,7 @@ export function useQuoteDocumentUpload() {
       autoScore.mutate(quote.id);
 
       // Step 7: Trigger follow-up processor to evaluate and schedule follow-ups
-      triggerFollowUps.mutate({ quoteIds: [quote.id] });
+      triggerFollowUps.mutate({ quote_id: quote.id });
 
       toast.success("Quote uploaded and analyzed successfully", {
         description: `Quote ${quote.quote_ref} has been created and scored`,

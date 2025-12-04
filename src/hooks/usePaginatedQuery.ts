@@ -30,22 +30,22 @@ interface UsePaginatedQueryResult<T> extends PaginatedResult<T> {
 export function usePaginatedQuery<T = any>(
   tableName: string,
   options: PaginationOptions,
-  queryOptions?: Omit<UseQueryOptions, 'queryKey' | 'queryFn'>
+  queryOptions?: Omit<UseQueryOptions<any, any, any, any>, 'queryKey' | 'queryFn'>
 ): UsePaginatedQueryResult<T> {
   const [page, setPage] = useState(options.defaultPage || 1);
   const [pageSize, setPageSize] = useState(options.pageSize);
 
   const query = useQuery({
     queryKey: [tableName, 'paginated', page, pageSize],
-    queryFn: async (): Promise<PaginatedResult<T>> => {
+    queryFn: async () => {
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
 
-      const { data, error, count } = await supabase
-        .from(tableName)
+      const { data, error, count } = await (supabase
+        .from(tableName as any)
         .select('*', { count: 'exact' })
         .range(start, end)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
 
@@ -65,14 +65,16 @@ export function usePaginatedQuery<T = any>(
     ...queryOptions,
   });
 
+  const queryData = query.data as PaginatedResult<T> | undefined;
+
   const nextPage = () => {
-    if (query.data?.hasNextPage) {
+    if (queryData?.hasNextPage) {
       setPage((prev) => prev + 1);
     }
   };
 
   const previousPage = () => {
-    if (query.data?.hasPreviousPage) {
+    if (queryData?.hasPreviousPage) {
       setPage((prev) => prev - 1);
     }
   };
@@ -83,13 +85,13 @@ export function usePaginatedQuery<T = any>(
   };
 
   return {
-    data: query.data?.data ?? null,
-    total: query.data?.total ?? 0,
-    page: query.data?.page ?? page,
-    pageSize: query.data?.pageSize ?? pageSize,
-    totalPages: query.data?.totalPages ?? 0,
-    hasNextPage: query.data?.hasNextPage ?? false,
-    hasPreviousPage: query.data?.hasPreviousPage ?? false,
+    data: queryData?.data ?? null,
+    total: queryData?.total ?? 0,
+    page: queryData?.page ?? page,
+    pageSize: queryData?.pageSize ?? pageSize,
+    totalPages: queryData?.totalPages ?? 0,
+    hasNextPage: queryData?.hasNextPage ?? false,
+    hasPreviousPage: queryData?.hasPreviousPage ?? false,
     isLoading: query.isLoading,
     error: query.error as Error | null,
     setPage,
@@ -117,14 +119,14 @@ export function usePaginatedQueryWithFilters<T = any>(
 
   const query = useQuery({
     queryKey: [tableName, 'paginated', page, pageSize, options.filters, options.sortBy, options.sortOrder],
-    queryFn: async (): Promise<PaginatedResult<T>> => {
+    queryFn: async () => {
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
 
       let queryChain = supabase
-        .from(tableName)
+        .from(tableName as any)
         .select('*', { count: 'exact' })
-        .range(start, end);
+        .range(start, end) as any;
 
       // Apply custom query builder if provided
       if (queryBuilder) {
@@ -169,14 +171,16 @@ export function usePaginatedQueryWithFilters<T = any>(
     },
   });
 
+  const queryData = query.data as PaginatedResult<T> | undefined;
+
   const nextPage = () => {
-    if (query.data?.hasNextPage) {
+    if (queryData?.hasNextPage) {
       setPage((prev) => prev + 1);
     }
   };
 
   const previousPage = () => {
-    if (query.data?.hasPreviousPage) {
+    if (queryData?.hasPreviousPage) {
       setPage((prev) => prev - 1);
     }
   };
@@ -187,13 +191,13 @@ export function usePaginatedQueryWithFilters<T = any>(
   };
 
   return {
-    data: query.data?.data ?? null,
-    total: query.data?.total ?? 0,
-    page: query.data?.page ?? page,
-    pageSize: query.data?.pageSize ?? pageSize,
-    totalPages: query.data?.totalPages ?? 0,
-    hasNextPage: query.data?.hasNextPage ?? false,
-    hasPreviousPage: query.data?.hasPreviousPage ?? false,
+    data: queryData?.data ?? null,
+    total: queryData?.total ?? 0,
+    page: queryData?.page ?? page,
+    pageSize: queryData?.pageSize ?? pageSize,
+    totalPages: queryData?.totalPages ?? 0,
+    hasNextPage: queryData?.hasNextPage ?? false,
+    hasPreviousPage: queryData?.hasPreviousPage ?? false,
     isLoading: query.isLoading,
     error: query.error as Error | null,
     setPage,

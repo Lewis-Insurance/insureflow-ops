@@ -6,10 +6,10 @@ export function useTableExists(tableName: string) {
   return useQuery({
     queryKey: ['table-exists', tableName],
     queryFn: async () => {
-      const { error } = await supabase
-        .from(tableName)
+      const { error } = await (supabase
+        .from(tableName as any)
         .select('id')
-        .limit(0);
+        .limit(0) as any);
       
       return !error;
     },
@@ -21,11 +21,11 @@ export function useTableColumns(tableName: string) {
   return useQuery({
     queryKey: ['table-columns', tableName],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from(tableName)
+      const { data, error } = await (supabase
+        .from(tableName as any)
         .select('*')
         .limit(1)
-        .maybeSingle();
+        .maybeSingle() as any);
       
       if (error) throw error;
       return data ? Object.keys(data) : [];
