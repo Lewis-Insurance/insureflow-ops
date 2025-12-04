@@ -24,13 +24,55 @@ export interface LeadFilters {
   max_score?: number;
   insurance_types?: string[];
   search?: string;
+  page?: number;
+  pageSize?: number;
 }
 
-// Fetch all leads with filters
+// Fetch all leads with filters and pagination
 export function useLeads(filters?: LeadFilters) {
+  const page = filters?.page || 1;
+  const pageSize = filters?.pageSize || 25;
+
   return useQuery({
     queryKey: ['leads', filters],
     queryFn: async () => {
+      // First, get total count with same filters
+      let countQuery = supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true });
+
+      // Apply same filters to count query
+      if (filters?.status && filters.status.length > 0) {
+        countQuery = countQuery.in('status', filters.status);
+      }
+      if (filters?.assigned_to) {
+        countQuery = countQuery.eq('assigned_to', filters.assigned_to);
+      }
+      if (filters?.source_id) {
+        countQuery = countQuery.eq('source_id', filters.source_id);
+      }
+      if (filters?.min_score) {
+        countQuery = countQuery.gte('lead_score', filters.min_score);
+      }
+      if (filters?.max_score) {
+        countQuery = countQuery.lte('lead_score', filters.max_score);
+      }
+      if (filters?.insurance_types && filters.insurance_types.length > 0) {
+        countQuery = countQuery.overlaps('insurance_types', filters.insurance_types);
+      }
+      if (filters?.search) {
+        countQuery = countQuery.or(
+          `first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`
+        );
+      }
+
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+
+      // Then get paginated data
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
       let query = supabase
         .from('leads')
         .select(`
@@ -38,7 +80,8 @@ export function useLeads(filters?: LeadFilters) {
           source:lead_sources(name),
           assigned:profiles!leads_assigned_to_fkey(full_name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       // Apply filters
       if (filters?.status && filters.status.length > 0) {
@@ -69,11 +112,19 @@ export function useLeads(filters?: LeadFilters) {
 
       if (error) throw error;
 
-      return data.map(lead => ({
+      const leads = data.map(lead => ({
         ...lead,
         source_name: lead.source?.name,
         assigned_to_name: lead.assigned?.full_name
       }));
+
+      return {
+        data: leads,
+        total: count || 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      };
     }
   });
 }

@@ -19,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -48,17 +50,27 @@ export function LeadList() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showNewLeadForm, setShowNewLeadForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
-  const { data: leads, isLoading, error } = useLeads(filters);
+  const { data: leadsResponse, isLoading, error } = useLeads({ ...filters, page, pageSize });
   const { data: sources } = useLeadSources();
+
+  const leads = leadsResponse?.data || [];
+  const paginationInfo = {
+    total: leadsResponse?.total || 0,
+    totalPages: leadsResponse?.totalPages || 1,
+  };
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setFilters((prev) => ({ ...prev, search: value || undefined }));
+    setPage(1); // Reset to first page on search
   };
 
   const handleStatusFilter = (statuses: string[]) => {
     setFilters((prev) => ({ ...prev, status: statuses.length > 0 ? statuses : undefined }));
+    setPage(1); // Reset to first page on filter change
   };
 
   const handleSourceFilter = (sourceId: string) => {
@@ -66,6 +78,12 @@ export function LeadList() {
       ...prev,
       source_id: sourceId === 'all' ? undefined : sourceId,
     }));
+    setPage(1); // Reset to first page on filter change
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1); // Reset to first page when changing page size
   };
 
   const exportToCSV = () => {
@@ -191,13 +209,7 @@ export function LeadList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                </TableCell>
-              </TableRow>
-            )}
+            {isLoading && <TableSkeleton rows={8} columns={9} />}
 
             {error && (
               <TableRow>
@@ -290,6 +302,18 @@ export function LeadList() {
               ))}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {!isLoading && !error && paginationInfo.total > 0 && (
+          <DataTablePagination
+            currentPage={page}
+            totalPages={paginationInfo.totalPages}
+            pageSize={pageSize}
+            totalItems={paginationInfo.total}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       {/* Lead Detail Sheet */}

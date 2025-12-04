@@ -458,14 +458,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/comparison"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <InsuranceComparison />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
                 path="/workspace"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
@@ -509,7 +501,7 @@ const App = () => (
                 path="/analyze-documents"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <ExplorePolicy />
+                    <DocumentAnalysisPage />
                   </ErrorBoundary>
                 }
               />

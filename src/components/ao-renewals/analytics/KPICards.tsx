@@ -9,6 +9,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { KPIData } from "@/hooks/useAOAnalytics";
+import type { BadgeVariant } from "@/types/ui";
 
 interface KPICardsProps {
   data: KPIData;
@@ -118,7 +119,7 @@ export function KPICards({ data, isLoading }: KPICardsProps) {
                 {card.title}
               </span>
               {card.badge && (
-                <Badge variant={card.badge as any}>{card.formatter(card.value)}</Badge>
+                <Badge variant={card.badge as BadgeVariant}>{card.formatter(card.value)}</Badge>
               )}
               {card.alert && card.value > 0 && (
                 <Badge variant="destructive">{card.value}</Badge>

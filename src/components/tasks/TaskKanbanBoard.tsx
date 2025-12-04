@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTasks, Task, TaskStatus } from '@/hooks/useTasks';
 import { Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -62,7 +63,43 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading tasks...</div>;
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statusColumns.map(({ status, label, color }) => (
+          <div key={status} className="flex flex-col gap-2">
+            <Card className={color}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </div>
+              </CardHeader>
+            </Card>
+            <div className="space-y-2 min-h-[200px]">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="cursor-pointer hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-4 rounded" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-4 rounded" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
