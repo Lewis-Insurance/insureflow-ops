@@ -51,6 +51,7 @@ const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligen
 const DocumentAnalysisPage = React.lazy(() => import("./pages/AnalyzeDocumentsPage"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
 const KnowledgeManagerPage = React.lazy(() => import("./pages/KnowledgeManagerPage"));
+const KnowledgeAnalytics = React.lazy(() => import("./pages/KnowledgeAnalytics"));
 const InsuranceComparison = React.lazy(() => import("./pages/InsuranceComparison"));
 const WorkspaceDetailPage = React.lazy(() => import("./pages/WorkspaceDetailPage"));
 const WorkspaceListViewPage = React.lazy(() => import("./pages/WorkspaceListViewPage"));
@@ -463,6 +464,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <KnowledgeManagerPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/knowledge-analytics"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <KnowledgeAnalytics />
                   </ErrorBoundary>
                 }
               />
