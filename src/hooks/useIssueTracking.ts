@@ -136,11 +136,7 @@ export function useIssues(filters?: {
       let query = supabase
         .from('issues' as any)
         .select(`
-          *,
-          reported_by_user:auth.users!issues_reported_by_fkey(id, email, raw_user_meta_data),
-          assigned_to_user:auth.users!issues_assigned_to_fkey(id, email, raw_user_meta_data),
-          attachments:issue_attachments(count),
-          comments:issue_comments(count)
+          *
         `)
         .order('created_at', { ascending: false });
 
@@ -194,22 +190,7 @@ export function useIssue(issueId?: string) {
       const { data, error } = await supabase
         .from('issues' as any)
         .select(`
-          *,
-          reported_by_user:auth.users!issues_reported_by_fkey(id, email, raw_user_meta_data),
-          assigned_to_user:auth.users!issues_assigned_to_fkey(id, email, raw_user_meta_data),
-          resolved_by_user:auth.users!issues_resolved_by_fkey(id, email, raw_user_meta_data),
-          attachments:issue_attachments(*),
-          comments:issue_comments(
-            *,
-            author:auth.users(id, email, raw_user_meta_data)
-          ),
-          labels:issue_label_assignments(
-            label:issue_labels(*)
-          ),
-          activity:issue_activity_log(
-            *,
-            user:auth.users(id, email, raw_user_meta_data)
-          )
+          *
         `)
         .eq('id', issueId)
         .single();
