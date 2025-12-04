@@ -85,7 +85,7 @@ export function useSubmitAIFeedback() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_response_feedback")
         .insert({
           conversation_id: params.conversationId,
@@ -109,7 +109,7 @@ export function useSubmitAIFeedback() {
       if (error) throw new Error(`Failed to submit feedback: ${error.message}`);
       return data as AIFeedback;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-feedback"] });
       queryClient.invalidateQueries({ queryKey: ["ai-conversation-sessions"] });
 
@@ -132,7 +132,7 @@ export function useUserAIFeedback(limit: number = 50) {
   return useQuery({
     queryKey: ["ai-feedback", "user", limit],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_response_feedback")
         .select("*")
         .order("created_at", { ascending: false })
@@ -155,7 +155,7 @@ export function useFeedbackAnalytics(days: number = 30) {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_feedback_analytics")
         .select("*")
         .gte("date", startDate.toISOString())
@@ -176,7 +176,7 @@ export function useRefreshFeedbackAnalytics() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("refresh_ai_feedback_analytics");
+      const { error } = await (supabase as any).rpc("refresh_ai_feedback_analytics");
       if (error) throw new Error(`Failed to refresh analytics: ${error.message}`);
     },
     onSuccess: () => {
@@ -210,7 +210,7 @@ export function useCreateConversationSession() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_conversation_sessions")
         .insert({
           user_id: user.id,
@@ -242,7 +242,7 @@ export function useActiveConversationSessions() {
   return useQuery({
     queryKey: ["ai-conversation-sessions", "active"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_conversation_sessions")
         .select("*")
         .eq("is_active", true)
@@ -263,7 +263,7 @@ export function useEndConversationSession() {
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("ai_conversation_sessions")
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq("id", sessionId);
@@ -290,7 +290,7 @@ export function useConversationSession(sessionId: string | null) {
     queryFn: async () => {
       if (!sessionId) return null;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ai_conversation_sessions")
         .select("*")
         .eq("id", sessionId)
