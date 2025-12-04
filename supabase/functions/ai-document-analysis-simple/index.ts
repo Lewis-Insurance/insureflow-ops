@@ -84,7 +84,7 @@ serve(async (req) => {
     console.log('STEP 2: Extracting text from ALL pages');
     console.log('----------------------------------------');
 
-    const pdfData = await pdfParse(Buffer.from(pdfBuffer));
+    const pdfData = await pdfParse(new Uint8Array(pdfBuffer));
     
     const fullText = pdfData.text;
     const pageCount = pdfData.numpages;

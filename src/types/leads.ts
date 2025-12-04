@@ -82,14 +82,19 @@ export interface Lead {
   email?: string;
   phone?: string;
   address?: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
   city?: string;
   state?: string;
   zip_code?: string;
   company_name?: string;
-  
+
   // Status & Scoring
   status: LeadStatus;
   lead_score: number;
+  scoring_factors?: any | null;  // Json type from database
+  scoring_recommendation?: string | null;
+  last_scored_at?: string | null;
   assigned_to?: string;
   
   // Insurance Needs - using correct column name

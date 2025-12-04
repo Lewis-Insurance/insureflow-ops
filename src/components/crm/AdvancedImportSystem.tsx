@@ -18,6 +18,18 @@ function isValidationErrorArray(value: unknown): value is any[] {
   return Array.isArray(value);
 }
 
+// Type guard for batch processing response
+function isBatchProcessResult(value: unknown): value is { processed_rows: number; successful_rows: number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'processed_rows' in value &&
+    'successful_rows' in value &&
+    typeof (value as any).processed_rows === 'number' &&
+    typeof (value as any).successful_rows === 'number'
+  );
+}
+
 interface AdvancedImportSystemProps {
   onImportComplete?: () => void;
 }
@@ -178,9 +190,13 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (error) throw error;
 
+      const resultMessage = isBatchProcessResult(data)
+        ? `Processed ${data.processed_rows} rows with ${data.successful_rows} successes.`
+        : 'Batch processed successfully.';
+
       toast({
         title: "Batch processed successfully",
-        description: `Processed ${(data).processed_rows} rows with ${(data).successful_rows} successes.`,
+        description: resultMessage,
       });
 
       fetchImportData();

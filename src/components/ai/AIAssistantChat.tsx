@@ -476,10 +476,11 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
       // Final update with KB attribution
       const finalContent = fullResponse + kbSourceAttribution;
-      const assistantMessage: Message = { 
-        role: 'assistant', 
-        content: finalContent, 
-        timestamp: new Date() 
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: finalContent,
+        timestamp: new Date()
       };
 
       // Update final message with KB attribution

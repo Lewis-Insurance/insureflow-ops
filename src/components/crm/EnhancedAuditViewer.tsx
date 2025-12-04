@@ -96,7 +96,24 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
 
       if (detailedError) throw detailedError;
 
-      setAuditLogs(auditData || []);
+      // Map audit_logs schema to AuditLog interface
+      const mappedAuditLogs: AuditLog[] = (auditData || []).map(log => ({
+        id: String(log.id),
+        entity_type: log.entity || '',
+        entity_id: log.entity_id || '',
+        action: log.action,
+        user_id: log.user_id || null,
+        user_name: log.changed_by || null,
+        session_id: null,
+        ip_address: null,
+        user_agent: null,
+        changed_fields: log.diff || null,
+        metadata: log.details || null,
+        occurred_at: log.changed_at || log.created_at,
+        created_at: log.created_at
+      }));
+
+      setAuditLogs(mappedAuditLogs);
       setDetailedLogs(detailedData || []);
 
       // Fetch impersonation logs if admin

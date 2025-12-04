@@ -87,7 +87,7 @@ export function TCPACompliance({ contactId, contactName }: TCPAComplianceProps) 
           status: 'granted',
           granted_at: new Date().toISOString(),
           notes: newConsent.notes || null,
-          ip_address: null, // Would be captured in real implementation
+          ip_address: null as unknown, // Would be captured in real implementation
           user_agent: navigator.userAgent,
         });
 
