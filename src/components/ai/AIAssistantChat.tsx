@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, X, Loader2, FileText, Copy, Edit2, RotateCw, Check } from 'lucide-react';
+import { Send, Paperclip, X, Loader2, FileText, Copy, Edit2, RotateCw, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useSubmitAIFeedback } from '@/hooks/useAIFeedback';
 
 // ===== KB types & helper =====
 type KbEntry = {
@@ -41,10 +42,12 @@ async function getKbAnswer(
 }
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   documents?: DocumentInfo[];
+  feedbackGiven?: boolean;
 }
 
 interface DocumentInfo {
@@ -95,8 +98,9 @@ const getContextualGreeting = (ctx?: AIContext | null): string => {
 
 export function AIAssistantChat({ context }: AIAssistantChatProps) {
   const { toast } = useToast();
+  const submitFeedback = useSubmitAIFeedback();
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: getContextualGreeting(context), timestamp: new Date() },
+    { id: crypto.randomUUID(), role: 'assistant', content: getContextualGreeting(context), timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -158,6 +162,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
           if (savedMessages && savedMessages.length > 0) {
             const loadedMessages: Message[] = savedMessages.map((msg) => ({
+              id: msg.id || crypto.randomUUID(),
               role: msg.role as 'user' | 'assistant',
               content: msg.content,
               timestamp: new Date(msg.created_at),
@@ -234,6 +239,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     if (isLoading) return;
 
     const userMessage: Message = {
+      id: crypto.randomUUID(),
       role: 'user',
       content: input || 'Please analyze these documents',
       timestamp: new Date(),
@@ -339,6 +345,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         
         // Add assistant response to messages
         const assistantMessage: Message = {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: responseContent,
           timestamp: new Date(),
@@ -408,7 +415,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
       // Add an empty assistant message that we'll update
       const assistantMessageIndex = messages.length + 1;
-      setMessages((prev) => [...prev, { role: 'assistant', content: '', timestamp: new Date() }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: '', timestamp: new Date() }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -491,7 +498,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
       toast({ title: 'Error', description: err?.message || 'Failed to get AI response. Please try again.', variant: 'destructive' });
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'I encountered an error processing your request. Please try again.', timestamp: new Date() },
+        { id: crypto.randomUUID(), role: 'assistant', content: 'I encountered an error processing your request. Please try again.', timestamp: new Date() },
       ]);
     } finally {
       if (!signal.aborted) setIsLoading(false);
@@ -588,6 +595,34 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     }, 100);
   }, [messages]);
 
+  const handleFeedback = useCallback((messageId: string, helpful: boolean) => {
+    // Find the message and its corresponding user query
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+
+    const assistantMessage = messages[messageIndex];
+
+    // Find the corresponding user message (the one immediately before)
+    const userMessage = messageIndex > 0 ? messages[messageIndex - 1] : null;
+    const query = userMessage?.content || 'No query';
+
+    // Submit feedback
+    submitFeedback.mutate({
+      conversationId: conversationId || undefined,
+      messageId,
+      query,
+      response: assistantMessage.content,
+      helpful,
+      contextType: context?.type || 'general',
+      contextMetadata: context?.metadata || {},
+    });
+
+    // Mark feedback as given
+    setMessages(prev => prev.map(m =>
+      m.id === messageId ? { ...m, feedbackGiven: true } : m
+    ));
+  }, [messages, conversationId, context, submitFeedback]);
+
   const quickQuestions = [
     "What is comprehensive coverage?",
     "How do I file a claim?",
@@ -681,6 +716,35 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
                         >
                           <RotateCw className="h-3 w-3" />
                         </Button>
+                      )}
+
+                      {message.role === 'assistant' && !message.feedbackGiven && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 hover:text-green-600"
+                            onClick={() => handleFeedback(message.id, true)}
+                            disabled={isLoading}
+                            title="This response was helpful"
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 hover:text-red-600"
+                            onClick={() => handleFeedback(message.id, false)}
+                            disabled={isLoading}
+                            title="This response was not helpful"
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+
+                      {message.role === 'assistant' && message.feedbackGiven && (
+                        <span className="text-xs text-muted-foreground px-2">Thanks for your feedback!</span>
                       )}
                     </div>
                   </>
