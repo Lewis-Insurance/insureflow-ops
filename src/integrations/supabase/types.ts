@@ -2301,7 +2301,7 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quote_rankings"
-            referencedColumns: ["id"]
+            referencedColumns: ["quote_id"]
           },
           {
             foreignKeyName: "coverage_gap_analysis_quote_id_fkey"
@@ -7697,7 +7697,7 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quote_rankings"
-            referencedColumns: ["id"]
+            referencedColumns: ["quote_id"]
           },
           {
             foreignKeyName: "quote_coverages_quote_id_fkey"
@@ -7749,7 +7749,7 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quote_rankings"
-            referencedColumns: ["id"]
+            referencedColumns: ["quote_id"]
           },
           {
             foreignKeyName: "quote_followup_history_quote_id_fkey"
@@ -7938,7 +7938,7 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quote_rankings"
-            referencedColumns: ["id"]
+            referencedColumns: ["quote_id"]
           },
           {
             foreignKeyName: "quote_followups_quote_id_fkey"
@@ -9397,7 +9397,7 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quote_rankings"
-            referencedColumns: ["id"]
+            referencedColumns: ["quote_id"]
           },
           {
             foreignKeyName: "tasks_quote_id_fkey"
@@ -10387,13 +10387,13 @@ export type Database = {
           carrier_rating_score: number | null
           coverage_completeness_score: number | null
           deductible_score: number | null
-          id: string | null
           last_scored_at: string | null
           line_of_business:
             | Database["public"]["Enums"]["line_of_business"]
             | null
           premium: number | null
           price_score: number | null
+          quote_id: string | null
           quote_ref: string | null
           quote_score: number | null
           rank_in_account: number | null
