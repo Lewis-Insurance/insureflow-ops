@@ -4814,6 +4814,66 @@ export type Database = {
           },
         ]
       }
+      knowledge_base_versions: {
+        Row: {
+          category: string
+          change_notes: string | null
+          changed_by: string | null
+          content: string
+          created_at: string | null
+          id: string
+          knowledge_id: string | null
+          metadata: Json | null
+          source: string | null
+          tags: string[] | null
+          title: string
+          version_number: number
+        }
+        Insert: {
+          category: string
+          change_notes?: string | null
+          changed_by?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          knowledge_id?: string | null
+          metadata?: Json | null
+          source?: string | null
+          tags?: string[] | null
+          title: string
+          version_number: number
+        }
+        Update: {
+          category?: string
+          change_notes?: string | null
+          changed_by?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          knowledge_id?: string | null
+          metadata?: Json | null
+          source?: string | null
+          tags?: string[] | null
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_versions_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_versions_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_gaps: {
         Row: {
           answered: boolean | null
@@ -10623,6 +10683,19 @@ export type Database = {
         Returns: Json
       }
       generate_ticket_number: { Args: never; Returns: string }
+      get_knowledge_version_diff: {
+        Args: {
+          p_knowledge_id: string
+          p_version_1: number
+          p_version_2: number
+        }
+        Returns: {
+          changed: boolean
+          field: string
+          version_1_value: string
+          version_2_value: string
+        }[]
+      }
       get_next_round_robin_producer: {
         Args: { p_rule_id: string }
         Returns: string
