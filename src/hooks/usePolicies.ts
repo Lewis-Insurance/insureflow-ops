@@ -171,7 +171,7 @@ export function usePolicyStats() {
           return acc;
         }, {} as Record<string, number>),
         byMGA: data.reduce((acc, p) => {
-          const mgaName = (p.mga_info as any)?.name;
+          const mgaName = p.mga_info?.name;
           if (mgaName) {
             acc[mgaName] = (acc[mgaName] || 0) + 1;
           }

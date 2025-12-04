@@ -60,12 +60,12 @@ export function useAuth() {
         console.log('Profile loaded successfully:', { 
           id: profileData.id, 
           role: profileData.role, 
-          is_staff: (profileData as any).is_staff 
+          is_staff: (profileData).is_staff 
         });
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
-          is_staff: Boolean((profileData as any).is_staff),
+          is_staff: Boolean((profileData).is_staff),
           notification_email: typeof profileData.notification_email === 'string' 
             ? profileData.notification_email === 'true' 
             : Boolean(profileData.notification_email),
@@ -127,7 +127,7 @@ export function useAuth() {
         const { data: { session: existingSession }, error } = await Promise.race([
           sessionPromise,
           timeoutPromise
-        ]) as any;
+        ]);
         
         if (!mounted) return;
 

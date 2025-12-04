@@ -164,7 +164,7 @@ export function useInsuranceComparison() {
     if (!analysisData || !analysisData.extracted) {
       throw new Error('Invalid analysis data: missing extracted field');
     }
-    const extracted = analysisData.extracted as any;
+    const extracted = analysisData.extracted;
     
     // Validate required fields
     if (!extracted.insuredName && !extracted.carrier) {

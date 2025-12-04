@@ -61,7 +61,7 @@ export const useAtRiskRenewals = () => {
         .order('risk_score', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as any as AtRiskRenewal[];
+      return (data || []) as AtRiskRenewal[];
     },
   });
 };
@@ -79,7 +79,7 @@ export const useRenewalIntelligenceSummary = () => {
 
       if (error) throw error;
 
-      const allRenewals = (renewals || []) as any[];
+      const allRenewals = (renewals || [])[];
       const now = new Date();
       const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 

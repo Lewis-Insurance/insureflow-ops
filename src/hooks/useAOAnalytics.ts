@@ -70,7 +70,7 @@ export const useAOPipelineData = () => {
     queryKey: ["ao-pipeline-summary"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ao_renewals_pipeline_summary" as any)
+        .from("ao_renewals_pipeline_summary")
         .select("*");
       
       if (error) throw error;
@@ -84,7 +84,7 @@ export const useAOPriorityData = () => {
     queryKey: ["ao-priority-summary"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ao_renewals_priority_summary" as any)
+        .from("ao_renewals_priority_summary")
         .select("*");
       
       if (error) throw error;
@@ -98,7 +98,7 @@ export const useAOMonthlyForecast = () => {
     queryKey: ["ao-monthly-forecast"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ao_renewals_monthly_forecast" as any)
+        .from("ao_renewals_monthly_forecast")
         .select("*")
         .order("month", { ascending: true })
         .limit(12);

@@ -181,7 +181,7 @@ export function useTaskTemplates() {
 
       if (error) throw error;
 
-      const result = data as any;
+      const result = data;
       if (result?.generated_count > 0) {
         toast({
           title: 'Tasks Generated',

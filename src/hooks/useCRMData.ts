@@ -235,7 +235,7 @@ export function useCRMData() {
           type: 'account_created',
           entity_type: 'account',
           entity_id: account.id,
-          payload: { name: data.name, type: (data as any).type || data.account_type }
+          payload: { name: data.name, type: (data ).type || data.account_type }
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
@@ -309,12 +309,12 @@ export function useCRMData() {
 
       // Update local list if present
       setAccounts(prev =>
-        (prev || []).map(a => (a.id === accountId ? (data as any) : a))
+        (prev || []).map(a => (a.id === accountId ? (data ) : a))
       );
 
       // Update Recently Viewed snapshot
       try {
-        updateRecentlyAccessedAccount(data as any);
+        updateRecentlyAccessedAccount(data );
       } catch { /* no-op if not available */ }
 
       // Log account update event (fire-and-forget)
@@ -488,7 +488,7 @@ export function useCRMData() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'accounts' },
         (payload) => {
-          const updatedAccount = payload.new as any;
+          const updatedAccount = payload.new ;
           setAccounts(prev => 
             (prev || []).map(a => (a.id === updatedAccount.id ? updatedAccount : a))
           );

@@ -24,7 +24,7 @@ export const useAutoVehicles = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-vehicles', leadId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lead_auto_vehicles')
         .select('*')
         .eq('lead_id', leadId)
@@ -42,7 +42,7 @@ export const useAddAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async (vehicle: AutoVehicle) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lead_auto_vehicles')
         .insert(vehicle)
         .select()
@@ -67,7 +67,7 @@ export const useUpdateAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...vehicle }: AutoVehicle & { id: string }) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lead_auto_vehicles')
         .update(vehicle)
         .eq('id', id)
@@ -93,7 +93,7 @@ export const useDeleteAutoVehicle = () => {
 
   return useMutation({
     mutationFn: async ({ id, leadId }: { id: string; leadId: string }) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('lead_auto_vehicles')
         .delete()
         .eq('id', id);

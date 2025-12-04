@@ -192,7 +192,7 @@ export function useMultiMetricProjections(
       const elapsedDays = differenceInDays(new Date(), start);
 
       // Process all metrics
-      const results: Record<ProjectionMetric, ProjectionResult> = {} as any;
+      const results: Record<ProjectionMetric, ProjectionResult> = {};
 
       metrics.forEach((metric) => {
         let currentActual = 0;

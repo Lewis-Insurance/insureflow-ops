@@ -42,8 +42,8 @@ export interface JobEvent {
 }
 
 // tiny guards
-const asJob = (v: unknown): v is JobRow => !!v && typeof (v as any).id === 'string';
-const asEvent = (v: unknown): v is JobEvent => !!v && typeof (v as any).id === 'string';
+const asJob = (v: unknown): v is JobRow => !!v && typeof (v).id === 'string';
+const asEvent = (v: unknown): v is JobEvent => !!v && typeof (v).id === 'string';
 
 // --- useWorkspaceJobs ---
 export function useWorkspaceJobs(workspaceId?: string) {

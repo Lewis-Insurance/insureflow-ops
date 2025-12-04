@@ -44,14 +44,14 @@ export function useAssignmentRules(accountId: string) {
     queryKey: assignmentKeys.rule(accountId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .select('*')
         .eq('account_id', accountId)
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as any as AssignmentRule[];
+      return data as AssignmentRule[];
     },
     enabled: !!accountId,
   });
@@ -65,13 +65,13 @@ export function useAssignmentRule(ruleId: string) {
     queryKey: assignmentKeys.ruleDetail(ruleId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .select('*')
         .eq('id', ruleId)
         .single();
 
       if (error) throw error;
-      return data as any as AssignmentRule;
+      return data as AssignmentRule;
     },
     enabled: !!ruleId,
   });
@@ -85,14 +85,14 @@ export function useActiveAssignmentRules(accountId: string) {
     queryKey: assignmentKeys.activeRules(accountId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .select('*')
         .eq('account_id', accountId)
         .eq('is_active', true)
         .order('priority', { ascending: false });
 
       if (error) throw error;
-      return data as any as AssignmentRule[];
+      return data as AssignmentRule[];
     },
     enabled: !!accountId,
   });
@@ -110,18 +110,18 @@ export function useCreateAssignmentRule(accountId: string) {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .insert({
           account_id: accountId,
           created_by: user.id,
           ...input,
-          conditions: input.conditions as any,
-        } as any)
+          conditions: input.conditions,
+        })
         .select()
         .single();
 
       if (error) throw error;
-      return data as any as AssignmentRule;
+      return data as AssignmentRule;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: assignmentKeys.rule(accountId) });
@@ -143,18 +143,18 @@ export function useUpdateAssignmentRule(ruleId: string) {
   return useMutation({
     mutationFn: async (input: AssignmentRuleUpdateInput) => {
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .update({
           ...input,
-          conditions: input.conditions as any,
+          conditions: input.conditions,
           updated_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', ruleId)
         .select()
         .single();
 
       if (error) throw error;
-      return data as any as AssignmentRule;
+      return data as AssignmentRule;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: assignmentKeys.ruleDetail(ruleId) });
@@ -177,18 +177,18 @@ export function useDeleteAssignmentRule() {
   return useMutation({
     mutationFn: async (ruleId: string) => {
       const { data: rule } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .select('account_id')
         .eq('id', ruleId)
         .single();
 
       const { error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .delete()
         .eq('id', ruleId);
 
       if (error) throw error;
-      return (rule as any)?.account_id;
+      return (rule)?.account_id;
     },
     onSuccess: (accountId) => {
       if (accountId) {
@@ -212,17 +212,17 @@ export function useToggleAssignmentRule(ruleId: string) {
   return useMutation({
     mutationFn: async (isActive: boolean) => {
       const { data, error } = await supabase
-        .from('assignment_rules' as any)
+        .from('assignment_rules')
         .update({ 
           is_active: isActive,
           updated_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', ruleId)
         .select()
         .single();
 
       if (error) throw error;
-      return data as any as AssignmentRule;
+      return data as AssignmentRule;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: assignmentKeys.ruleDetail(ruleId) });
@@ -248,13 +248,13 @@ export function useLeadAssignments(leadId: string) {
     queryKey: assignmentKeys.assignmentsByLead(leadId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('lead_assignments' as any)
+        .from('lead_assignments')
         .select('*')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as any as LeadAssignment[];
+      return data as LeadAssignment[];
     },
     enabled: !!leadId,
   });
@@ -268,13 +268,13 @@ export function useProducerAssignments(producerId: string) {
     queryKey: assignmentKeys.assignmentsByProducer(producerId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('lead_assignments' as any)
+        .from('lead_assignments')
         .select('*')
         .eq('assigned_to', producerId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as any as LeadAssignment[];
+      return data as LeadAssignment[];
     },
     enabled: !!producerId,
   });
@@ -293,11 +293,11 @@ export function useAssignLead() {
 
       // Update the lead's assigned_to field
       const { data: lead, error: leadError } = await supabase
-        .from('leads' as any)
+        .from('leads')
         .update({ 
           assigned_to: input.assigned_to,
           assigned_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', input.lead_id)
         .select()
         .single();
@@ -306,7 +306,7 @@ export function useAssignLead() {
 
       // Create assignment record
       const { data: assignment, error: assignmentError } = await supabase
-        .from('lead_assignments' as any)
+        .from('lead_assignments')
         .insert({
           lead_id: input.lead_id,
           assigned_to: input.assigned_to,
@@ -314,7 +314,7 @@ export function useAssignLead() {
           assignment_rule_id: input.assignment_rule_id,
           assignment_method: 'manual',
           reason: input.reason || 'Manual assignment',
-        } as any)
+        })
         .select()
         .single();
 
@@ -323,8 +323,8 @@ export function useAssignLead() {
       return { lead, assignment };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByLead((data.lead as any).id) });
-      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByProducer((data.assignment as any).assigned_to) });
+      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByLead((data.lead).id) });
+      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByProducer((data.assignment).assigned_to) });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast.success('Lead assigned successfully');
     },
@@ -347,11 +347,11 @@ export function useReassignLead() {
 
       // Update the lead
       const { data: lead, error: leadError } = await supabase
-        .from('leads' as any)
+        .from('leads')
         .update({ 
           assigned_to: input.assigned_to,
           assigned_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', input.lead_id)
         .select()
         .single();
@@ -360,7 +360,7 @@ export function useReassignLead() {
 
       // Create reassignment record
       const { data: assignment, error: assignmentError } = await supabase
-        .from('lead_assignments' as any)
+        .from('lead_assignments')
         .insert({
           lead_id: input.lead_id,
           assigned_to: input.assigned_to,
@@ -368,7 +368,7 @@ export function useReassignLead() {
           assignment_rule_id: input.assignment_rule_id,
           assignment_method: 'reassignment',
           reason: input.reason || 'Lead reassigned',
-        } as any)
+        })
         .select()
         .single();
 
@@ -377,7 +377,7 @@ export function useReassignLead() {
       return { lead, assignment };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByLead((data.lead as any).id) });
+      queryClient.invalidateQueries({ queryKey: assignmentKeys.assignmentsByLead((data.lead).id) });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast.success('Lead reassigned successfully');
     },
@@ -399,7 +399,7 @@ export function useProducerWorkload(producerId: string) {
     queryKey: assignmentKeys.workloadByProducer(producerId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('producer_workload_stats' as any)
+        .from('producer_workload_stats')
         .select('*')
         .eq('producer_id', producerId)
         .single();
@@ -411,7 +411,7 @@ export function useProducerWorkload(producerId: string) {
         }
         throw error;
       }
-      return data as any as ProducerWorkloadStats;
+      return data as ProducerWorkloadStats;
     },
     enabled: !!producerId,
   });
@@ -425,13 +425,13 @@ export function useAccountProducerWorkloads(accountId: string) {
     queryKey: assignmentKeys.workloadByAccount(accountId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('producer_workload_stats' as any)
+        .from('producer_workload_stats')
         .select('*')
         .eq('account_id', accountId)
         .order('active_leads_count', { ascending: false });
 
       if (error) throw error;
-      return data as any as ProducerWorkloadStats[];
+      return data as ProducerWorkloadStats[];
     },
     enabled: !!accountId,
   });
@@ -445,7 +445,7 @@ export function useLowestWorkloadProducer(accountId: string, eligibleProducerIds
     queryKey: [...assignmentKeys.workloadByAccount(accountId), 'lowest', eligibleProducerIds],
     queryFn: async () => {
       let query = supabase
-        .from('producer_workload_stats' as any)
+        .from('producer_workload_stats')
         .select('*')
         .eq('account_id', accountId)
         .order('active_leads_count', { ascending: true })
@@ -462,7 +462,7 @@ export function useLowestWorkloadProducer(accountId: string, eligibleProducerIds
         if (error.code === 'PGRST116') return null;
         throw error;
       }
-      return data as any as ProducerWorkloadStats;
+      return data as ProducerWorkloadStats;
     },
     enabled: !!accountId,
   });
@@ -476,7 +476,7 @@ export function useLowestWorkloadProducer(accountId: string, eligibleProducerIds
  * Call the database function to get next round robin producer
  */
 export async function getNextRoundRobinProducer(ruleId: string): Promise<string | null> {
-  const { data, error } = await (supabase.rpc as any)('get_next_round_robin_producer', {
+  const { data, error } = await (supabase.rpc)('get_next_round_robin_producer', {
     p_rule_id: ruleId,
   });
 

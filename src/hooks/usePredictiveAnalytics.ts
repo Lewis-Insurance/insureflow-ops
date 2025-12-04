@@ -204,7 +204,7 @@ export function useCustomerPredictions(filters?: {
     queryKey: ['customer-predictions', filters],
     queryFn: async () => {
       let query = supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .select('*')
         .order('churn_probability', { ascending: false });
 
@@ -244,7 +244,7 @@ export function useCustomerPrediction(predictionId: string | undefined) {
       if (!predictionId) return null;
 
       const { data, error } = await supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .select('*')
         .eq('id', predictionId)
         .single();
@@ -264,7 +264,7 @@ export function useAtRiskCustomers() {
     queryKey: ['at-risk-customers'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('at_risk_customers_current' as any)
+        .from('at_risk_customers_current')
         .select('*')
         .order('churn_probability', { ascending: false });
 
@@ -286,7 +286,7 @@ export function useRetentionInterventions(filters?: {
     queryKey: ['retention-interventions', filters],
     queryFn: async () => {
       let query = supabase
-        .from('retention_interventions' as any)
+        .from('retention_interventions')
         .select('*')
         .order('scheduled_date', { ascending: false });
 
@@ -318,7 +318,7 @@ export function usePredictiveAnalyticsDashboard() {
     queryKey: ['predictive-analytics-dashboard'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('predictive_analytics_dashboard' as any)
+        .from('predictive_analytics_dashboard')
         .select('*')
         .order('month', { ascending: false })
         .limit(12); // Last 12 months
@@ -337,7 +337,7 @@ export function usePredictionStats() {
     queryKey: ['prediction-stats'],
     queryFn: async () => {
       const { data: predictions, error } = await supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .select('*')
         .eq('status', 'active');
 
@@ -383,7 +383,7 @@ export function useCreatePrediction() {
   return useMutation({
     mutationFn: async (request: CreatePredictionRequest) => {
       const { data, error } = await supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .insert(request)
         .select()
         .single();
@@ -413,7 +413,7 @@ export function useUpdatePrediction() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CustomerPrediction> }) => {
       const { data, error } = await supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .update(updates)
         .eq('id', id)
         .select()
@@ -453,7 +453,7 @@ export function useRecordPredictionOutcome() {
       outcomeDate: string;
     }) => {
       const { data, error } = await supabase
-        .from('customer_predictions' as any)
+        .from('customer_predictions')
         .update({
           outcome_actual: outcome,
           outcome_date: outcomeDate,
@@ -487,7 +487,7 @@ export function useCreateIntervention() {
   return useMutation({
     mutationFn: async (request: CreateInterventionRequest) => {
       const { data, error } = await supabase
-        .from('retention_interventions' as any)
+        .from('retention_interventions')
         .insert(request)
         .select()
         .single();
@@ -521,7 +521,7 @@ export function useUpdateIntervention() {
       updates: Partial<RetentionIntervention>;
     }) => {
       const { data, error } = await supabase
-        .from('retention_interventions' as any)
+        .from('retention_interventions')
         .update(updates)
         .eq('id', id)
         .select()
@@ -549,7 +549,7 @@ export function useRefreshPredictiveAnalytics() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('refresh_predictive_analytics_dashboard' as any);
+      const { error } = await supabase.rpc('refresh_predictive_analytics_dashboard');
       if (error) throw error;
     },
     onSuccess: () => {
@@ -571,7 +571,7 @@ export function useExpireOldPredictions() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('expire_old_predictions' as any);
+      const { error } = await supabase.rpc('expire_old_predictions');
       if (error) throw error;
     },
     onSuccess: () => {
@@ -595,7 +595,7 @@ export function useCalculateInterventionROI() {
 
   return useMutation({
     mutationFn: async (interventionId: string) => {
-      const { data, error } = await supabase.rpc('calculate_intervention_roi' as any, {
+      const { data, error } = await supabase.rpc('calculate_intervention_roi', {
         p_intervention_id: interventionId,
       });
       if (error) throw error;

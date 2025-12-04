@@ -7,7 +7,7 @@ export function useTableExists(tableName: string) {
     queryKey: ['table-exists', tableName],
     queryFn: async () => {
       const { error } = await supabase
-        .from(tableName as any)
+        .from(tableName)
         .select('id')
         .limit(0);
       
@@ -22,7 +22,7 @@ export function useTableColumns(tableName: string) {
     queryKey: ['table-columns', tableName],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from(tableName as any)
+        .from(tableName)
         .select('*')
         .limit(1)
         .maybeSingle();
