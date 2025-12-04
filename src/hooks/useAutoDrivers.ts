@@ -19,6 +19,8 @@ export const useAutoDrivers = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-drivers', leadId],
     queryFn: async () => {
+      // TABLE DISABLED: lead_auto_drivers does not exist in schema
+      return [];
       const { data, error } = await supabase
         .from('lead_auto_drivers' as any)
         .select('*')

@@ -65,7 +65,7 @@ export function useAuth() {
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
-          is_staff: Boolean((profileData).is_staff),
+          is_staff: false,
           notification_email: typeof profileData.notification_email === 'string' 
             ? profileData.notification_email === 'true' 
             : Boolean(profileData.notification_email),
@@ -120,14 +120,15 @@ export function useAuth() {
       try {
         // Add timeout to prevent hanging on slow connections
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Session timeout')), 10000)
         );
-        
-        const { data: { session: existingSession }, error } = await Promise.race([
+
+        const result: any = await Promise.race([
           sessionPromise,
           timeoutPromise
         ]);
+        const { data: { session: existingSession } = {}, error } = result || {};
         
         if (!mounted) return;
 

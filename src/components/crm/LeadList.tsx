@@ -318,8 +318,8 @@ export function LeadList() {
 
       {/* Lead Detail Sheet */}
       {selectedLeadId && leads && (
-        <LeadDetailView 
-          lead={(leads.find(l => l.id === selectedLeadId)) || null}
+        <LeadDetailView
+          lead={(leads.find(l => l.id === selectedLeadId) as any) || null}
           open={!!selectedLeadId}
           onOpenChange={(open) => !open && setSelectedLeadId(null)}
         />

@@ -283,7 +283,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         metadata: {
           documents: userMessage.documents,
           kb_record_id: null // Will be set later if KB is used
-        },
+        } as any,
       }]);
     }
 

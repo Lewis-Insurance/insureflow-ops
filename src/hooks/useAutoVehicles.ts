@@ -24,6 +24,8 @@ export const useAutoVehicles = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-vehicles', leadId],
     queryFn: async () => {
+      // TABLE DISABLED: lead_auto_vehicles does not exist in schema
+      return [];
       const { data, error } = await supabase
         .from('lead_auto_vehicles')
         .select('*')

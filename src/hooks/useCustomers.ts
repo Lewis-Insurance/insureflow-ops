@@ -127,8 +127,8 @@ export function useCustomers(accountId?: string) {
           city: updates.city,
           state: updates.state,
           zip_code: updates.postal_code,
-          type: updates.type,
-          account_status: updates.status,
+          type: updates. as any) || type,
+          account_status: updates. as any) || status,
           notes: updates.notes_summary
         })
         .eq('id', id)
