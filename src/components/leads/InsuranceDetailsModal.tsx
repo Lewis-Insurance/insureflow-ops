@@ -123,7 +123,7 @@ export const InsuranceDetailsModal: React.FC<InsuranceDetailsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'upload' | 'manual')} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <FileUp className="h-4 w-4" />

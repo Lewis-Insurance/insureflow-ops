@@ -37,48 +37,51 @@ export const InsuranceDetailsPanel = ({ leadId, insuranceTypes = [] }: Insurance
         {enabledOptions.map(({ type, label, icon: Icon }) => {
           const InsuranceCard = () => {
             const { data: details } = useLeadInsuranceDetails(leadId, type);
-            
+
             // Get summary info for commercial
             const getSummary = () => {
               if (!details) return null;
-              
+
+              // Cast to any since properties vary by insurance type
+              const detailsAny = details as any;
+
               if (type === 'commercial') {
                 const coverages: string[] = [];
                 // Only show coverages that are explicitly true
-                if (details.general_liability === true) coverages.push('GL');
-                if (details.property_coverage === true) coverages.push('Prop');
-                if (details.workers_comp === true) coverages.push('WC');
-                if (details.commercial_auto === true) coverages.push('Auto');
-                
+                if (detailsAny.general_liability === true) coverages.push('GL');
+                if (detailsAny.property_coverage === true) coverages.push('Prop');
+                if (detailsAny.workers_comp === true) coverages.push('WC');
+                if (detailsAny.commercial_auto === true) coverages.push('Auto');
+
                 return {
-                  title: details.business_name || null,
+                  title: detailsAny.business_name || null,
                   subtitle: coverages.length > 0 ? coverages.join(' • ') : null,
                 };
               }
               
               if (type === 'auto') {
                 return {
-                  title: details.current_carrier || null,
-                  subtitle: details.vehicle_count ? `${details.vehicle_count} vehicle(s)` : null,
+                  title: detailsAny.current_carrier || null,
+                  subtitle: detailsAny.vehicle_count ? `${detailsAny.vehicle_count} vehicle(s)` : null,
                 };
               }
-              
+
               if (type === 'home') {
                 return {
-                  title: details.property_address || null,
-                  subtitle: details.dwelling_coverage ? `$${Number(details.dwelling_coverage).toLocaleString()} coverage` : null,
+                  title: detailsAny.property_address || null,
+                  subtitle: detailsAny.dwelling_coverage ? `$${Number(detailsAny.dwelling_coverage).toLocaleString()} coverage` : null,
                 };
               }
-              
+
               if (type === 'life') {
                 return {
-                  title: details.policy_type ? `${details.policy_type} policy` : null,
-                  subtitle: details.coverage_amount ? `$${Number(details.coverage_amount).toLocaleString()} coverage` : null,
+                  title: detailsAny.policy_type ? `${detailsAny.policy_type} policy` : null,
+                  subtitle: detailsAny.coverage_amount ? `$${Number(detailsAny.coverage_amount).toLocaleString()} coverage` : null,
                 };
               }
-              
+
               return {
-                title: details.current_carrier || null,
+                title: detailsAny.current_carrier || null,
                 subtitle: null,
               };
             };
