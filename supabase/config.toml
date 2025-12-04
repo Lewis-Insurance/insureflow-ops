@@ -24,22 +24,15 @@ pop3_port = 54326
 
 [storage]
 enabled = true
-port = 54327
 file_size_limit = "50MiB"
 image_transformation = { enabled = true }
 
 [auth]
 enabled = true
-port = 54328
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_confirmations = false
-
-[edge_functions]
-enabled = true
-port = 54329
 
 [functions.setup-mfa]
 verify_jwt = true
