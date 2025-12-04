@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
@@ -164,9 +164,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
               {/* Command Center Group */}
               <NavGroup label="Command Center" defaultOpen={false}>
-                <NavItem 
-                  icon={BarChart3} 
-                  label="Agency Dashboard" 
+                <NavItem
+                  icon={BarChart3}
+                  label="Agency Dashboard"
                   to="/dashboard/agency"
                 />
                 <NavItem
@@ -199,14 +199,19 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Knowledge Manager"
                   to="/knowledge-manager"
                 />
-                <NavItem 
-                  icon={BarChart3} 
-                  label="Reports" 
+                <NavItem
+                  icon={BarChart3}
+                  label="Reports"
                   to="/reports"
                 />
-                <NavItem 
-                  icon={Sliders} 
-                  label="Customization" 
+                <NavItem
+                  icon={Bug}
+                  label="Issue Tracker"
+                  to="/issues"
+                />
+                <NavItem
+                  icon={Sliders}
+                  label="Customization"
                   to="/customization"
                 />
                 <NavItem
@@ -214,10 +219,10 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Customer Success"
                   to="/customer-success"
                 />
-                <NavItem 
-                  icon={Radio} 
-                  label="Command Center" 
-                  to="/command-center" 
+                <NavItem
+                  icon={Radio}
+                  label="Command Center"
+                  to="/command-center"
                 />
               </NavGroup>
 
