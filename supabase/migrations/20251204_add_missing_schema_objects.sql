@@ -158,11 +158,38 @@ CREATE POLICY "Users can delete vehicles for their account's leads"
   );
 
 -- ============================================================================
--- Create knowledge analytics views (used by useKnowledgeAnalytics.ts)
+-- Create knowledge_base_queries table FIRST
+-- (Required for the views below)
 -- ============================================================================
 
--- Note: These views require a knowledge_base_queries table to exist
--- If it doesn't exist, these views will fail. You may need to create that table first.
+CREATE TABLE IF NOT EXISTS knowledge_base_queries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  knowledge_id UUID REFERENCES knowledge_base(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  query_text TEXT NOT NULL,
+  helpful BOOLEAN,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_knowledge_id ON knowledge_base_queries(knowledge_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_user_id ON knowledge_base_queries(user_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_created_at ON knowledge_base_queries(created_at);
+
+-- Add RLS for knowledge_base_queries
+ALTER TABLE knowledge_base_queries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own knowledge queries"
+  ON knowledge_base_queries FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own knowledge queries"
+  ON knowledge_base_queries FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+-- ============================================================================
+-- Create knowledge analytics views (used by useKnowledgeAnalytics.ts)
+-- Now that knowledge_base_queries table exists, we can create the views
+-- ============================================================================
 
 CREATE OR REPLACE VIEW knowledge_usage_stats AS
 SELECT
@@ -208,35 +235,6 @@ SELECT
 FROM knowledge_base kb
 LEFT JOIN knowledge_base_queries kbq ON kb.id = kbq.knowledge_id
 GROUP BY kb.category;
-
--- ============================================================================
--- Create knowledge_base_queries table if it doesn't exist
--- (Required for the views above)
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS knowledge_base_queries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  knowledge_id UUID REFERENCES knowledge_base(id) ON DELETE SET NULL,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  query_text TEXT NOT NULL,
-  helpful BOOLEAN,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_knowledge_id ON knowledge_base_queries(knowledge_id);
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_user_id ON knowledge_base_queries(user_id);
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_created_at ON knowledge_base_queries(created_at);
-
--- Add RLS for knowledge_base_queries
-ALTER TABLE knowledge_base_queries ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own knowledge queries"
-  ON knowledge_base_queries FOR SELECT
-  USING (user_id = auth.uid());
-
-CREATE POLICY "Users can insert their own knowledge queries"
-  ON knowledge_base_queries FOR INSERT
-  WITH CHECK (user_id = auth.uid());
 
 -- ============================================================================
 -- Grant permissions
