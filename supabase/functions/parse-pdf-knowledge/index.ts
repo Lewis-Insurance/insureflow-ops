@@ -436,10 +436,10 @@ serve(async (req) => {
       const metadata = await pdfDoc.getMetadata();
       if (metadata?.info) {
         pdfInfo = {
-          title: metadata.info.Title || file.name,
-          author: metadata.info.Author || 'Unknown',
-          subject: metadata.info.Subject || '',
-          keywords: metadata.info.Keywords || '',
+          title: (metadata.info as any).Title || file.name,
+          author: (metadata.info as any).Author || 'Unknown',
+          subject: (metadata.info as any).Subject || '',
+          keywords: (metadata.info as any).Keywords || '',
         };
       }
     } catch (e) {
