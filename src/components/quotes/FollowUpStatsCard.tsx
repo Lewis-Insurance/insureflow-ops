@@ -1,7 +1,7 @@
 import { useFollowUpStats } from "@/hooks/useQuoteFollowups";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, TrendingUp, TrendingDown, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
 interface FollowUpStatsCardProps {
@@ -10,7 +10,7 @@ interface FollowUpStatsCardProps {
 }
 
 export function FollowUpStatsCard({ accountId, className }: FollowUpStatsCardProps) {
-  const { data: stats, isLoading, error } = useFollowUpStats(accountId);
+  const { data: stats, isLoading, error } = useFollowUpStats();
 
   if (isLoading) {
     return (
@@ -47,16 +47,9 @@ export function FollowUpStatsCard({ accountId, className }: FollowUpStatsCardPro
     return null;
   }
 
-  const responseRate = stats.total_sent > 0
-    ? Math.round((stats.total_responses / stats.total_sent) * 100)
-    : 0;
-
-  const acceptanceRate = stats.total_responses > 0
-    ? Math.round((stats.accepted_responses / stats.total_responses) * 100)
-    : 0;
-
-  const completionRate = stats.total_scheduled > 0
-    ? Math.round((stats.total_completed / stats.total_scheduled) * 100)
+  const responseRate = stats.response_rate || 0;
+  const completionRate = stats.scheduled > 0
+    ? Math.round((stats.completed / stats.scheduled) * 100)
     : 0;
 
   return (
@@ -73,70 +66,57 @@ export function FollowUpStatsCard({ accountId, className }: FollowUpStatsCardPro
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <div className="text-2xl font-bold text-primary">
-                {stats.total_scheduled}
+                {stats.scheduled}
               </div>
-              <div className="text-xs text-muted-foreground">Total Scheduled</div>
+              <div className="text-xs text-muted-foreground">Scheduled</div>
             </div>
 
             <div className="space-y-1">
               <div className="text-2xl font-bold text-blue-600">
-                {stats.total_sent}
+                {stats.sent}
               </div>
               <div className="text-xs text-muted-foreground">Sent</div>
             </div>
 
             <div className="space-y-1">
               <div className="text-2xl font-bold text-green-600">
-                {stats.total_responses}
+                {stats.completed}
               </div>
-              <div className="text-xs text-muted-foreground">Responses</div>
+              <div className="text-xs text-muted-foreground">Completed</div>
             </div>
 
             <div className="space-y-1">
               <div className="text-2xl font-bold text-orange-600">
-                {stats.pending_followups}
+                {stats.pending}
               </div>
               <div className="text-xs text-muted-foreground">Pending</div>
             </div>
           </div>
 
-          {/* Response Breakdown */}
+          {/* Status Breakdown */}
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Accepted</span>
+                <span>Completed</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{stats.accepted_responses}</span>
-                <Badge variant="outline" className="text-green-600">
-                  {acceptanceRate}%
-                </Badge>
-              </div>
+              <span className="font-semibold">{stats.completed}</span>
             </div>
 
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span>Rejected</span>
+                <Clock className="h-4 w-4 text-orange-600" />
+                <span>Pending</span>
               </div>
-              <span className="font-semibold">{stats.rejected_responses}</span>
+              <span className="font-semibold">{stats.pending}</span>
             </div>
 
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <span>Requested Changes</span>
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <span>Failed</span>
               </div>
-              <span className="font-semibold">{stats.requested_changes_responses}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-600" />
-                <span>No Response</span>
-              </div>
-              <span className="font-semibold">{stats.no_response}</span>
+              <span className="font-semibold">{stats.failed}</span>
             </div>
           </div>
 
@@ -146,7 +126,7 @@ export function FollowUpStatsCard({ accountId, className }: FollowUpStatsCardPro
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Response Rate</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold">{responseRate}%</span>
+                  <span className="font-semibold">{Math.round(responseRate)}%</span>
                   {responseRate >= 60 ? (
                     <TrendingUp className="h-4 w-4 text-green-600" />
                   ) : responseRate >= 40 ? (
@@ -203,22 +183,12 @@ export function FollowUpStatsCard({ accountId, className }: FollowUpStatsCardPro
           <div className="pt-4 border-t">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="space-y-1">
-                <div className="text-muted-foreground">Completed</div>
-                <div className="font-semibold">{stats.total_completed}</div>
+                <div className="text-muted-foreground">Cancelled</div>
+                <div className="font-semibold text-gray-600">{stats.cancelled}</div>
               </div>
               <div className="space-y-1">
                 <div className="text-muted-foreground">Failed</div>
-                <div className="font-semibold text-red-600">{stats.total_failed}</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-muted-foreground">Cancelled</div>
-                <div className="font-semibold text-gray-600">{stats.total_cancelled}</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-muted-foreground">Overdue</div>
-                <div className="font-semibold text-orange-600">
-                  {stats.overdue_followups}
-                </div>
+                <div className="font-semibold text-red-600">{stats.failed}</div>
               </div>
             </div>
           </div>

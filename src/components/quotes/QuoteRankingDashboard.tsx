@@ -4,7 +4,7 @@ import { useBulkScoreQuotes } from "@/hooks/useQuoteScoring";
 import { QuoteRankingCard } from "./QuoteRankingCard";
 import { QuoteComparisonTable } from "./QuoteComparisonTable";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Table2, LayoutGrid, AlertCircle } from "lucide-react";
+import { RefreshCw, Table2, LayoutGrid, AlertCircle, Trophy } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 

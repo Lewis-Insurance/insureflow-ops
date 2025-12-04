@@ -28,7 +28,7 @@ import {
 } from "@/hooks/useKnowledgeAnalytics";
 import { formatDistanceToNow } from "date-fns";
 
-export function KnowledgeAnalytics() {
+export default function KnowledgeAnalytics() {
   const [selectedTab, setSelectedTab] = useState("overview");
 
   const { data: usageStats, isLoading: isLoadingUsage } = useKnowledgeUsageStats(100);

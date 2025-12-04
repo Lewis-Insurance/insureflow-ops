@@ -1,4 +1,4 @@
-import { useQuoteFollowUps } from "@/hooks/useQuoteFollowups";
+import { useQuoteFollowups } from "@/hooks/useQuoteFollowups";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ interface QuoteFollowUpTimelineProps {
 }
 
 export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
-  const { data: followups, isLoading, error } = useQuoteFollowUps(quoteId);
+  const { data: followups, isLoading, error } = useQuoteFollowups(quoteId);
 
   if (isLoading) {
     return (
