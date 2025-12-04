@@ -552,7 +552,7 @@ export const useCampaignExecutionStats = (campaignId: string | undefined) => {
       if (error) throw error;
 
       // Calculate stats
-      const executions = data[];
+      const executions = data || [];
       const total = executions.length;
       const successful = executions.filter(e => e.status === 'sent' || e.status === 'delivered').length;
       const failed = executions.filter(e => e.status === 'failed').length;
@@ -1003,7 +1003,7 @@ export const useCampaignAnalytics = (campaignId: string | undefined) => {
 
       if (enrollmentsError) throw enrollmentsError;
 
-      const enrollmentsData = enrollments[];
+      const enrollmentsData = enrollments || [];
       const campaignData = campaign;
 
       return {

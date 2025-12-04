@@ -37,7 +37,7 @@ export function useKnowledgeBase() {
       if (kbBaseRes.error) throw kbBaseRes.error;
       if (kbEntriesRes.error) throw kbEntriesRes.error;
 
-      const baseData = (kbBaseRes.data || [])[];
+      const baseData = (kbBaseRes.data || []);
       const entriesFromKnowledgeBase = baseData as KnowledgeEntry[];
 
       // Map kb_entries rows to KnowledgeEntry shape
