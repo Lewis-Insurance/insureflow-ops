@@ -253,7 +253,7 @@ function extractPolicyInfo(text: string) {
 }
 
 function extractInsuranceTerms(text: string) {
-  const glossaryTerms = [];
+  const glossaryTerms: any[] = [];
   
   // Common definition patterns in insurance docs
   const definitionPatterns = [
@@ -481,7 +481,7 @@ serve(async (req) => {
     console.log('Extracted Florida-specific info:', JSON.stringify(floridaInfo, null, 2));
     
     // Parse the text into knowledge base entries
-    const entries = [];
+    const entries: any[] = [];
     
     // Try multiple Q&A patterns including insurance-specific formats
     const qaPatterns = [

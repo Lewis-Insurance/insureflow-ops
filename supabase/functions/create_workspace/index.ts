@@ -293,7 +293,7 @@ serve(async (req) => {
               console.log(`✓ Parseur upload successful (raw):`, responseText.substring(0, 200));
             }
           }
-        } catch (err) {
+        } catch (err: unknown) {
           console.error(`Failed to process ${fileName}:`, {
             error: err.message,
             stack: err.stack,
@@ -323,7 +323,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Create workspace error:", err);
     return new Response(JSON.stringify({ success: false, error: err.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

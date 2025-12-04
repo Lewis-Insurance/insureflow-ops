@@ -11,7 +11,11 @@ serve(async (req) => {
   }
 
   try {
-    const results = {
+    const results: {
+      env_check: Record<string, any>;
+      tests: Record<string, any>;
+      summary: { all_tests_passed: boolean; failed_tests: string[] };
+    } = {
       env_check: {},
       tests: {},
       summary: { all_tests_passed: false, failed_tests: [] }

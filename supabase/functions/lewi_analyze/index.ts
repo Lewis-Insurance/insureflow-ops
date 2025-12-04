@@ -109,7 +109,7 @@ serve(async (req) => {
       JSON.stringify({ success: true, mode, doc_count: docs.length, output }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Lewi error:", err);
     return new Response(
       JSON.stringify({ success: false, error: err.message }),

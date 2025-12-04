@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
             console.log(`✓ Found: ${doc.storage_path} in ${bucket}`);
             break;
           }
-        } catch (err) {
+        } catch (err: unknown) {
           console.error(`Error checking ${bucket}:`, err);
         }
       }

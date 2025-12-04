@@ -224,7 +224,7 @@ Provide clear findings with specific references to the documents.`;
         status: 200,
       }
     );
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Analysis error:", err);
     
     // Try to update workspace status to failed

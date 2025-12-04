@@ -187,6 +187,7 @@ serve(async (req) => {
     };
 
     // Start background processing
+    // @ts-ignore - EdgeRuntime is a Deno Edge Runtime global
     EdgeRuntime.waitUntil(processDocuments());
 
     // Return immediate response

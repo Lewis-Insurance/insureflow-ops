@@ -240,7 +240,7 @@ serve(async (req) => {
         });
 
         console.log(`Successfully generated task: ${taskTitle}`);
-      } catch (ruleError) {
+      } catch (ruleError: unknown) {
         console.error(`Error processing rule ${rule.name}:`, ruleError);
 
         // Log failure

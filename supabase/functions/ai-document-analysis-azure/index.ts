@@ -174,6 +174,7 @@ serve(async (req) => {
 
     if (!ocrResult) throw new Error('All Azure OCR API versions failed');
 
+    if (!workingConfig) throw new Error('No working configuration found');
     console.log(`Using config: ${workingConfig.path}/${workingConfig.model} v${workingConfig.version}`);
 
     // Extract text from all pages

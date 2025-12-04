@@ -229,7 +229,7 @@ Always cite which knowledge entries you used to answer the question.`
               .eq('id', entry.id);
 
             updated++;
-          } catch (err) {
+          } catch (err: unknown) {
             console.error(`Failed to update embedding for ${entry.id}:`, err);
           }
         }

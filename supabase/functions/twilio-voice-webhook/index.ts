@@ -162,7 +162,7 @@ serve(async (req) => {
     return new Response(twiml, {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Twilio voice webhook error:', err);
     const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="alice">We are experiencing technical difficulties. Please try again later.</Say>\n</Response>`;
     return new Response(errorTwiml, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/xml' } });

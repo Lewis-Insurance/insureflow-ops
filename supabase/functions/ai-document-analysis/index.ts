@@ -47,7 +47,7 @@ async function getCachedOCR(supabase: any, documentHash: string, path: string): 
     }
     
     return null;
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('Cache retrieval failed:', err);
     return null;
   }
@@ -70,7 +70,7 @@ async function cacheOCR(supabase: any, documentHash: string, path: string, ocrTe
     });
     
     console.log('✓ Cached OCR result for:', path);
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('Cache save failed (non-critical):', err);
   }
 }
@@ -140,7 +140,7 @@ async function fetchWithRetry(
       lastError = new Error(
         `HTTP ${response.status}: ${response.statusText} (attempt ${attempt + 1}/${maxRetries + 1})`
       );
-    } catch (err) {
+    } catch (err: unknown) {
       lastError = err as Error;
       console.error(`Fetch attempt ${attempt + 1} failed:`, err);
       
@@ -203,7 +203,7 @@ serve(async (req) => {
     let requestBody;
     try {
       requestBody = await req.json();
-    } catch (err) {
+    } catch (err: unknown) {
       throw new Error('Invalid JSON in request body');
     }
 
@@ -340,7 +340,7 @@ serve(async (req) => {
               path: path,
               warnings: warnings
             };
-          } catch (err) {
+          } catch (err: unknown) {
             console.error(`✗ Error processing document at index ${idx}:`, err);
             throw err;
           }
@@ -884,7 +884,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       let result;
       try {
         result = JSON.parse(errorText);
-      } catch (err) {
+      } catch (err: unknown) {
         throw new AIServiceError('AI service returned invalid JSON response');
       }
 

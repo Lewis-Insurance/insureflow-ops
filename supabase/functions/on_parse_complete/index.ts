@@ -92,7 +92,7 @@ serve(async (req) => {
       headers: corsHeaders,
       status: 200,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("on_parse_complete error:", err);
     return new Response(JSON.stringify({ success: false, error: err.message }), {
       headers: corsHeaders,
