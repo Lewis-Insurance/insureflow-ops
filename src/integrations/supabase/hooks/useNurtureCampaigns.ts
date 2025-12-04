@@ -158,7 +158,7 @@ export const useCreateNurtureCampaign = () => {
           steps: campaign.steps,
           account_id: membership.account_id,
           created_by: user.id,
-          status: 'draft',
+          active: campaign.active ?? false,
         })
         .select()
         .single();

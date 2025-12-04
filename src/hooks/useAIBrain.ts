@@ -24,19 +24,19 @@ export function useAIBrain() {
 
       if (error) {
         console.warn('RPC failed, falling back to knowledge_base table:', error);
-        
+
         // Fallback to reading from knowledge_base table
         const { data: viewData, error: viewError } = await supabase
           .from('knowledge_base')
           .select('title, content, category, tags, source')
           .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
           .limit(5);
-        
+
         if (viewError) {
           console.error('Fallback query failed:', viewError);
           throw viewError;
         }
-        
+
         return {
           shortAnswer: 'Found matching knowledge entries',
           fullAnswer: null,
@@ -44,8 +44,9 @@ export function useAIBrain() {
           fallback: true
         };
       }
-      
-      const result = data;
+
+      // RPC returns an array, get first result
+      const result = Array.isArray(data) ? data[0] : data;
       return {
         shortAnswer: result?.faq_short_answer || 'No answer found',
         fullAnswer: result?.answer_canonical_markdown || null,

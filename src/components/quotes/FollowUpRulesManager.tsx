@@ -91,7 +91,7 @@ export function FollowUpRulesManager() {
 
     if (editingRule) {
       updateRule.mutate(
-        { ruleId: editingRule.id, updates: formData },
+        { id: editingRule.id, updates: formData },
         {
           onSuccess: () => {
             setIsDialogOpen(false);
