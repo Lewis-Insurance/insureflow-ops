@@ -88,7 +88,7 @@ export function useCreateIssue() {
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('issues')
+        .from('issues' as any)
         .insert({
           ...request,
           reported_by: user.id,
@@ -134,7 +134,7 @@ export function useIssues(filters?: {
     queryKey: ['issues', filters],
     queryFn: async () => {
       let query = supabase
-        .from('issues')
+        .from('issues' as any)
         .select(`
           *,
           reported_by_user:auth.users!issues_reported_by_fkey(id, email, raw_user_meta_data),
@@ -192,7 +192,7 @@ export function useIssue(issueId?: string) {
       if (!issueId) return null;
 
       const { data, error } = await supabase
-        .from('issues')
+        .from('issues' as any)
         .select(`
           *,
           reported_by_user:auth.users!issues_reported_by_fkey(id, email, raw_user_meta_data),
@@ -231,7 +231,7 @@ export function useUpdateIssue() {
   return useMutation({
     mutationFn: async ({ issue_id, updates }: UpdateIssueRequest) => {
       const { data, error } = await supabase
-        .from('issues')
+        .from('issues' as any)
         .update(updates)
         .eq('id', issue_id)
         .select()
@@ -283,13 +283,13 @@ export function useAddIssueComment() {
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('issue_comments')
+        .from('issue_comments' as any)
         .insert({
           issue_id,
           author_id: user.id,
           comment_text,
           parent_comment_id,
-        })
+        } as any)
         .select()
         .single();
 
@@ -332,7 +332,7 @@ export function useVoteIssue() {
       if (remove) {
         // Remove vote
         const { error } = await supabase
-          .from('issue_votes')
+          .from('issue_votes' as any)
           .delete()
           .eq('issue_id', issue_id)
           .eq('user_id', user.id);
@@ -341,10 +341,10 @@ export function useVoteIssue() {
         return { action: 'removed' };
       } else {
         // Add vote
-        const { error } = await supabase.from('issue_votes').insert({
+        const { error } = await supabase.from('issue_votes' as any).insert({
           issue_id,
           user_id: user.id,
-        });
+        } as any);
 
         if (error) throw error;
         return { action: 'added' };
@@ -407,7 +407,7 @@ export function useUploadIssueAttachment() {
 
       // Create attachment record
       const { data, error } = await supabase
-        .from('issue_attachments')
+        .from('issue_attachments' as any)
         .insert({
           issue_id,
           uploaded_by: user.id,
@@ -418,7 +418,7 @@ export function useUploadIssueAttachment() {
           mime_type: file.type,
           attachment_type,
           description,
-        })
+        } as any)
         .select()
         .single();
 
@@ -450,7 +450,7 @@ export function useIssueStats() {
   return useQuery({
     queryKey: ['issue-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('issues').select('status, category, severity');
+      const { data, error } = await supabase.from('issues' as any).select('status, category, severity');
 
       if (error) throw error;
 
@@ -496,7 +496,7 @@ export function useHasVoted(issueId?: string) {
       if (!user) return false;
 
       const { data, error } = await supabase
-        .from('issue_votes')
+        .from('issue_votes' as any)
         .select('id')
         .eq('issue_id', issueId)
         .eq('user_id', user.id)
@@ -517,7 +517,7 @@ export function useIssueLabels() {
     queryKey: ['issue-labels'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('issue_labels')
+        .from('issue_labels' as any)
         .select('*')
         .eq('is_active', true)
         .order('name');
