@@ -37,7 +37,7 @@ export function useRecurringTasks() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setRecurrenceRules((data as any) || []);
+      setRecurrenceRules(data || []);
     } catch (error: any) {
       console.error('Error fetching recurrence rules:', error);
       toast({
@@ -54,7 +54,7 @@ export function useRecurringTasks() {
     try {
       const { data, error } = await supabase
         .from('task_recurrence_rules')
-        .insert(ruleData as any)
+        .insertruleData
         .select()
         .single();
 
@@ -81,7 +81,7 @@ export function useRecurringTasks() {
     try {
       const { error } = await supabase
         .from('task_recurrence_rules')
-        .update(updates as any)
+        .updateupdates
         .eq('id', ruleId);
 
       if (error) throw error;

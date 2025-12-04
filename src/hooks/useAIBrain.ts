@@ -15,7 +15,7 @@ export function useAIBrain() {
     setLoading(true);
     try {
       // Try the RPC endpoint first
-      const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
+      const { data, error } = await supabase.rpc('kb_resolve_answer', {
         q: query,
         in_carrier: carrier || null,
         in_program: program || null,
@@ -27,7 +27,7 @@ export function useAIBrain() {
         
         // Fallback to reading from knowledge_base table
         const { data: viewData, error: viewError } = await supabase
-          .from('knowledge_base' as any)
+          .from('knowledge_base')
           .select('title, content, category, tags, source')
           .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
           .limit(5);
@@ -45,7 +45,7 @@ export function useAIBrain() {
         };
       }
       
-      const result = data as any;
+      const result = data;
       return {
         shortAnswer: result?.faq_short_answer || 'No answer found',
         fullAnswer: result?.answer_canonical_markdown || null,
