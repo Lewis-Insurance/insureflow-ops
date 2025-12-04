@@ -11,48 +11,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
-          
+          bun-version: latest
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: bun install --frozen-lockfile
+
       - name: TypeScript strict check
-        run: npx tsc -p tsconfig.strict.json --noEmit
+        run: bunx tsc -p tsconfig.strict.json --noEmit
         
   lint:
     name: ESLint Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
-          
+          bun-version: latest
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: bun install --frozen-lockfile
+
       - name: ESLint check
-        run: npm run lint:strict
+        run: bun run lint:strict
         
   build:
     name: Build Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
-          
+          bun-version: latest
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: bun install --frozen-lockfile
+
       - name: Build application
-        run: npm run build
+        run: bun run build
