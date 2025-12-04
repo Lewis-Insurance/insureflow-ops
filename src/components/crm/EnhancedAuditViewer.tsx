@@ -13,6 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { AuditLog, DetailedAuditLog, ImpersonationLog, ProfileAccessLog } from '@/types/crm-enhanced-clean';
 
+// Type guard for ip_address
+function isStringOrNull(value: unknown): value is string | null {
+  return typeof value === 'string' || value === null;
+}
+
 interface EnhancedAuditViewerProps {
   entityId?: string;
   entityType?: string;
@@ -187,7 +192,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
       </div>
       <div className="flex items-center gap-2">
         {getActionBadge(log.action)}
-        {log.ip_address && (
+        {log.ip_address && isStringOrNull(log.ip_address) && (
           <Badge variant="outline" className="text-xs">
             {log.ip_address}
           </Badge>
@@ -389,7 +394,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {new Date(log.created_at).toLocaleString()}
-                                {log.ip_address && ` • IP: ${log.ip_address}`}
+                                {log.ip_address && isStringOrNull(log.ip_address) && ` • IP: ${log.ip_address}`}
                               </div>
                             </div>
                           </div>

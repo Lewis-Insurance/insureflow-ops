@@ -87,7 +87,7 @@ export const useCreateAutomationRule = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+    mutationFn: async (rule: Omit<AutomationRule, 'id' | 'account_id' | 'created_at' | 'updated_at' | 'created_by'>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 

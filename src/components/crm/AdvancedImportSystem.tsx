@@ -13,6 +13,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { ImportBatch, ImportStaging, DataExportRequest } from '@/types/crm-enhanced-clean';
 
+// Type guard for validation_errors
+function isValidationErrorArray(value: unknown): value is any[] {
+  return Array.isArray(value);
+}
+
 interface AdvancedImportSystemProps {
   onImportComplete?: () => void;
 }
@@ -458,7 +463,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
                   <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto">
                     {JSON.stringify(row.raw_data, null, 2)}
                   </pre>
-                  {row.validation_errors && row.validation_errors.length > 0 && (
+                  {row.validation_errors && isValidationErrorArray(row.validation_errors) && row.validation_errors.length > 0 && (
                     <div className="text-xs text-destructive mt-1">
                       Errors: {JSON.stringify(row.validation_errors)}
                     </div>
