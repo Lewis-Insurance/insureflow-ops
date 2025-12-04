@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import pdfParse from 'npm:pdf-parse@1.1.1';
+// TEMPORARILY DISABLED: pdf-parse is not fully compatible with Deno runtime
+// TODO: Replace with Deno-native PDF parser or use external service
+// import pdfParse from 'npm:pdf-parse@1.1.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -84,8 +86,13 @@ serve(async (req) => {
     console.log('STEP 2: Extracting text from ALL pages');
     console.log('----------------------------------------');
 
+    // TEMPORARILY DISABLED: pdf-parse not compatible with Deno
+    // TODO: Implement Deno-native PDF parsing or use external service
+    throw new Error('PDF parsing temporarily disabled - awaiting Deno-compatible solution');
+
+    /* COMMENTED OUT UNTIL DENO-COMPATIBLE SOLUTION FOUND
     const pdfData = await pdfParse(new Uint8Array(pdfBuffer));
-    
+
     const fullText = pdfData.text;
     const pageCount = pdfData.numpages;
 
@@ -95,7 +102,9 @@ serve(async (req) => {
     if (fullText.length === 0) {
       throw new Error('No text could be extracted from PDF');
     }
+    */
 
+    /* STEP 3 ALSO DISABLED - DEPENDS ON PDF PARSING
     // STEP 3: AI Analysis with Lovable AI
     console.log('----------------------------------------');
     console.log('STEP 3: Analyzing with Lovable AI');
@@ -254,6 +263,7 @@ Return ONLY the JSON object, no other text.`;
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+    */ // End of commented out section
 
   } catch (error) {
     console.error('========================================');
