@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// TEMPORARILY DISABLED: Resend npm package not compatible with Deno Edge Runtime
+// TODO: Replace with Deno-compatible email service
+// import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +21,22 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // TEMPORARILY DISABLED - Resend integration not Deno-compatible
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "COI email sending temporarily disabled - awaiting Deno-compatible email solution"
+    }),
+    {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    }
+  );
+
+  /* COMMENTED OUT UNTIL DENO-COMPATIBLE SOLUTION
   try {
     const { to, certificateNumber, certificateUrl, holderName }: SendCOIEmailRequest = await req.json();
 
@@ -130,19 +146,20 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error sending COI email:", error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
+      JSON.stringify({
+        success: false,
+        error: error.message
       }),
       {
         status: 500,
-        headers: { 
-          "Content-Type": "application/json", 
-          ...corsHeaders 
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
         },
       }
     );
   }
+  */ // End of commented section
 };
 
 serve(handler);
