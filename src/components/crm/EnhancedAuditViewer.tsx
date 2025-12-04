@@ -127,7 +127,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         if (impersonationError) {
           console.error('Error fetching impersonation logs:', impersonationError);
         } else {
-          setImpersonationLogs(impersonationData || []);
+          setImpersonationLogs((impersonationData || []) as ImpersonationLog[]);
         }
 
         // Fetch profile access logs

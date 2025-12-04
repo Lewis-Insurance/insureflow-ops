@@ -276,7 +276,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
     // Save user message to database (will update with kb_record_id later if found)
     if (conversationId) {
-      await supabase.from('ai_messages').insert({
+      await supabase.from('ai_messages').insert([{
         conversation_id: conversationId,
         role: 'user',
         content: userMessage.content,
@@ -284,7 +284,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
           documents: userMessage.documents,
           kb_record_id: null // Will be set later if KB is used
         },
-      });
+      }]);
     }
 
     try {

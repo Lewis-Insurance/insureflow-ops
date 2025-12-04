@@ -113,7 +113,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       current_premium: lead.current_premium?.toString() || "",
       estimated_effective_date: (lead).estimated_effective_date || "",
       notes: lead.notes || "",
-      status: lead.status,
+      status: lead.status as "contacted" | "lost" | "new" | "nurturing" | "qualified" | "quoted" | "won",
     } : undefined,
   });
 

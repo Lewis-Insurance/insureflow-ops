@@ -245,7 +245,7 @@ export function DataExport() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => requestExport(type)}
+                  onClick={() => requestExport(type as "activity" | "full" | "profile")}
                   disabled={requesting === type}
                   className="w-full"
                 >

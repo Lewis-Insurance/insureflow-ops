@@ -66,8 +66,8 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (exportError) throw exportError;
 
-      setImportBatches(batchData || []);
-      setExportRequests(exportData || []);
+      setImportBatches((batchData || []) as ImportBatch[]);
+      setExportRequests((exportData || []) as DataExportRequest[]);
     } catch (error) {
       console.error('Error fetching import data:', error);
       toast({
@@ -224,7 +224,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (error) throw error;
 
-      setStagingData(data || []);
+      setStagingData((data || []) as ImportStaging[]);
       setSelectedBatch(batch);
       setShowStagingPreview(true);
     } catch (error) {
