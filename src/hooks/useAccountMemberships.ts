@@ -12,7 +12,7 @@ export function useAccountMemberships() {
   const createOwnerMembership = useCallback(async (accountId: string, userId: string): Promise<boolean> => {
     try {
       // Cast to any to bypass TypeScript type checking until types are regenerated
-      const { error } = await (supabase.rpc as any)('upsert_membership', {
+      const { error } = await supabase.rpc('upsert_membership', {
         p_account: accountId,
         p_user: userId,
         p_role: 'owner'
@@ -42,7 +42,7 @@ export function useAccountMemberships() {
   ): Promise<boolean> => {
     try {
       // Cast to any to bypass TypeScript type checking until types are regenerated
-      const { error } = await (supabase.rpc as any)('upsert_membership', {
+      const { error } = await supabase.rpc('upsert_membership', {
         p_account: accountId,
         p_user: userId,
         p_role: role

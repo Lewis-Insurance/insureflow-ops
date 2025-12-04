@@ -285,11 +285,11 @@ export function useUpdateLead() {
 
       if ('status' in dbUpdates) {
         if (statusKey && statusKey !== 'status') {
-          dbUpdates[statusKey] = (dbUpdates as any).status;
-          delete (dbUpdates as any).status;
+          dbUpdates[statusKey] = dbUpdates.status;
+          delete dbUpdates.status;
         } else if (!statusKey) {
           // If no status-like column exists, don't attempt to update it
-          delete (dbUpdates as any).status;
+          delete dbUpdates.status;
         }
       }
 

@@ -98,7 +98,7 @@ export function useDocumentIntelligence() {
       }
       
       if (filters?.category && filters.category.length > 0) {
-        query = query.in('category', filters.category as any);
+        query = query.in('category', filters.category);
       }
       
       if (filters?.dateFrom) {

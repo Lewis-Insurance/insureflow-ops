@@ -460,7 +460,7 @@ export const useImportAORenewals = () => {
             if (importType === "update") {
               const { error: updateError } = await supabase
                 .from("ao_renewals")
-                .update(renewal as any)
+                .update(renewal)
                 .eq("id", existing.id);
 
               if (updateError) {

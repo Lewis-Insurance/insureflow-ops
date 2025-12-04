@@ -273,7 +273,7 @@ export function useCOIGeneration() {
       // Append version to history
       await supabase.rpc('append_coi_version', {
         p_coi_id: coiId,
-        p_version_data: versionData as any,
+        p_version_data: versionData ,
       });
 
       // Update COI record with document URL and current version
@@ -618,7 +618,7 @@ export function useCOIGeneration() {
           metadata: {
             coi_emailed_to: recipientEmail,
             coi_emailed_at: new Date().toISOString(),
-          } as any,
+          } ,
         })
         .eq('id', ticketId);
 
