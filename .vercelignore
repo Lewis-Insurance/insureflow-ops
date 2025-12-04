@@ -1,0 +1,18 @@
+# Vercel build ignores
+node_modules
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+coverage
+.vscode
+.idea
+
+# Supabase (handled separately)
+supabase/.branches
+supabase/.temp
+supabase/config.toml
+
+# Development files
+*.tsbuildinfo
