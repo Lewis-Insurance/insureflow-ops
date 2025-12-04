@@ -304,7 +304,7 @@ export interface ConsentRecord {
   method: 'verbal' | 'written' | 'web_form' | 'sms_keyword' | 'api';
   status: 'granted' | 'revoked';
   evidence_ref?: string;
-  ip_address?: string;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string;
   location_data?: any;
   notes?: string;
@@ -324,7 +324,7 @@ export interface AuditLog {
   user_id?: string | null;
   user_name?: string | null;
   session_id?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   changed_fields?: any | null; // Using any to match Json type
   metadata?: any | null; // Using any to match Json type
@@ -340,7 +340,7 @@ export interface DetailedAuditLog {
   user_id?: string | null;
   user_name?: string | null;
   session_id?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   changed_fields?: any | null; // Using any to match Json type
   metadata?: any | null; // Using any to match Json type
@@ -369,7 +369,7 @@ export interface ConsentEvidence {
   expires_at?: string | null;
   revoked_at?: string | null;
   evidence_ref?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   location_data?: any | null; // Using any to match Json type
   notes?: string | null;
@@ -377,13 +377,13 @@ export interface ConsentEvidence {
   created_at: string;
 }
 
-// User Management  
+// User Management
 export interface UserSession {
   id: string;
   user_id: string;
   session_token: string;
   device_info?: Record<string, any> | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   location_data?: Record<string, any> | null;
   last_active: string;
@@ -399,7 +399,7 @@ export interface ImpersonationLog {
   reason?: string | null;
   started_at: string;
   ended_at?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   actions_taken?: Record<string, any>[] | null;
   created_at: string;
@@ -527,7 +527,7 @@ export interface ProfileAccessLog {
   accessor_user_id?: string | null;
   action: string;
   details?: Record<string, any> | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   created_at: string;
 }

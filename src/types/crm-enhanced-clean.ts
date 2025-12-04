@@ -334,7 +334,7 @@ export interface AuditLog {
   user_id?: string | null;
   user_name?: string | null;
   session_id?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   changed_fields?: any | null;
   metadata?: any | null;
@@ -350,7 +350,7 @@ export interface DetailedAuditLog {
   user_id?: string | null;
   user_name?: string | null;
   session_id?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   changed_fields?: any | null;
   metadata?: any | null;
@@ -379,7 +379,7 @@ export interface ConsentEvidence {
   expires_at?: string | null;
   revoked_at?: string | null;
   evidence_ref?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   location_data?: any | null;
   notes?: string | null;
@@ -393,7 +393,7 @@ export interface UserSession {
   user_id: string;
   session_token: string;
   device_info?: any | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   location_data?: any | null;
   last_active: string;
@@ -409,7 +409,7 @@ export interface ImpersonationLog {
   reason?: string | null;
   started_at: string;
   ended_at?: string | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   actions_taken?: any[] | null;
   created_at: string;
@@ -508,7 +508,7 @@ export interface ProfileAccessLog {
   accessor_user_id?: string | null;
   action: string;
   details?: any | null;
-  ip_address?: string | null;
+  ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   created_at: string;
 }
