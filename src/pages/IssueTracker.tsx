@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TableSkeleton } from '@/components/ui/skeleton-components';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function IssueTracker() {
   const navigate = useNavigate();
@@ -134,7 +135,8 @@ export default function IssueTracker() {
   ).length || 0;
 
   return (
-    <div className="container mx-auto py-8">
+    <AppLayout>
+      <div className="container mx-auto py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -441,5 +443,6 @@ export default function IssueTracker() {
         </TabsContent>
       </Tabs>
     </div>
+    </AppLayout>
   );
 }

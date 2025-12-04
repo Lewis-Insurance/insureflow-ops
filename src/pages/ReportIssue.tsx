@@ -26,6 +26,7 @@ import {
   Lightbulb,
   CheckCircle2,
 } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function ReportIssue() {
   const navigate = useNavigate();
@@ -93,7 +94,8 @@ export default function ReportIssue() {
   const isFormValid = formData.title && formData.description && formData.category;
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
+    <AppLayout>
+      <div className="container mx-auto py-8 max-w-4xl">
       {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/issues')} className="mb-4">
@@ -424,5 +426,6 @@ export default function ReportIssue() {
         </div>
       </form>
     </div>
+    </AppLayout>
   );
 }

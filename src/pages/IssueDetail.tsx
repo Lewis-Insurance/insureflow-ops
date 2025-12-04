@@ -39,6 +39,7 @@ import {
 import { format } from 'date-fns';
 import { TableSkeleton } from '@/components/ui/skeleton-components';
 import { Separator } from '@/components/ui/separator';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function IssueDetail() {
   const { issueId } = useParams();
@@ -115,7 +116,8 @@ export default function IssueDetail() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <AppLayout>
+      <div className="container mx-auto py-8">
       {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/issues')} className="mb-4">
@@ -498,5 +500,6 @@ export default function IssueDetail() {
         </div>
       </div>
     </div>
+    </AppLayout>
   );
 }
