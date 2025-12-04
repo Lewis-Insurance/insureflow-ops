@@ -376,7 +376,7 @@ export const useExecutionStats = (ruleId: string | undefined) => {
 
       if (error) throw error;
 
-      const executions = data as any[];
+      const executions = data[];
       const total = executions.length;
       const success = executions.filter(e => e.status === 'success').length;
       const failed = executions.filter(e => e.status === 'failed').length;

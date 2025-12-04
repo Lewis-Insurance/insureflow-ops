@@ -79,7 +79,7 @@ export default function CustomerEdit() {
           .from('accounts')
           .update({
             name: data.name.trim(),
-            type: data.type === 'business' ? 'commercial_business' : data.type as any,
+            type: data.type === 'business' ? 'commercial_business' : data.type,
             email: data.email?.trim() || null,
             phone: data.phone?.trim() || null,
           })

@@ -76,7 +76,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
       
       try {
         // Show recent tasks - tasks table doesn't have lead relationships
-        const response = await (supabase as any)
+        const response = await (supabase)
           .from("tasks")
           .select("*")
           .order("due_at", { ascending: true })
@@ -99,7 +99,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
       if (!lead?.id) return [];
       
       try {
-        const response = await (supabase as any)
+        const response = await (supabase)
           .from("lead_activities")
           .select("*")
           .eq("lead_id", lead.id)
@@ -252,8 +252,8 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
 
   if (!lead) return null;
 
-  const insuranceTypes = (lead as any).insurance_types || [];
-  const address = (lead as any).address_line1;
+  const insuranceTypes = (lead).insurance_types || [];
+  const address = (lead).address_line1;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -404,9 +404,9 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       {isEditing ? (
                         <Input
-                          value={(editedLead as any).address_line1 !== undefined ? (editedLead as any).address_line1 : address}
+                          value={(editedLead).address_line1 !== undefined ? (editedLead).address_line1 : address}
                           onChange={(e) =>
-                            setEditedLead({ ...editedLead, address_line1: e.target.value } as any)
+                            setEditedLead({ ...editedLead, address_line1: e.target.value })
                           }
                         />
                       ) : (
@@ -414,32 +414,32 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       )}
                     </div>
                   )}
-                  {((lead as any).city || (lead as any).state || (lead as any).zip_code) && (
+                  {((lead).city || (lead).state || (lead).zip_code) && (
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground opacity-0" />
                       {isEditing ? (
                         <div className="flex gap-2 flex-1">
                           <Input
                             placeholder="City"
-                            value={(editedLead as any).city !== undefined ? (editedLead as any).city : (lead as any).city || ""}
+                            value={(editedLead).city !== undefined ? (editedLead).city : (lead).city || ""}
                             onChange={(e) =>
-                              setEditedLead({ ...editedLead, city: e.target.value } as any)
+                              setEditedLead({ ...editedLead, city: e.target.value })
                             }
                             className="flex-1"
                           />
                           <Input
                             placeholder="State"
-                            value={(editedLead as any).state !== undefined ? (editedLead as any).state : (lead as any).state || ""}
+                            value={(editedLead).state !== undefined ? (editedLead).state : (lead).state || ""}
                             onChange={(e) =>
-                              setEditedLead({ ...editedLead, state: e.target.value } as any)
+                              setEditedLead({ ...editedLead, state: e.target.value })
                             }
                             className="w-20"
                           />
                           <Input
                             placeholder="Zip"
-                            value={(editedLead as any).zip_code !== undefined ? (editedLead as any).zip_code : (lead as any).zip_code || ""}
+                            value={(editedLead).zip_code !== undefined ? (editedLead).zip_code : (lead).zip_code || ""}
                             onChange={(e) =>
-                              setEditedLead({ ...editedLead, zip_code: e.target.value } as any)
+                              setEditedLead({ ...editedLead, zip_code: e.target.value })
                             }
                             className="w-24"
                           />
@@ -447,9 +447,9 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       ) : (
                         <span className="text-sm">
                           {[
-                            (lead as any).city,
-                            (lead as any).state,
-                            (lead as any).zip_code
+                            (lead).city,
+                            (lead).state,
+                            (lead).zip_code
                           ].filter(Boolean).join(", ")}
                         </span>
                       )}
@@ -535,9 +535,9 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
               <LeadScoreBreakdown
                 leadId={lead.id}
                 score={lead.lead_score}
-                factors={(lead as any).scoring_factors}
-                recommendation={(lead as any).scoring_recommendation}
-                lastScoredAt={(lead as any).last_scored_at}
+                factors={(lead).scoring_factors}
+                recommendation={(lead).scoring_recommendation}
+                lastScoredAt={(lead).last_scored_at}
               />
 
               <Separator />

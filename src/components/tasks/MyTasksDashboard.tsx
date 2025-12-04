@@ -208,14 +208,14 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
           {/* Customer & Policy Info from metadata */}
           {task.metadata && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {((task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name) && (
+              {((task.metadata).renewal_customer_name || (task.metadata).customer_name) && (
                 <Badge variant="secondary" className="font-normal">
-                  {(task.metadata as any).renewal_customer_name || (task.metadata as any).customer_name}
+                  {(task.metadata).renewal_customer_name || (task.metadata).customer_name}
                 </Badge>
               )}
-              {((task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number) && (
+              {((task.metadata).renewal_policy_number || (task.metadata).policy_number) && (
                 <Badge variant="outline" className="font-normal">
-                  Policy: {(task.metadata as any).renewal_policy_number || (task.metadata as any).policy_number}
+                  Policy: {(task.metadata).renewal_policy_number || (task.metadata).policy_number}
                 </Badge>
               )}
             </div>

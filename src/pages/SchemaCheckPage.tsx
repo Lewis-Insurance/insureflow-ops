@@ -37,7 +37,7 @@ export default function SchemaCheckPage() {
       console.log(`Checking: ${tableName}`);
       
       const { data, error } = await supabase
-        .from(tableName as any)
+        .from(tableName)
         .select('*')
         .limit(1)
         .maybeSingle();

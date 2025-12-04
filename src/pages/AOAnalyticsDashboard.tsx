@@ -90,12 +90,12 @@ export default function AOAnalyticsDashboard() {
           <TabsContent value="pipeline" className="space-y-6 mt-6">
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PipelineFunnelChart data={pipelineData as any || []} isLoading={pipelineLoading} />
-              <PriorityDistributionChart data={priorityData as any || []} isLoading={priorityLoading} />
+              <PipelineFunnelChart data={pipelineData || []} isLoading={pipelineLoading} />
+              <PriorityDistributionChart data={priorityData || []} isLoading={priorityLoading} />
             </div>
 
             {/* Monthly Forecast - Full Width */}
-            <MonthlyForecastChart data={forecastData as any || []} isLoading={forecastLoading} />
+            <MonthlyForecastChart data={forecastData || []} isLoading={forecastLoading} />
 
             {/* Premium Analytics */}
             <PremiumAnalytics data={renewalsData || []} isLoading={renewalsLoading} />
@@ -110,7 +110,7 @@ export default function AOAnalyticsDashboard() {
             <TopPerformersTable data={renewalsData || []} isLoading={renewalsLoading} />
 
             {/* At-Risk Renewals Table */}
-            <AtRiskRenewalsTable data={atRiskData as any || []} isLoading={atRiskLoading} />
+            <AtRiskRenewalsTable data={atRiskData || []} isLoading={atRiskLoading} />
           </TabsContent>
 
           <TabsContent value="quotes" className="mt-6">

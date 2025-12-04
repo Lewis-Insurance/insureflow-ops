@@ -141,7 +141,7 @@ export const QuickLeadCapture = () => {
       lead_score: 50,
     };
 
-    createLead.mutate(leadData as any, {
+    createLead.mutate(leadData, {
       onSuccess: (newLead) => {
         setCreatedLeadId(newLead.id);
         setSelectedInsuranceTypes(data.insurance_types || []);

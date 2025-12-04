@@ -146,7 +146,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {(analysis.coverages as any[]).map((coverage: any, index: number) => (
+              {(analysis.coverages[]).map((coverage: any, index: number) => (
                 <div key={index} className="flex justify-between items-start border-b pb-2 last:border-0">
                   <div>
                     <div className="font-medium">{coverage.type}</div>
@@ -175,7 +175,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {(analysis.insured_items as any[]).map((item: any, index: number) => (
+              {(analysis.insured_items[]).map((item: any, index: number) => (
                 <div key={index} className="p-3 border rounded-lg">
                   {item.type === 'vehicle' && (
                     <div>

@@ -211,7 +211,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                       size="sm"
                       onClick={async () => {
                         const tab = window.open('about:blank', '_blank', 'noopener');
-                        const url = await getDocumentUrl(document as any);
+                        const url = await getDocumentUrl(document);
                         if (url) {
                           if (tab) tab.location.replace(url);
                           else window.open(url, '_blank');

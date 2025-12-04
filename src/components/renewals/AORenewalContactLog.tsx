@@ -58,7 +58,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
     queryKey: ["ao-renewal-contact-log", renewalId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ao_renewal_contact_log" as any)
+        .from("ao_renewal_contact_log")
         .select("*")
         .eq("renewal_id", renewalId)
         .order("contact_date", { ascending: false });
@@ -92,7 +92,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("ao_renewal_contact_log" as any).insert({
+      const { error } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,

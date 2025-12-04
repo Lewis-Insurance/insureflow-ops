@@ -254,7 +254,7 @@ export function LeadsList({ onLeadSelect, onCreateLead }: LeadsListProps) {
                       {lead.source?.name || 'Unknown'}
                     </TableCell>
                     <TableCell>
-                      {(lead as any).assigned?.full_name || 'Unassigned'}
+                      {(lead).assigned?.full_name || 'Unassigned'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })}

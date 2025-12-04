@@ -137,7 +137,7 @@ const CRMContent = memo(() => {
   const handleCreateAccount = useCallback(async (data: CreateAccountData) => {
     setFormLoading(true);
     try {
-      await createAccount(data as any);
+      await createAccount(data);
       setShowAccountForm(false);
     } finally {
       setFormLoading(false);
@@ -342,7 +342,7 @@ const CRMContent = memo(() => {
             {/* Bulk Actions Bar */}
             <ErrorBoundary level="component">
               <BulkActionsBar
-                selectedAccounts={selectedAccounts as any}
+                selectedAccounts={selectedAccounts}
                 onSelectionClear={handleSelectionClear}
                 onBulkAction={handleBulkAction}
               />
@@ -364,12 +364,12 @@ const CRMContent = memo(() => {
                 </div>
 
                 <AccountList
-                  accounts={accounts as any}
+                  accounts={accounts}
                   loading={loading}
-                  onEdit={handleEdit as any}
+                  onEdit={handleEdit}
                   onDelete={handleDelete}
-                  selectedAccounts={selectedAccounts as any}
-                  onAccountSelection={handleAccountSelection as any}
+                  selectedAccounts={selectedAccounts}
+                  onAccountSelection={handleAccountSelection}
                 />
               </div>
             </ErrorBoundary>
@@ -406,8 +406,8 @@ const CRMContent = memo(() => {
               setShowAccountForm(open);
               if (!open) setEditingAccount(null);
             }}
-            onSubmit={editingAccount ? (handleEditAccount as any) : (handleCreateAccount as any)}
-            account={editingAccount as any}
+            onSubmit={editingAccount ? (handleEditAccount) : (handleCreateAccount)}
+            account={editingAccount}
             loading={formLoading}
           />
         </ErrorBoundary>

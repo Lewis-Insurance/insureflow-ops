@@ -48,7 +48,7 @@ const SmartQA = () => {
       const normalizedCarrier = carrier.trim() || null;
       
       // Try to call the RPC function
-      const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
+      const { data, error } = await supabase.rpc('kb_resolve_answer', {
         q: question.trim(),
         in_carrier: normalizedCarrier,
         in_jurisdiction: jurisdiction || 'FL',

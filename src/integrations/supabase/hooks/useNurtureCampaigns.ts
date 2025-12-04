@@ -159,7 +159,7 @@ export const useCreateNurtureCampaign = () => {
           account_id: membership.account_id,
           created_by: user.id,
           status: 'draft',
-        } as any)
+        })
         .select()
         .single();
 
@@ -191,7 +191,7 @@ export const useUpdateNurtureCampaign = () => {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<NurtureCampaign> }) => {
       const { data, error } = await supabase
         .from('nurture_campaigns')
-        .update(updates as any)
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
@@ -265,7 +265,7 @@ export const useToggleCampaignActive = () => {
           .eq('id', id)
           .single();
         
-        if (campaign && !(campaign as any).started_at) {
+        if (campaign && !(campaign).started_at) {
           updates.started_at = new Date().toISOString();
         }
       } else {
@@ -392,7 +392,7 @@ export const useEnrollLead = () => {
         .eq('id', campaignId)
         .single();
 
-      const steps = (campaign as any)?.steps;
+      const steps = (campaign)?.steps;
       if (!campaign || !steps || !Array.isArray(steps) || steps.length === 0) {
         throw new Error('Campaign has no steps');
       }
@@ -409,7 +409,7 @@ export const useEnrollLead = () => {
           current_step: 0,
           status: 'active',
           metadata: {},
-        } as any)
+        })
         .select()
         .single();
 
@@ -451,7 +451,7 @@ export const useUpdateEnrollmentStatus = () => {
 
       const { data, error } = await supabase
         .from('campaign_enrollments')
-        .update(updates as any)
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
@@ -489,7 +489,7 @@ export const useMarkEnrollmentConverted = () => {
           status: 'completed',
           completed_at: new Date().toISOString(),
           last_activity_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', enrollmentId)
         .select()
         .single();
@@ -526,7 +526,7 @@ export const useCampaignStepExecutions = (enrollmentId?: string) => {
       if (!enrollmentId) return [];
 
       const { data, error } = await supabase
-        .from('campaign_step_executions' as any)
+        .from('campaign_step_executions')
         .select('*')
         .eq('enrollment_id', enrollmentId)
         .order('executed_at', { ascending: false });
@@ -545,14 +545,14 @@ export const useCampaignExecutionStats = (campaignId: string | undefined) => {
       if (!campaignId) return null;
 
       const { data, error } = await supabase
-        .from('campaign_step_executions' as any)
+        .from('campaign_step_executions')
         .select('status, channel')
         .eq('campaign_id', campaignId);
 
       if (error) throw error;
 
       // Calculate stats
-      const executions = data as any[];
+      const executions = data[];
       const total = executions.length;
       const successful = executions.filter(e => e.status === 'sent' || e.status === 'delivered').length;
       const failed = executions.filter(e => e.status === 'failed').length;
@@ -585,7 +585,7 @@ export const useMessageTemplates = (channel?: 'email' | 'sms') => {
     queryKey: ['message-templates', channel],
     queryFn: async () => {
       let query = supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -608,7 +608,7 @@ export const useMessageTemplate = (id: string | undefined) => {
       if (!id) return null;
 
       const { data, error } = await supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .select('*')
         .eq('id', id)
         .single();
@@ -642,7 +642,7 @@ export const useCreateMessageTemplate = () => {
       const variables = extractVariables(template.body);
 
       const { data, error } = await supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .insert({
           name: template.name,
           description: template.description,
@@ -698,7 +698,7 @@ export const useUpdateMessageTemplate = () => {
       if (updates.active !== undefined) dbUpdates.is_active = updates.active;
 
       const { data, error } = await supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .update(dbUpdates)
         .eq('id', id)
         .select()
@@ -732,7 +732,7 @@ export const useDeleteMessageTemplate = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .delete()
         .eq('id', id);
 
@@ -762,15 +762,15 @@ export const useIncrementTemplateUsage = () => {
     mutationFn: async (templateId: string) => {
       // Increment usage count manually since RPC doesn't exist yet
       const { data: template } = await supabase
-        .from('message_templates' as any)
+        .from('message_templates')
         .select('*')
         .eq('id', templateId)
         .single();
       
       if (template) {
-        const currentCount = (template as any).usage_count || 0;
+        const currentCount = (template).usage_count || 0;
         await supabase
-          .from('message_templates' as any)
+          .from('message_templates')
           .update({ usage_count: currentCount + 1 })
           .eq('id', templateId);
       }
@@ -810,14 +810,14 @@ export const useDuplicateCampaign = () => {
       const { data, error } = await supabase
         .from('nurture_campaigns')
         .insert({
-          account_id: (original as any).account_id,
-          name: `${(original as any).name} (Copy)`,
-          description: (original as any).description,
-          trigger_conditions: (original as any).trigger_conditions,
-          steps: (original as any).steps,
+          account_id: (original).account_id,
+          name: `${(original).name} (Copy)`,
+          description: (original).description,
+          trigger_conditions: (original).trigger_conditions,
+          steps: (original).steps,
           status: 'draft', // Start as draft
           created_by: user.id,
-        } as any)
+        })
         .select()
         .single();
 
@@ -914,8 +914,8 @@ export const useTestCampaignConditions = () => {
 
       if (leadError) throw leadError;
 
-      const conditions = (campaign as any).trigger_conditions || {};
-      const leadData = lead as any;
+      const conditions = (campaign).trigger_conditions || {};
+      const leadData = lead;
       
       // Test conditions
       let matches = true;
@@ -1003,8 +1003,8 @@ export const useCampaignAnalytics = (campaignId: string | undefined) => {
 
       if (enrollmentsError) throw enrollmentsError;
 
-      const enrollmentsData = enrollments as any[];
-      const campaignData = campaign as any;
+      const enrollmentsData = enrollments[];
+      const campaignData = campaign;
 
       return {
         campaign_id: campaignId,

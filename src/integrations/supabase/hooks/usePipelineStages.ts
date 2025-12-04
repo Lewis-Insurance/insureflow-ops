@@ -58,7 +58,7 @@ export const usePipelineStages = () => {
       }
 
       // Now fetch pipeline stages for this account only
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase)
         .from('pipeline_stages')
         .select('*')
         .eq('account_id', membership.account_id)
@@ -76,7 +76,7 @@ export const usePipelineStage = (stageId: string | undefined) => {
     queryFn: async () => {
       if (!stageId) return null;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase)
         .from('pipeline_stages')
         .select('*')
         .eq('id', stageId)

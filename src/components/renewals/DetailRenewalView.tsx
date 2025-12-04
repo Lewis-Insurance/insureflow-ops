@@ -650,7 +650,7 @@ const DetailRenewalView = () => {
                     </div>
 
                     <div className="space-y-3">
-                      {(activeCampaign.touchpoints as any[]).map((touchpoint, idx) => (
+                      {(activeCampaign.touchpoints[]).map((touchpoint, idx) => (
                         <div
                           key={idx}
                           className={`flex items-center gap-3 p-4 border rounded-lg ${

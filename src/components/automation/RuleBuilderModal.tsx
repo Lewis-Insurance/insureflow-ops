@@ -82,7 +82,7 @@ export function RuleBuilderModal({ open, onOpenChange, ruleId }: RuleBuilderModa
         priority,
         trigger_conditions: {},
       };
-      await createRule.mutateAsync(ruleData as any);
+      await createRule.mutateAsync(ruleData);
     }
     
     onOpenChange(false);

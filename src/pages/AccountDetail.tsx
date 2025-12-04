@@ -66,7 +66,7 @@ export default function AccountDetail() {
       if (error) throw error;
 
       setAccount(data);
-      const accountData = data as any;
+      const accountData = data;
       updateRecentlyAccessedAccount({
         id: accountData.id,
         name: accountData.name,

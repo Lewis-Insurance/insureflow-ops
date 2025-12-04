@@ -202,7 +202,7 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
 
             <div>
               <Label htmlFor="status">Status *</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <Select value={status} onValueChange={(v) => setStatus(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

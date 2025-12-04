@@ -37,16 +37,16 @@ export default function ComparisonReportPage() {
 
         // Build comparison object from session data
         const comparisonData: ComparisonResult = {
-          option1: data.option1_data as any,
-          option2: data.option2_data as any,
-          differences: (data.comparison_results as any)?.differences || {
+          option1: data.option1_data,
+          option2: data.option2_data,
+          differences: (data.comparison_results)?.differences || {
             coverageDifferences: [],
             premiumDifference: 0,
             premiumPercentage: 0,
             carrierComparison: '',
             termComparison: '',
           },
-          recommendation: (data.comparison_results as any)?.recommendation || '',
+          recommendation: (data.comparison_results)?.recommendation || '',
           analysisDate: new Date(data.created_at),
         };
 

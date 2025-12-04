@@ -42,7 +42,7 @@ export function LeadTrendsChart() {
               Track lead volume and outcomes over time
             </CardDescription>
           </div>
-          <Tabs value={period} onValueChange={(v) => setPeriod(v as any)}>
+          <Tabs value={period} onValueChange={(v) => setPeriod(v)}>
             <TabsList>
               <TabsTrigger value="week">Week</TabsTrigger>
               <TabsTrigger value="month">Month</TabsTrigger>

@@ -170,7 +170,7 @@ export function CampaignBuilder() {
           description: 'Campaign updated successfully',
         });
       } else {
-        const result = await createCampaign.mutateAsync(campaignData as any);
+        const result = await createCampaign.mutateAsync(campaignData);
         toast({
           title: 'Success',
           description: 'Campaign created successfully',

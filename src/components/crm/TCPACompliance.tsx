@@ -53,8 +53,8 @@ export function TCPACompliance({ contactId, contactName }: TCPAComplianceProps) 
 
       if (twilioError) throw twilioError;
 
-      setConsents(consentData as any || []);
-      setTwilioConsents(twilioData as any || []);
+      setConsents(consentData || []);
+      setTwilioConsents(twilioData || []);
     } catch (error) {
       console.error('Error fetching consents:', error);
       toast({

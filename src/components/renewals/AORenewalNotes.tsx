@@ -33,7 +33,7 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     queryKey: ["ao-renewal-notes", renewalId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ao_renewal_notes" as any)
+        .from("ao_renewal_notes")
         .select("*")
         .eq("renewal_id", renewalId)
         .order("created_at", { ascending: false });
@@ -65,7 +65,7 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("ao_renewal_notes" as any).insert({
+      const { error } = await supabase.from("ao_renewal_notes").insert({
         renewal_id: renewalId,
         content: content.trim(),
         created_by: user.id,

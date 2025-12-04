@@ -41,7 +41,7 @@ export async function generateTasks(
     });
 
     if (error) throw error;
-    return data as any;
+    return data;
   } catch (error) {
     console.error('Error generating tasks:', error);
     return null;

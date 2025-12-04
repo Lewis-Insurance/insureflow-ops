@@ -111,9 +111,9 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
       insurance_types: lead.insurance_types || [],
       current_carrier: lead.current_carrier || "",
       current_premium: lead.current_premium?.toString() || "",
-      estimated_effective_date: (lead as any).estimated_effective_date || "",
+      estimated_effective_date: (lead).estimated_effective_date || "",
       notes: lead.notes || "",
-      status: lead.status as any,
+      status: lead.status,
     } : undefined,
   });
 
@@ -125,7 +125,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
         id: leadId,
         ...data,
         current_premium: data.current_premium ? parseFloat(data.current_premium) : null,
-      } as any,
+      },
       {
         onSuccess: () => {
           setIsEditing(false);

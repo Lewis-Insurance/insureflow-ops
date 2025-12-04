@@ -48,8 +48,8 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
       setLoading(true);
       
       // Build base query with explicit typing to prevent circular type inference
-      let auditQuery = supabase.from('audit_logs').select('*') as any;
-      let detailedQuery = supabase.from('detailed_audit_logs').select('*') as any;
+      let auditQuery = supabase.from('audit_logs').select('*');
+      let detailedQuery = supabase.from('detailed_audit_logs').select('*');
       
       if (entityId && entityType) {
         auditQuery = auditQuery.eq('entity_id', entityId).eq('entity', entityType);
@@ -91,8 +91,8 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
 
       if (detailedError) throw detailedError;
 
-      setAuditLogs(auditData as any || []);
-      setDetailedLogs(detailedData as any || []);
+      setAuditLogs(auditData || []);
+      setDetailedLogs(detailedData || []);
 
       // Fetch impersonation logs if admin
       if (isAdmin) {
@@ -105,7 +105,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         if (impersonationError) {
           console.error('Error fetching impersonation logs:', impersonationError);
         } else {
-          setImpersonationLogs(impersonationData as any || []);
+          setImpersonationLogs(impersonationData || []);
         }
 
         // Fetch profile access logs
@@ -118,7 +118,7 @@ export function EnhancedAuditViewer({ entityId, entityType }: EnhancedAuditViewe
         if (accessError) {
           console.error('Error fetching access logs:', accessError);
         } else {
-          setAccessLogs(accessData as any || []);
+          setAccessLogs(accessData || []);
         }
       }
 

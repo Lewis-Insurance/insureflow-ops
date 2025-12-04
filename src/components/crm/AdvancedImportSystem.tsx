@@ -49,8 +49,8 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (exportError) throw exportError;
 
-      setImportBatches(batchData as any || []);
-      setExportRequests(exportData as any || []);
+      setImportBatches(batchData || []);
+      setExportRequests(exportData || []);
     } catch (error) {
       console.error('Error fetching import data:', error);
       toast({
@@ -175,7 +175,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       toast({
         title: "Batch processed successfully",
-        description: `Processed ${(data as any).processed_rows} rows with ${(data as any).successful_rows} successes.`,
+        description: `Processed ${(data).processed_rows} rows with ${(data).successful_rows} successes.`,
       });
 
       fetchImportData();
@@ -203,7 +203,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
 
       if (error) throw error;
 
-      setStagingData(data as any || []);
+      setStagingData(data || []);
       setSelectedBatch(batch);
       setShowStagingPreview(true);
     } catch (error) {

@@ -88,7 +88,7 @@ export function AccountList({
           const isSelected = selectedAccounts?.some(selected => selected.id === account.id) || false;
           
           // Defensive field reading and normalization
-          const rawType = (account as any).account_type ?? (account as any).type ?? '';
+          const rawType = (account).account_type ?? (account).type ?? '';
           const normalizedType = String(rawType).trim().toLowerCase();
           
           const isBusinessByName = /\b(llc|inc\.?|corp\.?|co\.?|company|plc|llp|manufacturing|industries|partners?)\b/i

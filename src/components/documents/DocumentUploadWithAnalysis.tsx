@@ -221,7 +221,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
   if (completedAnalysisId && analysisData) {
     // Parse analysis_result from JSONB
     const analysisResult = typeof analysisData.analysis_result === 'object' && analysisData.analysis_result !== null
-      ? analysisData.analysis_result as any
+      ? analysisData.analysis_result
       : {};
 
     return (

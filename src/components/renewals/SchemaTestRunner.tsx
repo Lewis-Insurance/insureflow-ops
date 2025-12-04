@@ -34,7 +34,7 @@ export const SchemaTestRunner = () => {
       setResults([...testResults]);
 
       const { data: renewal, error: renewalError } = await supabase
-        .from('renewals' as any)
+        .from('renewals')
         .select('*')
         .limit(1)
         .maybeSingle();
@@ -117,7 +117,7 @@ export const SchemaTestRunner = () => {
 
       // Test 4: Check renewal_risk_history table
       const { error: historyError } = await supabase
-        .from('renewal_risk_history' as any)
+        .from('renewal_risk_history')
         .select('id')
         .limit(0);
 
@@ -139,7 +139,7 @@ export const SchemaTestRunner = () => {
 
       // Test 5: Check renewal_campaigns table
       const { error: campaignsError } = await supabase
-        .from('renewal_campaigns' as any)
+        .from('renewal_campaigns')
         .select('id')
         .limit(0);
 
@@ -161,7 +161,7 @@ export const SchemaTestRunner = () => {
 
       // Test 6: Check account relationship
       const { error: accountsError } = await supabase
-        .from('accounts' as any)
+        .from('accounts')
         .select('id, name, email, phone')
         .limit(0);
 
@@ -183,7 +183,7 @@ export const SchemaTestRunner = () => {
 
       // Test 7: Check profiles relationship
       const { error: profilesError } = await supabase
-        .from('profiles' as any)
+        .from('profiles')
         .select('id, full_name, email')
         .limit(0);
 

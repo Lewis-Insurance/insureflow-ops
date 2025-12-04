@@ -220,7 +220,7 @@ export default function IssueTracker() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -236,7 +236,7 @@ export default function IssueTracker() {
               </SelectContent>
             </Select>
 
-            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -253,7 +253,7 @@ export default function IssueTracker() {
               </SelectContent>
             </Select>
 
-            <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as any)}>
+            <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>

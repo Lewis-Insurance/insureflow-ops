@@ -9,7 +9,7 @@ export async function checkTableSchema(tableName: string) {
   try {
     // Try to query the table with limit 0 to get structure without data
     const { data, error } = await supabase
-      .from(tableName as any)
+      .from(tableName)
       .select('*')
       .limit(0);
     
@@ -23,7 +23,7 @@ export async function checkTableSchema(tableName: string) {
     
     // Get a sample row to see actual columns
     const { data: sample } = await supabase
-      .from(tableName as any)
+      .from(tableName)
       .select('*')
       .limit(1)
       .single();
@@ -83,7 +83,7 @@ export async function verifyRenewalRiskSchema() {
   // Check if renewals table has risk fields
   if (results.renewals?.exists) {
     const { data: renewal } = await supabase
-      .from('renewals' as any)
+      .from('renewals')
       .select('*')
       .limit(1)
       .single();

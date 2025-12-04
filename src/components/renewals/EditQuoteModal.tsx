@@ -110,7 +110,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
 
             <div>
               <Label htmlFor="status">Status *</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <Select value={status} onValueChange={(v) => setStatus(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

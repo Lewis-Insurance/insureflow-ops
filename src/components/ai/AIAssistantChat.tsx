@@ -26,7 +26,7 @@ async function getKbAnswer(
   jurisdiction: string = 'FL',
   program?: string | null
 ): Promise<KbEntry | null> {
-  const { data, error } = await supabase.rpc('kb_resolve_answer' as any, {
+  const { data, error } = await supabase.rpc('kb_resolve_answer', {
     q,
     in_carrier: carrier || null,
     in_jurisdiction: jurisdiction || 'FL',
@@ -135,7 +135,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
         // Filter conversations by context in JavaScript to avoid TS issues
         const matchingConversation = existingConversations?.find((conv) => {
-          const convContext = conv.context as any;
+          const convContext = conv.context;
           if (contextType && contextId) {
             return convContext?.type === contextType && convContext?.id === contextId;
           }
@@ -161,7 +161,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
               role: msg.role as 'user' | 'assistant',
               content: msg.content,
               timestamp: new Date(msg.created_at),
-              documents: (msg.metadata as any)?.documents,
+              documents: (msg.metadata)?.documents,
             }));
             setMessages(loadedMessages);
           }
@@ -176,7 +176,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
             .insert({
               user_id: user.id,
               account_id: contextId || null,
-              context: contextPayload as any,
+              context: contextPayload,
               title: context?.name || 'AI Assistant Chat',
             })
             .select()
@@ -193,7 +193,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
               conversation_id: convId,
               role: 'assistant',
               content: greeting,
-              metadata: {} as any,
+              metadata: {},
             });
           }
         }
@@ -261,7 +261,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         metadata: {
           documents: userMessage.documents,
           kb_record_id: null // Will be set later if KB is used
-        } as any,
+        },
       });
     }
 
@@ -355,7 +355,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
             metadata: {
               kb_record_id: kbRecordId,
               tool_calls_made: assistantData.tool_calls_made || 0
-            } as any,
+            },
           });
 
           // Update conversation timestamp
@@ -474,7 +474,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
           content: finalContent,
           metadata: {
             kb_record_id: kbRecordId
-          } as any,
+          },
         });
 
         // Update conversation timestamp

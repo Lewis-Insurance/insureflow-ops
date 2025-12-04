@@ -74,7 +74,7 @@ export default function ProducerDashboard() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>

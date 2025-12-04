@@ -286,7 +286,7 @@ const KnowledgeManager = () => {
           };
         }
         
-        const { error } = await supabase.from(table as any).insert(rowData);
+        const { error } = await supabase.from(table).insert(rowData);
         if (error) {
           console.error(`Error inserting row ${index + 1}:`, error);
           // Continue with other rows even if one fails

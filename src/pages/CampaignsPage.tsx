@@ -37,7 +37,7 @@ export default function CampaignsPage() {
 
       if (error) throw error;
 
-      const result = data as any;
+      const result = data;
       toast({
         title: 'Success',
         description: `Enrolled ${result.total_enrolled} leads across ${result.campaigns_processed} campaigns`,

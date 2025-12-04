@@ -254,7 +254,7 @@ export const useLeadInsuranceDetails = (leadId: string, insuranceType: Insurance
     queryKey: ['lead-insurance-details', leadId, insuranceType],
     queryFn: async () => {
       const tableName = TABLE_MAP[insuranceType];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase)
         .from(tableName)
         .select('*')
         .eq('lead_id', leadId)
@@ -276,7 +276,7 @@ export const useSaveLeadInsuranceDetails = (insuranceType: InsuranceType) => {
       const tableName = TABLE_MAP[insuranceType];
       
       // Check if record exists
-      const { data: existing } = await (supabase as any)
+      const { data: existing } = await (supabase)
         .from(tableName)
         .select('id')
         .eq('lead_id', details.lead_id)
@@ -285,7 +285,7 @@ export const useSaveLeadInsuranceDetails = (insuranceType: InsuranceType) => {
       let result;
       if (existing) {
         // Update existing record
-        const { data, error } = await (supabase as any)
+        const { data, error } = await (supabase)
           .from(tableName)
           .update(details)
           .eq('id', existing.id)
@@ -296,7 +296,7 @@ export const useSaveLeadInsuranceDetails = (insuranceType: InsuranceType) => {
         result = data;
       } else {
         // Insert new record
-        const { data, error } = await (supabase as any)
+        const { data, error } = await (supabase)
           .from(tableName)
           .insert(details)
           .select()
@@ -358,7 +358,7 @@ export const useUploadInsuranceDocument = (leadId: string, insuranceType: Insura
 
       if (analysisError) throw analysisError;
 
-      const extracted = (analysisData as any)?.extracted ?? analysisData;
+      const extracted = (analysisData)?.extracted ?? analysisData;
       return {
         documentUrl: publicUrl,
         documentPath: filePath,
