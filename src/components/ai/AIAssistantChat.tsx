@@ -220,7 +220,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
     const interval = setInterval(() => {
       kbCacheRef.current.clear();
       console.log('KB cache cleared');
-    }, 30 * 60 * 1000); // 30 minutes
+    }, 24 * 60 * 60 * 1000); // 24 hours - extended for better performance
     
     return () => clearInterval(interval);
   }, []);
