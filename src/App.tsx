@@ -516,14 +516,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/analyze-documents"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentAnalysisPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
                 path="/campaigns/:id"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
