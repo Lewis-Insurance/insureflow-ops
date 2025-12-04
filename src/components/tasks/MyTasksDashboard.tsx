@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { TaskBulkActionsBar } from './TaskBulkActionsBar';
 import { TaskEditModal } from './TaskEditModal';
+import { LoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -241,7 +242,7 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
   );
 
   if (loading) {
-    return <div className="text-center py-8">Loading your tasks...</div>;
+    return <LoadingSkeleton variant="dashboard" count={1} />;
   }
 
 
