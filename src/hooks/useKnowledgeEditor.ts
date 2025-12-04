@@ -19,6 +19,7 @@ export interface KnowledgeHistory {
   category_snapshot: string;
   tags_snapshot: string[];
   changed_by?: string;
+  changed_by_user?: { email: string; raw_user_meta_data?: any };
   changed_at: string;
   metadata?: any;
 }

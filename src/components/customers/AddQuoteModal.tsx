@@ -95,7 +95,7 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
       autoScoreQuote.mutate(newQuote.id);
 
       // Trigger follow-up processor
-      triggerFollowUps.mutate({ quoteIds: [newQuote.id] });
+      triggerFollowUps.mutate({ quote_id: newQuote.id });
 
       toast({
         title: 'Success',
