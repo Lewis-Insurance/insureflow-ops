@@ -65,6 +65,8 @@ const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
 const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
 const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
 const LewiAI = React.lazy(() => import("./pages/LewiAI"));
+const CoverageGapAnalysis = React.lazy(() => import("./pages/CoverageGapAnalysis"));
+const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -528,6 +530,30 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <LewiAI />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/coverage-gap-analysis"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CoverageGapAnalysis />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/coverage-gap-analysis/:accountId"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CoverageGapAnalysis />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/coverage-gap/:analysisId"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CoverageGapDetail />
                   </ErrorBoundary>
                 }
               />
