@@ -210,6 +210,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/issues"
                 />
                 <NavItem
+                  icon={TrendingUp}
+                  label="Predictive Analytics"
+                  to="/predictive-analytics"
+                />
+                <NavItem
                   icon={Sliders}
                   label="Customization"
                   to="/customization"

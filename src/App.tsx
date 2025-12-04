@@ -70,6 +70,7 @@ const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
 const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
 const ReportIssue = React.lazy(() => import("./pages/ReportIssue"));
 const IssueDetail = React.lazy(() => import("./pages/IssueDetail"));
+const PredictiveAnalytics = React.lazy(() => import("./pages/PredictiveAnalytics"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -581,6 +582,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <IssueDetail />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/predictive-analytics"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PredictiveAnalytics />
                   </ErrorBoundary>
                 }
               />
