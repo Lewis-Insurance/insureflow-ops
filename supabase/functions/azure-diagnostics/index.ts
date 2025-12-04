@@ -52,7 +52,7 @@ serve(async (req) => {
       } catch (error: any) {
         results.tests['document_intelligence_connection'] = {
           success: false,
-          error: error.message,
+          error: (error instanceof Error ? error.message : String(error)),
         };
       }
     } else {
@@ -91,7 +91,7 @@ serve(async (req) => {
       } catch (error: any) {
         results.tests['azure_openai_connection'] = {
           success: false,
-          error: error.message,
+          error: (error instanceof Error ? error.message : String(error)),
         };
       }
     } else {
@@ -118,7 +118,7 @@ serve(async (req) => {
     } catch (error: any) {
       results.tests['supabase_connection'] = {
         success: false,
-        error: error.message,
+        error: (error instanceof Error ? error.message : String(error)),
       };
     }
 
@@ -140,7 +140,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Diagnostics error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 

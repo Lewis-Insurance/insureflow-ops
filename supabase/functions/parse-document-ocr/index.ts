@@ -287,12 +287,12 @@ Return your response as a JSON array of knowledge entries.`
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error processing document:", error);
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred"
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : "Unknown error occurred"
       }),
       { 
         status: 500, 

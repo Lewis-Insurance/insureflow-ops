@@ -66,8 +66,8 @@ serve(async (req) => {
       .select('id, full_name, role, created_at')
     
     // Combine auth and profile data
-    const combinedUsers = authUsers.map(authUser => {
-      const profile = profiles?.find(p => p.id === authUser.id)
+    const combinedUsers = authUsers.map((authUser: any) => {
+      const profile = profiles?.find((p: any) => p.id === authUser.id)
       return {
         id: authUser.id,
         email: authUser.email,
@@ -81,10 +81,10 @@ serve(async (req) => {
       JSON.stringify({ users: combinedUsers }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

@@ -81,7 +81,7 @@ function detectLanguage(text: string): string {
 
 function removeDuplicates(entries: any[]): any[] {
   const seen = new Set();
-  return entries.filter(entry => {
+  return entries.filter((entry: any) => {
     const hash = `${entry.title}:${entry.content.substring(0, 100)}`;
     if (seen.has(hash)) return false;
     seen.add(hash);
@@ -106,9 +106,9 @@ function extractReferences(text: string): string[] {
   ];
   
   const refs = new Set<string>();
-  patterns.forEach(pattern => {
+  patterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => refs.add(match[1]));
+    matches.forEach((match: any) => refs.add(match[1]));
   });
   
   return Array.from(refs);
@@ -165,9 +165,9 @@ function extractPolicyInfo(text: string) {
     /\b(HO[-\s]?\d{4}|DP[-\s]?\d{4}|CP[-\s]?\d{4})\b/gi, // Home/Property forms
   ];
   
-  policyPatterns.forEach(pattern => {
+  policyPatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1] && !policyInfo.policyNumbers.includes(match[1])) {
         policyInfo.policyNumbers.push(match[1].trim());
       }
@@ -181,9 +181,9 @@ function extractPolicyInfo(text: string) {
     /(?:To|Ending|Through)[\s:]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
   ];
   
-  datePatterns.forEach(pattern => {
+  datePatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1]) policyInfo.effectiveDates.push(match[1].trim());
     });
   });
@@ -194,9 +194,9 @@ function extractPolicyInfo(text: string) {
     /\$?([\d,]+(?:\.\d{2})?)\s*(?:per year|per month|annually|monthly)/gi,
   ];
   
-  premiumPatterns.forEach(pattern => {
+  premiumPatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1]) policyInfo.premiums.push(match[1].replace(/,/g, ''));
     });
   });
@@ -208,9 +208,9 @@ function extractPolicyInfo(text: string) {
     /(\d+)%\s*(?:hurricane|wind|named storm)\s*deductible/gi,
   ];
   
-  deductiblePatterns.forEach(pattern => {
+  deductiblePatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1]) policyInfo.deductibles.push(match[1].replace(/,/g, ''));
     });
   });
@@ -222,9 +222,9 @@ function extractPolicyInfo(text: string) {
     /\$?([\d,]+)\s*(?:coverage|limit)/gi,
   ];
   
-  limitPatterns.forEach(pattern => {
+  limitPatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1] && parseInt(match[1].replace(/,/g, '')) > 1000) {
         policyInfo.coverageLimits.push(match[1].replace(/,/g, ''));
       }
@@ -237,9 +237,9 @@ function extractPolicyInfo(text: string) {
     /\b(Citizens Property Insurance|State Farm|Progressive|GEICO|Allstate|Liberty Mutual|USAA|Farmers|American Family)\b/gi,
   ];
   
-  carrierPatterns.forEach(pattern => {
+  carrierPatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1]) {
         const carrier = match[1].trim();
         if (!policyInfo.carriers.includes(carrier) && carrier.length > 3) {
@@ -265,9 +265,9 @@ function extractInsuranceTerms(text: string) {
     /\*\*([^*]+)\*\*\s*[-–—]\s*([^.]+\.)/g,
   ];
   
-  definitionPatterns.forEach(pattern => {
+  definitionPatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1] && match[2]) {
         glossaryTerms.push({
           term: match[1].trim(),
@@ -296,9 +296,9 @@ function extractFloridaSpecificInfo(text: string) {
     /(?:separate|special)\s+(?:hurricane|wind)\s+(?:deductible|coverage)[\s:]*([^.]+\.)/gi,
   ];
   
-  hurricanePatterns.forEach(pattern => {
+  hurricanePatterns.forEach((pattern: any) => {
     const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
+    matches.forEach((match: any) => {
       if (match[1]) floridaInfo.hurricaneProvisions.push(match[1].trim());
     });
   });
@@ -306,7 +306,7 @@ function extractFloridaSpecificInfo(text: string) {
   // Florida statutes
   const statutePattern = /(?:F\.S\.|Florida Statute[s]?)\s*([\d.]+)/gi;
   const matches = [...text.matchAll(statutePattern)];
-  matches.forEach(match => {
+  matches.forEach((match: any) => {
     if (match[1]) floridaInfo.statutoryReferences.push(`F.S. ${match[1]}`);
   });
   
@@ -314,7 +314,7 @@ function extractFloridaSpecificInfo(text: string) {
   if (text.toLowerCase().includes('sinkhole')) {
     const sinkPattern = /[^.]*sinkhole[^.]*\./gi;
     const sinkMatches = [...text.matchAll(sinkPattern)];
-    sinkMatches.forEach(match => {
+    sinkMatches.forEach((match: any) => {
       floridaInfo.sinkholeCoverage.push(match[0].trim());
     });
   }
@@ -323,7 +323,7 @@ function extractFloridaSpecificInfo(text: string) {
   if (text.toLowerCase().includes('assignment of benefits') || text.toLowerCase().includes('aob')) {
     const aobPattern = /[^.]*(?:assignment of benefits|AOB)[^.]*\./gi;
     const aobMatches = [...text.matchAll(aobPattern)];
-    aobMatches.forEach(match => {
+    aobMatches.forEach((match: any) => {
       floridaInfo.assignmentOfBenefits.push(match[0].trim());
     });
   }
@@ -666,7 +666,7 @@ serve(async (req) => {
     
     // Apply chunking for large entries
     const chunkedEntries: any[] = [];
-    uniqueEntries.forEach(entry => {
+    uniqueEntries.forEach((entry: any) => {
       if (entry.content.length > 1500) {
         const chunks = chunkContent(entry.content, options.chunkSize);
         chunks.forEach((chunk, idx) => {
@@ -684,12 +684,12 @@ serve(async (req) => {
     });
     
     // Filter and process
-    let validEntries = chunkedEntries.filter(entry => 
+    let validEntries = chunkedEntries.filter((entry: any) => 
       entry.content.length > options.minContentLength && entry.title.length > 3
     );
     
     // Calculate confidence scores
-    validEntries.forEach(entry => {
+    validEntries.forEach((entry: any) => {
       entry.confidence = calculateConfidence(entry);
     });
     
@@ -709,8 +709,8 @@ serve(async (req) => {
         return acc;
       }, {} as Record<string, number>),
       byLanguage: {
-        english: validEntries.filter(e => e.language === 'english').length,
-        spanish: validEntries.filter(e => e.language === 'spanish').length
+        english: validEntries.filter((e: any) => e.language === 'english').length,
+        spanish: validEntries.filter((e: any) => e.language === 'spanish').length
       },
       averageConfidence: validEntries.length > 0 
         ? validEntries.reduce((sum, e) => sum + e.confidence, 0) / validEntries.length 
@@ -745,10 +745,10 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error parsing PDF:', error);
     
-    if (error.message?.includes('password')) {
+    if ((error instanceof Error ? error.message : String(error))?.includes('password')) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -759,7 +759,7 @@ serve(async (req) => {
       );
     }
     
-    if (error.message?.includes('Invalid PDF')) {
+    if ((error instanceof Error ? error.message : String(error))?.includes('Invalid PDF')) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -773,7 +773,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Failed to parse PDF',
+        error: (error instanceof Error ? error.message : String(error)) || 'Failed to parse PDF',
         code: 'PARSE_ERROR'
       }),
       { 

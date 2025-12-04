@@ -189,11 +189,11 @@ Create a well-formatted, professional quote document that our agents can use to 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in generate-insurance-quote-doc:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred',
       }),
       {
         status: 500,

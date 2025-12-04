@@ -166,7 +166,7 @@ serve(async (req) => {
 
           if (ocrResult) break;
         } catch (error: any) {
-          console.log(`❌ Error: ${error.message}`);
+          console.log(`❌ Error: ${(error instanceof Error ? error.message : String(error))}`);
         }
       }
       if (ocrResult) break;
@@ -328,7 +328,7 @@ Return ONLY valid JSON:
 
   } catch (error: any) {
     console.error('========================================');
-    console.error('[Document Analysis] Error:', error.message);
+    console.error('[Document Analysis] Error:', (error instanceof Error ? error.message : String(error)));
     console.error('========================================');
     
     if (documentId) {
@@ -339,7 +339,7 @@ Return ONLY valid JSON:
         );
         await supabase
           .from('document_analysis')
-          .update({ processing_status: 'failed', error_message: error.message })
+          .update({ processing_status: 'failed', error_message: (error instanceof Error ? error.message : String(error)) })
           .eq('document_id', documentId);
       } catch (updateError) {
         console.error('[Status Update Error]:', updateError);
@@ -347,7 +347,7 @@ Return ONLY valid JSON:
     }
 
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error instanceof Error ? error.message : String(error)) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

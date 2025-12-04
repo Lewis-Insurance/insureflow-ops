@@ -44,8 +44,8 @@ serve(async (req) => {
       jobs.map((job: any) => processJob(supabaseClient, job))
     );
 
-    const processed = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
+    const processed = results.filter((r: any) => r.status === 'fulfilled').length;
+    const failed = results.filter((r: any) => r.status === 'rejected').length;
 
     return new Response(
       JSON.stringify({ processed, failed, total: jobs.length }),
@@ -148,7 +148,7 @@ async function analyzeDocuments(supabase: any, documentPaths: string[]) {
     },
   });
 
-  if (error) throw new Error(`Document analysis failed: ${error.message}`);
+  if (error) throw new Error(`Document analysis failed: ${(error instanceof Error ? error.message : String(error))}`);
   return data?.extracted || data;
 }
 
@@ -157,7 +157,7 @@ async function compareOptions(supabase: any, option1: any, option2: any) {
     body: { option1, option2 },
   });
 
-  if (error) throw new Error(`Comparison failed: ${error.message}`);
+  if (error) throw new Error(`Comparison failed: ${(error instanceof Error ? error.message : String(error))}`);
   return data;
 }
 

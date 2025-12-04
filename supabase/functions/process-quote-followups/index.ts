@@ -187,7 +187,7 @@ serve(async (req) => {
           console.log(`Created follow-up for quote ${quote.id} (attempt #${followUpNumber})`);
         } catch (error) {
           console.error(`Error processing quote ${quote.id} with rule ${rule.id}:`, error);
-          errors.push(`Quote ${quote.id}: ${error.message}`);
+          errors.push(`Quote ${quote.id}: ${(error instanceof Error ? error.message : String(error))}`);
         }
       }
     }
@@ -210,10 +210,10 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in process-quote-followups:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) || "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -399,7 +399,7 @@ async function executeScheduledFollowups(supabaseClient: any): Promise<number> {
         .from("quote_followups")
         .update({
           status: "failed",
-          error_message: error.message,
+          error_message: (error instanceof Error ? error.message : String(error)),
         })
         .eq("id", followup.id);
 
@@ -407,7 +407,7 @@ async function executeScheduledFollowups(supabaseClient: any): Promise<number> {
         followup_id: followup.id,
         quote_id: followup.quote_id,
         event_type: "failed",
-        event_data: { error: error.message },
+        event_data: { error: (error instanceof Error ? error.message : String(error)) },
       });
     }
   }

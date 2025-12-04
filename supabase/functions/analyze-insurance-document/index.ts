@@ -395,12 +395,12 @@ Return ONLY valid JSON with this structure:
             file_name
           });
           workflowResults.push(result);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[Workflow] Trigger failed:', error);
           workflowResults.push({
             trigger_type: trigger.trigger_type,
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error'
           });
         }
       }
@@ -463,7 +463,7 @@ Return ONLY valid JSON with this structure:
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Azure Analysis] Error:', error);
     
     // Try to update record with error
@@ -478,7 +478,7 @@ Return ONLY valid JSON with this structure:
           .from('document_analysis')
           .update({
             processing_status: 'error',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_message: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
             updated_at: new Date().toISOString()
           })
           .eq('document_id', documentId);
@@ -490,7 +490,7 @@ Return ONLY valid JSON with this structure:
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred' 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

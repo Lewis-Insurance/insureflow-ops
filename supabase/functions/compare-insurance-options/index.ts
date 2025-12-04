@@ -25,7 +25,7 @@ class ComparisonEngine {
   constructor() {
     this.termToCanonical = new Map();
     Object.entries(this.normalizeTerms).forEach(([canonical, variations]) => {
-      variations.forEach(variation => {
+      variations.forEach((variation: any) => {
         this.termToCanonical.set(variation.toLowerCase(), canonical);
       });
     });
@@ -46,7 +46,7 @@ class ComparisonEngine {
 
   normalizeCoverages(coverages: any[]): Map<string, any> {
     const normalized = new Map();
-    coverages.forEach(coverage => {
+    coverages.forEach((coverage: any) => {
       const canonicalType = this.getCanonicalType(coverage.type);
       normalized.set(canonicalType, { ...coverage, type: canonicalType });
     });
@@ -57,7 +57,7 @@ class ComparisonEngine {
     const gaps: any[] = [];
     const criticalCoverages = ['COLL', 'COMP', 'BI', 'PD', 'UM'];
     
-    criticalCoverages.forEach(type => {
+    criticalCoverages.forEach((type: any) => {
       const readableName = this.getReadableName(type);
       
       if (!coverages1.has(type) && coverages2.has(type)) {
@@ -126,7 +126,7 @@ serve(async (req) => {
 
     // Build enhanced comparison prompt with gap analysis
     const gapSummary = gaps.length > 0 
-      ? `\n\nCRITICAL GAPS IDENTIFIED:\n${gaps.map(g => `- ${g.description}`).join('\n')}`
+      ? `\n\nCRITICAL GAPS IDENTIFIED:\n${gaps.map((g: any) => `- ${g.description}`).join('\n')}`
       : '\n\nNo critical coverage gaps identified.';
 
     const prompt = `You are an expert insurance analyst. Compare these two insurance options and provide a detailed analysis.
@@ -259,10 +259,10 @@ Return your analysis as a structured JSON object.`;
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Comparison error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

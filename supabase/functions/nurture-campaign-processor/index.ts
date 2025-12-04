@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
           .from('campaign_enrollments')
           .select('lead_id')
           .eq('campaign_id', campaign.id)
-          .in('lead_id', filteredLeads.map(l => l.id));
+          .in('lead_id', filteredLeads.map((l: any) => l.id));
 
         const enrolledLeadIds = new Set(
           (existingEnrollments || []).map((e: any) => e.lead_id)
@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
           campaign_id: campaign.id,
           campaign_name: campaign.name,
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
         });
       }
     }
@@ -254,11 +254,11 @@ Deno.serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Fatal error:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
         success: false,
       }),
       { 

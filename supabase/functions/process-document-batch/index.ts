@@ -162,7 +162,7 @@ serve(async (req) => {
             .from('document_processing_queue')
             .update({ 
               status: shouldRetry ? 'queued' : 'failed',
-              error_message: error instanceof Error ? error.message : 'Unknown error',
+              error_message: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error',
               completed_at: shouldRetry ? null : new Date().toISOString()
             })
             .eq('id', item.id);
@@ -203,11 +203,11 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in process-document-batch:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred' 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

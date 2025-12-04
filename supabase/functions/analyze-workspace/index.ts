@@ -62,7 +62,7 @@ serve(async (req) => {
     console.log(`Processing workspace ${workspace_id} with ${workspace.workspace_documents?.length || 0} documents`);
 
     // Check if all documents have been parsed by Parseur
-    const unparsedDocs = workspace.workspace_documents?.filter(doc => 
+    const unparsedDocs = workspace.workspace_documents?.filter((doc: any) => 
       !doc.parsed_documents || doc.parsed_documents.length === 0
     ) || [];
     
@@ -82,7 +82,7 @@ serve(async (req) => {
     }
 
     // Collect parsed data from all documents
-    const documentData = workspace.workspace_documents?.map(doc => ({
+    const documentData = workspace.workspace_documents?.map((doc: any) => ({
       filename: doc.file_name,
       role: doc.role,
       document_type: doc.parsed_documents?.[0]?.document_type,
@@ -114,7 +114,7 @@ Focus on:
 
 Provide a clear, structured summary with specific details and actionable insights.`;
 
-      userPrompt = `Analyze the following insurance policy data:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
+      userPrompt = `Analyze the following insurance policy data:\n\n${documentData.map((d: any) => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
 
     } else if (workspace.task_type === "coverage_comparison") {
       systemPrompt = `You are an expert at comparing insurance policies. Analyze multiple parsed policy documents and provide a detailed comparison.
@@ -129,7 +129,7 @@ Focus on:
 
 Present the comparison in a structured format with tables where appropriate.`;
 
-      userPrompt = `Compare the following insurance policy documents:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'Option'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide a comprehensive comparison highlighting key differences in coverage, premiums, and value. Make a clear recommendation.`;
+      userPrompt = `Compare the following insurance policy documents:\n\n${documentData.map((d: any) => `=== ${d.filename} (${d.role || 'Option'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide a comprehensive comparison highlighting key differences in coverage, premiums, and value. Make a clear recommendation.`;
 
     } else if (workspace.task_type === "contract_review") {
       systemPrompt = `You are an expert at reviewing insurance contracts and certificates. Cross-reference the provided documents and identify any discrepancies, compliance issues, or areas of concern.
@@ -145,11 +145,11 @@ Focus on:
 
 Provide clear findings with specific references to the documents.`;
 
-      userPrompt = `Review and cross-reference the following insurance documents:\n\n${documentData.map(d => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide detailed findings on accuracy, compliance, and any concerns.`;
+      userPrompt = `Review and cross-reference the following insurance documents:\n\n${documentData.map((d: any) => `=== ${d.filename} (${d.role || 'document'}) ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}\n\nProvide detailed findings on accuracy, compliance, and any concerns.`;
 
     } else {
       systemPrompt = "You are an expert insurance document analyst. Provide detailed insights and analysis of the provided insurance data.";
-      userPrompt = `Analyze these insurance documents:\n\n${documentData.map(d => `=== ${d.filename} ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
+      userPrompt = `Analyze these insurance documents:\n\n${documentData.map((d: any) => `=== ${d.filename} ===\nDocument Type: ${d.document_type || 'unknown'}\n${JSON.stringify(d.parsed_data, null, 2)}\n`).join("\n\n")}`;
     }
 
     // Call Azure OpenAI for analysis
@@ -190,7 +190,7 @@ Provide clear findings with specific references to the documents.`;
     const analysisOutput = {
       task_type: workspace.task_type,
       analyzed_at: new Date().toISOString(),
-      documents: documentData.map(d => ({
+      documents: documentData.map((d: any) => ({
         filename: d.filename,
         role: d.role,
         document_type: d.document_type,

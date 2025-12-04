@@ -83,13 +83,13 @@ serve(async (req) => {
         const result = await response.json();
         results.successful++;
         console.log(`✓ Processed renewal ${renewal.id} - Risk: ${result.risk_level} (${result.risk_score})`);
-      } catch (error) {
+      } catch (error: unknown) {
         results.failed++;
         results.errors.push({
           renewal_id: renewal.id,
-          error: error.message
+          error: (error instanceof Error ? error.message : String(error))
         });
-        console.error(`✗ Failed to process renewal ${renewal.id}:`, error.message);
+        console.error(`✗ Failed to process renewal ${renewal.id}:`, (error instanceof Error ? error.message : String(error)));
       }
     }
 
@@ -106,10 +106,10 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Batch processing error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

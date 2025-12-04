@@ -238,7 +238,7 @@ serve(async (req) => {
 
       if (error) {
         console.error("Error fetching lead:", error);
-        throw new Error(`Failed to fetch lead: ${error.message}`);
+        throw new Error(`Failed to fetch lead: ${(error instanceof Error ? error.message : String(error))}`);
       }
       
       if (!data) {
@@ -302,13 +302,13 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Lead scoring error:", error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "An unknown error occurred",
+        error: (error instanceof Error ? error.message : String(error)) || "An unknown error occurred",
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

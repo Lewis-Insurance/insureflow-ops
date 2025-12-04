@@ -17,7 +17,7 @@ async function hashDocument(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((b: any) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Cache management functions
@@ -307,7 +307,7 @@ serve(async (req) => {
               }
 
               fullText = extractResult.pages
-                .map(p => `=== Page ${p.page} ===\n${p.text}`)
+                .map((p: any) => `=== Page ${p.page} ===\n${p.text}`)
                 .join('\n\n');
 
               if (!fullText.trim()) {
@@ -349,10 +349,10 @@ serve(async (req) => {
       );
 
       // Check for failures
-      const failures = documentResults.filter(r => r.status === 'rejected');
+      const failures = documentResults.filter((r: any) => r.status === 'rejected');
       const successes = documentResults
         .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-        .map(r => r.value);
+        .map((r: any) => r.value);
 
       if (failures.length === documentPaths.length) {
         throw new DocumentFetchError(
@@ -479,7 +479,7 @@ serve(async (req) => {
           });
           
           docContent = extractResult.pages
-            .map(p => `=== Page ${p.page} ===\n${p.text}`)
+            .map((p: any) => `=== Page ${p.page} ===\n${p.text}`)
             .join('\n\n');
           
           console.log(`✓ Extracted ${docContent.length} characters from ${docData.name}`);
@@ -1026,13 +1026,13 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
               }
 
               // Bodily Injury (by words or BI)
-              if (!inferred.find(c => /Bodily Injury/i.test(c.type)) && (has(/bodily\s+injury/i) || has(/\bBI\b/i) || nearYes(/bodily\s+injury|\bBI\b/i))) {
+              if (!inferred.find((c: any) => /Bodily Injury/i.test(c.type)) && (has(/bodily\s+injury/i) || has(/\bBI\b/i) || nearYes(/bodily\s+injury|\bBI\b/i))) {
                 const biNum = docsText.match(/(bodily\s+injury|\bBI\b)[^\n]{0,160}?((\$?\d{1,3}(?:,\d{3})?)\s*\/\s*(\$?\d{1,3}(?:,\d{3})?))/i)?.[2];
                 inferred.push({ type: 'Bodily Injury Liability', limit: biNum || undefined, notes: biNum ? undefined : 'Included (numeric limit not specified)' });
               }
 
               // Property Damage (by words or PD)
-              if (!inferred.find(c => /Property Damage/i.test(c.type)) && (has(/property\s+damage/i) || has(/\bPD\b/i) || nearYes(/property\s+damage|\bPD\b/i))) {
+              if (!inferred.find((c: any) => /Property Damage/i.test(c.type)) && (has(/property\s+damage/i) || has(/\bPD\b/i) || nearYes(/property\s+damage|\bPD\b/i))) {
                 const pdNum = docsText.match(/(property\s+damage|\bPD\b)[^\n]{0,160}?(\$?\d{1,3}(?:,\d{3})+)/i)?.[2];
                 inferred.push({ type: 'Property Damage Liability', limit: pdNum || undefined, notes: pdNum ? undefined : 'Included (numeric limit not specified)' });
               }
@@ -1153,7 +1153,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       },
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in ai-document-analysis:', error);
     
     let statusCode = 500;
@@ -1161,15 +1161,15 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
     
     if (error instanceof ConfigurationError) {
       statusCode = 500;
-      errorMessage = `Configuration error: ${error.message}`;
+      errorMessage = `Configuration error: ${(error instanceof Error ? error.message : String(error))}`;
     } else if (error instanceof DocumentFetchError) {
       statusCode = 404;
-      errorMessage = `Document error: ${error.message}`;
+      errorMessage = `Document error: ${(error instanceof Error ? error.message : String(error))}`;
     } else if (error instanceof AIServiceError) {
       statusCode = error.statusCode || 500;
-      errorMessage = error.message;
+      errorMessage = (error instanceof Error ? error.message : String(error));
     } else if (error instanceof Error) {
-      errorMessage = error.message;
+      errorMessage = (error instanceof Error ? error.message : String(error));
     }
     
     return new Response(

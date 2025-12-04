@@ -138,11 +138,11 @@ Deno.serve(async (req) => {
       }
     )
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Lead capture error:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: (error instanceof Error ? error.message : String(error)),
         details: 'Failed to capture lead'
       }),
       { 

@@ -140,7 +140,7 @@ function calculateQuoteScore(factors: ScoringFactors): ScoringResult {
   // ==========================================
   // FACTOR 2: Coverage Completeness (0-25 points)
   // ==========================================
-  const includedCoverages = factors.coverages.filter(c => c.is_included);
+  const includedCoverages = factors.coverages.filter((c: any) => c.is_included);
   const criticalCoverages = factors.requiredCoverages || ['BI', 'PD', 'COMP', 'COLL', 'UM'];
 
   const missingCritical = criticalCoverages.filter(
@@ -382,7 +382,7 @@ serve(async (req) => {
     const carrierNames = [
       ...new Set(
         quotes
-          .map(q => q.carrier_info?.name)
+          .map((q: any) => q.carrier_info?.name)
           .filter(Boolean) as string[]
       ),
     ];
@@ -393,7 +393,7 @@ serve(async (req) => {
       .in("carrier_name", carrierNames);
 
     const carrierRatingMap = new Map(
-      carrierRatings?.map(cr => [cr.carrier_name, cr]) || []
+      carrierRatings?.map((cr: any) => [cr.carrier_name, cr]) || []
     );
 
     // Score each quote
@@ -407,8 +407,8 @@ serve(async (req) => {
         carrierName: quote.carrier_info?.name || "",
         carrierRating: carrierRatingMap.get(quote.carrier_info?.name || ""),
         deductibles: (quote.quote_coverages || [])
-          .filter(c => c.deductible_amount)
-          .map(c => ({
+          .filter((c: any) => c.deductible_amount)
+          .map((c: any) => ({
             type: c.coverage_type,
             amount: parseDeductible(c.deductible_amount),
           })),
@@ -453,10 +453,10 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in calculate-quote-score:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) || "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

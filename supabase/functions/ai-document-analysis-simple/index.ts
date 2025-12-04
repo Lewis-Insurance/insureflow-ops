@@ -265,16 +265,16 @@ Return ONLY the JSON object, no other text.`;
     );
     */ // End of commented out section
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('========================================');
-    console.error('ERROR:', error.message);
-    console.error('Stack:', error.stack);
+    console.error('ERROR:', (error instanceof Error ? error.message : String(error)));
+    console.error('Stack:', (error instanceof Error ? error.stack : undefined));
     console.error('========================================');
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        details: error.stack
+        error: (error instanceof Error ? error.message : String(error)),
+        details: (error instanceof Error ? error.stack : undefined)
       }),
       { 
         status: 500,

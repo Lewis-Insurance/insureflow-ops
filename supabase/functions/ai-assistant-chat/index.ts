@@ -393,7 +393,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(lead => ({
+              result = data?.map((lead: any) => ({
                 id: lead.id,
                 name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
                 email: lead.email,
@@ -423,7 +423,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(account => ({
+              result = data?.map((account: any) => ({
                 id: account.id,
                 name: account.name,
                 email: account.email,
@@ -452,7 +452,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (policyError) throw policyError;
 
               // Get account associations for these policies
-              const policyIds = policies?.map(p => p.id) || [];
+              const policyIds = policies?.map((p: any) => p.id) || [];
               let accountNames: Record<string, string> = {};
               
               if (policyIds.length > 0) {
@@ -461,7 +461,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                   .select('policy_id, accounts(name)')
                   .in('policy_id', policyIds);
                 
-                associations?.forEach(assoc => {
+                associations?.forEach((assoc: any) => {
                   if (assoc.policy_id && assoc.accounts) {
                     accountNames[assoc.policy_id] = (assoc.accounts as any).name;
                   }
@@ -469,7 +469,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               }
 
               // Format results with URLs
-              result = policies?.map(policy => ({
+              result = policies?.map((policy: any) => ({
                 id: policy.id,
                 policy_number: policy.policy_number,
                 carrier: policy.carrier,
@@ -505,7 +505,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(renewal => ({
+              result = data?.map((renewal: any) => ({
                 id: renewal.id,
                 policy_number: renewal.policy_number,
                 carrier: renewal.carrier,
@@ -535,7 +535,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(aoRenewal => ({
+              result = data?.map((aoRenewal: any) => ({
                 id: aoRenewal.id,
                 customer_name: aoRenewal.customer_name,
                 policy_number: aoRenewal.policy_number,
@@ -572,7 +572,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(task => ({
+              result = data?.map((task: any) => ({
                 id: task.id,
                 title: task.title,
                 description: task.description,
@@ -602,7 +602,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(quote => ({
+              result = data?.map((quote: any) => ({
                 id: quote.id,
                 quote_number: quote.quote_number,
                 account_name: (quote.accounts as any)?.name || 'Unknown',
@@ -631,7 +631,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
               if (error) throw error;
               
               // Format results with URLs
-              result = data?.map(contact => ({
+              result = data?.map((contact: any) => ({
                 id: contact.id,
                 name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
                 email: contact.email,
@@ -663,9 +663,9 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
                   total_active: taskStats?.length || 0,
                   overdue: overdueTasks.data?.length || 0,
                   by_priority: {
-                    high: taskStats?.filter(t => t.priority === 'high').length || 0,
-                    medium: taskStats?.filter(t => t.priority === 'medium').length || 0,
-                    low: taskStats?.filter(t => t.priority === 'low').length || 0
+                    high: taskStats?.filter((t: any) => t.priority === 'high').length || 0,
+                    medium: taskStats?.filter((t: any) => t.priority === 'medium').length || 0,
+                    low: taskStats?.filter((t: any) => t.priority === 'low').length || 0
                   }
                 };
               }
@@ -726,7 +726,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
           }
         } catch (error) {
           console.error(`Error executing ${functionName}:`, error);
-          result = { error: error instanceof Error ? error.message : 'Unknown error' };
+          result = { error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error' };
         }
 
         toolResults.push({
@@ -783,11 +783,11 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in ai-assistant-chat:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

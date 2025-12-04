@@ -123,7 +123,7 @@ serve(async (req) => {
         .eq('status', 'active');
 
       if (policyData) {
-        policies = policyData.map(p => ({
+        policies = policyData.map((p: any) => ({
           coverage_type: p.coverage_type,
           premium: p.premium,
         }));
@@ -144,7 +144,7 @@ serve(async (req) => {
     let riskScore = 0;
 
     // Get current coverage types
-    const currentCoverageTypes = new Set(policies.map(p => p.coverage_type));
+    const currentCoverageTypes = new Set(policies.map((p: any) => p.coverage_type));
 
     // Analyze each template
     for (const template of templates || []) {
@@ -207,7 +207,7 @@ serve(async (req) => {
     const aiRecommendations = generateAIRecommendations(gaps, profile);
 
     // Prepare recommended coverages
-    const recommendedCoverages = gaps.map(gap => ({
+    const recommendedCoverages = gaps.map((gap: any) => ({
       coverage_type: gap.coverage_type,
       coverage_name: gap.coverage_name,
       severity: gap.gap_severity,
@@ -249,7 +249,7 @@ serve(async (req) => {
 
     // Insert individual recommendations
     if (gaps.length > 0) {
-      const recommendations = gaps.map(gap => ({
+      const recommendations = gaps.map((gap: any) => ({
         gap_analysis_id: analysisData.id,
         ...gap,
       }));
@@ -275,10 +275,10 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in analyze-coverage-gaps:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -482,8 +482,8 @@ function generateAISummary(
   profile: any
 ): string {
   const gapCount = gaps.length;
-  const criticalCount = gaps.filter(g => g.gap_severity === 'critical').length;
-  const highCount = gaps.filter(g => g.gap_severity === 'high').length;
+  const criticalCount = gaps.filter((g: any) => g.gap_severity === 'critical').length;
+  const highCount = gaps.filter((g: any) => g.gap_severity === 'high').length;
 
   if (gapCount === 0) {
     return `✅ Excellent coverage portfolio! Your current insurance coverage appears comprehensive for a ${profile.industry || 'business'} with ${profile.employees || 'several'} employees. No critical gaps identified. Risk Score: ${riskScore}/100 (${riskLevel.toUpperCase()})`;
@@ -514,7 +514,7 @@ function generateAIRecommendations(gaps: CoverageGap[], profile: any): string {
   let recommendations = '📋 Recommended Action Plan:\n\n';
 
   // Critical gaps first
-  const criticalGaps = gaps.filter(g => g.gap_severity === 'critical');
+  const criticalGaps = gaps.filter((g: any) => g.gap_severity === 'critical');
   if (criticalGaps.length > 0) {
     recommendations += '🚨 IMMEDIATE PRIORITIES:\n';
     criticalGaps.forEach((gap, idx) => {
@@ -524,7 +524,7 @@ function generateAIRecommendations(gaps: CoverageGap[], profile: any): string {
   }
 
   // High priority gaps
-  const highGaps = gaps.filter(g => g.gap_severity === 'high');
+  const highGaps = gaps.filter((g: any) => g.gap_severity === 'high');
   if (highGaps.length > 0) {
     recommendations += '⚠️ HIGH PRIORITY (Address within 30 days):\n';
     highGaps.forEach((gap, idx) => {
@@ -534,7 +534,7 @@ function generateAIRecommendations(gaps: CoverageGap[], profile: any): string {
   }
 
   // Medium/Low gaps
-  const otherGaps = gaps.filter(g => !['critical', 'high'].includes(g.gap_severity));
+  const otherGaps = gaps.filter((g: any) => !['critical', 'high'].includes(g.gap_severity));
   if (otherGaps.length > 0) {
     recommendations += '📌 CONSIDER FOR COMPREHENSIVE PROTECTION:\n';
     otherGaps.forEach((gap, idx) => {
