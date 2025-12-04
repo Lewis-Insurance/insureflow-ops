@@ -8,6 +8,22 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSubmitAIFeedback } from '@/hooks/useAIFeedback';
 
+// ===== Type Guards for Json types =====
+function isAIContextJson(value: unknown): value is { type: string; id: string; name?: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    'id' in value &&
+    typeof (value as any).type === 'string' &&
+    typeof (value as any).id === 'string'
+  );
+}
+
+function isMessageMetadata(value: unknown): value is { documents?: DocumentInfo[] } {
+  return typeof value === 'object' && value !== null;
+}
+
 // ===== KB types & helper =====
 type KbEntry = {
   record_id: string;
@@ -140,8 +156,8 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         // Filter conversations by context in JavaScript to avoid TS issues
         const matchingConversation = existingConversations?.find((conv) => {
           const convContext = conv.context;
-          if (contextType && contextId) {
-            return convContext?.type === contextType && convContext?.id === contextId;
+          if (contextType && contextId && isAIContextJson(convContext)) {
+            return convContext.type === contextType && convContext.id === contextId;
           }
           return !convContext;
         });
@@ -166,7 +182,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
               role: msg.role as 'user' | 'assistant',
               content: msg.content,
               timestamp: new Date(msg.created_at),
-              documents: (msg.metadata)?.documents,
+              documents: isMessageMetadata(msg.metadata) ? msg.metadata.documents : undefined,
             }));
             setMessages(loadedMessages);
           }
