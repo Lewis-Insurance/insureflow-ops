@@ -14,9 +14,6 @@ export interface Lead extends Omit<LeadRow, 'insurance_types' | 'lead_score'> {
   insurance_types: string[];
   source_name?: string;
   assigned_to_name?: string;
-  contact_count?: number;
-  email_opens?: number;
-  email_clicks?: number;
 }
 
 export interface LeadFilters {
