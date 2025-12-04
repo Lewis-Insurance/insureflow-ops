@@ -99,6 +99,53 @@ export function useQuotesByAccount(accountId: string) {
   });
 }
 
+export interface CreateQuoteInput {
+  account_id: string;
+  carrier_id?: string;
+  quote_ref: string;
+  line_of_business: string;
+  premium?: number;
+  expires_at?: string;
+  status?: Quote['status'];
+  competitor_carrier?: string;
+}
+
+export function useCreateQuote() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (input: CreateQuoteInput) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('quotes')
+        .insert([{
+          ...input,
+          created_by: user.id,
+          updated_by: user.id,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Quote;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quotes', 'account', variables.account_id] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: `Failed to create quote: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useUpdateQuoteStatus() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

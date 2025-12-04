@@ -5,11 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateTasks } from '@/lib/taskAutomation';
 import { useAutoScoreQuote } from '@/hooks/useQuoteScoring';
 import { useTriggerFollowUpProcessor } from '@/hooks/useQuoteFollowups';
+import { useCreateQuote } from '@/hooks/useQuotes';
 import { z } from 'zod';
 import { AIQuoteAssistant, type QuoteSuggestion } from '@/components/quotes/AIQuoteAssistant';
 
@@ -41,9 +41,9 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
     billing_frequency: 'annual',
     notes: '',
   });
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const createQuote = useCreateQuote();
   const autoScoreQuote = useAutoScoreQuote();
   const triggerFollowUps = useTriggerFollowUpProcessor();
 
@@ -68,65 +68,40 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
 
   async function handleSave() {
     if (!validateForm()) return;
-    
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to add quotes',
-          variant: 'destructive',
-        });
-        return;
-      }
 
-      // Create a "quote" as a policy with quote status
-      const quoteData = {
+    try {
+      // Create quote in the quotes table
+      const quoteInput = {
         account_id: accountId,
-        insured_user_id: user.id, // Set to current user creating the quote
-        policy_number: formData.quote_number.trim(), // Store quote number as policy number
-        carrier: formData.carrier.trim(),
-        line_of_business: formData.line_of_business.trim(),
-        premium: formData.premium ? parseFloat(formData.premium) : null,
-        effective_date: formData.effective_date,
-        expiration_date: formData.expiration_date,
-        billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
-        status: 'quoted', // Mark as quote
-        notes: formData.notes.trim() || null,
+        quote_ref: formData.quote_number.trim(),
+        competitor_carrier: formData.carrier.trim(),
+        line_of_business: formData.line_of_business.trim() as any, // Will be enum type
+        premium: formData.premium ? parseFloat(formData.premium) : undefined,
+        expires_at: formData.expiration_date,
+        status: 'open' as const,
       };
 
-      const { data: newQuote, error } = await supabase
-        .from('policies')
-        .insert([quoteData])
-        .select()
-        .single();
-
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
+      const newQuote = await new Promise<any>((resolve, reject) => {
+        createQuote.mutate(quoteInput, {
+          onSuccess: (data) => resolve(data),
+          onError: (error) => reject(error),
         });
-        return;
-      }
+      });
 
       // Auto-generate tasks for quote
-      if (newQuote) {
-        await generateTasks('quote_requested', accountId, 'quote', newQuote.id);
+      await generateTasks('quote_requested', accountId, 'quote', newQuote.id);
 
-        // TODO: When migrating to new quotes table, trigger auto-scoring and follow-ups here
-        // autoScoreQuote.mutate(newQuote.id);
-        // triggerFollowUps.mutate({ quoteIds: [newQuote.id] });
-        // For now, this creates quotes in policies table with status='quoted'
-        // which maintains backward compatibility
-      }
+      // Auto-score the quote (silent, no toast)
+      autoScoreQuote.mutate(newQuote.id);
+
+      // Trigger follow-up processor
+      triggerFollowUps.mutate({ quoteIds: [newQuote.id] });
 
       toast({
         title: 'Success',
-        description: 'Quote added successfully and tasks created',
+        description: 'Quote added successfully. Auto-scoring in progress...',
       });
-      
+
       // Reset form
       setFormData({
         quote_number: '',
@@ -142,13 +117,8 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to add quote',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+      // Error toast already shown by createQuote hook
+      console.error('Failed to add quote:', error);
     }
   }
 
@@ -293,8 +263,8 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? 'Adding...' : 'Add Quote'}
+            <Button onClick={handleSave} disabled={createQuote.isPending}>
+              {createQuote.isPending ? 'Adding...' : 'Add Quote'}
             </Button>
           </div>
         </div>
