@@ -264,6 +264,54 @@ export type Database = {
           },
         ]
       }
+      ai_conversation_sessions: {
+        Row: {
+          avg_response_time_ms: number | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          helpful_count: number | null
+          id: string
+          is_active: boolean | null
+          last_activity_at: string | null
+          message_count: number | null
+          not_helpful_count: number | null
+          session_type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_response_time_ms?: number | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          helpful_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_activity_at?: string | null
+          message_count?: number | null
+          not_helpful_count?: number | null
+          session_type: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_response_time_ms?: number | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          helpful_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_activity_at?: string | null
+          message_count?: number | null
+          not_helpful_count?: number | null
+          session_type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           account_id: string | null
@@ -336,6 +384,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_response_feedback: {
+        Row: {
+          context_metadata: Json | null
+          context_type: string | null
+          conversation_id: string | null
+          created_at: string | null
+          feedback_text: string | null
+          helpful: boolean
+          id: string
+          issue_category: string | null
+          message_id: string | null
+          query: string
+          response: string
+          response_time_ms: number | null
+          suggested_improvement: string | null
+          token_count: number | null
+          updated_at: string | null
+          user_id: string | null
+          was_cached: boolean | null
+        }
+        Insert: {
+          context_metadata?: Json | null
+          context_type?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          feedback_text?: string | null
+          helpful: boolean
+          id?: string
+          issue_category?: string | null
+          message_id?: string | null
+          query: string
+          response: string
+          response_time_ms?: number | null
+          suggested_improvement?: string | null
+          token_count?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          was_cached?: boolean | null
+        }
+        Update: {
+          context_metadata?: Json | null
+          context_type?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          feedback_text?: string | null
+          helpful?: boolean
+          id?: string
+          issue_category?: string | null
+          message_id?: string | null
+          query?: string
+          response?: string
+          response_time_ms?: number | null
+          suggested_improvement?: string | null
+          token_count?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          was_cached?: boolean | null
+        }
+        Relationships: []
       }
       ao_renewal_contact_log: {
         Row: {
@@ -1239,6 +1347,65 @@ export type Database = {
           },
         ]
       }
+      carrier_ratings: {
+        Row: {
+          avg_claim_response_days: number | null
+          carrier_id: string | null
+          carrier_name: string
+          created_at: string | null
+          customer_satisfaction_score: number | null
+          denial_rate: number | null
+          financial_strength: string | null
+          id: string
+          last_updated: string | null
+          metadata: Json | null
+          overall_rating: number | null
+          quote_count: number | null
+          selected_count: number | null
+          win_rate: number | null
+        }
+        Insert: {
+          avg_claim_response_days?: number | null
+          carrier_id?: string | null
+          carrier_name: string
+          created_at?: string | null
+          customer_satisfaction_score?: number | null
+          denial_rate?: number | null
+          financial_strength?: string | null
+          id?: string
+          last_updated?: string | null
+          metadata?: Json | null
+          overall_rating?: number | null
+          quote_count?: number | null
+          selected_count?: number | null
+          win_rate?: number | null
+        }
+        Update: {
+          avg_claim_response_days?: number | null
+          carrier_id?: string | null
+          carrier_name?: string
+          created_at?: string | null
+          customer_satisfaction_score?: number | null
+          denial_rate?: number | null
+          financial_strength?: string | null
+          id?: string
+          last_updated?: string | null
+          metadata?: Json | null
+          overall_rating?: number | null
+          quote_count?: number | null
+          selected_count?: number | null
+          win_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_ratings_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       carriers: {
         Row: {
           address_line1: string | null
@@ -2027,6 +2194,243 @@ export type Database = {
           },
         ]
       }
+      coverage_gap_analysis: {
+        Row: {
+          account_id: string | null
+          ai_recommendations: string | null
+          ai_summary: string | null
+          analysis_date: string | null
+          analysis_type: string | null
+          analyzed_by: string | null
+          created_at: string | null
+          current_policies: Json | null
+          customer_name: string | null
+          customer_profile: Json | null
+          estimated_annual_premium: number | null
+          estimated_premium_increase: number | null
+          expires_at: string | null
+          id: string
+          identified_gaps: Json | null
+          quote_id: string | null
+          quoted_at: string | null
+          recommended_coverages: Json | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risk_factors: string[] | null
+          risk_level: string | null
+          risk_score: number | null
+          sale_amount: number | null
+          sold_at: string | null
+          status: string | null
+          updated_at: string | null
+          was_sold: boolean | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_recommendations?: string | null
+          ai_summary?: string | null
+          analysis_date?: string | null
+          analysis_type?: string | null
+          analyzed_by?: string | null
+          created_at?: string | null
+          current_policies?: Json | null
+          customer_name?: string | null
+          customer_profile?: Json | null
+          estimated_annual_premium?: number | null
+          estimated_premium_increase?: number | null
+          expires_at?: string | null
+          id?: string
+          identified_gaps?: Json | null
+          quote_id?: string | null
+          quoted_at?: string | null
+          recommended_coverages?: Json | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_factors?: string[] | null
+          risk_level?: string | null
+          risk_score?: number | null
+          sale_amount?: number | null
+          sold_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          was_sold?: boolean | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_recommendations?: string | null
+          ai_summary?: string | null
+          analysis_date?: string | null
+          analysis_type?: string | null
+          analyzed_by?: string | null
+          created_at?: string | null
+          current_policies?: Json | null
+          customer_name?: string | null
+          customer_profile?: Json | null
+          estimated_annual_premium?: number | null
+          estimated_premium_increase?: number | null
+          expires_at?: string | null
+          id?: string
+          identified_gaps?: Json | null
+          quote_id?: string | null
+          quoted_at?: string | null
+          recommended_coverages?: Json | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_factors?: string[] | null
+          risk_level?: string | null
+          risk_score?: number | null
+          sale_amount?: number | null
+          sold_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          was_sold?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coverage_gap_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_gap_analysis_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quote_rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_gap_analysis_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coverage_gap_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          gap_description_template: string | null
+          id: string
+          industry: string | null
+          is_active: boolean | null
+          name: string
+          priority: number | null
+          recommendation_template: string | null
+          recommended_coverages: string[] | null
+          required_coverages: string[] | null
+          risk_indicators: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          gap_description_template?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean | null
+          name: string
+          priority?: number | null
+          recommendation_template?: string | null
+          recommended_coverages?: string[] | null
+          required_coverages?: string[] | null
+          risk_indicators?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          gap_description_template?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean | null
+          name?: string
+          priority?: number | null
+          recommendation_template?: string | null
+          recommended_coverages?: string[] | null
+          required_coverages?: string[] | null
+          risk_indicators?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      coverage_recommendations: {
+        Row: {
+          coverage_name: string
+          coverage_type: string
+          created_at: string | null
+          customer_response: string | null
+          estimated_premium: number | null
+          gap_analysis_id: string | null
+          gap_description: string | null
+          gap_severity: string | null
+          id: string
+          priority: number | null
+          recommendation_reason: string | null
+          recommended_deductible: string | null
+          recommended_limits: string | null
+          response_date: string | null
+          risk_if_not_covered: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          coverage_name: string
+          coverage_type: string
+          created_at?: string | null
+          customer_response?: string | null
+          estimated_premium?: number | null
+          gap_analysis_id?: string | null
+          gap_description?: string | null
+          gap_severity?: string | null
+          id?: string
+          priority?: number | null
+          recommendation_reason?: string | null
+          recommended_deductible?: string | null
+          recommended_limits?: string | null
+          response_date?: string | null
+          risk_if_not_covered?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          coverage_name?: string
+          coverage_type?: string
+          created_at?: string | null
+          customer_response?: string | null
+          estimated_premium?: number | null
+          gap_analysis_id?: string | null
+          gap_description?: string | null
+          gap_severity?: string | null
+          id?: string
+          priority?: number | null
+          recommendation_reason?: string | null
+          recommended_deductible?: string | null
+          recommended_limits?: string | null
+          response_date?: string | null
+          risk_if_not_covered?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coverage_recommendations_gap_analysis_id_fkey"
+            columns: ["gap_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "coverage_gap_analysis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_identities: {
         Row: {
           created_at: string | null
@@ -2062,6 +2466,119 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_predictions: {
+        Row: {
+          account_id: string | null
+          actions_taken: Json | null
+          ai_recommendations: Json | null
+          ai_summary: string | null
+          churn_factors: Json | null
+          churn_probability: number | null
+          churn_risk_level: string | null
+          claim_probability: number | null
+          claim_risk_factors: Json | null
+          created_at: string | null
+          cross_sell_opportunities: Json | null
+          customer_name: string | null
+          expires_at: string | null
+          id: string
+          ltv_confidence: number | null
+          max_acceptable_increase_pct: number | null
+          model_factors: Json | null
+          next_product_prediction: string | null
+          next_product_probability: number | null
+          outcome_actual: string | null
+          outcome_date: string | null
+          predicted_claim_type: string | null
+          predicted_ltv: number | null
+          predicted_renewal_date: string | null
+          prediction_date: string | null
+          prediction_model_version: string | null
+          premium_sensitivity_score: number | null
+          price_elasticity: string | null
+          renewal_confidence_score: number | null
+          renewal_probability: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          actions_taken?: Json | null
+          ai_recommendations?: Json | null
+          ai_summary?: string | null
+          churn_factors?: Json | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          claim_probability?: number | null
+          claim_risk_factors?: Json | null
+          created_at?: string | null
+          cross_sell_opportunities?: Json | null
+          customer_name?: string | null
+          expires_at?: string | null
+          id?: string
+          ltv_confidence?: number | null
+          max_acceptable_increase_pct?: number | null
+          model_factors?: Json | null
+          next_product_prediction?: string | null
+          next_product_probability?: number | null
+          outcome_actual?: string | null
+          outcome_date?: string | null
+          predicted_claim_type?: string | null
+          predicted_ltv?: number | null
+          predicted_renewal_date?: string | null
+          prediction_date?: string | null
+          prediction_model_version?: string | null
+          premium_sensitivity_score?: number | null
+          price_elasticity?: string | null
+          renewal_confidence_score?: number | null
+          renewal_probability?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          actions_taken?: Json | null
+          ai_recommendations?: Json | null
+          ai_summary?: string | null
+          churn_factors?: Json | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          claim_probability?: number | null
+          claim_risk_factors?: Json | null
+          created_at?: string | null
+          cross_sell_opportunities?: Json | null
+          customer_name?: string | null
+          expires_at?: string | null
+          id?: string
+          ltv_confidence?: number | null
+          max_acceptable_increase_pct?: number | null
+          model_factors?: Json | null
+          next_product_prediction?: string | null
+          next_product_probability?: number | null
+          outcome_actual?: string | null
+          outcome_date?: string | null
+          predicted_claim_type?: string | null
+          predicted_ltv?: number | null
+          predicted_renewal_date?: string | null
+          prediction_date?: string | null
+          prediction_model_version?: string | null
+          premium_sensitivity_score?: number | null
+          price_elasticity?: string | null
+          renewal_confidence_score?: number | null
+          renewal_probability?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_predictions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -2975,6 +3492,84 @@ export type Database = {
           },
         ]
       }
+      generated_tasks_log: {
+        Row: {
+          ai_context: string | null
+          ai_suggestions: Json | null
+          assigned_to: string | null
+          assignment_reason: string | null
+          completed_at: string | null
+          created_at: string | null
+          generation_error: string | null
+          generation_status: string | null
+          id: string
+          rule_id: string | null
+          task_id: string | null
+          trigger_data: Json | null
+          trigger_entity_id: string | null
+          trigger_entity_type: string | null
+          trigger_type: string
+          user_feedback: string | null
+          was_ai_enhanced: boolean | null
+          was_helpful: boolean | null
+        }
+        Insert: {
+          ai_context?: string | null
+          ai_suggestions?: Json | null
+          assigned_to?: string | null
+          assignment_reason?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          generation_error?: string | null
+          generation_status?: string | null
+          id?: string
+          rule_id?: string | null
+          task_id?: string | null
+          trigger_data?: Json | null
+          trigger_entity_id?: string | null
+          trigger_entity_type?: string | null
+          trigger_type: string
+          user_feedback?: string | null
+          was_ai_enhanced?: boolean | null
+          was_helpful?: boolean | null
+        }
+        Update: {
+          ai_context?: string | null
+          ai_suggestions?: Json | null
+          assigned_to?: string | null
+          assignment_reason?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          generation_error?: string | null
+          generation_status?: string | null
+          id?: string
+          rule_id?: string | null
+          task_id?: string | null
+          trigger_data?: Json | null
+          trigger_entity_id?: string | null
+          trigger_entity_type?: string | null
+          trigger_type?: string
+          user_feedback?: string | null
+          was_ai_enhanced?: boolean | null
+          was_helpful?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_tasks_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "task_generation_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_tasks_log_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_accounts: {
         Row: {
           account_id: string
@@ -3451,6 +4046,374 @@ export type Database = {
           },
         ]
       }
+      issue_activity_log: {
+        Row: {
+          activity_type: string
+          comment: string | null
+          created_at: string | null
+          id: string
+          issue_id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          issue_id: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          issue_id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_activity_log_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_attachments: {
+        Row: {
+          attachment_type: string | null
+          created_at: string | null
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          issue_id: string
+          mime_type: string | null
+          thumbnail_path: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          attachment_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          issue_id: string
+          mime_type?: string | null
+          thumbnail_path?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          attachment_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          issue_id?: string
+          mime_type?: string | null
+          thumbnail_path?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_attachments_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_comments: {
+        Row: {
+          author_id: string
+          comment_text: string
+          created_at: string | null
+          edited_at: string | null
+          id: string
+          is_edited: boolean | null
+          is_internal: boolean | null
+          is_status_change: boolean | null
+          issue_id: string
+          parent_comment_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          comment_text: string
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string
+          is_edited?: boolean | null
+          is_internal?: boolean | null
+          is_status_change?: boolean | null
+          issue_id: string
+          parent_comment_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          comment_text?: string
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string
+          is_edited?: boolean | null
+          is_internal?: boolean | null
+          is_status_change?: boolean | null
+          issue_id?: string
+          parent_comment_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_comments_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "issue_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_label_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          issue_id: string
+          label_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          issue_id: string
+          label_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          issue_id?: string
+          label_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_label_assignments_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_label_assignments_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "issue_labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_labels: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      issue_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          issue_id: string
+          user_id: string
+          vote_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          issue_id: string
+          user_id: string
+          vote_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          issue_id?: string
+          user_id?: string
+          vote_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_votes_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issues: {
+        Row: {
+          actual_behavior: string | null
+          affected_module: string | null
+          affected_page: string | null
+          assigned_at: string | null
+          assigned_to: string | null
+          browser_info: Json | null
+          category: string
+          closed_at: string | null
+          console_logs: string | null
+          created_at: string | null
+          description: string
+          duplicate_of: string | null
+          error_message: string | null
+          expected_behavior: string | null
+          id: string
+          is_blocker: boolean | null
+          is_regression: boolean | null
+          is_visible_to_customer: boolean | null
+          issue_number: number
+          last_activity_at: string | null
+          network_logs: string | null
+          priority: string
+          reported_by: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          steps_to_reproduce: string | null
+          time_to_close: number | null
+          time_to_resolve: number | null
+          time_to_triage: number | null
+          title: string
+          updated_at: string | null
+          upvotes: number | null
+        }
+        Insert: {
+          actual_behavior?: string | null
+          affected_module?: string | null
+          affected_page?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          browser_info?: Json | null
+          category: string
+          closed_at?: string | null
+          console_logs?: string | null
+          created_at?: string | null
+          description: string
+          duplicate_of?: string | null
+          error_message?: string | null
+          expected_behavior?: string | null
+          id?: string
+          is_blocker?: boolean | null
+          is_regression?: boolean | null
+          is_visible_to_customer?: boolean | null
+          issue_number?: number
+          last_activity_at?: string | null
+          network_logs?: string | null
+          priority?: string
+          reported_by: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          steps_to_reproduce?: string | null
+          time_to_close?: number | null
+          time_to_resolve?: number | null
+          time_to_triage?: number | null
+          title: string
+          updated_at?: string | null
+          upvotes?: number | null
+        }
+        Update: {
+          actual_behavior?: string | null
+          affected_module?: string | null
+          affected_page?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          browser_info?: Json | null
+          category?: string
+          closed_at?: string | null
+          console_logs?: string | null
+          created_at?: string | null
+          description?: string
+          duplicate_of?: string | null
+          error_message?: string | null
+          expected_behavior?: string | null
+          id?: string
+          is_blocker?: boolean | null
+          is_regression?: boolean | null
+          is_visible_to_customer?: boolean | null
+          issue_number?: number
+          last_activity_at?: string | null
+          network_logs?: string | null
+          priority?: string
+          reported_by?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          steps_to_reproduce?: string | null
+          time_to_close?: number | null
+          time_to_resolve?: number | null
+          time_to_triage?: number | null
+          title?: string
+          updated_at?: string | null
+          upvotes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issues_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_events: {
         Row: {
           created_at: string
@@ -3686,65 +4649,83 @@ export type Database = {
         Row: {
           account_id: string | null
           category: string
+          change_summary: string | null
           confidence_score: number | null
           content: string
           created_at: string
           created_by: string | null
+          edited_at: string | null
+          edited_by: string | null
           embedding: string | null
           embedding_model: string | null
           helpful_count: number | null
           id: string
+          is_current_version: boolean | null
           last_accessed: string | null
           metadata: Json | null
           not_helpful_count: number | null
+          previous_version_id: string | null
           processed_at: string | null
           source: string | null
           tags: string[] | null
           title: string
           updated_at: string
           usage_count: number | null
+          version: number | null
         }
         Insert: {
           account_id?: string | null
           category: string
+          change_summary?: string | null
           confidence_score?: number | null
           content: string
           created_at?: string
           created_by?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           embedding?: string | null
           embedding_model?: string | null
           helpful_count?: number | null
           id?: string
+          is_current_version?: boolean | null
           last_accessed?: string | null
           metadata?: Json | null
           not_helpful_count?: number | null
+          previous_version_id?: string | null
           processed_at?: string | null
           source?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
           usage_count?: number | null
+          version?: number | null
         }
         Update: {
           account_id?: string | null
           category?: string
+          change_summary?: string | null
           confidence_score?: number | null
           content?: string
           created_at?: string
           created_by?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           embedding?: string | null
           embedding_model?: string | null
           helpful_count?: number | null
           id?: string
+          is_current_version?: boolean | null
           last_accessed?: string | null
           metadata?: Json | null
           not_helpful_count?: number | null
+          previous_version_id?: string | null
           processed_at?: string | null
           source?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
           usage_count?: number | null
+          version?: number | null
         }
         Relationships: [
           {
@@ -3752,6 +4733,83 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_base_history: {
+        Row: {
+          category_snapshot: string | null
+          change_summary: string | null
+          change_type: string
+          changed_at: string | null
+          changed_by: string | null
+          content_snapshot: string | null
+          field_changes: Json | null
+          id: string
+          knowledge_id: string
+          metadata: Json | null
+          tags_snapshot: string[] | null
+          title_snapshot: string | null
+          version: number
+        }
+        Insert: {
+          category_snapshot?: string | null
+          change_summary?: string | null
+          change_type: string
+          changed_at?: string | null
+          changed_by?: string | null
+          content_snapshot?: string | null
+          field_changes?: Json | null
+          id?: string
+          knowledge_id: string
+          metadata?: Json | null
+          tags_snapshot?: string[] | null
+          title_snapshot?: string | null
+          version: number
+        }
+        Update: {
+          category_snapshot?: string | null
+          change_summary?: string | null
+          change_type?: string
+          changed_at?: string | null
+          changed_by?: string | null
+          content_snapshot?: string | null
+          field_changes?: Json | null
+          id?: string
+          knowledge_id?: string
+          metadata?: Json | null
+          tags_snapshot?: string[] | null
+          title_snapshot?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_history_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_history_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
         ]
@@ -3789,43 +4847,119 @@ export type Database = {
         }
         Relationships: []
       }
-      knowledge_usage_logs: {
+      knowledge_search_queries: {
         Row: {
-          context: string | null
+          avg_relevance_score: number | null
           created_at: string | null
+          had_results: boolean | null
           id: string
-          knowledge_base_id: string | null
-          query: string | null
-          response_helpful: boolean | null
-          response_time_ms: number | null
+          normalized_query: string | null
+          query_text: string
+          result_count: number | null
+          session_id: string | null
+          top_result_id: string | null
+          user_clicked_result: boolean | null
           user_id: string | null
+          user_satisfied: boolean | null
         }
         Insert: {
-          context?: string | null
+          avg_relevance_score?: number | null
           created_at?: string | null
+          had_results?: boolean | null
           id?: string
-          knowledge_base_id?: string | null
-          query?: string | null
-          response_helpful?: boolean | null
-          response_time_ms?: number | null
+          normalized_query?: string | null
+          query_text: string
+          result_count?: number | null
+          session_id?: string | null
+          top_result_id?: string | null
+          user_clicked_result?: boolean | null
           user_id?: string | null
+          user_satisfied?: boolean | null
         }
         Update: {
-          context?: string | null
+          avg_relevance_score?: number | null
           created_at?: string | null
+          had_results?: boolean | null
           id?: string
-          knowledge_base_id?: string | null
-          query?: string | null
-          response_helpful?: boolean | null
-          response_time_ms?: number | null
+          normalized_query?: string | null
+          query_text?: string
+          result_count?: number | null
+          session_id?: string | null
+          top_result_id?: string | null
+          user_clicked_result?: boolean | null
           user_id?: string | null
+          user_satisfied?: boolean | null
         }
         Relationships: [
           {
-            foreignKeyName: "knowledge_usage_logs_knowledge_base_id_fkey"
-            columns: ["knowledge_base_id"]
+            foreignKeyName: "knowledge_search_queries_top_result_id_fkey"
+            columns: ["top_result_id"]
             isOneToOne: false
             referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_search_queries_top_result_id_fkey"
+            columns: ["top_result_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_usage_logs: {
+        Row: {
+          context_type: string | null
+          created_at: string | null
+          id: string
+          knowledge_id: string | null
+          relevance_score: number | null
+          response_time_ms: number | null
+          search_query: string | null
+          session_id: string | null
+          user_action: string
+          user_id: string | null
+          was_helpful: boolean | null
+        }
+        Insert: {
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          knowledge_id?: string | null
+          relevance_score?: number | null
+          response_time_ms?: number | null
+          search_query?: string | null
+          session_id?: string | null
+          user_action: string
+          user_id?: string | null
+          was_helpful?: boolean | null
+        }
+        Update: {
+          context_type?: string | null
+          created_at?: string | null
+          id?: string
+          knowledge_id?: string | null
+          relevance_score?: number | null
+          response_time_ms?: number | null
+          search_query?: string | null
+          session_id?: string | null
+          user_action?: string
+          user_id?: string | null
+          was_helpful?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_usage_logs_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_usage_logs_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
         ]
@@ -6229,6 +7363,88 @@ export type Database = {
           },
         ]
       }
+      prediction_accuracy_tracking: {
+        Row: {
+          account_id: string | null
+          accuracy_score: number | null
+          actual_date: string | null
+          actual_value: string | null
+          created_at: string | null
+          error_margin: number | null
+          error_type: string | null
+          feedback_notes: string | null
+          feedback_provided: boolean | null
+          id: string
+          predicted_probability: number | null
+          predicted_value: string
+          prediction_date: string
+          prediction_id: string | null
+          prediction_type: string
+          updated_at: string | null
+          was_accurate: boolean | null
+        }
+        Insert: {
+          account_id?: string | null
+          accuracy_score?: number | null
+          actual_date?: string | null
+          actual_value?: string | null
+          created_at?: string | null
+          error_margin?: number | null
+          error_type?: string | null
+          feedback_notes?: string | null
+          feedback_provided?: boolean | null
+          id?: string
+          predicted_probability?: number | null
+          predicted_value: string
+          prediction_date: string
+          prediction_id?: string | null
+          prediction_type: string
+          updated_at?: string | null
+          was_accurate?: boolean | null
+        }
+        Update: {
+          account_id?: string | null
+          accuracy_score?: number | null
+          actual_date?: string | null
+          actual_value?: string | null
+          created_at?: string | null
+          error_margin?: number | null
+          error_type?: string | null
+          feedback_notes?: string | null
+          feedback_provided?: boolean | null
+          id?: string
+          predicted_probability?: number | null
+          predicted_value?: string
+          prediction_date?: string
+          prediction_id?: string | null
+          prediction_type?: string
+          updated_at?: string | null
+          was_accurate?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_accuracy_tracking_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_accuracy_tracking_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "at_risk_customers_current"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_accuracy_tracking_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "customer_predictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       producer_goals: {
         Row: {
           created_at: string
@@ -6378,63 +7594,405 @@ export type Database = {
         }
         Relationships: []
       }
-      quotes: {
+      quote_coverages: {
         Row: {
-          account_id: string
-          carrier_id: string | null
-          competitor_carrier: string | null
+          coverage_type: string
+          created_at: string | null
+          deductible_amount: string | null
+          extracted_from_document: boolean | null
+          id: string
+          is_included: boolean | null
+          limit_amount: string | null
+          premium_amount: number | null
+          quote_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          coverage_type: string
+          created_at?: string | null
+          deductible_amount?: string | null
+          extracted_from_document?: boolean | null
+          id?: string
+          is_included?: boolean | null
+          limit_amount?: string | null
+          premium_amount?: number | null
+          quote_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          coverage_type?: string
+          created_at?: string | null
+          deductible_amount?: string | null
+          extracted_from_document?: boolean | null
+          id?: string
+          is_included?: boolean | null
+          limit_amount?: string | null
+          premium_amount?: number | null
+          quote_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_coverages_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quote_rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_coverages_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_followup_history: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          followup_id: string
+          id: string
+          quote_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          followup_id: string
+          id?: string
+          quote_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          followup_id?: string
+          id?: string
+          quote_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_followup_history_followup_id_fkey"
+            columns: ["followup_id"]
+            isOneToOne: false
+            referencedRelation: "quote_followups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followup_history_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quote_rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followup_history_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_followup_rules: {
+        Row: {
+          action_type: string
+          assign_to_role: string | null
+          assign_to_user_id: string | null
+          carrier_names: string[] | null
           created_at: string | null
           created_by: string | null
-          deleted_at: string | null
-          expires_at: string | null
+          delay_hours: number
+          description: string | null
+          email_template_id: string | null
+          follow_up_interval_hours: number | null
           id: string
-          line_of_business: Database["public"]["Enums"]["line_of_business"]
-          options: Json | null
-          quote_ref: string | null
-          quoted_at: string | null
-          reason_loss: string | null
-          reason_win: string | null
-          status: Database["public"]["Enums"]["quote_status"] | null
+          is_active: boolean | null
+          line_of_business: string[] | null
+          max_follow_ups: number | null
+          max_quote_score: number | null
+          metadata: Json | null
+          min_quote_score: number | null
+          name: string
+          org_id: string | null
+          sms_template_text: string | null
+          task_priority: string | null
+          task_template_id: string | null
+          trigger_type: string
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
-          account_id: string
-          carrier_id?: string | null
-          competitor_carrier?: string | null
+          action_type: string
+          assign_to_role?: string | null
+          assign_to_user_id?: string | null
+          carrier_names?: string[] | null
           created_at?: string | null
           created_by?: string | null
-          deleted_at?: string | null
-          expires_at?: string | null
+          delay_hours?: number
+          description?: string | null
+          email_template_id?: string | null
+          follow_up_interval_hours?: number | null
           id?: string
-          line_of_business: Database["public"]["Enums"]["line_of_business"]
-          options?: Json | null
-          quote_ref?: string | null
-          quoted_at?: string | null
-          reason_loss?: string | null
-          reason_win?: string | null
-          status?: Database["public"]["Enums"]["quote_status"] | null
+          is_active?: boolean | null
+          line_of_business?: string[] | null
+          max_follow_ups?: number | null
+          max_quote_score?: number | null
+          metadata?: Json | null
+          min_quote_score?: number | null
+          name: string
+          org_id?: string | null
+          sms_template_text?: string | null
+          task_priority?: string | null
+          task_template_id?: string | null
+          trigger_type: string
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
-          account_id?: string
-          carrier_id?: string | null
-          competitor_carrier?: string | null
+          action_type?: string
+          assign_to_role?: string | null
+          assign_to_user_id?: string | null
+          carrier_names?: string[] | null
           created_at?: string | null
           created_by?: string | null
+          delay_hours?: number
+          description?: string | null
+          email_template_id?: string | null
+          follow_up_interval_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          line_of_business?: string[] | null
+          max_follow_ups?: number | null
+          max_quote_score?: number | null
+          metadata?: Json | null
+          min_quote_score?: number | null
+          name?: string
+          org_id?: string | null
+          sms_template_text?: string | null
+          task_priority?: string | null
+          task_template_id?: string | null
+          trigger_type?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_followup_rules_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_followups: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          email_sent_at: string | null
+          error_message: string | null
+          executed_at: string | null
+          follow_up_number: number | null
+          id: string
+          metadata: Json | null
+          next_follow_up_at: string | null
+          notification_created_id: string | null
+          outcome: string | null
+          outcome_notes: string | null
+          quote_id: string
+          response_received: boolean | null
+          response_received_at: string | null
+          response_type: string | null
+          rule_id: string | null
+          scheduled_at: string
+          sms_sent_at: string | null
+          status: string
+          task_created_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          email_sent_at?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          follow_up_number?: number | null
+          id?: string
+          metadata?: Json | null
+          next_follow_up_at?: string | null
+          notification_created_id?: string | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          quote_id: string
+          response_received?: boolean | null
+          response_received_at?: string | null
+          response_type?: string | null
+          rule_id?: string | null
+          scheduled_at: string
+          sms_sent_at?: string | null
+          status?: string
+          task_created_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          email_sent_at?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          follow_up_number?: number | null
+          id?: string
+          metadata?: Json | null
+          next_follow_up_at?: string | null
+          notification_created_id?: string | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          quote_id?: string
+          response_received?: boolean | null
+          response_received_at?: string | null
+          response_type?: string | null
+          rule_id?: string | null
+          scheduled_at?: string
+          sms_sent_at?: string | null
+          status?: string
+          task_created_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_followups_notification_created_id_fkey"
+            columns: ["notification_created_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followups_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quote_rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followups_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followups_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "quote_followup_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_followups_task_created_id_fkey"
+            columns: ["task_created_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          account_id: string
+          ai_recommendation: string | null
+          carrier_id: string | null
+          carrier_rating_score: number | null
+          competitiveness_rank: number | null
+          competitor_carrier: string | null
+          coverage_completeness_score: number | null
+          created_at: string | null
+          created_by: string | null
+          deductible_score: number | null
+          deleted_at: string | null
+          expires_at: string | null
+          id: string
+          last_scored_at: string | null
+          line_of_business: Database["public"]["Enums"]["line_of_business"]
+          options: Json | null
+          premium: number | null
+          price_score: number | null
+          quote_ref: string | null
+          quote_score: number | null
+          quoted_at: string | null
+          reason_loss: string | null
+          reason_win: string | null
+          scoring_metadata: Json | null
+          status: Database["public"]["Enums"]["quote_status"] | null
+          updated_at: string | null
+          updated_by: string | null
+          value_score: number | null
+        }
+        Insert: {
+          account_id: string
+          ai_recommendation?: string | null
+          carrier_id?: string | null
+          carrier_rating_score?: number | null
+          competitiveness_rank?: number | null
+          competitor_carrier?: string | null
+          coverage_completeness_score?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          deductible_score?: number | null
           deleted_at?: string | null
           expires_at?: string | null
           id?: string
-          line_of_business?: Database["public"]["Enums"]["line_of_business"]
+          last_scored_at?: string | null
+          line_of_business: Database["public"]["Enums"]["line_of_business"]
           options?: Json | null
+          premium?: number | null
+          price_score?: number | null
           quote_ref?: string | null
+          quote_score?: number | null
           quoted_at?: string | null
           reason_loss?: string | null
           reason_win?: string | null
+          scoring_metadata?: Json | null
           status?: Database["public"]["Enums"]["quote_status"] | null
           updated_at?: string | null
           updated_by?: string | null
+          value_score?: number | null
+        }
+        Update: {
+          account_id?: string
+          ai_recommendation?: string | null
+          carrier_id?: string | null
+          carrier_rating_score?: number | null
+          competitiveness_rank?: number | null
+          competitor_carrier?: string | null
+          coverage_completeness_score?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          deductible_score?: number | null
+          deleted_at?: string | null
+          expires_at?: string | null
+          id?: string
+          last_scored_at?: string | null
+          line_of_business?: Database["public"]["Enums"]["line_of_business"]
+          options?: Json | null
+          premium?: number | null
+          price_score?: number | null
+          quote_ref?: string | null
+          quote_score?: number | null
+          quoted_at?: string | null
+          reason_loss?: string | null
+          reason_win?: string | null
+          scoring_metadata?: Json | null
+          status?: Database["public"]["Enums"]["quote_status"] | null
+          updated_at?: string | null
+          updated_by?: string | null
+          value_score?: number | null
         }
         Relationships: [
           {
@@ -6871,6 +8429,109 @@ export type Database = {
           },
         ]
       }
+      retention_interventions: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          churn_risk_at_intervention: string | null
+          created_at: string | null
+          customer_response: string | null
+          executed_date: string | null
+          id: string
+          intervention_cost: number | null
+          intervention_description: string | null
+          intervention_title: string
+          intervention_type: string
+          notes: string | null
+          offer_expires_at: string | null
+          offer_type: string | null
+          offer_value: number | null
+          prediction_id: string | null
+          retained_revenue: number | null
+          roi: number | null
+          scheduled_date: string | null
+          status: string | null
+          success_metrics: Json | null
+          triggered_by_score: number | null
+          updated_at: string | null
+          was_successful: boolean | null
+        }
+        Insert: {
+          account_id?: string | null
+          assigned_to?: string | null
+          churn_risk_at_intervention?: string | null
+          created_at?: string | null
+          customer_response?: string | null
+          executed_date?: string | null
+          id?: string
+          intervention_cost?: number | null
+          intervention_description?: string | null
+          intervention_title: string
+          intervention_type: string
+          notes?: string | null
+          offer_expires_at?: string | null
+          offer_type?: string | null
+          offer_value?: number | null
+          prediction_id?: string | null
+          retained_revenue?: number | null
+          roi?: number | null
+          scheduled_date?: string | null
+          status?: string | null
+          success_metrics?: Json | null
+          triggered_by_score?: number | null
+          updated_at?: string | null
+          was_successful?: boolean | null
+        }
+        Update: {
+          account_id?: string | null
+          assigned_to?: string | null
+          churn_risk_at_intervention?: string | null
+          created_at?: string | null
+          customer_response?: string | null
+          executed_date?: string | null
+          id?: string
+          intervention_cost?: number | null
+          intervention_description?: string | null
+          intervention_title?: string
+          intervention_type?: string
+          notes?: string | null
+          offer_expires_at?: string | null
+          offer_type?: string | null
+          offer_value?: number | null
+          prediction_id?: string | null
+          retained_revenue?: number | null
+          roi?: number | null
+          scheduled_date?: string | null
+          status?: string | null
+          success_metrics?: Json | null
+          triggered_by_score?: number | null
+          updated_at?: string | null
+          was_successful?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_interventions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retention_interventions_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "at_risk_customers_current"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retention_interventions_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "customer_predictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_change_requests: {
         Row: {
           created_at: string
@@ -7290,6 +8951,75 @@ export type Database = {
           },
         ]
       }
+      task_generation_rules: {
+        Row: {
+          ai_prompt: string | null
+          assign_to_role: string | null
+          assign_to_type: string | null
+          assign_to_user_id: string | null
+          conditions: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          due_in_days: number | null
+          due_in_hours: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          priority: string | null
+          tags: string[] | null
+          task_description_template: string | null
+          task_title_template: string
+          task_type: string | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_prompt?: string | null
+          assign_to_role?: string | null
+          assign_to_type?: string | null
+          assign_to_user_id?: string | null
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_in_days?: number | null
+          due_in_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          priority?: string | null
+          tags?: string[] | null
+          task_description_template?: string | null
+          task_title_template: string
+          task_type?: string | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_prompt?: string | null
+          assign_to_role?: string | null
+          assign_to_type?: string | null
+          assign_to_user_id?: string | null
+          conditions?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_in_days?: number | null
+          due_in_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          priority?: string | null
+          tags?: string[] | null
+          task_description_template?: string | null
+          task_title_template?: string
+          task_type?: string | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       task_recurrence_rules: {
         Row: {
           created_at: string
@@ -7600,6 +9330,13 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quote_rankings"
             referencedColumns: ["id"]
           },
           {
@@ -8077,6 +9814,20 @@ export type Database = {
       }
     }
     Views: {
+      ai_feedback_analytics: {
+        Row: {
+          avg_response_time: number | null
+          cache_hit_rate: number | null
+          cached_responses: number | null
+          context_type: string | null
+          date: string | null
+          helpful_count: number | null
+          helpfulness_rate: number | null
+          not_helpful_count: number | null
+          total_feedback: number | null
+        }
+        Relationships: []
+      }
       ao_quotes_analytics: {
         Row: {
           avg_annual_premium: number | null
@@ -8157,6 +9908,71 @@ export type Database = {
         }
         Relationships: []
       }
+      at_risk_customers_current: {
+        Row: {
+          account_id: string | null
+          ai_recommendations: Json | null
+          ai_summary: string | null
+          churn_factors: Json | null
+          churn_probability: number | null
+          churn_risk_level: string | null
+          customer_name: string | null
+          days_until_renewal: number | null
+          id: string | null
+          intervention_count: number | null
+          last_intervention_date: string | null
+          predicted_ltv: number | null
+          predicted_renewal_date: string | null
+          prediction_date: string | null
+          premium_sensitivity_score: number | null
+          renewal_probability: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_recommendations?: Json | null
+          ai_summary?: string | null
+          churn_factors?: Json | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          customer_name?: string | null
+          days_until_renewal?: never
+          id?: string | null
+          intervention_count?: never
+          last_intervention_date?: never
+          predicted_ltv?: number | null
+          predicted_renewal_date?: string | null
+          prediction_date?: string | null
+          premium_sensitivity_score?: number | null
+          renewal_probability?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_recommendations?: Json | null
+          ai_summary?: string | null
+          churn_factors?: Json | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          customer_name?: string | null
+          days_until_renewal?: never
+          id?: string | null
+          intervention_count?: never
+          last_intervention_date?: never
+          predicted_ltv?: number | null
+          predicted_renewal_date?: string | null
+          prediction_date?: string | null
+          premium_sensitivity_score?: number | null
+          renewal_probability?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_predictions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       at_risk_renewals: {
         Row: {
           account_id: string | null
@@ -8223,6 +10039,24 @@ export type Database = {
           },
         ]
       }
+      coverage_gap_analytics: {
+        Row: {
+          avg_days_to_close: number | null
+          avg_premium_increase: number | null
+          avg_risk_score: number | null
+          conversion_rate: number | null
+          converted_count: number | null
+          month: string | null
+          quote_rate: number | null
+          quoted_count: number | null
+          risk_level: string | null
+          sold_count: number | null
+          status: string | null
+          total_analyses: number | null
+          total_revenue: number | null
+        }
+        Relationships: []
+      }
       document_batch_summary: {
         Row: {
           account_id: string | null
@@ -8241,6 +10075,140 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_analytics: {
+        Row: {
+          avg_resolution_time_minutes: number | null
+          avg_triage_time_minutes: number | null
+          avg_upvotes: number | null
+          blocker_count: number | null
+          category: string | null
+          in_progress_count: number | null
+          issue_count: number | null
+          new_count: number | null
+          regression_count: number | null
+          resolved_count: number | null
+          severity: string | null
+          status: string | null
+          total_upvotes: number | null
+          week: string | null
+        }
+        Relationships: []
+      }
+      knowledge_base_with_stats: {
+        Row: {
+          account_id: string | null
+          category: string | null
+          change_summary: string | null
+          confidence_score: number | null
+          content: string | null
+          created_at: string | null
+          created_by: string | null
+          edited_at: string | null
+          edited_by: string | null
+          embedding: string | null
+          embedding_model: string | null
+          helpful_count: number | null
+          id: string | null
+          is_current_version: boolean | null
+          last_accessed: string | null
+          last_modified_at: string | null
+          last_modified_by_email: string | null
+          metadata: Json | null
+          not_helpful_count: number | null
+          previous_version_id: string | null
+          processed_at: string | null
+          source: string | null
+          tags: string[] | null
+          title: string | null
+          total_revisions: number | null
+          updated_at: string | null
+          usage_count: number | null
+          version: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          category?: string | null
+          change_summary?: string | null
+          confidence_score?: number | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          helpful_count?: number | null
+          id?: string | null
+          is_current_version?: boolean | null
+          last_accessed?: string | null
+          last_modified_at?: never
+          last_modified_by_email?: never
+          metadata?: Json | null
+          not_helpful_count?: number | null
+          previous_version_id?: string | null
+          processed_at?: string | null
+          source?: string | null
+          tags?: string[] | null
+          title?: string | null
+          total_revisions?: never
+          updated_at?: string | null
+          usage_count?: number | null
+          version?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          category?: string | null
+          change_summary?: string | null
+          confidence_score?: number | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          helpful_count?: number | null
+          id?: string | null
+          is_current_version?: boolean | null
+          last_accessed?: string | null
+          last_modified_at?: never
+          last_modified_by_email?: never
+          metadata?: Json | null
+          not_helpful_count?: number | null
+          previous_version_id?: string | null
+          processed_at?: string | null
+          source?: string | null
+          tags?: string[] | null
+          title?: string | null
+          total_revisions?: never
+          updated_at?: string | null
+          usage_count?: number | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_with_stats"
             referencedColumns: ["id"]
           },
         ]
@@ -8314,6 +10282,26 @@ export type Database = {
         }
         Relationships: []
       }
+      predictive_analytics_dashboard: {
+        Row: {
+          actual_churns: number | null
+          actual_renewals: number | null
+          avg_churn_probability: number | null
+          avg_renewal_probability: number | null
+          churn_risk_level: string | null
+          high_risk_count: number | null
+          likely_renewals: number | null
+          medium_risk_count: number | null
+          month: string | null
+          prediction_accuracy_pct: number | null
+          revenue_at_risk_high: number | null
+          revenue_at_risk_medium: number | null
+          total_actions_taken: number | null
+          total_predictions: number | null
+          unique_customers: number | null
+        }
+        Relationships: []
+      }
       producer_lead_stats: {
         Row: {
           avg_lead_score: number | null
@@ -8330,6 +10318,72 @@ export type Database = {
           won_leads: number | null
         }
         Relationships: []
+      }
+      quote_rankings: {
+        Row: {
+          account_id: string | null
+          ai_recommendation: string | null
+          carrier_id: string | null
+          carrier_rating_score: number | null
+          coverage_completeness_score: number | null
+          deductible_score: number | null
+          id: string | null
+          last_scored_at: string | null
+          line_of_business:
+            | Database["public"]["Enums"]["line_of_business"]
+            | null
+          premium: number | null
+          price_score: number | null
+          quote_ref: string | null
+          quote_score: number | null
+          rank_in_account: number | null
+          status: Database["public"]["Enums"]["quote_status"] | null
+          total_quotes_for_account: number | null
+          value_score: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_generation_analytics: {
+        Row: {
+          ai_enhanced_count: number | null
+          ai_enhancement_rate: number | null
+          date: string | null
+          failed_generations: number | null
+          generation_status: string | null
+          helpful_count: number | null
+          helpfulness_rate: number | null
+          not_helpful_count: number | null
+          rule_id: string | null
+          success_rate: number | null
+          successful_generations: number | null
+          total_attempts: number | null
+          trigger_type: string | null
+          unique_assignees: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_tasks_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "task_generation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_kb_simple: {
         Row: {
@@ -8388,6 +10442,10 @@ export type Database = {
       }
       calculate_days_since_last_contact: {
         Args: { renewal_account_id: string }
+        Returns: number
+      }
+      calculate_intervention_roi: {
+        Args: { p_intervention_id: string }
         Returns: number
       }
       calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
@@ -8498,6 +10556,15 @@ export type Database = {
       decrypt_ssn: { Args: { enc: string }; Returns: string }
       digits_only: { Args: { "": string }; Returns: string }
       encrypt_ssn: { Args: { ssn: string }; Returns: string }
+      expire_old_coverage_analyses: { Args: never; Returns: undefined }
+      expire_old_predictions: { Args: never; Returns: undefined }
+      find_matching_rules: {
+        Args: { p_trigger_data: Json; p_trigger_type: string }
+        Returns: {
+          rule_id: string
+          rule_name: string
+        }[]
+      }
       find_recent_ticket_by_sender: {
         Args: { p_sender: string }
         Returns: {
@@ -8535,6 +10602,15 @@ export type Database = {
       generate_coi_number: { Args: never; Returns: string }
       generate_recurring_task_instance: {
         Args: { p_due_date: string; p_template_task_id: string }
+        Returns: string
+      }
+      generate_task_from_rule: {
+        Args: {
+          p_rule_id: string
+          p_trigger_data: Json
+          p_trigger_entity_id?: string
+          p_trigger_entity_type?: string
+        }
         Returns: string
       }
       generate_tasks_from_templates: {
@@ -8824,6 +10900,28 @@ export type Database = {
         Args: { p_context?: string; p_question: string }
         Returns: string
       }
+      log_knowledge_search: {
+        Args: {
+          p_avg_relevance_score?: number
+          p_query_text: string
+          p_result_count?: number
+          p_session_id?: string
+          p_top_result_id?: string
+        }
+        Returns: string
+      }
+      log_knowledge_usage: {
+        Args: {
+          p_context_type?: string
+          p_knowledge_id: string
+          p_relevance_score?: number
+          p_response_time_ms?: number
+          p_search_query?: string
+          p_session_id?: string
+          p_user_action: string
+        }
+        Returns: string
+      }
       log_profile_access: {
         Args: { action_type: string; details_json?: Json; target_id: string }
         Returns: undefined
@@ -8854,7 +10952,20 @@ export type Database = {
         Args: { batch_id: string; field_mapping?: Json; import_type?: string }
         Returns: Json
       }
+      refresh_ai_feedback_analytics: { Args: never; Returns: undefined }
+      refresh_coverage_gap_analytics: { Args: never; Returns: undefined }
+      refresh_issue_analytics: { Args: never; Returns: undefined }
+      refresh_predictive_analytics_dashboard: {
+        Args: never
+        Returns: undefined
+      }
+      refresh_quote_rankings: { Args: never; Returns: undefined }
+      refresh_task_generation_analytics: { Args: never; Returns: undefined }
       rescore_leads: { Args: { lead_ids?: string[] }; Returns: Json }
+      revert_knowledge_to_version: {
+        Args: { p_knowledge_id: string; p_version: number }
+        Returns: string
+      }
       scan_for_duplicates: {
         Args: { entity_type?: string; similarity_threshold?: number }
         Returns: Json

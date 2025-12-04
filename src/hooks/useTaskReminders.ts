@@ -33,7 +33,7 @@ export function useTaskReminders() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setReminders((data as any) || []);
+      setReminders(data || []);
     } catch (error: any) {
       console.error('Error fetching reminders:', error);
       toast({
@@ -57,7 +57,7 @@ export function useTaskReminders() {
           remind_at: reminderData.remind_at!,
           reminder_type: reminderData.reminder_type!,
           created_by: user?.id,
-        } as any)
+        })
         .select()
         .single();
 
