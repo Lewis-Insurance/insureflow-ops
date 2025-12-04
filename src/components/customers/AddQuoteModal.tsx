@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateTasks } from '@/lib/taskAutomation';
 import { useAutoScoreQuote } from '@/hooks/useQuoteScoring';
+import { useTriggerFollowUpProcessor } from '@/hooks/useQuoteFollowups';
 import { z } from 'zod';
 import { AIQuoteAssistant, type QuoteSuggestion } from '@/components/quotes/AIQuoteAssistant';
 
@@ -44,6 +45,7 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const autoScoreQuote = useAutoScoreQuote();
+  const triggerFollowUps = useTriggerFollowUpProcessor();
 
   const validateForm = () => {
     try {
@@ -113,8 +115,9 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
       if (newQuote) {
         await generateTasks('quote_requested', accountId, 'quote', newQuote.id);
 
-        // TODO: When migrating to new quotes table, trigger auto-scoring here
+        // TODO: When migrating to new quotes table, trigger auto-scoring and follow-ups here
         // autoScoreQuote.mutate(newQuote.id);
+        // triggerFollowUps.mutate({ quoteIds: [newQuote.id] });
         // For now, this creates quotes in policies table with status='quoted'
         // which maintains backward compatibility
       }

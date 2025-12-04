@@ -28,6 +28,7 @@ const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
 const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
+const QuoteDetail = React.lazy(() => import("./pages/QuoteDetail"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
 const MessageNew = React.lazy(() => import("./pages/MessageNew"));
 const Profile = React.lazy(() => import("./pages/Profile"));
@@ -233,15 +234,23 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
-              <Route 
-                path="/quotes/new" 
+              <Route
+                path="/quotes/new"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <QuoteNew />
                   </ErrorBoundary>
-                } 
+                }
               />
-              <Route 
+              <Route
+                path="/quotes/:quoteId"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <QuoteDetail />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
                 path="/claims/new" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>

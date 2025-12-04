@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAutoScoreQuote } from "./useQuoteScoring";
+import { useTriggerFollowUpProcessor } from "./useQuoteFollowups";
 import { toast } from "sonner";
 
 export interface ParsedQuoteData {
@@ -25,6 +26,7 @@ export interface ParsedQuoteData {
 export function useQuoteDocumentUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const autoScore = useAutoScoreQuote();
+  const triggerFollowUps = useTriggerFollowUpProcessor();
 
   const uploadAndParseQuote = async (file: File, accountId: string) => {
     setIsUploading(true);
@@ -124,6 +126,9 @@ export function useQuoteDocumentUpload() {
 
       // Step 6: Auto-score the quote
       autoScore.mutate(quote.id);
+
+      // Step 7: Trigger follow-up processor to evaluate and schedule follow-ups
+      triggerFollowUps.mutate({ quoteIds: [quote.id] });
 
       toast.success("Quote uploaded and analyzed successfully", {
         description: `Quote ${quote.quote_ref} has been created and scored`,

@@ -10,6 +10,7 @@ import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
 import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
 import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
+import { PendingFollowupsWidget } from '@/components/quotes/PendingFollowupsWidget';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -35,11 +36,16 @@ const DashboardContent = React.memo(() => {
         </div>
       </div>
 
-      {/* Upcoming Tasks */}
-      <ErrorBoundary level="component">
-        <UpcomingTasksCard />
-      </ErrorBoundary>
-      
+      {/* Upcoming Tasks and Pending Follow-Ups */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <ErrorBoundary level="component">
+          <UpcomingTasksCard />
+        </ErrorBoundary>
+        <ErrorBoundary level="component">
+          <PendingFollowupsWidget limit={5} />
+        </ErrorBoundary>
+      </div>
+
       {/* AI Knowledge Search */}
       <ErrorBoundary level="component">
         <AIKnowledgeSearch />
