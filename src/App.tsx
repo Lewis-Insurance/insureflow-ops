@@ -67,6 +67,9 @@ const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
 const LewiAI = React.lazy(() => import("./pages/LewiAI"));
 const CoverageGapAnalysis = React.lazy(() => import("./pages/CoverageGapAnalysis"));
 const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
+const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
+const ReportIssue = React.lazy(() => import("./pages/ReportIssue"));
+const IssueDetail = React.lazy(() => import("./pages/IssueDetail"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -554,6 +557,30 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CoverageGapDetail />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/issues"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <IssueTracker />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/issues/new"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ReportIssue />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/issues/:issueId"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <IssueDetail />
                   </ErrorBoundary>
                 }
               />
