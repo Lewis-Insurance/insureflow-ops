@@ -29,44 +29,17 @@ export default defineConfig(({ mode }) => ({
     // Enable code splitting for better performance
     rollupOptions: {
       output: {
-        // Manual chunk splitting for optimal loading
+        // Simplified manual chunk splitting to prevent module initialization errors
         manualChunks: (id) => {
-          // Vendor chunks - split by package
           if (id.includes('node_modules')) {
-            // CRITICAL: Keep React core with react-dom to prevent module resolution issues
-            if (id.includes('react-dom') || id.includes('react/') || id.includes('react/jsx-runtime') ||
-                (id.includes('react') && !id.includes('react-router') && !id.includes('react-hook-form') &&
-                 !id.includes('react-pdf') && !id.includes('lucide-react') && !id.includes('@tanstack/react'))) {
+            // React ecosystem - keep together to prevent initialization issues
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
             }
 
-            if (id.includes('react-router')) {
-              return 'react-router-vendor';
-            }
-
-            // Query & state management
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor';
-            }
-
-            // Chart libraries (often large)
+            // Large chart libraries
             if (id.includes('recharts')) {
               return 'charts-vendor';
-            }
-
-            // Icon libraries
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-
-            // Date utilities
-            if (id.includes('date-fns')) {
-              return 'date-vendor';
-            }
-
-            // Form libraries
-            if (id.includes('react-hook-form') || id.includes('zod')) {
-              return 'forms-vendor';
             }
 
             // Supabase
@@ -74,52 +47,8 @@ export default defineConfig(({ mode }) => ({
               return 'supabase-vendor';
             }
 
-            // Shadcn/ui components (Radix)
-            if (id.includes('@radix-ui')) {
-              return 'radix-vendor';
-            }
-
-            // Table libraries
-            if (id.includes('@tanstack/react-table')) {
-              return 'table-vendor';
-            }
-
-            // DnD libraries
-            if (id.includes('@dnd-kit') || id.includes('dnd')) {
-              return 'dnd-vendor';
-            }
-
-            // Other node_modules
+            // All other vendor code
             return 'vendor';
-          }
-
-          // Feature-based chunks
-          if (id.includes('/src/components/crm/')) {
-            return 'crm-features';
-          }
-          if (id.includes('/src/components/ai/')) {
-            return 'ai-features';
-          }
-          if (id.includes('/src/components/communications/')) {
-            return 'communications-features';
-          }
-          if (id.includes('/src/components/predictive/')) {
-            return 'predictive-features';
-          }
-          if (id.includes('/src/components/tasks/')) {
-            return 'tasks-features';
-          }
-          if (id.includes('/src/components/quotes/')) {
-            return 'quotes-features';
-          }
-          if (id.includes('/src/components/renewals/')) {
-            return 'renewals-features';
-          }
-          if (id.includes('/src/components/ao-renewals/')) {
-            return 'ao-renewals-features';
-          }
-          if (id.includes('/src/components/leads/')) {
-            return 'leads-features';
           }
         },
       },
