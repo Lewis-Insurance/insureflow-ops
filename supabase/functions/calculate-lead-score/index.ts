@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { requireAuth, verifyResourceAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -217,6 +218,13 @@ serve(async (req) => {
       }
     );
 
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
+
     // Parse request body
     const { leadId, leadData } = await req.json();
 
@@ -226,10 +234,45 @@ serve(async (req) => {
 
     // Fetch lead data if only ID provided
     let lead: Lead;
-    
+
     if (leadData) {
       lead = leadData;
+
+      // SECURITY: If leadData provided, still verify user has access to that lead's account
+      if (authenticatedUser.accountId && lead.account_id !== authenticatedUser.accountId) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Forbidden: You do not have access to this lead'
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     } else if (leadId) {
+      // SECURITY: Verify user has access to this lead
+      const hasAccess = await verifyResourceAccess(
+        supabaseClient,
+        authenticatedUser.id,
+        'lead',
+        leadId
+      );
+
+      if (!hasAccess) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Forbidden: You do not have access to this lead'
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
       const { data, error } = await supabaseClient
         .from("leads")
         .select("*")
@@ -240,11 +283,11 @@ serve(async (req) => {
         console.error("Error fetching lead:", error);
         throw new Error(`Failed to fetch lead: ${(error instanceof Error ? error.message : String(error))}`);
       }
-      
+
       if (!data) {
         throw new Error(`Lead not found: ${leadId}`);
       }
-      
+
       lead = data;
     } else {
       throw new Error("Invalid request: missing lead data");
