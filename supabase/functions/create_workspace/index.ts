@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,10 +12,21 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      throw new Error("Missing authorization header");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
     }
+    const authenticatedUser = authResult;
 
     const { title, task_type, client_name, notes, documents, customer_id, policy_id } = await req.json();
 
@@ -30,23 +42,6 @@ serve(async (req) => {
 
     if (!task_type || !documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Missing required fields: task_type or documents[]");
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      throw new Error("User not authenticated");
     }
 
     // Validate customer_id exists in database if provided
@@ -97,7 +92,7 @@ serve(async (req) => {
       description: notes || null,
       task_type,
       status: "idle",
-      created_by: user.id,
+      created_by: authenticatedUser.id,
       client_name: client_name || null,
       notes: notes || null,
     };

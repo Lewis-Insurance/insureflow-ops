@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { requireAuth } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,18 +19,21 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     )
 
-    // Get user from JWT
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders)
+    if (authResult instanceof Response) {
+      return authResult // Return 401 if auth failed
     }
+    const authenticatedUser = authResult
 
     const { request_type }: DataExportRequest = await req.json()
 
@@ -37,7 +41,7 @@ serve(async (req) => {
     const { data: recentRequest } = await supabaseClient
       .from('data_export_requests')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', authenticatedUser.id)
       .eq('request_type', request_type)
       .gte('requested_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .order('requested_at', { ascending: false })
@@ -55,7 +59,7 @@ serve(async (req) => {
     const { data: exportRequest, error: createError } = await supabaseClient
       .from('data_export_requests')
       .insert({
-        user_id: user.id,
+        user_id: authenticatedUser.id,
         request_type,
         status: 'processing'
       })
@@ -71,7 +75,7 @@ serve(async (req) => {
     }
 
     // Process export in background
-    processExport(supabaseClient, user.id, exportRequest.id, request_type).catch(console.error)
+    processExport(supabaseClient, authenticatedUser.id, exportRequest.id, request_type).catch(console.error)
 
     return new Response(JSON.stringify({ success: true, request_id: exportRequest.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { requireAuth, verifyResourceAccess } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,23 +64,21 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
         },
       }
     );
 
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
     }
+    const authenticatedUser = authResult;
 
     const requestData: CoverageGapRequest = await req.json();
     const {
@@ -91,6 +90,27 @@ serve(async (req) => {
 
     if (!account_id) {
       throw new Error('account_id is required');
+    }
+
+    // SECURITY: Verify user has access to this account
+    const hasAccess = await verifyResourceAccess(
+      supabaseClient,
+      authenticatedUser.id,
+      'account',
+      account_id
+    );
+
+    if (!hasAccess) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Forbidden: You do not have access to this account'
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Fetch account details if customer_profile not provided
@@ -239,7 +259,7 @@ serve(async (req) => {
       .insert({
         ...analysisResult,
         customer_name: customerName,
-        analyzed_by: user.id,
+        analyzed_by: authenticatedUser.id,
         analysis_date: new Date().toISOString(),
         status: 'pending',
       })

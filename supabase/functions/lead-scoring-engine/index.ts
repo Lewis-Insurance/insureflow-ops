@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 interface LeadScoringFactors {
   // Insurance needs complexity (0-25 points)
@@ -105,13 +106,14 @@ function calculateLeadScore(factors: LeadScoringFactors): number {
   return Math.min(Math.max(score, 0), 100);
 }
 
-async function scoreLeads(supabaseClient: any, leadIds?: string[]) {
+async function scoreLeads(supabaseClient: any, accountId: string | undefined, leadIds?: string[]) {
   try {
     // Build query
     let query = supabaseClient
       .from('leads')
       .select(`
         id,
+        account_id,
         insurance_types,
         current_premium,
         decision_timeframe,
@@ -121,7 +123,12 @@ async function scoreLeads(supabaseClient: any, leadIds?: string[]) {
         source_id,
         lead_sources (type)
       `);
-    
+
+    // SECURITY: Filter by account if user has specific account
+    if (accountId) {
+      query = query.eq('account_id', accountId);
+    }
+
     // Filter by specific lead IDs if provided
     if (leadIds && leadIds.length > 0) {
       query = query.in('id', leadIds);
@@ -197,7 +204,14 @@ Deno.serve(async (req) => {
         },
       }
     );
-    
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
+
     // Parse request body
     const { leadIds, rescore_all } = await req.json();
     
@@ -214,9 +228,10 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Score leads
+    // Score leads - pass accountId to restrict to user's account
     const result = await scoreLeads(
       supabaseClient,
+      authenticatedUser.accountId,
       rescore_all ? undefined : leadIds
     );
     

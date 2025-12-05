@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAuth, verifyResourceAccess } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,26 +35,61 @@ serve(async (req) => {
   let documentId: string | null = null;
 
   try {
+    // Initialize Supabase first
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
+
     const requestData: DocumentAnalysisRequest = await req.json();
-    const { 
-      document_url, 
-      document_id, 
+    const {
+      document_url,
+      document_id,
       file_name,
       account_id,
-      user_id,
       analysis_mode = 'all',
       workflow_context = {}
     } = requestData;
-    
+
     documentId = document_id;
 
     console.log('[Azure Analysis] Starting:', file_name, 'Mode:', analysis_mode);
 
-    // Initialize Supabase
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // SECURITY: If account_id is provided, verify user has access to it
+    if (account_id) {
+      const hasAccess = await verifyResourceAccess(
+        supabase,
+        authenticatedUser.id,
+        'account',
+        account_id
+      );
+
+      if (!hasAccess) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Forbidden: You do not have access to this account'
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
 
     // Create initial record
     const normalizedAccountId = account_id && String(account_id).trim() !== '' ? account_id : null;
@@ -63,7 +99,7 @@ serve(async (req) => {
         document_id,
         file_name,
         account_id: normalizedAccountId,
-        created_by: user_id,
+        created_by: authenticatedUser.id,
         processing_status: 'pending'
       })
       .select()
@@ -391,7 +427,7 @@ Return ONLY valid JSON with this structure:
           const result = await processWorkflowTrigger(supabase, trigger, {
             document_id,
             account_id: normalizedAccountId,
-            user_id,
+            user_id: authenticatedUser.id,
             file_name
           });
           workflowResults.push(result);
