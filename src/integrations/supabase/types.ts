@@ -1350,50 +1350,80 @@ export type Database = {
       carrier_ratings: {
         Row: {
           avg_claim_response_days: number | null
+          avg_premium_difference: number | null
+          carrier_code: string | null
           carrier_id: string | null
           carrier_name: string
           created_at: string | null
+          customer_satisfaction: number | null
           customer_satisfaction_score: number | null
           denial_rate: number | null
           financial_strength: string | null
           id: string
+          is_active: boolean | null
+          is_preferred_carrier: boolean | null
+          last_metrics_update: string | null
           last_updated: string | null
+          market_share: number | null
           metadata: Json | null
           overall_rating: number | null
           quote_count: number | null
           selected_count: number | null
+          specialties: string[] | null
+          total_quotes_submitted: number | null
+          total_quotes_won: number | null
           win_rate: number | null
         }
         Insert: {
           avg_claim_response_days?: number | null
+          avg_premium_difference?: number | null
+          carrier_code?: string | null
           carrier_id?: string | null
           carrier_name: string
           created_at?: string | null
+          customer_satisfaction?: number | null
           customer_satisfaction_score?: number | null
           denial_rate?: number | null
           financial_strength?: string | null
           id?: string
+          is_active?: boolean | null
+          is_preferred_carrier?: boolean | null
+          last_metrics_update?: string | null
           last_updated?: string | null
+          market_share?: number | null
           metadata?: Json | null
           overall_rating?: number | null
           quote_count?: number | null
           selected_count?: number | null
+          specialties?: string[] | null
+          total_quotes_submitted?: number | null
+          total_quotes_won?: number | null
           win_rate?: number | null
         }
         Update: {
           avg_claim_response_days?: number | null
+          avg_premium_difference?: number | null
+          carrier_code?: string | null
           carrier_id?: string | null
           carrier_name?: string
           created_at?: string | null
+          customer_satisfaction?: number | null
           customer_satisfaction_score?: number | null
           denial_rate?: number | null
           financial_strength?: string | null
           id?: string
+          is_active?: boolean | null
+          is_preferred_carrier?: boolean | null
+          last_metrics_update?: string | null
           last_updated?: string | null
+          market_share?: number | null
           metadata?: Json | null
           overall_rating?: number | null
           quote_count?: number | null
           selected_count?: number | null
+          specialties?: string[] | null
+          total_quotes_submitted?: number | null
+          total_quotes_won?: number | null
           win_rate?: number | null
         }
         Relationships: [
@@ -1800,6 +1830,109 @@ export type Database = {
             columns: ["primary_contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_history: {
+        Row: {
+          account_id: string | null
+          ai_confidence_score: number | null
+          ai_generated: boolean | null
+          click_count: number | null
+          communication_type: string
+          compliance_checked: boolean | null
+          compliance_notes: string | null
+          compliance_passed: boolean | null
+          context_data: Json | null
+          created_at: string | null
+          delivered_at: string | null
+          id: string
+          message_body: string
+          open_count: number | null
+          opened_at: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+          template_id: string | null
+          template_used: string | null
+          tone_used: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_confidence_score?: number | null
+          ai_generated?: boolean | null
+          click_count?: number | null
+          communication_type: string
+          compliance_checked?: boolean | null
+          compliance_notes?: string | null
+          compliance_passed?: boolean | null
+          context_data?: Json | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          message_body: string
+          open_count?: number | null
+          opened_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          template_id?: string | null
+          template_used?: string | null
+          tone_used?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_confidence_score?: number | null
+          ai_generated?: boolean | null
+          click_count?: number | null
+          communication_type?: string
+          compliance_checked?: boolean | null
+          compliance_notes?: string | null
+          compliance_passed?: boolean | null
+          context_data?: Json | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          message_body?: string
+          open_count?: number | null
+          opened_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          template_id?: string | null
+          template_used?: string | null
+          tone_used?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_history_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_history_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "top_email_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -2583,6 +2716,86 @@ export type Database = {
           },
         ]
       }
+      customer_risk_scores: {
+        Row: {
+          account_id: string
+          churn_confidence: number | null
+          churn_probability: number | null
+          churn_risk_level: string | null
+          created_at: string | null
+          current_lifetime_value: number | null
+          days_until_renewal: number | null
+          expires_at: string | null
+          id: string
+          ltv_trend: string | null
+          model_version: string | null
+          next_product_predictions: Json | null
+          predicted_lifetime_value: number | null
+          protective_factors: Json | null
+          recommended_actions: Json | null
+          renewal_risk_level: string | null
+          renewal_risk_probability: number | null
+          risk_factors: Json | null
+          scored_at: string | null
+          scoring_metadata: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          churn_confidence?: number | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          created_at?: string | null
+          current_lifetime_value?: number | null
+          days_until_renewal?: number | null
+          expires_at?: string | null
+          id?: string
+          ltv_trend?: string | null
+          model_version?: string | null
+          next_product_predictions?: Json | null
+          predicted_lifetime_value?: number | null
+          protective_factors?: Json | null
+          recommended_actions?: Json | null
+          renewal_risk_level?: string | null
+          renewal_risk_probability?: number | null
+          risk_factors?: Json | null
+          scored_at?: string | null
+          scoring_metadata?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          churn_confidence?: number | null
+          churn_probability?: number | null
+          churn_risk_level?: string | null
+          created_at?: string | null
+          current_lifetime_value?: number | null
+          days_until_renewal?: number | null
+          expires_at?: string | null
+          id?: string
+          ltv_trend?: string | null
+          model_version?: string | null
+          next_product_predictions?: Json | null
+          predicted_lifetime_value?: number | null
+          protective_factors?: Json | null
+          recommended_actions?: Json | null
+          renewal_risk_level?: string | null
+          renewal_risk_probability?: number | null
+          risk_factors?: Json | null
+          scored_at?: string | null
+          scoring_metadata?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_tags: {
         Row: {
           created_at: string
@@ -3030,78 +3243,159 @@ export type Database = {
           },
         ]
       }
+      document_queues: {
+        Row: {
+          assigned_user_ids: string[] | null
+          auto_route_rules: Json | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          max_queue_size: number | null
+          priority: number | null
+          queue_description: string | null
+          queue_name: string
+          queue_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_user_ids?: string[] | null
+          auto_route_rules?: Json | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          max_queue_size?: number | null
+          priority?: number | null
+          queue_description?: string | null
+          queue_name: string
+          queue_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_user_ids?: string[] | null
+          auto_route_rules?: Json | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          max_queue_size?: number | null
+          priority?: number | null
+          queue_description?: string | null
+          queue_name?: string
+          queue_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           account_id: string | null
+          auto_routed: boolean | null
           category: Database["public"]["Enums"]["document_category"] | null
+          classification_confidence: number | null
+          classified_at: string | null
           created_at: string
+          document_type: string | null
           dropbox_id: string | null
+          extracted_text: string | null
           file_missing: boolean
+          file_name: string | null
+          file_path: string | null
           file_size: number | null
           filename: string
           id: string
           kind: string
           last_checked_at: string | null
+          line_of_business: string | null
           mime_type: string | null
           name: string | null
           pii_level: string | null
           policy_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          routed_to_queue: string | null
           sha256: string | null
           signature_request_id: string | null
           size_bytes: number | null
           storage_bucket: string | null
           storage_path: string
+          tags: string[] | null
           updated_at: string
           uploaded_at: string | null
           uploaded_by: string | null
+          urgency_level: string | null
         }
         Insert: {
           account_id?: string | null
+          auto_routed?: boolean | null
           category?: Database["public"]["Enums"]["document_category"] | null
+          classification_confidence?: number | null
+          classified_at?: string | null
           created_at?: string
+          document_type?: string | null
           dropbox_id?: string | null
+          extracted_text?: string | null
           file_missing?: boolean
+          file_name?: string | null
+          file_path?: string | null
           file_size?: number | null
           filename: string
           id?: string
           kind: string
           last_checked_at?: string | null
+          line_of_business?: string | null
           mime_type?: string | null
           name?: string | null
           pii_level?: string | null
           policy_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          routed_to_queue?: string | null
           sha256?: string | null
           signature_request_id?: string | null
           size_bytes?: number | null
           storage_bucket?: string | null
           storage_path: string
+          tags?: string[] | null
           updated_at?: string
           uploaded_at?: string | null
           uploaded_by?: string | null
+          urgency_level?: string | null
         }
         Update: {
           account_id?: string | null
+          auto_routed?: boolean | null
           category?: Database["public"]["Enums"]["document_category"] | null
+          classification_confidence?: number | null
+          classified_at?: string | null
           created_at?: string
+          document_type?: string | null
           dropbox_id?: string | null
+          extracted_text?: string | null
           file_missing?: boolean
+          file_name?: string | null
+          file_path?: string | null
           file_size?: number | null
           filename?: string
           id?: string
           kind?: string
           last_checked_at?: string | null
+          line_of_business?: string | null
           mime_type?: string | null
           name?: string | null
           pii_level?: string | null
           policy_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          routed_to_queue?: string | null
           sha256?: string | null
           signature_request_id?: string | null
           size_bytes?: number | null
           storage_bucket?: string | null
           storage_path?: string
+          tags?: string[] | null
           updated_at?: string
           uploaded_at?: string | null
           uploaded_by?: string | null
+          urgency_level?: string | null
         }
         Relationships: [
           {
@@ -3271,6 +3565,63 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          available_variables: string[] | null
+          avg_response_rate: number | null
+          body_template: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+          requires_compliance_check: boolean | null
+          subject_template: string
+          target_audience: string | null
+          template_category: string
+          template_description: string | null
+          template_name: string
+          tone: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          available_variables?: string[] | null
+          avg_response_rate?: number | null
+          body_template: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          requires_compliance_check?: boolean | null
+          subject_template: string
+          target_audience?: string | null
+          template_category: string
+          template_description?: string | null
+          template_name: string
+          tone?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          available_variables?: string[] | null
+          avg_response_rate?: number | null
+          body_template?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          requires_compliance_check?: boolean | null
+          subject_template?: string
+          target_audience?: string | null
+          template_category?: string
+          template_description?: string | null
+          template_name?: string
+          tone?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: []
       }
@@ -7804,6 +8155,80 @@ export type Database = {
           },
         ]
       }
+      product_recommendations: {
+        Row: {
+          account_id: string
+          confidence: number | null
+          created_at: string | null
+          estimated_annual_premium: number | null
+          estimated_commission: number | null
+          expires_at: string | null
+          id: string
+          model_version: string | null
+          outcome_at: string | null
+          presented_at: string | null
+          priority_score: number | null
+          product_category: string | null
+          product_name: string
+          purchase_probability: number | null
+          rationale: string | null
+          recommendation_metadata: Json | null
+          status: string | null
+          supporting_factors: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          confidence?: number | null
+          created_at?: string | null
+          estimated_annual_premium?: number | null
+          estimated_commission?: number | null
+          expires_at?: string | null
+          id?: string
+          model_version?: string | null
+          outcome_at?: string | null
+          presented_at?: string | null
+          priority_score?: number | null
+          product_category?: string | null
+          product_name: string
+          purchase_probability?: number | null
+          rationale?: string | null
+          recommendation_metadata?: Json | null
+          status?: string | null
+          supporting_factors?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          confidence?: number | null
+          created_at?: string | null
+          estimated_annual_premium?: number | null
+          estimated_commission?: number | null
+          expires_at?: string | null
+          id?: string
+          model_version?: string | null
+          outcome_at?: string | null
+          presented_at?: string | null
+          priority_score?: number | null
+          product_category?: string | null
+          product_name?: string
+          purchase_probability?: number | null
+          rationale?: string | null
+          recommendation_metadata?: Json | null
+          status?: string | null
+          supporting_factors?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_recommendations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_access_logs: {
         Row: {
           accessor_user_id: string | null
@@ -7883,6 +8308,7 @@ export type Database = {
           deductible_amount: string | null
           extracted_from_document: boolean | null
           id: string
+          is_critical: boolean | null
           is_included: boolean | null
           limit_amount: string | null
           premium_amount: number | null
@@ -7895,6 +8321,7 @@ export type Database = {
           deductible_amount?: string | null
           extracted_from_document?: boolean | null
           id?: string
+          is_critical?: boolean | null
           is_included?: boolean | null
           limit_amount?: string | null
           premium_amount?: number | null
@@ -7907,6 +8334,7 @@ export type Database = {
           deductible_amount?: string | null
           extracted_from_document?: boolean | null
           id?: string
+          is_critical?: boolean | null
           is_included?: boolean | null
           limit_amount?: string | null
           premium_amount?: number | null
@@ -8716,22 +9144,32 @@ export type Database = {
           account_id: string | null
           assigned_to: string | null
           churn_risk_at_intervention: string | null
+          completed_at: string | null
           created_at: string | null
           customer_response: string | null
+          customer_retained: boolean | null
+          estimated_value_saved: number | null
           executed_date: string | null
           id: string
           intervention_cost: number | null
           intervention_description: string | null
+          intervention_metadata: Json | null
           intervention_title: string
           intervention_type: string
           notes: string | null
           offer_expires_at: string | null
           offer_type: string | null
           offer_value: number | null
+          outcome: string | null
+          outcome_notes: string | null
+          post_intervention_churn_probability: number | null
+          pre_intervention_churn_probability: number | null
           prediction_id: string | null
+          recommended_timeline_days: number | null
           retained_revenue: number | null
           roi: number | null
           scheduled_date: string | null
+          scheduled_for: string | null
           status: string | null
           success_metrics: Json | null
           triggered_by_score: number | null
@@ -8742,22 +9180,32 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           churn_risk_at_intervention?: string | null
+          completed_at?: string | null
           created_at?: string | null
           customer_response?: string | null
+          customer_retained?: boolean | null
+          estimated_value_saved?: number | null
           executed_date?: string | null
           id?: string
           intervention_cost?: number | null
           intervention_description?: string | null
+          intervention_metadata?: Json | null
           intervention_title: string
           intervention_type: string
           notes?: string | null
           offer_expires_at?: string | null
           offer_type?: string | null
           offer_value?: number | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          post_intervention_churn_probability?: number | null
+          pre_intervention_churn_probability?: number | null
           prediction_id?: string | null
+          recommended_timeline_days?: number | null
           retained_revenue?: number | null
           roi?: number | null
           scheduled_date?: string | null
+          scheduled_for?: string | null
           status?: string | null
           success_metrics?: Json | null
           triggered_by_score?: number | null
@@ -8768,22 +9216,32 @@ export type Database = {
           account_id?: string | null
           assigned_to?: string | null
           churn_risk_at_intervention?: string | null
+          completed_at?: string | null
           created_at?: string | null
           customer_response?: string | null
+          customer_retained?: boolean | null
+          estimated_value_saved?: number | null
           executed_date?: string | null
           id?: string
           intervention_cost?: number | null
           intervention_description?: string | null
+          intervention_metadata?: Json | null
           intervention_title?: string
           intervention_type?: string
           notes?: string | null
           offer_expires_at?: string | null
           offer_type?: string | null
           offer_value?: number | null
+          outcome?: string | null
+          outcome_notes?: string | null
+          post_intervention_churn_probability?: number | null
+          pre_intervention_churn_probability?: number | null
           prediction_id?: string | null
+          recommended_timeline_days?: number | null
           retained_revenue?: number | null
           roi?: number | null
           scheduled_date?: string | null
+          scheduled_for?: string | null
           status?: string | null
           success_metrics?: Json | null
           triggered_by_score?: number | null
@@ -9062,6 +9520,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "urgent_documents"
             referencedColumns: ["id"]
           },
           {
@@ -10321,6 +10786,63 @@ export type Database = {
           },
         ]
       }
+      churn_predictions: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          active_policies: number | null
+          churn_confidence: number | null
+          churn_probability: number | null
+          churn_risk_level: string | null
+          current_lifetime_value: number | null
+          customer_since: string | null
+          days_until_renewal: number | null
+          expires_at: string | null
+          id: string | null
+          last_interaction: string | null
+          ltv_trend: string | null
+          next_product_predictions: Json | null
+          predicted_lifetime_value: number | null
+          protective_factors: Json | null
+          recommended_actions: Json | null
+          renewal_risk_level: string | null
+          renewal_risk_probability: number | null
+          risk_factors: Json | null
+          scored_at: string | null
+          won_quotes: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_engagement_stats: {
+        Row: {
+          account_id: string | null
+          communication_type: string | null
+          last_contact_at: string | null
+          open_rate: number | null
+          opened_count: number | null
+          replied_count: number | null
+          reply_rate: number | null
+          successful_deliveries: number | null
+          total_communications: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coverage_gap_analytics: {
         Row: {
           avg_days_to_close: number | null
@@ -10712,6 +11234,75 @@ export type Database = {
           },
         ]
       }
+      top_email_templates: {
+        Row: {
+          avg_response_rate: number | null
+          id: string | null
+          last_used_at: string | null
+          target_audience: string | null
+          template_category: string | null
+          template_name: string | null
+          tone: string | null
+          usage_count: number | null
+        }
+        Relationships: []
+      }
+      urgent_documents: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          auto_routed: boolean | null
+          category: Database["public"]["Enums"]["document_category"] | null
+          classification_confidence: number | null
+          classified_at: string | null
+          created_at: string | null
+          document_type: string | null
+          dropbox_id: string | null
+          extracted_text: string | null
+          file_missing: boolean | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          filename: string | null
+          id: string | null
+          kind: string | null
+          last_checked_at: string | null
+          line_of_business: string | null
+          mime_type: string | null
+          name: string | null
+          pii_level: string | null
+          policy_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          routed_to_queue: string | null
+          sha256: string | null
+          signature_request_id: string | null
+          size_bytes: number | null
+          storage_bucket: string | null
+          storage_path: string | null
+          tags: string[] | null
+          updated_at: string | null
+          uploaded_at: string | null
+          uploaded_by: string | null
+          urgency_level: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_kb_simple: {
         Row: {
           category: string | null
@@ -10767,6 +11358,7 @@ export type Database = {
         Args: { p_lead_id: string; p_manual_assignee?: string }
         Returns: string
       }
+      auto_route_document: { Args: { p_document_id: string }; Returns: string }
       calculate_days_since_last_contact: {
         Args: { renewal_account_id: string }
         Returns: number
@@ -10950,6 +11542,19 @@ export type Database = {
         Returns: Json
       }
       generate_ticket_number: { Args: never; Returns: string }
+      get_at_risk_customers: {
+        Args: { p_limit?: number; p_risk_threshold?: number }
+        Returns: {
+          account_id: string
+          account_name: string
+          churn_probability: number
+          days_until_renewal: number
+          last_interaction: string
+          recommended_actions: Json
+          risk_factors: Json
+          risk_level: string
+        }[]
+      }
       get_knowledge_version_diff: {
         Args: {
           p_knowledge_id: string
@@ -10999,7 +11604,65 @@ export type Database = {
           status: Database["public"]["Enums"]["claim_status"]
         }[]
       }
+      get_ranked_quotes_for_account: {
+        Args: { p_account_id: string; p_include_unscored?: boolean }
+        Returns: {
+          ai_recommendation: string
+          carrier_rating_score: number
+          coverage_completeness_score: number
+          coverage_count: number
+          created_at: string
+          deductible_score: number
+          premium: number
+          price_score: number
+          quote_id: string
+          quote_score: number
+          rank: number
+          status: string
+          total_quotes: number
+          value_score: number
+        }[]
+      }
+      get_recommended_templates: {
+        Args: { p_account_id: string; p_category?: string }
+        Returns: {
+          avg_response_rate: number
+          body_template: string
+          recommendation_score: number
+          subject_template: string
+          template_category: string
+          template_id: string
+          template_name: string
+          tone: string
+          usage_count: number
+        }[]
+      }
       get_renewal_intelligence_summary: { Args: never; Returns: Json }
+      get_top_product_opportunities: {
+        Args: { p_limit?: number; p_min_probability?: number }
+        Returns: {
+          account_id: string
+          account_name: string
+          estimated_annual_premium: number
+          estimated_commission: number
+          priority_score: number
+          product_category: string
+          product_name: string
+          purchase_probability: number
+          rationale: string
+        }[]
+      }
+      get_unclassified_documents: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_id: string
+          content_type: string
+          created_at: string
+          days_unclassified: number
+          file_name: string
+          id: string
+        }[]
+      }
       get_upcoming_ao_renewals: {
         Args: { days_ahead?: number }
         Returns: {
@@ -11293,6 +11956,7 @@ export type Database = {
         Returns: Json
       }
       refresh_ai_feedback_analytics: { Args: never; Returns: undefined }
+      refresh_churn_predictions: { Args: never; Returns: undefined }
       refresh_coverage_gap_analytics: { Args: never; Returns: undefined }
       refresh_issue_analytics: { Args: never; Returns: undefined }
       refresh_predictive_analytics_dashboard: {
@@ -11411,6 +12075,10 @@ export type Database = {
       }
       update_campaign_conversion_rate: {
         Args: { p_campaign_id: string }
+        Returns: undefined
+      }
+      update_template_usage_stats: {
+        Args: { p_template_id: string }
         Returns: undefined
       }
       upsert_membership: {
