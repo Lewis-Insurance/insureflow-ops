@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { requireAuth, verifyResourceAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,24 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
+
     const { leadId, insuranceType } = await req.json();
     console.log('Generating quote document for:', { leadId, insuranceType });
 
@@ -19,15 +38,25 @@ serve(async (req) => {
       throw new Error('leadId and insuranceType are required');
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+    // SECURITY: Verify user has access to this lead
+    const hasAccess = await verifyResourceAccess(
+      supabaseClient,
+      authenticatedUser.id,
+      'lead',
+      leadId
     );
+
+    if (!hasAccess) {
+      return new Response(
+        JSON.stringify({
+          error: 'Forbidden: You do not have access to this lead'
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Fetch lead details
     const { data: lead, error: leadError } = await supabaseClient

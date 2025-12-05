@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,21 @@ serve(async (req) => {
     const provider = Deno.env.get('EMAIL_PROVIDER') || 'postmark';
     const apiKey = Deno.env.get('EMAIL_PROVIDER_API_KEY')!;
     const fromEmail = Deno.env.get('OUTBOUND_FROM')!;
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
+
     const { ticketId, to, subject, body, inReplyTo } = await req.json();
 
     let response;
