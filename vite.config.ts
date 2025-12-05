@@ -26,31 +26,11 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Enable code splitting for better performance
+    // Disable code splitting to prevent module initialization errors
+    // All vendor code will be in a single bundle for reliability
     rollupOptions: {
       output: {
-        // Simplified manual chunk splitting to prevent module initialization errors
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            // React ecosystem - keep together to prevent initialization issues
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-
-            // Large chart libraries
-            if (id.includes('recharts')) {
-              return 'charts-vendor';
-            }
-
-            // Supabase
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
-
-            // All other vendor code
-            return 'vendor';
-          }
-        },
+        manualChunks: undefined, // Disable manual chunking - let Vite handle it automatically
       },
     },
     // Optimize chunk size
