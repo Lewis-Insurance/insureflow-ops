@@ -12,9 +12,10 @@ import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { AICustomerActions } from '@/components/customers/AICustomerActions';
+import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, FileText, CheckSquare, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare, Plus, Mail } from 'lucide-react';
 
 interface Account {
   id: string;
@@ -68,6 +69,7 @@ export default function CustomerDetail() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
 
   const refetchTasks = async () => {
     if (!id) return;
@@ -245,8 +247,25 @@ export default function CustomerDetail() {
 
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
+
+        {/* Communication History Section */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Communications
+            </CardTitle>
+            <Button size="sm" onClick={() => setEmailComposerOpen(true)}>
+              <Mail className="h-4 w-4 mr-2" />
+              Compose Email
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <CommunicationHistory accountId={account.id} />
+          </CardContent>
+        </Card>
       </div>
-      
+
       {/* Modals */}
       <AddNoteModal
         open={addNoteOpen}
@@ -269,6 +288,12 @@ export default function CustomerDetail() {
           }}
         />
       )}
+      <EmailComposerModal
+        open={emailComposerOpen}
+        onOpenChange={setEmailComposerOpen}
+        accountId={account.id}
+        accountName={account.name}
+      />
     </AppLayout>
   );
 }
