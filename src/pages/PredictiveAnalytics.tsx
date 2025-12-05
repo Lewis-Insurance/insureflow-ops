@@ -13,11 +13,10 @@ import React, { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import {
   useAtRiskCustomers,
-  usePredictionStats,
-  useRetentionInterventions,
+  useRiskDashboardStats,
+  usePendingInterventions,
   useCreateIntervention,
-  useUpdateIntervention,
-  useRecordPredictionOutcome,
+  useUpdateInterventionStatus,
   type AtRiskCustomer,
   type ChurnRiskLevel,
 } from '@/hooks/usePredictiveAnalytics';
@@ -66,18 +65,17 @@ export default function PredictiveAnalytics() {
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
 
   // Queries
-  const { data: atRiskCustomers = [], isLoading: loadingCustomers } = useAtRiskCustomers();
-  const { data: stats } = usePredictionStats();
-  const { data: interventions = [] } = useRetentionInterventions();
+  const { data: atRiskCustomers = [], isLoading: loadingCustomers } = useAtRiskCustomers(50); // 50% threshold
+  const { data: stats } = useRiskDashboardStats();
+  const { data: interventions = [] } = usePendingInterventions();
 
   // Mutations
   const createInterventionMutation = useCreateIntervention();
-  const updateInterventionMutation = useUpdateIntervention();
-  const recordOutcomeMutation = useRecordPredictionOutcome();
+  const updateInterventionMutation = useUpdateInterventionStatus();
 
   // Filter customers
   const filteredCustomers = atRiskCustomers.filter((customer) => {
-    const matchesSearch = customer.customer_name
+    const matchesSearch = customer.account_name
       ?.toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesRisk = riskFilter === 'all' || customer.churn_risk_level === riskFilter;
@@ -94,7 +92,6 @@ export default function PredictiveAnalytics() {
       case 'medium':
         return 'secondary';
       case 'low':
-      case 'very_low':
         return 'outline';
       default:
         return 'outline';
@@ -242,7 +239,7 @@ export default function PredictiveAnalytics() {
                               {/* Customer Name & Risk */}
                               <div className="flex items-center gap-3">
                                 <h3 className="font-semibold text-lg">
-                                  {customer.customer_name}
+                                  {customer.account_name}
                                 </h3>
                                 <Badge variant={getRiskBadgeVariant(customer.churn_risk_level)}>
                                   {customer.churn_probability}% Churn Risk
@@ -252,25 +249,18 @@ export default function PredictiveAnalytics() {
                                 </Badge>
                               </div>
 
-                              {/* AI Summary */}
-                              {customer.ai_summary && (
-                                <p className="text-sm text-muted-foreground">
-                                  {customer.ai_summary}
-                                </p>
-                              )}
-
                               {/* Key Metrics */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
                                 <div>
-                                  <div className="text-xs text-muted-foreground">Renewal Prob.</div>
+                                  <div className="text-xs text-muted-foreground">Renewal Risk</div>
                                   <div className="font-semibold">
-                                    {customer.renewal_probability}%
+                                    {customer.renewal_risk_probability}%
                                   </div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground">Predicted LTV</div>
                                   <div className="font-semibold">
-                                    ${customer.predicted_ltv?.toLocaleString() || 0}
+                                    ${customer.predicted_lifetime_value?.toLocaleString() || 0}
                                   </div>
                                 </div>
                                 <div>
@@ -280,17 +270,17 @@ export default function PredictiveAnalytics() {
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-xs text-muted-foreground">Interventions</div>
+                                  <div className="text-xs text-muted-foreground">Active Policies</div>
                                   <div className="font-semibold">
-                                    {customer.intervention_count}
+                                    {customer.active_policies}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Churn Factors */}
-                              {customer.churn_factors && customer.churn_factors.length > 0 && (
+                              {/* Risk Factors */}
+                              {customer.risk_factors && Array.isArray(customer.risk_factors) && customer.risk_factors.length > 0 && (
                                 <div className="flex flex-wrap gap-2 pt-2">
-                                  {customer.churn_factors.slice(0, 3).map((factor: any, idx: number) => (
+                                  {customer.risk_factors.slice(0, 3).map((factor: any, idx: number) => (
                                     <Badge key={idx} variant="secondary" className="text-xs">
                                       {factor.factor}
                                     </Badge>
@@ -411,7 +401,7 @@ export default function PredictiveAnalytics() {
             <DialogHeader>
               <DialogTitle>Create Retention Intervention</DialogTitle>
               <DialogDescription>
-                Plan a proactive action to prevent {selectedCustomer?.customer_name} from churning
+                Plan a proactive action to prevent {selectedCustomer?.account_name} from churning
               </DialogDescription>
             </DialogHeader>
             <InterventionForm
@@ -434,7 +424,7 @@ export default function PredictiveAnalytics() {
             <DialogHeader>
               <DialogTitle>Record Actual Outcome</DialogTitle>
               <DialogDescription>
-                Update what actually happened with {selectedCustomer?.customer_name}
+                Update what actually happened with {selectedCustomer?.account_name}
               </DialogDescription>
             </DialogHeader>
             <OutcomeForm

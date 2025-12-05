@@ -2,11 +2,13 @@
  * Predictive Analytics Hooks
  *
  * React Query hooks for AI-powered customer predictions including:
- * - Churn prediction
- * - Renewal forecasting
- * - Next product recommendations
+ * - Churn prediction and risk scoring
+ * - Renewal risk forecasting
+ * - Product cross-sell recommendations
  * - Retention interventions
- * - Analytics dashboard data
+ * - LTV prediction and trends
+ *
+ * Updated to use customer_risk_scores schema (v2.0)
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,203 +16,273 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // =============================================================================
-// Types
+// Types (Updated for customer_risk_scores schema)
 // =============================================================================
 
-export type ChurnRiskLevel = 'very_low' | 'low' | 'medium' | 'high' | 'critical';
-export type PriceElasticity = 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+export type ChurnRiskLevel = 'low' | 'medium' | 'high' | 'critical';
+export type LtvTrend = 'increasing' | 'stable' | 'declining';
 export type PredictionStatus = 'active' | 'expired' | 'archived';
 
 export type InterventionType =
-  | 'proactive_call'
-  | 'special_offer'
+  | 'check_in_call'
   | 'coverage_review'
-  | 'loyalty_program'
-  | 'rate_freeze'
-  | 'service_upgrade'
-  | 'personal_visit'
-  | 'customer_appreciation'
-  | 'other';
+  | 'premium_discount_offer'
+  | 'payment_plan_adjustment'
+  | 'loyalty_reward'
+  | 'service_recovery'
+  | 'proactive_claim_support'
+  | 'policy_optimization';
 
 export type InterventionStatus =
-  | 'planned'
+  | 'recommended'
   | 'scheduled'
-  | 'in_progress'
   | 'completed'
-  | 'cancelled'
-  | 'failed';
+  | 'dismissed'
+  | 'expired';
 
-export type CustomerResponse = 'positive' | 'neutral' | 'negative' | 'no_response';
+export type InterventionOutcome = 'successful' | 'unsuccessful' | 'partial' | 'pending';
 
-export interface CustomerPrediction {
+/**
+ * Customer risk score from customer_risk_scores table
+ */
+export interface CustomerRiskScore {
   id: string;
   account_id: string;
-  customer_name: string;
-  prediction_date: string;
-  prediction_model_version: string;
 
-  // Churn metrics
+  // Churn prediction
   churn_probability: number;
   churn_risk_level: ChurnRiskLevel;
-  churn_factors: Array<{ factor: string; weight: number }>;
+  churn_confidence: number;
 
-  // Renewal metrics
-  renewal_probability: number;
-  predicted_renewal_date: string;
-  renewal_confidence_score: number;
+  // Renewal risk
+  renewal_risk_probability: number;
+  renewal_risk_level: ChurnRiskLevel;
+  days_until_renewal: number | null;
 
-  // Product prediction
-  next_product_prediction: string;
-  next_product_probability: number;
-  cross_sell_opportunities: Array<{
+  // Lifetime value prediction
+  predicted_lifetime_value: number;
+  current_lifetime_value: number;
+  ltv_trend: LtvTrend;
+
+  // Risk factors
+  risk_factors: Array<{
+    factor: string;
+    weight: number;
+    severity: string;
+    points: number;
+  }>;
+  protective_factors: Array<{
+    factor: string;
+    weight: number;
+    points: number;
+  }>;
+
+  // Recommended actions
+  recommended_actions: Array<{
+    action: string;
+    priority: string;
+    due_days: number;
+    rationale: string;
+  }>;
+
+  // Product recommendations
+  next_product_predictions: Array<{
     product: string;
     probability: number;
     rationale: string;
   }>;
 
-  // Claim prediction
-  claim_probability: number;
-  predicted_claim_type: string;
-  claim_risk_factors: any[];
-
-  // Premium sensitivity
-  premium_sensitivity_score: number;
-  price_elasticity: PriceElasticity;
-  max_acceptable_increase_pct: number;
-
-  // LTV
-  predicted_ltv: number;
-  ltv_confidence: number;
-
-  // AI insights
-  ai_summary: string;
-  ai_recommendations: Array<{
-    action: string;
-    timing: string;
-    reason: string;
-  }>;
-
-  model_factors: Record<string, any>;
-  status: PredictionStatus;
+  // Metadata
+  model_version: string;
+  scoring_metadata: any;
+  scored_at: string;
   expires_at: string;
-  actions_taken: any[];
-  outcome_actual: string | null;
-  outcome_date: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * Retention intervention from retention_interventions table
+ */
 export interface RetentionIntervention {
   id: string;
   account_id: string;
-  prediction_id: string | null;
+  risk_score_id: string | null;
   intervention_type: InterventionType;
-  intervention_title: string;
-  intervention_description: string;
-  churn_risk_at_intervention: string;
-  triggered_by_score: number;
-  scheduled_date: string;
-  executed_date: string | null;
-  assigned_to: string | null;
-  offer_type: string | null;
-  offer_value: number | null;
-  offer_expires_at: string | null;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  recommended_timeline_days: number | null;
   status: InterventionStatus;
-  customer_response: CustomerResponse | null;
-  was_successful: boolean | null;
-  success_metrics: any;
-  intervention_cost: number | null;
-  retained_revenue: number | null;
-  roi: number | null;
-  notes: string | null;
+  assigned_to: string | null;
+  scheduled_for: string | null;
+  completed_at: string | null;
+  outcome: InterventionOutcome | null;
+  outcome_notes: string | null;
+  customer_retained: boolean | null;
+  pre_intervention_churn_probability: number | null;
+  post_intervention_churn_probability: number | null;
+  estimated_value_saved: number | null;
+  intervention_metadata: any;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * At-risk customer from churn_predictions materialized view
+ */
 export interface AtRiskCustomer {
   id: string;
   account_id: string;
-  customer_name: string;
+  account_name: string;
+  customer_since: string;
   churn_probability: number;
   churn_risk_level: ChurnRiskLevel;
-  churn_factors: any[];
-  renewal_probability: number;
-  predicted_renewal_date: string;
-  predicted_ltv: number;
-  premium_sensitivity_score: number;
-  ai_summary: string;
-  ai_recommendations: any[];
-  prediction_date: string;
-  intervention_count: number;
-  last_intervention_date: string | null;
+  churn_confidence: number;
+  renewal_risk_probability: number;
+  renewal_risk_level: ChurnRiskLevel;
   days_until_renewal: number | null;
-}
-
-export interface CreatePredictionRequest {
-  account_id: string;
-  customer_name: string;
-  churn_probability: number;
-  churn_risk_level: ChurnRiskLevel;
-  churn_factors?: any[];
-  renewal_probability: number;
-  predicted_renewal_date?: string;
-  renewal_confidence_score: number;
-  next_product_prediction?: string;
-  next_product_probability?: number;
-  cross_sell_opportunities?: any[];
-  claim_probability?: number;
-  predicted_claim_type?: string;
-  claim_risk_factors?: any[];
-  premium_sensitivity_score?: number;
-  price_elasticity?: PriceElasticity;
-  max_acceptable_increase_pct?: number;
-  predicted_ltv?: number;
-  ltv_confidence?: number;
-  ai_summary?: string;
-  ai_recommendations?: any[];
-  model_factors?: Record<string, any>;
+  predicted_lifetime_value: number;
+  current_lifetime_value: number;
+  ltv_trend: LtvTrend;
+  risk_factors: any;
+  protective_factors: any;
+  recommended_actions: any;
+  next_product_predictions: any;
+  active_policies: number;
+  won_quotes: number;
+  last_interaction: string | null;
+  scored_at: string;
+  expires_at: string;
 }
 
 export interface CreateInterventionRequest {
   account_id: string;
-  prediction_id?: string;
+  risk_score_id?: string;
   intervention_type: InterventionType;
-  intervention_title: string;
-  intervention_description: string;
-  churn_risk_at_intervention?: string;
-  triggered_by_score?: number;
-  scheduled_date: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  recommended_timeline_days?: number;
   assigned_to?: string;
-  offer_type?: string;
-  offer_value?: number;
-  offer_expires_at?: string;
-  notes?: string;
+  scheduled_for?: string;
+  intervention_metadata?: any;
 }
 
 // =============================================================================
-// Query Hooks
+// Mutation Hooks: Calculate Risk Scores
 // =============================================================================
 
 /**
- * Fetch all customer predictions with optional filters
+ * Calculate risk scores for specific accounts
  */
-export function useCustomerPredictions(filters?: {
-  accountId?: string;
+export function useCalculateRiskScores() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ accountIds }: { accountIds: string[] }) => {
+      const { data, error } = await supabase.functions.invoke('calculate-customer-risk', {
+        body: { accountIds },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Risk calculation failed');
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['churn-predictions'] });
+
+      toast.success(`Analyzed ${data.analyzed} customer${data.analyzed !== 1 ? 's' : ''}`, {
+        description: 'Risk scores have been updated',
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Risk calculation failed', {
+        description: error.message,
+      });
+    },
+  });
+}
+
+/**
+ * Calculate risk scores for all accounts (background job)
+ */
+export function useCalculateAllRiskScores() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('calculate-customer-risk', {
+        body: { calculateAll: true },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Risk calculation failed');
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
+
+      toast.success(`Analyzed ${data.analyzed} customers`, {
+        description: 'All risk scores have been updated',
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Bulk risk calculation failed', {
+        description: error.message,
+      });
+    },
+  });
+}
+
+// =============================================================================
+// Query Hooks: Risk Scores
+// =============================================================================
+
+/**
+ * Get risk score for a specific account
+ */
+export function useAccountRiskScore(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['risk-scores', accountId],
+    queryFn: async (): Promise<CustomerRiskScore | null> => {
+      if (!accountId) return null;
+
+      const { data, error } = await supabase
+        .from('customer_risk_scores')
+        .select('*')
+        .eq('account_id', accountId)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // No rows
+        throw new Error(`Failed to fetch risk score: ${error.message}`);
+      }
+
+      return data as CustomerRiskScore;
+    },
+    enabled: !!accountId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Get all customer risk scores with optional filters
+ */
+export function useCustomerRiskScores(filters?: {
   riskLevel?: ChurnRiskLevel;
   minChurnProbability?: number;
-  status?: PredictionStatus;
 }) {
   return useQuery({
-    queryKey: ['customer-predictions', filters],
+    queryKey: ['risk-scores', filters],
     queryFn: async () => {
       let query = supabase
-        .from('customer_predictions')
+        .from('customer_risk_scores')
         .select('*')
+        .gt('expires_at', new Date().toISOString())
         .order('churn_probability', { ascending: false });
-
-      if (filters?.accountId) {
-        query = query.eq('account_id', filters.accountId);
-      }
 
       if (filters?.riskLevel) {
         query = query.eq('churn_risk_level', filters.riskLevel);
@@ -220,139 +292,153 @@ export function useCustomerPredictions(filters?: {
         query = query.gte('churn_probability', filters.minChurnProbability);
       }
 
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      } else {
-        query = query.eq('status', 'active'); // Default to active only
-      }
-
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as CustomerPrediction[];
+      return data as CustomerRiskScore[];
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 /**
- * Fetch a single customer prediction by ID
+ * Get at-risk customers (churn probability >= threshold)
+ * Uses the get_at_risk_customers RPC function
  */
-export function useCustomerPrediction(predictionId: string | undefined) {
+export function useAtRiskCustomers(riskThreshold: number = 60, limit: number = 100) {
   return useQuery({
-    queryKey: ['customer-prediction', predictionId],
-    queryFn: async () => {
-      if (!predictionId) return null;
+    queryKey: ['at-risk-customers', riskThreshold, limit],
+    queryFn: async (): Promise<AtRiskCustomer[]> => {
+      const { data, error } = await supabase.rpc('get_at_risk_customers', {
+        p_risk_threshold: riskThreshold,
+        p_limit: limit,
+      });
 
-      const { data, error } = await supabase
-        .from('customer_predictions')
-        .select('*')
-        .eq('id', predictionId)
-        .single();
+      if (error) {
+        // Fallback to direct query if RPC fails
+        console.error('RPC failed, using fallback query:', error);
 
-      if (error) throw error;
-      return data as CustomerPrediction;
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('churn_predictions')
+          .select('*')
+          .gte('churn_probability', riskThreshold)
+          .order('churn_probability', { ascending: false })
+          .limit(limit);
+
+        if (fallbackError) throw new Error(`Failed to fetch at-risk customers: ${fallbackError.message}`);
+        return fallbackData as AtRiskCustomer[];
+      }
+
+      return data as AtRiskCustomer[];
     },
-    enabled: !!predictionId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
 /**
- * Fetch at-risk customers (churn probability >= 50%)
+ * Get all churn predictions from materialized view
  */
-export function useAtRiskCustomers() {
+export function useChurnPredictions() {
   return useQuery({
-    queryKey: ['at-risk-customers'],
-    queryFn: async () => {
+    queryKey: ['churn-predictions'],
+    queryFn: async (): Promise<AtRiskCustomer[]> => {
       const { data, error } = await supabase
-        .from('at_risk_customers_current')
+        .from('churn_predictions')
         .select('*')
         .order('churn_probability', { ascending: false });
 
-      if (error) throw error;
+      if (error) throw new Error(`Failed to fetch churn predictions: ${error.message}`);
+
       return data as AtRiskCustomer[];
     },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// =============================================================================
+// Query Hooks: Retention Interventions
+// =============================================================================
+
+/**
+ * Get retention interventions for an account
+ */
+export function useRetentionInterventions(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['retention-interventions', accountId],
+    queryFn: async (): Promise<RetentionIntervention[]> => {
+      if (!accountId) return [];
+
+      const { data, error } = await supabase
+        .from('retention_interventions')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch interventions: ${error.message}`);
+
+      return data as RetentionIntervention[];
+    },
+    enabled: !!accountId,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
 /**
- * Fetch retention interventions with optional filters
+ * Get pending retention interventions (for staff dashboard)
  */
-export function useRetentionInterventions(filters?: {
-  accountId?: string;
-  predictionId?: string;
-  status?: InterventionStatus;
-}) {
+export function usePendingInterventions(assignedToUserId?: string) {
   return useQuery({
-    queryKey: ['retention-interventions', filters],
-    queryFn: async () => {
+    queryKey: ['pending-interventions', assignedToUserId],
+    queryFn: async (): Promise<RetentionIntervention[]> => {
       let query = supabase
         .from('retention_interventions')
         .select('*')
-        .order('scheduled_date', { ascending: false });
+        .in('status', ['recommended', 'scheduled'])
+        .order('priority', { ascending: false })
+        .order('scheduled_for', { ascending: true });
 
-      if (filters?.accountId) {
-        query = query.eq('account_id', filters.accountId);
-      }
-
-      if (filters?.predictionId) {
-        query = query.eq('prediction_id', filters.predictionId);
-      }
-
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
+      if (assignedToUserId) {
+        query = query.eq('assigned_to', assignedToUserId);
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) throw new Error(`Failed to fetch pending interventions: ${error.message}`);
+
       return data as RetentionIntervention[];
     },
-  });
-}
-
-/**
- * Fetch predictive analytics dashboard metrics
- */
-export function usePredictiveAnalyticsDashboard() {
-  return useQuery({
-    queryKey: ['predictive-analytics-dashboard'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('predictive_analytics_dashboard')
-        .select('*')
-        .order('month', { ascending: false })
-        .limit(12); // Last 12 months
-
-      if (error) throw error;
-      return data;
-    },
+    staleTime: 2 * 60 * 1000,
   });
 }
 
 /**
  * Get dashboard summary statistics
  */
-export function usePredictionStats() {
+export function useRiskDashboardStats() {
   return useQuery({
-    queryKey: ['prediction-stats'],
+    queryKey: ['risk-dashboard-stats'],
     queryFn: async () => {
-      const { data: predictions, error } = await supabase
-        .from('customer_predictions')
+      const { data: scores, error} = await supabase
+        .from('customer_risk_scores')
         .select('*')
-        .eq('status', 'active');
+        .gt('expires_at', new Date().toISOString());
 
       if (error) throw error;
 
-      const total = predictions?.length || 0;
-      const critical = predictions?.filter((p: any) => p.churn_probability >= 70).length || 0;
-      const high = predictions?.filter((p: any) => p.churn_probability >= 50 && p.churn_probability < 70).length || 0;
-      const medium = predictions?.filter((p: any) => p.churn_probability >= 30 && p.churn_probability < 50).length || 0;
-      const low = predictions?.filter((p: any) => p.churn_probability < 30).length || 0;
+      const total = scores?.length || 0;
+      const critical = scores?.filter((s: any) => s.churn_risk_level === 'critical').length || 0;
+      const high = scores?.filter((s: any) => s.churn_risk_level === 'high').length || 0;
+      const medium = scores?.filter((s: any) => s.churn_risk_level === 'medium').length || 0;
+      const low = scores?.filter((s: any) => s.churn_risk_level === 'low').length || 0;
 
-      const totalRevenue = predictions?.reduce((sum: number, p: any) => sum + (p.predicted_ltv || 0), 0) || 0;
-      const revenueAtRisk = predictions
-        ?.filter((p: any) => p.churn_probability >= 50)
-        .reduce((sum: number, p: any) => sum + (p.predicted_ltv || 0), 0) || 0;
+      const totalLTV = scores?.reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0) || 0;
+      const ltvAtRisk = scores
+        ?.filter((s: any) => s.churn_probability >= 50)
+        .reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0) || 0;
+
+      const avgChurnProbability = total > 0
+        ? scores.reduce((sum: number, s: any) => sum + s.churn_probability, 0) / total
+        : 0;
 
       return {
         total,
@@ -360,123 +446,19 @@ export function usePredictionStats() {
         high,
         medium,
         low,
-        totalRevenue,
-        revenueAtRisk,
-        avgChurnProbability: total > 0
-          ? predictions.reduce((sum: number, p: any) => sum + p.churn_probability, 0) / total
-          : 0,
+        totalLTV,
+        ltvAtRisk,
+        avgChurnProbability,
+        percentAtRisk: total > 0 ? ((critical + high) / total) * 100 : 0,
       };
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 // =============================================================================
-// Mutation Hooks
+// Mutation Hooks: Retention Interventions
 // =============================================================================
-
-/**
- * Create a new customer prediction
- */
-export function useCreatePrediction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (request: CreatePredictionRequest) => {
-      const { data, error } = await supabase
-        .from('customer_predictions')
-        .insert(request)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as CustomerPrediction;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-predictions'] });
-      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
-      queryClient.invalidateQueries({ queryKey: ['prediction-stats'] });
-      toast.success('Prediction created successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error creating prediction:', error);
-      toast.error('Failed to create prediction');
-    },
-  });
-}
-
-/**
- * Update an existing prediction
- */
-export function useUpdatePrediction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<CustomerPrediction> }) => {
-      const { data, error } = await supabase
-        .from('customer_predictions')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as CustomerPrediction;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['customer-predictions'] });
-      queryClient.invalidateQueries({ queryKey: ['customer-prediction', data.id] });
-      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
-      queryClient.invalidateQueries({ queryKey: ['prediction-stats'] });
-      toast.success('Prediction updated successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error updating prediction:', error);
-      toast.error('Failed to update prediction');
-    },
-  });
-}
-
-/**
- * Record actual outcome for a prediction
- */
-export function useRecordPredictionOutcome() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      predictionId,
-      outcome,
-      outcomeDate,
-    }: {
-      predictionId: string;
-      outcome: string;
-      outcomeDate: string;
-    }) => {
-      const { data, error } = await supabase
-        .from('customer_predictions')
-        .update({
-          outcome_actual: outcome,
-          outcome_date: outcomeDate,
-          status: 'archived',
-        })
-        .eq('id', predictionId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-predictions'] });
-      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
-      toast.success('Outcome recorded successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error recording outcome:', error);
-      toast.error('Failed to record outcome');
-    },
-  });
-}
 
 /**
  * Create a retention intervention
@@ -485,129 +467,195 @@ export function useCreateIntervention() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (request: CreateInterventionRequest) => {
+    mutationFn: async (intervention: Partial<RetentionIntervention>) => {
       const { data, error } = await supabase
         .from('retention_interventions')
-        .insert(request)
+        .insert(intervention)
         .select()
         .single();
 
       if (error) throw error;
       return data as RetentionIntervention;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retention-interventions'] });
-      toast.success('Intervention created successfully');
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['retention-interventions', data.account_id] });
+      queryClient.invalidateQueries({ queryKey: ['pending-interventions'] });
+
+      toast.success('Intervention created', {
+        description: 'Retention action has been scheduled',
+      });
     },
-    onError: (error: any) => {
-      console.error('Error creating intervention:', error);
-      toast.error('Failed to create intervention');
+    onError: (error: Error) => {
+      toast.error('Failed to create intervention', {
+        description: error.message,
+      });
     },
   });
 }
 
 /**
- * Update an intervention
+ * Update intervention status
  */
-export function useUpdateIntervention() {
+export function useUpdateInterventionStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
-      id,
-      updates,
+      interventionId,
+      status,
+      outcome,
+      outcomeNotes,
+      customerRetained,
     }: {
-      id: string;
-      updates: Partial<RetentionIntervention>;
+      interventionId: string;
+      status: 'scheduled' | 'completed' | 'dismissed';
+      outcome?: InterventionOutcome;
+      outcomeNotes?: string;
+      customerRetained?: boolean;
     }) => {
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (status === 'completed') {
+        updateData.completed_at = new Date().toISOString();
+        if (outcome) updateData.outcome = outcome;
+        if (outcomeNotes) updateData.outcome_notes = outcomeNotes;
+        if (customerRetained !== undefined) updateData.customer_retained = customerRetained;
+      }
+
       const { data, error } = await supabase
         .from('retention_interventions')
-        .update(updates)
-        .eq('id', id)
+        .update(updateData)
+        .eq('id', interventionId)
         .select()
         .single();
 
       if (error) throw error;
       return data as RetentionIntervention;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['retention-interventions'] });
-      toast.success('Intervention updated successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error updating intervention:', error);
-      toast.error('Failed to update intervention');
-    },
-  });
-}
+      queryClient.invalidateQueries({ queryKey: ['pending-interventions'] });
 
-/**
- * Refresh predictive analytics dashboard
- */
-export function useRefreshPredictiveAnalytics() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('refresh_predictive_analytics_dashboard');
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['predictive-analytics-dashboard'] });
-      toast.success('Analytics refreshed successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error refreshing analytics:', error);
-      toast.error('Failed to refresh analytics');
-    },
-  });
-}
-
-/**
- * Expire old predictions
- */
-export function useExpireOldPredictions() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('expire_old_predictions');
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-predictions'] });
-      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
-      queryClient.invalidateQueries({ queryKey: ['prediction-stats'] });
-      toast.success('Old predictions expired');
-    },
-    onError: (error: any) => {
-      console.error('Error expiring predictions:', error);
-      toast.error('Failed to expire predictions');
-    },
-  });
-}
-
-/**
- * Calculate intervention ROI
- */
-export function useCalculateInterventionROI() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (interventionId: string) => {
-      const { data, error } = await supabase.rpc('calculate_intervention_roi', {
-        p_intervention_id: interventionId,
+      toast.success('Intervention updated', {
+        description: `Status changed to ${data.status}`,
       });
-      if (error) throw error;
-      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retention-interventions'] });
-      toast.success('ROI calculated successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error calculating ROI:', error);
-      toast.error('Failed to calculate ROI');
+    onError: (error: Error) => {
+      toast.error('Failed to update intervention', {
+        description: error.message,
+      });
     },
   });
+}
+
+/**
+ * Refresh churn predictions materialized view
+ */
+export function useRefreshChurnPredictions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('refresh_churn_predictions');
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['churn-predictions'] });
+      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
+      toast.success('Churn predictions refreshed');
+    },
+    onError: (error: any) => {
+      console.error('Error refreshing predictions:', error);
+      toast.error('Failed to refresh predictions');
+    },
+  });
+}
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
+/**
+ * Get risk level color class
+ */
+export function getRiskLevelColor(level: ChurnRiskLevel): string {
+  switch (level) {
+    case 'critical':
+      return 'text-red-600 dark:text-red-400';
+    case 'high':
+      return 'text-orange-600 dark:text-orange-400';
+    case 'medium':
+      return 'text-yellow-600 dark:text-yellow-400';
+    case 'low':
+      return 'text-green-600 dark:text-green-400';
+    default:
+      return 'text-gray-600 dark:text-gray-400';
+  }
+}
+
+/**
+ * Get risk level badge variant
+ */
+export function getRiskLevelBadge(level: ChurnRiskLevel): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (level) {
+    case 'critical':
+      return 'destructive';
+    case 'high':
+      return 'destructive';
+    case 'medium':
+      return 'secondary';
+    case 'low':
+      return 'outline';
+    default:
+      return 'outline';
+  }
+}
+
+/**
+ * Get LTV trend icon
+ */
+export function getLtvTrendIcon(trend: LtvTrend): string {
+  switch (trend) {
+    case 'increasing':
+      return '📈';
+    case 'declining':
+      return '📉';
+    case 'stable':
+      return '➡️';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Format currency
+ */
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/**
+ * Get priority color
+ */
+export function getPriorityColor(priority: string): string {
+  switch (priority) {
+    case 'urgent':
+      return 'text-red-600 dark:text-red-400';
+    case 'high':
+      return 'text-orange-600 dark:text-orange-400';
+    case 'medium':
+      return 'text-yellow-600 dark:text-yellow-400';
+    case 'low':
+      return 'text-blue-600 dark:text-blue-400';
+    default:
+      return 'text-gray-600 dark:text-gray-400';
+  }
 }
