@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Database } from '@/integrations/supabase/types';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 
 // Types
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -61,9 +62,8 @@ export function useLeads(filters?: LeadFilters) {
         countQuery = countQuery.overlaps('insurance_types', filters.insurance_types);
       }
       if (filters?.search) {
-        countQuery = countQuery.or(
-          `first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`
-        );
+        const searchCondition = sanitizeMultiFieldSearch(filters.search, ['first_name', 'last_name', 'email', 'phone']);
+        countQuery = countQuery.or(searchCondition);
       }
 
       const { count, error: countError } = await countQuery;
@@ -103,9 +103,8 @@ export function useLeads(filters?: LeadFilters) {
         query = query.overlaps('insurance_types', filters.insurance_types);
       }
       if (filters?.search) {
-        query = query.or(
-          `first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`
-        );
+        const searchCondition = sanitizeMultiFieldSearch(filters.search, ['first_name', 'last_name', 'email', 'phone']);
+        query = query.or(searchCondition);
       }
 
       const { data, error } = await query;

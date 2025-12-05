@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { sanitizeForILike, sanitizeMultiFieldSearch } from '@/lib/sanitize';
 
 export type Policy = Database['public']['Tables']['policies']['Row'];
 
@@ -65,13 +66,13 @@ export function usePolicies(filters: PolicyFilters = {}) {
 
       // Apply filters
       if (filters.search) {
-        query = query.or(
-          `policy_number.ilike.%${filters.search}%,carrier.ilike.%${filters.search}%,line_of_business.ilike.%${filters.search}%`
-        );
+        const searchCondition = sanitizeMultiFieldSearch(filters.search, ['policy_number', 'carrier', 'line_of_business']);
+        query = query.or(searchCondition);
       }
 
       if (filters.policyNumber) {
-        query = query.ilike('policy_number', `%${filters.policyNumber}%`);
+        const sanitized = sanitizeForILike(filters.policyNumber);
+        query = query.ilike('policy_number', `%${sanitized}%`);
       }
 
       if (filters.effectiveDateFrom) {
@@ -91,7 +92,8 @@ export function usePolicies(filters: PolicyFilters = {}) {
       }
 
       if (filters.carrier) {
-        query = query.ilike('carrier', `%${filters.carrier}%`);
+        const sanitized = sanitizeForILike(filters.carrier);
+        query = query.ilike('carrier', `%${sanitized}%`);
       }
 
       if (filters.mga) {
@@ -99,7 +101,8 @@ export function usePolicies(filters: PolicyFilters = {}) {
       }
 
       if (filters.lineOfBusiness) {
-        query = query.ilike('line_of_business', `%${filters.lineOfBusiness}%`);
+        const sanitized = sanitizeForILike(filters.lineOfBusiness);
+        query = query.ilike('line_of_business', `%${sanitized}%`);
       }
 
       if (filters.status) {

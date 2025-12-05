@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AdvancedFilters, DocumentFilters } from '@/components/document-intelligence/AdvancedFilters';
 import { SavedViews } from '@/components/document-intelligence/SavedViews';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeForILike } from '@/lib/sanitize';
 
 export default function DocumentIntelligence() {
   const { toast } = useToast();
@@ -83,10 +84,11 @@ export default function DocumentIntelligence() {
     try {
       const searchText = String(result.document || '').trim();
       if (searchText) {
+        const sanitized = sanitizeForILike(searchText);
         let { data: found, error } = await supabase
           .from('documents')
           .select('*')
-          .ilike('name', `%${searchText}%`)
+          .ilike('name', `%${sanitized}%`)
           .limit(1)
           .maybeSingle();
 
@@ -96,7 +98,7 @@ export default function DocumentIntelligence() {
           const alt = await supabase
             .from('documents')
             .select('*')
-            .ilike('filename', `%${searchText}%`)
+            .ilike('filename', `%${sanitized}%`)
             .limit(1)
             .maybeSingle();
           if (alt.error) throw alt.error;

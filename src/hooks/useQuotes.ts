@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeForILike } from '@/lib/sanitize';
 
 export type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -48,11 +49,13 @@ export function useQuotes(filters: QuoteFilters = {}) {
       }
 
       if (filters.carrier) {
-        query = query.ilike('carrier', `%${filters.carrier}%`);
+        const sanitized = sanitizeForILike(filters.carrier);
+        query = query.ilike('carrier', `%${sanitized}%`);
       }
 
       if (filters.lineOfBusiness) {
-        query = query.ilike('line_of_business', `%${filters.lineOfBusiness}%`);
+        const sanitized = sanitizeForILike(filters.lineOfBusiness);
+        query = query.ilike('line_of_business', `%${sanitized}%`);
       }
 
       const { data, error } = await query;
