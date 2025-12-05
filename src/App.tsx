@@ -76,8 +76,8 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (was cacheTime)
+      staleTime: 5 * 60 * 1000, // 5 minutes - data fresh for 5 min
+      gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for 10 min
       retry: (failureCount, error) => {
         // Don't retry on 404s or auth errors
         if (error instanceof Error && (error.message.includes('404') || error.message.includes('auth'))) {
@@ -86,6 +86,9 @@ const queryClient = new QueryClient({
         return failureCount < 2; // Reduce retries from 3 to 2
       },
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+      refetchOnWindowFocus: false, // Don't refetch on window focus to reduce API calls
+      refetchOnMount: true, // Refetch on component mount if data is stale
+      refetchOnReconnect: true, // Refetch when connection restored
     },
     mutations: {
       retry: 1, // Reduce mutation retries
