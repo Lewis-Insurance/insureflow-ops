@@ -309,7 +309,18 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
 
         if (!kbAnswer) {
           kbAnswer = await getKbAnswer(input.trim(), userCarrier || null, userJurisdiction || 'FL', userProgram);
-          if (kbAnswer) kbCacheRef.current.set(cacheKey, kbAnswer);
+          if (kbAnswer) {
+            // LRU eviction: if cache exceeds 500 entries, remove oldest entries
+            const MAX_CACHE_SIZE = 500;
+            if (kbCacheRef.current.size >= MAX_CACHE_SIZE) {
+              // Remove the first (oldest) entry
+              const firstKey = kbCacheRef.current.keys().next().value;
+              if (firstKey) {
+                kbCacheRef.current.delete(firstKey);
+              }
+            }
+            kbCacheRef.current.set(cacheKey, kbAnswer);
+          }
         }
 
         if (kbAnswer) {
