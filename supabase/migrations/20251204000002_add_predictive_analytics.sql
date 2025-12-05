@@ -223,6 +223,22 @@ CREATE TABLE IF NOT EXISTS public.retention_interventions (
 COMMENT ON TABLE public.retention_interventions IS 'Retention intervention recommendations and tracking';
 COMMENT ON COLUMN public.retention_interventions.customer_retained IS 'Whether customer renewed after intervention';
 
+-- Ensure all columns exist if table was created previously
+DO $$
+BEGIN
+  -- Add missing columns if table exists but columns don't
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'retention_interventions') THEN
+    ALTER TABLE public.retention_interventions
+    ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS outcome TEXT CHECK (outcome IN ('successful', 'unsuccessful', 'partial', 'pending')),
+    ADD COLUMN IF NOT EXISTS outcome_notes TEXT,
+    ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES auth.users(id),
+    ADD COLUMN IF NOT EXISTS recommended_timeline_days INTEGER,
+    ADD COLUMN IF NOT EXISTS intervention_metadata JSONB DEFAULT '{}'::jsonb;
+  END IF;
+END $$;
+
 -- =============================================================================
 -- PART 5: Create indexes for performance
 -- =============================================================================
