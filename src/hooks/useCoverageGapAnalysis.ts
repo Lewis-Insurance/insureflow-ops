@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCoverageGapTaskGeneration } from './useAutoTaskGeneration';
 
 interface CoverageGapRequest {
   account_id: string;
@@ -35,6 +36,7 @@ interface AnalysisResponse {
 export function useAnalyzeCoverageGaps() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { generateFromGap } = useCoverageGapTaskGeneration();
 
   return useMutation({
     mutationFn: async (request: CoverageGapRequest) => {
@@ -45,11 +47,38 @@ export function useAnalyzeCoverageGaps() {
       if (error) throw error;
       return data as AnalysisResponse;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       toast({
         title: 'Coverage Analysis Complete',
         description: `Found ${data.gaps_found} coverage gap${data.gaps_found !== 1 ? 's' : ''} with ${data.risk_level.toUpperCase()} risk level`,
       });
+
+      // Auto-generate task if gaps were found
+      if (data.gaps_found > 0) {
+        // Get account/customer name
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('name')
+          .eq('id', variables.account_id)
+          .single();
+
+        const gapSummary = data.analysis?.gaps
+          ?.map((g: any) => g.coverage_type || g.title)
+          .slice(0, 3)
+          .join(', ') || 'Multiple coverage gaps';
+
+        const recommendations = data.analysis?.recommendations
+          ?.slice(0, 2)
+          .map((r: any) => r.recommendation || r)
+          .join('; ') || 'Review analysis for recommendations';
+
+        generateFromGap({
+          accountId: variables.account_id,
+          customerName: account?.name || 'Customer',
+          gapDetails: gapSummary,
+          recommendedCoverage: recommendations,
+        });
+      }
 
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['coverage-gap-analyses', variables.account_id] });

@@ -161,7 +161,7 @@ serve(async (req) => {
             assignmentReason = "Assigned to account owner";
           }
         } else if (rule.assign_to_type === "creator") {
-          assignedTo = user.id;
+          assignedTo = authenticatedUser.id;
           assignmentReason = "Assigned to task creator";
         }
 

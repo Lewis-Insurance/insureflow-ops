@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
+import { useDocumentAnalysisTaskGeneration } from '@/hooks/useAutoTaskGeneration';
 
 interface DocumentAnalysisButtonProps {
   documentId?: string;
@@ -30,6 +31,7 @@ export function DocumentAnalysisButton({
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { generateFromAnalysis } = useDocumentAnalysisTaskGeneration();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -112,6 +114,20 @@ export function DocumentAnalysisButton({
 
       setAnalysisResult(responseText);
       toast({ title: 'Analysis Complete', description: 'Document analysis has been generated.' });
+
+      // Auto-generate follow-up task
+      if (documentId && documentsToAnalyze.length > 0) {
+        generateFromAnalysis({
+          accountId,
+          documentId,
+          documentName: documentsToAnalyze[0].filename || documentsToAnalyze[0].name || 'Document',
+          analysisResults: {
+            summary: responseText.substring(0, 200) + '...', // First 200 chars
+            document_count: documentsToAnalyze.length,
+            analysis_type: multi ? 'comparison' : 'single',
+          },
+        });
+      }
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
       console.error('Document analysis error:', err);
