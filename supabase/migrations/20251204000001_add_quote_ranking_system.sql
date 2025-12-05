@@ -108,6 +108,30 @@ COMMENT ON TABLE public.carrier_ratings IS 'Carrier quality metrics and performa
 COMMENT ON COLUMN public.carrier_ratings.win_rate IS 'Percentage of our quotes that customer accepts';
 COMMENT ON COLUMN public.carrier_ratings.denial_rate IS 'Percentage of claims denied by carrier';
 
+-- Ensure all columns exist if table was created previously
+DO $$
+BEGIN
+  -- Add missing columns if table exists but columns don't
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'carrier_ratings') THEN
+    ALTER TABLE public.carrier_ratings
+    ADD COLUMN IF NOT EXISTS carrier_code TEXT,
+    ADD COLUMN IF NOT EXISTS overall_rating NUMERIC(3,2) CHECK (overall_rating >= 0 AND overall_rating <= 5),
+    ADD COLUMN IF NOT EXISTS financial_strength TEXT,
+    ADD COLUMN IF NOT EXISTS denial_rate NUMERIC(5,2) CHECK (denial_rate >= 0 AND denial_rate <= 100),
+    ADD COLUMN IF NOT EXISTS avg_claim_response_days INTEGER,
+    ADD COLUMN IF NOT EXISTS customer_satisfaction NUMERIC(3,2) CHECK (customer_satisfaction >= 0 AND customer_satisfaction <= 5),
+    ADD COLUMN IF NOT EXISTS win_rate NUMERIC(5,2) CHECK (win_rate >= 0 AND win_rate <= 100),
+    ADD COLUMN IF NOT EXISTS total_quotes_submitted INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS total_quotes_won INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS avg_premium_difference NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS market_share NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS specialties TEXT[],
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
+    ADD COLUMN IF NOT EXISTS is_preferred_carrier BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS last_metrics_update TIMESTAMP WITH TIME ZONE;
+  END IF;
+END $$;
+
 -- =============================================================================
 -- PART 4: Create materialized view for quote rankings
 -- =============================================================================
