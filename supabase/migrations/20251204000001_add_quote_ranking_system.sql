@@ -124,7 +124,6 @@ SELECT
   q.deductible_score,
   q.value_score,
   q.ai_recommendation,
-  q.carrier_name,
   q.status,
   q.created_at,
   q.last_scored_at,
@@ -172,9 +171,10 @@ CREATE INDEX IF NOT EXISTS idx_quotes_premium
   ON public.quotes(premium ASC NULLS LAST)
   WHERE premium IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_quotes_carrier_name
-  ON public.quotes(carrier_name)
-  WHERE carrier_name IS NOT NULL;
+-- Removed: quotes table doesn't have carrier_name column
+-- CREATE INDEX IF NOT EXISTS idx_quotes_carrier_name
+--   ON public.quotes(carrier_name)
+--   WHERE carrier_name IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_quotes_last_scored_at
   ON public.quotes(last_scored_at DESC NULLS LAST);
@@ -279,7 +279,6 @@ RETURNS TABLE(
   deductible_score INTEGER,
   value_score INTEGER,
   ai_recommendation TEXT,
-  carrier_name TEXT,
   status TEXT,
   rank INTEGER,
   total_quotes INTEGER,
@@ -298,7 +297,6 @@ BEGIN
     qr.deductible_score,
     qr.value_score,
     qr.ai_recommendation,
-    qr.carrier_name,
     qr.status,
     qr.rank_in_account::INTEGER,
     qr.total_quotes_in_account::INTEGER,
@@ -321,7 +319,6 @@ BEGIN
       q.deductible_score,
       q.value_score,
       q.ai_recommendation,
-      q.carrier_name,
       q.status,
       999999 AS rank, -- Put unscored at bottom
       (SELECT COUNT(*)::INTEGER FROM public.quotes WHERE account_id = p_account_id) AS total_quotes,
@@ -338,54 +335,57 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION public.get_ranked_quotes_for_account IS 'Get all ranked quotes for an account in order';
 
--- Function to update carrier metrics based on quote outcomes
-CREATE OR REPLACE FUNCTION public.update_carrier_metrics_from_quote()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_carrier_name TEXT;
-BEGIN
-  v_carrier_name := NEW.carrier_name;
-
-  -- Only update if carrier_name exists
-  IF v_carrier_name IS NULL OR v_carrier_name = '' THEN
-    RETURN NEW;
-  END IF;
-
-  -- Ensure carrier exists
-  INSERT INTO public.carrier_ratings (carrier_name)
-  VALUES (v_carrier_name)
-  ON CONFLICT (carrier_name) DO NOTHING;
-
-  -- Update metrics when quote is won/lost
-  IF NEW.status = 'won' AND (OLD.status IS NULL OR OLD.status != 'won') THEN
-    UPDATE public.carrier_ratings
-    SET
-      total_quotes_won = total_quotes_won + 1,
-      total_quotes_submitted = total_quotes_submitted + 1,
-      win_rate = ((total_quotes_won + 1)::NUMERIC / (total_quotes_submitted + 1)::NUMERIC) * 100,
-      last_metrics_update = now()
-    WHERE carrier_name = v_carrier_name;
-  ELSIF NEW.status IN ('lost', 'rejected') AND (OLD.status IS NULL OR OLD.status NOT IN ('lost', 'rejected')) THEN
-    UPDATE public.carrier_ratings
-    SET
-      total_quotes_submitted = total_quotes_submitted + 1,
-      win_rate = (total_quotes_won::NUMERIC / (total_quotes_submitted + 1)::NUMERIC) * 100,
-      last_metrics_update = now()
-    WHERE carrier_name = v_carrier_name;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-COMMENT ON FUNCTION public.update_carrier_metrics_from_quote IS 'Auto-update carrier metrics when quote status changes';
-
--- Create trigger for carrier metrics update
-DROP TRIGGER IF EXISTS update_carrier_metrics_on_quote_change ON public.quotes;
-CREATE TRIGGER update_carrier_metrics_on_quote_change
-  AFTER INSERT OR UPDATE OF status ON public.quotes
-  FOR EACH ROW
-  EXECUTE FUNCTION public.update_carrier_metrics_from_quote();
+-- Commented out: quotes table doesn't have carrier_name column
+-- This functionality will need to be re-implemented when carrier tracking is added
+--
+-- -- Function to update carrier metrics based on quote outcomes
+-- CREATE OR REPLACE FUNCTION public.update_carrier_metrics_from_quote()
+-- RETURNS TRIGGER AS $$
+-- DECLARE
+--   v_carrier_name TEXT;
+-- BEGIN
+--   v_carrier_name := NEW.carrier_name;
+--
+--   -- Only update if carrier_name exists
+--   IF v_carrier_name IS NULL OR v_carrier_name = '' THEN
+--     RETURN NEW;
+--   END IF;
+--
+--   -- Ensure carrier exists
+--   INSERT INTO public.carrier_ratings (carrier_name)
+--   VALUES (v_carrier_name)
+--   ON CONFLICT (carrier_name) DO NOTHING;
+--
+--   -- Update metrics when quote is won/lost
+--   IF NEW.status = 'won' AND (OLD.status IS NULL OR OLD.status != 'won') THEN
+--     UPDATE public.carrier_ratings
+--     SET
+--       total_quotes_won = total_quotes_won + 1,
+--       total_quotes_submitted = total_quotes_submitted + 1,
+--       win_rate = ((total_quotes_won + 1)::NUMERIC / (total_quotes_submitted + 1)::NUMERIC) * 100,
+--       last_metrics_update = now()
+--     WHERE carrier_name = v_carrier_name;
+--   ELSIF NEW.status IN ('lost', 'rejected') AND (OLD.status IS NULL OR OLD.status NOT IN ('lost', 'rejected')) THEN
+--     UPDATE public.carrier_ratings
+--     SET
+--       total_quotes_submitted = total_quotes_submitted + 1,
+--       win_rate = (total_quotes_won::NUMERIC / (total_quotes_submitted + 1)::NUMERIC) * 100,
+--       last_metrics_update = now()
+--     WHERE carrier_name = v_carrier_name;
+--   END IF;
+--
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;
+--
+-- COMMENT ON FUNCTION public.update_carrier_metrics_from_quote IS 'Auto-update carrier metrics when quote status changes';
+--
+-- -- Create trigger for carrier metrics update
+-- DROP TRIGGER IF EXISTS update_carrier_metrics_on_quote_change ON public.quotes;
+-- CREATE TRIGGER update_carrier_metrics_on_quote_change
+--   AFTER INSERT OR UPDATE OF status ON public.quotes
+--   FOR EACH ROW
+--   EXECUTE FUNCTION public.update_carrier_metrics_from_quote();
 
 -- =============================================================================
 -- PART 8: Triggers for updated_at
