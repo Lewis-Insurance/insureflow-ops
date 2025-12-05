@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLeads, useMoveLeadToStage, type Lead } from "@/hooks/useLeads";
@@ -17,24 +17,24 @@ const STAGES = [
   { id: 'won', label: 'Won', color: 'bg-green-500' },
 ];
 
-const LeadCard = ({ 
-  lead, 
-  onDragStart, 
-  onClick 
-}: { 
-  lead: Lead & any; 
+const LeadCard = memo(({
+  lead,
+  onDragStart,
+  onClick
+}: {
+  lead: Lead & any;
   onDragStart: (lead: Lead) => void;
   onClick: (lead: Lead) => void;
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setDragStartPos({ x: e.clientX, y: e.clientY });
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (dragStartPos) {
       const distance = Math.sqrt(
         Math.pow(e.clientX - dragStartPos.x, 2) + Math.pow(e.clientY - dragStartPos.y, 2)
@@ -43,21 +43,25 @@ const LeadCard = ({
         setIsDragging(true);
       }
     }
-  };
+  }, [dragStartPos]);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isDragging) {
       onClick(lead);
     }
     setDragStartPos(null);
     setIsDragging(false);
-  };
+  }, [isDragging, onClick, lead]);
+
+  const handleDragStart = useCallback(() => {
+    onDragStart(lead);
+  }, [onDragStart, lead]);
 
   return (
     <Card
       draggable
-      onDragStart={() => onDragStart(lead)}
+      onDragStart={handleDragStart}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onClick={handleClick}
@@ -142,9 +146,11 @@ const LeadCard = ({
       </CardContent>
     </Card>
   );
-};
+});
 
-const KanbanColumn = ({
+LeadCard.displayName = 'LeadCard';
+
+const KanbanColumn = memo(({
   stage,
   leads,
   onDrop,
@@ -159,20 +165,20 @@ const KanbanColumn = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = () => {
+  const handleDragLeave = useCallback(() => {
     setIsDragOver(false);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     onDrop(stage.id as Lead['status']);
-  };
+  }, [onDrop, stage.id]);
 
   return (
     <div
@@ -209,7 +215,9 @@ const KanbanColumn = ({
       </Card>
     </div>
   );
-};
+});
+
+KanbanColumn.displayName = 'KanbanColumn';
 
 export const PipelineKanban = ({ filters }: { filters?: any }) => {
   const { data: leadsResponse, isLoading } = useLeads(filters);
@@ -219,11 +227,11 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
-  const handleDragStart = (lead: Lead) => {
+  const handleDragStart = useCallback((lead: Lead) => {
     setDraggedLead(lead);
-  };
+  }, []);
 
-  const handleDrop = (status: Lead['status']) => {
+  const handleDrop = useCallback((status: Lead['status']) => {
     if (!draggedLead) return;
 
     moveLeadStage.mutate({
@@ -232,11 +240,19 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
     });
 
     setDraggedLead(null);
-  };
+  }, [draggedLead, moveLeadStage]);
 
-  const handleLeadClick = (lead: Lead) => {
+  const handleLeadClick = useCallback((lead: Lead) => {
     setSelectedLeadId(lead.id);
-  };
+  }, []);
+
+  // Memoize grouped leads by stage to prevent recalculation on every render
+  const leadsByStage = useMemo(() => {
+    return STAGES.map((stage) => ({
+      ...stage,
+      leads: leads?.filter((lead) => lead.status === stage.id) || [],
+    }));
+  }, [leads]);
 
   if (isLoading) {
     return (
@@ -258,11 +274,6 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
       </div>
     );
   }
-
-  const leadsByStage = STAGES.map((stage) => ({
-    ...stage,
-    leads: leads?.filter((lead) => lead.status === stage.id) || [],
-  }));
 
   return (
     <div className="space-y-4">
