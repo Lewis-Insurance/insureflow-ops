@@ -232,31 +232,29 @@ CREATE INDEX IF NOT EXISTS idx_customer_risk_scores_account_id
   ON public.customer_risk_scores(account_id);
 
 CREATE INDEX IF NOT EXISTS idx_customer_risk_scores_churn_probability
-  ON public.customer_risk_scores(churn_probability DESC)
-  WHERE expires_at > now();
+  ON public.customer_risk_scores(churn_probability DESC);
 
 CREATE INDEX IF NOT EXISTS idx_customer_risk_scores_risk_level
   ON public.customer_risk_scores(churn_risk_level)
-  WHERE churn_risk_level IN ('high', 'critical') AND expires_at > now();
+  WHERE churn_risk_level IN ('high', 'critical');
 
 CREATE INDEX IF NOT EXISTS idx_customer_risk_scores_expires_at
-  ON public.customer_risk_scores(expires_at)
-  WHERE expires_at > now();
+  ON public.customer_risk_scores(expires_at DESC);
 
 -- Product recommendations indexes
 CREATE INDEX IF NOT EXISTS idx_product_recommendations_account_id
   ON public.product_recommendations(account_id);
 
 CREATE INDEX IF NOT EXISTS idx_product_recommendations_probability
-  ON public.product_recommendations(purchase_probability DESC)
-  WHERE status = 'pending' AND expires_at > now();
+  ON public.product_recommendations(purchase_probability DESC, expires_at DESC)
+  WHERE status = 'pending';
 
 CREATE INDEX IF NOT EXISTS idx_product_recommendations_priority
   ON public.product_recommendations(priority_score DESC)
   WHERE status = 'pending';
 
 CREATE INDEX IF NOT EXISTS idx_product_recommendations_status
-  ON public.product_recommendations(status, expires_at);
+  ON public.product_recommendations(status, expires_at DESC);
 
 -- Retention interventions indexes
 CREATE INDEX IF NOT EXISTS idx_retention_interventions_account_id
@@ -439,16 +437,19 @@ COMMENT ON FUNCTION public.get_top_product_opportunities IS 'Get highest-priorit
 -- PART 8: Triggers for updated_at
 -- =============================================================================
 
+DROP TRIGGER IF EXISTS update_customer_risk_scores_updated_at ON public.customer_risk_scores;
 CREATE TRIGGER update_customer_risk_scores_updated_at
   BEFORE UPDATE ON public.customer_risk_scores
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_product_recommendations_updated_at ON public.product_recommendations;
 CREATE TRIGGER update_product_recommendations_updated_at
   BEFORE UPDATE ON public.product_recommendations
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_retention_interventions_updated_at ON public.retention_interventions;
 CREATE TRIGGER update_retention_interventions_updated_at
   BEFORE UPDATE ON public.retention_interventions
   FOR EACH ROW
