@@ -229,8 +229,6 @@ CREATE INDEX IF NOT EXISTS idx_retention_interventions_customer_retained
   ON public.retention_interventions(customer_retained)
   WHERE customer_retained IS NOT NULL;
 
-RAISE NOTICE '✅ Created indexes';
-
 -- =============================================================================
 -- FIX 7: Final validation
 -- =============================================================================
