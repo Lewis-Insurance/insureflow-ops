@@ -12,6 +12,7 @@ import { useTriggerFollowUpProcessor } from '@/hooks/useQuoteFollowups';
 import { useCreateQuote } from '@/hooks/useQuotes';
 import { z } from 'zod';
 import { AIQuoteAssistant, type QuoteSuggestion } from '@/components/quotes/AIQuoteAssistant';
+import type { Database } from '@/integrations/supabase/types';
 
 const quoteSchema = z.object({
   quote_number: z.string().min(1, 'Quote number is required').max(50, 'Quote number too long'),
@@ -75,7 +76,7 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
         account_id: accountId,
         quote_ref: formData.quote_number.trim(),
         competitor_carrier: formData.carrier.trim(),
-        line_of_business: formData.line_of_business.trim() as any, // Will be enum type
+        line_of_business: formData.line_of_business.trim() as Database['public']['Enums']['line_of_business'],
         premium: formData.premium ? parseFloat(formData.premium) : undefined,
         expires_at: formData.expiration_date,
         status: 'open' as const,

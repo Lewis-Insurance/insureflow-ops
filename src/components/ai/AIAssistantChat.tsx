@@ -10,13 +10,15 @@ import { useSubmitAIFeedback } from '@/hooks/useAIFeedback';
 
 // ===== Type Guards for Json types =====
 function isAIContextJson(value: unknown): value is { type: string; id: string; name?: string } {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    'id' in value &&
-    typeof (value as any).type === 'string' &&
-    typeof (value as any).id === 'string'
+    'type' in obj &&
+    'id' in obj &&
+    typeof obj.type === 'string' &&
+    typeof obj.id === 'string'
   );
 }
 
@@ -283,7 +285,7 @@ export function AIAssistantChat({ context }: AIAssistantChatProps) {
         metadata: {
           documents: userMessage.documents,
           kb_record_id: null // Will be set later if KB is used
-        } as any,
+        },
       }]);
     }
 

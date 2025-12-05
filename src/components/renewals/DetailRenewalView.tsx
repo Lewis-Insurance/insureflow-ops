@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   useRenewalsWithRisk,
   useRenewalRiskHistory,
@@ -64,7 +65,35 @@ const DetailRenewalView = () => {
   const renewal = allRenewals?.find(r => r.id === renewalId);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Skeleton className="h-10 w-10" />
+          <div className="flex-1">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-32" />
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!renewal) {
