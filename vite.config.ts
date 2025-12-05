@@ -33,15 +33,15 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Vendor chunks - split by package
           if (id.includes('node_modules')) {
-            // React ecosystem - split further
-            if (id.includes('react-dom')) {
-              return 'react-dom-vendor';
+            // CRITICAL: Keep React core with react-dom to prevent module resolution issues
+            if (id.includes('react-dom') || id.includes('react/') || id.includes('react/jsx-runtime') ||
+                (id.includes('react') && !id.includes('react-router') && !id.includes('react-hook-form') &&
+                 !id.includes('react-pdf') && !id.includes('lucide-react') && !id.includes('@tanstack/react'))) {
+              return 'react-vendor';
             }
+
             if (id.includes('react-router')) {
               return 'react-router-vendor';
-            }
-            if (id.includes('react') && !id.includes('react-dom') && !id.includes('react-router')) {
-              return 'react-vendor';
             }
 
             // Query & state management
