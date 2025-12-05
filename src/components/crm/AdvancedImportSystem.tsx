@@ -20,13 +20,15 @@ function isValidationErrorArray(value: unknown): value is any[] {
 
 // Type guard for batch processing response
 function isBatchProcessResult(value: unknown): value is { processed_rows: number; successful_rows: number } {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'processed_rows' in value &&
-    'successful_rows' in value &&
-    typeof (value as any).processed_rows === 'number' &&
-    typeof (value as any).successful_rows === 'number'
+    'processed_rows' in obj &&
+    'successful_rows' in obj &&
+    typeof obj.processed_rows === 'number' &&
+    typeof obj.successful_rows === 'number'
   );
 }
 

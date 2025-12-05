@@ -108,11 +108,15 @@ export const AOImportWizard = () => {
         let headerRowIndex = -1;
         let dataStartIndex = -1;
 
+        // Type for XLSX sheet data (array of arrays)
+        type SheetRow = (string | number | boolean | null | undefined)[];
+        const typedJsonData = jsonData as SheetRow[];
+
         // Find the header row (contains "NAMED INSURED")
-        for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-          const row: any = jsonData[i];
-          if (Array.isArray(row) && row.some((cell: any) => 
-            String(cell).trim().toUpperCase() === 'NAMED INSURED'
+        for (let i = 0; i < Math.min(10, typedJsonData.length); i++) {
+          const row = typedJsonData[i];
+          if (Array.isArray(row) && row.some((cell) =>
+            String(cell ?? '').trim().toUpperCase() === 'NAMED INSURED'
           )) {
             headerRowIndex = i;
             dataStartIndex = i + 1;
@@ -126,15 +130,15 @@ export const AOImportWizard = () => {
         }
 
         // Extract headers
-        const headers = ((jsonData as any[])[headerRowIndex] || []).map((h: any) => String(h).trim());
-        
+        const headers = (typedJsonData[headerRowIndex] || []).map((h) => String(h ?? '').trim());
+
         // Extract data rows
-        const dataRows = jsonData.slice(dataStartIndex);
-        
+        const dataRows = typedJsonData.slice(dataStartIndex);
+
         // Parse data with Auto-Owners specific column mapping
         const parsedData: Partial<AORenewal>[] = [];
-        
-        dataRows.forEach((row: any) => {
+
+        dataRows.forEach((row) => {
           if (!Array.isArray(row) || row.length === 0) return;
           
           const renewal: Partial<AORenewal> = {

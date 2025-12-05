@@ -9,6 +9,7 @@ import { Shield, Phone, MessageSquare, Mail, AlertTriangle, CheckCircle2, Clock 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { ConsentEvidence, TwilioConsent } from '@/types/crm-enhanced-clean';
+import type { Database } from '@/integrations/supabase/types';
 
 interface TCPAComplianceProps {
   contactId: string;
@@ -17,7 +18,7 @@ interface TCPAComplianceProps {
 
 export function TCPACompliance({ contactId, contactName }: TCPAComplianceProps) {
   const [consents, setConsents] = useState<ConsentEvidence[]>([]);
-  const [twilioConsents, setTwilioConsents] = useState<TwilioConsent[]>([]);
+  const [twilioConsents, setTwilioConsents] = useState<Database['public']['Tables']['twilio_consents']['Row'][]>([]);
   const [loading, setLoading] = useState(true);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [newConsent, setNewConsent] = useState({
@@ -54,7 +55,7 @@ export function TCPACompliance({ contactId, contactName }: TCPAComplianceProps) 
       if (twilioError) throw twilioError;
 
       setConsents(consentData || []);
-      setTwilioConsents((twilioData || []) as any);
+      setTwilioConsents(twilioData || []);
     } catch (error) {
       console.error('Error fetching consents:', error);
       toast({
