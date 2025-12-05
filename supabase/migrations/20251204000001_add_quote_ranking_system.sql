@@ -116,7 +116,6 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS public.quote_rankings AS
 SELECT
   q.id AS quote_id,
   q.account_id,
-  q.lead_id,
   q.premium,
   q.quote_score,
   q.price_score,
