@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { extractTextFromBlob, validateExtraction } from './pdf-extractor.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -198,7 +199,19 @@ serve(async (req) => {
       console.warn('GOOGLE_CLOUD_VISION_API_KEY not configured - OCR may fail');
     }
     
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return 401 if auth failed
+    }
+    const authenticatedUser = authResult;
 
     let requestBody;
     try {
