@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
+import { useAutoClassifyDocument, useAutoRouteDocument } from '@/hooks/useDocumentClassification';
 
 interface UploadDocModalProps {
   open: boolean;
@@ -30,9 +31,11 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
   const [taskDueDate, setTaskDueDate] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  
+
   const { data: policies, isLoading: policiesLoading } = usePoliciesByAccount(accountId);
   const { data: quotes, isLoading: quotesLoading } = useQuotesByAccount(accountId);
+  const classifyDocument = useAutoClassifyDocument();
+  const routeDocument = useAutoRouteDocument();
 
   // Reset form when modal closes
   React.useEffect(() => {
@@ -145,11 +148,30 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
         }
       }
 
+      // Auto-classify and route document (silent - no interruption)
+      if (document?.id) {
+        try {
+          // Classify the document
+          const classificationResult = await classifyDocument.mutateAsync({
+            documentId: document.id,
+            fileName: file.name,
+          });
+
+          // If classification successful and urgency is high, auto-route
+          if (classificationResult && ['immediate', 'high'].includes(classificationResult.urgency_level)) {
+            await routeDocument.mutateAsync({ documentId: document.id });
+          }
+        } catch (error) {
+          // Silent fail - don't interrupt user flow
+          console.error('Auto-classification/routing failed:', error);
+        }
+      }
+
       toast({
         title: 'Success',
         description: 'Document uploaded successfully',
       });
-      
+
       onSuccess?.();
       onOpenChange(false);
     } catch (error) {

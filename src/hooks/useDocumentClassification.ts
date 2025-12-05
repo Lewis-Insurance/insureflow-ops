@@ -277,3 +277,40 @@ export function useDocumentNeedsAttention(
 
   return false;
 }
+
+/**
+ * Hook to auto-route a document to appropriate queue
+ */
+export function useAutoRouteDocument() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ documentId }: { documentId: string }) => {
+      const { data, error } = await supabase.rpc('auto_route_document', {
+        p_document_id: documentId,
+      });
+
+      if (error) throw error;
+      return { documentId, queueName: data as string | null };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['document-queues'] });
+
+      if (data.queueName) {
+        toast({
+          title: 'Document Routed',
+          description: `Sent to: ${data.queueName}`,
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Auto-routing Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
