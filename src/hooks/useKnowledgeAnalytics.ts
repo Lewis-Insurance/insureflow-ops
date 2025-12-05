@@ -125,9 +125,9 @@ export interface LogSearchParams {
 export function useLogKnowledgeUsage() {
   return useMutation({
     mutationFn: async (params: LogUsageParams) => {
-      const { data, error } = await (supabase.rpc as any)("log_knowledge_usage", {
+      const { data, error } = await supabase.rpc("log_knowledge_usage", {
         p_knowledge_id: params.knowledgeId,
-        p_user_action: params.actionType,
+        p_action_type: params.actionType,
         p_search_query: params.searchQuery,
         p_context_type: params.contextType,
         p_response_time_ms: params.responseTimeMs,
@@ -180,8 +180,14 @@ export function useKnowledgeUsageStats(limit: number = 50) {
   return useQuery({
     queryKey: ["knowledge-usage-stats", limit],
     queryFn: async (): Promise<KnowledgeUsageStats[]> => {
-      // TABLE DISABLED: knowledge_usage_stats does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_usage_stats")
+        .select("*")
+        .order("total_interactions", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch usage stats: ${error.message}`);
+      return data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -194,8 +200,19 @@ export function useKnowledgeEntryStats(knowledgeId: string | null) {
   return useQuery({
     queryKey: ["knowledge-usage-stats", knowledgeId],
     queryFn: async (): Promise<KnowledgeUsageStats | null> => {
-      // TABLE DISABLED: knowledge_usage_stats does not exist in schema
-      return null;
+      if (!knowledgeId) return null;
+
+      const { data, error } = await supabase
+        .from("knowledge_usage_stats")
+        .select("*")
+        .eq("knowledge_id", knowledgeId)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116") return null; // No rows returned
+        throw new Error(`Failed to fetch entry stats: ${error.message}`);
+      }
+      return data;
     },
     enabled: !!knowledgeId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -209,8 +226,14 @@ export function useKnowledgeSearchTrends(limit: number = 100) {
   return useQuery({
     queryKey: ["knowledge-search-trends", limit],
     queryFn: async (): Promise<KnowledgeSearchTrend[]> => {
-      // TABLE DISABLED: knowledge_search_trends does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_search_trends")
+        .select("*")
+        .order("search_count", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch search trends: ${error.message}`);
+      return data || [];
     },
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
@@ -223,8 +246,15 @@ export function useKnowledgeGaps(limit: number = 50) {
   return useQuery({
     queryKey: ["knowledge-gaps", limit],
     queryFn: async (): Promise<KnowledgeSearchTrend[]> => {
-      // TABLE DISABLED: knowledge_search_trends does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_search_trends")
+        .select("*")
+        .eq("is_knowledge_gap", true)
+        .order("search_count", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch knowledge gaps: ${error.message}`);
+      return data || [];
     },
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
@@ -237,8 +267,18 @@ export function useKnowledgeGapTrends(days: number = 30) {
   return useQuery({
     queryKey: ["knowledge-gap-trends", days],
     queryFn: async (): Promise<KnowledgeGapTrend[]> => {
-      // TABLE DISABLED: knowledge_gap_trends does not exist in schema
-      return [];
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const { data, error } = await supabase
+        .from("knowledge_gap_trends")
+        .select("*")
+        .gte("date", startDate.toISOString())
+        .order("date", { ascending: false })
+        .order("attempt_count", { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch gap trends: ${error.message}`);
+      return data || [];
     },
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
@@ -251,8 +291,13 @@ export function useKnowledgeCategoryStats() {
   return useQuery({
     queryKey: ["knowledge-category-stats"],
     queryFn: async (): Promise<KnowledgeCategoryStats[]> => {
-      // TABLE DISABLED: knowledge_category_stats does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_category_stats")
+        .select("*")
+        .order("total_views", { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch category stats: ${error.message}`);
+      return data || [];
     },
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
@@ -264,9 +309,15 @@ export function useKnowledgeCategoryStats() {
 export function useRecentKnowledgeUsage(limit: number = 100) {
   return useQuery({
     queryKey: ["knowledge-usage-logs", limit],
-    queryFn: async (): Promise<any[]> => {
-      // TABLE DISABLED: knowledge_usage_logs does not exist in schema
-      return [];
+    queryFn: async (): Promise<KnowledgeUsageLog[]> => {
+      const { data, error } = await supabase
+        .from("knowledge_usage_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch usage logs: ${error.message}`);
+      return data || [];
     },
     staleTime: 1 * 60 * 1000, // 1 minute
   });
@@ -279,8 +330,14 @@ export function useRecentSearchQueries(limit: number = 100) {
   return useQuery({
     queryKey: ["knowledge-search-queries", limit],
     queryFn: async (): Promise<KnowledgeSearchQuery[]> => {
-      // TABLE DISABLED: knowledge_search_queries does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_search_queries")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch search queries: ${error.message}`);
+      return data || [];
     },
     staleTime: 1 * 60 * 1000, // 1 minute
   });
@@ -298,8 +355,8 @@ export function useRefreshKnowledgeAnalytics() {
 
   return useMutation({
     mutationFn: async () => {
-      // RPC DISABLED: refresh_knowledge_analytics does not exist in schema
-      return;
+      const { error } = await supabase.rpc("refresh_knowledge_analytics");
+      if (error) throw new Error(`Failed to refresh analytics: ${error.message}`);
     },
     onSuccess: () => {
       // Invalidate all analytics queries
@@ -308,6 +365,8 @@ export function useRefreshKnowledgeAnalytics() {
       queryClient.invalidateQueries({ queryKey: ["knowledge-gaps"] });
       queryClient.invalidateQueries({ queryKey: ["knowledge-gap-trends"] });
       queryClient.invalidateQueries({ queryKey: ["knowledge-category-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["top-knowledge-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["most-helpful-entries"] });
 
       toast.success("Analytics refreshed successfully");
     },
@@ -330,8 +389,14 @@ export function useTopKnowledgeEntries(limit: number = 10) {
   return useQuery({
     queryKey: ["top-knowledge-entries", limit],
     queryFn: async (): Promise<KnowledgeUsageStats[]> => {
-      // TABLE DISABLED: knowledge_usage_stats does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_usage_stats")
+        .select("*")
+        .order("total_interactions", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch top entries: ${error.message}`);
+      return data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -344,8 +409,16 @@ export function useMostHelpfulEntries(limit: number = 10) {
   return useQuery({
     queryKey: ["most-helpful-entries", limit],
     queryFn: async (): Promise<KnowledgeUsageStats[]> => {
-      // TABLE DISABLED: knowledge_usage_stats does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from("knowledge_usage_stats")
+        .select("*")
+        .not("helpfulness_rate", "is", null)
+        .gte("helpful_votes", 3) // Require at least 3 votes for reliability
+        .order("helpfulness_rate", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch helpful entries: ${error.message}`);
+      return data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -357,9 +430,19 @@ export function useMostHelpfulEntries(limit: number = 10) {
 export function useTrendingSearches(days: number = 7, limit: number = 20) {
   return useQuery({
     queryKey: ["trending-searches", days, limit],
-    queryFn: async (): Promise<any[]> => {
-      // TABLE DISABLED: knowledge_search_queries does not exist in schema
-      return [];
+    queryFn: async (): Promise<KnowledgeSearchQuery[]> => {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const { data, error } = await supabase
+        .from("knowledge_search_queries")
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) throw new Error(`Failed to fetch trending searches: ${error.message}`);
+      return data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
