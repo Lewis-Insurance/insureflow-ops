@@ -415,11 +415,13 @@ COMMENT ON FUNCTION public.get_ranked_quotes_for_account IS 'Get all ranked quot
 -- PART 8: Triggers for updated_at
 -- =============================================================================
 
+DROP TRIGGER IF EXISTS update_quote_coverages_updated_at ON public.quote_coverages;
 CREATE TRIGGER update_quote_coverages_updated_at
   BEFORE UPDATE ON public.quote_coverages
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_carrier_ratings_updated_at ON public.carrier_ratings;
 CREATE TRIGGER update_carrier_ratings_updated_at
   BEFORE UPDATE ON public.carrier_ratings
   FOR EACH ROW
