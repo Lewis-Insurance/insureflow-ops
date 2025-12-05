@@ -223,9 +223,9 @@ serve(async (req) => {
     const currentAnnualPremium = policies.reduce((sum, p) => sum + (p.premium || 0), 0);
     const estimatedAnnualPremium = currentAnnualPremium + estimatedPremiumIncrease;
 
-    // Generate AI summary
-    const aiSummary = generateAISummary(gaps, riskScore, riskLevel, profile);
-    const aiRecommendations = generateAIRecommendations(gaps, profile);
+    // Generate AI summary with real AI enhancement
+    const aiSummary = await generateEnhancedAISummary(gaps, riskScore, riskLevel, profile, policies);
+    const aiRecommendations = await generateEnhancedAIRecommendations(gaps, profile, riskFactors);
 
     // Prepare recommended coverages
     const recommendedCoverages = gaps.map((gap: any) => ({
@@ -571,4 +571,164 @@ function generateAIRecommendations(gaps: CoverageGap[], profile: any): string {
   recommendations += '4. Implement critical coverages immediately to reduce risk exposure';
 
   return recommendations;
+}
+
+// Enhanced AI-powered summary using actual AI model
+async function generateEnhancedAISummary(
+  gaps: CoverageGap[],
+  riskScore: number,
+  riskLevel: string,
+  profile: any,
+  policies: any[]
+): Promise<string> {
+  // Fall back to template if AI not available
+  const templateSummary = generateAISummary(gaps, riskScore, riskLevel, profile);
+
+  const lovableApiUrl = Deno.env.get('LOVABLE_API_URL') || 'https://api.lovable.app/v1/chat';
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+
+  if (!lovableApiKey) {
+    console.warn('LOVABLE_API_KEY not configured, using template summary');
+    return templateSummary;
+  }
+
+  try {
+    const systemPrompt = `You are an expert insurance advisor analyzing coverage gaps for businesses. Provide clear, actionable insights focused on risk mitigation and business protection.`;
+
+    const userPrompt = `Analyze this business insurance coverage portfolio and provide a professional executive summary:
+
+**Business Profile:**
+- Industry: ${profile.industry || 'General Business'}
+- Employees: ${profile.employees || 0}
+- Annual Revenue: $${(profile.revenue || 0).toLocaleString()}
+- Handles Client Data: ${profile.handles_client_data ? 'Yes' : 'No'}
+
+**Current Coverage:**
+${policies.length > 0 ? policies.map((p: any) => `- ${p.coverage_type}: $${(p.premium || 0).toLocaleString()}/year`).join('\n') : 'No active policies found'}
+
+**Identified Gaps (${gaps.length}):**
+${gaps.map((g: any, i) => `${i + 1}. ${g.coverage_name} (${g.gap_severity.toUpperCase()} priority) - $${g.estimated_premium.toLocaleString()}/year est.`).join('\n')}
+
+**Risk Assessment:**
+- Risk Score: ${riskScore}/100
+- Risk Level: ${riskLevel.toUpperCase()}
+
+Provide a 3-4 sentence executive summary that:
+1. Acknowledges current coverage (if any)
+2. Highlights the most critical gaps
+3. Explains the business impact of these gaps
+4. Provides an overall risk assessment
+
+Be professional, direct, and focus on business value.`;
+
+    const response = await fetch(lovableApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${lovableApiKey}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const aiSummary = result.choices?.[0]?.message?.content || templateSummary;
+
+    return aiSummary;
+  } catch (error) {
+    console.error('AI summary generation failed, using template:', error);
+    return templateSummary;
+  }
+}
+
+// Enhanced AI-powered recommendations using actual AI model
+async function generateEnhancedAIRecommendations(
+  gaps: CoverageGap[],
+  profile: any,
+  riskFactors: string[]
+): Promise<string> {
+  // Fall back to template if AI not available
+  const templateRecs = generateAIRecommendations(gaps, profile);
+
+  const lovableApiUrl = Deno.env.get('LOVABLE_API_URL') || 'https://api.lovable.app/v1/chat';
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+
+  if (!lovableApiKey) {
+    console.warn('LOVABLE_API_KEY not configured, using template recommendations');
+    return templateRecs;
+  }
+
+  try {
+    const systemPrompt = `You are an expert insurance advisor creating actionable implementation plans. Provide specific, prioritized steps that a business owner can take immediately.`;
+
+    const criticalGaps = gaps.filter((g: any) => g.gap_severity === 'critical');
+    const highGaps = gaps.filter((g: any) => g.gap_severity === 'high');
+    const mediumGaps = gaps.filter((g: any) => g.gap_severity === 'medium');
+
+    const userPrompt = `Create a prioritized action plan for addressing these insurance coverage gaps:
+
+**Business Context:**
+- Industry: ${profile.industry || 'General Business'}
+- Employees: ${profile.employees || 0}
+- Revenue: $${(profile.revenue || 0).toLocaleString()}
+
+**Risk Factors:**
+${riskFactors.map((rf, i) => `${i + 1}. ${rf}`).join('\n')}
+
+**Critical Gaps (Immediate Action Required):**
+${criticalGaps.map((g: any) => `- ${g.coverage_name}: ${g.risk_if_not_covered}`).join('\n') || 'None'}
+
+**High Priority Gaps:**
+${highGaps.map((g: any) => `- ${g.coverage_name}: Est. $${g.estimated_premium.toLocaleString()}/year`).join('\n') || 'None'}
+
+**Medium Priority:**
+${mediumGaps.length > 0 ? `${mediumGaps.length} additional coverage types recommended` : 'None'}
+
+Create a 4-6 step action plan that:
+1. Starts with immediate priorities
+2. Provides specific timeframes (e.g., "Within 48 hours", "This week")
+3. Includes practical next steps
+4. Explains business impact of each action
+5. Suggests bundling opportunities to reduce costs
+
+Be specific and actionable. Use clear priority markers (🚨 URGENT, ⚠️ HIGH PRIORITY, 📋 PLAN FOR).`;
+
+    const response = await fetch(lovableApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${lovableApiKey}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const aiRecs = result.choices?.[0]?.message?.content || templateRecs;
+
+    return aiRecs;
+  } catch (error) {
+    console.error('AI recommendations generation failed, using template:', error);
+    return templateRecs;
+  }
 }
