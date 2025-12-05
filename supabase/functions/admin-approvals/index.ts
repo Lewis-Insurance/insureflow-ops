@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { requireAuth } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,24 +22,27 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     )
 
-    // Get user from JWT
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders)
+    if (authResult instanceof Response) {
+      return authResult // Return 401 if auth failed
     }
+    const authenticatedUser = authResult
 
     // Check if user is admin
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', authenticatedUser.id)
       .single()
 
     if (!profile || profile.role !== 'admin') {
@@ -51,9 +55,9 @@ serve(async (req) => {
     const { action, request_type, request_id, reason }: ApprovalRequest = await req.json()
 
     if (request_type === 'email') {
-      return await handleEmailChangeApproval(supabaseClient, user.id, action, request_id, reason)
+      return await handleEmailChangeApproval(supabaseClient, authenticatedUser.id, action, request_id, reason)
     } else if (request_type === 'role') {
-      return await handleRoleChangeApproval(supabaseClient, user.id, action, request_id, reason)
+      return await handleRoleChangeApproval(supabaseClient, authenticatedUser.id, action, request_id, reason)
     } else {
       return new Response(JSON.stringify({ error: 'Invalid request type' }), {
         status: 400,

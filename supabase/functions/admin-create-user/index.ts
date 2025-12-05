@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2'
+import { requireAuth } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,24 +24,18 @@ serve(async (req) => {
       }
     )
 
-    // Verify the user is authenticated and is an admin
-    const authHeader = req.headers.get('Authorization')!
-    const token = authHeader.replace('Bearer ', '')
-    
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseAdmin, corsHeaders)
+    if (authResult instanceof Response) {
+      return authResult // Return 401 if auth failed
     }
+    const authenticatedUser = authResult
 
     // Check if user is admin
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', authenticatedUser.id)
       .single()
 
     if (profile?.role !== 'admin') {
