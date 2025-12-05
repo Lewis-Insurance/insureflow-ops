@@ -33,6 +33,8 @@ import {
 import { useLead, useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { InsuranceDetailsPanel } from "./insurance/InsuranceDetailsPanel";
+import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
+import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
 import {
   Phone,
   Mail,
@@ -47,6 +49,9 @@ import {
   Save,
   Edit2,
   X,
+  FileText,
+  Plus,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -95,8 +100,10 @@ interface LeadDetailViewProps {
 export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const { data: lead, isLoading } = useLead(leadId || undefined);
   const { data: sources } = useLeadSources();
+  const { data: rankedQuotes } = useRankedQuotesByAccount(leadId || '');
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
 
@@ -378,6 +385,105 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                 </div>
               </div>
 
+              <Separator />
+
+              {/* Quotes Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    QUOTES ({rankedQuotes?.length || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddQuoteOpen(true)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Quote
+                  </Button>
+                </div>
+
+                {rankedQuotes && rankedQuotes.length > 0 ? (
+                  <div className="space-y-3">
+                    {rankedQuotes.slice(0, 3).map((quote: any, index: number) => (
+                      <div
+                        key={quote.id}
+                        className="border rounded-lg p-3 space-y-2 hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={index === 0 ? "default" : "secondary"}>
+                              #{index + 1}
+                            </Badge>
+                            <span className="font-medium text-sm">
+                              {quote.carrier || 'Unknown Carrier'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-sm">
+                              ${quote.premium?.toLocaleString() || 'N/A'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              /year
+                            </div>
+                          </div>
+                        </div>
+
+                        {quote.quote_score !== null && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  quote.quote_score >= 85
+                                    ? 'bg-green-500'
+                                    : quote.quote_score >= 70
+                                    ? 'bg-blue-500'
+                                    : quote.quote_score >= 55
+                                    ? 'bg-yellow-500'
+                                    : 'bg-red-500'
+                                }`}
+                                style={{ width: `${quote.quote_score}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium min-w-[3ch]">
+                              {quote.quote_score}
+                            </span>
+                          </div>
+                        )}
+
+                        {quote.line_of_business && (
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {quote.line_of_business}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {rankedQuotes.length > 3 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        +{rankedQuotes.length - 3} more quote{rankedQuotes.length - 3 !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 border-2 border-dashed rounded-lg">
+                    <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground mb-3">No quotes yet</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddQuoteOpen(true)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add First Quote
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {lead.notes && (
                 <>
                   <Separator />
@@ -629,6 +735,16 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Add Quote Modal */}
+      {lead && (
+        <AddQuoteModal
+          open={addQuoteOpen}
+          onOpenChange={setAddQuoteOpen}
+          accountId={lead.id}
+          accountName={`${lead.first_name} ${lead.last_name}`}
+        />
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
