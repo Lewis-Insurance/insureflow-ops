@@ -123,6 +123,7 @@ DECLARE
   v_document RECORD;
   v_queue RECORD;
   v_matched_queue TEXT;
+  v_rule JSONB;
 BEGIN
   -- Get document classification
   SELECT * INTO v_document
@@ -141,12 +142,12 @@ BEGIN
     ORDER BY priority DESC, created_at ASC
   LOOP
     -- Check if document matches any routing rule
-    FOR rule IN SELECT * FROM jsonb_array_elements(v_queue.auto_route_rules) LOOP
+    FOR v_rule IN SELECT * FROM jsonb_array_elements(v_queue.auto_route_rules) LOOP
       -- Simple rule matching (can be enhanced with more complex logic)
       IF (
-        (rule->>'document_type' IS NULL OR rule->>'document_type' = v_document.document_type) AND
-        (rule->>'line_of_business' IS NULL OR rule->>'line_of_business' = v_document.line_of_business) AND
-        (rule->>'urgency_level' IS NULL OR rule->>'urgency_level' = v_document.urgency_level)
+        (v_rule->>'document_type' IS NULL OR v_rule->>'document_type' = v_document.document_type) AND
+        (v_rule->>'line_of_business' IS NULL OR v_rule->>'line_of_business' = v_document.line_of_business) AND
+        (v_rule->>'urgency_level' IS NULL OR v_rule->>'urgency_level' = v_document.urgency_level)
       ) THEN
         v_matched_queue := v_queue.queue_name;
         EXIT; -- Stop at first matching queue
