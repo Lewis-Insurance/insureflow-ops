@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { requireAuth } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,18 +21,21 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     )
 
-    // Get user from JWT
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    // SECURITY: Require authentication
+    const authResult = await requireAuth(req, supabaseClient, corsHeaders)
+    if (authResult instanceof Response) {
+      return authResult // Return 401 if auth failed
     }
+    const authenticatedUser = authResult
 
     const { action, phone_number, code }: PhoneVerificationRequest = await req.json()
 
@@ -48,7 +52,7 @@ serve(async (req) => {
         const { data: recentCodes } = await supabaseClient
           .from('phone_verification_codes')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('user_id', authenticatedUser.id)
           .gte('created_at', new Date(Date.now() - 60000).toISOString())
 
         if (recentCodes && recentCodes.length > 0) {
@@ -76,7 +80,7 @@ serve(async (req) => {
         const { error: insertError } = await supabaseClient
           .from('phone_verification_codes')
           .insert({
-            user_id: user.id,
+            user_id: authenticatedUser.id,
             phone_number: normalizedPhone,
             verification_code: verificationCode,
             expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes
@@ -116,7 +120,7 @@ serve(async (req) => {
         const { data: verification, error: verifyError } = await supabaseClient
           .from('phone_verification_codes')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', authenticatedUser.id)
           .eq('phone_number', phone_number)
           .eq('verification_code', code)
           .eq('verified', false)
@@ -130,7 +134,7 @@ serve(async (req) => {
           const { data: currentCode } = await supabaseClient
             .from('phone_verification_codes')
             .select('attempts')
-            .eq('user_id', user.id)
+            .eq('user_id', authenticatedUser.id)
             .eq('phone_number', phone_number)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -139,7 +143,7 @@ serve(async (req) => {
           await supabaseClient
             .from('phone_verification_codes')
             .update({ attempts: (currentCode?.attempts || 0) + 1 })
-            .eq('user_id', user.id)
+            .eq('user_id', authenticatedUser.id)
             .eq('phone_number', phone_number)
 
           return new Response(JSON.stringify({ error: 'Invalid or expired verification code' }), {
@@ -166,7 +170,7 @@ serve(async (req) => {
             phone_verified: true,
             phone_verification_sent_at: new Date().toISOString()
           })
-          .eq('id', user.id)
+          .eq('id', authenticatedUser.id)
 
         if (updateProfileError) {
           console.error('Error updating profile:', updateProfileError)
