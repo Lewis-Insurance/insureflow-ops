@@ -1,12 +1,14 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { QuoteRankingDashboard } from '@/components/quotes/QuoteRankingDashboard';
 
 function normalizeTypeForRPC(v: any) {
   const out: any = { ...v };
@@ -21,6 +23,7 @@ export default function AccountDetail() {
   const rawId = String(params.id ?? params.accountId ?? '').trim();
   const accountId = useMemo(() => rawId.split(/[?#]/)[0], [rawId]);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -90,24 +93,71 @@ export default function AccountDetail() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>{account.name}</CardTitle>
-            <Button onClick={() => setShowEditForm(true)}>Edit Account</Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div><strong>Type:</strong> {account.account_type}</div>
-              <div><strong>Email:</strong> {account.email || 'Not provided'}</div>
-              <div><strong>Phone:</strong> {account.phone || 'Not provided'}</div>
-              <div><strong>Address:</strong> {account.address_line1 || 'Not provided'}</div>
-              <div><strong>City:</strong> {account.city || 'Not provided'}</div>
-              <div><strong>State:</strong> {account.state || 'Not provided'}</div>
-              <div><strong>ZIP:</strong> {account.zip_code || 'Not provided'}</div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">{account.name}</h1>
+            <p className="text-muted-foreground">{account.account_type} account</p>
+          </div>
+          <Button onClick={() => setShowEditForm(true)}>Edit Account</Button>
+        </div>
+
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="quotes">Quote Rankings</TabsTrigger>
+            <TabsTrigger value="policies">Policies</TabsTrigger>
+            <TabsTrigger value="claims">Claims</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><strong>Type:</strong> {account.account_type}</div>
+                  <div><strong>Email:</strong> {account.email || 'Not provided'}</div>
+                  <div><strong>Phone:</strong> {account.phone || 'Not provided'}</div>
+                  <div><strong>Address:</strong> {account.address_line1 || 'Not provided'}</div>
+                  <div><strong>City:</strong> {account.city || 'Not provided'}</div>
+                  <div><strong>State:</strong> {account.state || 'Not provided'}</div>
+                  <div><strong>ZIP:</strong> {account.zip_code || 'Not provided'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="quotes">
+            <QuoteRankingDashboard
+              accountId={accountId}
+              onQuoteClick={(quoteId) => navigate(`/quote/${quoteId}`)}
+            />
+          </TabsContent>
+
+          <TabsContent value="policies">
+            <Card>
+              <CardHeader>
+                <CardTitle>Policies</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Policy management coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="claims">
+            <Card>
+              <CardHeader>
+                <CardTitle>Claims</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Claims management coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <AccountForm
           open={showEditForm}
