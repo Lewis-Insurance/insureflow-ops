@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Repeat, Trash2 } from 'lucide-react';
 
 interface TaskRecurrenceFormProps {
@@ -75,7 +76,31 @@ export function TaskRecurrenceForm({ taskId }: TaskRecurrenceFormProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-4 text-muted-foreground">Loading...</div>;
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <div className="flex gap-2">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-12" />
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (existingRule) {

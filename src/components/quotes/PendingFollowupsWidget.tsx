@@ -2,6 +2,7 @@ import { usePendingFollowups, useMarkFollowupResponse, useCancelFollowup } from 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CheckCircle2, XCircle, Clock, Mail, MessageSquare, Bell } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import {
@@ -22,11 +23,19 @@ export function PendingFollowupsWidget({ limit = 10 }: { limit?: number }) {
       <Card>
         <CardHeader>
           <CardTitle>Pending Follow-Ups</CardTitle>
-          <CardDescription>Loading...</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-4 border rounded space-y-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

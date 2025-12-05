@@ -6,6 +6,7 @@ import { Search, Calendar, FileText, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, startOfDay, endOfDay } from 'date-fns';
 import { useEffect } from 'react';
 import { PendingFollowupsWidget } from './PendingFollowupsWidget';
@@ -200,7 +201,15 @@ export function UpcomingRenewalsWidget() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-center text-muted-foreground py-4">Loading...</div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-3 border rounded space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            ))}
+          </div>
         ) : renewals.length === 0 ? (
           <div className="text-center text-muted-foreground py-4">No renewals in next 30 days</div>
         ) : (
