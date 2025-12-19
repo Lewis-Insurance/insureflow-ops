@@ -77,6 +77,8 @@ const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
 const ReportIssue = React.lazy(() => import("./pages/ReportIssue"));
 const IssueDetail = React.lazy(() => import("./pages/IssueDetail"));
 const PredictiveAnalytics = React.lazy(() => import("./pages/PredictiveAnalytics"));
+const PortalLoginPage = React.lazy(() => import("./pages/PortalLoginPage"));
+const PortalDashboard = React.lazy(() => import("./pages/PortalDashboard"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -459,14 +461,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/acord-templates"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TemplateManagement />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
                 path="/acord-forms"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
@@ -668,6 +662,31 @@ const App = () => (
               />
               {/* Redirect old /operations route to Command Center */}
               <Route path="/operations" element={<CommandCenterPage />} />
+              {/* Client Portal Routes (Public) */}
+              <Route
+                path="/portal/login"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PortalLoginPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/portal/dashboard"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PortalDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/portal"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PortalDashboard />
+                  </ErrorBoundary>
+                }
+              />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
