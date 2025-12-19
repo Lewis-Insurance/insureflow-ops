@@ -47,6 +47,12 @@ const RetentionPage = React.lazy(() => import("./pages/RetentionPage"));
 const FinancialPage = React.lazy(() => import("./pages/FinancialPage"));
 const AIInsightsPage = React.lazy(() => import("./pages/AIInsightsPage"));
 const COIGenerator = React.lazy(() => import("./pages/COIGenerator"));
+const AcordTemplates = React.lazy(() => import("./pages/AcordTemplates"));
+const IntakeTemplates = React.lazy(() => import("./pages/IntakeTemplates"));
+const IntakeBuilder = React.lazy(() => import("./pages/IntakeBuilder"));
+const PublicIntake = React.lazy(() => import("./pages/PublicIntake"));
+const TemplateManagement = React.lazy(() => import("./pages/TemplateManagement"));
+const FormManagement = React.lazy(() => import("./pages/FormManagement"));
 const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
 const DocumentAnalysisPage = React.lazy(() => import("./pages/AnalyzeDocumentsPage"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
@@ -417,6 +423,70 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <COIGenerator />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/acord-templates"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AcordTemplates />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/intake-templates"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <IntakeTemplates />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/intake-builder/:id?"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <IntakeBuilder />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/intake/:token?"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PublicIntake />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/acord-templates"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <TemplateManagement />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/acord-forms"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <FormManagement />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/acord-forms/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <FormManagement />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/acord-forms/:id/edit"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <FormManagement />
                   </ErrorBoundary>
                 }
               />
