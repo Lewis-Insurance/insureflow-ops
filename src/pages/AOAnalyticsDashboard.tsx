@@ -14,6 +14,7 @@ import { TopPerformersTable } from "@/components/ao-renewals/analytics/TopPerfor
 import { ConversionMetrics } from "@/components/ao-renewals/analytics/ConversionMetrics";
 import { ExportButton } from "@/components/ao-renewals/analytics/ExportButton";
 import { QuotesAnalyticsTab } from "@/components/ao-renewals/analytics/QuotesAnalyticsTab";
+import { RetentionAnalyticsTab } from "@/components/ao-renewals/analytics/RetentionAnalyticsTab";
 import {
   useAOAnalyticsKPIs,
   useAOPipelineData,
@@ -82,8 +83,9 @@ export default function AOAnalyticsDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="pipeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="pipeline">Renewals Pipeline</TabsTrigger>
+            <TabsTrigger value="retention">Retention Analytics</TabsTrigger>
             <TabsTrigger value="quotes">Quote Analytics</TabsTrigger>
           </TabsList>
 
@@ -111,6 +113,10 @@ export default function AOAnalyticsDashboard() {
 
             {/* At-Risk Renewals Table */}
             <AtRiskRenewalsTable data={atRiskData || []} isLoading={atRiskLoading} />
+          </TabsContent>
+
+          <TabsContent value="retention" className="mt-6">
+            <RetentionAnalyticsTab />
           </TabsContent>
 
           <TabsContent value="quotes" className="mt-6">

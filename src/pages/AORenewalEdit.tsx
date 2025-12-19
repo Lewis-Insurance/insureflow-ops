@@ -8,10 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, CheckSquare } from 'lucide-react';
-import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority, type AORenewal } from '@/hooks/useAORenewals';
+import { ArrowLeft, Loader2, CheckSquare, ArrowRightLeft } from 'lucide-react';
+import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority, type AORenewal, type AORenewalTerm } from '@/hooks/useAORenewals';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
+import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
@@ -25,8 +27,10 @@ export default function AORenewalEdit() {
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
   const { profiles } = useProfiles();
-  
+
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showMovedModal, setShowMovedModal] = useState(false);
+  const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
 
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -41,6 +45,9 @@ export default function AORenewalEdit() {
     last_contact_date: '',
     losses_3yr: '',
     oldest_in_household: '',
+    moved_carrier: '' as string,
+    moved_term: '' as '' | AORenewalTerm,
+    moved_premium: '' as string,
   });
 
   useEffect(() => {
@@ -58,13 +65,45 @@ export default function AORenewalEdit() {
         last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
         losses_3yr: renewal.losses_3yr?.toString() || '',
         oldest_in_household: renewal.oldest_in_household?.toString() || '',
+        moved_carrier: renewal.moved_carrier || '',
+        moved_term: renewal.moved_term || '',
+        moved_premium: renewal.moved_premium?.toString() || '',
       });
     }
   }, [renewal]);
 
+  // Handle status change - show modal if moved
+  const handleStatusChange = (newStatus: AORenewalStatus) => {
+    if (newStatus === 'moved' && formData.status !== 'moved') {
+      setPendingMovedStatus(true);
+      setShowMovedModal(true);
+    } else {
+      setFormData(prev => ({ ...prev, status: newStatus }));
+    }
+  };
+
+  // Handle moved modal confirmation
+  const handleMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
+    setFormData(prev => ({
+      ...prev,
+      status: 'moved',
+      moved_carrier: data.carrier,
+      moved_term: data.term,
+      moved_premium: data.premium.toString(),
+    }));
+    setPendingMovedStatus(false);
+    setShowMovedModal(false);
+  };
+
+  // Handle moved modal cancel
+  const handleMovedCancel = () => {
+    setPendingMovedStatus(false);
+    setShowMovedModal(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!id) return;
 
     try {
@@ -83,6 +122,9 @@ export default function AORenewalEdit() {
           last_contact_date: formData.last_contact_date || null,
           losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
           oldest_in_household: formData.oldest_in_household ? parseInt(formData.oldest_in_household) : null,
+          moved_carrier: formData.moved_carrier || null,
+          moved_term: formData.moved_term || null,
+          moved_premium: formData.moved_premium ? parseFloat(formData.moved_premium) : null,
         },
       });
 
@@ -260,7 +302,7 @@ export default function AORenewalEdit() {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as AORenewalStatus }))}
+                    onValueChange={(value) => handleStatusChange(value as AORenewalStatus)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -270,6 +312,7 @@ export default function AORenewalEdit() {
                       <SelectItem value="contacted">Contacted</SelectItem>
                       <SelectItem value="quoted">Quoted</SelectItem>
                       <SelectItem value="renewed">Renewed</SelectItem>
+                      <SelectItem value="moved">Moved</SelectItem>
                       <SelectItem value="lost">Lost</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
@@ -330,6 +373,45 @@ export default function AORenewalEdit() {
                 </div>
               </div>
 
+              {/* Moved Details Section */}
+              {formData.status === 'moved' && formData.moved_carrier && (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">Policy Moved Details</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground">New Carrier</Label>
+                      <p className="font-medium">{formData.moved_carrier}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Policy Term</Label>
+                      <p className="font-medium">
+                        {formData.moved_term === '6_month' ? '6 Months' : formData.moved_term === 'annual' ? 'Annual' : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground">New Premium</Label>
+                      <p className="font-medium">
+                        {formData.moved_premium
+                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(formData.moved_premium))
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setShowMovedModal(true)}
+                  >
+                    Edit Moved Details
+                  </Button>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4">
                 <Button
                   type="button"
@@ -372,6 +454,14 @@ export default function AORenewalEdit() {
             renewal={renewal}
           />
         )}
+
+        {/* Moved Status Modal */}
+        <MovedStatusModal
+          open={showMovedModal}
+          onOpenChange={handleMovedCancel}
+          onConfirm={handleMovedConfirm}
+          customerName={formData.customer_name}
+        />
       </div>
     </AppLayout>
   );

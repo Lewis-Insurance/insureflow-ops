@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 // Types
-export type AORenewalStatus = "pending" | "contacted" | "quoted" | "renewed" | "lost" | "cancelled";
+export type AORenewalStatus = "pending" | "contacted" | "quoted" | "renewed" | "lost" | "cancelled" | "moved";
 export type AORenewalPriority = "low" | "normal" | "high" | "urgent";
+export type AORenewalTerm = "6_month" | "annual";
 
 export interface AORenewalCustomData {
   loss_count?: string;
@@ -35,6 +36,10 @@ export interface AORenewal {
   created_at: string;
   updated_at: string;
   last_contact_date: string | null;
+  // Moved status fields
+  moved_carrier: string | null;
+  moved_term: AORenewalTerm | null;
+  moved_premium: number | null;
 }
 
 export interface AORenewalFilters {
@@ -168,6 +173,7 @@ export const useAORenewalsStats = () => {
           renewed: 0,
           lost: 0,
           cancelled: 0,
+          moved: 0,
         },
         by_priority: {
           low: 0,

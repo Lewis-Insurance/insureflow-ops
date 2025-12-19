@@ -79,6 +79,9 @@ const IssueDetail = React.lazy(() => import("./pages/IssueDetail"));
 const PredictiveAnalytics = React.lazy(() => import("./pages/PredictiveAnalytics"));
 const PortalLoginPage = React.lazy(() => import("./pages/PortalLoginPage"));
 const PortalDashboard = React.lazy(() => import("./pages/PortalDashboard"));
+const MarketingAutomationsPage = React.lazy(() => import("./pages/MarketingAutomationsPage"));
+const AutomationBuilderPage = React.lazy(() => import("./pages/AutomationBuilderPage"));
+const MarketingTemplatesPage = React.lazy(() => import("./pages/MarketingTemplatesPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -593,6 +596,31 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <CampaignBuilderPage />
+                  </ErrorBoundary>
+                }
+              />
+              {/* Marketing Automations (Levitate) */}
+              <Route
+                path="/marketing/automations"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <MarketingAutomationsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/marketing/automations/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AutomationBuilderPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/marketing/templates"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <MarketingTemplatesPage />
                   </ErrorBoundary>
                 }
               />

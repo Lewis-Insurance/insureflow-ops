@@ -36,11 +36,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
-  Upload, 
-  Download, 
-  Filter, 
-  MoreVertical, 
+import {
+  Upload,
+  Download,
+  Filter,
+  MoreVertical,
   Calendar,
   DollarSign,
   TrendingUp,
@@ -51,9 +51,11 @@ import {
   Users,
   Search,
   Trash2,
+  ArrowRightLeft,
+  User,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import {
   useAORenewals,
   useAORenewalsStats,
@@ -65,21 +67,61 @@ import {
   type AORenewalFilters,
   type AORenewal,
 } from "@/hooks/useAORenewals";
+import { useMyAORenewalsCount } from "@/hooks/useMyAORenewals";
+import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 
 export default function AORenewalsPage() {
   const navigate = useNavigate();
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Filters
   const [filters, setFilters] = useState<AORenewalFilters>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
+  const [showMyAssignments, setShowMyAssignments] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getUser();
+  }, []);
+
+  // Handle URL param for "my assignments" filter
+  useEffect(() => {
+    const assigned = searchParams.get("assigned");
+    if (assigned === "me" && currentUserId) {
+      setShowMyAssignments(true);
+      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
+    }
+  }, [searchParams, currentUserId]);
+
+  // Toggle my assignments filter
+  const handleToggleMyAssignments = () => {
+    const newValue = !showMyAssignments;
+    setShowMyAssignments(newValue);
+    if (newValue && currentUserId) {
+      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
+      setSearchParams({ assigned: "me" });
+    } else {
+      setFilters((prev) => {
+        const { assigned_to, ...rest } = prev;
+        return rest;
+      });
+      setSearchParams({});
+    }
+  };
 
   // Queries
   const { data: renewals = [], isLoading } = useAORenewals(filters);
   const { data: stats } = useAORenewalsStats();
+  const { data: myStats } = useMyAORenewalsCount();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
@@ -129,6 +171,7 @@ export default function AORenewalsPage() {
       renewed: "default",
       lost: "destructive",
       cancelled: "destructive",
+      moved: "default",
     } as const;
 
     const icons = {
@@ -138,12 +181,23 @@ export default function AORenewalsPage() {
       renewed: CheckCircle,
       lost: XCircle,
       cancelled: XCircle,
+      moved: ArrowRightLeft,
+    };
+
+    const colors = {
+      pending: "",
+      contacted: "",
+      quoted: "",
+      renewed: "bg-green-600 hover:bg-green-700",
+      lost: "",
+      cancelled: "",
+      moved: "bg-blue-600 hover:bg-blue-700",
     };
 
     const Icon = icons[status];
 
     return (
-      <Badge variant={variants[status]} className="gap-1">
+      <Badge variant={variants[status]} className={`gap-1 ${colors[status]}`}>
         <Icon className="h-3 w-3" />
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
@@ -266,7 +320,7 @@ export default function AORenewalsPage() {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -330,6 +384,34 @@ export default function AORenewalsPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* My Assignments Card */}
+            <Card
+              className={`cursor-pointer transition-all ${
+                showMyAssignments
+                  ? "ring-2 ring-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+              }`}
+              onClick={handleToggleMyAssignments}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  My Assignments
+                  {showMyAssignments && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      Active
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{myStats?.count || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {myStats?.upcomingWithin7Days || 0} due within 7 days
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -373,6 +455,7 @@ export default function AORenewalsPage() {
                   <SelectItem value="contacted">Contacted</SelectItem>
                   <SelectItem value="quoted">Quoted</SelectItem>
                   <SelectItem value="renewed">Renewed</SelectItem>
+                  <SelectItem value="moved">Moved</SelectItem>
                   <SelectItem value="lost">Lost</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -404,6 +487,8 @@ export default function AORenewalsPage() {
                 onClick={() => {
                   setFilters({});
                   setSearchQuery("");
+                  setShowMyAssignments(false);
+                  setSearchParams({});
                 }}
               >
                 Clear Filters

@@ -11,6 +11,7 @@ import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
 import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import { PendingFollowupsWidget } from '@/components/quotes/PendingFollowupsWidget';
+import { MyAORenewalsCard } from '@/components/dashboard/MyAORenewalsCard';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -35,6 +36,11 @@ const DashboardContent = React.memo(() => {
           </p>
         </div>
       </div>
+
+      {/* My AO Renewals */}
+      <ErrorBoundary level="component">
+        <MyAORenewalsCard />
+      </ErrorBoundary>
 
       {/* Upcoming Tasks and Pending Follow-Ups */}
       <div className="grid gap-6 md:grid-cols-2">
