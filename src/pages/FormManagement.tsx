@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -359,6 +360,7 @@ export default function FormManagement() {
   };
 
   return (
+    <AppLayout>
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -673,5 +675,6 @@ export default function FormManagement() {
         </CardContent>
       </Card>
     </div>
+    </AppLayout>
   );
 }
