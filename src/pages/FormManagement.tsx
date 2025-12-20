@@ -105,7 +105,7 @@ export default function FormManagement() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [accounts, setAccounts] = useState<{ id: string; business_name: string }[]>([]);
+  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [templates, setTemplates] = useState<{ id: string; form_number: string; form_name: string }[]>([]);
 
   // Load forms
@@ -122,15 +122,15 @@ export default function FormManagement() {
         .from('acord_forms')
         .select(`
           *,
-          template:template_id(form_number, form_name, field_inventory),
-          account:account_id(business_name)
+          acord_templates!template_id (form_number, form_name, field_inventory),
+          accounts!account_id (name)
         `)
         .order(sortField, { ascending: sortOrder === 'asc' });
 
       if (error) throw error;
 
       const formsWithDetails: FormWithDetails[] = (data || []).map(form => {
-        const fieldInventory = (form.template as any)?.field_inventory || [];
+        const fieldInventory = (form.acord_templates as any)?.field_inventory || [];
         const fieldValues = form.field_values || {};
         const filledCount = Object.keys(fieldValues).filter(
           k => fieldValues[k] !== null && fieldValues[k] !== undefined && fieldValues[k] !== ''
@@ -141,9 +141,9 @@ export default function FormManagement() {
 
         return {
           ...form,
-          templateFormNumber: (form.template as any)?.form_number,
-          templateFormName: (form.template as any)?.form_name,
-          accountName: (form.account as any)?.business_name,
+          templateFormNumber: (form.acord_templates as any)?.form_number,
+          templateFormName: (form.acord_templates as any)?.form_name,
+          accountName: (form.accounts as any)?.name,
           completionPercentage,
         };
       });
@@ -163,8 +163,8 @@ export default function FormManagement() {
   const loadAccounts = async () => {
     const { data } = await supabase
       .from('accounts')
-      .select('id, business_name')
-      .order('business_name');
+      .select('id, name')
+      .order('name');
     setAccounts(data || []);
   };
 
@@ -400,7 +400,7 @@ export default function FormManagement() {
                     <SelectContent>
                       {accounts.map(account => (
                         <SelectItem key={account.id} value={account.id}>
-                          {account.business_name}
+                          {account.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
