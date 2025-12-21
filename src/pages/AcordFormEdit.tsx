@@ -48,7 +48,9 @@ import {
   Eye,
   History,
   UserPlus,
+  FileSearch,
 } from 'lucide-react';
+import { DocumentImportModal } from '@/components/acord/DocumentImportModal';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
@@ -120,6 +122,7 @@ export default function AcordFormEdit() {
   const [activeSection, setActiveSection] = useState('1');
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Load form data
   useEffect(() => {
@@ -302,6 +305,15 @@ export default function AcordFormEdit() {
         description: 'All applicable fields already have values',
       });
     }
+  };
+
+  const handleDocumentImport = (extractedFields: Record<string, any>) => {
+    const newValues = { ...fieldValues, ...extractedFields };
+    setFieldValues(newValues);
+    toast({
+      title: 'Document data imported',
+      description: `${Object.keys(extractedFields).length} fields populated from document`,
+    });
   };
 
   const handleNavigation = (path: string) => {
@@ -517,6 +529,10 @@ export default function AcordFormEdit() {
             <Button variant="outline" onClick={handlePullFromAccount} disabled={!account}>
               <UserPlus className="h-4 w-4 mr-2" />
               Pull Account Data
+            </Button>
+            <Button variant="outline" onClick={() => setShowImportModal(true)}>
+              <FileSearch className="h-4 w-4 mr-2" />
+              Import Document
             </Button>
             <Button variant="outline" onClick={() => handleSave()} disabled={isSaving || !hasUnsavedChanges}>
               {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -753,6 +769,16 @@ export default function AcordFormEdit() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Document Import Modal */}
+        <DocumentImportModal
+          open={showImportModal}
+          onOpenChange={setShowImportModal}
+          accountId={form?.account_id || ''}
+          acordFormId={id || ''}
+          templateFormNumber={template?.form_number}
+          onFieldsExtracted={handleDocumentImport}
+        />
       </div>
     </AppLayout>
   );
