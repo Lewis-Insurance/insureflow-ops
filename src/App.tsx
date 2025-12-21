@@ -84,6 +84,10 @@ const PortalDashboard = React.lazy(() => import("./pages/PortalDashboard"));
 const MarketingAutomationsPage = React.lazy(() => import("./pages/MarketingAutomationsPage"));
 const AutomationBuilderPage = React.lazy(() => import("./pages/AutomationBuilderPage"));
 const MarketingTemplatesPage = React.lazy(() => import("./pages/MarketingTemplatesPage"));
+const CarrierTemplatesPage = React.lazy(() => import("./pages/CarrierTemplatesPage"));
+const CarrierTemplateBuilder = React.lazy(() => import("./pages/CarrierTemplateBuilder"));
+const ExtractionReviewQueue = React.lazy(() => import("./pages/ExtractionReviewQueue"));
+const ExtractionReviewDetail = React.lazy(() => import("./pages/ExtractionReviewDetail"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -714,6 +718,47 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <PortalDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              {/* Carrier Templates & Extraction Review */}
+              <Route
+                path="/carrier-templates"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CarrierTemplatesPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/carrier-templates/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CarrierTemplateBuilder />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/carrier-templates/:id/edit"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <CarrierTemplateBuilder />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/extraction-review"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ExtractionReviewQueue />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/extraction-review/:id"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ExtractionReviewDetail />
                   </ErrorBoundary>
                 }
               />

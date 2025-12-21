@@ -1,6 +1,7 @@
 // ============================================
 // Document Import Modal for ACORD Forms
 // Upload and extract data from insurance documents
+// V2 with confidence tiers and document type selection
 // ============================================
 
 import React, { useState, useCallback } from 'react';
@@ -20,6 +21,18 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Upload,
   FileText,
   Loader2,
@@ -29,9 +42,51 @@ import {
   Sparkles,
   Eye,
   FileSearch,
+  ChevronDown,
+  Brain,
+  Target,
+  XCircle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+const DOCUMENT_TYPES = [
+  { value: 'dec_page', label: 'Declaration Page' },
+  { value: 'prior_policy', label: 'Prior Policy' },
+  { value: 'application', label: 'Application' },
+  { value: 'certificate', label: 'Certificate of Insurance' },
+  { value: 'loss_run', label: 'Loss Run Report' },
+  { value: 'endorsement', label: 'Endorsement' },
+  { value: 'other', label: 'Other Document' },
+];
+
+// Field row component for the review list
+function FieldRow({
+  field,
+  onToggle,
+}: {
+  field: { name: string; value: any; confidence: number; selected: boolean };
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between p-2 rounded-lg border ${
+        field.selected ? 'bg-primary/5 border-primary/20' : 'bg-muted/30 border-transparent'
+      }`}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <Checkbox checked={field.selected} onCheckedChange={onToggle} />
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm truncate">{field.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{String(field.value)}</p>
+        </div>
+      </div>
+      <Badge variant="outline" className="text-xs ml-2 shrink-0">
+        {Math.round(field.confidence * 100)}%
+      </Badge>
+    </div>
+  );
+}
 
 interface DocumentImportModalProps {
   open: boolean;
@@ -49,6 +104,15 @@ interface ExtractedField {
   value: any;
   confidence: number;
   selected: boolean;
+  tier: 'high' | 'medium' | 'low';
+}
+
+interface ExtractionResult {
+  confidenceTier: string;
+  matchedTemplate: any;
+  detectedCarrier: string;
+  detectedLob: string;
+  processingTimeMs: number;
 }
 
 export function DocumentImportModal({
@@ -67,6 +131,13 @@ export function DocumentImportModal({
   const [extractedFields, setExtractedFields] = useState<ExtractedField[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [documentType, setDocumentType] = useState<string>('');
+  const [selectedDocType, setSelectedDocType] = useState<string>('dec_page');
+  const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
+  const [expandedTiers, setExpandedTiers] = useState<Record<string, boolean>>({
+    high: true,
+    medium: true,
+    low: true,
+  });
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,11 +197,11 @@ export function DocumentImportModal({
         .from('documents')
         .getPublicUrl(fileName);
 
-      // Call extraction edge function
+      // Call extraction edge function (v2 with ensemble)
       const { data: { session } } = await supabase.auth.getSession();
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/acord-document-extractor`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/acord-document-extractor-v2`,
         {
           method: 'POST',
           headers: {
@@ -143,6 +214,10 @@ export function DocumentImportModal({
             account_id: accountId,
             acord_form_id: acordFormId,
             target_form_number: templateFormNumber,
+            document_type: selectedDocType,
+            use_template_matching: true,
+            use_ensemble: true,
+            enable_learning: true,
           }),
         }
       );
@@ -162,24 +237,49 @@ export function DocumentImportModal({
 
       setProgress(100);
 
-      // Convert extracted fields to review format
+      // Categorize fields by confidence tier
+      const getTier = (confidence: number): 'high' | 'medium' | 'low' => {
+        if (confidence >= 0.9) return 'high';
+        if (confidence >= 0.7) return 'medium';
+        return 'low';
+      };
+
+      // Convert extracted fields to review format with tiers
       const fields: ExtractedField[] = Object.entries(result.extracted_fields || {}).map(
-        ([name, value]) => ({
-          name,
-          value,
-          confidence: result.confidence_scores?.[name] || 0.8,
-          selected: true,
-        })
+        ([name, value]) => {
+          const confidence = result.confidence_scores?.[name] || 0.8;
+          return {
+            name,
+            value,
+            confidence,
+            selected: confidence >= 0.7, // Auto-select high and medium confidence
+            tier: getTier(confidence),
+          };
+        }
       );
+
+      // Sort by confidence (highest first)
+      fields.sort((a, b) => b.confidence - a.confidence);
 
       setExtractedFields(fields);
       setSuggestions(result.suggestions || []);
       setDocumentType(result.document_type || 'unknown');
+      setExtractionResult({
+        confidenceTier: result.confidence_tier,
+        matchedTemplate: result.matched_template,
+        detectedCarrier: result.detected_carrier,
+        detectedLob: result.detected_lob,
+        processingTimeMs: result.processing_time_ms,
+      });
       setStatus('reviewing');
+
+      const highCount = fields.filter(f => f.tier === 'high').length;
+      const mediumCount = fields.filter(f => f.tier === 'medium').length;
+      const lowCount = fields.filter(f => f.tier === 'low').length;
 
       toast({
         title: 'Extraction complete',
-        description: `Found ${fields.length} fields from ${result.document_type || 'document'}`,
+        description: `Found ${fields.length} fields: ${highCount} high, ${mediumCount} medium, ${lowCount} low confidence`,
       });
 
     } catch (error) {
@@ -234,6 +334,23 @@ export function DocumentImportModal({
     setExtractedFields([]);
     setSuggestions([]);
     setDocumentType('');
+    setSelectedDocType('dec_page');
+    setExtractionResult(null);
+    setExpandedTiers({ high: true, medium: true, low: true });
+  };
+
+  const toggleTier = (tier: string) => {
+    setExpandedTiers(prev => ({ ...prev, [tier]: !prev[tier] }));
+  };
+
+  const selectByTier = (tier: 'high' | 'medium' | 'low', select: boolean) => {
+    setExtractedFields(prev =>
+      prev.map(f => f.tier === tier ? { ...f, selected: select } : f)
+    );
+  };
+
+  const getFieldsByTier = (tier: 'high' | 'medium' | 'low') => {
+    return extractedFields.filter(f => f.tier === tier);
   };
 
   const getConfidenceBadge = (confidence: number) => {
@@ -257,6 +374,26 @@ export function DocumentImportModal({
 
         {status === 'idle' && (
           <div className="space-y-4">
+            {/* Document Type Selector */}
+            <div className="space-y-2">
+              <Label>Document Type</Label>
+              <Select value={selectedDocType} onValueChange={setSelectedDocType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_TYPES.map(dt => (
+                    <SelectItem key={dt.value} value={dt.value}>
+                      {dt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Selecting the correct type helps improve extraction accuracy
+              </p>
+            </div>
+
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Input
                 type="file"
@@ -296,12 +433,13 @@ export function DocumentImportModal({
             <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
               <h4 className="font-medium flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 text-blue-600" />
-                AI-Powered Extraction
+                AI-Powered Multi-Model Extraction
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Azure Document Intelligence extracts text & tables</li>
-                <li>• Claude AI maps values to ACORD field names</li>
-                <li>• Review and confirm before applying to form</li>
+                <li>• Multiple Azure DI models for comprehensive extraction</li>
+                <li>• Claude AI for intelligent ACORD field mapping</li>
+                <li>• Template matching for known carrier formats</li>
+                <li>• Learning from your corrections to improve over time</li>
               </ul>
             </div>
           </div>
@@ -341,6 +479,7 @@ export function DocumentImportModal({
 
         {status === 'reviewing' && (
           <div className="space-y-4">
+            {/* Summary Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
@@ -359,6 +498,33 @@ export function DocumentImportModal({
               </div>
             </div>
 
+            {/* Extraction metadata */}
+            {extractionResult && (
+              <div className="flex flex-wrap gap-2 text-sm">
+                {extractionResult.matchedTemplate && (
+                  <Badge className="bg-purple-100 text-purple-800">
+                    <Target className="h-3 w-3 mr-1" />
+                    Template: {extractionResult.matchedTemplate.carrier}
+                  </Badge>
+                )}
+                {extractionResult.detectedCarrier && (
+                  <Badge variant="outline">
+                    Carrier: {extractionResult.detectedCarrier}
+                  </Badge>
+                )}
+                {extractionResult.detectedLob && (
+                  <Badge variant="outline">
+                    {extractionResult.detectedLob}
+                  </Badge>
+                )}
+                {extractionResult.processingTimeMs && (
+                  <Badge variant="secondary">
+                    {(extractionResult.processingTimeMs / 1000).toFixed(1)}s
+                  </Badge>
+                )}
+              </div>
+            )}
+
             {suggestions.length > 0 && (
               <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
                 <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Suggestions:</p>
@@ -368,30 +534,97 @@ export function DocumentImportModal({
               </div>
             )}
 
-            <ScrollArea className="h-64 border rounded-lg">
-              <div className="p-4 space-y-2">
-                {extractedFields.map((field) => (
-                  <div
-                    key={field.name}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      field.selected ? 'bg-primary/5 border-primary/20' : 'bg-muted/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={field.selected}
-                        onCheckedChange={() => toggleField(field.name)}
-                      />
-                      <div>
-                        <p className="font-medium text-sm">{field.name}</p>
-                        <p className="text-sm text-muted-foreground truncate max-w-xs">
-                          {String(field.value)}
-                        </p>
+            <ScrollArea className="h-72 border rounded-lg">
+              <div className="p-2 space-y-2">
+                {/* High Confidence Tier */}
+                {getFieldsByTier('high').length > 0 && (
+                  <Collapsible open={expandedTiers.high} onOpenChange={() => toggleTier('high')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-green-50 hover:bg-green-100">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="font-medium text-green-800">
+                          High Confidence ({getFieldsByTier('high').length})
+                        </span>
                       </div>
-                    </div>
-                    {getConfidenceBadge(field.confidence)}
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={(e) => { e.stopPropagation(); selectByTier('high', true); }}
+                        >
+                          All
+                        </Button>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedTiers.high ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-1 pt-1">
+                      {getFieldsByTier('high').map(field => (
+                        <FieldRow key={field.name} field={field} onToggle={() => toggleField(field.name)} />
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Medium Confidence Tier */}
+                {getFieldsByTier('medium').length > 0 && (
+                  <Collapsible open={expandedTiers.medium} onOpenChange={() => toggleTier('medium')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-yellow-50 hover:bg-yellow-100">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        <span className="font-medium text-yellow-800">
+                          Needs Review ({getFieldsByTier('medium').length})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={(e) => { e.stopPropagation(); selectByTier('medium', true); }}
+                        >
+                          All
+                        </Button>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedTiers.medium ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-1 pt-1">
+                      {getFieldsByTier('medium').map(field => (
+                        <FieldRow key={field.name} field={field} onToggle={() => toggleField(field.name)} />
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Low Confidence Tier */}
+                {getFieldsByTier('low').length > 0 && (
+                  <Collapsible open={expandedTiers.low} onOpenChange={() => toggleTier('low')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-red-50 hover:bg-red-100">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span className="font-medium text-red-800">
+                          Low Confidence ({getFieldsByTier('low').length})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={(e) => { e.stopPropagation(); selectByTier('low', false); }}
+                        >
+                          None
+                        </Button>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedTiers.low ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-1 pt-1">
+                      {getFieldsByTier('low').map(field => (
+                        <FieldRow key={field.name} field={field} onToggle={() => toggleField(field.name)} />
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
 
                 {extractedFields.length === 0 && (
                   <p className="text-center text-muted-foreground py-8">
@@ -400,6 +633,12 @@ export function DocumentImportModal({
                 )}
               </div>
             </ScrollArea>
+
+            {/* Learning notice */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Brain className="h-4 w-4" />
+              <span>Your corrections help improve future extractions</span>
+            </div>
           </div>
         )}
 
