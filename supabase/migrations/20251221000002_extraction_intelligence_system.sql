@@ -296,6 +296,19 @@ ALTER TABLE extraction_review_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE extraction_processing_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE extraction_analytics ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "authenticated_read_templates" ON carrier_document_templates;
+DROP POLICY IF EXISTS "authenticated_manage_templates" ON carrier_document_templates;
+DROP POLICY IF EXISTS "authenticated_read_zones" ON template_field_zones;
+DROP POLICY IF EXISTS "authenticated_manage_zones" ON template_field_zones;
+DROP POLICY IF EXISTS "authenticated_manage_corrections" ON extraction_corrections;
+DROP POLICY IF EXISTS "authenticated_read_rules" ON extraction_learned_rules;
+DROP POLICY IF EXISTS "authenticated_manage_rules" ON extraction_learned_rules;
+DROP POLICY IF EXISTS "authenticated_manage_assignments" ON extraction_review_assignments;
+DROP POLICY IF EXISTS "authenticated_read_config" ON extraction_processing_config;
+DROP POLICY IF EXISTS "authenticated_manage_config" ON extraction_processing_config;
+DROP POLICY IF EXISTS "authenticated_read_analytics" ON extraction_analytics;
+
 -- All authenticated users can read templates
 CREATE POLICY "authenticated_read_templates" ON carrier_document_templates
 FOR SELECT TO authenticated USING (true);

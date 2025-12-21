@@ -88,6 +88,7 @@ const CarrierTemplatesPage = React.lazy(() => import("./pages/CarrierTemplatesPa
 const CarrierTemplateBuilder = React.lazy(() => import("./pages/CarrierTemplateBuilder"));
 const ExtractionReviewQueue = React.lazy(() => import("./pages/ExtractionReviewQueue"));
 const ExtractionReviewDetail = React.lazy(() => import("./pages/ExtractionReviewDetail"));
+const ExtractionAnalyticsPage = React.lazy(() => import("./pages/ExtractionAnalyticsPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -759,6 +760,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <ExtractionReviewDetail />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/extraction-analytics"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ExtractionAnalyticsPage />
                   </ErrorBoundary>
                 }
               />

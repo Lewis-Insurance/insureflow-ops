@@ -3,6 +3,77 @@
 -- Parse insurance documents and extract data for ACORD forms
 -- ============================================
 
+-- ============================================
+-- SCHEMA VALIDATION AND REPAIR
+-- Ensure document_extractions has all required columns
+-- ============================================
+
+DO $$
+DECLARE
+  v_table_exists BOOLEAN;
+  v_has_created_at BOOLEAN;
+  v_has_updated_at BOOLEAN;
+  v_has_created_by BOOLEAN;
+  v_has_document_url BOOLEAN;
+BEGIN
+  -- Check if table exists
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'document_extractions'
+  ) INTO v_table_exists;
+
+  IF v_table_exists THEN
+    -- Check for required columns
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'document_extractions' AND column_name = 'created_at'
+    ) INTO v_has_created_at;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'document_extractions' AND column_name = 'updated_at'
+    ) INTO v_has_updated_at;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'document_extractions' AND column_name = 'created_by'
+    ) INTO v_has_created_by;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'document_extractions' AND column_name = 'document_url'
+    ) INTO v_has_document_url;
+
+    -- If any required column is missing, drop dependent objects and add the column
+    IF NOT v_has_created_at THEN
+      RAISE NOTICE 'Adding missing created_at column to document_extractions';
+      ALTER TABLE public.document_extractions ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+
+    IF NOT v_has_updated_at THEN
+      RAISE NOTICE 'Adding missing updated_at column to document_extractions';
+      ALTER TABLE public.document_extractions ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+
+    IF NOT v_has_created_by THEN
+      RAISE NOTICE 'Adding missing created_by column to document_extractions';
+      ALTER TABLE public.document_extractions ADD COLUMN created_by UUID;
+    END IF;
+
+    IF NOT v_has_document_url THEN
+      -- Table exists but is missing core columns - needs to be rebuilt
+      RAISE NOTICE 'Table document_extractions is missing core columns, dropping CASCADE and recreating';
+      DROP TABLE public.document_extractions CASCADE;
+      v_table_exists := FALSE;
+    END IF;
+  END IF;
+
+  -- If table doesn't exist (or was just dropped), we'll create it below
+  IF NOT v_table_exists THEN
+    RAISE NOTICE 'Creating document_extractions table';
+  END IF;
+END $$;
+
 -- Document extraction jobs
 CREATE TABLE IF NOT EXISTS document_extractions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
