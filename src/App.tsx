@@ -53,6 +53,8 @@ const IntakeBuilder = React.lazy(() => import("./pages/IntakeBuilder"));
 const PublicIntake = React.lazy(() => import("./pages/PublicIntake"));
 const TemplateManagement = React.lazy(() => import("./pages/TemplateManagement"));
 const FormManagement = React.lazy(() => import("./pages/FormManagement"));
+const AcordFormView = React.lazy(() => import("./pages/AcordFormView"));
+const AcordFormEdit = React.lazy(() => import("./pages/AcordFormEdit"));
 const DocumentIntelligence = React.lazy(() => import("./pages/DocumentIntelligence"));
 const DocumentAnalysisPage = React.lazy(() => import("./pages/AnalyzeDocumentsPage"));
 const AIBrain = React.lazy(() => import("./pages/AIBrain"));
@@ -475,7 +477,7 @@ const App = () => (
                 path="/acord-forms/:id"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <FormManagement />
+                    <AcordFormView />
                   </ErrorBoundary>
                 }
               />
@@ -483,7 +485,7 @@ const App = () => (
                 path="/acord-forms/:id/edit"
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <FormManagement />
+                    <AcordFormEdit />
                   </ErrorBoundary>
                 }
               />
