@@ -19,6 +19,58 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type OCRPage = { page: number; text: string };
+
+async function sha256Hex(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(input));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function normalizeQuestion(q: string): string {
+  return q.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function tokenize(text: string): string[] {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && w.length <= 32);
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pickRelevantPages(
+  pages: OCRPage[],
+  question: string,
+  maxPages = 6
+): { pages: OCRPage[]; pageNumbers: number[] } {
+  if (!pages || pages.length === 0) return { pages: [], pageNumbers: [] };
+  const qTokens = new Set(tokenize(question));
+  if (qTokens.size === 0) {
+    const head = pages.slice(0, Math.min(maxPages, pages.length));
+    return { pages: head, pageNumbers: head.map((p) => p.page) };
+  }
+
+  const scored = pages.map((p) => {
+    const hay = (p.text || '').toLowerCase();
+    let score = 0;
+    for (const t of qTokens) {
+      const m = hay.match(new RegExp(`\b${escapeRegExp(t)}\b`, 'g'));
+      if (m) score += m.length;
+    }
+    return { p, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored.filter((s) => s.score > 0).slice(0, maxPages).map((s) => s.p);
+  const fallback = best.length > 0 ? best : pages.slice(0, Math.min(maxPages, pages.length));
+  return { pages: fallback, pageNumbers: fallback.map((p) => p.page) };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -66,12 +118,43 @@ serve(async (req) => {
     }
 
     let documentText = '';
+    let documentPages: OCRPage[] = [];
+    let cachedFromDb = false;
+
+    // Step 0: Q&A cache (exact question repeats)
+    if (document_id) {
+      const normalized = normalizeQuestion(question);
+      const qHash = await sha256Hex(normalized);
+      const { data: cachedQA } = await supabase
+        .from('document_qa_cache')
+        .select('answer, evidence_pages, created_at')
+        .eq('document_id', document_id)
+        .eq('question_hash', qHash)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cachedQA?.answer) {
+        console.log('✅ Using cached Q&A answer');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            answer: cachedQA.answer,
+            cached_answer: true,
+            cached_ocr: true,
+            tokens_used: 0,
+            evidence_pages: cachedQA.evidence_pages || [],
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+    }
 
     // Step 1: Check if we have cached OCR text
     if (document_id) {
       const { data: cachedAnalysis } = await supabase
         .from('document_analysis')
-        .select('ocr_text, processing_status')
+        .select('ocr_text, ocr_pages, processing_status')
         .eq('document_id', document_id)
         .eq('processing_status', 'completed')
         .order('created_at', { ascending: false })
@@ -81,6 +164,11 @@ serve(async (req) => {
       if (cachedAnalysis?.ocr_text) {
         console.log('✅ Using cached OCR text');
         documentText = cachedAnalysis.ocr_text;
+        cachedFromDb = true;
+      }
+
+      if (cachedAnalysis?.ocr_pages && Array.isArray(cachedAnalysis.ocr_pages)) {
+        documentPages = cachedAnalysis.ocr_pages as OCRPage[];
       }
     }
 
@@ -187,6 +275,8 @@ serve(async (req) => {
                 const pages = result.analyzeResult?.pages || [];
                 const content = result.analyzeResult?.content || ''; // Full content as single string
                 const readResults = result.analyzeResult?.readResults || []; // Older API format
+                documentPages = [];
+
                 
                 console.log(`📄 Pages array length: ${pages.length}`);
                 console.log(`📄 Content string length: ${content.length}`);
@@ -201,6 +291,28 @@ serve(async (req) => {
                 if (content && content.length > 0) {
                   documentText = content;
                   console.log(`✅ Using full content extraction: ${content.length} chars`);
+
+                  // Build per-page OCR text from lines or spans (so Q&A can retrieve only relevant pages)
+                  if (Array.isArray(pages) && pages.length > 0) {
+                    documentPages = pages
+                      .map((p: any, idx: number) => {
+                        const pageNum = Number(p.pageNumber || (idx + 1));
+                        if (Array.isArray(p.lines) && p.lines.length > 0) {
+                          return { page: pageNum, text: p.lines.map((l: any) => l.content || '').join('\n') };
+                        }
+                        if (Array.isArray(p.spans) && p.spans.length > 0) {
+                          const parts: string[] = [];
+                          for (const s of p.spans) {
+                            const off = Number(s.offset || 0);
+                            const ln = Number(s.length || 0);
+                            if (ln > 0) parts.push(content.slice(off, off + ln));
+                          }
+                          return { page: pageNum, text: parts.join('\n') };
+                        }
+                        return { page: pageNum, text: '' };
+                      })
+                      .filter((p: any) => (p.text || '').trim().length > 0);
+                  }
                 } else if (readResults.length > 0) {
                   // Try older readResults format
                   console.log(`📄 Using readResults format`);
@@ -210,6 +322,8 @@ serve(async (req) => {
                     if (page.lines) {
                       documentText += page.lines.map((line: any) => line.text || line.content || '').join('\n') + '\n';
                     }
+                    const pageText = page.lines ? page.lines.map((line: any) => line.text || line.content || '').join('\n') : '';
+                    if (pageText.trim()) documentPages.push({ page: i + 1, text: pageText });
                   }
                 } else {
                   // Fallback to pages array extraction
@@ -219,7 +333,9 @@ serve(async (req) => {
                     const pageLines = page.lines?.length || 0;
                     documentText += `\n--- PAGE ${i + 1} (${pageLines} lines) ---\n`;
                     if (page.lines) {
-                      documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
+                      const pageText = page.lines.map((line: any) => line.content || '').join('\n');
+                      documentText += pageText + '\n';
+                      if (pageText.trim()) documentPages.push({ page: i + 1, text: pageText });
                     }
                     console.log(`  Page ${i + 1}: ${pageLines} lines extracted`);
                   }
@@ -236,6 +352,7 @@ serve(async (req) => {
                       document_id,
                       file_name: filename,
                       ocr_text: documentText,
+                      ocr_pages: documentPages.length > 0 ? documentPages : null,
                       ocr_char_count: documentText.length,
                       total_pages: pages.length,
                       processing_status: 'completed',
@@ -261,13 +378,23 @@ If the document text is provided, base your answer on the actual content.
 If document content is limited, provide a helpful response based on the document type and context.
 Always be specific and cite relevant details from the document when possible.`;
 
-    // Use up to 100k characters to ensure we get later pages
-    const truncatedText = documentText.substring(0, 100000);
-    const wasTruncated = documentText.length > 100000;
+    // Token saver: prefer sending only the most relevant pages (from cached per-page OCR)
+    let evidencePages: number[] = [];
+    let contextText = '';
+    let wasTruncated = false;
+
+    if (documentPages.length > 0) {
+      const picked = pickRelevantPages(documentPages, question, 6);
+      evidencePages = picked.pageNumbers;
+      contextText = picked.pages.map((p) => `--- PAGE ${p.page} ---\n${p.text}`).join('\n\n');
+    } else {
+      contextText = documentText.substring(0, 60000);
+      wasTruncated = documentText.length > 60000;
+    }
 
     const userPrompt = `${context ? `Context: ${context}\n\n` : ''}Document: ${filename || 'Unknown document'}
 
-${truncatedText ? `Document Content (${wasTruncated ? 'truncated' : 'full'}):\n${truncatedText}` : '[No document content available]'}
+${contextText ? `Document Content (${documentPages.length > 0 ? `selected pages ${evidencePages.join(', ') || 'N/A'}` : (wasTruncated ? 'truncated' : 'full')}):\n${contextText}` : '[No document content available]'}
 
 Question: ${question}
 
@@ -303,12 +430,44 @@ Please provide a clear, accurate answer based on the document content above. Ref
     console.log('✅ Answer generated');
     console.log('========================================');
 
+    // Cache answer for exact question repeats (best-effort)
+    if (document_id) {
+      try {
+        const normalized = normalizeQuestion(question);
+        const qHash = await sha256Hex(normalized);
+
+        const { data: analysisRow } = await supabase
+          .from('document_analysis')
+          .select('account_id, created_by')
+          .eq('document_id', document_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        await supabase
+          .from('document_qa_cache')
+          .insert({
+            document_id,
+            account_id: analysisRow?.account_id ?? null,
+            created_by: analysisRow?.created_by ?? null,
+            question,
+            question_hash: qHash,
+            answer,
+            evidence_pages: evidencePages,
+          });
+      } catch (e) {
+        console.warn('Failed to cache Q&A answer:', e);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         answer,
-        cached_ocr: !!documentText && document_id,
-        tokens_used: aiData.usage?.total_tokens || 0
+        cached_ocr: cachedFromDb,
+        cached_answer: false,
+        tokens_used: aiData.usage?.total_tokens || 0,
+        evidence_pages: evidencePages
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
