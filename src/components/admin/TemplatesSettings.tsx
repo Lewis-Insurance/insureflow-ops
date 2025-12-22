@@ -66,7 +66,7 @@ import {
 interface Template {
   id: string;
   name: string;
-  type: 'email' | 'sms' | 'document' | 'proposal';
+  template_type: 'email' | 'sms' | 'document' | 'proposal';
   category: string;
   subject?: string;
   content: string;
@@ -80,7 +80,7 @@ const SAMPLE_TEMPLATES: Template[] = [
   {
     id: '1',
     name: 'Welcome Email',
-    type: 'email',
+    template_type: 'email',
     category: 'Onboarding',
     subject: 'Welcome to {{company_name}}!',
     content: 'Dear {{client_name}},\n\nWelcome to {{company_name}}! We are excited to have you as a client...',
@@ -92,7 +92,7 @@ const SAMPLE_TEMPLATES: Template[] = [
   {
     id: '2',
     name: 'Renewal Reminder',
-    type: 'email',
+    template_type: 'email',
     category: 'Renewals',
     subject: 'Your policy renews on {{renewal_date}}',
     content: 'Dear {{client_name}},\n\nYour {{policy_type}} policy is coming up for renewal on {{renewal_date}}...',
@@ -104,7 +104,7 @@ const SAMPLE_TEMPLATES: Template[] = [
   {
     id: '3',
     name: 'Quote Follow-up',
-    type: 'sms',
+    template_type: 'sms',
     category: 'Sales',
     content: 'Hi {{first_name}}, following up on the quote we sent. Any questions? Reply or call {{agent_phone}}.',
     variables: ['first_name', 'agent_phone'],
@@ -124,7 +124,7 @@ export function TemplatesSettings() {
   const { toast } = useToast();
 
   const filteredTemplates = templates.filter(
-    t => t.type === activeTab && 
+    t => t.template_type === activeTab && 
     (searchQuery === '' || 
      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      t.category.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -185,7 +185,7 @@ export function TemplatesSettings() {
     setEditingTemplate({
       id: '',
       name: '',
-      type: activeTab as 'email' | 'sms' | 'document' | 'proposal',
+      template_type: activeTab as 'email' | 'sms' | 'document' | 'proposal',
       category: '',
       subject: activeTab === 'email' ? '' : undefined,
       content: '',
@@ -227,28 +227,28 @@ export function TemplatesSettings() {
                   <Mail className="h-4 w-4" />
                   Email
                   <Badge variant="secondary" className="ml-1">
-                    {templates.filter(t => t.type === 'email').length}
+                    {templates.filter(t => t.template_type === 'email').length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="sms" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
                   SMS
                   <Badge variant="secondary" className="ml-1">
-                    {templates.filter(t => t.type === 'sms').length}
+                    {templates.filter(t => t.template_type === 'sms').length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="document" className="flex items-center gap-2">
                   <File className="h-4 w-4" />
                   Document
                   <Badge variant="secondary" className="ml-1">
-                    {templates.filter(t => t.type === 'document').length}
+                    {templates.filter(t => t.template_type === 'document').length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="proposal" className="flex items-center gap-2">
                   <FileSpreadsheet className="h-4 w-4" />
                   Proposal
                   <Badge variant="secondary" className="ml-1">
-                    {templates.filter(t => t.type === 'proposal').length}
+                    {templates.filter(t => t.template_type === 'proposal').length}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
