@@ -56,7 +56,10 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
+import { AgentProgressVisualization } from '@/components/prism/AgentProgressVisualization';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
@@ -324,6 +327,24 @@ export default function PrismAIPage() {
     }
   };
 
+  // Clear form and start fresh
+  const handleClearForm = () => {
+    setPrompt('');
+    setMode('sequential');
+    setDepth('synthesis');
+    setActiveRunId(null);
+  };
+
+  // Get total cycles based on depth
+  const getTotalCycles = (d: PrismDepth): number => {
+    switch (d) {
+      case 'insight': return 1;
+      case 'synthesis': return 2;
+      case 'mastery': return 3;
+      default: return 2;
+    }
+  };
+
   const formatCost = (cost: number | undefined | null) => {
     if (cost == null) return '$0.00';
     return new Intl.NumberFormat('en-US', {
@@ -487,24 +508,37 @@ export default function PrismAIPage() {
                     </div>
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={runMutation.isPending || !prompt.trim()}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {runMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting Analysis...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Start Analysis
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleClearForm}
+                      disabled={runMutation.isPending}
+                      size="lg"
+                      className="flex-shrink-0"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Clear
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={runMutation.isPending || !prompt.trim()}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      {runMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Starting Analysis...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Start Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -552,62 +586,87 @@ export default function PrismAIPage() {
                   <p className="text-muted-foreground">
                     No active run. Start a new analysis to see results here.
                   </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setActiveTab('new-run')}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Start New Analysis
+                  </Button>
                 </CardContent>
               </Card>
             ) : isLoadingStatus ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin" />
-                  <p className="text-muted-foreground">Loading run status...</p>
-                </CardContent>
-              </Card>
+              <AgentProgressVisualization
+                isRunning={true}
+                cyclesCompleted={0}
+                totalCycles={getTotalCycles(depth)}
+                status="pending"
+                depth={depth}
+              />
             ) : runStatus ? (
               <div className="space-y-4">
+                {/* Agent Progress Visualization */}
+                <AgentProgressVisualization
+                  isRunning={runStatus.status === 'running' || runStatus.status === 'pending'}
+                  cyclesCompleted={runStatus.cycles_completed || 0}
+                  totalCycles={getTotalCycles(runStatus.depth as PrismDepth)}
+                  status={runStatus.status as 'running' | 'complete' | 'failed' | 'pending'}
+                  depth={runStatus.depth as PrismDepth}
+                />
+
+                {/* Run Details Card */}
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle>Run Status</CardTitle>
-                        <CardDescription>Run ID: {runStatus.run_id}</CardDescription>
+                        <CardTitle>Run Details</CardTitle>
+                        <CardDescription className="font-mono text-xs">
+                          Run ID: {runStatus.run_id}
+                        </CardDescription>
                       </div>
-                      {getStatusBadge(runStatus.status)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(runStatus.status)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleClearForm}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          New Run
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <div className="text-sm text-muted-foreground">Mode</div>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Mode</div>
                         <div className="font-medium capitalize">{runStatus.mode}</div>
                       </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Depth</div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Depth</div>
                         <div className="font-medium capitalize">{runStatus.depth}</div>
                       </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Cycles Completed</div>
-                        <div className="font-medium">{runStatus.cycles_completed}</div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Cycles</div>
+                        <div className="font-medium">
+                          {runStatus.cycles_completed} / {getTotalCycles(runStatus.depth as PrismDepth)}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Status</div>
+                        <div className="font-medium capitalize">{runStatus.status}</div>
                       </div>
                     </div>
 
-                    {runStatus.status === 'running' && (
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-2 text-blue-700">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="font-medium">Analysis in progress...</span>
-                        </div>
-                        <p className="text-sm text-blue-600 mt-2">
-                          Prism is processing your request through {runStatus.cycles_completed + 1} reasoning cycles.
-                        </p>
-                      </div>
-                    )}
-
                     {runStatus.error && (
-                      <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                        <div className="flex items-center gap-2 text-red-700">
+                      <div className="mt-4 p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
                           <XCircle className="h-4 w-4" />
                           <span className="font-medium">Error</span>
                         </div>
-                        <p className="text-sm text-red-600 mt-2">{runStatus.error}</p>
+                        <p className="text-sm text-red-600 dark:text-red-300 mt-2">{runStatus.error}</p>
                       </div>
                     )}
                   </CardContent>
