@@ -113,9 +113,15 @@ export function DocumentAIAnalysisModal({
         throw new Error('Please log in to use AI analysis');
       }
 
-      // Call Prism API for analysis with timeout
-      const prismResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prism-api/run`,
+      // Build context string
+      const contextParts: string[] = [];
+      if (doc.account?.name) contextParts.push(`Account: ${doc.account.name}`);
+      if (doc.policy?.policy_number) contextParts.push(`Policy: ${doc.policy.policy_number}`);
+      if (doc.policy?.line_of_business) contextParts.push(`Line of Business: ${doc.policy.line_of_business}`);
+
+      // Call Azure Document Q&A for fast analysis
+      const azureResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-qa-azure`,
         {
           method: 'POST',
           headers: {
@@ -123,20 +129,11 @@ export function DocumentAIAnalysisModal({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            prompt: `You are an insurance document analyst. Analyze the following document and answer the question.
-
-Document Information:
-- Filename: ${doc.filename}
-- Document Type: ${doc.kind}
-- Uploaded: ${new Date(doc.created_at).toLocaleDateString()}
-${doc.policy ? `- Associated Policy: ${doc.policy.policy_number} (${doc.policy.line_of_business})` : ''}
-${doc.account ? `- Account: ${doc.account.name}` : ''}
-
-Question: ${queryText}
-
-Please provide a comprehensive analysis based on the document type and context. If you need to make assumptions about the document content, clearly state them.`,
-            mode: 'sequential',
-            depth: 'insight', // Use 'insight' for faster response
+            document_id: doc.id,
+            storage_path: doc.storage_path,
+            filename: doc.filename,
+            question: queryText,
+            context: contextParts.length > 0 ? contextParts.join(', ') : undefined,
           }),
           signal: abortControllerRef.current.signal,
         }
@@ -144,15 +141,15 @@ Please provide a comprehensive analysis based on the document type and context. 
 
       clearTimeout(timeoutId);
 
-      if (!prismResponse.ok) {
-        const errorData = await prismResponse.json().catch(() => ({}));
+      if (!azureResponse.ok) {
+        const errorData = await azureResponse.json().catch(() => ({}));
         throw new Error(errorData.error || 'AI analysis failed');
       }
 
-      const result = await prismResponse.json();
+      const result = await azureResponse.json();
       
-      if (result.status === 'completed' && result.final_output) {
-        setResponse(result.final_output);
+      if (result.success && result.answer) {
+        setResponse(result.answer);
       } else if (result.error) {
         throw new Error(result.error);
       } else {
