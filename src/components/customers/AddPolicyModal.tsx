@@ -84,13 +84,18 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         return;
       }
 
+      // Parse premium - remove commas and convert to number, default to 0
+      const premiumValue = formData.premium 
+        ? parseFloat(formData.premium.replace(/,/g, '')) 
+        : 0;
+
       const policyData = {
         account_id: accountId,
         insured_user_id: user.id, // Set to current user creating the policy
         policy_number: formData.policy_number.trim(),
         carrier: formData.carrier.trim(),
         line_of_business: formData.line_of_business.trim(),
-        premium: formData.premium ? parseFloat(formData.premium) : null,
+        premium: isNaN(premiumValue) ? 0 : premiumValue,
         effective_date: formData.effective_date,
         expiration_date: formData.expiration_date,
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
