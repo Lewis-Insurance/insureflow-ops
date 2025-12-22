@@ -103,10 +103,14 @@ CREATE TABLE IF NOT EXISTS public.client_context_index_jobs (
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   
-  -- Prevent duplicate pending jobs
-  UNIQUE (account_id, source_type, source_id, status) 
-    WHERE status IN ('pending', 'processing')
+  -- Note: Duplicate prevention handled by partial index below
+  CONSTRAINT client_context_index_jobs_pkey PRIMARY KEY (id)
 );
+
+-- Partial unique index to prevent duplicate pending/processing jobs
+CREATE UNIQUE INDEX IF NOT EXISTS idx_index_jobs_no_duplicate_pending
+  ON public.client_context_index_jobs(account_id, source_type, source_id)
+  WHERE status IN ('pending', 'processing');
 
 -- Index for processing jobs in order
 CREATE INDEX IF NOT EXISTS idx_index_jobs_pending 
@@ -265,15 +269,31 @@ SECURITY DEFINER
 AS $$
 DECLARE
   job_id UUID;
+  existing_job_id UUID;
 BEGIN
-  INSERT INTO public.client_context_index_jobs (
-    account_id, source_type, source_id, priority, status
-  )
-  VALUES (p_account_id, p_source_type, p_source_id, p_priority, 'pending')
-  ON CONFLICT (account_id, source_type, source_id, status) 
-    WHERE status IN ('pending', 'processing')
-  DO UPDATE SET priority = GREATEST(client_context_index_jobs.priority, p_priority)
-  RETURNING id INTO job_id;
+  -- Check if there's already a pending or processing job for this source
+  SELECT id INTO existing_job_id
+  FROM public.client_context_index_jobs
+  WHERE account_id = p_account_id
+    AND source_type = p_source_type
+    AND source_id = p_source_id
+    AND status IN ('pending', 'processing')
+  LIMIT 1;
+
+  IF existing_job_id IS NOT NULL THEN
+    -- Update priority if new priority is higher
+    UPDATE public.client_context_index_jobs
+    SET priority = GREATEST(priority, p_priority)
+    WHERE id = existing_job_id
+    RETURNING id INTO job_id;
+  ELSE
+    -- Insert new job
+    INSERT INTO public.client_context_index_jobs (
+      account_id, source_type, source_id, priority, status
+    )
+    VALUES (p_account_id, p_source_type, p_source_id, p_priority, 'pending')
+    RETURNING id INTO job_id;
+  END IF;
   
   RETURN job_id;
 END;
