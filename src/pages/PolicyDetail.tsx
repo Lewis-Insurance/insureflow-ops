@@ -27,6 +27,7 @@ import { EOPolicyDetails } from '@/components/policies/EOPolicyDetails';
 import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
 import { Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock, Briefcase } from 'lucide-react';
 import { PolicyManualDetailsModal } from '@/components/policies/PolicyManualDetailsModal';
+import { DocumentsList } from '@/components/documents/DocumentsList';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -527,6 +528,22 @@ export default function PolicyDetail() {
         {/* Professional Liability / E&O Details Section */}
         {isEO && policyId && (
           <EOPolicyDetails policyId={policyId} />
+        )}
+
+        {/* Documents Section */}
+        {policyId && (
+          <DocumentsList
+            policyId={policyId}
+            title="Policy Documents"
+            onUploadClick={() => setUploadDocOpen(true)}
+            onAskAI={(doc) => {
+              toast({
+                title: 'AI Analysis',
+                description: `Opening AI analysis for ${doc.filename}...`,
+              });
+              // Navigate to AI analysis or open modal
+            }}
+          />
         )}
       </div>
 
