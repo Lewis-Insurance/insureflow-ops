@@ -28,6 +28,7 @@ serve(async (req) => {
     const { 
       document_id,
       storage_path,
+      storage_bucket = 'customer-docs', // Default to customer-docs bucket
       filename,
       question,
       context // Optional: account name, policy info, etc.
@@ -46,6 +47,7 @@ serve(async (req) => {
     console.log('========================================');
     console.log('Question:', question);
     console.log('Document ID:', document_id);
+    console.log('Storage bucket:', storage_bucket);
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -92,13 +94,21 @@ serve(async (req) => {
       if (cleanPath.startsWith('/')) {
         cleanPath = cleanPath.substring(1);
       }
-      if (cleanPath.startsWith('documents/')) {
-        cleanPath = cleanPath.substring('documents/'.length);
+      // Remove bucket prefix if it exists (handle both 'documents/' and 'customer-docs/')
+      const bucketPrefixes = ['documents/', 'customer-docs/'];
+      for (const prefix of bucketPrefixes) {
+        if (cleanPath.startsWith(prefix)) {
+          cleanPath = cleanPath.substring(prefix.length);
+          break;
+        }
       }
 
-      // Create signed URL
+      console.log('Clean path:', cleanPath);
+      console.log('Using bucket:', storage_bucket);
+
+      // Create signed URL from the correct bucket
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('documents')
+        .from(storage_bucket)
         .createSignedUrl(cleanPath, 3600);
 
       if (signedUrlError) {
