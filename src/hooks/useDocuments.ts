@@ -125,7 +125,8 @@ export function useDeleteDocument() {
       if (error) throw new Error(`Failed to delete document: ${error.message}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      // Invalidate all document queries regardless of filters
+      queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
       toast({ title: 'Document deleted', description: 'The document has been removed.' });
     },
     onError: (error) => {
@@ -155,7 +156,8 @@ export function useUpdateDocument() {
       if (error) throw new Error(`Failed to update document: ${error.message}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      // Invalidate all document queries regardless of filters
+      queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
       toast({ title: 'Document updated', description: 'Changes have been saved.' });
     },
     onError: (error) => {
