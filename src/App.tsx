@@ -90,6 +90,7 @@ const ExtractionReviewQueue = React.lazy(() => import("./pages/ExtractionReviewQ
 const ExtractionReviewDetail = React.lazy(() => import("./pages/ExtractionReviewDetail"));
 const ExtractionAnalyticsPage = React.lazy(() => import("./pages/ExtractionAnalyticsPage"));
 const PrismAIPage = React.lazy(() => import("./pages/PrismAIPage"));
+const SMSPage = React.lazy(() => import("./pages/SMSPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -348,6 +349,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <TelephonyDashboard />
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/sms" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <SMSPage />
                   </ErrorBoundary>
                 } 
               />
