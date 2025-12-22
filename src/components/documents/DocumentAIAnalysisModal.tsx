@@ -131,6 +131,7 @@ export function DocumentAIAnalysisModal({
           body: JSON.stringify({
             document_id: doc.id,
             storage_path: doc.storage_path,
+            storage_bucket: (doc as any).storage_bucket || 'customer-docs', // Use actual bucket
             filename: doc.filename,
             question: queryText,
             context: contextParts.length > 0 ? contextParts.join(', ') : undefined,
