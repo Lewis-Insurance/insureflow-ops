@@ -73,13 +73,29 @@ export default function COIGenerator() {
     special_provisions: '',
   });
 
+  const formatAccountName = (a: any) => {
+    if (!a) return '';
+    return a.name || 'Unnamed Account';
+  };
+
+  const formatAccountAddress = (a: any) => {
+    if (!a) return '';
+    const parts = [
+      a.address_line1,
+      a.address_line2,
+      [a.city, a.state].filter(Boolean).join(', '),
+      a.zip_code,
+    ].filter(Boolean);
+    return parts.join('\n');
+  };
+
   // Fetch all customers on mount
   useEffect(() => {
     const fetchCustomers = async () => {
       setCustomersLoading(true);
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, company_name, first_name, last_name, email, phone, address')
+        .select('id, name, email, phone, address_line1, address_line2, city, state, zip_code')
         .order('name', { ascending: true });
 
       if (error) {
@@ -177,17 +193,14 @@ export default function COIGenerator() {
     fetchPolicy();
   }, [selectedPolicyId, toast]);
 
-  // Filter customers based on search query (searches name, company, first/last name, email)
+  // Filter customers based on search query (searches name + email)
   const filteredCustomers = customers.filter(customer => {
     if (!customerSearchQuery) return true;
     const query = customerSearchQuery.toLowerCase();
     return (
       (customer.name?.toLowerCase().includes(query)) ||
-      (customer.company_name?.toLowerCase().includes(query)) ||
-      (customer.first_name?.toLowerCase().includes(query)) ||
-      (customer.last_name?.toLowerCase().includes(query)) ||
       (customer.email?.toLowerCase().includes(query)) ||
-      (`${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase().includes(query))
+      (customer.phone?.toLowerCase?.().includes?.(query) ?? false)
     );
   });
 
@@ -368,12 +381,8 @@ export default function COIGenerator() {
                     >
                       {account ? (
                         <span className="flex items-center gap-2">
-                          {account.company_name ? (
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <User className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          {account.name || account.company_name || `${account.first_name} ${account.last_name}`}
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          {formatAccountName(account)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">Search customers...</span>
@@ -384,7 +393,7 @@ export default function COIGenerator() {
                   <PopoverContent className="w-[400px] p-0" align="start">
                     <Command>
                       <CommandInput
-                        placeholder="Search by name, company, email..."
+                        placeholder="Search by name, email, phone..."
                         value={customerSearchQuery}
                         onValueChange={setCustomerSearchQuery}
                       />
@@ -400,14 +409,10 @@ export default function COIGenerator() {
                               onSelect={() => handleCustomerSelect(customer.id)}
                             >
                               <div className="flex items-center gap-2 flex-1">
-                                {customer.company_name ? (
-                                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                  <User className="h-4 w-4 text-muted-foreground" />
-                                )}
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium truncate">
-                                    {customer.name || customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`}
+                                    {formatAccountName(customer)}
                                   </p>
                                   {customer.email && (
                                     <p className="text-xs text-muted-foreground truncate">{customer.email}</p>
@@ -471,7 +476,7 @@ export default function COIGenerator() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Customer Name</p>
-                    <p className="font-medium">{account.name || account.company_name || `${account.first_name} ${account.last_name}`}</p>
+                    <p className="font-medium">{formatAccountName(account)}</p>
                   </div>
                   {account.email && (
                     <div>
