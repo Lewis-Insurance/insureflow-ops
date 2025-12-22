@@ -570,6 +570,7 @@ export default function PolicyDetail() {
             onOpenChange={setManualDetailsOpen}
             policyId={policy.id}
             isWorkersComp={isWorkersComp}
+            lineOfBusiness={policy.line_of_business || ''}
             initialCoverage={policy.coverage}
             initialCustom={policy.custom}
             initialInsuredItems={policy.insured_items}
