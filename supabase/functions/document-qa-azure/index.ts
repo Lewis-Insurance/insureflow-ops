@@ -157,19 +157,41 @@ serve(async (req) => {
               const result = await resultResponse.json();
 
               if (result.status === 'succeeded') {
+                // DEBUG: Log the full structure of analyzeResult
+                console.log('========== AZURE RESPONSE DEBUG ==========');
+                console.log('analyzeResult keys:', Object.keys(result.analyzeResult || {}));
+                
                 // Extract text from ALL pages with page markers
                 const pages = result.analyzeResult?.pages || [];
                 const content = result.analyzeResult?.content || ''; // Full content as single string
+                const readResults = result.analyzeResult?.readResults || []; // Older API format
                 
-                console.log(`📄 Azure returned ${pages.length} pages`);
-                console.log(`📄 Content length from Azure: ${content.length} characters`);
+                console.log(`📄 Pages array length: ${pages.length}`);
+                console.log(`📄 Content string length: ${content.length}`);
+                console.log(`📄 ReadResults array length: ${readResults.length}`);
                 
-                // Use the full content if available (more reliable for multi-page)
+                // Log first 500 chars of content to verify
+                if (content) {
+                  console.log(`📄 Content preview: ${content.substring(0, 500)}...`);
+                }
+                
+                // Use the full content if available (most reliable for multi-page)
                 if (content && content.length > 0) {
                   documentText = content;
-                  console.log(`✅ Using full content extraction`);
+                  console.log(`✅ Using full content extraction: ${content.length} chars`);
+                } else if (readResults.length > 0) {
+                  // Try older readResults format
+                  console.log(`📄 Using readResults format`);
+                  for (let i = 0; i < readResults.length; i++) {
+                    const page = readResults[i];
+                    documentText += `\n--- PAGE ${i + 1} ---\n`;
+                    if (page.lines) {
+                      documentText += page.lines.map((line: any) => line.text || line.content || '').join('\n') + '\n';
+                    }
+                  }
                 } else {
-                  // Fallback to page-by-page extraction
+                  // Fallback to pages array extraction
+                  console.log(`📄 Using pages array extraction`);
                   for (let i = 0; i < pages.length; i++) {
                     const page = pages[i];
                     const pageLines = page.lines?.length || 0;
@@ -180,7 +202,9 @@ serve(async (req) => {
                     console.log(`  Page ${i + 1}: ${pageLines} lines extracted`);
                   }
                 }
-                console.log(`✅ OCR complete: ${pages.length} pages, ${documentText.length} characters`);
+                
+                console.log(`✅ Final OCR result: ${pages.length} pages, ${documentText.length} characters`);
+                console.log('========== END AZURE DEBUG ==========')
 
                 // Cache the OCR result
                 if (document_id) {
