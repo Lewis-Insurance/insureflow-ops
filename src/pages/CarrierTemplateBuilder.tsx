@@ -149,8 +149,8 @@ export default function CarrierTemplateBuilder() {
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldType, setNewFieldType] = useState('text');
 
-  // Loading state
-  const [isLoading, setIsLoading] = useState(!!id);
+  // Loading state - only load if editing existing template (not 'new')
+  const [isLoading, setIsLoading] = useState(!!id && id !== 'new');
   const [isSaving, setIsSaving] = useState(false);
 
   // Load existing template

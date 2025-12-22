@@ -15,7 +15,7 @@ import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, FileText, CheckSquare, Plus, Mail } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare, Plus, Mail, Award } from 'lucide-react';
 
 interface Account {
   id: string;
@@ -186,7 +186,16 @@ export default function CustomerDetail() {
               <p className="text-muted-foreground capitalize">{account.type} Customer</p>
             </div>
           </div>
-          <ActionMenu account={{ id: account.id, name: account.name }} />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/coi-generator?accountId=${account.id}`)}
+            >
+              <Award className="h-4 w-4 mr-2" />
+              New Certificate
+            </Button>
+            <ActionMenu account={{ id: account.id, name: account.name }} />
+          </div>
         </div>
 
         {/* Customer Information Grid */}

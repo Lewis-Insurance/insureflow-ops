@@ -8,25 +8,55 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useCOI } from '@/hooks/useCOI';
 import { useCOIGeneration } from '@/hooks/useCOIGeneration';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, FileText, Download, Send, Sparkles } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Send, Sparkles, Search, Check, Building2, User } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function COIGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const searchParams = new URLSearchParams(window.location.search);
-  const accountId = searchParams.get('accountId');
-  const policyId = searchParams.get('policyId');
-  
+  const initialAccountId = searchParams.get('accountId');
+  const initialPolicyId = searchParams.get('policyId');
+
   const { cois, createCOI, updateCOI } = useCOI();
   const { generateAndAttachCOI, downloadCOI } = useCOIGeneration();
-  
+
+  // Customer selection state
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialAccountId);
+  const [customerPolicies, setCustomerPolicies] = useState<any[]>([]);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(initialPolicyId);
+
   const [account, setAccount] = useState<any>(null);
   const [policy, setPolicy] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(true);
   const [formData, setFormData] = useState({
     certificate_holder_name: '',
     certificate_holder_address: '',
@@ -43,39 +73,131 @@ export default function COIGenerator() {
     special_provisions: '',
   });
 
+  // Fetch all customers on mount
   useEffect(() => {
-    if (!accountId) return;
-    
-    const fetchData = async () => {
+    const fetchCustomers = async () => {
+      setCustomersLoading(true);
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, name, company_name, first_name, last_name, email, phone, address')
+        .order('name', { ascending: true });
+
+      if (error) {
+        toast({ title: 'Error loading customers', description: error.message, variant: 'destructive' });
+      } else {
+        setCustomers(data || []);
+      }
+      setCustomersLoading(false);
+    };
+
+    fetchCustomers();
+  }, [toast]);
+
+  // Fetch customer data and policies when customer is selected
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setAccount(null);
+      setPolicy(null);
+      setCustomerPolicies([]);
+      return;
+    }
+
+    const fetchCustomerData = async () => {
+      // Fetch account details
       const { data: accountData, error: accountError } = await supabase
         .from('accounts')
         .select('*')
-        .eq('id', accountId)
+        .eq('id', selectedCustomerId)
         .single();
 
       if (accountError) {
-        toast({ title: 'Error loading account', description: accountError.message, variant: 'destructive' });
+        toast({ title: 'Error loading customer', description: accountError.message, variant: 'destructive' });
         return;
       }
       setAccount(accountData);
 
-      if (policyId) {
-        const { data: policyData, error: policyError } = await supabase
-          .from('policies')
-          .select('*')
-          .eq('id', policyId)
-          .single();
+      // Fetch customer's policies
+      const { data: policiesData, error: policiesError } = await supabase
+        .from('policies')
+        .select('*')
+        .eq('account_id', selectedCustomerId)
+        .order('effective_date', { ascending: false });
 
-        if (policyError) {
-          toast({ title: 'Error loading policy', description: policyError.message, variant: 'destructive' });
-          return;
+      if (policiesError) {
+        toast({ title: 'Error loading policies', description: policiesError.message, variant: 'destructive' });
+      } else {
+        setCustomerPolicies(policiesData || []);
+        // Auto-select first active policy if none selected
+        if (!selectedPolicyId && policiesData && policiesData.length > 0) {
+          const activePolicy = policiesData.find(p => p.status === 'active') || policiesData[0];
+          setSelectedPolicyId(activePolicy.id);
         }
-        setPolicy(policyData);
       }
     };
 
-    fetchData();
-  }, [accountId, policyId, toast]);
+    fetchCustomerData();
+  }, [selectedCustomerId, toast]);
+
+  // Fetch selected policy details
+  useEffect(() => {
+    if (!selectedPolicyId) {
+      setPolicy(null);
+      return;
+    }
+
+    const fetchPolicy = async () => {
+      const { data: policyData, error: policyError } = await supabase
+        .from('policies')
+        .select('*')
+        .eq('id', selectedPolicyId)
+        .single();
+
+      if (policyError) {
+        toast({ title: 'Error loading policy', description: policyError.message, variant: 'destructive' });
+        return;
+      }
+      setPolicy(policyData);
+
+      // Auto-fill form with policy dates and coverage
+      if (policyData) {
+        setFormData(prev => ({
+          ...prev,
+          effective_date: policyData.effective_date || '',
+          expiration_date: policyData.expiration_date || '',
+          coverage_details: {
+            general_liability: policyData.coverage_details?.general_liability || prev.coverage_details.general_liability,
+            auto_liability: policyData.coverage_details?.auto_liability || prev.coverage_details.auto_liability,
+            workers_comp: policyData.coverage_details?.workers_comp || prev.coverage_details.workers_comp,
+            umbrella: policyData.coverage_details?.umbrella || prev.coverage_details.umbrella,
+          }
+        }));
+      }
+    };
+
+    fetchPolicy();
+  }, [selectedPolicyId, toast]);
+
+  // Filter customers based on search query (searches name, company, first/last name, email)
+  const filteredCustomers = customers.filter(customer => {
+    if (!customerSearchQuery) return true;
+    const query = customerSearchQuery.toLowerCase();
+    return (
+      (customer.name?.toLowerCase().includes(query)) ||
+      (customer.company_name?.toLowerCase().includes(query)) ||
+      (customer.first_name?.toLowerCase().includes(query)) ||
+      (customer.last_name?.toLowerCase().includes(query)) ||
+      (customer.email?.toLowerCase().includes(query)) ||
+      (`${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase().includes(query))
+    );
+  });
+
+  // Handle customer selection
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setSelectedPolicyId(null); // Reset policy selection
+    setCustomerSearchOpen(false);
+    setCustomerSearchQuery('');
+  };
 
   const handleGenerateWithAI = async () => {
     if (!account) return;
@@ -125,11 +247,11 @@ export default function COIGenerator() {
   };
 
   const handleSaveDraft = async () => {
-    if (!accountId || !account) return;
-    
+    if (!selectedCustomerId || !account) return;
+
     try {
       await createCOI({
-        account_id: accountId,
+        account_id: selectedCustomerId,
         certificate_holder_name: formData.certificate_holder_name,
         certificate_holder_address: { text: formData.certificate_holder_address },
         effective_date: formData.effective_date,
@@ -145,10 +267,10 @@ export default function COIGenerator() {
   };
 
   const handleGeneratePDF = async () => {
-    if (!account || !formData.certificate_holder_name) {
+    if (!selectedCustomerId || !account || !formData.certificate_holder_name) {
       toast({
         title: 'Missing Information',
-        description: 'Please fill in required fields before generating PDF',
+        description: 'Please select a customer and fill in required fields before generating PDF',
         variant: 'destructive',
       });
       return;
@@ -159,7 +281,7 @@ export default function COIGenerator() {
 
       // First, save the COI to get a certificate number
       const savedCOI = await createCOI({
-        account_id: accountId!,
+        account_id: selectedCustomerId,
         certificate_holder_name: formData.certificate_holder_name,
         certificate_holder_address: { text: formData.certificate_holder_address },
         effective_date: formData.effective_date,
@@ -172,7 +294,7 @@ export default function COIGenerator() {
 
       // Generate and attach PDF using the hook
       const publicUrl = await generateAndAttachCOI(
-        accountId!,
+        selectedCustomerId,
         savedCOI.id,
         {
           certificate_number: savedCOI.certificate_number,
@@ -212,15 +334,168 @@ export default function COIGenerator() {
             <div>
               <h1 className="text-3xl font-bold">Certificate of Insurance Generator</h1>
               <p className="text-muted-foreground">
-                {account?.name || 'Loading...'}
+                {account?.name || 'Select a customer to begin'}
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleGenerateWithAI} disabled={loading}>
+          <Button variant="outline" onClick={handleGenerateWithAI} disabled={loading || !account}>
             <Sparkles className="h-4 w-4 mr-2" />
             Generate with AI
           </Button>
         </div>
+
+        {/* Customer & Policy Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Select Customer & Policy
+            </CardTitle>
+            <CardDescription>Choose a customer and their policy to generate a certificate</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer Search */}
+              <div className="space-y-2">
+                <Label>Customer *</Label>
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {account ? (
+                        <span className="flex items-center gap-2">
+                          {account.company_name ? (
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <User className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          {account.name || account.company_name || `${account.first_name} ${account.last_name}`}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Search customers...</span>
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search by name, company, email..."
+                        value={customerSearchQuery}
+                        onValueChange={setCustomerSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {customersLoading ? 'Loading customers...' : 'No customers found.'}
+                        </CommandEmpty>
+                        <CommandGroup heading="Customers">
+                          {filteredCustomers.slice(0, 50).map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={customer.id}
+                              onSelect={() => handleCustomerSelect(customer.id)}
+                            >
+                              <div className="flex items-center gap-2 flex-1">
+                                {customer.company_name ? (
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">
+                                    {customer.name || customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`}
+                                  </p>
+                                  {customer.email && (
+                                    <p className="text-xs text-muted-foreground truncate">{customer.email}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Policy Selection */}
+              <div className="space-y-2">
+                <Label>Policy</Label>
+                <Select
+                  value={selectedPolicyId || ''}
+                  onValueChange={setSelectedPolicyId}
+                  disabled={!selectedCustomerId || customerPolicies.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !selectedCustomerId
+                        ? "Select a customer first"
+                        : customerPolicies.length === 0
+                        ? "No policies found"
+                        : "Select a policy"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customerPolicies.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{p.policy_number || 'No Policy #'}</span>
+                          <Badge variant={p.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                            {p.status || 'draft'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {p.policy_type || p.line_of_business}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Selected Customer Info */}
+            {account && (
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Customer Name</p>
+                    <p className="font-medium">{account.name || account.company_name || `${account.first_name} ${account.last_name}`}</p>
+                  </div>
+                  {account.email && (
+                    <div>
+                      <p className="text-muted-foreground">Email</p>
+                      <p className="font-medium">{account.email}</p>
+                    </div>
+                  )}
+                  {account.phone && (
+                    <div>
+                      <p className="text-muted-foreground">Phone</p>
+                      <p className="font-medium">{account.phone}</p>
+                    </div>
+                  )}
+                  {policy && (
+                    <div>
+                      <p className="text-muted-foreground">Policy #</p>
+                      <p className="font-medium">{policy.policy_number || 'N/A'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">

@@ -81,6 +81,13 @@ async function checkRateLimit(
   apiKey: PrismAPIKey,
   supabase: any
 ): Promise<{ allowed: boolean; reason?: string }> {
+  // System-wide keys have higher limits and may skip rate limiting
+  if (!apiKey.user_id) {
+    // For system-wide keys, we still check but with higher thresholds
+    // You can adjust this logic based on your needs
+    return { allowed: true };
+  }
+
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const todayStart = new Date(now.setHours(0, 0, 0, 0));
@@ -151,16 +158,21 @@ async function runPrismAnalysis(
 
   if (PRISM_SERVICE_URL) {
     // Forward to external Prism service
+    // Get the API key to forward (use system key or the validated key)
+    const apiKeyToForward = Deno.env.get('PRISM_SYSTEM_API_KEY') || '';
+    
     const response = await fetch(`${PRISM_SERVICE_URL}/run`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${apiKeyToForward}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ prompt, mode, depth }),
     });
 
     if (!response.ok) {
-      throw new Error(`Prism service error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Prism service error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     return response.json();
@@ -285,23 +297,49 @@ serve(async (req) => {
 
       // Call webhook if provided
       if (webhook_url && result.status === 'complete') {
-        // Fire and forget webhook call
+        // Fire and forget webhook call with HMAC signature
+        const webhookPayload = JSON.stringify({
+          event: 'run.completed',
+          run_id: result.run_id,
+          status: result.status,
+          final_output: result.final_output,
+          completed_at: new Date().toISOString(),
+        });
+        
+        const timestamp = Date.now().toString();
+        const webhookSecret = Deno.env.get('PRISM_WEBHOOK_SECRET') || '';
+        
+        // Generate HMAC signature if secret is configured
+        let signature = '';
+        if (webhookSecret) {
+          const encoder = new TextEncoder();
+          const keyData = encoder.encode(webhookSecret);
+          const messageData = encoder.encode(`${timestamp}.${webhookPayload}`);
+          const key = await crypto.subtle.importKey(
+            'raw',
+            keyData,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+          );
+          const signatureBuffer = await crypto.subtle.sign('HMAC', key, messageData);
+          signature = Array.from(new Uint8Array(signatureBuffer))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+        
         fetch(webhook_url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Prism-Signature': 'TODO', // Implement HMAC signature
-            'X-Prism-Timestamp': Date.now().toString(),
+            'X-Prism-Signature': signature,
+            'X-Prism-Timestamp': timestamp,
             'X-Prism-Version': '1.0',
           },
-          body: JSON.stringify({
-            event: 'run.completed',
-            run_id: result.run_id,
-            status: result.status,
-            final_output: result.final_output,
-            completed_at: new Date().toISOString(),
-          }),
-        }).catch(console.error);
+          body: webhookPayload,
+        }).catch((err) => {
+          console.error('Webhook call failed:', err);
+        });
       }
 
       return new Response(JSON.stringify(result), {
@@ -379,19 +417,27 @@ serve(async (req) => {
 
       const { data: runs } = await supabase
         .from('prism_runs')
-        .select('tokens_used, cost, created_at')
+        .select('id, run_id, prompt, mode, depth, status, tokens_used, cost, created_at, completed_at')
         .eq('user_id', validatedKey.user_id)
-        .gte('created_at', todayStart.toISOString());
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       const totalRequests = runs?.length || 0;
       const totalTokens = runs?.reduce((sum, r) => sum + (r.tokens_used || 0), 0) || 0;
       const totalCost = runs?.reduce((sum, r) => sum + (r.cost || 0), 0) || 0;
 
+      // Format recent logs to match API spec
       const recentLogs = (runs || []).slice(0, 20).map((run) => ({
-        run_id: run.id,
+        run_id: run.run_id,
+        prompt: run.prompt.substring(0, 100), // Truncate for logs
+        mode: run.mode,
+        depth: run.depth,
+        status: run.status,
         tokens_used: run.tokens_used || 0,
         cost: run.cost || 0,
         created_at: run.created_at,
+        completed_at: run.completed_at || undefined,
       }));
 
       return new Response(

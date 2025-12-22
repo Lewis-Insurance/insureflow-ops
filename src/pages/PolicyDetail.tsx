@@ -7,13 +7,25 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
 import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
+import { WCPolicyDetailsView } from '@/components/policies/WCPolicyDetails';
+import type { WCPolicyDetails } from '@/types/workers-comp';
+import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
+import { InlandMarinePolicyDetails } from '@/components/policies/InlandMarinePolicyDetails';
+import { useExtractInlandMarinePolicy, isInlandMarinePolicy } from '@/hooks/useInlandMarineExtraction';
+import { CyberPolicyDetails } from '@/components/policies/CyberPolicyDetails';
+import { useExtractCyberPolicy, isCyberPolicy } from '@/hooks/useCyberExtraction';
+import { CrimePolicyDetails } from '@/components/policies/CrimePolicyDetails';
+import { useExtractCrimePolicy, isCrimePolicy } from '@/hooks/useCrimeExtraction';
+import { EOPolicyDetails } from '@/components/policies/EOPolicyDetails';
+import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
+import { Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock, Briefcase } from 'lucide-react';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -23,6 +35,13 @@ export default function PolicyDetail() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
+
+  // Extraction hooks
+  const extractWC = useExtractWCPolicy();
+  const extractIM = useExtractInlandMarinePolicy();
+  const extractCyber = useExtractCyberPolicy();
+  const extractCrime = useExtractCrimePolicy();
+  const extractEO = useExtractEOPolicy();
 
   // Fetch policy with account and carrier info
   const { data: policy, isLoading, error, refetch } = useQuery({
@@ -86,6 +105,17 @@ export default function PolicyDetail() {
     setEditPolicyOpen(true);
   };
 
+  // Check policy line of business
+  const isWorkersComp = policy?.line_of_business?.toLowerCase().includes('work') &&
+    policy?.line_of_business?.toLowerCase().includes('comp');
+  const isInlandMarine = isInlandMarinePolicy(policy?.line_of_business);
+  const isCyber = isCyberPolicy(policy?.line_of_business);
+  const isCrime = isCrimePolicy(policy?.line_of_business);
+  const isEO = isEOPolicy(policy?.line_of_business);
+
+  // Parse WC details from the policy's wc_details JSON field
+  const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -143,6 +173,15 @@ export default function PolicyDetail() {
             </div>
           </div>
           <div className="flex gap-2">
+            {policy.account && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/coi-generator?accountId=${policy.account!.id}&policyId=${policyId}`)}
+              >
+                <Award className="h-4 w-4 mr-2" />
+                New Certificate
+              </Button>
+            )}
             <Button variant="outline" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Policy
@@ -295,14 +334,129 @@ export default function PolicyDetail() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {policy.account && (
-                  <DocumentAnalysisButton
-                    accountId={policy.account.id}
-                    variant="outline"
-                    size="default"
-                  />
+                  <>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => navigate(`/coi-generator?accountId=${policy.account!.id}&policyId=${policyId}`)}
+                    >
+                      <Award className="h-4 w-4 mr-2" />
+                      Generate Certificate
+                    </Button>
+                    <DocumentAnalysisButton
+                      accountId={policy.account.id}
+                      variant="outline"
+                      size="default"
+                    />
+                  </>
                 )}
-                <Button 
-                  variant="outline" 
+                {isWorkersComp && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      toast({
+                        title: 'Extract WC Details',
+                        description: 'Upload a WC document to extract details automatically.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractWC.isPending}
+                  >
+                    {extractWC.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Extract WC Details
+                  </Button>
+                )}
+                {isInlandMarine && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      toast({
+                        title: 'Extract Inland Marine Details',
+                        description: 'Upload an IM document to extract scheduled items and coverages.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractIM.isPending}
+                  >
+                    {extractIM.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Anchor className="h-4 w-4 mr-2" />
+                    )}
+                    Extract IM Details
+                  </Button>
+                )}
+                {isCyber && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      toast({
+                        title: 'Extract Cyber Details',
+                        description: 'Upload a cyber policy to extract coverages and provisions.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractCyber.isPending}
+                  >
+                    {extractCyber.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Lock className="h-4 w-4 mr-2" />
+                    )}
+                    Extract Cyber Details
+                  </Button>
+                )}
+                {isCrime && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      toast({
+                        title: 'Extract Crime Details',
+                        description: 'Upload a crime policy to extract insuring agreements.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractCrime.isPending}
+                  >
+                    {extractCrime.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ShieldIcon className="h-4 w-4 mr-2" />
+                    )}
+                    Extract Crime Details
+                  </Button>
+                )}
+                {isEO && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      toast({
+                        title: 'Extract E&O Details',
+                        description: 'Upload an E&O policy to extract claims-made details, ERP, and limits.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractEO.isPending}
+                  >
+                    {extractEO.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Briefcase className="h-4 w-4 mr-2" />
+                    )}
+                    Extract E&O Details
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => setAddNoteOpen(true)}
                 >
@@ -329,6 +483,34 @@ export default function PolicyDetail() {
             </Card>
           </div>
         </div>
+
+        {/* Workers' Comp Details Section */}
+        {isWorkersComp && (
+          <WCPolicyDetailsView
+            policyId={policyId!}
+            wcDetails={wcDetails}
+          />
+        )}
+
+        {/* Inland Marine Details Section */}
+        {isInlandMarine && policyId && (
+          <InlandMarinePolicyDetails policyId={policyId} />
+        )}
+
+        {/* Cyber Liability Details Section */}
+        {isCyber && policyId && (
+          <CyberPolicyDetails policyId={policyId} />
+        )}
+
+        {/* Commercial Crime Details Section */}
+        {isCrime && policyId && (
+          <CrimePolicyDetails policyId={policyId} />
+        )}
+
+        {/* Professional Liability / E&O Details Section */}
+        {isEO && policyId && (
+          <EOPolicyDetails policyId={policyId} />
+        )}
       </div>
 
       {/* Modals */}
