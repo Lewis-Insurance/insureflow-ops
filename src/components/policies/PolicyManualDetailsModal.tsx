@@ -280,6 +280,7 @@ export function PolicyManualDetailsModal({
   onOpenChange,
   policyId,
   isWorkersComp,
+  lineOfBusiness,
   initialCoverage,
   initialCustom,
   initialInsuredItems,
@@ -290,6 +291,7 @@ export function PolicyManualDetailsModal({
   onOpenChange: (open: boolean) => void;
   policyId: string;
   isWorkersComp: boolean;
+  lineOfBusiness: string;
   initialCoverage: unknown;
   initialCustom: unknown;
   initialInsuredItems: unknown;
@@ -298,6 +300,147 @@ export function PolicyManualDetailsModal({
 }) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+
+  type PresetKey =
+    | 'auto'
+    | 'general_liability'
+    | 'property'
+    | 'workers_comp'
+    | 'cyber'
+    | 'eo'
+    | 'crime'
+    | 'inland_marine'
+    | 'other';
+
+  function guessPresetFromLOB(lobRaw: string): PresetKey {
+    const lob = (lobRaw || '').toLowerCase();
+    if (lob.includes('work') && lob.includes('comp')) return 'workers_comp';
+    if (lob.includes('cyber')) return 'cyber';
+    if (lob.includes('errors') || lob.includes('omission') || lob.includes('e&o') || lob.includes('e & o') || lob.includes('professional')) return 'eo';
+    if (lob.includes('crime') || lob.includes('fidelity')) return 'crime';
+    if (lob.includes('inland') || lob.includes('marine')) return 'inland_marine';
+    if (lob.includes('auto') || lob.includes('commercial auto') || lob.includes('vehicle')) return 'auto';
+    if (lob.includes('property') || lob.includes('building') || lob.includes('bop')) return 'property';
+    if (lob.includes('liability') || lob.includes('general') || lob.includes('cgl')) return 'general_liability';
+    return 'other';
+  }
+
+  const initialPresetGuess = useMemo(() => guessPresetFromLOB(lineOfBusiness), [lineOfBusiness]);
+  const [presetKey, setPresetKey] = useState<PresetKey>(initialPresetGuess);
+  const [presetMode, setPresetMode] = useState<'merge' | 'replace'>('merge');
+
+  const PRESETS: Record<
+    PresetKey,
+    {
+      label: string;
+      coverage: Array<{ key: string; type: KVType; valueText?: string; valueBool?: boolean }>;
+      custom?: Array<{ key: string; type: KVType; valueText?: string; valueBool?: boolean }>;
+      insuredItems?: Array<{ name: string; description?: string; valueText?: string }>;
+      wc?: Partial<WCPolicyDetails>;
+    }
+  > = {
+    general_liability: {
+      label: 'General Liability (CGL)',
+      coverage: [
+        { key: 'occurrence_limit', type: 'number', valueText: '1000000' },
+        { key: 'aggregate_limit', type: 'number', valueText: '2000000' },
+        { key: 'products_completed_ops_agg', type: 'number', valueText: '2000000' },
+        { key: 'personal_advertising_injury', type: 'number', valueText: '1000000' },
+        { key: 'damage_to_rented_premises', type: 'number', valueText: '300000' },
+        { key: 'medical_expense', type: 'number', valueText: '5000' },
+        { key: 'deductible', type: 'number', valueText: '' },
+      ],
+      insuredItems: [{ name: 'Primary Location', description: 'Add location details (address, operations, etc.)', valueText: '' }],
+    },
+    auto: {
+      label: 'Commercial Auto',
+      coverage: [
+        { key: 'liability_combined_single_limit', type: 'number', valueText: '1000000' },
+        { key: 'collision_deductible', type: 'number', valueText: '1000' },
+        { key: 'comprehensive_deductible', type: 'number', valueText: '500' },
+        { key: 'uninsured_motorist', type: 'boolean', valueBool: true },
+        { key: 'medical_payments', type: 'number', valueText: '' },
+      ],
+      insuredItems: [{ name: 'Vehicle #1', description: 'Year/Make/Model/VIN', valueText: '' }],
+    },
+    property: {
+      label: 'Property',
+      coverage: [
+        { key: 'building_limit', type: 'number', valueText: '' },
+        { key: 'business_personal_property', type: 'number', valueText: '' },
+        { key: 'loss_of_income', type: 'number', valueText: '' },
+        { key: 'wind_deductible', type: 'number', valueText: '' },
+        { key: 'all_other_perils_deductible', type: 'number', valueText: '' },
+      ],
+      insuredItems: [{ name: 'Building / Location', description: 'Address, construction, occupancy', valueText: '' }],
+    },
+    workers_comp: {
+      label: "Workers' Comp",
+      coverage: [
+        { key: 'employers_liability_each_accident', type: 'number', valueText: '100000' },
+        { key: 'employers_liability_disease_each_employee', type: 'number', valueText: '100000' },
+        { key: 'employers_liability_disease_policy_limit', type: 'number', valueText: '500000' },
+        { key: 'policy_type', type: 'text', valueText: 'standard' },
+      ],
+      insuredItems: [{ name: 'Operations / Payroll', description: 'Add class codes/payroll info in additional fields', valueText: '' }],
+      wc: {
+        coverage: {
+          policy_type: 'standard',
+          covered_states: [],
+          part_one_wc: 'statutory',
+          part_two_employers_liability: {
+            each_accident: 100000,
+            disease_each_employee: 100000,
+            disease_policy_limit: 500000,
+          },
+        } as any,
+        extraction_source: 'manual',
+      },
+    },
+    cyber: {
+      label: 'Cyber',
+      coverage: [
+        { key: 'limit', type: 'number', valueText: '1000000' },
+        { key: 'retention', type: 'number', valueText: '' },
+        { key: 'first_party', type: 'boolean', valueBool: true },
+        { key: 'third_party', type: 'boolean', valueBool: true },
+      ],
+      custom: [{ key: 'ransomware_coverage', type: 'boolean', valueBool: true }],
+    },
+    eo: {
+      label: 'Professional Liability / E&O',
+      coverage: [
+        { key: 'limit', type: 'number', valueText: '1000000' },
+        { key: 'retention', type: 'number', valueText: '' },
+        { key: 'claims_made', type: 'boolean', valueBool: true },
+        { key: 'retroactive_date', type: 'text', valueText: '' },
+      ],
+    },
+    crime: {
+      label: 'Crime / Fidelity',
+      coverage: [
+        { key: 'employee_theft', type: 'number', valueText: '' },
+        { key: 'forgery_or_alteration', type: 'number', valueText: '' },
+        { key: 'computer_fraud', type: 'number', valueText: '' },
+        { key: 'funds_transfer_fraud', type: 'number', valueText: '' },
+      ],
+    },
+    inland_marine: {
+      label: 'Inland Marine',
+      coverage: [
+        { key: 'limit', type: 'number', valueText: '' },
+        { key: 'deductible', type: 'number', valueText: '' },
+      ],
+      insuredItems: [{ name: 'Scheduled Item #1', description: 'Add description/serial/value', valueText: '' }],
+    },
+    other: {
+      label: 'Generic',
+      coverage: [
+        { key: 'limit', type: 'number', valueText: '' },
+        { key: 'deductible', type: 'number', valueText: '' },
+      ],
+    },
+  };
 
   const initialCoverageRows = useMemo(() => toKVRows(initialCoverage), [initialCoverage]);
   const initialCustomRows = useMemo(() => toKVRows(initialCustom), [initialCustom]);
@@ -390,12 +533,109 @@ export function PolicyManualDetailsModal({
     setInsuredItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const applyPreset = () => {
+    const preset = PRESETS[presetKey];
+
+    const presetToRows = (entries: Array<{ key: string; type: KVType; valueText?: string; valueBool?: boolean }>) =>
+      entries.map((e) => ({
+        id: crypto.randomUUID(),
+        key: e.key,
+        type: e.type,
+        valueText: e.valueText ?? '',
+        valueBool: e.valueBool ?? false,
+      })) satisfies KVRow[];
+
+    const newCoverage = presetToRows(preset.coverage);
+    const newCustom = preset.custom ? presetToRows(preset.custom) : [];
+    const newItems: InsuredItemForm[] = (preset.insuredItems || []).map((it) => ({
+      id: crypto.randomUUID(),
+      name: it.name,
+      description: it.description || '',
+      valueText: it.valueText || '',
+      extra: [],
+    }));
+
+    if (presetMode === 'replace') {
+      setCoverageRows(newCoverage);
+      setCustomRows(newCustom);
+      setInsuredItems(newItems);
+    } else {
+      // merge: only add keys that don't exist
+      const mergeRows = (existing: KVRow[], incoming: KVRow[]) => {
+        const existingKeys = new Set(existing.map((r) => r.key.trim()).filter(Boolean));
+        return [...existing, ...incoming.filter((r) => !existingKeys.has(r.key.trim()))];
+      };
+      setCoverageRows((prev) => mergeRows(prev, newCoverage));
+      setCustomRows((prev) => mergeRows(prev, newCustom));
+      setInsuredItems((prev) => (prev.length > 0 ? prev : newItems));
+    }
+
+    if (presetKey === 'workers_comp' && preset.wc) {
+      setWcDetailsDraft((prev) => ({
+        ...prev,
+        ...(preset.wc as any),
+        extraction_source: 'manual',
+        last_updated_at: new Date().toISOString(),
+      }));
+    }
+
+    toast({
+      title: 'Preset applied',
+      description: `${preset.label} (${presetMode})`,
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manual Policy Details</DialogTitle>
         </DialogHeader>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Common Field Presets</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>Preset</Label>
+                <Select value={presetKey} onValueChange={(v) => setPresetKey(v as PresetKey)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PRESETS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Apply Mode</Label>
+                <Select value={presetMode} onValueChange={(v) => setPresetMode(v as 'merge' | 'replace')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="merge">Merge (recommended)</SelectItem>
+                    <SelectItem value="replace">Replace</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button type="button" className="w-full" variant="outline" onClick={applyPreset}>
+                  Apply Preset
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Merge adds missing fields and won’t overwrite existing entries. Replace overwrites Coverage/Custom/Insured Items with the preset.
+            </p>
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="coverage" className="space-y-4">
           <TabsList className={isWorkersComp ? 'grid w-full grid-cols-4' : 'grid w-full grid-cols-3'}>
