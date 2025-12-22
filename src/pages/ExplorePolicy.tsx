@@ -985,7 +985,7 @@ export default function ExplorePolicy() {
                           <Database className="w-5 h-5" />
                           Structured Analysis (Database)
                         </h3>
-                        <DocumentAnalysisDisplay documentId={selectedDoc.id} />
+                        <DocumentAnalysisDisplay documentId={uploadedDocumentIds.get(selectedDoc.id)!} />
                       </div>
                     )}
                     </div>

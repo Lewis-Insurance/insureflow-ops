@@ -538,7 +538,17 @@ export const useDocumentAnalysisByDocumentId = (documentId: string | null) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!documentId
+    enabled: !!documentId,
+    // Poll every 3 seconds while analysis is pending/processing
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      // If no data yet or still processing, poll every 3 seconds
+      if (!data || data.processing_status === 'pending' || data.processing_status === 'processing') {
+        return 3000;
+      }
+      // Stop polling once complete or errored
+      return false;
+    },
   });
 };
 
