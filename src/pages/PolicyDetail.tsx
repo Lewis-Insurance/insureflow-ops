@@ -26,6 +26,7 @@ import { useExtractCrimePolicy, isCrimePolicy } from '@/hooks/useCrimeExtraction
 import { EOPolicyDetails } from '@/components/policies/EOPolicyDetails';
 import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
 import { Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock, Briefcase } from 'lucide-react';
+import { PolicyManualDetailsModal } from '@/components/policies/PolicyManualDetailsModal';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -35,6 +36,7 @@ export default function PolicyDetail() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
+  const [manualDetailsOpen, setManualDetailsOpen] = useState(false);
 
   // Extraction hooks
   const extractWC = useExtractWCPolicy();
@@ -479,6 +481,14 @@ export default function PolicyDetail() {
                   <FileText className="h-4 w-4 mr-2" />
                   Upload Document
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setManualDetailsOpen(true)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Manual Details
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -554,6 +564,17 @@ export default function PolicyDetail() {
               payment_type: policy.payment_type
             } : null}
             onSuccess={refetch}
+          />
+          <PolicyManualDetailsModal
+            open={manualDetailsOpen}
+            onOpenChange={setManualDetailsOpen}
+            policyId={policy.id}
+            isWorkersComp={isWorkersComp}
+            initialCoverage={policy.coverage}
+            initialCustom={policy.custom}
+            initialInsuredItems={policy.insured_items}
+            initialWcDetails={(policy as any).wc_details}
+            onSaved={refetch}
           />
         </>
       )}
