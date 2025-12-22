@@ -515,3 +515,18 @@ export function useCRMData() {
     deleteAccount
   };
 }
+
+/**
+ * Lightweight wrapper for code paths that expect a react-query-ish API.
+ * (e.g. `const { data } = useAccounts()`).
+ */
+export function useAccounts() {
+  const { accounts, loading, error, fetchAccounts } = useCRMData();
+
+  return {
+    data: accounts,
+    isLoading: loading,
+    error,
+    refetch: fetchAccounts,
+  };
+}
