@@ -16,7 +16,7 @@ export default function PoliciesPage() {
   const { toast } = useToast();
   const [filters, setFilters] = useState<PolicyFilters>({});
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
   
   const { data: policies = [], isLoading, refetch } = usePolicies(filters);
   const { data: stats, isLoading: statsLoading } = usePolicyStats();
@@ -73,7 +73,7 @@ export default function PoliciesPage() {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button onClick={handleCreatePolicy} disabled={!selectedAccountId}>
+            <Button onClick={handleCreatePolicy} disabled={!selectedClient?.id}>
               <Plus className="h-4 w-4 mr-2" />
               New Policy
             </Button>
@@ -84,13 +84,13 @@ export default function PoliciesPage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 max-w-[520px]">
             <ClientSelector
-              value={selectedAccountId}
-              onChange={setSelectedAccountId}
+              selectedClient={selectedClient}
+              onSelect={setSelectedClient}
               placeholder="Select a client to create a policy..."
             />
           </div>
           <div className="text-sm text-muted-foreground">
-            {selectedAccountId ? 'Client selected' : 'Select a client to enable policy creation'}
+            {selectedClient?.id ? 'Client selected' : 'Select a client to enable policy creation'}
           </div>
         </div>
 
@@ -114,7 +114,7 @@ export default function PoliciesPage() {
         <AddPolicyModal
           open={addPolicyOpen}
           onOpenChange={setAddPolicyOpen}
-          accountId={selectedAccountId || ''}
+          accountId={selectedClient?.id || ''}
           onSuccess={() => {
             toast({ title: 'Policy created', description: 'Policy added successfully' });
             refetch();
