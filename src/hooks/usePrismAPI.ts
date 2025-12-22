@@ -83,14 +83,54 @@ export function usePrismRun() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        // Extract error message - could be nested
+        let errorMessage = error.error || error.message || `Request failed: ${response.statusText}`;
+        
+        // Handle nested error objects (e.g., "anthropic error: {...}")
+        if (typeof errorMessage === 'string' && errorMessage.includes('anthropic error:')) {
+          try {
+            const anthropicErrorMatch = errorMessage.match(/anthropic error:\s*({.*})/);
+            if (anthropicErrorMatch) {
+              const anthropicError = JSON.parse(anthropicErrorMatch[1]);
+              errorMessage = anthropicError.error || anthropicError.message || errorMessage;
+            }
+          } catch {
+            // If parsing fails, use the original message
+          }
+        }
+        
         throw new PrismAPIError(
-          error.error || `Request failed: ${response.statusText}`,
+          errorMessage,
           response.status,
           error.code
         );
       }
 
       const data = await response.json();
+      
+      // Check if response indicates an error even with 200 status
+      if (data && data.status === 'error') {
+        let errorMessage = data.error || 'Unknown error from Prism service';
+        
+        // Handle nested error objects
+        if (typeof errorMessage === 'string' && errorMessage.includes('anthropic error:')) {
+          try {
+            const anthropicErrorMatch = errorMessage.match(/anthropic error:\s*({.*})/);
+            if (anthropicErrorMatch) {
+              const anthropicError = JSON.parse(anthropicErrorMatch[1]);
+              errorMessage = anthropicError.error || anthropicError.message || errorMessage;
+            }
+          } catch {
+            // If parsing fails, use the original message
+          }
+        }
+        
+        throw new PrismAPIError(
+          errorMessage,
+          500,
+          'PRISM_SERVICE_ERROR'
+        );
+      }
 
       // Store run in local database for tracking
       const user = (await supabase.auth.getUser()).data.user;
@@ -129,16 +169,30 @@ export function usePrismRun() {
     },
     onError: (error: PrismAPIError) => {
       let message = error.message;
+      let title = 'Prism API Error';
+      
       if (error.statusCode === 401) {
         message = 'Invalid API key. Please check your Prism API key in settings.';
+        title = 'Authentication Error';
       } else if (error.statusCode === 429) {
         message = 'Rate limit exceeded. Please try again later.';
+        title = 'Rate Limit Exceeded';
       } else if (error.statusCode === 413) {
         message = 'Prompt too large. Maximum 50,000 characters.';
+        title = 'Prompt Too Large';
+      } else if (error.statusCode === 500 || error.code === 'PRISM_SERVICE_ERROR') {
+        // Check if it's an Anthropic/Claude error
+        if (message.toLowerCase().includes('anthropic') || message.toLowerCase().includes('claude')) {
+          title = 'AI Service Error';
+          message = 'The AI service encountered an error. This may be temporary. Please try again in a moment.';
+        } else {
+          title = 'Service Error';
+          message = message || 'The Prism service encountered an error. Please try again.';
+        }
       }
 
       toast({
-        title: 'Prism API Error',
+        title,
         description: message,
         variant: 'destructive',
       });

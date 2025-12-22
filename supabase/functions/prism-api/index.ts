@@ -171,12 +171,21 @@ async function runPrismAnalysis(
       body: JSON.stringify({ prompt, mode, depth }),
     });
 
+    const responseData = await response.json().catch(() => null);
+
+    // Check for HTTP errors
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Prism service error: ${response.status} ${response.statusText} - ${errorText}`);
+      const errorMessage = responseData?.error || responseData?.message || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage);
     }
 
-    return response.json();
+    // Check if response indicates an error even with 200 status
+    if (responseData && responseData.status === 'error') {
+      const errorMessage = responseData.error || 'Unknown error from Prism service';
+      throw new Error(errorMessage);
+    }
+
+    return responseData;
   }
 
   // Placeholder implementation - replace with actual Prism logic
@@ -307,7 +316,37 @@ serve(async (req) => {
       }
 
       // Run Prism analysis
-      const result = await runPrismAnalysis(prompt, mode, depth);
+      let result;
+      let errorMessage: string | null = null;
+      
+      try {
+        result = await runPrismAnalysis(prompt, mode, depth);
+      } catch (error) {
+        // If analysis fails, create a failed run record
+        errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorRunId = crypto.randomUUID();
+        
+        // Store failed run in database
+        if (validatedKey.user_id) {
+          await supabase.from('prism_runs').insert({
+            user_id: validatedKey.user_id,
+            prompt,
+            mode,
+            depth,
+            run_id: errorRunId,
+            status: 'failed',
+            cycles_completed: 0,
+            final_output: null,
+            tokens_used: null,
+            cost: null,
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          });
+        }
+        
+        // Re-throw to return error response
+        throw error;
+      }
 
       // Store in database
       if (validatedKey.user_id) {
@@ -322,7 +361,8 @@ serve(async (req) => {
           final_output: result.final_output || null,
           tokens_used: result.usage?.total_tokens || null,
           cost: result.usage?.estimated_cost || null,
-          completed_at: result.status === 'complete' ? new Date().toISOString() : null,
+          error_message: result.status === 'error' ? (result.error || null) : null,
+          completed_at: result.status === 'complete' || result.status === 'error' ? new Date().toISOString() : null,
         });
       }
 
