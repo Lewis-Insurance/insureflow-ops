@@ -295,6 +295,75 @@ export const useDeleteWorkspace = () => {
   });
 };
 
+// Bulk delete workspaces mutation
+export const useBulkDeleteWorkspaces = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (workspaceIds: string[]) => {
+      const { error } = await supabase
+        .from("workspaces")
+        .delete()
+        .in("id", workspaceIds);
+
+      if (error) throw error;
+      return workspaceIds.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      toast({
+        title: "Workspaces deleted",
+        description: `${count} workspace(s) have been removed`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete workspaces",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+// Delete all processing workspaces
+export const useDeleteAllProcessing = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("workspaces")
+        .delete()
+        .eq("created_by", user.id)
+        .in("status", ["processing", "idle"])
+        .select();
+
+      if (error) throw error;
+      return data?.length || 0;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      toast({
+        title: "All processing jobs deleted",
+        description: `${count} workspace(s) have been removed`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete workspaces",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
 // Trigger analysis mutation
 export const useTriggerAnalysis = () => {
   const queryClient = useQueryClient();

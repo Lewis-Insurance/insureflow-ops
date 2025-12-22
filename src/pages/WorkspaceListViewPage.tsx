@@ -1,14 +1,26 @@
 import { useState } from "react";
-import { useActiveWorkspaces, useCompletedWorkspaces, useWorkspaceSubscription, type Workspace } from "@/hooks/useWorkspaces";
+import { useActiveWorkspaces, useCompletedWorkspaces, useWorkspaceSubscription, useDeleteWorkspace, useDeleteAllProcessing, type Workspace } from "@/hooks/useWorkspaces";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, FileText, CheckCircle2, XCircle, Clock, Search, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, FileText, CheckCircle2, XCircle, Clock, Search, Filter, Trash2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDistanceToNow } from "date-fns";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const WorkspaceListViewPage = () => {
   const navigate = useNavigate();
@@ -17,6 +29,7 @@ const WorkspaceListViewPage = () => {
 
   const { data: activeWorkspaces, isLoading: loadingActive } = useActiveWorkspaces();
   const { data: completedWorkspaces, isLoading: loadingCompleted } = useCompletedWorkspaces();
+  const deleteAllProcessing = useDeleteAllProcessing();
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,8 +147,53 @@ const WorkspaceListViewPage = () => {
       {/* Active Jobs */}
       <Card>
         <CardHeader>
-          <CardTitle>Working in background</CardTitle>
-          <CardDescription>Currently processing documents ({filteredActive.length})</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Working in background</CardTitle>
+              <CardDescription>Currently processing documents ({filteredActive.length})</CardDescription>
+            </div>
+            {filteredActive.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All ({filteredActive.length})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                      Delete All Processing Jobs?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete {filteredActive.length} workspace(s) that are currently processing or idle.
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteAllProcessing.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {deleteAllProcessing.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete All
+                        </>
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loadingActive ? (
@@ -195,6 +253,8 @@ interface WorkspaceItemProps {
 }
 
 function WorkspaceItem({ workspace, onClick }: WorkspaceItemProps) {
+  const deleteWorkspace = useDeleteWorkspace();
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "processing":
@@ -216,6 +276,10 @@ function WorkspaceItem({ workspace, onClick }: WorkspaceItemProps) {
       failed: "destructive",
     };
     return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
   };
 
   return (
@@ -275,7 +339,38 @@ function WorkspaceItem({ workspace, onClick }: WorkspaceItemProps) {
         </div>
       </div>
 
-      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2" onClick={handleDelete}>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this workspace?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete "{workspace.name}" and all associated data.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteWorkspace.mutate(workspace.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteWorkspace.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <FileText className="h-4 w-4 text-muted-foreground" />
+      </div>
     </div>
   );
 }
