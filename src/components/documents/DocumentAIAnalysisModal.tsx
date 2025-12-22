@@ -79,9 +79,30 @@ export function DocumentAIAnalysisModal({
     }
   };
 
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsAnalyzing(false);
+  };
+
   const handleAnalyze = async (promptText?: string) => {
     const queryText = promptText || question;
     if (!queryText.trim() || !doc) return;
+
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller with 60 second timeout
+    abortControllerRef.current = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortControllerRef.current?.abort();
+    }, 60000); // 60 second timeout
 
     setIsAnalyzing(true);
     setResponse(null);
@@ -92,7 +113,7 @@ export function DocumentAIAnalysisModal({
         throw new Error('Please log in to use AI analysis');
       }
 
-      // Call Prism API for analysis
+      // Call Prism API for analysis with timeout
       const prismResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prism-api/run`,
         {
@@ -115,10 +136,13 @@ Question: ${queryText}
 
 Please provide a comprehensive analysis based on the document type and context. If you need to make assumptions about the document content, clearly state them.`,
             mode: 'sequential',
-            depth: 'synthesis',
+            depth: 'insight', // Use 'insight' for faster response
           }),
+          signal: abortControllerRef.current.signal,
         }
       );
+
+      clearTimeout(timeoutId);
 
       if (!prismResponse.ok) {
         const errorData = await prismResponse.json().catch(() => ({}));
@@ -135,6 +159,16 @@ Please provide a comprehensive analysis based on the document type and context. 
         setResponse('Analysis completed but no response was generated. Please try again.');
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        toast({
+          title: 'Request Cancelled',
+          description: 'The analysis was cancelled or timed out.',
+        });
+        return;
+      }
+      
       console.error('AI analysis error:', error);
       toast({
         title: 'Analysis Error',
@@ -217,9 +251,15 @@ Please provide a comprehensive analysis based on the document type and context. 
             <Card className="flex-1">
               <CardContent className="pt-4">
                 {isAnalyzing ? (
-                  <div className="flex items-center justify-center py-8 gap-3">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="text-muted-foreground">Analyzing document...</span>
+                  <div className="flex flex-col items-center justify-center py-8 gap-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="text-muted-foreground">Analyzing document...</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">This may take up to 60 seconds</p>
+                    <Button variant="outline" size="sm" onClick={handleCancel}>
+                      Cancel
+                    </Button>
                   </div>
                 ) : response ? (
                   <div className="space-y-3">
