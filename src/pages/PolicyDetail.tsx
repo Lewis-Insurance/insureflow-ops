@@ -51,32 +51,39 @@ export default function PolicyDetail() {
     queryFn: async () => {
       if (!policyId) throw new Error('Policy ID is required');
       
-      const { data, error } = await supabase
-        .from('policies')
-        .select(`
-          *,
-          account:accounts!policies_account_id_fkey(
-            id,
-            name,
-            type,
-            email,
-            phone
-          ),
-          carrier_info:carriers!policies_carrier_id_fkey(
-            id,
-            name
-          )
-        `)
-        .eq('id', policyId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('policies')
+          .select(`
+            *,
+            account:accounts!policies_account_id_fkey(
+              id,
+              name,
+              type,
+              email,
+              phone
+            ),
+            carrier_info:carriers!policies_carrier_id_fkey(
+              id,
+              name
+            )
+          `)
+          .eq('id', policyId)
+          .maybeSingle();
 
-      if (error) {
-        throw new Error(`Failed to fetch policy: ${error.message}`);
+        if (error) {
+          console.error('Policy fetch error:', error);
+          throw new Error(`Failed to fetch policy: ${error.message}`);
+        }
+
+        return data;
+      } catch (err) {
+        console.error('Policy query exception:', err);
+        throw err;
       }
-
-      return data;
     },
     enabled: !!policyId,
+    retry: 1,
   });
 
   const formatCurrency = (amount: number | null) => {
