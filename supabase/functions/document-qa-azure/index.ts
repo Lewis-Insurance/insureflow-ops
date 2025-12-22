@@ -159,13 +159,25 @@ serve(async (req) => {
               if (result.status === 'succeeded') {
                 // Extract text from ALL pages with page markers
                 const pages = result.analyzeResult?.pages || [];
-                console.log(`📄 Found ${pages.length} pages in document`);
+                const content = result.analyzeResult?.content || ''; // Full content as single string
                 
-                for (let i = 0; i < pages.length; i++) {
-                  const page = pages[i];
-                  documentText += `\n--- PAGE ${i + 1} ---\n`;
-                  if (page.lines) {
-                    documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
+                console.log(`📄 Azure returned ${pages.length} pages`);
+                console.log(`📄 Content length from Azure: ${content.length} characters`);
+                
+                // Use the full content if available (more reliable for multi-page)
+                if (content && content.length > 0) {
+                  documentText = content;
+                  console.log(`✅ Using full content extraction`);
+                } else {
+                  // Fallback to page-by-page extraction
+                  for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const pageLines = page.lines?.length || 0;
+                    documentText += `\n--- PAGE ${i + 1} (${pageLines} lines) ---\n`;
+                    if (page.lines) {
+                      documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
+                    }
+                    console.log(`  Page ${i + 1}: ${pageLines} lines extracted`);
                   }
                 }
                 console.log(`✅ OCR complete: ${pages.length} pages, ${documentText.length} characters`);
