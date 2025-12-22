@@ -53,8 +53,8 @@ export default function AcordTemplates() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
-    templates,
-    currentTemplates,
+    templates = [],
+    currentTemplates = [],
     loading,
     uploadTemplate,
     setCurrentVersion,
@@ -78,8 +78,10 @@ export default function AcordTemplates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'current' | 'archived'>('current');
 
-  // Filter templates
-  const filteredTemplates = templates.filter(t => {
+  // Filter templates with defensive checks
+  const filteredTemplates = (templates || []).filter(t => {
+    if (!t || !t.form_number || !t.form_name) return false;
+    
     const matchesSearch =
       t.form_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.form_name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -91,6 +93,7 @@ export default function AcordTemplates() {
 
   // Group templates by form number
   const groupedTemplates = filteredTemplates.reduce((acc, template) => {
+    if (!template || !template.form_number) return acc;
     const key = template.form_number;
     if (!acc[key]) acc[key] = [];
     acc[key].push(template);
@@ -130,9 +133,13 @@ export default function AcordTemplates() {
     setUploading(true);
 
     try {
+      const formName = uploadForm.formName || 
+        (ACORD_FORMS && uploadForm.formNumber ? ACORD_FORMS[uploadForm.formNumber as keyof typeof ACORD_FORMS]?.name : null) || 
+        `ACORD ${uploadForm.formNumber}`;
+      
       const result = await uploadTemplate(selectedFile, {
         formNumber: uploadForm.formNumber,
-        formName: uploadForm.formName || ACORD_FORMS[uploadForm.formNumber as keyof typeof ACORD_FORMS]?.name || `ACORD ${uploadForm.formNumber}`,
+        formName,
         version: uploadForm.version,
         templateSource: 'acord_portal',
         licenseNotes: uploadForm.licenseNotes,
