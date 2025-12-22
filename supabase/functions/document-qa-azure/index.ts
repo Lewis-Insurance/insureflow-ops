@@ -142,9 +142,9 @@ serve(async (req) => {
           const operationLocation = analyzeResponse.headers.get('Operation-Location');
           
           if (operationLocation) {
-            // Poll for results (max 30 seconds for Q&A)
+            // Poll for results (max 60 seconds for larger documents)
             let attempts = 0;
-            const maxAttempts = 15;
+            const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds
 
             while (attempts < maxAttempts) {
               await sleep(2000);
@@ -157,14 +157,18 @@ serve(async (req) => {
               const result = await resultResponse.json();
 
               if (result.status === 'succeeded') {
-                // Extract text from pages
+                // Extract text from ALL pages with page markers
                 const pages = result.analyzeResult?.pages || [];
-                for (const page of pages) {
+                console.log(`📄 Found ${pages.length} pages in document`);
+                
+                for (let i = 0; i < pages.length; i++) {
+                  const page = pages[i];
+                  documentText += `\n--- PAGE ${i + 1} ---\n`;
                   if (page.lines) {
                     documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
                   }
                 }
-                console.log(`✅ OCR complete: ${documentText.length} characters`);
+                console.log(`✅ OCR complete: ${pages.length} pages, ${documentText.length} characters`);
 
                 // Cache the OCR result
                 if (document_id) {
@@ -199,13 +203,17 @@ If the document text is provided, base your answer on the actual content.
 If document content is limited, provide a helpful response based on the document type and context.
 Always be specific and cite relevant details from the document when possible.`;
 
+    // Use up to 100k characters to ensure we get later pages
+    const truncatedText = documentText.substring(0, 100000);
+    const wasTruncated = documentText.length > 100000;
+
     const userPrompt = `${context ? `Context: ${context}\n\n` : ''}Document: ${filename || 'Unknown document'}
 
-${documentText ? `Document Content:\n${documentText.substring(0, 50000)}` : '[No document content available]'}
+${truncatedText ? `Document Content (${wasTruncated ? 'truncated' : 'full'}):\n${truncatedText}` : '[No document content available]'}
 
 Question: ${question}
 
-Please provide a clear, accurate answer based on the document content above.`;
+Please provide a clear, accurate answer based on the document content above. Reference specific page numbers when citing information.`;
 
     const aiResponse = await fetch(
       `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
