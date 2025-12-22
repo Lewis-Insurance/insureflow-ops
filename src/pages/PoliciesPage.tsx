@@ -8,11 +8,15 @@ import { PolicyStats } from '@/components/policies/PolicyStats';
 import { Button } from '@/components/ui/button';
 import { usePolicies, usePolicyStats, type PolicyFilters, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useToast } from '@/hooks/use-toast';
+import { AddPolicyModal } from '@/components/customers/AddPolicyModal';
+import { ClientSelector } from '@/components/client/ClientSelector';
 
 export default function PoliciesPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [filters, setFilters] = useState<PolicyFilters>({});
+  const [addPolicyOpen, setAddPolicyOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   
   const { data: policies = [], isLoading, refetch } = usePolicies(filters);
   const { data: stats, isLoading: statsLoading } = usePolicyStats();
@@ -46,11 +50,7 @@ export default function PoliciesPage() {
   };
 
   const handleCreatePolicy = () => {
-    // Navigate to create policy page when implemented
-    toast({
-      title: "Coming Soon",
-      description: "Policy creation will be available soon",
-    });
+    setAddPolicyOpen(true);
   };
 
   return (
@@ -73,10 +73,24 @@ export default function PoliciesPage() {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button onClick={handleCreatePolicy}>
+            <Button onClick={handleCreatePolicy} disabled={!selectedAccountId}>
               <Plus className="h-4 w-4 mr-2" />
               New Policy
             </Button>
+          </div>
+        </div>
+
+        {/* Create Policy (select client first) */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 max-w-[520px]">
+            <ClientSelector
+              value={selectedAccountId}
+              onChange={setSelectedAccountId}
+              placeholder="Select a client to create a policy..."
+            />
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {selectedAccountId ? 'Client selected' : 'Select a client to enable policy creation'}
           </div>
         </div>
 
@@ -95,6 +109,16 @@ export default function PoliciesPage() {
           policies={policies}
           loading={isLoading}
           onPolicySelect={handlePolicySelect}
+        />
+
+        <AddPolicyModal
+          open={addPolicyOpen}
+          onOpenChange={setAddPolicyOpen}
+          accountId={selectedAccountId || ''}
+          onSuccess={() => {
+            toast({ title: 'Policy created', description: 'Policy added successfully' });
+            refetch();
+          }}
         />
       </div>
     </AppLayout>
