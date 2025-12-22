@@ -10,7 +10,9 @@ import { AccountForm } from '@/components/crm/AccountForm';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { QuoteRankingDashboard } from '@/components/quotes/QuoteRankingDashboard';
 import { ClientIntelligencePanel } from '@/components/client/ClientIntelligencePanel';
-import { Brain } from 'lucide-react';
+import { DocumentsList } from '@/components/documents/DocumentsList';
+import { UploadDocModal } from '@/components/customers/UploadDocModal';
+import { Brain, FileText } from 'lucide-react';
 
 function normalizeTypeForRPC(v: any) {
   const out: any = { ...v };
@@ -31,6 +33,7 @@ export default function AccountDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [uploadDocOpen, setUploadDocOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +114,10 @@ export default function AccountDetail() {
               <Brain className="h-4 w-4" />
               AI Insights
             </TabsTrigger>
+            <TabsTrigger value="documents" className="gap-1.5">
+              <FileText className="h-4 w-4" />
+              Documents
+            </TabsTrigger>
             <TabsTrigger value="quotes">Quote Rankings</TabsTrigger>
             <TabsTrigger value="policies">Policies</TabsTrigger>
             <TabsTrigger value="claims">Claims</TabsTrigger>
@@ -139,6 +146,21 @@ export default function AccountDetail() {
             <ClientIntelligencePanel
               accountId={accountId}
               accountName={account.name}
+            />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <DocumentsList
+              accountId={accountId}
+              title="All Documents"
+              showPolicyColumn={true}
+              onUploadClick={() => setUploadDocOpen(true)}
+              onAskAI={(doc) => {
+                toast({
+                  title: 'AI Analysis',
+                  description: `Opening AI analysis for ${doc.filename}...`,
+                });
+              }}
             />
           </TabsContent>
 
@@ -178,6 +200,15 @@ export default function AccountDetail() {
           onSubmit={handleSave}
           account={account}
           loading={saving}
+        />
+
+        <UploadDocModal
+          open={uploadDocOpen}
+          onOpenChange={setUploadDocOpen}
+          accountId={accountId}
+          onSuccess={() => {
+            toast({ title: 'Document uploaded', description: 'Document has been added.' });
+          }}
         />
       </div>
     </AppLayout>
