@@ -85,80 +85,95 @@ serve(async (req) => {
     // Step 2: If no cached text, run OCR
     if (!documentText && storage_path && AZURE_ENDPOINT && AZURE_API_KEY) {
       console.log('📄 Running OCR on document...');
+      console.log('Storage path:', storage_path);
+
+      // Clean up storage path - remove leading slashes and bucket prefix if present
+      let cleanPath = storage_path;
+      if (cleanPath.startsWith('/')) {
+        cleanPath = cleanPath.substring(1);
+      }
+      if (cleanPath.startsWith('documents/')) {
+        cleanPath = cleanPath.substring('documents/'.length);
+      }
 
       // Create signed URL
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('documents')
-        .createSignedUrl(storage_path, 3600);
+        .createSignedUrl(cleanPath, 3600);
 
-      if (signedUrlError) throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
-
-      const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
-
-      // Try OCR with Azure Document Intelligence
-      const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31`;
-
-      const analyzeResponse = await fetch(analyzeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        },
-        body: JSON.stringify({
-          urlSource: signedUrlData.signedUrl,
-        })
-      });
-
-      if (!analyzeResponse.ok) {
-        const errorText = await analyzeResponse.text();
-        console.error('OCR failed:', errorText);
+      if (signedUrlError) {
+        console.error('Signed URL error:', signedUrlError);
+        console.log('Falling back to metadata-only analysis');
         // Fall back to answering without document content
-        documentText = `[Document: ${filename || 'Unknown'}. OCR failed - answering based on context only.]`;
-      } else {
-        const operationLocation = analyzeResponse.headers.get('Operation-Location');
-        
-        if (operationLocation) {
-          // Poll for results (max 30 seconds for Q&A)
-          let attempts = 0;
-          const maxAttempts = 15;
+        documentText = `[Document "${filename}" exists in the database but the file could not be accessed. Answering based on available context only.]`;
+      } else if (signedUrlData?.signedUrl) {
+        const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
 
-          while (attempts < maxAttempts) {
-            await sleep(2000);
-            attempts++;
+        // Try OCR with Azure Document Intelligence
+        const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31`;
 
-            const resultResponse = await fetch(operationLocation, {
-              headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
-            });
+        const analyzeResponse = await fetch(analyzeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+          },
+          body: JSON.stringify({
+            urlSource: signedUrlData.signedUrl,
+          })
+        });
 
-            const result = await resultResponse.json();
+        if (!analyzeResponse.ok) {
+          const errorText = await analyzeResponse.text();
+          console.error('OCR failed:', errorText);
+          // Fall back to answering without document content
+          documentText = `[Document: ${filename || 'Unknown'}. OCR failed - answering based on context only.]`;
+        } else {
+          const operationLocation = analyzeResponse.headers.get('Operation-Location');
+          
+          if (operationLocation) {
+            // Poll for results (max 30 seconds for Q&A)
+            let attempts = 0;
+            const maxAttempts = 15;
 
-            if (result.status === 'succeeded') {
-              // Extract text from pages
-              const pages = result.analyzeResult?.pages || [];
-              for (const page of pages) {
-                if (page.lines) {
-                  documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
+            while (attempts < maxAttempts) {
+              await sleep(2000);
+              attempts++;
+
+              const resultResponse = await fetch(operationLocation, {
+                headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
+              });
+
+              const result = await resultResponse.json();
+
+              if (result.status === 'succeeded') {
+                // Extract text from pages
+                const pages = result.analyzeResult?.pages || [];
+                for (const page of pages) {
+                  if (page.lines) {
+                    documentText += page.lines.map((line: any) => line.content || '').join('\n') + '\n';
+                  }
                 }
-              }
-              console.log(`✅ OCR complete: ${documentText.length} characters`);
+                console.log(`✅ OCR complete: ${documentText.length} characters`);
 
-              // Cache the OCR result
-              if (document_id) {
-                await supabase
-                  .from('document_analysis')
-                  .upsert({
-                    document_id,
-                    file_name: filename,
-                    ocr_text: documentText,
-                    ocr_char_count: documentText.length,
-                    total_pages: pages.length,
-                    processing_status: 'completed',
-                    processed_at: new Date().toISOString()
-                  }, { onConflict: 'document_id' });
+                // Cache the OCR result
+                if (document_id) {
+                  await supabase
+                    .from('document_analysis')
+                    .upsert({
+                      document_id,
+                      file_name: filename,
+                      ocr_text: documentText,
+                      ocr_char_count: documentText.length,
+                      total_pages: pages.length,
+                      processing_status: 'completed',
+                      processed_at: new Date().toISOString()
+                    }, { onConflict: 'document_id' });
+                }
+                break;
+              } else if (result.status === 'failed') {
+                throw new Error('OCR failed: ' + JSON.stringify(result.error));
               }
-              break;
-            } else if (result.status === 'failed') {
-              throw new Error('OCR failed: ' + JSON.stringify(result.error));
             }
           }
         }
