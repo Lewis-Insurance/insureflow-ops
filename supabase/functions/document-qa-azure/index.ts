@@ -106,25 +106,35 @@ serve(async (req) => {
       console.log('Clean path:', cleanPath);
       console.log('Using bucket:', storage_bucket);
 
-      // Create signed URL from the correct bucket
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      // Download file directly and send as base64 (more reliable for large docs)
+      console.log('📥 Downloading file from storage...');
+      const { data: fileData, error: downloadError } = await supabase.storage
         .from(storage_bucket)
-        .createSignedUrl(cleanPath, 3600);
+        .download(cleanPath);
 
-      if (signedUrlError) {
-        console.error('Signed URL error:', signedUrlError);
+      if (downloadError) {
+        console.error('Download error:', downloadError);
         console.log('Falling back to metadata-only analysis');
-        // Fall back to answering without document content
         documentText = `[Document "${filename}" exists in the database but the file could not be accessed. Answering based on available context only.]`;
-      } else if (signedUrlData?.signedUrl) {
+      } else if (fileData) {
+        // Convert blob to base64
+        const arrayBuffer = await fileData.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64Data = btoa(binary);
+        
+        console.log(`📄 File downloaded: ${bytes.length} bytes (${(bytes.length / 1024 / 1024).toFixed(2)} MB)`);
+        
         const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
 
-        // Try OCR with Azure Document Intelligence
+        // Try OCR with Azure Document Intelligence using base64
         // Use pages=1- to explicitly request ALL pages (no upper limit)
         const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31&pages=1-`;
         
-        console.log('🔗 Calling Azure with URL:', analyzeUrl);
-        console.log('🔗 Document URL length:', signedUrlData.signedUrl.length);
+        console.log('🔗 Calling Azure with base64 data...');
 
         const analyzeResponse = await fetch(analyzeUrl, {
           method: 'POST',
@@ -133,7 +143,7 @@ serve(async (req) => {
             'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
           },
           body: JSON.stringify({
-            urlSource: signedUrlData.signedUrl,
+            base64Source: base64Data,
           })
         });
         
