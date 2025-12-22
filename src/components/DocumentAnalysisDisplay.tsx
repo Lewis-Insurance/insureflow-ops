@@ -12,13 +12,32 @@ interface DocumentAnalysisDisplayProps {
 export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayProps) => {
   const { data: analysis, isLoading, error } = useDocumentAnalysisByDocumentId(documentId);
 
-  if (isLoading || analysis?.processing_status === 'pending') {
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center p-8">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Analyzing document...</p>
+            <p className="text-sm text-muted-foreground">Loading analysis...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (analysis?.processing_status === 'pending' || analysis?.processing_status === 'processing') {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-500" />
+            <p className="text-sm font-medium text-blue-600">Processing Document</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {analysis.processing_status === 'pending' ? 'Waiting to start...' : 'Extracting and analyzing...'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              This may take 30-60 seconds for large documents
+            </p>
           </div>
         </CardContent>
       </Card>
