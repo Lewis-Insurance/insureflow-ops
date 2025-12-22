@@ -96,7 +96,23 @@ export default function PrismAIPage() {
 
   // Test API key
   const testAPIKey = async (key: string) => {
-    if (!key || !key.startsWith('sk_prism_')) {
+    // Trim whitespace
+    const trimmedKey = key?.trim();
+    
+    // If empty, that's okay (user can use system key)
+    if (!trimmedKey) {
+      setApiKeyStatus('none');
+      return true; // Allow empty - system key will be used
+    }
+
+    // Check format - must start with sk_prism_ and have reasonable length
+    if (!trimmedKey.startsWith('sk_prism_')) {
+      setApiKeyStatus('invalid');
+      return false;
+    }
+
+    // Minimum length check (sk_prism_ is 9 chars, plus some base64url chars)
+    if (trimmedKey.length < 20) {
       setApiKeyStatus('invalid');
       return false;
     }
@@ -104,7 +120,7 @@ export default function PrismAIPage() {
     try {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lrqajzwcmdwahnjyidgv.supabase.co'}/functions/v1/prism-api/usage`, {
         headers: {
-          'Authorization': `Bearer ${key}`,
+          'Authorization': `Bearer ${trimmedKey}`,
         },
       });
 
@@ -112,12 +128,20 @@ export default function PrismAIPage() {
         setApiKeyStatus('valid');
         return true;
       } else {
-        setApiKeyStatus('invalid');
-        return false;
+        // If it's a 401, might be invalid key format or expired
+        // If it's other error, might be rate limit or other issue - still consider format valid
+        if (response.status === 401) {
+          setApiKeyStatus('invalid');
+          return false;
+        }
+        // Other errors might be temporary - mark as checking
+        setApiKeyStatus('checking');
+        return true; // Format is valid, even if API call failed
       }
     } catch {
-      setApiKeyStatus('invalid');
-      return false;
+      // Network error - don't mark as invalid, just checking
+      setApiKeyStatus('checking');
+      return true; // Format looks valid
     }
   };
 
@@ -125,11 +149,57 @@ export default function PrismAIPage() {
   const handleSaveAPIKey = async () => {
     if (!user) return;
 
-    const isValid = await testAPIKey(apiKey);
-    if (!isValid) {
+    const trimmedKey = apiKey.trim();
+    
+    // If empty, remove the key (use system key instead)
+    if (!trimmedKey) {
+      setIsSavingApiKey(true);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ prism_api_key: null })
+          .eq('id', user.id);
+
+        if (error) throw error;
+
+        setApiKey('');
+        setApiKeyStatus('none');
+        toast({
+          title: 'API Key Removed',
+          description: 'You will now use the system-wide API key.',
+        });
+        setIsSavingApiKey(false);
+        return;
+      } catch (error) {
+        console.error('Error removing API key:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to remove API key',
+          variant: 'destructive',
+        });
+        setIsSavingApiKey(false);
+        return;
+      }
+    }
+
+    // Validate format
+    if (!trimmedKey.startsWith('sk_prism_') || trimmedKey.length < 20) {
+      toast({
+        title: 'Invalid API Key Format',
+        description: 'API key must start with "sk_prism_" and be at least 20 characters long.',
+        variant: 'destructive',
+      });
+      setApiKeyStatus('invalid');
+      return;
+    }
+
+    // Test the key (but don't block if test fails - might be network issue)
+    await testAPIKey(trimmedKey);
+    
+    if (apiKeyStatus === 'invalid') {
       toast({
         title: 'Invalid API Key',
-        description: 'Please check your API key format (should start with sk_prism_)',
+        description: 'The API key format appears invalid. Please check and try again.',
         variant: 'destructive',
       });
       return;
@@ -139,7 +209,7 @@ export default function PrismAIPage() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ prism_api_key: apiKey })
+        .update({ prism_api_key: trimmedKey })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -834,12 +904,12 @@ export default function PrismAIPage() {
               <CardHeader>
                 <CardTitle>API Configuration</CardTitle>
                 <CardDescription>
-                  Configure your Prism API key for personalized access
+                  Optional: Configure your personal Prism API key. If left empty, the system-wide key will be used automatically.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api-key">Prism API Key</Label>
+                  <Label htmlFor="api-key">Personal Prism API Key (Optional)</Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Input
@@ -907,7 +977,7 @@ export default function PrismAIPage() {
                     )}
                     {apiKeyStatus === 'none' && !apiKey && (
                       <span className="text-muted-foreground">
-                        Enter your API key (starts with sk_prism_)
+                        Optional: Enter your personal API key (starts with sk_prism_) or leave empty to use system key
                       </span>
                     )}
                   </div>

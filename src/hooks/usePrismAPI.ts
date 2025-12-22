@@ -26,7 +26,16 @@ const PRISM_API_BASE = `${SUPABASE_URL}/functions/v1/prism-api`;
 // =============================================================================
 
 async function getPrismAPIKey(): Promise<string> {
-  // Check if user has API key in their profile
+  // For authenticated users, we use their Supabase session token
+  // The edge function will automatically use the system API key for authenticated users
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session?.access_token) {
+    // Return the Supabase session token - edge function will handle system key automatically
+    return session.access_token;
+  }
+
+  // Fallback: Check if user has API key in their profile (for external API access)
   const { data: profile } = await supabase
     .from('profiles')
     .select('prism_api_key')
@@ -37,13 +46,13 @@ async function getPrismAPIKey(): Promise<string> {
     return profile.prism_api_key;
   }
 
-  // Fallback to system-wide key (if stored in env or config)
+  // Last resort: system-wide key from env (if configured)
   const systemKey = import.meta.env.VITE_PRISM_API_KEY;
   if (systemKey) {
     return systemKey;
   }
 
-  throw new Error('Prism API key not found. Please configure your API key in settings.');
+  throw new Error('Please log in to use Prism AI, or configure your API key in settings.');
 }
 
 // =============================================================================
