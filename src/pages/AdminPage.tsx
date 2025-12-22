@@ -19,6 +19,7 @@ import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
 import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
 import { SecurityStatus } from '@/components/crm/SecurityStatus';
 import { EnhancedAuditViewer } from '@/components/crm/EnhancedAuditViewer';
+import { SystemConfiguration } from '@/components/admin/SystemConfiguration';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 
@@ -200,19 +201,7 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Configuration</CardTitle>
-                <CardDescription>
-                  System-wide settings and configuration
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  System configuration features coming soon
-                </div>
-              </CardContent>
-            </Card>
+            <SystemConfiguration />
           </TabsContent>
         </Tabs>
       </div>
