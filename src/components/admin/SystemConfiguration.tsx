@@ -65,6 +65,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { EmailProviderSettings } from './EmailProviderSettings';
+import { ESignatureSettings } from './ESignatureSettings';
+import { AutomationSettings } from './AutomationSettings';
+import { TemplatesSettings } from './TemplatesSettings';
+import { NotificationsSettings } from './NotificationsSettings';
+import { ComplianceSettings } from './ComplianceSettings';
 
 // =============================================================================
 // TYPES
@@ -291,22 +297,46 @@ export function SystemConfiguration() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
           <TabsTrigger value="api-keys" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
-            API Keys
+            <span className="hidden sm:inline">API Keys</span>
+          </TabsTrigger>
+          <TabsTrigger value="email" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Email</span>
+          </TabsTrigger>
+          <TabsTrigger value="esign" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">E-Sign</span>
+          </TabsTrigger>
+          <TabsTrigger value="automation" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Automation</span>
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Templates</span>
           </TabsTrigger>
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
-            Branding
+            <span className="hidden sm:inline">Branding</span>
           </TabsTrigger>
           <TabsTrigger value="features" className="flex items-center gap-2">
             <ToggleLeft className="h-4 w-4" />
-            Features
+            <span className="hidden sm:inline">Features</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Alerts</span>
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Compliance</span>
           </TabsTrigger>
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            General
+            <span className="hidden sm:inline">General</span>
           </TabsTrigger>
         </TabsList>
 
@@ -566,6 +596,26 @@ export function SystemConfiguration() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Email Provider Tab */}
+        <TabsContent value="email" className="space-y-6 mt-6">
+          <EmailProviderSettings />
+        </TabsContent>
+
+        {/* E-Signature Tab */}
+        <TabsContent value="esign" className="space-y-6 mt-6">
+          <ESignatureSettings />
+        </TabsContent>
+
+        {/* Automation Tab */}
+        <TabsContent value="automation" className="space-y-6 mt-6">
+          <AutomationSettings />
+        </TabsContent>
+
+        {/* Templates Tab */}
+        <TabsContent value="templates" className="space-y-6 mt-6">
+          <TemplatesSettings />
         </TabsContent>
 
         {/* Branding Tab */}
@@ -889,6 +939,16 @@ export function SystemConfiguration() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-6 mt-6">
+          <NotificationsSettings />
+        </TabsContent>
+
+        {/* Compliance Tab */}
+        <TabsContent value="compliance" className="space-y-6 mt-6">
+          <ComplianceSettings />
         </TabsContent>
 
         {/* General Tab */}
