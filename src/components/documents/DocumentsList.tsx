@@ -55,6 +55,7 @@ import {
 import { useDocuments, useDeleteDocument, useUpdateDocument, useDocumentUrl, type Document } from '@/hooks/useDocuments';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { DocumentAIAnalysisModal } from './DocumentAIAnalysisModal';
 
 interface DocumentsListProps {
   accountId?: string;
@@ -110,7 +111,7 @@ function DocumentActions({
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onAskAI?: () => void;
+  onAskAI: () => void;
   onDownload: () => void;
 }) {
   return (
@@ -134,12 +135,10 @@ function DocumentActions({
           <Pencil className="h-4 w-4 mr-2" />
           Edit Details
         </DropdownMenuItem>
-        {onAskAI && (
-          <DropdownMenuItem onClick={onAskAI}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Ask AI
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem onClick={onAskAI}>
+          <Sparkles className="h-4 w-4 mr-2" />
+          Ask AI
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="text-destructive">
           <Trash2 className="h-4 w-4 mr-2" />
@@ -165,6 +164,7 @@ export function DocumentsList({
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<Document | null>(null);
+  const [aiAnalysisDoc, setAiAnalysisDoc] = useState<Document | null>(null);
   const [editForm, setEditForm] = useState({ filename: '', kind: '' });
 
   const handleView = async (doc: Document) => {
@@ -222,6 +222,8 @@ export function DocumentsList({
   };
 
   const handleAskAI = (doc: Document) => {
+    setAiAnalysisDoc(doc);
+    // Also call external handler if provided
     if (onAskAI) {
       onAskAI(doc);
     }
@@ -417,6 +419,13 @@ export function DocumentsList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI Analysis Modal */}
+      <DocumentAIAnalysisModal
+        open={!!aiAnalysisDoc}
+        onOpenChange={(open) => !open && setAiAnalysisDoc(null)}
+        document={aiAnalysisDoc}
+      />
     </>
   );
 }
