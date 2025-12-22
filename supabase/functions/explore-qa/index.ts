@@ -1,7 +1,11 @@
 /**
  * Explore Q&A Edge Function
  * 
- * Provides evidence-backed Q&A for the Explore Insurance Document module.
+ * ALIGNED WITH EXISTING SCHEMA:
+ * - Uses knowledge_base for chunk retrieval (not explore_chunks)
+ * - Uses ai_conversations/ai_messages for chat history (not explore_messages)
+ * - Uses document_extractions for document context
+ * - Uses document_evidence_items for citations
  * 
  * Key principles:
  * - NO GUESSING: If information is not in evidence, say "not found"
@@ -19,7 +23,9 @@ const corsHeaders = {
 };
 
 interface QARequest {
-  session_id: string;
+  extraction_id?: string; // Filter by specific document extraction
+  document_id?: string; // Filter by documents table ID
+  conversation_id?: string; // Existing ai_conversations ID
   question: string;
   max_chunks?: number;
   include_conversation?: boolean;
@@ -113,39 +119,55 @@ serve(async (req) => {
       );
     }
 
-    // Parse request
-    const { session_id, question, max_chunks = 10, include_conversation = true }: QARequest = await req.json();
+    // Parse request - aligned with existing tables
+    const { 
+      extraction_id, 
+      document_id, 
+      conversation_id,
+      question, 
+      max_chunks = 10, 
+      include_conversation = true 
+    }: QARequest = await req.json();
     
-    if (!session_id || !question) {
+    if (!question) {
       return new Response(
-        JSON.stringify({ error: 'session_id and question are required' }),
+        JSON.stringify({ error: 'question is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`[explore-qa] User ${user.id} asking: "${question.slice(0, 50)}..."`);
 
-    // Verify session ownership
-    const { data: session, error: sessionError } = await supabase
-      .from('explore_sessions')
-      .select('id, created_by, account_id, policy_id')
-      .eq('id', session_id)
-      .eq('created_by', user.id)
-      .single();
+    // Get or create ai_conversation (using existing table)
+    let currentConversationId = conversation_id;
+    
+    if (!currentConversationId) {
+      const { data: newConvo, error: convoError } = await supabase
+        .from('ai_conversations')
+        .insert({
+          user_id: user.id,
+          title: `Document Q&A: ${question.slice(0, 50)}...`,
+          context: { extraction_id, document_id },
+        })
+        .select()
+        .single();
 
-    if (sessionError || !session) {
-      return new Response(
-        JSON.stringify({ error: 'Session not found or access denied' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (convoError) {
+        console.error('[explore-qa] Failed to create conversation:', convoError);
+      } else {
+        currentConversationId = newConvo.id;
+      }
     }
 
-    // Save user message
-    await supabase.from('explore_messages').insert({
-      session_id,
-      role: 'user',
-      content: question,
-    });
+    // Save user message in ai_messages (using existing table)
+    if (currentConversationId) {
+      await supabase.from('ai_messages').insert({
+        conversation_id: currentConversationId,
+        role: 'user',
+        content: question,
+        metadata: { extraction_id, document_id },
+      });
+    }
 
     // =======================================================================
     // STEP 1: Generate question embedding for vector search
@@ -175,40 +197,51 @@ serve(async (req) => {
     }
 
     // =======================================================================
-    // STEP 2: Retrieve relevant chunks
+    // STEP 2: Retrieve relevant chunks from knowledge_base (aligned)
     // =======================================================================
     
     let relevantChunks: any[] = [];
 
     if (questionEmbedding) {
-      // Vector search
-      const { data: vectorChunks } = await supabase.rpc('search_explore_chunks', {
-        p_session_id: session_id,
-        p_embedding: `[${questionEmbedding.join(',')}]`,
-        p_limit: max_chunks,
-        p_threshold: 0.5,
+      // Vector search using aligned function
+      const { data: vectorChunks } = await supabase.rpc('search_document_chunks', {
+        p_query_embedding: `[${questionEmbedding.join(',')}]`,
+        p_document_id: document_id || null,
+        p_extraction_id: extraction_id || null,
+        p_match_threshold: 0.5,
+        p_match_count: max_chunks,
       });
 
       relevantChunks = vectorChunks || [];
     }
 
-    // Fallback: keyword search if vector search returned few results
+    // Fallback: keyword search from knowledge_base if vector search returned few results
     if (relevantChunks.length < 3) {
       const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       
-      const { data: keywordChunks } = await supabase
-        .from('explore_chunks')
-        .select('id, document_id, chunk_text, page_start, evidence_ids')
-        .in('document_id', 
-          supabase.from('explore_documents').select('id').eq('session_id', session_id)
-        )
-        .limit(max_chunks);
+      let query = supabase
+        .from('knowledge_base')
+        .select('id, content, page_index, evidence_ids, document_extraction_id, document_id')
+        .eq('category', 'document_chunk');
+      
+      if (extraction_id) {
+        query = query.eq('document_extraction_id', extraction_id);
+      } else if (document_id) {
+        query = query.eq('document_id', document_id);
+      }
+      
+      const { data: keywordChunks } = await query.limit(max_chunks);
 
       // Simple keyword scoring
       const scoredChunks = (keywordChunks || []).map(chunk => {
-        const text = chunk.chunk_text.toLowerCase();
+        const text = chunk.content.toLowerCase();
         const matchCount = keywords.filter(kw => text.includes(kw)).length;
-        return { ...chunk, similarity: matchCount / Math.max(keywords.length, 1) };
+        return { 
+          ...chunk, 
+          chunk_text: chunk.content,
+          page_start: chunk.page_index,
+          similarity: matchCount / Math.max(keywords.length, 1) 
+        };
       }).sort((a, b) => b.similarity - a.similarity);
 
       // Merge with vector results
@@ -217,9 +250,10 @@ serve(async (req) => {
         if (!existingIds.has(chunk.id) && relevantChunks.length < max_chunks) {
           relevantChunks.push({
             chunk_id: chunk.id,
+            document_extraction_id: chunk.document_extraction_id,
             document_id: chunk.document_id,
-            chunk_text: chunk.chunk_text,
-            page_start: chunk.page_start,
+            chunk_text: chunk.content,
+            page_start: chunk.page_index,
             evidence_ids: chunk.evidence_ids,
             similarity: chunk.similarity,
           });
@@ -227,45 +261,45 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[explore-qa] Retrieved ${relevantChunks.length} chunks`);
+    console.log(`[explore-qa] Retrieved ${relevantChunks.length} chunks from knowledge_base`);
 
     // =======================================================================
-    // STEP 3: Get evidence details for citations
+    // STEP 3: Get evidence details from document_evidence_items (aligned)
     // =======================================================================
     
     const allEvidenceIds = relevantChunks.flatMap(c => c.evidence_ids || []);
     const uniqueEvidenceIds = [...new Set(allEvidenceIds)];
 
     const { data: evidenceItems } = await supabase
-      .from('explore_evidence_items')
-      .select('evidence_id, document_id, page_index, snippet_text, confidence, label')
+      .from('document_evidence_items')
+      .select('evidence_id, extraction_id, document_id, page_index, snippet_text, confidence, label')
       .in('evidence_id', uniqueEvidenceIds.slice(0, 100));
 
     const evidenceMap = new Map((evidenceItems || []).map(e => [e.evidence_id, e]));
 
     // =======================================================================
-    // STEP 4: Get document metadata
+    // STEP 4: Get document_extractions metadata (aligned)
     // =======================================================================
     
-    const docIds = [...new Set(relevantChunks.map(c => c.document_id))];
-    const { data: documents } = await supabase
-      .from('explore_documents')
-      .select('id, filename, predicted_doc_type, lob_detected, carrier_detected')
-      .in('id', docIds);
+    const extractionIds = [...new Set(relevantChunks.map(c => c.document_extraction_id).filter(Boolean))];
+    const { data: extractions } = await supabase
+      .from('document_extractions')
+      .select('id, document_name, document_type, extracted_fields')
+      .in('id', extractionIds);
 
-    const docMap = new Map((documents || []).map(d => [d.id, d]));
+    const extractionMap = new Map((extractions || []).map(d => [d.id, d]));
 
     // =======================================================================
-    // STEP 5: Get conversation history (if enabled)
+    // STEP 5: Get conversation history from ai_messages (aligned)
     // =======================================================================
     
     let conversationContext = '';
 
-    if (include_conversation) {
+    if (include_conversation && currentConversationId) {
       const { data: history } = await supabase
-        .from('explore_messages')
+        .from('ai_messages')
         .select('role, content')
-        .eq('session_id', session_id)
+        .eq('conversation_id', currentConversationId)
         .order('created_at', { ascending: false })
         .limit(6); // Last 3 exchanges
 
@@ -279,7 +313,7 @@ serve(async (req) => {
     // STEP 6: Build context pack for LLM
     // =======================================================================
     
-    const contextPack = buildContextPack(relevantChunks, evidenceMap, docMap);
+    const contextPack = buildContextPack(relevantChunks, evidenceMap, extractionMap);
 
     // =======================================================================
     // STEP 7: Call LLM
@@ -354,29 +388,34 @@ Provide your answer in the required JSON format. Remember to cite evidence IDs f
     }
 
     // =======================================================================
-    // STEP 9: Save assistant message
+    // STEP 9: Save assistant message in ai_messages (aligned)
     // =======================================================================
     
     const latencyMs = Date.now() - startTime;
 
-    await supabase.from('explore_messages').insert({
-      session_id,
-      role: 'assistant',
-      content: parsedResponse.answer || assistantContent,
-      citations: citations,
-      model_used: AZURE_OPENAI_DEPLOYMENT,
-      tokens_used: chatData.usage?.total_tokens,
-      latency_ms: latencyMs,
-      chunks_retrieved: relevantChunks.length,
-      retrieval_scores: Object.fromEntries(
-        relevantChunks.map(c => [c.chunk_id, c.similarity])
-      ),
-    });
+    if (currentConversationId) {
+      await supabase.from('ai_messages').insert({
+        conversation_id: currentConversationId,
+        role: 'assistant',
+        content: parsedResponse.answer || assistantContent,
+        citations: citations,
+        metadata: {
+          model_used: AZURE_OPENAI_DEPLOYMENT,
+          tokens_used: chatData.usage?.total_tokens,
+          latency_ms: latencyMs,
+          chunks_retrieved: relevantChunks.length,
+          retrieval_scores: Object.fromEntries(
+            relevantChunks.map(c => [c.chunk_id, c.similarity])
+          ),
+          confidence: parsedResponse.confidence,
+        },
+      });
+    }
 
     console.log(`[explore-qa] Response generated in ${latencyMs}ms with ${citations.length} citations`);
 
     // =======================================================================
-    // STEP 10: Return response
+    // STEP 10: Return response with conversation_id for continuity
     // =======================================================================
     
     const response: QAResponse = {
@@ -389,7 +428,10 @@ Provide your answer in the required JSON format. Remember to cite evidence IDs f
     };
 
     return new Response(
-      JSON.stringify(response),
+      JSON.stringify({
+        ...response,
+        conversation_id: currentConversationId, // For continuing the conversation
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -409,31 +451,32 @@ Provide your answer in the required JSON format. Remember to cite evidence IDs f
 function buildContextPack(
   chunks: any[],
   evidenceMap: Map<string, any>,
-  docMap: Map<string, any>
+  extractionMap: Map<string, any>
 ): string {
   const sections: string[] = [];
 
-  // Group chunks by document
-  const chunksByDoc = new Map<string, any[]>();
+  // Group chunks by extraction
+  const chunksByExtraction = new Map<string, any[]>();
   for (const chunk of chunks) {
-    const docId = chunk.document_id;
-    if (!chunksByDoc.has(docId)) {
-      chunksByDoc.set(docId, []);
+    const extId = chunk.document_extraction_id;
+    if (!chunksByExtraction.has(extId)) {
+      chunksByExtraction.set(extId, []);
     }
-    chunksByDoc.get(docId)!.push(chunk);
+    chunksByExtraction.get(extId)!.push(chunk);
   }
 
-  for (const [docId, docChunks] of chunksByDoc) {
-    const doc = docMap.get(docId);
-    const docLabel = doc 
-      ? `${doc.filename} (${doc.predicted_doc_type || 'unknown'}, ${doc.lob_detected?.join('/') || 'N/A'})`
+  for (const [extId, extChunks] of chunksByExtraction) {
+    const extraction = extractionMap.get(extId);
+    const classification = extraction?.extracted_fields?._classification;
+    const docLabel = extraction 
+      ? `${extraction.document_name} (${classification?.doc_type || extraction.document_type || 'unknown'}, ${classification?.lobs?.join('/') || 'N/A'})`
       : 'Document';
 
     sections.push(`\n=== DOCUMENT: ${docLabel} ===`);
 
-    for (const chunk of docChunks) {
+    for (const chunk of extChunks) {
       sections.push(`\n[Page ${(chunk.page_start || 0) + 1}]`);
-      sections.push(chunk.chunk_text);
+      sections.push(chunk.chunk_text || chunk.content);
 
       // Add evidence snippets with IDs
       const evidenceIds = chunk.evidence_ids || [];

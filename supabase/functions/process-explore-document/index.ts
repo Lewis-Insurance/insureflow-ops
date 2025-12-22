@@ -1,14 +1,17 @@
 /**
  * Process Explore Document Edge Function
  * 
- * Processes uploaded documents for the Explore Insurance Document module:
- * 1. Quality assessment
- * 2. Azure Document Intelligence OCR/Layout
- * 3. Build evidence catalog with bbox/snippets
- * 4. Chunk document for retrieval
- * 5. Generate embeddings
- * 6. Classify document type + LOB
- * 7. Optional: Extract structured snapshot
+ * ALIGNED WITH EXISTING SCHEMA:
+ * - Uses document_extractions table (not explore_documents)
+ * - Uses knowledge_base table for chunks (not explore_chunks)
+ * - Uses document_evidence_items for bbox evidence
+ * 
+ * Pipeline:
+ * 1. Azure Document Intelligence OCR/Layout
+ * 2. Build evidence catalog (page+bbox+snippet) -> document_evidence_items
+ * 3. Chunk text and store -> knowledge_base with document_extraction_id
+ * 4. Generate embeddings (768 dim to match existing knowledge_base)
+ * 5. Update document_extractions with status
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -19,15 +22,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configuration
-const CHUNK_SIZE = 1500; // tokens approx
+// Configuration - 768 dim to match existing knowledge_base.embedding
+const CHUNK_SIZE = 1500;
 const CHUNK_OVERLAP = 200;
 const MAX_SNIPPET_LENGTH = 500;
-const EMBEDDING_MODEL = 'text-embedding-ada-002';
+const EMBEDDING_DIM = 768;
 
 interface ProcessRequest {
-  document_id: string;
-  session_id: string;
+  extraction_id: string; // document_extractions.id
+  document_id?: string; // documents.id (optional)
 }
 
 interface EvidenceItem {
@@ -73,47 +76,52 @@ serve(async (req) => {
       throw new Error('Azure Document Intelligence credentials not configured');
     }
 
-    // Parse request
-    const { document_id, session_id }: ProcessRequest = await req.json();
-    console.log(`[process-explore-document] Processing document ${document_id} in session ${session_id}`);
+    // Parse request - aligned with existing tables
+    const { extraction_id, document_id }: ProcessRequest = await req.json();
+    console.log(`[process-explore-document] Processing extraction ${extraction_id}`);
 
-    // Update status to processing
+    // Update status to processing in document_extractions
     await supabase
-      .from('explore_documents')
+      .from('document_extractions')
       .update({
         status: 'processing',
-        processing_started_at: new Date().toISOString(),
-        attempt_count: supabase.raw('attempt_count + 1'),
-        last_attempt_at: new Date().toISOString(),
+        extraction_started_at: new Date().toISOString(),
+        embedding_status: 'processing',
+        retry_count: supabase.rpc ? undefined : 0, // Increment handled separately
       })
-      .eq('id', document_id);
+      .eq('id', extraction_id);
 
-    // Get document record
-    const { data: doc, error: docError } = await supabase
-      .from('explore_documents')
+    // Get extraction record
+    const { data: extraction, error: extractionError } = await supabase
+      .from('document_extractions')
       .select('*')
-      .eq('id', document_id)
+      .eq('id', extraction_id)
       .single();
 
-    if (docError || !doc) {
-      throw new Error(`Document not found: ${docError?.message}`);
+    if (extractionError || !extraction) {
+      throw new Error(`Extraction not found: ${extractionError?.message}`);
     }
 
-    // Get document file from storage
+    // Get document file - extraction has document_url
     let documentBytes: Uint8Array;
+    const documentUrl = extraction.document_url;
     
-    if (doc.storage_path) {
+    // Try to download from URL or storage
+    if (documentUrl.startsWith('http')) {
+      const response = await fetch(documentUrl);
+      if (!response.ok) throw new Error(`Failed to fetch document: ${response.status}`);
+      documentBytes = new Uint8Array(await response.arrayBuffer());
+    } else {
+      // Assume it's a storage path
       const { data: fileData, error: downloadError } = await supabase.storage
-        .from(doc.storage_bucket || 'documents')
-        .download(doc.storage_path);
+        .from('documents')
+        .download(documentUrl);
 
       if (downloadError) {
         throw new Error(`Failed to download file: ${downloadError.message}`);
       }
 
       documentBytes = new Uint8Array(await fileData.arrayBuffer());
-    } else {
-      throw new Error('No storage path available for document');
     }
 
     console.log(`[process-explore-document] Downloaded ${documentBytes.length} bytes`);
@@ -264,14 +272,15 @@ serve(async (req) => {
 
     console.log(`[process-explore-document] Built ${evidenceItems.length} evidence items`);
 
-    // Store evidence items
+    // Store evidence items in document_evidence_items table (aligned)
     if (evidenceItems.length > 0) {
       const { error: evidenceError } = await supabase
-        .from('explore_evidence_items')
+        .from('document_evidence_items')
         .upsert(
           evidenceItems.map(e => ({
             evidence_id: e.evidence_id,
-            document_id: document_id,
+            extraction_id: extraction_id,
+            document_id: document_id || null,
             page_index: e.page_index,
             bbox: e.bbox,
             snippet_text: e.snippet_text,
@@ -279,14 +288,29 @@ serve(async (req) => {
             source_type: e.source_type,
             confidence: e.confidence,
             tags: e.tags,
-            potential_field: e.potential_field,
           })),
-          { onConflict: 'document_id,evidence_id' }
+          { onConflict: 'extraction_id,evidence_id' }
         );
 
       if (evidenceError) {
         console.error('[process-explore-document] Failed to store evidence:', evidenceError);
       }
+
+      // Also store in evidence_catalog JSONB for quick access
+      await supabase
+        .from('document_extractions')
+        .update({
+          evidence_catalog: evidenceItems.map(e => ({
+            evidence_id: e.evidence_id,
+            page_index: e.page_index,
+            bbox: e.bbox,
+            snippet_text: e.snippet_text.slice(0, 200),
+            label: e.label,
+            confidence: e.confidence,
+            tags: e.tags,
+          })),
+        })
+        .eq('id', extraction_id);
     }
 
     // =======================================================================
@@ -304,17 +328,18 @@ serve(async (req) => {
     
     let embeddingsGenerated = 0;
 
+    // Store chunks in knowledge_base table (aligned with existing schema)
+    // Use 768-dim embeddings to match existing knowledge_base.embedding column
     if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY && chunks.length > 0) {
       const EMBEDDING_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_EMBEDDING_DEPLOYMENT') || 'text-embedding-ada-002';
       const embeddingUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${EMBEDDING_DEPLOYMENT}/embeddings?api-version=2024-02-15-preview`;
 
-      // Batch embeddings (max 16 at a time)
       const batchSize = 16;
       const chunksWithEmbeddings: Array<DocumentChunk & { embedding?: number[] }> = [...chunks];
 
       for (let i = 0; i < chunks.length; i += batchSize) {
         const batch = chunks.slice(i, i + batchSize);
-        const texts = batch.map(c => c.chunk_text.slice(0, 8000)); // Truncate if too long
+        const texts = batch.map(c => c.chunk_text.slice(0, 8000));
 
         try {
           const embResponse = await fetch(embeddingUrl, {
@@ -340,19 +365,28 @@ serve(async (req) => {
         }
       }
 
-      // Store chunks with embeddings
+      // Store chunks in knowledge_base table (reusing existing table!)
       for (const chunk of chunksWithEmbeddings) {
         const { error: chunkError } = await supabase
-          .from('explore_chunks')
+          .from('knowledge_base')
           .insert({
-            document_id: document_id,
-            chunk_text: chunk.chunk_text,
-            chunk_index: chunk.chunk_index,
-            page_start: chunk.page_start,
-            page_end: chunk.page_end,
+            title: `Chunk ${chunk.chunk_index + 1} - ${extraction.document_name}`,
+            content: chunk.chunk_text,
+            category: 'document_chunk',
+            tags: ['explore', classification.docType || 'unknown', ...(classification.lobs || [])],
+            source: extraction.document_name,
+            account_id: extraction.account_id || null,
+            document_extraction_id: extraction_id,
+            document_id: document_id || null,
+            page_index: chunk.page_start,
             evidence_ids: chunk.evidence_ids,
+            chunk_index: chunk.chunk_index,
             embedding: chunk.embedding ? `[${chunk.embedding.join(',')}]` : null,
-            token_count: Math.ceil(chunk.chunk_text.length / 4),
+            metadata: {
+              page_start: chunk.page_start,
+              page_end: chunk.page_end,
+              token_count: Math.ceil(chunk.chunk_text.length / 4),
+            },
           });
 
         if (chunkError) {
@@ -362,19 +396,23 @@ serve(async (req) => {
     } else {
       // Store chunks without embeddings
       for (const chunk of chunks) {
-        await supabase.from('explore_chunks').insert({
-          document_id: document_id,
-          chunk_text: chunk.chunk_text,
-          chunk_index: chunk.chunk_index,
-          page_start: chunk.page_start,
-          page_end: chunk.page_end,
+        await supabase.from('knowledge_base').insert({
+          title: `Chunk ${chunk.chunk_index + 1} - ${extraction.document_name}`,
+          content: chunk.chunk_text,
+          category: 'document_chunk',
+          tags: ['explore', classification.docType || 'unknown'],
+          source: extraction.document_name,
+          account_id: extraction.account_id || null,
+          document_extraction_id: extraction_id,
+          document_id: document_id || null,
+          page_index: chunk.page_start,
           evidence_ids: chunk.evidence_ids,
-          token_count: Math.ceil(chunk.chunk_text.length / 4),
+          chunk_index: chunk.chunk_index,
         });
       }
     }
 
-    console.log(`[process-explore-document] Stored ${chunks.length} chunks, ${embeddingsGenerated} with embeddings`);
+    console.log(`[process-explore-document] Stored ${chunks.length} chunks in knowledge_base, ${embeddingsGenerated} with embeddings`);
 
     // =======================================================================
     // STEP 5: Classify Document Type + LOB
@@ -397,40 +435,52 @@ serve(async (req) => {
     };
 
     // =======================================================================
-    // STEP 7: Update Document Record
+    // STEP 7: Update document_extractions Record (aligned with existing table)
     // =======================================================================
     
     const processingDuration = Date.now() - startTime;
 
     const { error: updateError } = await supabase
-      .from('explore_documents')
+      .from('document_extractions')
       .update({
-        status: 'ready',
+        status: 'extracted',
+        document_type: classification.docType,
         page_count: pageCount,
-        predicted_doc_type: classification.docType,
-        predicted_doc_type_confidence: classification.docTypeConfidence,
-        lob_detected: classification.lobs,
-        lob_confidence: classification.lobConfidence,
-        carrier_detected: classification.carrier,
-        quality_score: qualityScore,
-        quality_issues: qualityIssues,
-        azure_confidence: azureConfidence,
-        evidence_count: evidenceItems.length,
+        azure_confidence_score: azureConfidence,
+        azure_text_content: fullText.slice(0, 50000), // Bounded
         chunk_count: chunks.length,
-        processing_completed_at: new Date().toISOString(),
-        processing_duration_ms: processingDuration,
+        embedding_status: embeddingsGenerated > 0 ? 'ready' : 'skipped',
+        extraction_completed_at: new Date().toISOString(),
+        // Store classification in extracted_fields
+        extracted_fields: {
+          ...extraction.extracted_fields,
+          _classification: {
+            doc_type: classification.docType,
+            doc_type_confidence: classification.docTypeConfidence,
+            lobs: classification.lobs,
+            lob_confidence: classification.lobConfidence,
+            carrier: classification.carrier,
+          },
+          _quality: {
+            score: qualityScore,
+            issues: qualityIssues,
+            evidence_count: evidenceItems.length,
+            chunk_count: chunks.length,
+          },
+        },
       })
-      .eq('id', document_id);
+      .eq('id', extraction_id);
 
     if (updateError) {
-      throw new Error(`Failed to update document: ${updateError.message}`);
+      throw new Error(`Failed to update extraction: ${updateError.message}`);
     }
 
-    console.log(`[process-explore-document] Document ${document_id} processed in ${processingDuration}ms`);
+    console.log(`[process-explore-document] Extraction ${extraction_id} processed in ${processingDuration}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
+        extraction_id: extraction_id,
         document_id: document_id,
         evidence_count: evidenceItems.length,
         chunk_count: chunks.length,
@@ -444,22 +494,23 @@ serve(async (req) => {
   } catch (error) {
     console.error('[process-explore-document] Error:', error);
 
-    // Try to update document status to error
+    // Update document_extractions status to failed (aligned)
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       const body = await req.clone().json().catch(() => ({}));
-      if (body.document_id) {
+      if (body.extraction_id) {
         await supabase
-          .from('explore_documents')
+          .from('document_extractions')
           .update({
-            status: 'error',
+            status: 'failed',
             error_message: error.message,
-            processing_completed_at: new Date().toISOString(),
+            embedding_status: 'error',
+            extraction_completed_at: new Date().toISOString(),
           })
-          .eq('id', body.document_id);
+          .eq('id', body.extraction_id);
       }
     } catch (e) {
       console.error('[process-explore-document] Failed to update error status:', e);
