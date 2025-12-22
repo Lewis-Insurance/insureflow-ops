@@ -162,30 +162,55 @@ async function runPrismAnalysis(
     // Get the API key to forward (use system key or the validated key)
     const apiKeyToForward = Deno.env.get('PRISM_SYSTEM_API_KEY') || '';
     
-    const response = await fetch(`${PRISM_SERVICE_URL}/run`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKeyToForward}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt, mode, depth }),
-    });
+    try {
+      const response = await fetch(`${PRISM_SERVICE_URL}/run`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKeyToForward}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt, mode, depth }),
+      });
 
-    const responseData = await response.json().catch(() => null);
+      let responseData: any = null;
+      const contentType = response.headers.get('content-type');
+      
+      // Try to parse JSON response
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          responseData = await response.json();
+        } catch (parseError) {
+          // If JSON parsing fails, read as text
+          const textResponse = await response.text();
+          console.error('Failed to parse Prism service response as JSON:', textResponse);
+          throw new Error(`Prism service returned invalid JSON: ${textResponse.substring(0, 200)}`);
+        }
+      } else {
+        // Not JSON, read as text
+        const textResponse = await response.text();
+        responseData = { error: textResponse || `HTTP ${response.status}: ${response.statusText}` };
+      }
 
-    // Check for HTTP errors
-    if (!response.ok) {
-      const errorMessage = responseData?.error || responseData?.message || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(errorMessage);
+      // Check for HTTP errors
+      if (!response.ok) {
+        const errorMessage = responseData?.error || responseData?.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+
+      // Check if response indicates an error even with 200 status
+      if (responseData && responseData.status === 'error') {
+        const errorMessage = responseData.error || 'Unknown error from Prism service';
+        throw new Error(errorMessage);
+      }
+
+      return responseData;
+    } catch (error) {
+      // Re-throw with more context if it's not already an Error
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Prism service request failed: ${String(error)}`);
     }
-
-    // Check if response indicates an error even with 200 status
-    if (responseData && responseData.status === 'error') {
-      const errorMessage = responseData.error || 'Unknown error from Prism service';
-      throw new Error(errorMessage);
-    }
-
-    return responseData;
   }
 
   // Placeholder implementation - replace with actual Prism logic
@@ -326,44 +351,54 @@ serve(async (req) => {
         errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorRunId = crypto.randomUUID();
         
-        // Store failed run in database
+        // Store failed run in database (don't let DB errors prevent error response)
         if (validatedKey.user_id) {
-          await supabase.from('prism_runs').insert({
-            user_id: validatedKey.user_id,
-            prompt,
-            mode,
-            depth,
-            run_id: errorRunId,
-            status: 'failed',
-            cycles_completed: 0,
-            final_output: null,
-            tokens_used: null,
-            cost: null,
-            error_message: errorMessage,
-            completed_at: new Date().toISOString(),
-          });
+          try {
+            await supabase.from('prism_runs').insert({
+              user_id: validatedKey.user_id,
+              prompt,
+              mode,
+              depth,
+              run_id: errorRunId,
+              status: 'failed',
+              cycles_completed: 0,
+              final_output: null,
+              tokens_used: null,
+              cost: null,
+              error_message: errorMessage,
+              completed_at: new Date().toISOString(),
+            });
+          } catch (dbError) {
+            console.error('Failed to store error run in database:', dbError);
+            // Continue even if DB insert fails
+          }
         }
         
         // Re-throw to return error response
         throw error;
       }
 
-      // Store in database
+      // Store in database (don't let DB errors prevent response)
       if (validatedKey.user_id) {
-        await supabase.from('prism_runs').insert({
-          user_id: validatedKey.user_id,
-          prompt,
-          mode,
-          depth,
-          run_id: result.run_id,
-          status: result.status,
-          cycles_completed: result.cycles_completed || 0,
-          final_output: result.final_output || null,
-          tokens_used: result.usage?.total_tokens || null,
-          cost: result.usage?.estimated_cost || null,
-          error_message: result.status === 'error' ? (result.error || null) : null,
-          completed_at: result.status === 'complete' || result.status === 'error' ? new Date().toISOString() : null,
-        });
+        try {
+          await supabase.from('prism_runs').insert({
+            user_id: validatedKey.user_id,
+            prompt,
+            mode,
+            depth,
+            run_id: result.run_id,
+            status: result.status,
+            cycles_completed: result.cycles_completed || 0,
+            final_output: result.final_output || null,
+            tokens_used: result.usage?.total_tokens || null,
+            cost: result.usage?.estimated_cost || null,
+            error_message: result.status === 'error' ? (result.error || null) : null,
+            completed_at: result.status === 'complete' || result.status === 'error' ? new Date().toISOString() : null,
+          });
+        } catch (dbError) {
+          console.error('Failed to store run in database:', dbError);
+          // Continue even if DB insert fails - the API call succeeded
+        }
       }
 
       // Call webhook if provided
@@ -529,9 +564,19 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Prism API error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+        ? error 
+        : 'Internal server error';
+    
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: errorMessage,
+        details: error instanceof Error && error.stack ? error.stack.split('\n')[0] : undefined,
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
