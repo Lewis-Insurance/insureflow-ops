@@ -120,7 +120,11 @@ serve(async (req) => {
         const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
 
         // Try OCR with Azure Document Intelligence
-        const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31`;
+        // Use pages=1- to explicitly request ALL pages (no upper limit)
+        const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31&pages=1-`;
+        
+        console.log('🔗 Calling Azure with URL:', analyzeUrl);
+        console.log('🔗 Document URL length:', signedUrlData.signedUrl.length);
 
         const analyzeResponse = await fetch(analyzeUrl, {
           method: 'POST',
@@ -132,6 +136,8 @@ serve(async (req) => {
             urlSource: signedUrlData.signedUrl,
           })
         });
+        
+        console.log('📡 Azure initial response status:', analyzeResponse.status);
 
         if (!analyzeResponse.ok) {
           const errorText = await analyzeResponse.text();
@@ -142,9 +148,10 @@ serve(async (req) => {
           const operationLocation = analyzeResponse.headers.get('Operation-Location');
           
           if (operationLocation) {
-            // Poll for results (max 60 seconds for larger documents)
+            // Poll for results (max 120 seconds for large documents like 60+ pages)
             let attempts = 0;
-            const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds
+            const maxAttempts = 60; // 60 attempts * 2 seconds = 120 seconds
+            console.log('⏳ Polling for results (max 120 seconds for large docs)...');
 
             while (attempts < maxAttempts) {
               await sleep(2000);
@@ -155,6 +162,11 @@ serve(async (req) => {
               });
 
               const result = await resultResponse.json();
+              
+              // Log status every 5 attempts (every 10 seconds)
+              if (attempts % 5 === 0) {
+                console.log(`⏳ Attempt ${attempts}/${maxAttempts}: status = ${result.status}`);
+              }
 
               if (result.status === 'succeeded') {
                 // DEBUG: Log the full structure of analyzeResult
