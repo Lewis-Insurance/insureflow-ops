@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { useAutoClassifyDocument, useAutoRouteDocument } from '@/hooks/useDocumentClassification';
@@ -31,6 +32,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
   const [taskDueDate, setTaskDueDate] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: policies, isLoading: policiesLoading } = usePoliciesByAccount(accountId);
   const { data: quotes, isLoading: quotesLoading } = useQuotesByAccount(accountId);
@@ -166,6 +168,9 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
           console.error('Auto-classification/routing failed:', error);
         }
       }
+
+      // Invalidate document queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
 
       toast({
         title: 'Success',
