@@ -378,6 +378,32 @@ serve(async (req) => {
         throw error;
       }
 
+      // Extract usage data - handle multiple response formats
+      // Format 1: { usage: { total_tokens, estimated_cost } }
+      // Format 2: { total_tokens, cost } (flat)
+      // Format 3: { tokens_used, cost } (flat)
+      // Format 4: { usage: { tokens, cost } }
+      const tokensUsed = 
+        result.usage?.total_tokens || 
+        result.usage?.tokens ||
+        result.total_tokens || 
+        result.tokens_used ||
+        result.tokens ||
+        null;
+      
+      const costValue = 
+        result.usage?.estimated_cost || 
+        result.usage?.cost ||
+        result.estimated_cost ||
+        result.cost || 
+        null;
+
+      console.log('Prism response usage data:', { 
+        raw_result: JSON.stringify(result).substring(0, 500),
+        extracted_tokens: tokensUsed, 
+        extracted_cost: costValue 
+      });
+
       // Store in database (don't let DB errors prevent response)
       if (validatedKey.user_id) {
         try {
@@ -390,8 +416,8 @@ serve(async (req) => {
             status: result.status,
             cycles_completed: result.cycles_completed || 0,
             final_output: result.final_output || null,
-            tokens_used: result.usage?.total_tokens || null,
-            cost: result.usage?.estimated_cost || null,
+            tokens_used: tokensUsed,
+            cost: costValue,
             error_message: result.status === 'error' ? (result.error || null) : null,
             completed_at: result.status === 'complete' || result.status === 'error' ? new Date().toISOString() : null,
           });
