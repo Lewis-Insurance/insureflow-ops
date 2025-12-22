@@ -106,8 +106,8 @@ export default function PolicyDetail() {
   };
 
   // Check policy line of business
-  const isWorkersComp = policy?.line_of_business?.toLowerCase().includes('work') &&
-    policy?.line_of_business?.toLowerCase().includes('comp');
+  const lob = (policy?.line_of_business || '').toLowerCase();
+  const isWorkersComp = lob.includes('work') && lob.includes('comp');
   const isInlandMarine = isInlandMarinePolicy(policy?.line_of_business);
   const isCyber = isCyberPolicy(policy?.line_of_business);
   const isCrime = isCrimePolicy(policy?.line_of_business);
