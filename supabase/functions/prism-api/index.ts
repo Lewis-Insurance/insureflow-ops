@@ -162,6 +162,10 @@ async function runPrismAnalysis(
     // Get the API key to forward (use system key or the validated key)
     const apiKeyToForward = Deno.env.get('PRISM_SYSTEM_API_KEY') || '';
     
+    // Create abort controller with 55 second timeout (Supabase limit is 60s)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+    
     try {
       const response = await fetch(`${PRISM_SERVICE_URL}/run`, {
         method: 'POST',
@@ -170,7 +174,10 @@ async function runPrismAnalysis(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ prompt, mode, depth }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       let responseData: any = null;
       const contentType = response.headers.get('content-type');
@@ -205,6 +212,13 @@ async function runPrismAnalysis(
 
       return responseData;
     } catch (error) {
+      clearTimeout(timeoutId);
+      
+      // Handle abort/timeout errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Prism service request timed out after 55 seconds. Try a simpler prompt or try again later.');
+      }
+      
       // Re-throw with more context if it's not already an Error
       if (error instanceof Error) {
         throw error;
