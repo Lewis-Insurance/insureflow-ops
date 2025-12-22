@@ -14,8 +14,8 @@ import type {
   PrismUsageStats,
   PrismMode,
   PrismDepth,
-  PrismAPIError,
 } from '@/types/prism-api';
+import { PrismAPIError } from '@/types/prism-api';
 
 // Get Supabase project URL from environment
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lrqajzwcmdwahnjyidgv.supabase.co';
