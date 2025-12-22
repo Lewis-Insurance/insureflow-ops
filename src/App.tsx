@@ -27,6 +27,7 @@ const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
 const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
+const RenewalRateWatchPage = React.lazy(() => import("./pages/RenewalRateWatchPage"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const QuoteDetail = React.lazy(() => import("./pages/QuoteDetail"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
@@ -248,13 +249,29 @@ const App = () => (
                   </ErrorBoundary>
                 } 
               />
-              <Route 
+<Route 
                 path="/ao-renewals/analytics" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AOAnalyticsDashboard />
                   </ErrorBoundary>
-                } 
+                }
+              />
+              <Route 
+                path="/ao-renewals/rate-watch" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <RenewalRateWatchPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route 
+                path="/ao-renewals/rate-watch/:workspaceId" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <RenewalRateWatchPage />
+                  </ErrorBoundary>
+                }
               />
               <Route
                 path="/policies/:policyId"

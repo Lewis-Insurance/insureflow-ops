@@ -53,6 +53,7 @@ import {
   Trash2,
   ArrowRightLeft,
   User,
+  Target,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -299,6 +300,10 @@ export default function AORenewalsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/ao-renewals/rate-watch")}>
+              <Target className="h-4 w-4 mr-2" />
+              Rate Watch
+            </Button>
             <Button variant="outline" onClick={() => navigate("/ao-renewals/analytics")}>
               <TrendingUp className="h-4 w-4 mr-2" />
               Analytics
