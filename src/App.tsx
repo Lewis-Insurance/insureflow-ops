@@ -89,6 +89,7 @@ const CarrierTemplateBuilder = React.lazy(() => import("./pages/CarrierTemplateB
 const ExtractionReviewQueue = React.lazy(() => import("./pages/ExtractionReviewQueue"));
 const ExtractionReviewDetail = React.lazy(() => import("./pages/ExtractionReviewDetail"));
 const ExtractionAnalyticsPage = React.lazy(() => import("./pages/ExtractionAnalyticsPage"));
+const PrismAIPage = React.lazy(() => import("./pages/PrismAIPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -539,6 +540,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <AIBrain />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/prism-ai"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <PrismAIPage />
                   </ErrorBoundary>
                 }
               />

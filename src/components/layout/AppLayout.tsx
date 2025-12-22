@@ -248,6 +248,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/ai-brain"
                 />
                 <NavItem
+                  icon={Sparkles}
+                  label="Prism AI"
+                  to="/prism-ai"
+                />
+                <NavItem
                   icon={BookMarked}
                   label="Knowledge Manager"
                   to="/knowledge-manager"
