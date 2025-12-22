@@ -81,25 +81,31 @@ export default function PrismAIPage() {
 
   const { user, profile } = useAuth();
   const runMutation = usePrismRun();
-  const { data: runStatus, isLoading: isLoadingStatus, error: runStatusError } = usePrismRunStatus(activeRunId);
+  const { data: runStatus, isLoading: isLoadingStatus, error: runStatusError, refetch: refetchRunStatus } = usePrismRunStatus(activeRunId);
   const { data: usage, refetch: refetchUsage, error: usageError } = usePrismUsage();
   const { data: runHistory, refetch: refetchHistory, error: historyError } = usePrismRunHistory(100);
   const saveFavoriteMutation = useSavePrismRun();
   const { toast } = useToast();
 
+  const isValidPrismApiKeyFormat = (key: string) => {
+    const trimmed = key.trim();
+    return trimmed.startsWith('sk_prism_') && trimmed.length >= 20;
+  };
+
   // Load API key on mount
   useEffect(() => {
-    if (profile?.prism_api_key) {
-      setApiKey(profile.prism_api_key);
-      setApiKeyStatus('valid');
-    } else {
-      setApiKeyStatus('none');
+    const loaded = (profile as any)?.prism_api_key as string | null | undefined;
+    if (loaded && typeof loaded === 'string' && loaded.trim().length > 0) {
+      setApiKey(loaded);
+      setApiKeyStatus(isValidPrismApiKeyFormat(loaded) ? 'valid' : 'invalid');
+      return;
     }
+    setApiKey('');
+    setApiKeyStatus('none');
   }, [profile]);
 
   // Test API key
   const testAPIKey = async (key: string) => {
-    // Trim whitespace
     const trimmedKey = key?.trim();
     
     // If empty, that's okay (user can use system key)
@@ -108,44 +114,16 @@ export default function PrismAIPage() {
       return true; // Allow empty - system key will be used
     }
 
-    // Check format - must start with sk_prism_ and have reasonable length
-    if (!trimmedKey.startsWith('sk_prism_')) {
+    // IMPORTANT: do not call the Prism API to validate the key here.
+    // The backend validates user keys by looking them up in `profiles.prism_api_key`,
+    // so validating before saving creates a chicken-and-egg failure.
+    if (!isValidPrismApiKeyFormat(trimmedKey)) {
       setApiKeyStatus('invalid');
       return false;
     }
 
-    // Minimum length check (sk_prism_ is 9 chars, plus some base64url chars)
-    if (trimmedKey.length < 20) {
-      setApiKeyStatus('invalid');
-      return false;
-    }
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lrqajzwcmdwahnjyidgv.supabase.co'}/functions/v1/prism-api/usage`, {
-        headers: {
-          'Authorization': `Bearer ${trimmedKey}`,
-        },
-      });
-
-      if (response.ok) {
-        setApiKeyStatus('valid');
-        return true;
-      } else {
-        // If it's a 401, might be invalid key format or expired
-        // If it's other error, might be rate limit or other issue - still consider format valid
-        if (response.status === 401) {
-          setApiKeyStatus('invalid');
-          return false;
-        }
-        // Other errors might be temporary - mark as checking
-        setApiKeyStatus('checking');
-        return true; // Format is valid, even if API call failed
-      }
-    } catch {
-      // Network error - don't mark as invalid, just checking
-      setApiKeyStatus('checking');
-      return true; // Format looks valid
-    }
+    setApiKeyStatus('valid');
+    return true;
   };
 
   // Save API key
@@ -186,7 +164,7 @@ export default function PrismAIPage() {
     }
 
     // Validate format
-    if (!trimmedKey.startsWith('sk_prism_') || trimmedKey.length < 20) {
+    if (!isValidPrismApiKeyFormat(trimmedKey)) {
       toast({
         title: 'Invalid API Key Format',
         description: 'API key must start with "sk_prism_" and be at least 20 characters long.',
@@ -196,17 +174,8 @@ export default function PrismAIPage() {
       return;
     }
 
-    // Test the key (but don't block if test fails - might be network issue)
-    await testAPIKey(trimmedKey);
-    
-    if (apiKeyStatus === 'invalid') {
-      toast({
-        title: 'Invalid API Key',
-        description: 'The API key format appears invalid. Please check and try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Format validation only (see comment in testAPIKey)
+    setApiKeyStatus('valid');
 
     setIsSavingApiKey(true);
     try {
@@ -222,8 +191,8 @@ export default function PrismAIPage() {
         description: 'Your Prism API key has been saved successfully',
       });
 
-      // Refresh profile
-      window.location.reload();
+      setApiKey(trimmedKey);
+      setApiKeyStatus('valid');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -754,7 +723,7 @@ export default function PrismAIPage() {
                     variant="outline"
                     onClick={() => {
                       if (activeRunId) {
-                        window.location.reload();
+                        refetchRunStatus();
                       }
                     }}
                   >
@@ -977,12 +946,21 @@ export default function PrismAIPage() {
                         placeholder="sk_prism_..."
                         value={apiKey}
                         onChange={(e) => {
-                          setApiKey(e.target.value);
-                          setApiKeyStatus('checking');
+                          const next = e.target.value;
+                          setApiKey(next);
+                          if (!next.trim()) {
+                            setApiKeyStatus('none');
+                          } else if (isValidPrismApiKeyFormat(next)) {
+                            setApiKeyStatus('valid');
+                          } else {
+                            setApiKeyStatus('invalid');
+                          }
                         }}
                         onBlur={() => {
-                          if (apiKey) {
+                          if (apiKey.trim()) {
                             testAPIKey(apiKey);
+                          } else {
+                            setApiKeyStatus('none');
                           }
                         }}
                         className="font-mono text-sm"
@@ -1003,7 +981,7 @@ export default function PrismAIPage() {
                     </div>
                     <Button
                       onClick={handleSaveAPIKey}
-                      disabled={isSavingApiKey || !apiKey || apiKeyStatus === 'invalid'}
+                      disabled={isSavingApiKey || apiKeyStatus === 'invalid'}
                     >
                       {isSavingApiKey ? (
                         <>
