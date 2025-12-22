@@ -12,6 +12,8 @@ import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
 import { UserManagement } from '@/components/admin/UserManagement';
+import { EnhancedUserDirectory } from '@/components/admin/EnhancedUserDirectory';
+import { RBACManagement } from '@/components/admin/RBACManagement';
 import { LeadScoringAdmin } from '@/components/leads/LeadScoringAdmin';
 import { DuplicateDetection } from '@/components/crm/DuplicateDetection';
 import { AdvancedImportSystem } from '@/components/crm/AdvancedImportSystem';
@@ -55,11 +57,19 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+        <Tabs defaultValue="users-enhanced" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Users
+              Users (Basic)
+            </TabsTrigger>
+            <TabsTrigger value="users-enhanced" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Users (Enhanced)
+            </TabsTrigger>
+            <TabsTrigger value="rbac" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              RBAC
             </TabsTrigger>
             <TabsTrigger value="contacts" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
@@ -89,6 +99,14 @@ export default function AdminPage() {
 
           <TabsContent value="users" className="space-y-6">
             <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="users-enhanced" className="space-y-6">
+            <EnhancedUserDirectory />
+          </TabsContent>
+
+          <TabsContent value="rbac" className="space-y-6">
+            <RBACManagement />
           </TabsContent>
 
           <TabsContent value="contacts" className="space-y-6">
