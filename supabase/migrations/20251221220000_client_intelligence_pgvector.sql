@@ -101,10 +101,8 @@ CREATE TABLE IF NOT EXISTS public.client_context_index_jobs (
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  
-  -- Note: Duplicate prevention handled by partial index below
-  CONSTRAINT client_context_index_jobs_pkey PRIMARY KEY (id)
+  completed_at TIMESTAMPTZ
+  -- Note: Duplicate prevention handled by partial unique index below
 );
 
 -- Partial unique index to prevent duplicate pending/processing jobs
