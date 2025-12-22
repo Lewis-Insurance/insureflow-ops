@@ -78,6 +78,7 @@ export default function PrismAIPage() {
   const [apiKey, setApiKey] = useState('');
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'valid' | 'invalid' | 'none'>('checking');
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
+  const [isStartingRun, setIsStartingRun] = useState(false);
 
   const { user, profile } = useAuth();
   const runMutation = usePrismRun();
@@ -274,6 +275,11 @@ export default function PrismAIPage() {
       return;
     }
 
+    // Show progress immediately while the run is being created
+    setActiveTab('results');
+    setIsStartingRun(true);
+    setActiveRunId(null);
+
     try {
       const result = await runMutation.mutateAsync({
         prompt: prompt.trim(),
@@ -283,6 +289,7 @@ export default function PrismAIPage() {
 
       setActiveRunId(result.run_id);
       setActiveTab('results');
+      setIsStartingRun(false);
 
       // If already complete, show result immediately
       if (result.status === 'complete') {
@@ -292,6 +299,7 @@ export default function PrismAIPage() {
         });
       }
     } catch (error) {
+      setIsStartingRun(false);
       // Error handled by mutation
     }
   };
@@ -549,22 +557,32 @@ export default function PrismAIPage() {
           {/* RESULTS TAB */}
           <TabsContent value="results" className="space-y-4">
             {!activeRunId ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">
-                    No active run. Start a new analysis to see results here.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setActiveTab('new-run')}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Start New Analysis
-                  </Button>
-                </CardContent>
-              </Card>
+              isStartingRun || runMutation.isPending ? (
+                <AgentProgressVisualization
+                  isRunning={true}
+                  cyclesCompleted={0}
+                  totalCycles={getTotalCycles(depth)}
+                  status="pending"
+                  depth={depth}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground">
+                      No active run. Start a new analysis to see results here.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setActiveTab('new-run')}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Start New Analysis
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
             ) : isLoadingStatus ? (
               <AgentProgressVisualization
                 isRunning={true}
