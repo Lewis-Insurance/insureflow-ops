@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Download, RefreshCw } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PolicySearch } from '@/components/policies/PolicySearch';
 import { PolicyList } from '@/components/policies/PolicyList';
@@ -14,12 +15,13 @@ import { ClientSelector } from '@/components/client/ClientSelector';
 export default function PoliciesPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<PolicyFilters>({});
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   
   const { data: policies = [], isLoading, refetch } = usePolicies(filters);
-  const { data: stats, isLoading: statsLoading } = usePolicyStats();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = usePolicyStats();
 
   const handleFiltersChange = (newFilters: PolicyFilters) => {
     setFilters(newFilters);
@@ -35,10 +37,18 @@ export default function PoliciesPage() {
 
   const handleRefresh = () => {
     refetch();
+    refetchStats();
     toast({
       title: "Refreshed",
       description: "Policy data has been refreshed",
     });
+  };
+
+  const handlePolicyAdded = () => {
+    toast({ title: 'Policy created', description: 'Policy added successfully' });
+    // Invalidate all policy-related queries to refresh everything
+    queryClient.invalidateQueries({ queryKey: ['policies'] });
+    queryClient.invalidateQueries({ queryKey: ['policy-stats'] });
   };
 
   const handleExport = () => {
@@ -115,10 +125,7 @@ export default function PoliciesPage() {
           open={addPolicyOpen}
           onOpenChange={setAddPolicyOpen}
           accountId={selectedClient?.id || ''}
-          onSuccess={() => {
-            toast({ title: 'Policy created', description: 'Policy added successfully' });
-            refetch();
-          }}
+          onSuccess={handlePolicyAdded}
         />
       </div>
     </AppLayout>
