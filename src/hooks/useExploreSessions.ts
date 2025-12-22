@@ -1,5 +1,11 @@
 /**
  * React Query hooks for Explore Insurance Document module
+ * 
+ * ALIGNED WITH EXISTING SCHEMA:
+ * - Uses document_extractions (not explore_documents)
+ * - Uses knowledge_base for chunks (not explore_chunks)
+ * - Uses ai_conversations/ai_messages (not explore_sessions/messages)
+ * - Uses document_evidence_items for citations
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,235 +13,126 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // =============================================================================
-// TYPES
+// TYPES (Aligned with existing tables)
 // =============================================================================
 
-export interface ExploreSession {
+export interface DocumentExtraction {
   id: string;
-  created_by: string;
+  document_url: string;
+  document_name: string;
+  document_type: string;
+  file_size_bytes: number | null;
+  page_count: number | null;
+  account_id: string | null;
+  status: 'pending' | 'processing' | 'extracted' | 'mapped' | 'applied' | 'failed';
+  azure_confidence_score: number | null;
+  azure_text_content: string | null;
+  extracted_fields: Record<string, any>;
+  evidence_catalog: EvidenceItem[];
+  chunk_count: number;
+  embedding_status: 'pending' | 'processing' | 'ready' | 'error' | 'skipped';
+  error_message: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface AIConversation {
+  id: string;
+  account_id: string | null;
+  user_id: string;
+  title: string | null;
+  context: Record<string, any>;
   created_at: string;
   updated_at: string;
-  account_id: string | null;
-  policy_id: string | null;
-  title: string | null;
-  description: string | null;
-  status: 'pending' | 'processing' | 'ready' | 'error';
-  error_message: string | null;
-  total_documents: number;
-  processed_documents: number;
-  total_chunks: number;
-  total_evidence_items: number;
 }
 
-export interface ExploreDocument {
+export interface AIMessage {
   id: string;
-  session_id: string;
-  created_at: string;
-  storage_path: string | null;
-  storage_bucket: string;
-  filename: string;
-  mime_type: string | null;
-  file_size: number | null;
-  page_count: number | null;
-  doc_role: string | null;
-  predicted_doc_type: string | null;
-  predicted_doc_type_confidence: number | null;
-  lob_detected: string[] | null;
-  carrier_detected: string | null;
-  quality_score: number | null;
-  status: 'uploading' | 'processing' | 'ready' | 'error';
-  error_message: string | null;
-  evidence_count: number;
-  chunk_count: number;
-}
-
-export interface ExploreMessage {
-  id: string;
-  session_id: string;
-  created_at: string;
+  conversation_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   citations: Citation[] | null;
-  model_used: string | null;
-  tokens_used: number | null;
-  latency_ms: number | null;
+  metadata: Record<string, any>;
+  created_at: string;
 }
 
 export interface Citation {
   evidence_id: string;
-  document_id: string;
+  document_id?: string;
+  extraction_id?: string;
   page: number;
   snippet: string;
   confidence: number;
 }
 
 export interface EvidenceItem {
-  id: string;
+  id?: string;
   evidence_id: string;
-  document_id: string;
+  extraction_id?: string;
+  document_id?: string;
   page_index: number;
   bbox: { x: number; y: number; w: number; h: number } | null;
   snippet_text: string;
   label: string | null;
-  source_type: string;
+  source_type?: string;
   confidence: number;
-  tags: string[];
-  potential_field: string | null;
+  tags?: string[];
 }
 
 // =============================================================================
-// SESSION HOOKS
+// DOCUMENT EXTRACTION HOOKS (Aligned with existing table)
 // =============================================================================
 
 /**
- * Fetch all explore sessions for current user
+ * Fetch document extractions for the current user
  */
-export const useExploreSessions = () => {
+export const useDocumentExtractions = (accountId?: string | null) => {
   return useQuery({
-    queryKey: ['explore-sessions'],
+    queryKey: ['document-extractions', accountId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('explore_sessions')
+      let query = supabase
+        .from('document_extractions')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (accountId) {
+        query = query.eq('account_id', accountId);
+      }
+
+      const { data, error } = await query.limit(50);
+
       if (error) throw error;
-      return data as ExploreSession[];
+      return data as DocumentExtraction[];
     },
   });
 };
 
 /**
- * Fetch a single explore session with documents
+ * Fetch a single document extraction with polling for processing
  */
-export const useExploreSession = (sessionId: string | null) => {
+export const useDocumentExtraction = (extractionId: string | null) => {
   return useQuery({
-    queryKey: ['explore-session', sessionId],
+    queryKey: ['document-extraction', extractionId],
     queryFn: async () => {
-      if (!sessionId) return null;
+      if (!extractionId) return null;
 
       const { data, error } = await supabase
-        .from('explore_sessions')
+        .from('document_extractions')
         .select('*')
-        .eq('id', sessionId)
+        .eq('id', extractionId)
         .single();
 
       if (error) throw error;
-      return data as ExploreSession;
+      return data as DocumentExtraction;
     },
-    enabled: !!sessionId,
+    enabled: !!extractionId,
     refetchInterval: (query) => {
-      const data = query.state.data as ExploreSession | null;
+      const data = query.state.data as DocumentExtraction | null;
       // Poll while processing
       if (data?.status === 'pending' || data?.status === 'processing') {
         return 2000;
       }
-      return false;
-    },
-  });
-};
-
-/**
- * Create a new explore session
- */
-export const useCreateExploreSession = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (params: {
-      title?: string;
-      account_id?: string;
-      policy_id?: string;
-    }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('explore_sessions')
-        .insert({
-          created_by: user.id,
-          title: params.title || 'New Explore Session',
-          account_id: params.account_id || null,
-          policy_id: params.policy_id || null,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as ExploreSession;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['explore-sessions'] });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to create session: ${error.message}`,
-        variant: 'destructive',
-      });
-    },
-  });
-};
-
-/**
- * Delete an explore session
- */
-export const useDeleteExploreSession = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const { error } = await supabase
-        .from('explore_sessions')
-        .delete()
-        .eq('id', sessionId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['explore-sessions'] });
-      toast({ title: 'Session deleted' });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to delete session: ${error.message}`,
-        variant: 'destructive',
-      });
-    },
-  });
-};
-
-// =============================================================================
-// DOCUMENT HOOKS
-// =============================================================================
-
-/**
- * Fetch documents for a session
- */
-export const useExploreDocuments = (sessionId: string | null) => {
-  return useQuery({
-    queryKey: ['explore-documents', sessionId],
-    queryFn: async () => {
-      if (!sessionId) return [];
-
-      const { data, error } = await supabase
-        .from('explore_documents')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as ExploreDocument[];
-    },
-    enabled: !!sessionId,
-    refetchInterval: (query) => {
-      const data = query.state.data as ExploreDocument[] | undefined;
-      // Poll while any document is processing
-      if (data?.some(d => d.status === 'uploading' || d.status === 'processing')) {
+      if (data?.embedding_status === 'pending' || data?.embedding_status === 'processing') {
         return 2000;
       }
       return false;
@@ -244,7 +141,62 @@ export const useExploreDocuments = (sessionId: string | null) => {
 };
 
 /**
- * Upload a document to a session
+ * Trigger embedding generation for an existing extraction
+ */
+export const useTriggerExploreProcessing = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (extractionId: string) => {
+      const response = await supabase.functions.invoke('upload-explore-document', {
+        body: { extraction_id: extractionId },
+      });
+
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['document-extraction', data.extraction_id] });
+      toast({
+        title: 'Processing started',
+        description: 'Generating embeddings for Q&A...',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Processing failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+// =============================================================================
+// AI CONVERSATION HOOKS (Using existing ai_conversations/ai_messages)
+// =============================================================================
+
+/**
+ * Fetch AI conversations for the current user
+ */
+export const useAIConversations = () => {
+  return useQuery({
+    queryKey: ['ai-conversations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      return data as AIConversation[];
+    },
+  });
+};
+
+/**
+ * Upload a document and create extraction for explore Q&A
  */
 export const useUploadExploreDocument = () => {
   const queryClient = useQueryClient();
@@ -252,12 +204,9 @@ export const useUploadExploreDocument = () => {
 
   return useMutation({
     mutationFn: async (params: {
-      session_id?: string;
-      account_id?: string;
-      policy_id?: string;
       file: File;
-      doc_role?: string;
-      doc_type_hint?: string;
+      account_id?: string;
+      document_type?: string;
     }) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -268,15 +217,12 @@ export const useUploadExploreDocument = () => {
 
       const response = await supabase.functions.invoke('upload-explore-document', {
         body: {
-          session_id: params.session_id,
-          account_id: params.account_id,
-          policy_id: params.policy_id,
+          file_base64: base64,
           file_name: params.file.name,
           file_type: params.file.type,
           file_size: params.file.size,
-          file_base64: base64,
-          doc_role: params.doc_role,
-          doc_type_hint: params.doc_type_hint,
+          account_id: params.account_id,
+          document_type: params.document_type,
         },
       });
 
@@ -284,12 +230,11 @@ export const useUploadExploreDocument = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['explore-sessions'] });
-      queryClient.invalidateQueries({ queryKey: ['explore-session', data.session_id] });
-      queryClient.invalidateQueries({ queryKey: ['explore-documents', data.session_id] });
+      queryClient.invalidateQueries({ queryKey: ['document-extractions'] });
+      queryClient.invalidateQueries({ queryKey: ['document-extraction', data.extraction_id] });
       toast({
         title: 'Document uploaded',
-        description: 'Processing started...',
+        description: 'Generating embeddings for Q&A...',
       });
     },
     onError: (error) => {
@@ -303,34 +248,23 @@ export const useUploadExploreDocument = () => {
 };
 
 /**
- * Retry processing a failed document
+ * Retry processing a failed extraction
  */
 export const useRetryExploreDocument = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (documentId: string) => {
-      const { data: doc } = await supabase
-        .from('explore_documents')
-        .select('id, session_id')
-        .eq('id', documentId)
-        .single();
-
-      if (!doc) throw new Error('Document not found');
-
+    mutationFn: async (extractionId: string) => {
       const response = await supabase.functions.invoke('process-explore-document', {
-        body: {
-          document_id: documentId,
-          session_id: doc.session_id,
-        },
+        body: { extraction_id: extractionId },
       });
 
       if (response.error) throw response.error;
-      return { ...response.data, session_id: doc.session_id };
+      return { ...response.data, extraction_id: extractionId };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['explore-documents', data.session_id] });
+      queryClient.invalidateQueries({ queryKey: ['document-extraction', data.extraction_id] });
       toast({ title: 'Retry started' });
     },
     onError: (error) => {
@@ -344,33 +278,33 @@ export const useRetryExploreDocument = () => {
 };
 
 // =============================================================================
-// MESSAGE / Q&A HOOKS
+// MESSAGE / Q&A HOOKS (Using ai_messages)
 // =============================================================================
 
 /**
- * Fetch messages for a session
+ * Fetch messages for a conversation
  */
-export const useExploreMessages = (sessionId: string | null) => {
+export const useExploreMessages = (conversationId: string | null) => {
   return useQuery({
-    queryKey: ['explore-messages', sessionId],
+    queryKey: ['ai-messages', conversationId],
     queryFn: async () => {
-      if (!sessionId) return [];
+      if (!conversationId) return [];
 
       const { data, error } = await supabase
-        .from('explore_messages')
+        .from('ai_messages')
         .select('*')
-        .eq('session_id', sessionId)
+        .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data as ExploreMessage[];
+      return data as AIMessage[];
     },
-    enabled: !!sessionId,
+    enabled: !!conversationId,
   });
 };
 
 /**
- * Ask a question about documents in a session
+ * Ask a question about a document extraction
  */
 export const useExploreAsk = () => {
   const queryClient = useQueryClient();
@@ -378,7 +312,9 @@ export const useExploreAsk = () => {
 
   return useMutation({
     mutationFn: async (params: {
-      session_id: string;
+      extraction_id?: string;
+      document_id?: string;
+      conversation_id?: string;
       question: string;
     }) => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -386,16 +322,20 @@ export const useExploreAsk = () => {
 
       const response = await supabase.functions.invoke('explore-qa', {
         body: {
-          session_id: params.session_id,
+          extraction_id: params.extraction_id,
+          document_id: params.document_id,
+          conversation_id: params.conversation_id,
           question: params.question,
         },
       });
 
       if (response.error) throw response.error;
-      return { ...response.data, session_id: params.session_id };
+      return response.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['explore-messages', data.session_id] });
+      if (data.conversation_id) {
+        queryClient.invalidateQueries({ queryKey: ['ai-messages', data.conversation_id] });
+      }
     },
     onError: (error) => {
       toast({
@@ -408,50 +348,73 @@ export const useExploreAsk = () => {
 };
 
 // =============================================================================
-// EVIDENCE HOOKS
+// EVIDENCE HOOKS (Using document_evidence_items)
 // =============================================================================
 
 /**
- * Fetch evidence items for a document
+ * Fetch evidence items for an extraction
  */
-export const useExploreEvidence = (documentId: string | null) => {
+export const useExploreEvidence = (extractionId: string | null) => {
   return useQuery({
-    queryKey: ['explore-evidence', documentId],
+    queryKey: ['document-evidence', extractionId],
     queryFn: async () => {
-      if (!documentId) return [];
+      if (!extractionId) return [];
 
       const { data, error } = await supabase
-        .from('explore_evidence_items')
+        .from('document_evidence_items')
         .select('*')
-        .eq('document_id', documentId)
+        .eq('extraction_id', extractionId)
         .order('page_index', { ascending: true });
 
       if (error) throw error;
       return data as EvidenceItem[];
     },
-    enabled: !!documentId,
+    enabled: !!extractionId,
   });
 };
 
 /**
  * Get a specific evidence item by ID
  */
-export const useEvidenceItem = (evidenceId: string | null) => {
+export const useEvidenceItem = (extractionId: string | null, evidenceId: string | null) => {
   return useQuery({
-    queryKey: ['evidence-item', evidenceId],
+    queryKey: ['evidence-item', extractionId, evidenceId],
     queryFn: async () => {
-      if (!evidenceId) return null;
+      if (!extractionId || !evidenceId) return null;
 
       const { data, error } = await supabase
-        .from('explore_evidence_items')
+        .from('document_evidence_items')
         .select('*')
+        .eq('extraction_id', extractionId)
         .eq('evidence_id', evidenceId)
         .single();
 
       if (error) throw error;
       return data as EvidenceItem;
     },
-    enabled: !!evidenceId,
+    enabled: !!extractionId && !!evidenceId,
+  });
+};
+
+/**
+ * Get evidence from extraction's evidence_catalog JSONB
+ */
+export const useEvidenceCatalog = (extractionId: string | null) => {
+  return useQuery({
+    queryKey: ['evidence-catalog', extractionId],
+    queryFn: async () => {
+      if (!extractionId) return [];
+
+      const { data, error } = await supabase
+        .from('document_extractions')
+        .select('evidence_catalog')
+        .eq('id', extractionId)
+        .single();
+
+      if (error) throw error;
+      return (data?.evidence_catalog || []) as EvidenceItem[];
+    },
+    enabled: !!extractionId,
   });
 };
 

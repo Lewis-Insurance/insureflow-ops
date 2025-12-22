@@ -1,8 +1,10 @@
 /**
  * Upload Explore Document Edge Function
  * 
- * Handles document uploads for the Explore Insurance Document module.
- * Creates session if needed, stores file, and triggers async processing.
+ * ALIGNED WITH EXISTING SCHEMA:
+ * - Creates/updates document_extractions record
+ * - Triggers process-explore-document for embedding generation
+ * - Works with existing upload flows (upload-to-google-drive or direct storage)
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -14,16 +16,22 @@ const corsHeaders = {
 };
 
 interface UploadRequest {
-  session_id?: string; // Existing session or create new
+  // Option A: Create new extraction from URL
+  document_url?: string;
+  document_name?: string;
+  
+  // Option B: Reference existing document_extractions record
+  extraction_id?: string;
+  
+  // Option C: Upload file directly
+  file_base64?: string;
+  file_name?: string;
+  file_type?: string;
+  file_size?: number;
+  
+  // Common fields
   account_id?: string;
-  policy_id?: string;
-  doc_role?: string; // 'A', 'B', 'policy', 'quote', etc.
-  doc_type_hint?: string;
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  file_base64?: string; // For direct upload
-  storage_path?: string; // If already uploaded to storage
+  document_type?: string;
 }
 
 serve(async (req) => {
@@ -61,114 +69,96 @@ serve(async (req) => {
     // Parse request
     const body: UploadRequest = await req.json();
     const {
-      session_id,
-      account_id,
-      policy_id,
-      doc_role,
-      doc_type_hint,
+      document_url,
+      document_name,
+      extraction_id: existingExtractionId,
+      file_base64,
       file_name,
       file_type,
       file_size,
-      file_base64,
-      storage_path: existingStoragePath,
+      account_id,
+      document_type,
     } = body;
 
-    console.log(`[upload-explore-document] User ${user.id} uploading ${file_name}`);
+    let extractionId = existingExtractionId;
+    let documentUrl = document_url;
+    let docName = document_name || file_name || 'Unknown';
 
-    // Get or create session
-    let currentSessionId = session_id;
-    
-    if (!currentSessionId) {
-      // Create new session
-      const { data: newSession, error: sessionError } = await supabase
-        .from('explore_sessions')
-        .insert({
-          created_by: user.id,
-          account_id: account_id || null,
-          policy_id: policy_id || null,
-          title: `Explore: ${file_name}`,
-          status: 'pending',
-        })
-        .select()
-        .single();
+    console.log(`[upload-explore-document] User ${user.id} - processing ${docName}`);
 
-      if (sessionError) {
-        console.error('[upload-explore-document] Failed to create session:', sessionError);
-        return new Response(
-          JSON.stringify({ error: `Failed to create session: ${sessionError.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      currentSessionId = newSession.id;
-      console.log(`[upload-explore-document] Created new session: ${currentSessionId}`);
+    // Option A: Use existing extraction_id - just trigger processing
+    if (extractionId) {
+      console.log(`[upload-explore-document] Using existing extraction: ${extractionId}`);
     }
-
-    // Handle file storage
-    let storagePath = existingStoragePath;
-    
-    if (!storagePath && file_base64) {
-      // Upload file to Supabase Storage
+    // Option B: Upload file directly and create extraction
+    else if (file_base64) {
+      // Upload to storage
+      const fileName = file_name || `document-${Date.now()}.pdf`;
+      const storagePath = `explore/${user.id}/${Date.now()}-${fileName}`;
+      
       const fileBuffer = Uint8Array.from(atob(file_base64), c => c.charCodeAt(0));
-      const uniqueFileName = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${file_name}`;
-      storagePath = `explore/${currentSessionId}/${uniqueFileName}`;
-
-      const { error: uploadError } = await supabase.storage
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(storagePath, fileBuffer, {
-          contentType: file_type,
+          contentType: file_type || 'application/pdf',
           upsert: false,
         });
 
       if (uploadError) {
-        console.error('[upload-explore-document] Storage upload failed:', uploadError);
         return new Response(
-          JSON.stringify({ error: `Storage upload failed: ${uploadError.message}` }),
+          JSON.stringify({ error: `Upload failed: ${uploadError.message}` }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`[upload-explore-document] File uploaded to storage: ${storagePath}`);
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(storagePath);
+
+      documentUrl = publicUrl;
+      docName = fileName;
+      
+      console.log(`[upload-explore-document] Uploaded to: ${storagePath}`);
     }
 
-    // Create document record
-    const { data: docRecord, error: docError } = await supabase
-      .from('explore_documents')
-      .insert({
-        session_id: currentSessionId,
-        storage_provider: 'supabase',
-        storage_path: storagePath,
-        storage_bucket: 'documents',
-        filename: file_name,
-        mime_type: file_type,
-        file_size: file_size,
-        doc_role: doc_role || null,
-        doc_type_hint: doc_type_hint || null,
-        status: 'uploading',
-        attempt_count: 0,
-      })
-      .select()
-      .single();
+    // Create document_extractions record if we don't have one
+    if (!extractionId && documentUrl) {
+      const { data: extraction, error: extractionError } = await supabase
+        .from('document_extractions')
+        .insert({
+          document_url: documentUrl,
+          document_name: docName,
+          document_type: document_type || 'unknown',
+          file_size_bytes: file_size || null,
+          account_id: account_id || null,
+          status: 'pending',
+          created_by: user.id,
+          embedding_status: 'pending',
+        })
+        .select()
+        .single();
 
-    if (docError) {
-      console.error('[upload-explore-document] Failed to create document record:', docError);
+      if (extractionError) {
+        return new Response(
+          JSON.stringify({ error: `Failed to create extraction: ${extractionError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      extractionId = extraction.id;
+      console.log(`[upload-explore-document] Created extraction: ${extractionId}`);
+    }
+
+    if (!extractionId) {
       return new Response(
-        JSON.stringify({ error: `Failed to create document record: ${docError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Must provide extraction_id, document_url, or file_base64' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[upload-explore-document] Document record created: ${docRecord.id}`);
-
-    // Update document status to processing
-    await supabase
-      .from('explore_documents')
-      .update({ status: 'processing', processing_started_at: new Date().toISOString() })
-      .eq('id', docRecord.id);
-
-    // Trigger async processing (call process-explore-document edge function)
-    // For now, we'll let the client poll for status
-    // In production, you'd use a queue or background worker
+    // Trigger async processing
     try {
       const processResponse = await fetch(
         `${supabaseUrl}/functions/v1/process-explore-document`,
@@ -179,28 +169,26 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            document_id: docRecord.id,
-            session_id: currentSessionId,
+            extraction_id: extractionId,
           }),
         }
       );
 
       if (!processResponse.ok) {
-        console.warn('[upload-explore-document] Processing trigger failed, client will retry');
+        console.warn('[upload-explore-document] Processing trigger failed, client will poll');
       }
     } catch (processError) {
       console.warn('[upload-explore-document] Processing trigger error:', processError);
-      // Processing will be retried by client polling
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        session_id: currentSessionId,
-        document_id: docRecord.id,
-        storage_path: storagePath,
+        extraction_id: extractionId,
+        document_url: documentUrl,
+        document_name: docName,
         status: 'processing',
-        message: 'Document uploaded and processing started',
+        message: 'Document uploaded and embedding generation started',
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
