@@ -46,6 +46,7 @@ import {
   Users,
   Calendar,
   Bell,
+  HardDrive,
 } from 'lucide-react';
 import {
   Select,
@@ -71,6 +72,7 @@ import { AutomationSettings } from './AutomationSettings';
 import { TemplatesSettings } from './TemplatesSettings';
 import { NotificationsSettings } from './NotificationsSettings';
 import { ComplianceSettings } from './ComplianceSettings';
+import { BackupExportSettings } from './BackupExportSettings';
 
 // =============================================================================
 // TYPES
@@ -297,7 +299,7 @@ export function SystemConfiguration() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11">
           <TabsTrigger value="api-keys" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
             <span className="hidden sm:inline">API Keys</span>
@@ -333,6 +335,10 @@ export function SystemConfiguration() {
           <TabsTrigger value="compliance" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Compliance</span>
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-2">
+            <HardDrive className="h-4 w-4" />
+            <span className="hidden sm:inline">Backup</span>
           </TabsTrigger>
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -949,6 +955,11 @@ export function SystemConfiguration() {
         {/* Compliance Tab */}
         <TabsContent value="compliance" className="space-y-6 mt-6">
           <ComplianceSettings />
+        </TabsContent>
+
+        {/* Backup & Export Tab */}
+        <TabsContent value="backup" className="space-y-6 mt-6">
+          <BackupExportSettings />
         </TabsContent>
 
         {/* General Tab */}
