@@ -66,6 +66,31 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useSavePrismRun } from '@/hooks/usePrismAPI';
+import { ClientSelector } from '@/components/client/ClientSelector';
+import { useClientIntelligence } from '@/hooks/useClientIntelligence';
+import { buildClientContext } from '@/services/clientIntelligence';
+import { SUGGESTED_QUESTIONS } from '@/types/client-intelligence';
+import type { QuestionTemplate } from '@/types/client-intelligence';
+import {
+  Shield,
+  Calendar,
+  Activity,
+  AlertTriangle,
+  Heart,
+  Users,
+} from 'lucide-react';
+
+// Icon mapping for question templates
+const TEMPLATE_ICONS: Record<string, React.ElementType> = {
+  'Coverage Analysis': Shield,
+  'Renewal Prep': Calendar,
+  'Cross-Sell': TrendingUp,
+  'Risk Assessment': AlertTriangle,
+  'Activity Summary': Activity,
+  'Claims Analysis': FileText,
+  'Account Health': Heart,
+  'Meeting Prep': Users,
+};
 
 export default function PrismAIPage() {
   const [prompt, setPrompt] = useState('');
@@ -73,6 +98,18 @@ export default function PrismAIPage() {
   const [depth, setDepth] = useState<PrismDepth>('synthesis');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('new-run');
+  
+  // Client Intelligence state
+  const [selectedClient, setSelectedClient] = useState<{
+    id: string;
+    name: string;
+    account_type: string | null;
+    account_status: string | null;
+    city: string | null;
+    state: string | null;
+  } | null>(null);
+  const [clientContext, setClientContext] = useState<string | null>(null);
+  const [isLoadingClientContext, setIsLoadingClientContext] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
@@ -310,6 +347,70 @@ export default function PrismAIPage() {
     setMode('sequential');
     setDepth('synthesis');
     setActiveRunId(null);
+    setSelectedClient(null);
+    setClientContext(null);
+  };
+
+  // Handle client selection - load context
+  const handleClientSelect = async (client: typeof selectedClient) => {
+    setSelectedClient(client);
+    
+    if (!client) {
+      setClientContext(null);
+      return;
+    }
+
+    try {
+      setIsLoadingClientContext(true);
+      const context = await buildClientContext(client.id);
+      setClientContext(context.formattedContext);
+      
+      toast({
+        title: 'Client loaded',
+        description: `${client.name}: ${context.dataSummary.activePoliciesCount} policies, ${context.dataSummary.claimsCount} claims`,
+      });
+    } catch (error) {
+      console.error('Error loading client context:', error);
+      toast({
+        title: 'Error loading client',
+        description: error instanceof Error ? error.message : 'Failed to load client data',
+        variant: 'destructive',
+      });
+      setClientContext(null);
+    } finally {
+      setIsLoadingClientContext(false);
+    }
+  };
+
+  // Handle selecting a question template
+  const handleQuestionTemplate = (template: QuestionTemplate) => {
+    if (!selectedClient || !clientContext) {
+      toast({
+        title: 'Select a client first',
+        description: 'Please select a client to use question templates',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Build prompt with client context
+    const fullPrompt = `# CLIENT INTELLIGENCE REQUEST
+
+## Client: ${selectedClient.name}
+
+## Question: ${template.question}
+
+---
+
+# CLIENT DATA
+
+${clientContext}
+
+---
+
+Please analyze the above client data and answer the question thoroughly.`;
+
+    setPrompt(fullPrompt);
   };
 
   // Get total cycles based on depth
@@ -418,6 +519,65 @@ export default function PrismAIPage() {
 
           {/* NEW RUN TAB */}
           <TabsContent value="new-run" className="space-y-4">
+            {/* Client Intelligence Card */}
+            <Card className="border-violet-200 dark:border-violet-800 bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+                    <Brain className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Client Intelligence</CardTitle>
+                    <CardDescription className="text-xs">
+                      Select a client to analyze their complete profile with AI
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Select Client (Optional)</Label>
+                  <ClientSelector
+                    selectedClient={selectedClient}
+                    onSelect={handleClientSelect}
+                    placeholder="Search for a client..."
+                    className="w-full"
+                  />
+                  {isLoadingClientContext && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading client data...
+                    </div>
+                  )}
+                </div>
+
+                {/* Question Templates (only show when client is selected) */}
+                {selectedClient && clientContext && (
+                  <div className="space-y-2">
+                    <Label>Quick Questions</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {SUGGESTED_QUESTIONS.slice(0, 8).map((template) => {
+                        const Icon = TEMPLATE_ICONS[template.category] || Sparkles;
+                        return (
+                          <Button
+                            key={template.id}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-auto py-2 px-3 justify-start text-left"
+                            onClick={() => handleQuestionTemplate(template)}
+                          >
+                            <Icon className="h-3.5 w-3.5 mr-2 flex-shrink-0 text-violet-500" />
+                            <span className="text-xs truncate">{template.title}</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Start New Analysis</CardTitle>
@@ -431,15 +591,26 @@ export default function PrismAIPage() {
                     <Label htmlFor="prompt">Prompt</Label>
                     <Textarea
                       id="prompt"
-                      placeholder="e.g., Analyze the pros and cons of implementing a microservices architecture for our e-commerce platform..."
+                      placeholder={selectedClient 
+                        ? `Ask about ${selectedClient.name}... (client context is loaded)`
+                        : "e.g., Analyze the pros and cons of implementing a microservices architecture for our e-commerce platform..."
+                      }
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       rows={8}
                       className="font-mono text-sm"
                       maxLength={50000}
                     />
-                    <div className="text-xs text-muted-foreground text-right">
-                      {prompt.length.toLocaleString()} / 50,000 characters
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <div>
+                        {selectedClient && clientContext && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Brain className="h-3 w-3 mr-1" />
+                            Client context loaded: {selectedClient.name}
+                          </Badge>
+                        )}
+                      </div>
+                      <div>{prompt.length.toLocaleString()} / 50,000 characters</div>
                     </div>
                   </div>
 

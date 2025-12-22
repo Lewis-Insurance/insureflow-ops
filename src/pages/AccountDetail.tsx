@@ -9,6 +9,8 @@ import { updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed
 import { AccountForm } from '@/components/crm/AccountForm';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { QuoteRankingDashboard } from '@/components/quotes/QuoteRankingDashboard';
+import { ClientIntelligencePanel } from '@/components/client/ClientIntelligencePanel';
+import { Brain } from 'lucide-react';
 
 function normalizeTypeForRPC(v: any) {
   const out: any = { ...v };
@@ -105,6 +107,10 @@ export default function AccountDetail() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="ai-insights" className="gap-1.5">
+              <Brain className="h-4 w-4" />
+              AI Insights
+            </TabsTrigger>
             <TabsTrigger value="quotes">Quote Rankings</TabsTrigger>
             <TabsTrigger value="policies">Policies</TabsTrigger>
             <TabsTrigger value="claims">Claims</TabsTrigger>
@@ -127,6 +133,13 @@ export default function AccountDetail() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="ai-insights">
+            <ClientIntelligencePanel
+              accountId={accountId}
+              accountName={account.name}
+            />
           </TabsContent>
 
           <TabsContent value="quotes">
