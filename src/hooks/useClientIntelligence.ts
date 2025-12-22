@@ -13,6 +13,7 @@ import type {
   ClientContext,
   ClientIntelligenceResponse,
   QuestionTemplate,
+  CEOCopilotResponse,
 } from '@/types/client-intelligence';
 import { SUGGESTED_QUESTIONS } from '@/types/client-intelligence';
 
@@ -114,10 +115,37 @@ export function useClientIntelligence(options: UseClientIntelligenceOptions) {
 
       const result = await response.json();
 
+      // Try to parse structured response from the output
+      let structuredResponse: CEOCopilotResponse | undefined;
+      const finalOutput = result.final_output || '';
+      
+      if (finalOutput) {
+        try {
+          // Try to extract JSON from the response
+          // It might be wrapped in markdown code blocks
+          const jsonMatch = finalOutput.match(/```json\n?([\s\S]*?)\n?```/) ||
+                           finalOutput.match(/```\n?([\s\S]*?)\n?```/) ||
+                           finalOutput.match(/(\{[\s\S]*"executive_summary"[\s\S]*\})/);
+          
+          if (jsonMatch) {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const parsed = JSON.parse(jsonStr.trim());
+            
+            // Validate it has the expected structure
+            if (parsed.executive_summary && Array.isArray(parsed.key_findings)) {
+              structuredResponse = parsed as CEOCopilotResponse;
+            }
+          }
+        } catch (e) {
+          console.log('Could not parse structured response, using raw output');
+        }
+      }
+
       return {
         runId: result.run_id,
         question,
-        answer: result.final_output || 'No response generated',
+        answer: finalOutput || 'No response generated',
+        structuredResponse,
         tokensUsed: result.usage?.total_tokens || 0,
         cost: result.usage?.estimated_cost || 0,
         timestamp: new Date().toISOString(),
@@ -227,27 +255,116 @@ export function useClientIntelligence(options: UseClientIntelligenceOptions) {
 // =============================================================================
 
 function buildPromptWithContext(question: string, context: ClientContext): string {
-  const systemInstructions = `You are an expert insurance advisor and account analyst for Lewis Insurance Agency. 
-You have been provided with comprehensive client data below. Use this information to provide accurate, actionable insights.
+  const systemInstructions = `You are an AI-powered CEO co-pilot, specialized in strategic client intelligence analysis for Lewis Insurance Agency. Your role is to enhance understanding and service delivery by analyzing complete client profiles through AI-powered insights.
 
-## Your Analysis Guidelines:
-1. Be specific and reference actual data from the client's profile
-2. Identify concrete opportunities, risks, or recommendations
-3. Prioritize findings by importance/urgency
-4. Include relevant dates, amounts, and policy details when applicable
-5. Format your response clearly with sections and bullet points
-6. If you identify any concerning patterns or risks, highlight them prominently
-7. Always consider the client's full picture - policies, claims, communications, etc.
+## Your Primary Tasks:
+1. Identifying client coverage gaps
+2. Summarizing client activities from the past six months
+3. Highlighting cross-sell opportunities
+4. Assessing churn risk
+
+## Key Requirements:
+- Utilize structured data aggregation techniques, prioritizing data by recency and relevance
+- Manage token usage efficiently to ensure comprehensiveness without exceeding limits
+- Deliver insights with an executive summary, key findings, recommendations, action items, and risk flags
+- Every finding MUST include citations referencing the source data
 
 ## Response Format:
-- Start with a brief executive summary (2-3 sentences)
-- Follow with detailed findings organized by topic
-- End with prioritized recommendations or action items
-- Use markdown formatting for clarity
+You MUST respond with valid JSON matching this exact schema:
+
+\`\`\`json
+{
+  "executive_summary": "2-3 sentence overview of the most important insights",
+  "key_findings": [
+    {
+      "id": "finding-1",
+      "finding": "Description of the finding",
+      "severity": "critical|high|medium|low",
+      "category": "coverage|claims|engagement|renewal|other",
+      "evidence": [{"source_type": "policy|claim|note|document|task|call|sms|event|quote", "source_id": "uuid", "source_label": "Policy #123", "snippet": "relevant text", "deep_link": "/accounts/{id}/policies/{id}"}]
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "rec-1",
+      "priority": 1,
+      "recommendation": "What to do",
+      "rationale": "Why to do it",
+      "expected_impact": "Expected outcome",
+      "evidence": [...]
+    }
+  ],
+  "action_items": [
+    {
+      "id": "action-1",
+      "action": "Specific action to take",
+      "owner_suggestion": "Account Manager",
+      "due_suggestion": "Within 7 days",
+      "priority": "urgent|high|medium|low",
+      "can_create_task": true,
+      "related_finding_id": "finding-1"
+    }
+  ],
+  "risk_flags": [
+    {
+      "id": "risk-1",
+      "risk_type": "coverage_gap|churn|claims_pattern|compliance|renewal|payment|other",
+      "title": "Brief title",
+      "description": "Detailed description",
+      "severity": "critical|high|medium|low",
+      "mitigation_suggestion": "How to address",
+      "evidence": [...]
+    }
+  ],
+  "coverage_gaps": [
+    {
+      "id": "gap-1",
+      "gap_type": "No cyber liability coverage",
+      "current_state": "Current coverage description",
+      "recommended_coverage": "What should be added",
+      "estimated_premium": "$X,XXX/year",
+      "risk_if_unaddressed": "Potential exposure",
+      "priority": "critical|high|medium|low"
+    }
+  ],
+  "cross_sell_opportunities": [
+    {
+      "id": "xsell-1",
+      "product": "Product name",
+      "rationale": "Why this is a good fit",
+      "estimated_premium": "$X,XXX/year",
+      "likelihood": "high|medium|low",
+      "talking_points": ["Point 1", "Point 2"]
+    }
+  ],
+  "citations": [
+    {
+      "id": "cite-1",
+      "source_type": "policy",
+      "source_id": "uuid-from-data",
+      "source_label": "Policy #ABC123",
+      "snippet": "...coverage limit of $1M...",
+      "deep_link": "/accounts/${context.accountId}/policies/{policy_id}",
+      "timestamp": "2024-01-15"
+    }
+  ],
+  "confidence_score": 0.85
+}
+\`\`\`
+
+## Important Rules:
+1. ALWAYS cite sources using the exact source_id from the provided data
+2. Prioritize recent data (last 6 months) over older data
+3. Flag any critical issues (expiring policies, open claims, coverage gaps) prominently
+4. Be specific with numbers, dates, and policy details
+5. Action items should be concrete and assignable
+6. Use deep_link format: /accounts/${context.accountId}/{entity_type}/{entity_id}
 
 ---
 
 # CLIENT DATA
+
+**Account:** ${context.accountName} (ID: ${context.accountId})
 
 ${context.formattedContext}
 
@@ -259,7 +376,7 @@ ${question}
 
 ---
 
-Please provide a comprehensive, data-driven response based on the client information above.`;
+Respond ONLY with valid JSON matching the schema above. Do not include any text before or after the JSON. Include citations for all findings.`;
 
   return systemInstructions;
 }

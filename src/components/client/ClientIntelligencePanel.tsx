@@ -5,6 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,11 +38,14 @@ import {
   Copy,
   RefreshCw,
   Database,
+  Plus,
 } from 'lucide-react';
 import { useClientIntelligence } from '@/hooks/useClientIntelligence';
 import { useToast } from '@/hooks/use-toast';
-import type { QuestionTemplate, ClientIntelligenceResponse } from '@/types/client-intelligence';
+import type { QuestionTemplate, ClientIntelligenceResponse, ActionItem } from '@/types/client-intelligence';
 import { cn } from '@/lib/utils';
+import { CopilotResponse } from './CopilotResponse';
+import { supabase } from '@/integrations/supabase/client';
 
 // =============================================================================
 // ICON MAPPING
@@ -83,6 +87,7 @@ export function ClientIntelligencePanel({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const {
     context,
@@ -97,6 +102,66 @@ export function ClientIntelligencePanel({
     clearResponses,
     suggestedQuestions,
   } = useClientIntelligence({ accountId });
+
+  // Handle creating a task from an action item
+  const handleCreateTask = async (actionItem: ActionItem) => {
+    try {
+      // Parse due suggestion into a date
+      let dueDate: string | null = null;
+      if (actionItem.due_suggestion) {
+        const now = new Date();
+        const lowerSuggestion = actionItem.due_suggestion.toLowerCase();
+        
+        if (lowerSuggestion.includes('7 day') || lowerSuggestion.includes('week')) {
+          now.setDate(now.getDate() + 7);
+          dueDate = now.toISOString().split('T')[0];
+        } else if (lowerSuggestion.includes('30 day') || lowerSuggestion.includes('month')) {
+          now.setDate(now.getDate() + 30);
+          dueDate = now.toISOString().split('T')[0];
+        } else if (lowerSuggestion.includes('14 day') || lowerSuggestion.includes('two week')) {
+          now.setDate(now.getDate() + 14);
+          dueDate = now.toISOString().split('T')[0];
+        } else if (lowerSuggestion.includes('tomorrow')) {
+          now.setDate(now.getDate() + 1);
+          dueDate = now.toISOString().split('T')[0];
+        } else if (lowerSuggestion.includes('today') || lowerSuggestion.includes('immediately')) {
+          dueDate = now.toISOString().split('T')[0];
+        }
+      }
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Create the task
+      const { data: task, error } = await supabase.from('tasks').insert({
+        title: actionItem.action,
+        description: `Created from AI recommendation.\n\nPriority: ${actionItem.priority}\nSuggested Owner: ${actionItem.owner_suggestion || 'Not specified'}`,
+        entity_type: 'account',
+        entity_id: accountId,
+        status: 'pending',
+        priority: actionItem.priority === 'urgent' ? 'high' : actionItem.priority,
+        due_date: dueDate,
+        created_by: user?.id,
+      }).select().single();
+
+      if (error) throw error;
+
+      toast({
+        title: 'Task Created',
+        description: `"${actionItem.action}" has been added to your tasks.`,
+      });
+
+      // Optionally navigate to the task
+      // navigate(`/tasks/${task.id}`);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      toast({
+        title: 'Failed to create task',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Auto-scroll to bottom when new responses arrive
   useEffect(() => {
@@ -279,6 +344,7 @@ export function ClientIntelligencePanel({
               key={response.runId || index}
               response={response}
               onCopy={() => copyResponse(response.answer)}
+              onCreateTask={handleCreateTask}
             />
           ))}
         </div>
@@ -366,10 +432,12 @@ export function ClientIntelligencePanel({
 interface ResponseCardProps {
   response: ClientIntelligenceResponse;
   onCopy: () => void;
+  onCreateTask?: (item: ActionItem) => void;
 }
 
-function ResponseCard({ response, onCopy }: ResponseCardProps) {
+function ResponseCard({ response, onCopy, onCreateTask }: ResponseCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showRaw, setShowRaw] = useState(false);
 
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
@@ -377,6 +445,9 @@ function ResponseCard({ response, onCopy }: ResponseCardProps) {
       minute: '2-digit',
     });
   };
+
+  const hasStructuredResponse = response.structuredResponse && 
+    response.structuredResponse.executive_summary;
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
@@ -387,6 +458,11 @@ function ResponseCard({ response, onCopy }: ResponseCardProps) {
             <div className="flex items-center gap-2 min-w-0">
               <Sparkles className="h-4 w-4 text-violet-500 flex-shrink-0" />
               <span className="font-medium text-sm truncate">{response.question}</span>
+              {hasStructuredResponse && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                  Structured
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
@@ -404,10 +480,30 @@ function ResponseCard({ response, onCopy }: ResponseCardProps) {
         {/* Answer content */}
         <CollapsibleContent>
           <div className="p-4 space-y-3">
-            {/* Rendered markdown-ish content */}
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ResponseContent content={response.answer} />
-            </div>
+            {/* Structured response if available */}
+            {hasStructuredResponse && !showRaw ? (
+              <CopilotResponse 
+                response={response.structuredResponse!}
+                onCreateTask={onCreateTask}
+              />
+            ) : (
+              /* Rendered markdown-ish content */
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ResponseContent content={response.answer} />
+              </div>
+            )}
+
+            {/* Toggle between structured and raw */}
+            {hasStructuredResponse && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto text-xs"
+                onClick={() => setShowRaw(!showRaw)}
+              >
+                {showRaw ? 'Show structured view' : 'Show raw response'}
+              </Button>
+            )}
 
             {/* Footer with stats */}
             <div className="flex items-center justify-between pt-3 border-t">

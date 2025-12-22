@@ -267,6 +267,7 @@ export interface ClientIntelligenceResponse {
   runId: string;
   question: string;
   answer: string;
+  structuredResponse?: CEOCopilotResponse;
   tokensUsed: number;
   cost: number;
   timestamp: string;
@@ -278,5 +279,203 @@ export interface ClientIntelligenceState {
   context: ClientContext | null;
   responses: ClientIntelligenceResponse[];
   error: string | null;
+}
+
+// =============================================================================
+// CEO COPILOT STRUCTURED RESPONSE SCHEMA
+// =============================================================================
+// Aligned with the Ultimate System Prompt requirements
+
+export interface CEOCopilotResponse {
+  // Required sections from system prompt
+  executive_summary: string;
+  
+  key_findings: KeyFinding[];
+  recommendations: Recommendation[];
+  action_items: ActionItem[];
+  risk_flags: RiskFlag[];
+  
+  // Analysis-specific sections (optional based on question type)
+  coverage_gaps?: CoverageGap[];
+  cross_sell_opportunities?: CrossSellOpportunity[];
+  activity_summary?: ActivitySummary;
+  
+  // Citations for trust/verification
+  citations: Citation[];
+  
+  // Metadata
+  confidence_score: number; // 0-1
+  tokens_used: number;
+  analysis_timestamp: string;
+}
+
+export interface KeyFinding {
+  id: string;
+  finding: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category?: string;
+  evidence: Citation[];
+}
+
+export interface Recommendation {
+  id: string;
+  priority: 1 | 2 | 3; // 1 = highest
+  recommendation: string;
+  rationale: string;
+  expected_impact?: string;
+  evidence: Citation[];
+}
+
+export interface ActionItem {
+  id: string;
+  action: string;
+  owner_suggestion?: string;
+  due_suggestion?: string; // e.g., "Within 7 days", "Before renewal"
+  priority: 'urgent' | 'high' | 'medium' | 'low';
+  can_create_task: boolean;
+  related_finding_id?: string;
+}
+
+export interface RiskFlag {
+  id: string;
+  risk_type: 'coverage_gap' | 'churn' | 'claims_pattern' | 'compliance' | 'renewal' | 'payment' | 'other';
+  title: string;
+  description: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  mitigation_suggestion?: string;
+  evidence: Citation[];
+}
+
+export interface CoverageGap {
+  id: string;
+  gap_type: string; // e.g., "No cyber liability coverage"
+  current_state: string;
+  recommended_coverage: string;
+  estimated_premium?: string;
+  risk_if_unaddressed: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface CrossSellOpportunity {
+  id: string;
+  product: string;
+  rationale: string;
+  estimated_premium?: string;
+  likelihood: 'high' | 'medium' | 'low';
+  talking_points: string[];
+}
+
+export interface ActivitySummary {
+  period: string; // e.g., "Last 90 days"
+  total_interactions: number;
+  key_events: ActivityEvent[];
+  engagement_trend: 'increasing' | 'stable' | 'decreasing';
+  last_contact_date?: string;
+  next_renewal_date?: string;
+}
+
+export interface ActivityEvent {
+  date: string;
+  type: string;
+  description: string;
+  source_ref?: Citation;
+}
+
+// =============================================================================
+// CITATION TYPES
+// =============================================================================
+
+export interface Citation {
+  id: string;
+  source_type: 'policy' | 'claim' | 'note' | 'document' | 'task' | 'call' | 'sms' | 'event' | 'quote' | 'email';
+  source_id: string;
+  source_label: string; // Human-readable, e.g., "Policy #ABC123"
+  snippet?: string; // Relevant excerpt
+  deep_link: string; // URL path to navigate to source
+  timestamp?: string;
+  relevance_score?: number; // 0-1, how relevant this citation is
+}
+
+// =============================================================================
+// CONTEXT PACK TYPES (for edge function)
+// =============================================================================
+
+export interface ContextPack {
+  account_id: string;
+  account_name: string;
+  
+  // Structured snapshot (always included)
+  structured_snapshot: {
+    account: AccountData;
+    contacts: ContactData[];
+    policies: PolicyData[];
+    claims: ClaimData[];
+    active_tasks: TaskData[];
+  };
+  
+  // Retrieved chunks from semantic search
+  retrieved_chunks: RetrievedChunk[];
+  
+  // Token budget tracking
+  token_count: number;
+  max_tokens: number;
+  
+  // Metadata
+  build_time_ms: number;
+  cache_hit: boolean;
+  expires_at: string;
+}
+
+export interface RetrievedChunk {
+  id: string;
+  source_type: string;
+  source_id: string;
+  source_label: string;
+  content: string;
+  snippet: string;
+  deep_link: string;
+  similarity_score: number;
+  timestamp?: string;
+}
+
+// =============================================================================
+// EMBEDDING TYPES
+// =============================================================================
+
+export interface EmbeddingRecord {
+  id: string;
+  account_id: string;
+  source_type: string;
+  source_id: string;
+  source_label: string;
+  content: string;
+  content_hash: string;
+  chunk_index: number;
+  chunk_total: number;
+  embedding?: number[];
+  metadata: {
+    timestamp?: string;
+    snippet?: string;
+    deep_link?: string;
+    relevance_boost?: number;
+  };
+  created_at: string;
+  updated_at: string;
+  indexed_at: string;
+}
+
+export interface IndexJob {
+  id: string;
+  account_id: string;
+  source_type: string;
+  source_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
+  priority: number;
+  attempts: number;
+  max_attempts: number;
+  error_message?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
