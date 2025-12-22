@@ -12,6 +12,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { verifyAuth } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -212,7 +213,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Extract API key from Authorization header
+    // Extract token from Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
@@ -221,14 +222,44 @@ serve(async (req) => {
       );
     }
 
-    const apiKey = authHeader.replace('Bearer ', '');
-    const validatedKey = await validateAPIKey(apiKey, supabase);
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Try to authenticate as Supabase user first (for UI access)
+    const authResult = await verifyAuth(req, supabase);
+    let validatedKey: PrismAPIKey | null = null;
+    let authenticatedUserId: string | null = null;
+
+    if (authResult.user && !authResult.error) {
+      // Authenticated Supabase user - use system key automatically
+      authenticatedUserId = authResult.user.id;
+      const systemKey = Deno.env.get('PRISM_SYSTEM_API_KEY');
+      if (systemKey) {
+        validatedKey = {
+          key: systemKey,
+          user_id: authenticatedUserId,
+          rate_limit_per_hour: 100,
+          daily_token_limit: 1000000,
+          daily_cost_limit: 10.0,
+          is_active: true,
+        };
+      }
+    }
+
+    // If not authenticated user, try API key validation (for external API access)
+    if (!validatedKey) {
+      validatedKey = await validateAPIKey(token, supabase);
+    }
 
     if (!validatedKey || !validatedKey.is_active) {
       return new Response(
-        JSON.stringify({ error: 'Invalid or inactive API key' }),
+        JSON.stringify({ error: 'Invalid or inactive API key. Please authenticate or provide a valid Prism API key.' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Use authenticated user ID if available, otherwise use from validated key
+    if (authenticatedUserId && validatedKey.user_id !== authenticatedUserId) {
+      validatedKey.user_id = authenticatedUserId;
     }
 
     const url = new URL(req.url);
