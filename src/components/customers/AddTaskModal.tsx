@@ -12,9 +12,10 @@ interface AddTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string;
+  policyId?: string;
 }
 
-export function AddTaskModal({ open, onOpenChange, accountId }: AddTaskModalProps) {
+export function AddTaskModal({ open, onOpenChange, accountId, policyId }: AddTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -39,6 +40,7 @@ export function AddTaskModal({ open, onOpenChange, accountId }: AddTaskModalProp
 
       const { error } = await supabase.from('tasks').insert({
         account_id: accountId,
+        policy_id: policyId || null,
         title: title.trim(),
         description: description.trim() || null,
         due_at: dueAt || null,
@@ -63,6 +65,10 @@ export function AddTaskModal({ open, onOpenChange, accountId }: AddTaskModalProp
       queryClient.invalidateQueries({ queryKey: ['tasks', accountId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
       queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+      if (policyId) {
+        queryClient.invalidateQueries({ queryKey: ['policy-tasks', policyId] });
+        queryClient.invalidateQueries({ queryKey: ['policy', policyId] });
+      }
       
       setTitle('');
       setDescription('');

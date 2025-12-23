@@ -7101,6 +7101,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           id: string
+          policy_id: string | null
           title: string | null
         }
         Insert: {
@@ -7110,6 +7111,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          policy_id?: string | null
           title?: string | null
         }
         Update: {
@@ -7119,6 +7121,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          policy_id?: string | null
           title?: string | null
         }
         Relationships: [
@@ -7134,6 +7137,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
             referencedColumns: ["id"]
           },
         ]

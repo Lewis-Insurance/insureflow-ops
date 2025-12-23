@@ -87,6 +87,36 @@ export default function PolicyDetail() {
     retry: 1,
   });
 
+  const { data: policyNotes = [] } = useQuery({
+    queryKey: ['policy-notes', policyId],
+    queryFn: async () => {
+      if (!policyId) return [];
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('policy_id', policyId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!policyId,
+  });
+
+  const { data: policyTasks = [] } = useQuery({
+    queryKey: ['policy-tasks', policyId],
+    queryFn: async () => {
+      if (!policyId) return [];
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('policy_id', policyId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!policyId,
+  });
+
   const formatCurrency = (amount: number | null) => {
     if (!amount) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -510,6 +540,85 @@ export default function PolicyDetail() {
           />
         )}
 
+        {/* Policy Notes & Tasks */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Policy Notes ({policyNotes.length})
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setAddNoteOpen(true)}>
+                Add Note
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {policyNotes.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4">No policy notes yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {policyNotes.slice(0, 6).map((note: any) => (
+                    <div key={note.id} className="border-l-2 border-primary/20 pl-3">
+                      <p className="text-sm whitespace-pre-wrap">{note.body}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(note.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                  {policyNotes.length > 6 && (
+                    <p className="text-xs text-muted-foreground">+{policyNotes.length - 6} more notes</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Policy Tasks ({policyTasks.length})
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setAddTaskOpen(true)}>
+                Add Task
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {policyTasks.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4">No policy tasks yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {policyTasks.slice(0, 6).map((task: any) => (
+                    <div key={task.id} className="flex items-start justify-between gap-3 p-3 border rounded-lg">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">{task.title}</div>
+                        {task.description && (
+                          <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                            {task.description}
+                          </div>
+                        )}
+                        {task.due_at && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Due: {new Date(task.due_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      {task.status && (
+                        <Badge variant="secondary" className="shrink-0">
+                          {String(task.status)}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                  {policyTasks.length > 6 && (
+                    <p className="text-xs text-muted-foreground">+{policyTasks.length - 6} more tasks</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Inland Marine Details Section */}
         {isInlandMarine && policyId && (
           <InlandMarinePolicyDetails policyId={policyId} />
@@ -554,11 +663,13 @@ export default function PolicyDetail() {
             open={addNoteOpen}
             onOpenChange={setAddNoteOpen}
             accountId={policy.account.id}
+            policyId={policy.id}
           />
           <AddTaskModal
             open={addTaskOpen}
             onOpenChange={setAddTaskOpen}
             accountId={policy.account.id}
+            policyId={policy.id}
           />
           <UploadDocModal
             open={uploadDocOpen}
