@@ -104,6 +104,25 @@ export function AIResultsDisplay({
 
   // Render based on format
   const renderContent = () => {
+    // Smart detection: If result looks like structured data (nested objects, no text-like keys),
+    // use structured format even if config says 'chat'
+    const hasTextResponse =
+      typeof result.response === 'string' ||
+      typeof result.answer === 'string' ||
+      typeof result.content === 'string' ||
+      typeof result.text === 'string' ||
+      typeof result.summary === 'string';
+
+    const looksStructured = !hasTextResponse &&
+      typeof result === 'object' &&
+      Object.keys(result).length > 0 &&
+      Object.values(result).some(v => typeof v === 'object' && v !== null);
+
+    // If it's structured data, always use structured renderer
+    if (looksStructured && outputConfig.format !== 'html') {
+      return renderStructuredFormat();
+    }
+
     switch (outputConfig.format) {
       case 'html':
         return renderHtmlFormat();
