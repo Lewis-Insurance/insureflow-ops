@@ -15,7 +15,8 @@ import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, FileText, CheckSquare, Plus, Mail, Award } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare, Plus, Mail, Award, Inbox } from 'lucide-react';
+import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
 
 interface Account {
   id: string;
@@ -253,6 +254,9 @@ export default function CustomerDetail() {
 
         {/* Policies & Quotes Section */}
         <CustomerPoliciesSection accountId={account.id} />
+
+        {/* Document Collection Section */}
+        <DocumentCollectionBoard accountId={account.id} />
 
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
