@@ -94,6 +94,8 @@ const PrismAIPage = React.lazy(() => import("./pages/PrismAIPage"));
 const SMSPage = React.lazy(() => import("./pages/SMSPage"));
 const DocumentCollectionPortal = React.lazy(() => import("./pages/DocumentCollectionPortal"));
 const ModuleBuilderPage = React.lazy(() => import("./pages/ModuleBuilderPage"));
+const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
+const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -696,7 +698,23 @@ const App = () => (
                   path="/ai-hub"
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
-                      <LewiAI />
+                      <LewisAIHub />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ai/hub"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <LewisAIHub />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ai/:moduleSlug"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AIModuleExecute />
                     </ErrorBoundary>
                   }
                 />
