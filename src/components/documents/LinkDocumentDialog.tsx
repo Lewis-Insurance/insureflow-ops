@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/popover';
 import { ChevronsUpDown, Link2, Loader2, FileText } from 'lucide-react';
 import { useLinkDocument } from '@/integrations/supabase/hooks/useAIModules';
-import { useAccounts } from '@/hooks/useAccounts';
+import { useAccounts } from '@/hooks/useCRMData';
 import { useLeads } from '@/hooks/useLeads';
 import { cn } from '@/lib/utils';
 

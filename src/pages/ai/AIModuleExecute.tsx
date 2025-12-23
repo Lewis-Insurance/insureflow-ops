@@ -67,7 +67,7 @@ import {
   AIModuleInputConfig,
 } from '@/integrations/supabase/hooks/useAIModules';
 import { AIResultsDisplay } from '@/components/ai/AIResultsDisplay';
-import { useAccounts } from '@/hooks/useAccounts';
+import { useAccounts } from '@/hooks/useCRMData';
 import { useLeads } from '@/hooks/useLeads';
 
 // Icon mapping
