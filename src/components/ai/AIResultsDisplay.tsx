@@ -85,7 +85,7 @@ export function AIResultsDisplay({
 
   const handleDownloadReport = () => {
     if (!reportHtml) return;
-    
+
     const blob = new Blob([reportHtml], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -95,7 +95,7 @@ export function AIResultsDisplay({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: 'Downloaded!',
       description: 'Report downloaded successfully.',
@@ -119,14 +119,47 @@ export function AIResultsDisplay({
 
   // Structured JSON format - render sections as cards
   const renderStructuredFormat = () => {
-    const sections = outputConfig.sections || Object.keys(result);
-    
+    // Get all actual keys in the result
+    const resultKeys = Object.keys(result);
+
+    // If result has a 'content' or 'format: markdown' fallback, show that
+    if (result.format === 'markdown' && result.content) {
+      return (
+        <Card>
+          <CardContent className="p-6">
+            <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap">
+              {result.content as string}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Use configured sections if they exist AND match result keys, otherwise use all result keys
+    let sections = outputConfig.sections || [];
+    const matchingSections = sections.filter(s => result[s] !== undefined);
+
+    // If no configured sections match, show all result keys
+    if (matchingSections.length === 0) {
+      sections = resultKeys.filter(k => !['format'].includes(k)); // Exclude metadata keys
+    } else {
+      sections = matchingSections;
+    }
+
+    // Also add any result keys not in configured sections (for completeness)
+    const extraKeys = resultKeys.filter(k =>
+      !sections.includes(k) &&
+      result[k] &&
+      !['format', 'email_draft'].includes(k)
+    );
+    sections = [...sections, ...extraKeys];
+
     return (
       <div className="space-y-6">
         {sections.map((section) => {
           const sectionData = result[section];
           if (!sectionData) return null;
-          
+
           return (
             <SectionCard
               key={section}
@@ -145,11 +178,11 @@ export function AIResultsDisplay({
   // HTML format - render raw HTML
   const renderHtmlFormat = () => {
     const html = result.proposal_html as string || result.html as string || '';
-    
+
     return (
       <Card>
         <CardContent className="p-6">
-          <div 
+          <div
             className="prose dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: html }}
           />
@@ -160,10 +193,10 @@ export function AIResultsDisplay({
 
   // Markdown format - simple text rendering
   const renderMarkdownFormat = () => {
-    const content = typeof result === 'string' 
-      ? result 
+    const content = typeof result === 'string'
+      ? result
       : result.content as string || result.response as string || JSON.stringify(result, null, 2);
-    
+
     return (
       <Card>
         <CardContent className="p-6">
@@ -177,9 +210,17 @@ export function AIResultsDisplay({
 
   // Chat format - conversational with citations
   const renderChatFormat = () => {
-    const response = result.response as string || result.answer as string || '';
+    // Try multiple possible keys for the response text
+    const response = result.response as string
+      || result.answer as string
+      || result.content as string
+      || result.text as string
+      || result.summary as string
+      || (typeof result === 'string' ? result : '')
+      || (result.format === 'markdown' ? result.content as string : '')
+      || JSON.stringify(result, null, 2);
     const sources = result.sources as Array<{ page?: number; text?: string }> || [];
-    
+
     return (
       <div className="space-y-4">
         <Card>
@@ -189,7 +230,7 @@ export function AIResultsDisplay({
             </div>
           </CardContent>
         </Card>
-        
+
         {outputConfig.show_sources && sources.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger asChild>
@@ -415,7 +456,7 @@ function formatSectionTitle(section: string): string {
 function RiskRatingDisplay({ data }: { data: unknown }) {
   const rating = typeof data === 'string' ? data : (data as Record<string, unknown>)?.rating || 'Unknown';
   const score = typeof data === 'object' ? (data as Record<string, unknown>)?.score : null;
-  
+
   const ratingColors: Record<string, string> = {
     low: 'bg-green-500/10 text-green-600 border-green-500',
     medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-500',
@@ -614,7 +655,7 @@ function PremiumComparisonDisplay({ data }: { data: Record<string, unknown> }) {
           </div>
         ))}
       </div>
-      
+
       {savings && (
         <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
