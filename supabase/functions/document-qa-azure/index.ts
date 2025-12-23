@@ -19,6 +19,36 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+async function embedQueryAzureOpenAI(query: string) {
+  const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+  const apiKey = Deno.env.get('AZURE_OPENAI_KEY');
+  const deployment = Deno.env.get('AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME');
+  if (!endpoint || !apiKey || !deployment) return null;
+
+  const cleanEndpoint = endpoint.replace(/\/$/, '');
+  const url = `${cleanEndpoint}/openai/deployments/${deployment}/embeddings?api-version=2024-02-15-preview`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify({ input: query }),
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`Azure embeddings failed: ${resp.status} - ${t}`);
+  }
+
+  const data = await resp.json();
+  const embedding = data?.data?.[0]?.embedding;
+  if (!Array.isArray(embedding)) throw new Error('Azure embeddings response missing embedding');
+  return embedding;
+}
+
+
 type OCRPage = { page: number; text: string };
 
 async function sha256Hex(input: string): Promise<string> {
@@ -378,23 +408,61 @@ If the document text is provided, base your answer on the actual content.
 If document content is limited, provide a helpful response based on the document type and context.
 Always be specific and cite relevant details from the document when possible.`;
 
-    // Token saver: prefer sending only the most relevant pages (from cached per-page OCR)
+    // Token saver: prefer embeddings retrieval (document_chunks) when available;
+    // fall back to per-page keyword selection; then to truncated full text.
     let evidencePages: number[] = [];
     let contextText = '';
     let wasTruncated = false;
+    let usedRetrieval = false;
+    let retrievedChunksCount = 0;
 
-    if (documentPages.length > 0) {
-      const picked = pickRelevantPages(documentPages, question, 6);
-      evidencePages = picked.pageNumbers;
-      contextText = picked.pages.map((p) => `--- PAGE ${p.page} ---\n${p.text}`).join('\n\n');
-    } else {
-      contextText = documentText.substring(0, 60000);
-      wasTruncated = documentText.length > 60000;
+    if (document_id) {
+      try {
+        const queryEmbedding = await embedQueryAzureOpenAI(question);
+        if (queryEmbedding) {
+          const { data: chunks, error: chunkErr } = await supabase.rpc('match_document_chunks', {
+            query_embedding: queryEmbedding,
+            match_count: 8,
+            filter_document_id: document_id,
+            filter_account_id: null,
+          });
+
+          if (!chunkErr && Array.isArray(chunks) && chunks.length > 0) {
+            usedRetrieval = true;
+            retrievedChunksCount = chunks.length;
+            const pages = new Set<number>();
+            contextText = chunks
+              .map((c: any) => {
+                const ps = c.page_start as number | null;
+                const pe = c.page_end as number | null;
+                if (ps) pages.add(ps);
+                if (pe) pages.add(pe);
+                const range = ps && pe ? `Pages ${ps}${pe !== ps ? `-${pe}` : ''}` : `Chunk ${c.chunk_index ?? ''}`;
+                return `--- ${range} ---\n${c.content}`;
+              })
+              .join('\n\n');
+            evidencePages = Array.from(pages).sort((a, b) => a - b);
+          }
+        }
+      } catch (e) {
+        console.warn('Embeddings retrieval failed (non-fatal):', e);
+      }
+    }
+
+    if (!usedRetrieval) {
+      if (documentPages.length > 0) {
+        const picked = pickRelevantPages(documentPages, question, 6);
+        evidencePages = picked.pageNumbers;
+        contextText = picked.pages.map((p) => `--- PAGE ${p.page} ---\n${p.text}`).join('\n\n');
+      } else {
+        contextText = documentText.substring(0, 60000);
+        wasTruncated = documentText.length > 60000;
+      }
     }
 
     const userPrompt = `${context ? `Context: ${context}\n\n` : ''}Document: ${filename || 'Unknown document'}
 
-${contextText ? `Document Content (${documentPages.length > 0 ? `selected pages ${evidencePages.join(', ') || 'N/A'}` : (wasTruncated ? 'truncated' : 'full')}):\n${contextText}` : '[No document content available]'}
+${contextText ? `Document Content (${usedRetrieval ? `retrieved sections (pages ${evidencePages.join(', ') || 'N/A'})` : (documentPages.length > 0 ? `selected pages ${evidencePages.join(', ') || 'N/A'}` : (wasTruncated ? 'truncated' : 'full'))}):\n${contextText}` : '[No document content available]'}
 
 Question: ${question}
 
