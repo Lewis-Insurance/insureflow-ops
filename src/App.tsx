@@ -27,6 +27,7 @@ const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
 const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
+const RateWatchList = React.lazy(() => import("./pages/ao-renewals/RateWatchList"));
 const NewRateWatch = React.lazy(() => import("./pages/ao-renewals/NewRateWatch"));
 const RateWatchDetail = React.lazy(() => import("./pages/ao-renewals/RateWatchDetail"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
@@ -263,7 +264,7 @@ const App = () => (
                 path="/ao-renewals/rate-watch" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <NewRateWatch />
+                    <RateWatchList />
                   </ErrorBoundary>
                 }
               />
