@@ -146,8 +146,7 @@ export default function RenewalRateWatchPage() {
   const [accountSearch, setAccountSearch] = useState('');
 
   // Fetch accounts and policies for selection
-  const { data: accountsData } = useAccounts();
-  const accounts = accountsData?.accounts || [];
+  const { data: accounts = [] } = useAccounts();
   const { data: policiesData } = usePolicies({ accountId: selectedAccountId || undefined });
   const policies = policiesData?.policies || [];
 
