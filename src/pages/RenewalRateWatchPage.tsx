@@ -53,6 +53,8 @@ import {
   useRunRateWatchPipeline,
   useUpdateEmailDraft,
 } from '@/hooks/useRenewalRateWatch';
+import { useAccounts } from '@/hooks/useCRMData';
+import { usePolicies } from '@/hooks/usePolicies';
 
 export default function RenewalRateWatchPage() {
   const { workspaceId } = useParams<{ workspaceId?: string }>();
@@ -136,13 +138,56 @@ export default function RenewalRateWatchPage() {
     setEditingEmail(false);
   };
 
+  // Creation form state
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string>('');
+  const [jobName, setJobName] = useState('');
+  const [selectedLob, setSelectedLob] = useState('personal_auto');
+  const [accountSearch, setAccountSearch] = useState('');
+
+  // Fetch accounts and policies for selection
+  const { data: accountsData } = useAccounts();
+  const accounts = accountsData?.accounts || [];
+  const { data: policiesData } = usePolicies({ accountId: selectedAccountId || undefined });
+  const policies = policiesData?.policies || [];
+
+  // Filter accounts by search
+  const filteredAccounts = accounts.filter(a => 
+    a.name?.toLowerCase().includes(accountSearch.toLowerCase())
+  ).slice(0, 20);
+
+  // Auto-generate job name when account/policy selected
+  useEffect(() => {
+    if (selectedAccountId && !jobName) {
+      const account = accounts.find(a => a.id === selectedAccountId);
+      if (account) {
+        const date = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        setJobName(`${account.name} - Renewal ${date}`);
+      }
+    }
+  }, [selectedAccountId, accounts, jobName]);
+
+  const handleCreateWorkspace = () => {
+    if (!selectedAccountId) {
+      toast({ title: 'Error', description: 'Please select a customer', variant: 'destructive' });
+      return;
+    }
+    createWorkspace.mutate({
+      name: jobName || 'New Rate Watch',
+      account_id: selectedAccountId,
+      policy_id: selectedPolicyId || undefined,
+      ao_renewal_id: aoRenewalId || undefined,
+      lob: selectedLob,
+    });
+  };
+
   // If no workspace, show creation form
   if (!workspaceId) {
     return (
       <AppLayout>
         <div className="p-6 space-y-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -154,21 +199,85 @@ export default function RenewalRateWatchPage() {
             </div>
           </div>
 
-          <Card className="max-w-lg">
+          <Card className="max-w-xl">
             <CardHeader>
               <CardTitle>Create Rate Watch Job</CardTitle>
               <CardDescription>
-                Set up a new renewal rate comparison
+                Select a customer and policy to compare renewal options
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Account Selection */}
+              <div className="space-y-2">
+                <Label>Customer *</Label>
+                <Input
+                  placeholder="Search customers..."
+                  value={accountSearch}
+                  onChange={(e) => setAccountSearch(e.target.value)}
+                />
+                {accountSearch && filteredAccounts.length > 0 && (
+                  <div className="border rounded-md max-h-48 overflow-auto">
+                    {filteredAccounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className={`p-2 hover:bg-muted cursor-pointer ${
+                          selectedAccountId === account.id ? 'bg-muted' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedAccountId(account.id);
+                          setAccountSearch(account.name || '');
+                          setSelectedPolicyId(''); // Reset policy when account changes
+                        }}
+                      >
+                        <div className="font-medium">{account.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {account.email || account.phone || 'No contact info'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedAccountId && (
+                  <Badge variant="secondary" className="mt-1">
+                    Selected: {accounts.find(a => a.id === selectedAccountId)?.name}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Policy Selection */}
+              {selectedAccountId && (
+                <div className="space-y-2">
+                  <Label>Policy (Optional)</Label>
+                  <Select value={selectedPolicyId} onValueChange={setSelectedPolicyId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a policy..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific policy</SelectItem>
+                      {policies.map((policy) => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.policy_number} - {policy.line_of_business || 'Unknown LOB'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Job Name */}
               <div className="space-y-2">
                 <Label>Job Name</Label>
-                <Input placeholder="e.g., Smith Auto Renewal - Jan 2025" />
+                <Input 
+                  placeholder="e.g., Smith Auto Renewal - Jan 2025" 
+                  value={jobName}
+                  onChange={(e) => setJobName(e.target.value)}
+                />
               </div>
+
+              {/* Line of Business */}
               <div className="space-y-2">
                 <Label>Line of Business</Label>
-                <Select defaultValue="personal_auto">
+                <Select value={selectedLob} onValueChange={setSelectedLob}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -176,19 +285,19 @@ export default function RenewalRateWatchPage() {
                     <SelectItem value="personal_auto">Personal Auto</SelectItem>
                     <SelectItem value="home">Homeowners</SelectItem>
                     <SelectItem value="package">Home + Auto Package</SelectItem>
+                    <SelectItem value="commercial_auto">Commercial Auto</SelectItem>
+                    <SelectItem value="commercial_property">Commercial Property</SelectItem>
+                    <SelectItem value="general_liability">General Liability</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              <Separator />
+
               <Button
                 className="w-full"
-                onClick={() => {
-                  createWorkspace.mutate({
-                    name: 'New Rate Watch',
-                    ao_renewal_id: aoRenewalId || undefined,
-                    lob: 'personal_auto',
-                  });
-                }}
-                disabled={createWorkspace.isPending}
+                onClick={handleCreateWorkspace}
+                disabled={createWorkspace.isPending || !selectedAccountId}
               >
                 {createWorkspace.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
