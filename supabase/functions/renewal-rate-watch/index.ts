@@ -92,6 +92,10 @@ serve(async (req) => {
       case 'generate_email':
         result = await generateEmail(supabase, workspace_id, user.id);
         break;
+      case 'send_email':
+        const emailDraftId = body.email_draft_id;
+        result = await sendRenewalEmail(supabase, workspace_id, user.id, emailDraftId);
+        break;
       case 'full_pipeline':
         // Run all steps in sequence
         console.log('[renewal-rate-watch] Running full pipeline...');
@@ -1257,5 +1261,214 @@ Your Team at Lewis Insurance
   `;
 
   return { subject, bodyHtml, bodyText };
+}
+
+// =============================================================================
+// STEP 5: SEND EMAIL (Uses existing email-send edge function)
+// =============================================================================
+
+async function sendRenewalEmail(supabase: any, workspaceId: string, userId: string, emailDraftId?: string) {
+  // Get email draft
+  let draft;
+  if (emailDraftId) {
+    const { data, error } = await supabase
+      .from('renewal_email_drafts')
+      .select('*')
+      .eq('id', emailDraftId)
+      .single();
+    if (error) throw new Error(`Draft not found: ${error.message}`);
+    draft = data;
+  } else {
+    const { data, error } = await supabase
+      .from('renewal_email_drafts')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error) throw new Error(`No draft found: ${error.message}`);
+    draft = data;
+  }
+
+  if (!draft.to_email) {
+    return { success: false, error: 'No recipient email address' };
+  }
+
+  // Get report artifact for attachment reference
+  const { data: artifact } = await supabase
+    .from('renewal_report_artifacts')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  // Call email-send edge function
+  const EMAIL_PROVIDER = Deno.env.get('EMAIL_PROVIDER') || 'postmark';
+  const EMAIL_API_KEY = Deno.env.get('EMAIL_PROVIDER_API_KEY');
+  const FROM_EMAIL = Deno.env.get('OUTBOUND_FROM') || 'service@lewisinsurance.ai';
+
+  if (!EMAIL_API_KEY) {
+    // Fall back to queue-based sending
+    return await queueEmailForSending(supabase, draft, artifact, userId);
+  }
+
+  try {
+    let response: Response;
+
+    if (EMAIL_PROVIDER === 'postmark') {
+      response = await fetch('https://api.postmarkapp.com/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Postmark-Server-Token': EMAIL_API_KEY,
+        },
+        body: JSON.stringify({
+          From: FROM_EMAIL,
+          To: draft.to_email,
+          Subject: draft.subject,
+          HtmlBody: draft.body_html,
+          TextBody: draft.body_text,
+          MessageStream: 'outbound',
+          Tag: 'renewal-rate-watch',
+          Metadata: {
+            workspace_id: workspaceId,
+            draft_id: draft.id,
+          },
+        }),
+      });
+    } else if (EMAIL_PROVIDER === 'sendgrid') {
+      response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${EMAIL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: draft.to_email }] }],
+          from: { email: FROM_EMAIL },
+          subject: draft.subject,
+          content: [
+            { type: 'text/plain', value: draft.body_text },
+            { type: 'text/html', value: draft.body_html },
+          ],
+        }),
+      });
+    } else {
+      throw new Error(`Unsupported email provider: ${EMAIL_PROVIDER}`);
+    }
+
+    if (!response!.ok) {
+      const errorData = await response!.json();
+      throw new Error(`Email send failed: ${JSON.stringify(errorData)}`);
+    }
+
+    const result = EMAIL_PROVIDER === 'postmark' 
+      ? await response!.json()
+      : { id: 'sendgrid-success' };
+
+    // Update draft status
+    await supabase
+      .from('renewal_email_drafts')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        message_id: result.MessageID || result.id,
+      })
+      .eq('id', draft.id);
+
+    // Log activity
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('account_id')
+      .eq('id', workspaceId)
+      .single();
+
+    if (workspace?.account_id) {
+      await supabase.from('activities').insert({
+        account_id: workspace.account_id,
+        activity_type: 'email_sent',
+        title: `Renewal Rate Watch email sent to ${draft.to_name || draft.to_email}`,
+        description: draft.subject,
+        created_by: userId,
+      });
+    }
+
+    return {
+      success: true,
+      message_id: result.MessageID || result.id,
+      to: draft.to_email,
+    };
+
+  } catch (error) {
+    console.error('[renewal-rate-watch] Email send error:', error);
+
+    // Update draft with error
+    await supabase
+      .from('renewal_email_drafts')
+      .update({
+        status: 'failed',
+        error_message: error.message,
+      })
+      .eq('id', draft.id);
+
+    return { success: false, error: error.message };
+  }
+}
+
+async function queueEmailForSending(supabase: any, draft: any, artifact: any, userId: string) {
+  // Use the marketing_send_queue if available
+  try {
+    const { data: queueItem, error: queueError } = await supabase
+      .from('marketing_send_queue')
+      .insert({
+        idempotency_key: `renewal-rate-watch-${draft.id}`,
+        priority: 10, // High priority
+        scheduled_for: new Date().toISOString(),
+        channel: 'email',
+        classification: 'transactional',
+        from_user_id: userId,
+        to_email: draft.to_email,
+        source_type: 'renewal_rate_watch',
+        source_id: draft.workspace_id,
+      })
+      .select('id')
+      .single();
+
+    if (queueError) {
+      // Queue might not exist, update draft status
+      await supabase
+        .from('renewal_email_drafts')
+        .update({ status: 'pending_send' })
+        .eq('id', draft.id);
+
+      return { 
+        success: true, 
+        queued: true, 
+        message: 'Email draft saved. Please configure email provider to send.' 
+      };
+    }
+
+    // Add payload
+    await supabase.from('marketing_send_queue_payloads').insert({
+      queue_id: queueItem.id,
+      channel: 'email',
+      email_subject: draft.subject,
+      email_body_html: draft.body_html,
+      email_body_text: draft.body_text,
+    });
+
+    await supabase
+      .from('renewal_email_drafts')
+      .update({ status: 'queued' })
+      .eq('id', draft.id);
+
+    return { success: true, queued: true, queue_id: queueItem.id };
+
+  } catch (error) {
+    console.error('[renewal-rate-watch] Queue error:', error);
+    return { success: false, error: 'Failed to queue email' };
+  }
 }
 
