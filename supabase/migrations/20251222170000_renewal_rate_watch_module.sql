@@ -89,10 +89,12 @@ CREATE TABLE IF NOT EXISTS public.bundle_snapshots (
   error_message TEXT,
   
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  UNIQUE(workspace_id, bundle_role, COALESCE(carrier_name, ''))
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Unique constraint: one snapshot per bundle_role per carrier (or null carrier) per workspace
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bundle_snapshots_unique 
+  ON bundle_snapshots(workspace_id, bundle_role, COALESCE(carrier_name, ''));
 
 CREATE INDEX IF NOT EXISTS idx_bundle_snapshots_workspace ON bundle_snapshots(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_bundle_snapshots_role ON bundle_snapshots(bundle_role);
