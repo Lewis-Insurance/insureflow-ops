@@ -682,7 +682,7 @@ const App = () => (
                   path="/lewi-ai"
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
-                      <LewiAI />
+                      <LewisAIHub />
                     </ErrorBoundary>
                   }
                 />
