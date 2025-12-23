@@ -201,3 +201,4 @@ GRANT SELECT, INSERT ON public.document_evidence_items TO authenticated;
 GRANT EXECUTE ON FUNCTION public.search_document_chunks TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_evidence_item TO authenticated;
 
+

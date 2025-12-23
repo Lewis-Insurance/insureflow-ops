@@ -350,3 +350,4 @@ CREATE POLICY "authenticated_manage_portal_branding" ON portal_branding
 
 GRANT ALL ON portal_branding TO authenticated;
 
+

@@ -28,3 +28,4 @@ CREATE POLICY "authenticated_delete_carriers" ON public.carriers
     TO authenticated
     USING (true);
 
+

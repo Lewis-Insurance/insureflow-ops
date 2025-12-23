@@ -76,6 +76,11 @@ const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
 const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
 const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
 const LewiAI = React.lazy(() => import("./pages/LewiAI"));
+
+// Lewis AI Hub Pages
+const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
+const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
+const DocumentIntelligenceHub = React.lazy(() => import("./pages/ai/DocumentIntelligenceHub"));
 const CoverageGapAnalysis = React.lazy(() => import("./pages/CoverageGapAnalysis"));
 const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
 const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
@@ -693,6 +698,37 @@ const App = () => (
                   </ErrorBoundary>
                 }
               />
+              
+              {/* Lewis AI Hub Routes */}
+              <Route
+                path="/ai"
+                element={<Navigate to="/ai/hub" replace />}
+              />
+              <Route
+                path="/ai/hub"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <LewisAIHub />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/ai/documents"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <DocumentIntelligenceHub />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/ai/:moduleSlug"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <AIModuleExecute />
+                  </ErrorBoundary>
+                }
+              />
+
               <Route
                 path="/coverage-gap-analysis"
                 element={

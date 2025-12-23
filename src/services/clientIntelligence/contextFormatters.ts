@@ -638,3 +638,4 @@ function formatSingleQuote(quote: QuoteData): string {
   return lines.join('\n');
 }
 
+

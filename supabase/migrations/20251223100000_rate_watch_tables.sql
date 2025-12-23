@@ -119,3 +119,4 @@ CREATE POLICY "Users can delete rate watch documents"
 GRANT ALL ON rate_watch_jobs TO authenticated;
 GRANT ALL ON rate_watch_documents TO authenticated;
 
+

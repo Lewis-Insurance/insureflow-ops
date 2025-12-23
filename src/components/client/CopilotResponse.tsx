@@ -739,3 +739,4 @@ function formatDate(dateStr: string): string {
 
 export default CopilotResponse;
 
+

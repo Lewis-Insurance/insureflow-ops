@@ -437,3 +437,4 @@ export const COMMON_INSURANCE_PATTERNS: Record<string, RegExp[]> = {
   LicenseNumber: [/license/i, /tag/i, /plate/i],
 };
 
+
