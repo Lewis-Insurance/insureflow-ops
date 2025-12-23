@@ -23,8 +23,9 @@ const corsHeaders = {
 };
 
 interface RateWatchRequest {
-  action: 'process_documents' | 'compute_comparison' | 'generate_report' | 'generate_email' | 'full_pipeline';
+  action: 'process_documents' | 'compute_comparison' | 'generate_report' | 'generate_email' | 'send_email' | 'full_pipeline';
   workspace_id: string;
+  email_draft_id?: string;
 }
 
 serve(async (req) => {
@@ -54,7 +55,8 @@ serve(async (req) => {
       );
     }
 
-    const { action, workspace_id }: RateWatchRequest = await req.json();
+    const body = await req.json();
+    const { action, workspace_id } = body as RateWatchRequest;
     console.log(`[renewal-rate-watch] Action: ${action}, Workspace: ${workspace_id}`);
 
     // Get workspace
@@ -93,8 +95,7 @@ serve(async (req) => {
         result = await generateEmail(supabase, workspace_id, user.id);
         break;
       case 'send_email':
-        const emailDraftId = body.email_draft_id;
-        result = await sendRenewalEmail(supabase, workspace_id, user.id, emailDraftId);
+        result = await sendRenewalEmail(supabase, workspace_id, user.id, body.email_draft_id);
         break;
       case 'full_pipeline':
         // Run all steps in sequence
