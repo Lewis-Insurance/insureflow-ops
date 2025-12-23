@@ -255,10 +255,10 @@ export default function CustomerDetail() {
         {/* Policies & Quotes Section */}
         <CustomerPoliciesSection accountId={account.id} />
 
-        {/* Document Collection Section */}
-        <React.Suspense fallback={<Card className="p-6"><CardContent>Loading Document Collection...</CardContent></Card>}>
+        {/* Document Collection Section - temporarily disabled for debugging */}
+        {/* <React.Suspense fallback={<Card className="p-6"><CardContent>Loading Document Collection...</CardContent></Card>}>
           <DocumentCollectionBoard accountId={account.id} />
-        </React.Suspense>
+        </React.Suspense> */}
 
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
