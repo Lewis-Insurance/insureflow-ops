@@ -102,16 +102,59 @@ export function AIResultsDisplay({
     });
   };
 
+  // Helper: Extract JSON from markdown code blocks
+  const extractJsonFromMarkdown = (text: string): Record<string, unknown> | null => {
+    // Look for ```json ... ``` or ``` ... ``` blocks
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonBlockMatch && jsonBlockMatch[1]) {
+      try {
+        const parsed = JSON.parse(jsonBlockMatch[1].trim());
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed;
+        }
+      } catch (e) {
+        // Not valid JSON
+      }
+    }
+    return null;
+  };
+
   // Render based on format
   const renderContent = () => {
+    // First, check if any text field contains a JSON code block
+    const textContent =
+      (result.response as string) ||
+      (result.answer as string) ||
+      (result.content as string) ||
+      (result.text as string) ||
+      (result.summary as string) ||
+      '';
+
+    // Try to extract JSON from markdown code blocks in text response
+    if (typeof textContent === 'string' && textContent.includes('```')) {
+      const extractedJson = extractJsonFromMarkdown(textContent);
+      if (extractedJson) {
+        // Render the extracted JSON as structured data
+        return (
+          <div className="space-y-6">
+            {Object.entries(extractedJson).map(([key, value]) => (
+              <SectionCard
+                key={key}
+                title={formatSectionTitle(key)}
+                data={value}
+                section={key}
+                onCopy={handleCopy}
+                copiedField={copiedField}
+              />
+            ))}
+          </div>
+        );
+      }
+    }
+
     // Smart detection: If result looks like structured data (nested objects, no text-like keys),
     // use structured format even if config says 'chat'
-    const hasTextResponse =
-      typeof result.response === 'string' ||
-      typeof result.answer === 'string' ||
-      typeof result.content === 'string' ||
-      typeof result.text === 'string' ||
-      typeof result.summary === 'string';
+    const hasTextResponse = typeof textContent === 'string' && textContent.length > 0;
 
     const looksStructured = !hasTextResponse &&
       typeof result === 'object' &&
