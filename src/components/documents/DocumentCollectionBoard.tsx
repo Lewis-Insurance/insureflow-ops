@@ -59,16 +59,28 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 // Note: getDocTypeIcon is defined inline in RequirementTile to avoid module initialization issues
 
-const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
-  not_requested: { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not Requested' },
-  requested: { color: 'text-blue-600', bg: 'bg-blue-50', icon: Send, label: 'Requested' },
-  uploaded: { color: 'text-amber-600', bg: 'bg-amber-50', icon: Upload, label: 'Uploaded' },
-  processing: { color: 'text-purple-600', bg: 'bg-purple-50', icon: Loader2, label: 'Processing' },
-  needs_review: { color: 'text-orange-600', bg: 'bg-orange-50', icon: Eye, label: 'Needs Review' },
-  accepted: { color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2, label: 'Accepted' },
-  rejected: { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Rejected' },
-  expired: { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired' },
-};
+
+function getStatusMeta(status: string): { color: string; bg: string; icon: React.ElementType; label: string } {
+  switch (status) {
+    case 'requested':
+      return { color: 'text-blue-600', bg: 'bg-blue-50', icon: Send, label: 'Requested' };
+    case 'uploaded':
+      return { color: 'text-amber-600', bg: 'bg-amber-50', icon: Upload, label: 'Uploaded' };
+    case 'processing':
+      return { color: 'text-purple-600', bg: 'bg-purple-50', icon: Loader2, label: 'Processing' };
+    case 'needs_review':
+      return { color: 'text-orange-600', bg: 'bg-orange-50', icon: Eye, label: 'Needs Review' };
+    case 'accepted':
+      return { color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2, label: 'Accepted' };
+    case 'rejected':
+      return { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Rejected' };
+    case 'expired':
+      return { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired' };
+    case 'not_requested':
+    default:
+      return { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not Requested' };
+  }
+}
 
 // =============================================================================
 // MAIN COMPONENT
@@ -317,7 +329,7 @@ interface RequirementTileProps {
 }
 
 function RequirementTile({ requirement, onClick }: RequirementTileProps) {
-  const status = statusConfig[requirement.status] || statusConfig.not_requested;
+  const status = getStatusMeta(requirement.status);
   // Use FileText directly as the icon - avoids module initialization issues
   const Icon = FileText;
   const StatusIcon = status.icon;
