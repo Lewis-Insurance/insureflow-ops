@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -256,7 +256,9 @@ export default function CustomerDetail() {
         <CustomerPoliciesSection accountId={account.id} />
 
         {/* Document Collection Section */}
-        <DocumentCollectionBoard accountId={account.id} />
+        <React.Suspense fallback={<Card className="p-6"><CardContent>Loading Document Collection...</CardContent></Card>}>
+          <DocumentCollectionBoard accountId={account.id} />
+        </React.Suspense>
 
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
