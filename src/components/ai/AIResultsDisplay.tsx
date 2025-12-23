@@ -418,7 +418,17 @@ function SectionCard({ title, data, section, onCopy, copiedField }: SectionCardP
       return <p className="text-muted-foreground">{data}</p>;
     }
 
-    // Default: render as formatted JSON
+    // Nested object - render as formatted key-value pairs or nested cards
+    if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+      return <NestedObjectDisplay data={data as Record<string, unknown>} />;
+    }
+
+    // Array of objects - render as table
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
+      return <ArrayTableDisplay data={data as Array<Record<string, unknown>>} />;
+    }
+
+    // Default: render as formatted JSON (fallback)
     return (
       <pre className="text-sm bg-muted p-3 rounded-lg overflow-x-auto">
         {JSON.stringify(data, null, 2)}
@@ -712,6 +722,167 @@ function CoveragesListDisplay({ data }: { data: Array<Record<string, unknown>> }
               <TableCell>{String(coverage.limit || '-')}</TableCell>
               <TableCell>{String(coverage.deductible || '-')}</TableCell>
               <TableCell>{coverage.premium ? `$${coverage.premium}` : '-'}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Nested Object Display - formats nested objects as grouped key-value pairs
+function NestedObjectDisplay({ data }: { data: Record<string, unknown> }) {
+  // Helper to format values nicely
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') {
+      // Check if it looks like money
+      if (value >= 100 && Number.isInteger(value)) {
+        return `$${value.toLocaleString()}`;
+      }
+      return value.toLocaleString();
+    }
+    if (typeof value === 'string') {
+      // Check if it looks like a date
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+        return value; // Keep date format
+      }
+      // Check if it looks like money string
+      if (/^\$?[\d,]+\.?\d*$/.test(value)) {
+        const num = parseFloat(value.replace(/[$,]/g, ''));
+        if (!isNaN(num)) return `$${num.toLocaleString()}`;
+      }
+      return value;
+    }
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return String(value);
+  };
+
+  // Separate nested objects from simple values
+  const simpleEntries: [string, unknown][] = [];
+  const nestedEntries: [string, Record<string, unknown>][] = [];
+
+  Object.entries(data).forEach(([key, value]) => {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      nestedEntries.push([key, value as Record<string, unknown>]);
+    } else if (Array.isArray(value)) {
+      nestedEntries.push([key, { items: value } as Record<string, unknown>]);
+    } else {
+      simpleEntries.push([key, value]);
+    }
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Simple key-value pairs */}
+      {simpleEntries.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {simpleEntries.map(([key, value]) => (
+            <div key={key} className="p-3 rounded-lg bg-muted/50">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                {formatSectionTitle(key)}
+              </p>
+              <p className="font-medium">{formatValue(value)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Nested objects as sub-cards */}
+      {nestedEntries.map(([key, value]) => {
+        // Check if it's an array wrapper
+        if ('items' in value && Array.isArray(value.items)) {
+          return (
+            <div key={key} className="space-y-2">
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                {formatSectionTitle(key)}
+              </h4>
+              {typeof value.items[0] === 'object' ? (
+                <ArrayTableDisplay data={value.items as Array<Record<string, unknown>>} />
+              ) : (
+                <ul className="space-y-1">
+                  {value.items.map((item: unknown, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                      <span>{String(item)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        }
+
+        // Regular nested object
+        return (
+          <div key={key} className="border rounded-lg p-4 bg-card">
+            <h4 className="font-medium mb-3 pb-2 border-b">
+              {formatSectionTitle(key)}
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(value).map(([subKey, subValue]) => (
+                <div key={subKey}>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {formatSectionTitle(subKey)}
+                  </p>
+                  <p className="font-medium">{formatValue(subValue)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Array Table Display - renders arrays of objects as nice tables
+function ArrayTableDisplay({ data }: { data: Array<Record<string, unknown>> }) {
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  // Get all unique keys from all objects
+  const allKeys = new Set<string>();
+  data.forEach(item => {
+    Object.keys(item).forEach(key => allKeys.add(key));
+  });
+  const headers = Array.from(allKeys);
+
+  // Helper to format cell values
+  const formatCell = (value: unknown): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'number') {
+      // Check if negative (likely money adjustment)
+      if (value < 0) return `-$${Math.abs(value).toLocaleString()}`;
+      if (value >= 100) return `$${value.toLocaleString()}`;
+      return value.toLocaleString();
+    }
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            {headers.map(header => (
+              <TableHead key={header} className="font-medium">
+                {formatSectionTitle(header)}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((row, i) => (
+            <TableRow key={i} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
+              {headers.map(header => (
+                <TableCell key={header}>
+                  {formatCell(row[header])}
+                </TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>
