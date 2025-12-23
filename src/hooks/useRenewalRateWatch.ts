@@ -17,8 +17,6 @@ export interface RateWatchWorkspace {
   task_type: string;
   account_id: string | null;
   policy_id: string | null;
-  ao_renewal_id: string | null;
-  lob: string | null;
   status: 'draft' | 'processing' | 'ready' | 'reviewed' | 'sent' | 'archived';
   recommendation_status: 'pending' | 'switch_recommended' | 'stay_recommended' | 'options_presented' | 'no_better_option' | null;
   recommendation_notes: string | null;
@@ -26,7 +24,6 @@ export interface RateWatchWorkspace {
   updated_at: string;
   created_by: string;
   accounts?: any;
-  ao_renewals?: any;
 }
 
 export interface BundleSnapshot {
@@ -106,7 +103,7 @@ export const useRateWatchWorkspaces = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('*, accounts(*), ao_renewals(*)')
+        .select('*, accounts(*)')
         .eq('task_type', 'renewal_rate_watch')
         .order('created_at', { ascending: false });
 
@@ -127,7 +124,7 @@ export const useRateWatchWorkspace = (workspaceId: string | null) => {
 
       const { data, error } = await supabase
         .from('workspaces')
-        .select('*, accounts(*), ao_renewals(*)')
+        .select('*, accounts(*)')
         .eq('id', workspaceId)
         .single();
 
@@ -161,6 +158,15 @@ export const useCreateRateWatchWorkspace = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // NOTE: public.workspaces does NOT have ao_renewal_id or lob columns.
+      // We store config in analysis_output JSON, and we link ao_renewals separately (below).
+      const analysis_output = {
+        rate_watch: {
+          lob: params.lob ?? null,
+          ao_renewal_id: params.ao_renewal_id ?? null,
+        },
+      };
+
       const { data, error } = await supabase
         .from('workspaces')
         .insert({
@@ -168,10 +174,10 @@ export const useCreateRateWatchWorkspace = () => {
           task_type: 'renewal_rate_watch',
           account_id: params.account_id || null,
           policy_id: params.policy_id || null,
-          ao_renewal_id: params.ao_renewal_id || null,
-          lob: params.lob || null,
           status: 'draft',
           created_by: user.id,
+          client_name: null,
+          analysis_output,
         })
         .select()
         .single();
