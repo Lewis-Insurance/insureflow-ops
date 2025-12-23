@@ -11,8 +11,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { QuoteRankingDashboard } from '@/components/quotes/QuoteRankingDashboard';
 import { ClientIntelligencePanel } from '@/components/client/ClientIntelligencePanel';
 import { DocumentsList } from '@/components/documents/DocumentsList';
+import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
-import { Brain, FileText } from 'lucide-react';
+import { Brain, FileText, Inbox } from 'lucide-react';
 
 function normalizeTypeForRPC(v: any) {
   const out: any = { ...v };
@@ -110,6 +111,10 @@ export default function AccountDetail() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="collection" className="gap-1.5">
+              <Inbox className="h-4 w-4" />
+              Doc Collection
+            </TabsTrigger>
             <TabsTrigger value="ai-insights" className="gap-1.5">
               <Brain className="h-4 w-4" />
               AI Insights
@@ -140,6 +145,10 @@ export default function AccountDetail() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="collection">
+            <DocumentCollectionBoard accountId={accountId} />
           </TabsContent>
 
           <TabsContent value="ai-insights">

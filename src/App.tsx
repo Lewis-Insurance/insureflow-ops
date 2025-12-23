@@ -92,6 +92,7 @@ const ExtractionReviewDetail = React.lazy(() => import("./pages/ExtractionReview
 const ExtractionAnalyticsPage = React.lazy(() => import("./pages/ExtractionAnalyticsPage"));
 const PrismAIPage = React.lazy(() => import("./pages/PrismAIPage"));
 const SMSPage = React.lazy(() => import("./pages/SMSPage"));
+const DocumentCollectionPortal = React.lazy(() => import("./pages/DocumentCollectionPortal"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -494,6 +495,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <PublicIntake />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/portal/collect/:token"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <DocumentCollectionPortal />
                   </ErrorBoundary>
                 }
               />
