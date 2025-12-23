@@ -37,6 +37,8 @@ import {
     MoreHorizontal,
     Loader2,
     Building2,
+    MessageSquare,
+    Phone,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTasks } from '@/hooks/useTasks';
@@ -71,9 +73,12 @@ export function AIResultsActionBar({
     const [copied, setCopied] = useState(false);
     const [showNoteDialog, setShowNoteDialog] = useState(false);
     const [showTaskDialog, setShowTaskDialog] = useState(false);
+    const [showSMSDialog, setShowSMSDialog] = useState(false);
     const [noteContent, setNoteContent] = useState('');
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDescription, setTaskDescription] = useState('');
+    const [smsPhoneNumber, setSmsPhoneNumber] = useState('');
+    const [smsMessage, setSmsMessage] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     // Format result as readable text
@@ -335,13 +340,59 @@ export function AIResultsActionBar({
         }
     };
 
+    // Send SMS with results
+    const handleSendSMS = async () => {
+        if (!smsPhoneNumber) {
+            toast({
+                title: 'Phone number required',
+                description: 'Please enter a phone number',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // Create condensed SMS message (160 char limit friendly)
+            const message = smsMessage || `AI Analysis: ${title}. View full results at your portal or contact your agent for details.`;
+
+            const { data, error } = await supabase.functions.invoke('send-sms', {
+                body: {
+                    to_number: smsPhoneNumber,
+                    body: message,
+                    account_id: accountId || null,
+                },
+            });
+
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || 'Failed to send SMS');
+
+            toast({
+                title: 'SMS sent!',
+                description: `Message sent to ${smsPhoneNumber}`,
+            });
+            setShowSMSDialog(false);
+            setSmsPhoneNumber('');
+            setSmsMessage('');
+        } catch (error: any) {
+            console.error('Error sending SMS:', error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to send SMS',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <>
             <div className={cn(
-                'flex items-center gap-2 p-3 rounded-lg bg-muted/50 border',
+                'flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/50 border',
                 className
             )}>
-                {/* Primary Actions */}
+                {/* Primary Export Actions */}
                 <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
                     <Download className="h-4 w-4 mr-1.5" />
                     PDF
@@ -361,29 +412,43 @@ export function AIResultsActionBar({
                     Print
                 </Button>
 
+                {/* Divider */}
+                <div className="h-6 w-px bg-border mx-1" />
+
+                {/* CRM Actions - More Visible */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNoteDialog(true)}
+                    disabled={!accountId}
+                    title={!accountId ? 'Link to account first' : 'Save to account notes'}
+                >
+                    <StickyNote className="h-4 w-4 mr-1.5" />
+                    Add Note
+                </Button>
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTaskDialog(true)}
+                >
+                    <ListTodo className="h-4 w-4 mr-1.5" />
+                    Create Task
+                </Button>
+
                 {/* More Actions Dropdown */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm">
                             <MoreHorizontal className="h-4 w-4 mr-1.5" />
-                            More
+                            Share
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setShowNoteDialog(true)}>
-                            <StickyNote className="h-4 w-4 mr-2" />
-                            Save as Note
-                            {accountName && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                    {accountName}
-                                </Badge>
-                            )}
+                        <DropdownMenuItem onClick={() => setShowSMSDialog(true)}>
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Send SMS
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setShowTaskDialog(true)}>
-                            <ListTodo className="h-4 w-4 mr-2" />
-                            Create Task
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => {/* TODO: Email modal */ }}>
                             <Mail className="h-4 w-4 mr-2" />
                             Email Results
@@ -472,6 +537,54 @@ export function AIResultsActionBar({
                         <Button onClick={handleCreateTask} disabled={isSaving}>
                             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             Create Task
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Send SMS Dialog */}
+            <Dialog open={showSMSDialog} onOpenChange={setShowSMSDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5" />
+                            Send SMS
+                        </DialogTitle>
+                        <DialogDescription>
+                            Send a text message with a summary of this analysis
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="sms-phone">Phone Number</Label>
+                            <Input
+                                id="sms-phone"
+                                type="tel"
+                                value={smsPhoneNumber}
+                                onChange={(e) => setSmsPhoneNumber(e.target.value)}
+                                placeholder="(555) 555-5555"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="sms-message">Message (optional)</Label>
+                            <Textarea
+                                id="sms-message"
+                                value={smsMessage}
+                                onChange={(e) => setSmsMessage(e.target.value)}
+                                placeholder={`AI Analysis: ${title}. View full results at your portal or contact your agent for details.`}
+                                rows={3}
+                                maxLength={160}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {smsMessage.length}/160 characters
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowSMSDialog(false)}>Cancel</Button>
+                        <Button onClick={handleSendSMS} disabled={isSaving || !smsPhoneNumber}>
+                            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Send SMS
                         </Button>
                     </DialogFooter>
                 </DialogContent>
