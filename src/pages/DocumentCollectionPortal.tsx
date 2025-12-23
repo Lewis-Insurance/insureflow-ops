@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { usePortalPacket, usePortalUpload, CollectionRequirement } from '@/hooks/useDocumentCollection';
 import { cn } from '@/lib/utils';
+import { getDocType, PORTAL_INTRO_TEXT } from '@/config/documentTypes';
 
 // =============================================================================
 // STATUS CONFIG
@@ -45,6 +46,12 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Elem
   rejected: { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Rejected', clientLabel: 'Please re-upload' },
   expired: { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired', clientLabel: 'Expired' },
 };
+
+// Helper to get icon from doc type config
+function getDocTypeIcon(docTypeKey: string): React.ElementType {
+  const docType = getDocType(docTypeKey.toUpperCase());
+  return docType?.icon || FileText;
+}
 
 // =============================================================================
 // MAIN COMPONENT

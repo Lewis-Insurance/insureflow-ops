@@ -35,7 +35,6 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  FileText,
   Plus,
   Trash2,
   Copy,
@@ -46,33 +45,25 @@ import {
 } from 'lucide-react';
 import { useCollectionTemplates, useCreateCollectionPacket } from '@/hooks/useDocumentCollection';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  DOCUMENT_TYPES, 
+  PACKET_TEMPLATES, 
+  LOB_SUGGESTIONS,
+  getAllDocTypes,
+  getDocType,
+  getSuggestedDocTypesForLOB,
+} from '@/config/documentTypes';
 
 // =============================================================================
-// DOC TYPES
+// DOC TYPES (derived from config)
 // =============================================================================
 
-const docTypes = [
-  { value: 'acord_125', label: 'ACORD 125 - Commercial Application' },
-  { value: 'acord_126', label: 'ACORD 126 - Commercial Auto' },
-  { value: 'acord_130', label: 'ACORD 130 - Workers Comp' },
-  { value: 'acord_131', label: 'ACORD 131 - Umbrella' },
-  { value: 'acord_140', label: 'ACORD 140 - Property' },
-  { value: 'loss_run', label: 'Loss Runs' },
-  { value: 'payment_doc', label: 'Payment Documentation' },
-  { value: 'carrier_supplementary', label: 'Carrier Supplementary Form' },
-  { value: 'statement_of_no_loss', label: 'Statement of No Loss' },
-  { value: 'dec_page', label: 'Declaration Page' },
-  { value: 'prior_policy', label: 'Prior Policy' },
-  { value: 'signed_app', label: 'Signed Application' },
-  { value: 'proof_of_prior', label: 'Proof of Prior Insurance' },
-  { value: 'renewal_dec', label: 'Renewal Declaration' },
-  { value: 'driver_license', label: 'Driver License' },
-  { value: 'mvr', label: 'Motor Vehicle Report' },
-  { value: 'photos', label: 'Photos' },
-  { value: 'certificate', label: 'Certificate of Insurance' },
-  { value: 'endorsement', label: 'Endorsement' },
-  { value: 'other', label: 'Other Document' },
-];
+const docTypes = getAllDocTypes().map(dt => ({
+  value: dt.doc_type_key,
+  label: dt.display_name,
+  description: dt.short_description,
+  icon: dt.icon,
+}));
 
 interface Requirement {
   id: string;

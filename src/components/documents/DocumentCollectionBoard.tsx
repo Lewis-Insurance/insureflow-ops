@@ -57,36 +57,16 @@ import { CreatePacketModal } from './CreatePacketModal';
 import { RequirementDetailModal } from './RequirementDetailModal';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { getDocType } from '@/config/documentTypes';
 
 // =============================================================================
-// DOC TYPE ICONS
+// DOC TYPE ICONS (dynamic from config, with fallback)
 // =============================================================================
 
-const docTypeIcons: Record<string, React.ElementType> = {
-  acord_125: FileText,
-  acord_126: FileText,
-  acord_130: FileText,
-  acord_131: FileText,
-  acord_140: FileText,
-  loss_run: FileCheck,
-  payment_doc: FileText,
-  carrier_supplementary: FileText,
-  statement_of_no_loss: FileCheck,
-  dec_page: FileText,
-  prior_policy: FileClock,
-  id_card: FileText,
-  certificate: FileCheck,
-  application: FileText,
-  endorsement: FileText,
-  invoice: FileText,
-  signed_app: FileCheck,
-  proof_of_prior: FileClock,
-  renewal_dec: FileText,
-  driver_license: FileText,
-  mvr: FileText,
-  photos: FileText,
-  other: FileText,
-};
+function getDocTypeIcon(docTypeKey: string): React.ElementType {
+  const docType = getDocType(docTypeKey.toUpperCase());
+  return docType?.icon || FileText;
+}
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
   not_requested: { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not Requested' },
@@ -347,7 +327,7 @@ interface RequirementTileProps {
 
 function RequirementTile({ requirement, onClick }: RequirementTileProps) {
   const status = statusConfig[requirement.status] || statusConfig.not_requested;
-  const Icon = docTypeIcons[requirement.doc_type] || FileText;
+  const Icon = getDocTypeIcon(requirement.doc_type);
   const StatusIcon = status.icon;
   
   const uploadCount = requirement.collection_uploads?.length || 0;
