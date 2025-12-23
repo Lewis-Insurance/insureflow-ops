@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DashboardSkeleton } from "@/components/ui/skeleton-components";
 import { ThemeProvider } from "next-themes";
@@ -27,9 +27,7 @@ const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
 const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
-const RateWatchList = React.lazy(() => import("./pages/ao-renewals/RateWatchList"));
-const NewRateWatch = React.lazy(() => import("./pages/ao-renewals/NewRateWatch"));
-const RateWatchDetail = React.lazy(() => import("./pages/ao-renewals/RateWatchDetail"));
+const RenewalRateWatchPage = React.lazy(() => import("./pages/RenewalRateWatchPage"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const QuoteDetail = React.lazy(() => import("./pages/QuoteDetail"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
@@ -76,12 +74,6 @@ const CampaignsPage = React.lazy(() => import("./pages/CampaignsPage"));
 const CampaignBuilderPage = React.lazy(() => import("./pages/CampaignBuilderPage"));
 const ExplorePolicy = React.lazy(() => import("./pages/ExplorePolicy"));
 const LewiAI = React.lazy(() => import("./pages/LewiAI"));
-
-// Lewis AI Hub Pages
-const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
-const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
-const DocumentIntelligenceHub = React.lazy(() => import("./pages/ai/DocumentIntelligenceHub"));
-const ModuleBuilder = React.lazy(() => import("./pages/ai/ModuleBuilder"));
 const CoverageGapAnalysis = React.lazy(() => import("./pages/CoverageGapAnalysis"));
 const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
 const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
@@ -101,6 +93,7 @@ const ExtractionAnalyticsPage = React.lazy(() => import("./pages/ExtractionAnaly
 const PrismAIPage = React.lazy(() => import("./pages/PrismAIPage"));
 const SMSPage = React.lazy(() => import("./pages/SMSPage"));
 const DocumentCollectionPortal = React.lazy(() => import("./pages/DocumentCollectionPortal"));
+const ModuleBuilderPage = React.lazy(() => import("./pages/ModuleBuilderPage"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -136,747 +129,716 @@ const App = () => (
             <Sonner />
             <Suspense fallback={<DashboardSkeleton />}>
               <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ProducerDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/dashboard/agency"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AgencyDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route 
-                path="/leads" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <Leads />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/leads/analytics" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <LeadAnalyticsDashboard />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/crm" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CRM />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/crm/accounts/:accountId" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AccountDetail />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/customers" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CustomersPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/customers/:id" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CustomerDetail />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/customers/:id/edit" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CustomerEdit />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/policies" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PoliciesPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/renewals" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <RenewalsPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/renewals/intelligence" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <RenewalIntelligencePage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/ao-renewals" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AORenewalsPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/ao-renewals/import" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AOImportPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/ao-renewals/:id/edit" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AORenewalEdit />
-                  </ErrorBoundary>
-                } 
-              />
-<Route 
-                path="/ao-renewals/analytics" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AOAnalyticsDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route 
-                path="/ao-renewals/rate-watch" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <RateWatchList />
-                  </ErrorBoundary>
-                }
-              />
-              <Route 
-                path="/ao-renewals/rate-watch/new" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <NewRateWatch />
-                  </ErrorBoundary>
-                }
-              />
-              <Route 
-                path="/ao-renewals/rate-watch/:jobId" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <RateWatchDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/policies/:policyId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PolicyDetail />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route
-                path="/quotes/new"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <QuoteNew />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/quotes/:quoteId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <QuoteDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/claims/new" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ClaimNew />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/messages/new" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <MessageNew />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/profile" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <Profile />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/tasks" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TasksPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route
-                path="/task-templates" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TaskTemplatesPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/admin" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AdminPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/customization" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CustomizationPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/schema-check" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <SchemaCheckPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/calls" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <TelephonyDashboard />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/sms" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <SMSPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/reports" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ReportsPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route 
-                path="/command-center" 
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CommandCenterPage />
-                  </ErrorBoundary>
-                } 
-              />
-              <Route
-                path="/executive"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ExecutivePage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AnalyticsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/carriers"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CarriersPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/mgas"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <MGAsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/customer-success"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CustomerSuccessPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/retention"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <RetentionPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/financial"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <FinancialPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/ai-insights"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AIInsightsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/coi-generator"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <COIGenerator />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/acord-templates"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AcordTemplates />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/intake-templates"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <IntakeTemplates />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/intake-builder/:id?"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <IntakeBuilder />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/intake/:token?"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PublicIntake />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/portal/collect/:token"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentCollectionPortal />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/acord-forms"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <FormManagement />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/acord-forms/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AcordFormView />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/acord-forms/:id/edit"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AcordFormEdit />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/document-intelligence"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentIntelligence />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/analyze-documents"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentAnalysisPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/analyze-documents/:analysisId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentAnalysisPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/comparison"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ComparisonPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/comparison/:sessionId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ComparisonPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/ai-brain"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AIBrain />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/prism-ai"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PrismAIPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/knowledge-manager"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <KnowledgeManagerPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/knowledge-analytics"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <KnowledgeAnalytics />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/workspace"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <WorkspaceListViewPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/workspace/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <WorkspaceDetailPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route 
-                path="/comparison-report/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ComparisonReportPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/campaigns"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CampaignsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/campaigns/new"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CampaignBuilderPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/campaigns/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CampaignBuilderPage />
-                  </ErrorBoundary>
-                }
-              />
-              {/* Marketing Automations (Levitate) */}
-              <Route
-                path="/marketing/automations"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <MarketingAutomationsPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/marketing/automations/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AutomationBuilderPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/marketing/templates"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <MarketingTemplatesPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/lewi-ai"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <LewiAI />
-                  </ErrorBoundary>
-                }
-              />
-              
-              {/* Lewis AI Hub Routes */}
-              <Route
-                path="/ai"
-                element={<Navigate to="/ai/hub" replace />}
-              />
-              <Route
-                path="/ai/hub"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <LewisAIHub />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/ai/documents"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <DocumentIntelligenceHub />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/ai/module-builder"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ModuleBuilder />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/ai/:moduleSlug"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <AIModuleExecute />
-                  </ErrorBoundary>
-                }
-              />
-
-              <Route
-                path="/coverage-gap-analysis"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CoverageGapAnalysis />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/coverage-gap-analysis/:accountId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CoverageGapAnalysis />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/coverage-gap/:analysisId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CoverageGapDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/issues"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <IssueTracker />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/issues/new"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ReportIssue />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/issues/:issueId"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <IssueDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/predictive-analytics"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PredictiveAnalytics />
-                  </ErrorBoundary>
-                }
-              />
-              {/* Redirect old /operations route to Command Center */}
-              <Route path="/operations" element={<CommandCenterPage />} />
-              {/* Client Portal Routes (Public) */}
-              <Route
-                path="/portal/login"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PortalLoginPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/portal/dashboard"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PortalDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/portal"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <PortalDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              {/* Carrier Templates & Extraction Review */}
-              <Route
-                path="/carrier-templates"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CarrierTemplatesPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/carrier-templates/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CarrierTemplateBuilder />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/carrier-templates/:id/edit"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <CarrierTemplateBuilder />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/extraction-review"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ExtractionReviewQueue />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/extraction-review/:id"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ExtractionReviewDetail />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/extraction-analytics"
-                element={
-                  <ErrorBoundary level="page" resetOnPropsChange>
-                    <ExtractionAnalyticsPage />
-                  </ErrorBoundary>
-                }
-              />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </TooltipProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ProducerDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/dashboard/agency"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AgencyDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/leads"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <Leads />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/leads/analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <LeadAnalyticsDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/crm"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CRM />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/crm/accounts/:accountId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AccountDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/customers"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CustomersPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/customers/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CustomerDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/customers/:id/edit"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CustomerEdit />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/policies"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PoliciesPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/renewals"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <RenewalsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/renewals/intelligence"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <RenewalIntelligencePage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AORenewalsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals/import"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AOImportPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals/:id/edit"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AORenewalEdit />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals/analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AOAnalyticsDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals/rate-watch"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <RenewalRateWatchPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ao-renewals/rate-watch/:workspaceId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <RenewalRateWatchPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/policies/:policyId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PolicyDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/quotes/new"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <QuoteNew />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/quotes/:quoteId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <QuoteDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/claims/new"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ClaimNew />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/messages/new"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <MessageNew />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <Profile />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/tasks"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <TasksPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/task-templates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <TaskTemplatesPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AdminPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/customization"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CustomizationPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/schema-check"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <SchemaCheckPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/calls"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <TelephonyDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/sms"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <SMSPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/reports"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ReportsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/command-center"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CommandCenterPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/executive"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ExecutivePage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AnalyticsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/carriers"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CarriersPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/mgas"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <MGAsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/customer-success"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CustomerSuccessPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/retention"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <RetentionPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/financial"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <FinancialPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ai-insights"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AIInsightsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/coi-generator"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <COIGenerator />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/acord-templates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AcordTemplates />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/intake-templates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <IntakeTemplates />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/intake-builder/:id?"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <IntakeBuilder />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/intake/:token?"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PublicIntake />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/portal/collect/:token"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DocumentCollectionPortal />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/acord-forms"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <FormManagement />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/acord-forms/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AcordFormView />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/acord-forms/:id/edit"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AcordFormEdit />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/document-intelligence"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DocumentIntelligence />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/analyze-documents"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DocumentAnalysisPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/analyze-documents/:analysisId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DocumentAnalysisPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/comparison"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ComparisonPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/comparison/:sessionId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ComparisonPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ai-brain"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AIBrain />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/prism-ai"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PrismAIPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/knowledge-manager"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <KnowledgeManagerPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/knowledge-analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <KnowledgeAnalytics />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/workspace"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <WorkspaceListViewPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/workspace/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <WorkspaceDetailPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/comparison-report/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ComparisonReportPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/campaigns"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CampaignsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/campaigns/new"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CampaignBuilderPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/campaigns/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CampaignBuilderPage />
+                    </ErrorBoundary>
+                  }
+                />
+                {/* Marketing Automations (Levitate) */}
+                <Route
+                  path="/marketing/automations"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <MarketingAutomationsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/marketing/automations/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <AutomationBuilderPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/marketing/templates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <MarketingTemplatesPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/lewi-ai"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <LewiAI />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/module-builder"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ModuleBuilderPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/ai-hub"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <LewiAI />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/coverage-gap-analysis"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CoverageGapAnalysis />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/coverage-gap-analysis/:accountId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CoverageGapAnalysis />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/coverage-gap/:analysisId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CoverageGapDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/issues"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <IssueTracker />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/issues/new"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ReportIssue />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/issues/:issueId"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <IssueDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/predictive-analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PredictiveAnalytics />
+                    </ErrorBoundary>
+                  }
+                />
+                {/* Redirect old /operations route to Command Center */}
+                <Route path="/operations" element={<CommandCenterPage />} />
+                {/* Client Portal Routes (Public) */}
+                <Route
+                  path="/portal/login"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PortalLoginPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/portal/dashboard"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PortalDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/portal"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <PortalDashboard />
+                    </ErrorBoundary>
+                  }
+                />
+                {/* Carrier Templates & Extraction Review */}
+                <Route
+                  path="/carrier-templates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CarrierTemplatesPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/carrier-templates/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CarrierTemplateBuilder />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/carrier-templates/:id/edit"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CarrierTemplateBuilder />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/extraction-review"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ExtractionReviewQueue />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/extraction-review/:id"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ExtractionReviewDetail />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/extraction-analytics"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <ExtractionAnalyticsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </TooltipProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>
 );

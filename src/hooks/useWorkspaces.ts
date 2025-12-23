@@ -1,74 +1,134 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+import type {
+  Workspace,
+  WorkspaceWithEntities,
+  WorkspaceDocument,
+  WorkspaceFilters,
+  LinkWorkspacePayload,
+  WorkspaceStatus
+} from "@/types/workspace";
 
-export interface Workspace {
-  id: string;
-  name: string;
-  description: string | null;
-  task_type: string;
-  status: "idle" | "processing" | "completed" | "failed";
-  created_by: string;
-  client_name: string | null;
-  notes: string | null;
-  analysis_output: any;
-  created_at: string;
-  updated_at: string;
-  creator_name?: string;
-}
+// Re-export types for backward compatibility
+export type { Workspace, WorkspaceWithEntities, WorkspaceDocument, WorkspaceFilters };
 
-export interface WorkspaceDocument {
-  id: string;
-  workspace_id: string;
-  file_name: string | null;
-  file_url: string | null;
-  role: string | null;
-  parseur_document_id: string | null;
-  created_at: string;
-}
+// ============================================================
+// QUERIES
+// ============================================================
 
-// Fetch all workspaces for current user
-export const useWorkspaces = () => {
+/**
+ * Fetch all workspaces with entity details
+ * Uses the workspaces_with_entities view when available, falls back to basic query
+ */
+export function useWorkspaces(filters?: WorkspaceFilters) {
   return useQuery({
-    queryKey: ["workspaces"],
+    queryKey: ["workspaces", filters],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
+      // Try to use the view first, fallback to basic table
+      let query = supabase
         .from("workspaces")
         .select("*")
         .eq("created_by", user.id)
-        .order("created_at", { ascending: false });
+        .order("updated_at", { ascending: false });
 
+      // Apply filters - Note: entity linking filters require migration to be run first
+      if (filters?.status && filters.status !== 'all') {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.task_type && filters.task_type !== 'all') {
+        query = query.eq('task_type', filters.task_type);
+      }
+      if (filters?.search) {
+        query = query.or(
+          `name.ilike.%${filters.search}%,task_type.ilike.%${filters.search}%,client_name.ilike.%${filters.search}%`
+        );
+      }
+      // Entity filters (uncomment after migration runs):
+      // if (filters?.entity_type && filters.entity_type !== 'all') {
+      //   query = query.eq('linked_entity_type', filters.entity_type);
+      // }
+      // if (filters?.account_id) {
+      //   query = query.eq('account_id', filters.account_id);
+      // }
+      // if (filters?.unlinked_only) {
+      //   query = query.is('linked_entity_type', null);
+      // }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data as Workspace[];
+
+      // Fetch profiles for all unique creator IDs
+      if (data && data.length > 0) {
+        const creatorIds = [...new Set(data.map(ws => ws.created_by))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", creatorIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]));
+
+        // Also fetch entity names if linked (columns may not exist until migration runs)
+        const typedData = data as any[];
+        const accountIds = [...new Set(typedData.filter(w => w.account_id).map(w => w.account_id))];
+        const leadIds = [...new Set(typedData.filter(w => w.lead_id).map(w => w.lead_id))];
+        const policyIds = [...new Set(typedData.filter(w => w.policy_id).map(w => w.policy_id))];
+
+        const [accountsResult, leadsResult, policiesResult] = await Promise.all([
+          accountIds.length > 0
+            ? supabase.from("accounts").select("id, name, email, type").in("id", accountIds)
+            : { data: [] },
+          leadIds.length > 0
+            ? supabase.from("leads").select("id, first_name, last_name, email, status, company_name").in("id", leadIds)
+            : { data: [] },
+          policyIds.length > 0
+            ? supabase.from("policies").select("id, policy_number, line_of_business, status, carrier:carriers(name)").in("id", policyIds)
+            : { data: [] },
+        ]);
+
+        const accountMap = new Map((accountsResult.data || []).map((a: any) => [a.id, a]));
+        const leadMap = new Map((leadsResult.data || []).map((l: any) => [l.id, l]));
+        const policyMap = new Map((policiesResult.data || []).map((p: any) => [p.id, p]));
+
+        return typedData.map(ws => {
+          const profile = profileMap.get(ws.created_by);
+          const account = ws.account_id ? accountMap.get(ws.account_id) : null;
+          const lead = ws.lead_id ? leadMap.get(ws.lead_id) : null;
+          const policy = ws.policy_id ? policyMap.get(ws.policy_id) : null;
+
+          return {
+            ...ws,
+            creator_name: profile || "Unknown User",
+            // Account details
+            account_name: account?.name,
+            account_email: account?.email,
+            account_type: account?.type,
+            // Lead details
+            lead_name: lead ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.company_name : null,
+            lead_email: lead?.email,
+            lead_status: lead?.status,
+            lead_company: lead?.company_name,
+            // Policy details
+            policy_number: policy?.policy_number,
+            carrier_name: policy?.carrier && typeof policy.carrier === 'object' ? (policy.carrier as any).name : null,
+            policy_lob: policy?.line_of_business,
+            policy_status: policy?.status,
+          } as WorkspaceWithEntities;
+        });
+      }
+
+      return data as WorkspaceWithEntities[];
     },
   });
-};
+}
 
-// Fetch workspaces by status
-export const useWorkspacesByStatus = (status: Workspace["status"]) => {
-  return useQuery({
-    queryKey: ["workspaces", status],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data, error } = await supabase
-        .from("workspaces")
-        .select("*")
-        .eq("created_by", user.id)
-        .eq("status", status)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as Workspace[];
-    },
-  });
-};
-
-// Fetch active workspaces (idle + processing)
+/**
+ * Fetch active workspaces (idle + processing) with entity details
+ */
 export const useActiveWorkspaces = () => {
   return useQuery({
     queryKey: ["workspaces", "active"],
@@ -84,29 +144,71 @@ export const useActiveWorkspaces = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch profiles for all unique creator IDs
+
+      // Fetch profiles and entity details
       if (data && data.length > 0) {
         const creatorIds = [...new Set(data.map(ws => ws.created_by))];
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, full_name")
           .in("id", creatorIds);
-        
+
         const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]));
-        
-        return data.map(ws => ({
-          ...ws,
-          creator_name: profileMap.get(ws.created_by) || "Unknown User"
-        })) as Workspace[];
+
+        // Fetch entity names (columns may not exist until migration runs)
+        const typedData = data as any[];
+        const accountIds = [...new Set(typedData.filter(w => w.account_id).map(w => w.account_id))];
+        const leadIds = [...new Set(typedData.filter(w => w.lead_id).map(w => w.lead_id))];
+        const policyIds = [...new Set(typedData.filter(w => w.policy_id).map(w => w.policy_id))];
+
+        const [accountsResult, leadsResult, policiesResult] = await Promise.all([
+          accountIds.length > 0
+            ? supabase.from("accounts").select("id, name, email, type").in("id", accountIds)
+            : { data: [] },
+          leadIds.length > 0
+            ? supabase.from("leads").select("id, first_name, last_name, email, status, company_name").in("id", leadIds)
+            : { data: [] },
+          policyIds.length > 0
+            ? supabase.from("policies").select("id, policy_number, line_of_business, status, carrier:carriers(name)").in("id", policyIds)
+            : { data: [] },
+        ]);
+
+        const accountMap = new Map((accountsResult.data || []).map((a: any) => [a.id, a]));
+        const leadMap = new Map((leadsResult.data || []).map((l: any) => [l.id, l]));
+        const policyMap = new Map((policiesResult.data || []).map((p: any) => [p.id, p]));
+
+        return typedData.map(ws => {
+          const profile = profileMap.get(ws.created_by);
+          const account = ws.account_id ? accountMap.get(ws.account_id) : null;
+          const lead = ws.lead_id ? leadMap.get(ws.lead_id) : null;
+          const policy = ws.policy_id ? policyMap.get(ws.policy_id) : null;
+
+          return {
+            ...ws,
+            creator_name: profile || "Unknown User",
+            account_name: account?.name,
+            account_email: account?.email,
+            account_type: account?.type,
+            lead_name: lead ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.company_name : null,
+            lead_email: lead?.email,
+            lead_status: lead?.status,
+            lead_company: lead?.company_name,
+            policy_number: policy?.policy_number,
+            carrier_name: policy?.carrier && typeof policy.carrier === 'object' ? (policy.carrier as any).name : null,
+            policy_lob: policy?.line_of_business,
+            policy_status: policy?.status,
+          } as WorkspaceWithEntities;
+        });
       }
-      
-      return data as Workspace[];
+
+      return data as WorkspaceWithEntities[];
     },
   });
 };
 
-// Fetch completed workspaces
+/**
+ * Fetch completed workspaces with entity details
+ */
 export const useCompletedWorkspaces = () => {
   return useQuery({
     queryKey: ["workspaces", "completed"],
@@ -122,29 +224,71 @@ export const useCompletedWorkspaces = () => {
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch profiles for all unique creator IDs
+
+      // Fetch profiles and entity details
       if (data && data.length > 0) {
         const creatorIds = [...new Set(data.map(ws => ws.created_by))];
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, full_name")
           .in("id", creatorIds);
-        
+
         const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]));
-        
-        return data.map(ws => ({
-          ...ws,
-          creator_name: profileMap.get(ws.created_by) || "Unknown User"
-        })) as Workspace[];
+
+        // Fetch entity names (columns may not exist until migration runs)
+        const typedData = data as any[];
+        const accountIds = [...new Set(typedData.filter(w => w.account_id).map(w => w.account_id))];
+        const leadIds = [...new Set(typedData.filter(w => w.lead_id).map(w => w.lead_id))];
+        const policyIds = [...new Set(typedData.filter(w => w.policy_id).map(w => w.policy_id))];
+
+        const [accountsResult, leadsResult, policiesResult] = await Promise.all([
+          accountIds.length > 0
+            ? supabase.from("accounts").select("id, name, email, type").in("id", accountIds)
+            : { data: [] },
+          leadIds.length > 0
+            ? supabase.from("leads").select("id, first_name, last_name, email, status, company_name").in("id", leadIds)
+            : { data: [] },
+          policyIds.length > 0
+            ? supabase.from("policies").select("id, policy_number, line_of_business, status, carrier:carriers(name)").in("id", policyIds)
+            : { data: [] },
+        ]);
+
+        const accountMap = new Map((accountsResult.data || []).map((a: any) => [a.id, a]));
+        const leadMap = new Map((leadsResult.data || []).map((l: any) => [l.id, l]));
+        const policyMap = new Map((policiesResult.data || []).map((p: any) => [p.id, p]));
+
+        return typedData.map(ws => {
+          const profile = profileMap.get(ws.created_by);
+          const account = ws.account_id ? accountMap.get(ws.account_id) : null;
+          const lead = ws.lead_id ? leadMap.get(ws.lead_id) : null;
+          const policy = ws.policy_id ? policyMap.get(ws.policy_id) : null;
+
+          return {
+            ...ws,
+            creator_name: profile || "Unknown User",
+            account_name: account?.name,
+            account_email: account?.email,
+            account_type: account?.type,
+            lead_name: lead ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.company_name : null,
+            lead_email: lead?.email,
+            lead_status: lead?.status,
+            lead_company: lead?.company_name,
+            policy_number: policy?.policy_number,
+            carrier_name: policy?.carrier && typeof policy.carrier === 'object' ? (policy.carrier as any).name : null,
+            policy_lob: policy?.line_of_business,
+            policy_status: policy?.status,
+          } as WorkspaceWithEntities;
+        });
       }
-      
-      return data as Workspace[];
+
+      return data as WorkspaceWithEntities[];
     },
   });
 };
 
-// Fetch single workspace with documents
+/**
+ * Fetch single workspace with documents and entity details
+ */
 export const useWorkspace = (workspaceId: string | undefined) => {
   return useQuery({
     queryKey: ["workspace", workspaceId],
@@ -167,7 +311,9 @@ export const useWorkspace = (workspaceId: string | undefined) => {
   });
 };
 
-// Fetch documents for a workspace
+/**
+ * Fetch documents for a workspace
+ */
 export const useWorkspaceDocuments = (workspaceId: string | undefined) => {
   return useQuery({
     queryKey: ["workspace-documents", workspaceId],
@@ -187,7 +333,37 @@ export const useWorkspaceDocuments = (workspaceId: string | undefined) => {
   });
 };
 
-// Create workspace mutation
+/**
+ * Get unique task types for filter dropdown
+ */
+export function useWorkspaceTaskTypes() {
+  return useQuery({
+    queryKey: ['workspace-task-types'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('task_type')
+        .eq('created_by', user.id)
+        .order('task_type');
+
+      if (error) throw error;
+
+      const unique = [...new Set(data.map(d => d.task_type))];
+      return unique;
+    },
+  });
+}
+
+// ============================================================
+// MUTATIONS
+// ============================================================
+
+/**
+ * Create workspace mutation
+ */
 export const useCreateWorkspace = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -198,6 +374,9 @@ export const useCreateWorkspace = () => {
       task_type: string;
       client_name?: string;
       notes?: string;
+      account_id?: string;
+      lead_id?: string;
+      policy_id?: string;
       documents: Array<{
         file_name: string;
         file_url: string;
@@ -228,7 +407,113 @@ export const useCreateWorkspace = () => {
   });
 };
 
-// Update workspace status mutation
+/**
+ * Link a workspace to an account, lead, or policy
+ */
+export function useLinkWorkspace() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ workspace_id, entity_type, entity_id }: LinkWorkspacePayload) => {
+      const updateData: Record<string, string | null> = {
+        account_id: null,
+        lead_id: null,
+        policy_id: null,
+      };
+
+      // Set the appropriate FK based on entity type
+      if (entity_type === 'account') {
+        updateData.account_id = entity_id;
+      } else if (entity_type === 'lead') {
+        updateData.lead_id = entity_id;
+      } else if (entity_type === 'policy') {
+        updateData.policy_id = entity_id;
+
+        // If linking to policy, also get the account_id from the policy
+        const { data: policy } = await supabase
+          .from('policies')
+          .select('account_id')
+          .eq('id', entity_id)
+          .single();
+
+        if (policy?.account_id) {
+          updateData.account_id = policy.account_id;
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .update(updateData)
+        .eq('id', workspace_id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['workspace', variables.workspace_id] });
+      toast({
+        title: 'Workspace linked',
+        description: `Successfully linked to ${variables.entity_type}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error linking workspace',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Unlink a workspace from all entities
+ */
+export function useUnlinkWorkspace() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (workspaceId: string) => {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .update({
+          account_id: null,
+          lead_id: null,
+          policy_id: null,
+        })
+        .eq('id', workspaceId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, workspaceId) => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId] });
+      toast({
+        title: 'Workspace unlinked',
+        description: 'Entity link removed',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error unlinking workspace',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Update workspace status mutation
+ */
 export const useUpdateWorkspaceStatus = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -239,7 +524,7 @@ export const useUpdateWorkspaceStatus = () => {
       status,
     }: {
       workspaceId: string;
-      status: Workspace["status"];
+      status: WorkspaceStatus;
     }) => {
       const { data, error } = await supabase
         .from("workspaces")
@@ -264,7 +549,9 @@ export const useUpdateWorkspaceStatus = () => {
   });
 };
 
-// Delete workspace mutation
+/**
+ * Delete workspace mutation
+ */
 export const useDeleteWorkspace = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -295,7 +582,9 @@ export const useDeleteWorkspace = () => {
   });
 };
 
-// Bulk delete workspaces mutation
+/**
+ * Bulk delete workspaces mutation
+ */
 export const useBulkDeleteWorkspaces = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -327,7 +616,9 @@ export const useBulkDeleteWorkspaces = () => {
   });
 };
 
-// Delete all processing workspaces
+/**
+ * Delete all processing workspaces
+ */
 export const useDeleteAllProcessing = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -364,7 +655,65 @@ export const useDeleteAllProcessing = () => {
   });
 };
 
-// Trigger analysis mutation
+/**
+ * Bulk link multiple workspaces to an entity
+ */
+export function useBulkLinkWorkspaces() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      workspace_ids,
+      entity_type,
+      entity_id
+    }: {
+      workspace_ids: string[];
+      entity_type: 'account' | 'lead' | 'policy';
+      entity_id: string;
+    }) => {
+      const updateData: Record<string, string | null> = {
+        account_id: null,
+        lead_id: null,
+        policy_id: null,
+      };
+
+      if (entity_type === 'account') {
+        updateData.account_id = entity_id;
+      } else if (entity_type === 'lead') {
+        updateData.lead_id = entity_id;
+      } else if (entity_type === 'policy') {
+        updateData.policy_id = entity_id;
+      }
+
+      const { error } = await supabase
+        .from('workspaces')
+        .update(updateData)
+        .in('id', workspace_ids);
+
+      if (error) throw error;
+      return workspace_ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      toast({
+        title: 'Workspaces linked',
+        description: `${count} workspace(s) linked successfully`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error linking workspaces',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Trigger analysis mutation
+ */
 export const useTriggerAnalysis = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -396,15 +745,20 @@ export const useTriggerAnalysis = () => {
   });
 };
 
-// Real-time subscription hook
+// ============================================================
+// REAL-TIME SUBSCRIPTION
+// ============================================================
+
+/**
+ * Subscribe to workspace changes for real-time updates
+ */
 export const useWorkspaceSubscription = () => {
   const queryClient = useQueryClient();
 
-  return useQuery({
-    queryKey: ["workspace-subscription"],
-    queryFn: async () => {
+  useEffect(() => {
+    const subscribeToWorkspaces = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) return;
 
       const channel = supabase
         .channel("workspace-changes")
@@ -426,7 +780,8 @@ export const useWorkspaceSubscription = () => {
       return () => {
         supabase.removeChannel(channel);
       };
-    },
-    staleTime: Infinity,
-  });
+    };
+
+    subscribeToWorkspaces();
+  }, [queryClient]);
 };
