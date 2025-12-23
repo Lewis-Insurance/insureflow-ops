@@ -80,15 +80,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               {/* Lewi AI Group */}
               <NavGroup label="Lewi AI" defaultOpen={true}>
                 <NavItem
-                  icon={Sparkles}
-                  label="Lewi AI Home"
-                  to="/lewi-ai"
-                />
-                <NavItem
                   icon={Bot}
                   label="AI Hub"
                   to="/ai-hub"
-                  badge="NEW"
                 />
                 <NavItem
                   icon={Sliders}
