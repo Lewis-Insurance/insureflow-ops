@@ -143,11 +143,79 @@ serve(async (req) => {
 });
 
 // =============================================================================
+// PROMPT TEMPLATES (Evidence-Backed, Schema-Driven)
+// =============================================================================
+
+const BUNDLE_SNAPSHOT_SYSTEM_PROMPT = `You are a bundle snapshot mapping engine for a U.S. insurance agency (Lewis Insurance).
+
+SCOPE
+- You are given ONE bundle (CURRENT or RENEWAL or QUOTE for a specific carrier).
+- Bundle contains one or more documents (dec pages, renewal offer, quote proposal, schedules, endorsements).
+- Your job is to produce a normalized BundleSnapshot JSON that conforms to the schema provided.
+
+NON-NEGOTIABLE RULES
+1) NO GUESSING. If a value is not explicitly supported by evidence, mark status="NOT_FOUND".
+2) EVIDENCE REQUIRED. Any value with status != "NOT_FOUND" MUST include evidence_ids (non-empty).
+3) CONFLICTS. If there are multiple plausible values:
+   - set status="CONFLICT"
+   - provide conflict_candidates[] each with value + evidence_ids + reason
+4) Output MUST be valid JSON only. No markdown. No commentary.
+5) Do not compute savings or differences here. Only extract/normalize snapshot values.
+6) Prefer dec pages and schedule tables over narrative text. Prefer totals labeled "Total Premium", "Policy Premium", "Term Premium".
+7) If the document appears to be a billing page with installment amounts, do not treat "monthly" as term premium; capture it separately.
+8) Normalize:
+   - currency to numeric + display string
+   - dates to ISO (YYYY-MM-DD) if possible
+   - ded/limits to structured fields where feasible`;
+
+const BUNDLE_SNAPSHOT_SCHEMA = {
+  type: 'object',
+  required: ['bundle_id', 'bundle_role', 'identity', 'premium', 'coverages', 'unknowns'],
+  properties: {
+    bundle_id: { type: 'string' },
+    bundle_role: { type: 'string', enum: ['CURRENT', 'RENEWAL', 'QUOTE'] },
+    carrier_name: { type: ['string', 'null'] },
+    identity: {
+      type: 'object',
+      properties: {
+        insured_name: { $ref: '#/$defs/FieldResult' },
+        carrier: { $ref: '#/$defs/FieldResult' },
+        policy_or_quote_number: { $ref: '#/$defs/FieldResult' },
+        effective_date: { $ref: '#/$defs/FieldResult' },
+        expiration_date: { $ref: '#/$defs/FieldResult' },
+      },
+    },
+    premium: {
+      type: 'object',
+      properties: {
+        term_premium: { $ref: '#/$defs/FieldResult' },
+        fees: { $ref: '#/$defs/FieldResult' },
+        installment_amount: { $ref: '#/$defs/FieldResult' },
+      },
+    },
+    coverages: { type: 'array' },
+    unknowns: { type: 'array', items: { type: 'string' } },
+  },
+  $defs: {
+    FieldResult: {
+      type: 'object',
+      required: ['status', 'evidence_ids'],
+      properties: {
+        status: { type: 'string', enum: ['FOUND', 'NOT_FOUND', 'CONFLICT', 'NEEDS_VERIFICATION'] },
+        value: {},
+        display_value: { type: 'string' },
+        confidence: { type: 'number' },
+        evidence_ids: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+};
+
+// =============================================================================
 // STEP 1: PROCESS DOCUMENTS -> BUNDLE SNAPSHOTS
 // =============================================================================
 
 async function processDocuments(supabase: any, workspaceId: string) {
-  // Get all documents for this workspace
   const { data: docs, error: docsError } = await supabase
     .from('workspace_documents')
     .select('*')
@@ -159,10 +227,7 @@ async function processDocuments(supabase: any, workspaceId: string) {
   }
 
   // Group documents by role and carrier
-  const bundles: Record<string, any[]> = {
-    CURRENT: [],
-    RENEWAL: [],
-  };
+  const bundles: Record<string, any[]> = { CURRENT: [], RENEWAL: [] };
   const quoteBundles: Record<string, any[]> = {};
 
   for (const doc of docs) {
@@ -172,38 +237,30 @@ async function processDocuments(supabase: any, workspaceId: string) {
       bundles.RENEWAL.push(doc);
     } else if (doc.doc_role === 'QUOTE') {
       const carrier = doc.carrier_name || 'Unknown Carrier';
-      if (!quoteBundles[carrier]) {
-        quoteBundles[carrier] = [];
-      }
+      if (!quoteBundles[carrier]) quoteBundles[carrier] = [];
       quoteBundles[carrier].push(doc);
     }
   }
 
-  // Process each bundle
   const bundlesCreated: string[] = [];
 
-  // Process CURRENT bundle
+  // Process each bundle with Azure DI + LLM extraction
   if (bundles.CURRENT.length > 0) {
-    const snapshot = await processBundleDocuments(supabase, workspaceId, 'CURRENT', null, bundles.CURRENT);
+    await processBundleDocuments(supabase, workspaceId, 'CURRENT', null, bundles.CURRENT);
     bundlesCreated.push('CURRENT');
   }
 
-  // Process RENEWAL bundle
   if (bundles.RENEWAL.length > 0) {
-    const snapshot = await processBundleDocuments(supabase, workspaceId, 'RENEWAL', null, bundles.RENEWAL);
+    await processBundleDocuments(supabase, workspaceId, 'RENEWAL', null, bundles.RENEWAL);
     bundlesCreated.push('RENEWAL');
   }
 
-  // Process QUOTE bundles (one per carrier)
   for (const [carrier, quoteDocs] of Object.entries(quoteBundles)) {
-    const snapshot = await processBundleDocuments(supabase, workspaceId, 'QUOTE', carrier, quoteDocs);
+    await processBundleDocuments(supabase, workspaceId, 'QUOTE', carrier, quoteDocs);
     bundlesCreated.push(`QUOTE:${carrier}`);
   }
 
-  return {
-    bundles_created: bundlesCreated.length,
-    bundles: bundlesCreated,
-  };
+  return { bundles_created: bundlesCreated.length, bundles: bundlesCreated };
 }
 
 async function processBundleDocuments(
@@ -213,19 +270,121 @@ async function processBundleDocuments(
   carrierName: string | null,
   documents: any[]
 ): Promise<any> {
-  // For now, create a placeholder bundle snapshot
-  // In production, this would:
-  // 1. Get Azure DI evidence catalogs for each doc
-  // 2. Run schema-driven extraction
-  // 3. Merge snapshots with conflict detection
-  
   const documentIds = documents.map(d => d.id);
-  
-  // Check for existing evidence catalogs
+  const bundleId = crypto.randomUUID();
+
+  // Get existing evidence catalogs from Azure DI processing
   const { data: evidenceCatalogs } = await supabase
     .from('comparison_evidence_catalog')
     .select('*')
     .in('workspace_document_id', documentIds);
+
+  // Build evidence catalog for LLM
+  const evidenceCatalog: Record<string, any> = {};
+  let extractedCandidates: Record<string, any[]> = {};
+
+  if (evidenceCatalogs && evidenceCatalogs.length > 0) {
+    for (const catalog of evidenceCatalogs) {
+      const entries = catalog.evidence_entries || {};
+      for (const [evId, entry] of Object.entries(entries)) {
+        evidenceCatalog[evId] = entry;
+      }
+      
+      // Build candidates from evidence
+      const byField = catalog.evidence_by_potential_field || {};
+      for (const [field, evIds] of Object.entries(byField)) {
+        if (!extractedCandidates[field]) extractedCandidates[field] = [];
+        for (const evId of (evIds as string[])) {
+          const entry = entries[evId];
+          if (entry) {
+            extractedCandidates[field].push({
+              raw_value: entry.snippet_text,
+              normalized_value: entry.normalized_value || entry.snippet_text,
+              evidence_ids: [evId],
+              confidence: entry.confidence,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Call LLM for schema-driven extraction (if Azure OpenAI configured)
+  let snapshotJson: any = null;
+  const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+  const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+  const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'gpt-4o';
+
+  if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY && Object.keys(evidenceCatalog).length > 0) {
+    try {
+      const bundleContext = {
+        job_id: workspaceId,
+        bundle_id: bundleId,
+        bundle_role: bundleRole,
+        carrier_name: carrierName,
+        document_count: documents.length,
+      };
+
+      const userPrompt = `Create the BundleSnapshot for this bundle.
+
+STRICT OUTPUT REQUIREMENTS
+- Output MUST be valid JSON and MUST conform to target_output_schema.
+- Any field with a concrete value MUST include evidence_ids (non-empty).
+- If insufficient evidence -> status="NOT_FOUND" and evidence_ids=[].
+- If conflict -> status="CONFLICT" with conflict_candidates.
+
+INPUTS
+1) bundle_context:
+${JSON.stringify(bundleContext, null, 2)}
+
+2) target_output_schema:
+${JSON.stringify(BUNDLE_SNAPSHOT_SCHEMA, null, 2)}
+
+3) evidence_catalog (${Object.keys(evidenceCatalog).length} items):
+${JSON.stringify(Object.fromEntries(Object.entries(evidenceCatalog).slice(0, 50)), null, 2)}
+
+4) extracted_candidates:
+${JSON.stringify(extractedCandidates, null, 2)}
+
+Return BundleSnapshot JSON only.`;
+
+      const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+      
+      const chatResponse = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': AZURE_OPENAI_KEY,
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: BUNDLE_SNAPSHOT_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.1,
+          max_tokens: 4000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (chatResponse.ok) {
+        const chatData = await chatResponse.json();
+        const content = chatData.choices?.[0]?.message?.content;
+        if (content) {
+          snapshotJson = JSON.parse(content);
+          console.log('[renewal-rate-watch] LLM extraction successful');
+        }
+      }
+    } catch (llmError) {
+      console.error('[renewal-rate-watch] LLM extraction failed:', llmError);
+    }
+  }
+
+  // Extract premium from snapshot or fallback
+  let termPremium: number | null = null;
+  if (snapshotJson?.premium?.term_premium?.value) {
+    termPremium = parseFloat(snapshotJson.premium.term_premium.value);
+  }
 
   // Create or update bundle snapshot
   const { data: bundle, error: bundleError } = await supabase
@@ -234,19 +393,13 @@ async function processBundleDocuments(
       workspace_id: workspaceId,
       bundle_role: bundleRole,
       carrier_name: carrierName,
+      bundle_id: bundleId,
       document_ids: documentIds,
-      snapshot_json: {
-        // Placeholder - would be filled by extraction
-        insured_name: null,
-        policy_number: null,
-        term_dates: null,
-        coverages: [],
-        vehicles: [],
-        drivers: [],
-        premium_breakdown: null,
-      },
-      status: evidenceCatalogs?.length > 0 ? 'ready' : 'pending',
-      fields_extracted: 0,
+      snapshot_json: snapshotJson || { status: 'extraction_pending' },
+      field_evidence: snapshotJson ? extractedCandidates : {},
+      term_premium: termPremium,
+      status: snapshotJson ? 'ready' : 'pending',
+      fields_extracted: snapshotJson?.coverages?.length || 0,
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'workspace_id,bundle_role,carrier_name',
@@ -389,11 +542,60 @@ async function computeComparison(supabase: any, workspaceId: string) {
 }
 
 // =============================================================================
+// REPORT WRITER PROMPT (No New Facts)
+// =============================================================================
+
+const REPORT_WRITER_SYSTEM_PROMPT = `You are a professional insurance remarketing report writer for a U.S. insurance agency.
+
+SCOPE
+- You receive a computed, deterministic ComparisonModel JSON (already calculated by code).
+- Your job is to generate a client-ready report output JSON suitable for rendering to HTML/PDF.
+- You MUST NOT introduce new facts. You may only rephrase and organize what is provided.
+
+NON-NEGOTIABLE RULES
+1) NO NEW FACTS. Do not invent premiums, coverages, savings, endorsements, reasons for increases.
+2) Respect uncertainty:
+   - If a field is NOT_FOUND or CONFLICT or NEEDS_VERIFICATION, you MUST keep it as such.
+3) Be clear and client-friendly. Avoid jargon unless explained.
+4) Output MUST be valid JSON only and conform to the report schema provided.
+5) Do not mention OCR, LLMs, "extraction", or internal tooling.`;
+
+const REPORT_PACK_SCHEMA = {
+  type: 'object',
+  required: ['title', 'executive_summary', 'renewal_change_summary', 'options_table_rows', 'recommendation_section', 'disclaimers'],
+  properties: {
+    title: { type: 'string' },
+    subtitle: { type: 'string' },
+    executive_summary: { type: 'string' },
+    renewal_change_summary: {
+      type: 'object',
+      properties: {
+        current_premium_display: { type: 'string' },
+        renewal_premium_display: { type: 'string' },
+        change_amount: { type: ['number', 'null'] },
+        change_percent: { type: ['number', 'null'] },
+        change_direction: { type: 'string', enum: ['increase', 'decrease', 'unchanged', 'unknown'] },
+      },
+    },
+    options_table_rows: { type: 'array' },
+    recommendation_section: {
+      type: 'object',
+      properties: {
+        has_recommendation: { type: 'boolean' },
+        recommendation_type: { type: ['string', 'null'] },
+        rationale: { type: 'string' },
+      },
+    },
+    items_to_verify: { type: 'array' },
+    disclaimers: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+// =============================================================================
 // STEP 3: GENERATE REPORT
 // =============================================================================
 
 async function generateReport(supabase: any, workspaceId: string, userId: string) {
-  // Get comparison results
   const { data: comparison } = await supabase
     .from('renewal_comparison_results')
     .select('*')
@@ -404,15 +606,88 @@ async function generateReport(supabase: any, workspaceId: string, userId: string
     return { error: 'No comparison results found. Run compute_comparison first.' };
   }
 
-  // Get workspace with account info
   const { data: workspace } = await supabase
     .from('workspaces')
     .select('*, accounts(*)')
     .eq('id', workspaceId)
     .single();
 
-  // Generate HTML report
-  const reportHtml = generateReportHtml(comparison, workspace);
+  // Try LLM-generated report pack first
+  let reportPack: any = null;
+  const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+  const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+  const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'gpt-4o';
+
+  if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY) {
+    try {
+      const comparisonModel = {
+        current_term_premium: comparison.current_term_premium,
+        renewal_term_premium: comparison.renewal_term_premium,
+        renewal_increase_amount: comparison.renewal_increase_amount,
+        renewal_increase_percent: comparison.renewal_increase_percent,
+        quote_comparisons: comparison.quote_comparisons,
+        best_alternative_carrier: comparison.best_alternative_carrier,
+        best_alternative_savings: comparison.best_alternative_savings,
+        recommendation_type: comparison.recommendation_type,
+        recommendation_reason: comparison.recommendation_reason,
+        items_needing_verification: comparison.items_needing_verification,
+      };
+
+      const userPrompt = `Generate the report pack JSON from the comparison_model.
+
+INPUTS
+1) report_output_schema:
+${JSON.stringify(REPORT_PACK_SCHEMA, null, 2)}
+
+2) comparison_model:
+${JSON.stringify(comparisonModel, null, 2)}
+
+OUTPUT STRUCTURE (must match schema)
+- title / subtitle
+- executive_summary: concise narrative
+- renewal_change_summary: current vs renewal premium and % change
+- options_table_rows[]: carrier, premium, savings_vs_renewal, parity_score, key_differences
+- recommendation_section: recommendation + rationale
+- items_to_verify[]: missing info needed to proceed
+- disclaimers[]: coverage parity assumptions and next steps
+Return JSON only.`;
+
+      const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+      
+      const chatResponse = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': AZURE_OPENAI_KEY,
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: REPORT_WRITER_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.2,
+          max_tokens: 3000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (chatResponse.ok) {
+        const chatData = await chatResponse.json();
+        const content = chatData.choices?.[0]?.message?.content;
+        if (content) {
+          reportPack = JSON.parse(content);
+          console.log('[renewal-rate-watch] LLM report generation successful');
+        }
+      }
+    } catch (llmError) {
+      console.error('[renewal-rate-watch] LLM report generation failed:', llmError);
+    }
+  }
+
+  // Generate HTML from report pack or fallback
+  const reportHtml = reportPack 
+    ? generateReportHtmlFromPack(reportPack, workspace)
+    : generateReportHtml(comparison, workspace);
 
   // Save report artifact
   const { data: artifact, error: artifactError } = await supabase
@@ -434,7 +709,105 @@ async function generateReport(supabase: any, workspaceId: string, userId: string
   return {
     artifact_id: artifact?.id,
     artifact_type: 'summary_html',
+    used_llm: !!reportPack,
   };
+}
+
+function generateReportHtmlFromPack(pack: any, workspace: any): string {
+  const accountName = workspace?.accounts?.name || 'Valued Client';
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${pack.title || 'Renewal Options Summary'}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+    h1 { color: #1e40af; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+    h2 { color: #374151; margin-top: 30px; }
+    .summary-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0; }
+    .recommendation-box { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; margin: 20px 0; }
+    .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th, td { padding: 12px; text-align: left; border: 1px solid #e5e7eb; }
+    th { background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <h1>${pack.title || 'Renewal Options Summary'}</h1>
+  ${pack.subtitle ? `<p style="color: #6b7280;">${pack.subtitle}</p>` : ''}
+  <p><strong>Client:</strong> ${accountName}</p>
+  <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
+
+  <div class="summary-box">
+    <h2 style="margin-top: 0;">Executive Summary</h2>
+    <p>${pack.executive_summary || 'Summary not available.'}</p>
+  </div>
+
+  ${pack.renewal_change_summary ? `
+  <h2>Premium Change</h2>
+  <p>
+    <strong>Current:</strong> ${pack.renewal_change_summary.current_premium_display || 'N/A'}<br>
+    <strong>Renewal:</strong> ${pack.renewal_change_summary.renewal_premium_display || 'N/A'}<br>
+    <strong>Change:</strong> ${pack.renewal_change_summary.change_direction === 'increase' ? '+' : ''}$${pack.renewal_change_summary.change_amount || 0} 
+    (${pack.renewal_change_summary.change_percent || 0}%)
+  </p>
+  ` : ''}
+
+  ${pack.options_table_rows?.length > 0 ? `
+  <h2>Options Comparison</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Carrier</th>
+        <th>Term Premium</th>
+        <th>Savings vs Renewal</th>
+        <th>Coverage Match</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${pack.options_table_rows.map((row: any) => `
+        <tr>
+          <td>${row.carrier}${row.is_renewal ? ' (Renewal)' : ''}</td>
+          <td>${row.term_premium}</td>
+          <td>${row.savings_vs_renewal}</td>
+          <td>${row.parity_score}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${pack.recommendation_section?.has_recommendation ? `
+  <div class="recommendation-box">
+    <h2 style="margin-top: 0;">Our Recommendation</h2>
+    <p>${pack.recommendation_section.rationale}</p>
+  </div>
+  ` : ''}
+
+  ${pack.items_to_verify?.length > 0 ? `
+  <div class="warning-box">
+    <h2 style="margin-top: 0;">Items to Verify</h2>
+    <ul>
+      ${pack.items_to_verify.map((item: any) => `<li><strong>${item.field}:</strong> ${item.reason}</li>`).join('')}
+    </ul>
+  </div>
+  ` : ''}
+
+  ${pack.disclaimers?.length > 0 ? `
+  <h2>Important Notes</h2>
+  <ul>
+    ${pack.disclaimers.map((d: string) => `<li>${d}</li>`).join('')}
+  </ul>
+  ` : ''}
+
+  <p style="margin-top: 40px; color: #6b7280; font-size: 12px;">
+    Report generated by Lewis Insurance Renewal Rate Watch™
+  </p>
+</body>
+</html>
+  `;
 }
 
 function generateReportHtml(comparison: any, workspace: any): string {
@@ -544,11 +917,44 @@ function generateReportHtml(comparison: any, workspace: any): string {
 }
 
 // =============================================================================
+// EMAIL WRITER PROMPT (No New Facts)
+// =============================================================================
+
+const EMAIL_WRITER_SYSTEM_PROMPT = `You write client emails for a U.S. insurance agency.
+
+SCOPE
+- Draft a polished email based on the report summary and recommendation data provided.
+- The email should reassure the client we are proactively shopping their renewal.
+- The email must be accurate and must not introduce facts not in the input.
+
+NON-NEGOTIABLE RULES
+1) NO NEW FACTS. Only use values provided in the input JSON.
+2) If no cheaper option exists, clearly state that we shopped alternatives and renewal is currently best value (per the data).
+3) If cheaper options exist, present them as options and note that coverage comparisons matter.
+4) Include a short "Next steps" section and "Items we need to confirm" if provided.
+5) Never mention OCR/AI/extraction.
+6) Output MUST be valid JSON only and conform to the email schema provided.`;
+
+const EMAIL_DRAFT_SCHEMA = {
+  type: 'object',
+  required: ['subject', 'greeting_line', 'body_paragraphs', 'next_steps', 'closing_line', 'signature_block'],
+  properties: {
+    subject: { type: 'string' },
+    greeting_line: { type: 'string' },
+    body_paragraphs: { type: 'array', items: { type: 'string' } },
+    bullets: { type: 'array', items: { type: 'string' } },
+    next_steps: { type: 'array', items: { type: 'string' } },
+    items_to_confirm: { type: 'array', items: { type: 'string' } },
+    closing_line: { type: 'string' },
+    signature_block: { type: 'string' },
+  },
+};
+
+// =============================================================================
 // STEP 4: GENERATE EMAIL DRAFT
 // =============================================================================
 
 async function generateEmail(supabase: any, workspaceId: string, userId: string) {
-  // Get comparison results and workspace
   const { data: comparison } = await supabase
     .from('renewal_comparison_results')
     .select('*')
@@ -570,8 +976,111 @@ async function generateEmail(supabase: any, workspaceId: string, userId: string)
   const customerName = account?.name || aoRenewal?.customer_name || 'Valued Client';
   const toEmail = account?.email || '';
 
-  // Generate email content
-  const { subject, bodyHtml, bodyText } = generateEmailContent(comparison, customerName, aoRenewal);
+  // Try LLM-generated email first
+  let emailDraftJson: any = null;
+  const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+  const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+  const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'gpt-4o';
+
+  if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY) {
+    try {
+      const emailContext = {
+        client_name: customerName,
+        agency_name: 'Lewis Insurance',
+        producer_name: null,
+        phone: '(386) 755-0050',
+        email: 'service@lewisinsurance.ai',
+      };
+
+      const reportSummary = {
+        current_premium: comparison.current_term_premium,
+        renewal_premium: comparison.renewal_term_premium,
+        renewal_increase_amount: comparison.renewal_increase_amount,
+        renewal_increase_percent: comparison.renewal_increase_percent,
+        quotes_compared: comparison.quote_comparisons?.length || 0,
+        best_alternative_carrier: comparison.best_alternative_carrier,
+        best_alternative_savings: comparison.best_alternative_savings,
+      };
+
+      const recommendation = {
+        type: comparison.recommendation_type,
+        reason: comparison.recommendation_reason,
+        items_needing_verification: comparison.items_needing_verification,
+      };
+
+      const userPrompt = `Write a client email draft based on the provided report_summary and recommendation.
+
+INPUTS
+1) email_output_schema:
+${JSON.stringify(EMAIL_DRAFT_SCHEMA, null, 2)}
+
+2) email_context:
+${JSON.stringify(emailContext, null, 2)}
+
+3) report_summary:
+${JSON.stringify(reportSummary, null, 2)}
+
+4) recommendation:
+${JSON.stringify(recommendation, null, 2)}
+
+OUTPUT REQUIREMENTS (JSON only)
+- subject
+- greeting_line
+- body_paragraphs[] (2–6)
+- bullets[] (optional)
+- next_steps[] (clear calls to action)
+- items_to_confirm[] (if present)
+- closing_line
+- signature_block
+Return JSON only.`;
+
+      const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+      
+      const chatResponse = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': AZURE_OPENAI_KEY,
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: EMAIL_WRITER_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 2000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (chatResponse.ok) {
+        const chatData = await chatResponse.json();
+        const content = chatData.choices?.[0]?.message?.content;
+        if (content) {
+          emailDraftJson = JSON.parse(content);
+          console.log('[renewal-rate-watch] LLM email generation successful');
+        }
+      }
+    } catch (llmError) {
+      console.error('[renewal-rate-watch] LLM email generation failed:', llmError);
+    }
+  }
+
+  // Generate email content from LLM result or fallback
+  let subject: string;
+  let bodyHtml: string;
+  let bodyText: string;
+
+  if (emailDraftJson) {
+    subject = emailDraftJson.subject;
+    bodyHtml = buildEmailHtmlFromDraft(emailDraftJson);
+    bodyText = buildEmailTextFromDraft(emailDraftJson);
+  } else {
+    const generated = generateEmailContent(comparison, customerName, aoRenewal);
+    subject = generated.subject;
+    bodyHtml = generated.bodyHtml;
+    bodyText = generated.bodyText;
+  }
 
   // Save email draft
   const { data: emailDraft, error: emailError } = await supabase
@@ -597,7 +1106,63 @@ async function generateEmail(supabase: any, workspaceId: string, userId: string)
   return {
     email_draft_id: emailDraft?.id,
     subject,
+    used_llm: !!emailDraftJson,
   };
+}
+
+function buildEmailHtmlFromDraft(draft: any): string {
+  return `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+  <p>${draft.greeting_line}</p>
+  
+  ${draft.body_paragraphs?.map((p: string) => `<p>${p}</p>`).join('\n') || ''}
+  
+  ${draft.bullets?.length > 0 ? `
+  <ul>
+    ${draft.bullets.map((b: string) => `<li>${b}</li>`).join('\n')}
+  </ul>
+  ` : ''}
+  
+  ${draft.next_steps?.length > 0 ? `
+  <p><strong>Next Steps:</strong></p>
+  <ol>
+    ${draft.next_steps.map((s: string) => `<li>${s}</li>`).join('\n')}
+  </ol>
+  ` : ''}
+  
+  ${draft.items_to_confirm?.length > 0 ? `
+  <p><strong>To proceed, we'll need:</strong></p>
+  <ul>
+    ${draft.items_to_confirm.map((i: string) => `<li>${i}</li>`).join('\n')}
+  </ul>
+  ` : ''}
+  
+  <p>${draft.closing_line}</p>
+  
+  <p>${draft.signature_block?.replace(/\n/g, '<br>')}</p>
+</div>
+  `;
+}
+
+function buildEmailTextFromDraft(draft: any): string {
+  let text = `${draft.greeting_line}\n\n`;
+  text += draft.body_paragraphs?.join('\n\n') || '';
+  
+  if (draft.bullets?.length > 0) {
+    text += '\n\n' + draft.bullets.map((b: string) => `• ${b}`).join('\n');
+  }
+  
+  if (draft.next_steps?.length > 0) {
+    text += '\n\nNext Steps:\n' + draft.next_steps.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n');
+  }
+  
+  if (draft.items_to_confirm?.length > 0) {
+    text += '\n\nTo proceed, we\'ll need:\n' + draft.items_to_confirm.map((i: string) => `• ${i}`).join('\n');
+  }
+  
+  text += `\n\n${draft.closing_line}\n\n${draft.signature_block}`;
+  
+  return text;
 }
 
 function generateEmailContent(comparison: any, customerName: string, aoRenewal: any): {
