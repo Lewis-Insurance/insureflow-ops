@@ -57,23 +57,33 @@ import { CreatePacketModal } from './CreatePacketModal';
 import { RequirementDetailModal } from './RequirementDetailModal';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { getDocType } from '@/config/documentTypes';
+// =============================================================================
+// DOC TYPE ICONS (inline mapping to avoid config import issues)
+// =============================================================================
 
-// =============================================================================
-// DOC TYPE ICONS (dynamic from config, with fallback)
-// =============================================================================
+const DOC_TYPE_ICONS: Record<string, React.ElementType> = {
+  ACORD_125: FileText,
+  ACORD_126: FileText,
+  LOSS_RUNS: FileText,
+  PAYMENT_DOC: FileText,
+  CURRENT_DEC: FileText,
+  RENEWAL_DEC: FileText,
+  DRIVER_LIST_MVR: FileText,
+  VEHICLE_SCHEDULE: FileText,
+  ENTITY_DOCS: FileText,
+  CERTIFICATE_REQUEST: FileText,
+  PROPERTY_SOV: FileText,
+  WC_MOD_PAYROLL: FileText,
+  ID_CARDS: FileText,
+  SIGNED_APP: FileText,
+  PRIOR_POLICY: FileText,
+  PHOTOS: FileText,
+  OTHER: FileText,
+};
 
 function getDocTypeIcon(docTypeKey: string): React.ElementType {
-  try {
-    const docType = getDocType(docTypeKey?.toUpperCase() || '');
-    if (docType?.icon) {
-      return docType.icon;
-    }
-  } catch (e) {
-    console.warn('Error getting doc type icon:', e);
-  }
-  // Fallback to FileText from our local imports
-  return FileText;
+  const key = docTypeKey?.toUpperCase() || '';
+  return DOC_TYPE_ICONS[key] || FileText;
 }
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
