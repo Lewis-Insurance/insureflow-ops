@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { ClientSelector } from '@/components/client/ClientSelector';
 import {
   ArrowLeft,
   Upload,
@@ -53,8 +55,6 @@ import {
   useRunRateWatchPipeline,
   useUpdateEmailDraft,
 } from '@/hooks/useRenewalRateWatch';
-import { useAccounts } from '@/hooks/useCRMData';
-import { usePolicies } from '@/hooks/usePolicies';
 
 export default function RenewalRateWatchPage() {
   const { workspaceId } = useParams<{ workspaceId?: string }>();
@@ -66,7 +66,7 @@ export default function RenewalRateWatchPage() {
   const [activeTab, setActiveTab] = useState('documents');
 
   // Queries
-  const { data: workspace, isLoading: workspaceLoading } = useRateWatchWorkspace(workspaceId || null);
+  const { data: workspace, isLoading: workspaceLoading, error: workspaceError } = useRateWatchWorkspace(workspaceId || null);
   const { data: documents = [] } = useRateWatchDocuments(workspaceId || null);
   const { data: bundles = [] } = useBundleSnapshots(workspaceId || null);
   const { data: comparison } = useComparisonResult(workspaceId || null);
@@ -139,45 +139,51 @@ export default function RenewalRateWatchPage() {
   };
 
   // Creation form state
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const selectedAccountId = selectedClient?.id || '';
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('');
   const [jobName, setJobName] = useState('');
   const [selectedLob, setSelectedLob] = useState('personal_auto');
-  const [accountSearch, setAccountSearch] = useState('');
 
-  // Fetch accounts and policies for selection
-  const { data: accounts = [] } = useAccounts();
-  const { data: policiesData } = usePolicies({ accountId: selectedAccountId || undefined });
-  const policies = policiesData?.policies || [];
+  // Fetch policies for selected account (lightweight + safe)
+  const { data: policies = [] } = useQuery({
+    queryKey: ['rate-watch-policies', selectedAccountId],
+    queryFn: async () => {
+      if (!selectedAccountId) return [];
+      const { data, error } = await supabase
+        .from('policies')
+        .select('id, policy_number, line_of_business')
+        .eq('account_id', selectedAccountId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw new Error(`Failed to load policies: ${error.message}`);
+      return data || [];
+    },
+    enabled: !!selectedAccountId,
+    staleTime: 30 * 1000,
+  });
 
-  // Filter accounts by search
-  const filteredAccounts = accounts.filter(a => 
-    a.name?.toLowerCase().includes(accountSearch.toLowerCase())
-  ).slice(0, 20);
-
-  // Auto-generate job name when account/policy selected
+  // Auto-generate job name when client selected
   useEffect(() => {
-    if (selectedAccountId && !jobName) {
-      const account = accounts.find(a => a.id === selectedAccountId);
-      if (account) {
-        const date = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        setJobName(`${account.name} - Renewal ${date}`);
-      }
+    if (selectedClient?.name && !jobName) {
+      const date = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      setJobName(`${selectedClient.name} - Renewal ${date}`);
     }
-  }, [selectedAccountId, accounts, jobName]);
+  }, [selectedClient, jobName]);
 
-  const handleCreateWorkspace = () => {
+  const handleCreateWorkspace = async () => {
     if (!selectedAccountId) {
-      toast({ title: 'Error', description: 'Please select a customer', variant: 'destructive' });
+      toast({ title: 'Select a customer', description: 'Please select a customer to start Rate Watch.', variant: 'destructive' });
       return;
     }
-    createWorkspace.mutate({
-      name: jobName || 'New Rate Watch',
+    const ws = await createWorkspace.mutateAsync({
+      name: jobName.trim() || `${selectedClient?.name || 'New'} - Rate Watch`,
       account_id: selectedAccountId,
       policy_id: selectedPolicyId || undefined,
       ao_renewal_id: aoRenewalId || undefined,
       lob: selectedLob,
     });
+    navigate(`/ao-renewals/rate-watch/${ws.id}`);
   };
 
   // If no workspace, show creation form
@@ -206,41 +212,17 @@ export default function RenewalRateWatchPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Account Selection */}
+              {/* Customer Selection */}
               <div className="space-y-2">
                 <Label>Customer *</Label>
-                <Input
-                  placeholder="Search customers..."
-                  value={accountSearch}
-                  onChange={(e) => setAccountSearch(e.target.value)}
+                <ClientSelector
+                  selectedClient={selectedClient}
+                  onSelect={(c) => {
+                    setSelectedClient(c);
+                    setSelectedPolicyId(''); // Reset policy when customer changes
+                  }}
+                  placeholder="Select a customer..."
                 />
-                {accountSearch && filteredAccounts.length > 0 && (
-                  <div className="border rounded-md max-h-48 overflow-auto">
-                    {filteredAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className={`p-2 hover:bg-muted cursor-pointer ${
-                          selectedAccountId === account.id ? 'bg-muted' : ''
-                        }`}
-                        onClick={() => {
-                          setSelectedAccountId(account.id);
-                          setAccountSearch(account.name || '');
-                          setSelectedPolicyId(''); // Reset policy when account changes
-                        }}
-                      >
-                        <div className="font-medium">{account.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {account.email || account.phone || 'No contact info'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {selectedAccountId && (
-                  <Badge variant="secondary" className="mt-1">
-                    Selected: {accounts.find(a => a.id === selectedAccountId)?.name}
-                  </Badge>
-                )}
               </div>
 
               {/* Policy Selection */}
@@ -266,8 +248,8 @@ export default function RenewalRateWatchPage() {
               {/* Job Name */}
               <div className="space-y-2">
                 <Label>Job Name</Label>
-                <Input 
-                  placeholder="e.g., Smith Auto Renewal - Jan 2025" 
+                <Input
+                  placeholder="e.g., Smith Auto Renewal - Jan 2025"
                   value={jobName}
                   onChange={(e) => setJobName(e.target.value)}
                 />
@@ -305,6 +287,9 @@ export default function RenewalRateWatchPage() {
                 )}
                 Create Rate Watch
               </Button>
+              <p className="text-xs text-muted-foreground">
+                After creating the job, you’ll upload the current policy, renewal docs, and any alternative quotes.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -317,6 +302,39 @@ export default function RenewalRateWatchPage() {
       <AppLayout>
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (workspaceError) {
+    return (
+      <AppLayout>
+        <div className="p-6 max-w-3xl mx-auto space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Rate Watch load failed
+              </CardTitle>
+              <CardDescription>
+                This Rate Watch job may not exist or you may not have access to it.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {(workspaceError as any)?.message || 'Unknown error'}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => navigate('/ao-renewals')}>
+                  Back to AO Renewals
+                </Button>
+                <Button onClick={() => navigate('/ao-renewals/rate-watch')}>
+                  Start New Rate Watch
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
     );
