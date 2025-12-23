@@ -58,6 +58,43 @@ interface Task {
   updated_at: string;
 }
 
+// Simple error boundary wrapper for Document Collection
+class ErrorBoundaryWrapper extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('DocumentCollectionBoard error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-destructive">Document Collection Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Failed to load document collection. Error: {this.state.error?.message || 'Unknown error'}
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -255,10 +292,10 @@ export default function CustomerDetail() {
         {/* Policies & Quotes Section */}
         <CustomerPoliciesSection accountId={account.id} />
 
-        {/* Document Collection Section - temporarily disabled for debugging */}
-        {/* <React.Suspense fallback={<Card className="p-6"><CardContent>Loading Document Collection...</CardContent></Card>}>
+        {/* Document Collection Section */}
+        <ErrorBoundaryWrapper>
           <DocumentCollectionBoard accountId={account.id} />
-        </React.Suspense> */}
+        </ErrorBoundaryWrapper>
 
         {/* Documents Section */}
         <CustomerDocumentsSection accountId={account.id} />
