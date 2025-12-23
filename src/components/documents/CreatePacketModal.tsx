@@ -45,25 +45,29 @@ import {
 } from 'lucide-react';
 import { useCollectionTemplates, useCreateCollectionPacket } from '@/hooks/useDocumentCollection';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  DOCUMENT_TYPES, 
-  PACKET_TEMPLATES, 
-  LOB_SUGGESTIONS,
-  getAllDocTypes,
-  getDocType,
-  getSuggestedDocTypesForLOB,
-} from '@/config/documentTypes';
-
 // =============================================================================
-// DOC TYPES (derived from config)
+// DOC TYPES (inline to avoid config import issues)
 // =============================================================================
 
-const docTypes = getAllDocTypes().map(dt => ({
-  value: dt.doc_type_key,
-  label: dt.display_name,
-  description: dt.short_description,
-  icon: dt.icon,
-}));
+const docTypes = [
+  { value: 'ACORD_125', label: 'ACORD 125', description: 'Commercial insurance application' },
+  { value: 'ACORD_126', label: 'ACORD 126', description: 'Commercial general liability section' },
+  { value: 'LOSS_RUNS', label: 'Loss Runs', description: '3-5 years of loss history' },
+  { value: 'PAYMENT_DOC', label: 'Payment Documentation', description: 'Down payment proof' },
+  { value: 'CURRENT_DEC', label: 'Current Dec Page', description: 'Current policy declarations' },
+  { value: 'RENEWAL_DEC', label: 'Renewal Dec Page', description: 'Renewal declarations' },
+  { value: 'DRIVER_LIST_MVR', label: 'Driver List/MVR', description: 'Driver information and MVRs' },
+  { value: 'VEHICLE_SCHEDULE', label: 'Vehicle Schedule', description: 'List of vehicles' },
+  { value: 'ENTITY_DOCS', label: 'Entity Documents', description: 'Business formation docs' },
+  { value: 'CERTIFICATE_REQUEST', label: 'Certificate Request', description: 'COI request form' },
+  { value: 'PROPERTY_SOV', label: 'Property SOV', description: 'Statement of values' },
+  { value: 'WC_MOD_PAYROLL', label: 'WC Mod/Payroll', description: 'Workers comp info' },
+  { value: 'ID_CARDS', label: 'ID Cards', description: 'Insurance ID cards' },
+  { value: 'SIGNED_APP', label: 'Signed Application', description: 'Signed application' },
+  { value: 'PRIOR_POLICY', label: 'Prior Policy', description: 'Previous policy docs' },
+  { value: 'PHOTOS', label: 'Photos', description: 'Property/vehicle photos' },
+  { value: 'OTHER', label: 'Other', description: 'Other documents' },
+];
 
 interface Requirement {
   id: string;
