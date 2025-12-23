@@ -559,3 +559,4 @@ export const PORTAL_INTRO_TEXT =
   "To help us move quickly on your insurance request, please upload the documents below. " +
   "If you don't have a document handy, upload what you have and we'll follow up.";
 
+

@@ -77,3 +77,4 @@ ON CONFLICT (id) DO NOTHING;
 
 COMMENT ON TABLE public.system_settings IS 'System-wide configuration settings for the agency';
 
+

@@ -98,23 +98,29 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               </NavGroup>
 
               {/* Lewis AI Group */}
-              <NavGroup label="Lewis AI" defaultOpen={false}>
+              <NavGroup label="Lewis AI" defaultOpen={true}>
+                <NavItem
+                  icon={Bot}
+                  label="AI Hub"
+                  to="/ai/hub"
+                  badge="NEW"
+                />
                 <NavItem
                   icon={Scale}
                   label="Quote Comparison"
-                  to="/comparison"
+                  to="/ai/quote-comparison"
                   badge="AI"
                 />
                 <NavItem
                   icon={FileSearch}
                   label="Explore a Policy"
-                  to="/analyze-documents"
+                  to="/ai/explore-policy"
                   badge="AI"
                 />
                 <NavItem
                   icon={FileQuestion}
                   label="Document Intelligence"
-                  to="/document-intelligence"
+                  to="/ai/documents"
                   badge="AI"
                 />
               </NavGroup>

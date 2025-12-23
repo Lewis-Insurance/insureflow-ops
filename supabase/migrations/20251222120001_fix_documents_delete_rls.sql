@@ -51,3 +51,4 @@ CREATE POLICY "authenticated_update_documents" ON public.documents
         )
     );
 
+

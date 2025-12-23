@@ -569,3 +569,4 @@ GRANT EXECUTE ON FUNCTION generate_collection_token TO authenticated;
 GRANT EXECUTE ON FUNCTION validate_collection_token TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION get_collection_status_summary TO authenticated;
 
+
