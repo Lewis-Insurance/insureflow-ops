@@ -134,52 +134,69 @@ export default function DocumentCollectionPortal() {
 
   return (
     <PortalLayout branding={branding}>
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold mb-2">Document Upload Portal</h1>
-        <p className="text-muted-foreground">
-          {packet?.title || 'Document Request'}
-        </p>
+      {/* Welcome Section */}
+      <div className="text-center mb-10">
         {packet?.client_name && (
-          <p className="text-sm text-muted-foreground mt-1">
-            Welcome, {packet.client_name}
+          <p className="text-sm font-medium text-blue-600 mb-2">
+            Welcome back, {packet.client_name}
           </p>
         )}
-        {packet?.description && (
-          <p className="mt-4 text-muted-foreground max-w-lg mx-auto">
-            {packet.description}
-          </p>
-        )}
-        {!packet?.description && (
-          <p className="mt-4 text-muted-foreground max-w-lg mx-auto">
-            {PORTAL_INTRO_TEXT}
-          </p>
-        )}
+        <h1 className="text-3xl font-bold text-slate-800 mb-3">
+          {packet?.title || 'Document Request'}
+        </h1>
+        <p className="text-slate-600 max-w-xl mx-auto leading-relaxed">
+          {packet?.description || PORTAL_INTRO_TEXT}
+        </p>
       </div>
 
       {/* Progress Card */}
       {progress && (
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Your Progress</span>
-              <span className="text-sm text-muted-foreground">
-                {progress.completed} of {progress.required} required documents
-              </span>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">Your Progress</h3>
+                <p className="text-sm text-slate-500">
+                  {progress.completed} of {progress.required} required documents uploaded
+                </p>
+              </div>
             </div>
-            <Progress value={progressPercent} className="h-3" />
-            
-            {progress.all_required_complete && (
-              <Alert className="mt-4 bg-green-50 border-green-200">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-700">
-                  All required documents have been submitted! Your agent will review them shortly.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-blue-600">{progressPercent}%</span>
+            </div>
+          </div>
+          
+          <div className="relative h-3 bg-slate-100 rounded-full overflow-hidden">
+            <div 
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          
+          {progress.all_required_complete && (
+            <div className="mt-4 flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <div className="p-2 bg-emerald-100 rounded-full">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-medium text-emerald-800">All required documents submitted!</p>
+                <p className="text-sm text-emerald-600">Your agent will review them shortly.</p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
+
+      {/* Section Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-semibold text-slate-800">Requested Documents</h2>
+        <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full">
+          {requirements?.length || 0} items
+        </span>
+      </div>
 
       {/* Requirements List */}
       <div className="space-y-4">
@@ -262,52 +279,72 @@ function PortalLayout({
   const footerText = branding?.footer_text;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
+      {/* Header with gradient overlay */}
       <header 
-        className="border-b py-4"
+        className="relative overflow-hidden shadow-lg"
         style={{ backgroundColor: primaryColor }}
       >
-        <div className="max-w-2xl mx-auto px-4 flex items-center justify-between">
-          {logoUrl ? (
-            <img src={logoUrl} alt={agencyName} className="h-8" />
-          ) : (
-            <div className="flex items-center gap-2 text-white">
-              <Building2 className="h-6 w-6" />
-              <span className="font-semibold">{agencyName}</span>
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+        </div>
+        
+        <div className="relative max-w-3xl mx-auto px-6 py-5">
+          <div className="flex items-center justify-between">
+            {logoUrl ? (
+              <img src={logoUrl} alt={agencyName} className="h-10 drop-shadow-sm" />
+            ) : (
+              <div className="flex items-center gap-3 text-white">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <span className="text-xl font-bold tracking-tight">{agencyName}</span>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-4">
+              {contactPhone && (
+                <a 
+                  href={`tel:${contactPhone.replace(/[^0-9+]/g, '')}`} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-white text-sm font-medium transition-all backdrop-blur-sm border border-white/20"
+                >
+                  <Phone className="h-4 w-4" />
+                  <span className="hidden sm:inline">{contactPhone}</span>
+                </a>
+              )}
+              {contactEmail && (
+                <a 
+                  href={`mailto:${contactEmail}`} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-white text-sm font-medium transition-all backdrop-blur-sm border border-white/20"
+                >
+                  <Mail className="h-4 w-4" />
+                </a>
+              )}
             </div>
-          )}
-          
-          <div className="flex items-center gap-4 text-white/80 text-sm">
-            {contactPhone && (
-              <a href={`tel:${contactPhone.replace(/[^0-9+]/g, '')}`} className="flex items-center gap-1 hover:text-white">
-                <Phone className="h-4 w-4" />
-                <span className="hidden sm:inline">{contactPhone}</span>
-              </a>
-            )}
-            {contactEmail && (
-              <a href={`mailto:${contactEmail}`} className="flex items-center gap-1 hover:text-white">
-                <Mail className="h-4 w-4" />
-                <span className="hidden sm:inline">{contactEmail}</span>
-              </a>
-            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-6 py-10">
         {children}
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-6 mt-auto">
-        <div className="max-w-2xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          {footerText ? (
-            <p>{footerText}</p>
-          ) : (
-            <p>© {new Date().getFullYear()} {agencyName}. All rights reserved.</p>
-          )}
+      <footer className="border-t border-slate-200 bg-white/50 backdrop-blur-sm py-8 mt-auto">
+        <div className="max-w-3xl mx-auto px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm">Your documents are encrypted and secure</span>
+            </div>
+            <p className="text-sm text-slate-400">
+              {footerText || `© ${new Date().getFullYear()} ${agencyName}. All rights reserved.`}
+            </p>
+          </div>
         </div>
       </footer>
     </div>
@@ -388,91 +425,115 @@ function RequirementCard({ requirement, token, canUpload: canUploadProp = true, 
   };
 
   return (
-    <Card className={cn(
-      "transition-all",
-      isComplete && "border-green-200 bg-green-50/30",
-      isRejected && "border-red-200 bg-red-50/30"
+    <div className={cn(
+      "bg-white rounded-xl border-2 transition-all duration-300 hover:shadow-md overflow-hidden",
+      isComplete && "border-emerald-300 bg-gradient-to-r from-emerald-50 to-white",
+      isRejected && "border-red-300 bg-gradient-to-r from-red-50 to-white",
+      !isComplete && !isRejected && "border-slate-200 hover:border-slate-300"
     )}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            <div className={cn("p-2 rounded-lg", status.bg)}>
-              <FileText className={cn("h-5 w-5", status.color)} />
+      {/* Header Section */}
+      <div className="p-5 pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Icon */}
+            <div className={cn(
+              "p-3 rounded-xl transition-colors",
+              isComplete ? "bg-emerald-100" : isRejected ? "bg-red-100" : "bg-slate-100"
+            )}>
+              <FileText className={cn(
+                "h-6 w-6",
+                isComplete ? "text-emerald-600" : isRejected ? "text-red-600" : "text-slate-600"
+              )} />
             </div>
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                {requirement.label}
+            
+            {/* Title & Description */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-slate-800 text-lg">
+                  {requirement.label}
+                </h3>
                 {requirement.is_required && (
-                  <Badge variant="destructive" className="text-xs">Required</Badge>
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-md">
+                    Required
+                  </span>
                 )}
-              </CardTitle>
+              </div>
               {requirement.instructions && (
-                <CardDescription className="mt-1">
+                <p className="mt-1 text-sm text-slate-500 leading-relaxed">
                   {requirement.instructions}
-                </CardDescription>
+                </p>
               )}
             </div>
           </div>
           
-          <div className={cn("flex items-center gap-1.5 text-sm", status.color)}>
+          {/* Status Badge */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium shrink-0",
+            isComplete ? "bg-emerald-100 text-emerald-700" :
+            isRejected ? "bg-red-100 text-red-700" :
+            requirement.status === 'processing' ? "bg-purple-100 text-purple-700" :
+            requirement.status === 'under_review' ? "bg-amber-100 text-amber-700" :
+            "bg-blue-100 text-blue-700"
+          )}>
             <StatusIcon className={cn("h-4 w-4", requirement.status === 'processing' && 'animate-spin')} />
-            <span className="font-medium">{status.clientLabel}</span>
+            <span>{status.label}</span>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-3">
+      {/* Content Section */}
+      <div className="px-5 pb-5 space-y-4">
         {/* Rejection Message */}
-        {isRejected && latestUpload?.rejection_reason && (
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Please re-upload:</strong> {latestUpload.rejection_reason}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Needs Changes Message */}
-        {latestUpload?.review_status === 'needs_changes' && latestUpload.client_feedback && (
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Changes requested:</strong> {latestUpload.client_feedback}
-            </AlertDescription>
-          </Alert>
+        {isRejected && requirement.rejection_reason && (
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-red-800">Please re-upload</p>
+              <p className="text-sm text-red-600 mt-0.5">{requirement.rejection_reason}</p>
+            </div>
+          </div>
         )}
 
         {/* Upload Progress */}
         {uploadProgress !== null && (
-          <div className="space-y-1">
-            <Progress value={uploadProgress} className="h-2" />
-            <p className="text-xs text-muted-foreground text-center">
-              {uploadProgress < 100 ? 'Uploading...' : 'Upload complete!'}
+          <div className="space-y-2">
+            <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div 
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-500 text-center font-medium">
+              {uploadProgress < 100 ? 'Uploading your document...' : '✓ Upload complete!'}
             </p>
           </div>
         )}
 
         {/* Upload Error */}
         {uploadError && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{uploadError}</AlertDescription>
-          </Alert>
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-red-800">Upload failed</p>
+              <p className="text-sm text-red-600 mt-0.5">{uploadError}</p>
+            </div>
+          </div>
         )}
 
         {/* Uploaded Files */}
-        {uploads.length > 0 && !isRejected && (
-          <div className="text-sm text-muted-foreground">
-            <p className="flex items-center gap-1">
-              <Check className="h-4 w-4 text-green-600" />
-              Uploaded: {latestUpload?.filename}
-            </p>
+        {uploads.length > 0 && !isRejected && !isComplete && (
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+            <Check className="h-5 w-5 text-emerald-600" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-700 truncate">{latestUpload?.filename}</p>
+              <p className="text-xs text-slate-500">Under review</p>
+            </div>
           </div>
         )}
 
         {/* Upload Button */}
         {showUploadButton && (
-          <>
+          <div className="space-y-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -480,40 +541,45 @@ function RequirementCard({ requirement, token, canUpload: canUploadProp = true, 
               accept={requirement.accepted_file_types?.map(t => `.${t}`).join(',') || '*'}
               onChange={handleFileSelect}
             />
-            <Button
-              className="w-full"
-              variant={isRejected ? 'destructive' : 'default'}
+            <button
+              className={cn(
+                "w-full py-4 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2",
+                isRejected 
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200" 
+                  : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-200",
+                portalUpload.isPending && "opacity-70 cursor-not-allowed"
+              )}
               onClick={() => fileInputRef.current?.click()}
               disabled={portalUpload.isPending}
             >
               {portalUpload.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Uploading...</span>
                 </>
               ) : (
                 <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  {isRejected ? 'Re-upload Document' : 'Upload Document'}
+                  <Upload className="h-5 w-5" />
+                  <span>{isRejected ? 'Re-upload Document' : 'Upload Document'}</span>
                 </>
               )}
-            </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              Accepted: {(requirement.accepted_file_types || ['pdf', 'jpg', 'png']).join(', ').toUpperCase()} 
+            </button>
+            <p className="text-xs text-slate-400 text-center">
+              {(requirement.accepted_file_types || ['pdf', 'jpg', 'png']).join(', ').toUpperCase()} 
               {' '}• Max {requirement.max_file_size_mb || 25}MB
             </p>
-          </>
+          </div>
         )}
 
         {/* Complete State */}
         {isComplete && (
-          <div className="flex items-center justify-center gap-2 py-2 text-green-600">
-            <CheckCircle2 className="h-5 w-5" />
-            <span className="font-medium">Document accepted</span>
+          <div className="flex items-center justify-center gap-3 py-3 bg-emerald-50 rounded-xl">
+            <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            <span className="font-semibold text-emerald-700">Document received</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
