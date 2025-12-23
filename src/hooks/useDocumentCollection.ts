@@ -637,6 +637,7 @@ export function usePortalPacket(token: string | null) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
             action: 'portal_get_packet',
@@ -646,7 +647,7 @@ export function usePortalPacket(token: string | null) {
       );
 
       const result = await response.json();
-      if (!result.success) throw new Error(result.error);
+      if (result.error) throw new Error(result.error);
       
       return result;
     },
@@ -670,6 +671,7 @@ export function usePortalSubmitComplete() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
             action: 'portal_submit_complete',
@@ -715,6 +717,7 @@ export function usePortalUpload() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
             action: 'portal_upload',
