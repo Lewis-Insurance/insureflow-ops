@@ -64,8 +64,16 @@ import { getDocType } from '@/config/documentTypes';
 // =============================================================================
 
 function getDocTypeIcon(docTypeKey: string): React.ElementType {
-  const docType = getDocType(docTypeKey.toUpperCase());
-  return docType?.icon || FileText;
+  try {
+    const docType = getDocType(docTypeKey?.toUpperCase() || '');
+    if (docType?.icon) {
+      return docType.icon;
+    }
+  } catch (e) {
+    console.warn('Error getting doc type icon:', e);
+  }
+  // Fallback to FileText from our local imports
+  return FileText;
 }
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
