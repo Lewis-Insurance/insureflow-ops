@@ -106,6 +106,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   badge="NEW"
                 />
                 <NavItem
+                  icon={Sparkles}
+                  label="Module Builder"
+                  to="/ai/module-builder"
+                  badge="NEW"
+                />
+                <NavItem
                   icon={Scale}
                   label="Quote Comparison"
                   to="/ai/quote-comparison"
