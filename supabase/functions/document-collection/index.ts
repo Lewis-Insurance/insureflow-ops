@@ -50,6 +50,16 @@ interface ValidateTokenRequest {
   token: string;
 }
 
+interface PortalGetPacketRequest {
+  action: 'portal_get_packet';
+  token: string;
+}
+
+interface PortalSubmitCompleteRequest {
+  action: 'portal_submit_complete';
+  token: string;
+}
+
 interface PortalUploadRequest {
   action: 'portal_upload';
   token: string;
@@ -82,7 +92,9 @@ type RequestBody =
   | CreatePacketRequest 
   | GenerateTokenRequest 
   | ValidateTokenRequest
+  | PortalGetPacketRequest
   | PortalUploadRequest 
+  | PortalSubmitCompleteRequest
   | UpdateStatusRequest
   | SendReminderRequest
   | GetPacketDataRequest;
@@ -137,6 +149,14 @@ serve(async (req) => {
 
       case 'validate_token':
         result = await validateToken(supabase, body as ValidateTokenRequest, clientIp);
+        break;
+
+      case 'portal_get_packet':
+        result = await portalGetPacket(supabase, body as PortalGetPacketRequest, clientIp, req.headers.get('user-agent'));
+        break;
+
+      case 'portal_submit_complete':
+        result = await portalSubmitComplete(supabase, body as PortalSubmitCompleteRequest, clientIp);
         break;
 
       case 'portal_upload':
@@ -387,6 +407,121 @@ async function validateToken(
 }
 
 // =============================================================================
+// PORTAL GET PACKET (SECURE, CLIENT-SAFE DATA ONLY)
+// =============================================================================
+
+async function portalGetPacket(
+  supabase: any,
+  request: PortalGetPacketRequest,
+  clientIp: string | null,
+  userAgent: string | null
+): Promise<any> {
+  const { token } = request;
+
+  // Use the enhanced secure token validation
+  const { data: tokenValidation, error: tokenError } = await supabase.rpc('validate_portal_token', {
+    p_token: token,
+    p_ip: clientIp,
+    p_user_agent: userAgent,
+  });
+
+  if (tokenError) {
+    console.error('[document-collection] Token validation error:', tokenError);
+    throw new Error('Token validation failed');
+  }
+
+  if (!tokenValidation?.valid) {
+    const errorMap: Record<string, string> = {
+      'TOKEN_NOT_FOUND': 'This link is invalid.',
+      'TOKEN_REVOKED': 'This link has been revoked.',
+      'TOKEN_EXPIRED': 'This link has expired. Please contact your agent for a new link.',
+      'TOKEN_MAX_USES_EXCEEDED': 'This link has exceeded its maximum uses.',
+    };
+    throw new Error(errorMap[tokenValidation?.error] || 'Invalid or expired link');
+  }
+
+  // Check if upload action is allowed
+  const allowedActions = tokenValidation.allowed_actions || { upload: true, view_status: true };
+  if (!allowedActions.view_status) {
+    throw new Error('Access denied');
+  }
+
+  // Get portal-safe packet data using the secure function
+  const { data: packetData, error: packetError } = await supabase.rpc('get_portal_packet_data', {
+    p_workspace_id: tokenValidation.workspace_id,
+    p_token_id: tokenValidation.token_id,
+  });
+
+  if (packetError) {
+    console.error('[document-collection] Packet data error:', packetError);
+    throw new Error('Failed to load document request');
+  }
+
+  if (packetData?.error) {
+    throw new Error(packetData.error);
+  }
+
+  return {
+    ...packetData,
+    token_valid: true,
+    allowed_actions: allowedActions,
+    expires_at: tokenValidation.expires_at,
+  };
+}
+
+// =============================================================================
+// PORTAL SUBMIT COMPLETE (CLIENT MARKS DONE)
+// =============================================================================
+
+async function portalSubmitComplete(
+  supabase: any,
+  request: PortalSubmitCompleteRequest,
+  clientIp: string | null
+): Promise<any> {
+  const { token } = request;
+
+  // Validate token
+  const { data: tokenValidation } = await supabase.rpc('validate_portal_token', {
+    p_token: token,
+    p_ip: clientIp,
+  });
+
+  if (!tokenValidation?.valid) {
+    throw new Error('Invalid or expired token');
+  }
+
+  const workspaceId = tokenValidation.workspace_id;
+
+  // Update workspace status to indicate client marked complete
+  const { error: updateError } = await supabase
+    .from('workspaces')
+    .update({ 
+      status: 'ready', // Moves to ready for agent review
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', workspaceId);
+
+  if (updateError) {
+    console.error('[document-collection] Status update error:', updateError);
+    throw new Error('Failed to mark as complete');
+  }
+
+  // Log the action
+  await supabase.from('collection_audit_log').insert({
+    workspace_id: workspaceId,
+    action: 'packet_sent', // Using existing action - client submitted
+    actor_type: 'client',
+    actor_ip: clientIp,
+    new_value: { marked_complete_by_client: true },
+  });
+
+  return { 
+    success: true, 
+    message: 'Thank you! Your documents have been submitted for review.' 
+  };
+}
+
+// =============================================================================
 // PORTAL UPLOAD
 // =============================================================================
 
@@ -397,15 +532,29 @@ async function portalUpload(
 ): Promise<any> {
   const { token, requirement_id, filename, file_base64, mime_type } = request;
 
-  // Validate token and get workspace
-  const { data: workspaceId } = await supabase.rpc('validate_collection_token', {
+  // Validate token using enhanced function
+  const { data: tokenValidation } = await supabase.rpc('validate_portal_token', {
     p_token: token,
     p_ip: clientIp,
   });
 
-  if (!workspaceId) {
-    throw new Error('Invalid or expired token');
+  if (!tokenValidation?.valid) {
+    const errorMap: Record<string, string> = {
+      'TOKEN_NOT_FOUND': 'This link is invalid.',
+      'TOKEN_REVOKED': 'This link has been revoked.',
+      'TOKEN_EXPIRED': 'This link has expired.',
+      'TOKEN_MAX_USES_EXCEEDED': 'This link has exceeded its maximum uses.',
+    };
+    throw new Error(errorMap[tokenValidation?.error] || 'Invalid or expired link');
   }
+
+  // Check if upload action is allowed
+  const allowedActions = tokenValidation.allowed_actions || { upload: true };
+  if (!allowedActions.upload) {
+    throw new Error('Upload not permitted with this link');
+  }
+
+  const workspaceId = tokenValidation.workspace_id;
 
   // Verify requirement belongs to this workspace
   const { data: requirement } = await supabase
