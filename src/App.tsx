@@ -27,7 +27,8 @@ const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
 const AOAnalyticsDashboard = React.lazy(() => import("./pages/AOAnalyticsDashboard"));
-const RenewalRateWatchPage = React.lazy(() => import("./pages/RenewalRateWatchPage"));
+const NewRateWatch = React.lazy(() => import("./pages/ao-renewals/NewRateWatch"));
+const RateWatchDetail = React.lazy(() => import("./pages/ao-renewals/RateWatchDetail"));
 const QuoteNew = React.lazy(() => import("./pages/QuoteNew"));
 const QuoteDetail = React.lazy(() => import("./pages/QuoteDetail"));
 const ClaimNew = React.lazy(() => import("./pages/ClaimNew"));
@@ -262,15 +263,23 @@ const App = () => (
                 path="/ao-renewals/rate-watch" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <RenewalRateWatchPage />
+                    <NewRateWatch />
                   </ErrorBoundary>
                 }
               />
               <Route 
-                path="/ao-renewals/rate-watch/:workspaceId" 
+                path="/ao-renewals/rate-watch/new" 
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
-                    <RenewalRateWatchPage />
+                    <NewRateWatch />
+                  </ErrorBoundary>
+                }
+              />
+              <Route 
+                path="/ao-renewals/rate-watch/:jobId" 
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <RateWatchDetail />
                   </ErrorBoundary>
                 }
               />
