@@ -1,0 +1,142 @@
+-- ============================================================================
+-- Module Builder Wizard - Database Updates
+-- ============================================================================
+-- Adds draft/publish workflow to ai_modules and creates builder sessions table
+-- ============================================================================
+
+-- ============================================================================
+-- UPDATE AI_MODULES TABLE - Add draft/publish workflow
+-- ============================================================================
+
+ALTER TABLE public.ai_modules 
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published',
+ADD COLUMN IF NOT EXISTS wizard_conversation JSONB,
+ADD COLUMN IF NOT EXISTS parent_module_id UUID REFERENCES public.ai_modules(id),
+ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1,
+ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS published_by UUID REFERENCES public.profiles(id);
+
+-- Add constraint for status (do it safely)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_modules_status_check'
+  ) THEN
+    ALTER TABLE public.ai_modules 
+    ADD CONSTRAINT ai_modules_status_check 
+    CHECK (status IN ('draft', 'testing', 'published', 'archived'));
+  END IF;
+END $$;
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_ai_modules_status ON public.ai_modules(status);
+CREATE INDEX IF NOT EXISTS idx_ai_modules_created_by ON public.ai_modules(created_by);
+
+-- Update RLS policies for draft/publish workflow
+DROP POLICY IF EXISTS "All authenticated users can view active modules" ON public.ai_modules;
+DROP POLICY IF EXISTS "Users can view published modules and their own drafts" ON public.ai_modules;
+
+CREATE POLICY "Users can view published modules and their own drafts"
+  ON public.ai_modules FOR SELECT
+  TO authenticated
+  USING (
+    status = 'published' 
+    OR created_by = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Users can create modules" ON public.ai_modules;
+CREATE POLICY "Users can create modules"
+  ON public.ai_modules FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Users can update their own modules" ON public.ai_modules;
+CREATE POLICY "Users can update their own modules"
+  ON public.ai_modules FOR UPDATE
+  TO authenticated
+  USING (created_by = auth.uid());
+
+DROP POLICY IF EXISTS "Users can delete their own draft modules" ON public.ai_modules;
+CREATE POLICY "Users can delete their own draft modules"
+  ON public.ai_modules FOR DELETE
+  TO authenticated
+  USING (created_by = auth.uid() AND status IN ('draft', 'testing'));
+
+-- ============================================================================
+-- MODULE BUILDER SESSIONS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.ai_module_builder_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- The module being created/edited
+  module_id UUID REFERENCES public.ai_modules(id) ON DELETE SET NULL,
+  
+  -- Session type
+  session_type TEXT NOT NULL DEFAULT 'create',
+  
+  -- Conversation history
+  messages JSONB NOT NULL DEFAULT '[]',
+  
+  -- Generated config (before user edits)
+  generated_config JSONB,
+  
+  -- Final config (after user edits, what was actually saved)
+  final_config JSONB,
+  
+  -- Status
+  status TEXT NOT NULL DEFAULT 'in_progress',
+  
+  -- Metadata
+  created_by UUID NOT NULL REFERENCES public.profiles(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  
+  -- Constraints
+  CONSTRAINT builder_session_type_check CHECK (session_type IN ('create', 'improve', 'clone')),
+  CONSTRAINT builder_status_check CHECK (status IN ('in_progress', 'ready_to_test', 'testing', 'completed', 'abandoned'))
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_builder_sessions_user ON public.ai_module_builder_sessions(created_by);
+CREATE INDEX IF NOT EXISTS idx_builder_sessions_module ON public.ai_module_builder_sessions(module_id);
+CREATE INDEX IF NOT EXISTS idx_builder_sessions_status ON public.ai_module_builder_sessions(status);
+
+-- RLS
+ALTER TABLE public.ai_module_builder_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage their own builder sessions" ON public.ai_module_builder_sessions;
+CREATE POLICY "Users can manage their own builder sessions"
+  ON public.ai_module_builder_sessions FOR ALL
+  TO authenticated
+  USING (created_by = auth.uid());
+
+-- Comments
+COMMENT ON TABLE public.ai_module_builder_sessions IS 'Tracks wizard conversations for creating/improving AI modules';
+COMMENT ON COLUMN public.ai_module_builder_sessions.messages IS 'Conversation history: [{role, content, timestamp, generated_config?}]';
+COMMENT ON COLUMN public.ai_module_builder_sessions.generated_config IS 'Config generated by AI before user edits';
+COMMENT ON COLUMN public.ai_module_builder_sessions.final_config IS 'Final config after user edits, what was saved';
+
+-- ============================================================================
+-- UPDATED_AT TRIGGER
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION update_builder_sessions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS builder_sessions_updated_at ON public.ai_module_builder_sessions;
+CREATE TRIGGER builder_sessions_updated_at
+  BEFORE UPDATE ON public.ai_module_builder_sessions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_builder_sessions_updated_at();
+
+-- ============================================================================
+-- DONE
+-- ============================================================================
+

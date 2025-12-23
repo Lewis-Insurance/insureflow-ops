@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DashboardSkeleton } from "@/components/ui/skeleton-components";
 import { ThemeProvider } from "next-themes";
@@ -81,6 +81,7 @@ const LewiAI = React.lazy(() => import("./pages/LewiAI"));
 const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
 const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
 const DocumentIntelligenceHub = React.lazy(() => import("./pages/ai/DocumentIntelligenceHub"));
+const ModuleBuilder = React.lazy(() => import("./pages/ai/ModuleBuilder"));
 const CoverageGapAnalysis = React.lazy(() => import("./pages/CoverageGapAnalysis"));
 const CoverageGapDetail = React.lazy(() => import("./pages/CoverageGapDetail"));
 const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
@@ -717,6 +718,14 @@ const App = () => (
                 element={
                   <ErrorBoundary level="page" resetOnPropsChange>
                     <DocumentIntelligenceHub />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/ai/module-builder"
+                element={
+                  <ErrorBoundary level="page" resetOnPropsChange>
+                    <ModuleBuilder />
                   </ErrorBoundary>
                 }
               />
