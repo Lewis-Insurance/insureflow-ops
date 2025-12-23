@@ -57,6 +57,8 @@ import {
   FileDigit,
   Brain,
   AlertCircle,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +69,7 @@ import {
   AIModuleInputConfig,
 } from '@/integrations/supabase/hooks/useAIModules';
 import { AIResultsDisplay } from '@/components/ai/AIResultsDisplay';
+import { AIResultsActionBar } from '@/components/ai/AIResultsActionBar';
 import { useAccounts } from '@/hooks/useCRMData';
 import { useLeads } from '@/hooks/useLeads';
 
@@ -151,10 +154,10 @@ export default function AIModuleExecute() {
     }
 
     setIsUploading(true);
-    
+
     for (const file of acceptedFiles) {
       const tempId = `temp-${Date.now()}-${Math.random()}`;
-      
+
       // Add to state as uploading
       setDocuments(prev => [...prev, {
         id: tempId,
@@ -188,8 +191,8 @@ export default function AIModuleExecute() {
         if (dbError) throw dbError;
 
         // Update state with real ID
-        setDocuments(prev => prev.map(d => 
-          d.id === tempId 
+        setDocuments(prev => prev.map(d =>
+          d.id === tempId
             ? { id: docRecord.id, filename: file.name, storagePath: filePath, status: 'uploaded' as const }
             : d
         ));
@@ -257,7 +260,7 @@ export default function AIModuleExecute() {
       });
 
       setExecutionResult(result.result);
-      
+
       // Extract email draft if present
       const emailData = result.result?.email_draft as { subject?: string; body?: string } | undefined;
       if (emailData) {
@@ -350,7 +353,7 @@ export default function AIModuleExecute() {
           <CardHeader>
             <CardTitle className="text-lg">Upload Documents</CardTitle>
             <CardDescription>
-              {minDocs === maxDocs 
+              {minDocs === maxDocs
                 ? `Upload ${minDocs} document${minDocs > 1 ? 's' : ''}`
                 : `Upload ${minDocs} to ${maxDocs} documents`
               }
@@ -458,11 +461,11 @@ export default function AIModuleExecute() {
                     {field.label}
                     {field.required && <span className="text-destructive ml-1">*</span>}
                   </Label>
-                  
+
                   {field.type === 'select' && field.options ? (
                     <Select
                       value={additionalInputs[field.name] || field.default || ''}
-                      onValueChange={(value) => 
+                      onValueChange={(value) =>
                         setAdditionalInputs(prev => ({ ...prev, [field.name]: value }))
                       }
                     >
@@ -481,7 +484,7 @@ export default function AIModuleExecute() {
                     <Textarea
                       id={field.name}
                       value={additionalInputs[field.name] || ''}
-                      onChange={(e) => 
+                      onChange={(e) =>
                         setAdditionalInputs(prev => ({ ...prev, [field.name]: e.target.value }))
                       }
                       placeholder={field.placeholder}
@@ -492,7 +495,7 @@ export default function AIModuleExecute() {
                       id={field.name}
                       type={field.type === 'number' ? 'number' : 'text'}
                       value={additionalInputs[field.name] || ''}
-                      onChange={(e) => 
+                      onChange={(e) =>
                         setAdditionalInputs(prev => ({ ...prev, [field.name]: e.target.value }))
                       }
                       placeholder={field.placeholder}
@@ -627,13 +630,65 @@ export default function AIModuleExecute() {
           <>
             <Separator className="my-8" />
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Results</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Results</h2>
+              </div>
+
+              {/* Action Bar */}
+              <AIResultsActionBar
+                result={executionResult}
+                title={module.name}
+                accountId={linkType === 'account' ? linkId : undefined}
+                accountName={linkType === 'account' ? getLinkDisplayName() || undefined : undefined}
+                moduleSlug={moduleSlug}
+                documentIds={documents.filter(d => !d.id.startsWith('temp-')).map(d => d.id)}
+              />
+
+              {/* Results Display */}
               <AIResultsDisplay
                 result={executionResult}
                 outputConfig={module.output_config}
                 emailDraft={emailDraft}
                 reportHtml={executionResult.proposal_html as string || executionResult.report_html as string}
               />
+
+              {/* Follow-up Question Input */}
+              <Card className="mt-6 bg-gradient-to-r from-purple-500/5 to-blue-500/5 border-purple-500/20">
+                <CardContent className="p-4">
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-purple-500" />
+                      <Input
+                        placeholder="Ask a follow-up question about this document..."
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        className="pl-10 h-12 text-base bg-background"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey && inputText.trim()) {
+                            e.preventDefault();
+                            handleExecute();
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      size="lg"
+                      onClick={handleExecute}
+                      disabled={!inputText.trim() || executeModule.isPending}
+                      className="px-6"
+                    >
+                      {executeModule.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Ask
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </>
         )}
