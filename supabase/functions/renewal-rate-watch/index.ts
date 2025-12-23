@@ -60,9 +60,11 @@ serve(async (req) => {
     console.log(`[renewal-rate-watch] Action: ${action}, Workspace: ${workspace_id}`);
 
     // Get workspace
+    // NOTE: public.workspaces does not have an ao_renewal_id column and does not have an FK relation
+    // to ao_renewals. We fetch any linked ao_renewal via ao_renewals.rate_watch_workspace_id.
     const { data: workspace, error: wsError } = await supabase
       .from('workspaces')
-      .select('*, ao_renewals(*)')
+      .select('*')
       .eq('id', workspace_id)
       .single();
 
@@ -72,6 +74,15 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Fetch linked renewal (optional)
+    const { data: linkedRenewal } = await supabase
+      .from('ao_renewals')
+      .select('*')
+      .eq('rate_watch_workspace_id', workspace_id)
+      .maybeSingle();
+
+    (workspace as any).ao_renewals = linkedRenewal ?? null;
 
     // Update workspace status
     await supabase
