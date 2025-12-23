@@ -22,14 +22,14 @@ interface AppLayoutProps {
 
 function AppLayoutContent({ children }: AppLayoutProps) {
   const { user, profile, signOut } = useAuth();
-  const { 
-    isModalOpen, 
+  const {
+    isModalOpen,
     openModal,
     closeModal,
-    isSidebarOpen, 
-    openSidebar, 
+    isSidebarOpen,
+    openSidebar,
     closeSidebar,
-    context 
+    context
   } = useAIAssistantContext();
 
   const getInitials = (name: string | null) => {
@@ -43,37 +43,37 @@ function AppLayoutContent({ children }: AppLayoutProps) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center justify-start px-4 py-3">
-              <img 
-                src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png" 
+              <img
+                src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png"
                 alt="Lewis Insurance"
                 className="h-24 w-auto"
               />
             </div>
-            
+
             {/* Global Search */}
             <div className="px-4 pb-4">
               <GlobalSearch className="w-full" />
             </div>
           </SidebarHeader>
-          
+
           <SidebarContent>
             <div className="flex flex-col space-y-1 px-1">
               {/* Top Level Items */}
               <SidebarMenu>
-                <NavItem 
-                  icon={LayoutDashboard} 
-                  label="My Dashboard" 
-                  to="/dashboard" 
+                <NavItem
+                  icon={LayoutDashboard}
+                  label="My Dashboard"
+                  to="/dashboard"
                 />
-                <NavItem 
-                  icon={RefreshCw} 
-                  label="AO Renewals" 
-                  to="/ao-renewals" 
+                <NavItem
+                  icon={RefreshCw}
+                  label="AO Renewals"
+                  to="/ao-renewals"
                 />
-                <NavItem 
-                  icon={UserPlus} 
-                  label="Leads" 
-                  to="/leads" 
+                <NavItem
+                  icon={UserPlus}
+                  label="Leads"
+                  to="/leads"
                 />
               </SidebarMenu>
 
@@ -85,48 +85,44 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/lewi-ai"
                 />
                 <NavItem
+                  icon={Bot}
+                  label="AI Hub"
+                  to="/ai-hub"
+                  badge="NEW"
+                />
+                <NavItem
+                  icon={Sliders}
+                  label="Module Builder"
+                  to="/module-builder"
+                  badge="NEW"
+                />
+                <NavItem
                   icon={FolderKanban}
                   label="Workspace"
                   to="/workspace"
                 />
-                <NavItem 
-                  icon={Brain} 
-                  label="Renewal Intelligence" 
-                  to="/renewals/intelligence" 
+                <NavItem
+                  icon={Brain}
+                  label="Renewal Intelligence"
+                  to="/renewals/intelligence"
                   badge="AI"
-                />
-              </NavGroup>
-
-              {/* Lewis AI Group */}
-              <NavGroup label="Lewis AI" defaultOpen={true}>
-                <NavItem
-                  icon={Bot}
-                  label="AI Hub"
-                  to="/ai/hub"
-                  badge="NEW"
-                />
-                <NavItem
-                  icon={Sparkles}
-                  label="Module Builder"
-                  to="/ai/module-builder"
-                  badge="NEW"
                 />
                 <NavItem
                   icon={Scale}
                   label="Quote Comparison"
-                  to="/ai/quote-comparison"
+                  to="/comparison"
                   badge="AI"
                 />
                 <NavItem
                   icon={FileSearch}
                   label="Explore a Policy"
-                  to="/ai/explore-policy"
+                  to="/analyze-documents"
                   badge="AI"
                 />
                 <NavItem
                   icon={FileQuestion}
                   label="Document Intelligence"
-                  to="/ai/documents"
+                  to="/document-intelligence"
                   badge="AI"
                 />
               </NavGroup>
@@ -191,39 +187,39 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Customers"
                   to="/customers"
                 />
-                <NavItem 
-                  icon={FileText} 
-                  label="Policies" 
-                  to="/policies" 
+                <NavItem
+                  icon={FileText}
+                  label="Policies"
+                  to="/policies"
                 />
-                <NavItem 
-                  icon={Calendar} 
-                  label="Renewals" 
-                  to="/renewals" 
+                <NavItem
+                  icon={Calendar}
+                  label="Renewals"
+                  to="/renewals"
                 />
-                <NavItem 
-                  icon={Phone} 
-                  label="Calls" 
-                  to="/calls" 
+                <NavItem
+                  icon={Phone}
+                  label="Calls"
+                  to="/calls"
                 />
-                <NavItem 
-                  icon={MessageSquare} 
-                  label="SMS" 
-                  to="/sms" 
+                <NavItem
+                  icon={MessageSquare}
+                  label="SMS"
+                  to="/sms"
                 />
               </NavGroup>
 
               {/* Contacts Group */}
               <NavGroup label="Contacts" defaultOpen={false}>
-                <NavItem 
-                  icon={Building2} 
-                  label="Carriers" 
-                  to="/carriers" 
+                <NavItem
+                  icon={Building2}
+                  label="Carriers"
+                  to="/carriers"
                 />
-                <NavItem 
-                  icon={Briefcase} 
-                  label="MGAs" 
-                  to="/mgas" 
+                <NavItem
+                  icon={Briefcase}
+                  label="MGAs"
+                  to="/mgas"
                 />
               </NavGroup>
 
@@ -303,27 +299,27 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
               {/* Additional Items */}
               <SidebarMenu>
-                <NavItem 
-                  icon={CheckSquare} 
-                  label="Tasks" 
-                  to="/tasks" 
+                <NavItem
+                  icon={CheckSquare}
+                  label="Tasks"
+                  to="/tasks"
                 />
-                <NavItem 
-                  icon={Mail} 
-                  label="Campaigns" 
-                  to="/campaigns" 
+                <NavItem
+                  icon={Mail}
+                  label="Campaigns"
+                  to="/campaigns"
                 />
                 {profile?.role === 'admin' && (
-                  <NavItem 
-                    icon={Shield} 
-                    label="Admin" 
-                    to="/admin" 
+                  <NavItem
+                    icon={Shield}
+                    label="Admin"
+                    to="/admin"
                   />
                 )}
               </SidebarMenu>
             </div>
           </SidebarContent>
-          
+
           <SidebarFooter>
             <div className="px-3 py-2">
               <DropdownMenu>
@@ -361,7 +357,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
             </div>
           </SidebarFooter>
         </Sidebar>
-        
+
         <div className="flex-1 flex flex-col">
           <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-14 items-center justify-between px-4">
@@ -388,15 +384,15 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       </div>
 
       {/* AI Assistant Modal */}
-      <AIAssistantModal 
-        open={isModalOpen} 
+      <AIAssistantModal
+        open={isModalOpen}
         onOpenChange={(open) => open ? openModal() : closeModal()}
         context={context}
       />
-      
+
       {/* AI Assistant Sidebar */}
-      <AIAssistantSidebar 
-        open={isSidebarOpen} 
+      <AIAssistantSidebar
+        open={isSidebarOpen}
         onOpenChange={(open) => open ? openSidebar() : closeSidebar()}
         context={context}
       />
