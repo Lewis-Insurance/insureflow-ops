@@ -325,8 +325,8 @@ INSERT INTO document_type_definitions (
     0, 20,
     NULL,
     '[]'::JSONB,
-    ARRAY[],
-    ARRAY[],
+    ARRAY[]::TEXT[],
+    ARRAY[]::TEXT[],
     999
   )
 ON CONFLICT (doc_type_key) DO UPDATE SET
