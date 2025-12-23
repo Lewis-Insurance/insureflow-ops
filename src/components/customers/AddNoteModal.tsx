@@ -10,9 +10,10 @@ interface AddNoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string;
+  policyId?: string;
 }
 
-export function AddNoteModal({ open, onOpenChange, accountId }: AddNoteModalProps) {
+export function AddNoteModal({ open, onOpenChange, accountId, policyId }: AddNoteModalProps) {
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -35,6 +36,7 @@ export function AddNoteModal({ open, onOpenChange, accountId }: AddNoteModalProp
 
       const { error } = await supabase.from('notes').insert({
         account_id: accountId,
+        policy_id: policyId || null,
         author_id: user.id,
         body: body.trim()
       });
@@ -57,6 +59,10 @@ export function AddNoteModal({ open, onOpenChange, accountId }: AddNoteModalProp
       queryClient.invalidateQueries({ queryKey: ['notes', accountId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
       queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+      if (policyId) {
+        queryClient.invalidateQueries({ queryKey: ['policy-notes', policyId] });
+        queryClient.invalidateQueries({ queryKey: ['policy', policyId] });
+      }
       
       setBody('');
       onOpenChange(false);
