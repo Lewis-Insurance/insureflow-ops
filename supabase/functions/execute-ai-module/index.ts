@@ -1,8 +1,8 @@
 /**
- * Execute AI Module - Universal Edge Function
+ * Execute AI Module - Universal Edge Function (Azure Document Intelligence)
  * 
- * Executes any AI module based on its configuration.
- * Fetches module config, document content, calls AI, and saves results.
+ * Uses Azure Document Intelligence for OCR/extraction,
+ * then Azure OpenAI for analysis based on module configuration.
  */
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
@@ -15,6 +15,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 interface ExecuteRequest {
   module_slug: string;
   document_ids: string[];
@@ -24,6 +26,107 @@ interface ExecuteRequest {
     type: 'account' | 'lead' | 'policy';
     id: string;
   };
+}
+
+/**
+ * Extract text from a document using Azure Document Intelligence
+ */
+async function extractTextWithAzure(
+  documentUrl: string,
+  storagePath: string,
+  supabase: any,
+): Promise<string> {
+  const AZURE_ENDPOINT = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT');
+  const AZURE_API_KEY = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
+
+  if (!AZURE_ENDPOINT || !AZURE_API_KEY) {
+    console.warn('Azure Document Intelligence not configured, skipping OCR');
+    return '';
+  }
+
+  const cleanEndpoint = AZURE_ENDPOINT.endsWith('/') ? AZURE_ENDPOINT.slice(0, -1) : AZURE_ENDPOINT;
+
+  // Create signed URL for Azure to access the file
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from('documents')
+    .createSignedUrl(storagePath, 3600);
+
+  if (signedUrlError) {
+    console.error('Failed to create signed URL:', signedUrlError);
+    return '';
+  }
+
+  console.log(`[Azure OCR] Processing: ${storagePath}`);
+
+  // Try multiple API configurations
+  const apiConfigs = [
+    { path: 'formrecognizer', model: 'prebuilt-layout', versions: ['2023-07-31', '2022-08-31'] },
+    { path: 'documentintelligence', model: 'prebuilt-read', versions: ['2024-02-29-preview', '2023-10-31-preview'] }
+  ];
+
+  for (const config of apiConfigs) {
+    for (const version of config.versions) {
+      const analyzeUrl = `${cleanEndpoint}/${config.path}/documentModels/${config.model}:analyze?api-version=${version}`;
+
+      try {
+        const analyzeResponse = await fetch(analyzeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+          },
+          body: JSON.stringify({
+            urlSource: signedUrlData.signedUrl,
+            pages: ["1-"]
+          })
+        });
+
+        if (!analyzeResponse.ok) continue;
+
+        const operationLocation = analyzeResponse.headers.get('Operation-Location');
+        if (!operationLocation) continue;
+
+        // Poll for results
+        let attempts = 0;
+        const maxAttempts = 30; // 60 seconds max
+
+        while (attempts < maxAttempts) {
+          await sleep(2000);
+          attempts++;
+
+          const resultResponse = await fetch(operationLocation, {
+            headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
+          });
+
+          const result = await resultResponse.json();
+
+          if (result.status === 'succeeded') {
+            // Extract text from all pages
+            const allPages = result.analyzeResult.pages || [];
+            let fullText = '';
+
+            for (const page of allPages) {
+              if (page.lines) {
+                const pageText = page.lines.map((line: any) => line.content || '').join('\n');
+                fullText += pageText + '\n\n';
+              }
+            }
+
+            console.log(`[Azure OCR] Extracted ${fullText.length} chars from ${allPages.length} pages`);
+            return fullText;
+          } else if (result.status === 'failed') {
+            console.error('[Azure OCR] Failed:', result.error);
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`[Azure OCR] Error with ${config.path}/${version}:`, error);
+      }
+    }
+  }
+
+  console.warn('[Azure OCR] All configurations failed');
+  return '';
 }
 
 serve(async (req) => {
@@ -37,11 +140,9 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
+    const AZURE_OPENAI_ENDPOINT = Deno.env.get('AZURE_OPENAI_ENDPOINT');
+    const AZURE_OPENAI_KEY = Deno.env.get('AZURE_OPENAI_KEY');
+    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'gpt-4o';
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -99,9 +200,9 @@ serve(async (req) => {
 
     executionId = execution.id;
 
-    // 3. Fetch documents and their extracted text
+    // 3. Fetch documents and extract text using Azure Document Intelligence
     let documentContents: Array<{ filename: string; text: string }> = [];
-    
+
     if (document_ids.length > 0) {
       const { data: documents, error: docsError } = await supabase
         .from('documents')
@@ -112,39 +213,74 @@ serve(async (req) => {
         throw new Error(`Failed to fetch documents: ${docsError.message}`);
       }
 
-      // For documents without extracted text, try to get from document_analyses
       for (const doc of documents || []) {
         let text = doc.extracted_text;
-        
+
+        // If no extracted text, use Azure Document Intelligence
+        if (!text && doc.storage_path) {
+          console.log(`[OCR] No cached text for ${doc.filename}, running Azure OCR...`);
+
+          const documentUrl = `${SUPABASE_URL}/storage/v1/object/public/documents/${doc.storage_path}`;
+          text = await extractTextWithAzure(documentUrl, doc.storage_path, supabase);
+
+          // Cache the extracted text for future use
+          if (text && text.length > 0) {
+            await supabase
+              .from('documents')
+              .update({ extracted_text: text })
+              .eq('id', doc.id);
+            console.log(`[OCR] Cached ${text.length} chars for ${doc.filename}`);
+          }
+        }
+
+        // Also check document_analyses and document_analysis tables as fallback
         if (!text) {
-          // Try document_analyses table
-          const { data: analysis } = await supabase
+          const { data: analyses } = await supabase
             .from('document_analyses')
             .select('extracted_text')
             .eq('filename', doc.filename)
             .order('analyzed_at', { ascending: false })
             .limit(1)
             .single();
-          
-          text = analysis?.extracted_text;
+
+          text = analyses?.extracted_text;
+        }
+
+        if (!text) {
+          const { data: analysis } = await supabase
+            .from('document_analysis')
+            .select('ocr_text')
+            .eq('file_name', doc.filename)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          text = analysis?.ocr_text;
         }
 
         if (text) {
           documentContents.push({
             filename: doc.filename,
-            text: text.substring(0, 50000), // Limit to ~50k chars per doc
+            text: text.substring(0, 80000), // Limit to ~80k chars per doc
           });
+        } else {
+          console.warn(`[OCR] No text extracted for ${doc.filename}`);
         }
       }
     }
 
     console.log(`Loaded ${documentContents.length} documents with text content`);
 
+    // Check if we have any content to analyze
+    if (documentContents.length === 0 && !input_text) {
+      throw new Error('No document content could be extracted. Please ensure documents are readable PDF files.');
+    }
+
     // 4. Build the prompt
     const systemPrompt = module.system_prompt;
-    
+
     let userPrompt = '';
-    
+
     // Add document contents
     if (documentContents.length > 0) {
       userPrompt += 'DOCUMENTS:\n\n';
@@ -171,15 +307,20 @@ serve(async (req) => {
 
     console.log('Prompt length:', userPrompt.length, 'chars');
 
-    // 5. Call AI API
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // 5. Call Azure OpenAI API
+    if (!AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_KEY) {
+      throw new Error('Azure OpenAI credentials not configured');
+    }
+
+    const aiUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
+
+    const aiResponse = await fetch(aiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
+        'api-key': AZURE_OPENAI_KEY,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -191,7 +332,7 @@ serve(async (req) => {
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      throw new Error(`AI API error: ${aiResponse.status} - ${errorText}`);
+      throw new Error(`Azure OpenAI error: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
@@ -212,9 +353,9 @@ serve(async (req) => {
       if (jsonMatch) {
         jsonStr = jsonMatch[1].trim();
       }
-      
+
       result = JSON.parse(jsonStr);
-      
+
       // Extract email draft if present
       if (result.email_draft) {
         emailDraft = result.email_draft as { subject?: string; body?: string };
@@ -311,4 +452,3 @@ serve(async (req) => {
     );
   }
 });
-
