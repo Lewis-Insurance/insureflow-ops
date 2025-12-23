@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useLeadProjections, ProjectionMetric } from '@/hooks/useLeadProjections';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, FileCheck, Phone, FileText, Target, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, FileCheck, Phone, Target, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -34,7 +34,8 @@ const metricConfig = {
   },
   quotes: {
     label: 'Quotes',
-    icon: FileText,
+    // Avoid FileText in module-scope config (Safari init-order edge case)
+    icon: FileCheck,
     color: '#eab308',
     format: (value: number) => value.toFixed(0),
   },

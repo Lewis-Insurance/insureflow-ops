@@ -21,7 +21,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  FileText,
   Upload,
   CheckCircle2,
   XCircle,
@@ -330,8 +329,8 @@ interface RequirementTileProps {
 
 function RequirementTile({ requirement, onClick }: RequirementTileProps) {
   const status = getStatusMeta(requirement.status);
-  // Use FileText directly as the icon - avoids module initialization issues
-  const Icon = FileText;
+  // Avoid using FileText here (Safari can throw ReferenceError in certain init-order scenarios)
+  const Icon = FileCheck;
   const StatusIcon = status.icon;
   
   const uploadCount = requirement.collection_uploads?.length || 0;
