@@ -42,6 +42,7 @@ import {
   Loader2,
   Link2,
   Mail,
+  FileText,
 } from 'lucide-react';
 import { useCollectionTemplates, useCreateCollectionPacket } from '@/hooks/useDocumentCollection';
 import { useToast } from '@/hooks/use-toast';
