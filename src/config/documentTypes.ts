@@ -7,22 +7,21 @@
  * - LOB-based auto-suggestions
  */
 
-import {
-  FileText,
-  FileCheck,
-  DollarSign,
-  ClipboardList,
-  Shield,
-  Car,
-  Users,
-  Building2,
-  FileSignature,
-  Camera,
-  FileSpreadsheet,
-  Briefcase,
-  CreditCard,
-  LucideIcon,
-} from 'lucide-react';
+export type DocumentIconKey =
+  | 'fileText'
+  | 'fileCheck'
+  | 'dollarSign'
+  | 'clipboardList'
+  | 'shield'
+  | 'car'
+  | 'users'
+  | 'building2'
+  | 'fileSignature'
+  | 'camera'
+  | 'fileSpreadsheet'
+  | 'briefcase'
+  | 'creditCard';
+
 
 // =============================================================================
 // DOCUMENT TYPE DEFINITION
@@ -40,7 +39,7 @@ export interface DocumentTypeDefinition {
   acord_links: Array<{ form: string; section?: string }>;
   tags: string[];
   lob_relevance: string[];
-  icon: LucideIcon;
+  icon_key: DocumentIconKey;
 }
 
 // =============================================================================
@@ -60,7 +59,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [{ form: 'ACORD_125' }],
     tags: ['submission', 'underwriting'],
     lob_relevance: ['commercial', 'gl', 'property'],
-    icon: FileText,
+    icon_key: 'fileText',
   },
 
   LOSS_RUNS: {
@@ -75,7 +74,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [{ form: 'ACORD_125', section: 'LossHistory' }],
     tags: ['submission', 'underwriting', 'claims'],
     lob_relevance: ['commercial', 'personal', 'auto', 'gl', 'property', 'wc'],
-    icon: FileCheck,
+    icon_key: 'fileCheck',
   },
 
   PAYMENT_DOC: {
@@ -90,7 +89,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['bind', 'billing'],
     lob_relevance: ['commercial', 'personal'],
-    icon: CreditCard,
+    icon_key: 'creditCard',
   },
 
   CARRIER_SUPPLEMENT: {
@@ -104,7 +103,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['submission', 'underwriting'],
     lob_relevance: ['commercial', 'personal'],
-    icon: ClipboardList,
+    icon_key: 'clipboardList',
   },
 
   STATEMENT_NO_LOSS: {
@@ -119,7 +118,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['bind', 'underwriting'],
     lob_relevance: ['commercial', 'personal'],
-    icon: Shield,
+    icon_key: 'shield',
   },
 
   CURRENT_DEC: {
@@ -134,7 +133,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['remarket', 'underwriting', 'submission'],
     lob_relevance: ['commercial', 'personal', 'auto', 'gl', 'property', 'wc', 'umbrella'],
-    icon: FileText,
+    icon_key: 'fileText',
   },
 
   RENEWAL_DEC: {
@@ -149,7 +148,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['renewal', 'remarket'],
     lob_relevance: ['commercial', 'personal', 'auto', 'gl', 'property', 'wc'],
-    icon: FileText,
+    icon_key: 'fileText',
   },
 
   DRIVER_LIST_MVR: {
@@ -164,7 +163,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['submission', 'underwriting'],
     lob_relevance: ['auto', 'commercial_auto', 'personal_auto'],
-    icon: Users,
+    icon_key: 'users',
   },
 
   VEHICLE_SCHEDULE: {
@@ -179,7 +178,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['submission', 'underwriting'],
     lob_relevance: ['auto', 'commercial_auto'],
-    icon: Car,
+    icon_key: 'car',
   },
 
   ENTITY_DOCS: {
@@ -193,7 +192,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['submission', 'compliance'],
     lob_relevance: ['commercial'],
-    icon: Briefcase,
+    icon_key: 'briefcase',
   },
 
   CERTIFICATE_REQUEST: {
@@ -207,7 +206,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['service'],
     lob_relevance: ['commercial'],
-    icon: FileCheck,
+    icon_key: 'fileCheck',
   },
 
   PROPERTY_SOV: {
@@ -222,7 +221,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['property', 'submission', 'underwriting'],
     lob_relevance: ['property', 'commercial'],
-    icon: Building2,
+    icon_key: 'building2',
   },
 
   WC_MOD_PAYROLL: {
@@ -237,7 +236,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['wc', 'underwriting'],
     lob_relevance: ['wc', 'commercial'],
-    icon: FileSpreadsheet,
+    icon_key: 'fileSpreadsheet',
   },
 
   ID_CARDS: {
@@ -251,7 +250,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['service'],
     lob_relevance: ['auto', 'personal_auto'],
-    icon: CreditCard,
+    icon_key: 'creditCard',
   },
 
   SIGNED_APP: {
@@ -266,7 +265,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['bind'],
     lob_relevance: ['commercial', 'personal'],
-    icon: FileSignature,
+    icon_key: 'fileSignature',
   },
 
   PRIOR_POLICY: {
@@ -280,7 +279,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['submission', 'underwriting'],
     lob_relevance: ['commercial', 'personal'],
-    icon: FileText,
+    icon_key: 'fileText',
   },
 
   PHOTOS: {
@@ -294,7 +293,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: ['underwriting'],
     lob_relevance: ['property', 'auto'],
-    icon: Camera,
+    icon_key: 'camera',
   },
 
   OTHER: {
@@ -308,7 +307,7 @@ export const DOCUMENT_TYPES: Record<string, DocumentTypeDefinition> = {
     acord_links: [],
     tags: [],
     lob_relevance: [],
-    icon: FileText,
+    icon_key: 'fileText',
   },
 };
 
