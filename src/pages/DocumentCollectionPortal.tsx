@@ -28,23 +28,49 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import { usePortalPacket, usePortalUpload, CollectionRequirement } from '@/hooks/useDocumentCollection';
+import { usePortalPacket, usePortalUpload, usePortalSubmitComplete } from '@/hooks/useDocumentCollection';
 import { cn } from '@/lib/utils';
 import { getDocType, PORTAL_INTRO_TEXT } from '@/config/documentTypes';
 
 // =============================================================================
-// STATUS CONFIG
+// PORTAL-SAFE REQUIREMENT TYPE (client-facing data only)
 // =============================================================================
 
-const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string; clientLabel: string }> = {
-  not_requested: { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not Requested', clientLabel: 'Not needed' },
-  requested: { color: 'text-blue-600', bg: 'bg-blue-50', icon: Upload, label: 'Requested', clientLabel: 'Upload needed' },
-  uploaded: { color: 'text-amber-600', bg: 'bg-amber-50', icon: Clock, label: 'Uploaded', clientLabel: 'Under review' },
-  processing: { color: 'text-purple-600', bg: 'bg-purple-50', icon: Loader2, label: 'Processing', clientLabel: 'Processing...' },
-  needs_review: { color: 'text-orange-600', bg: 'bg-orange-50', icon: Clock, label: 'Needs Review', clientLabel: 'Under review' },
-  accepted: { color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2, label: 'Accepted', clientLabel: 'Accepted ✓' },
-  rejected: { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Rejected', clientLabel: 'Please re-upload' },
-  expired: { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired', clientLabel: 'Expired' },
+interface PortalRequirement {
+  id: string;
+  doc_type: string;
+  label: string;
+  instructions: string | null;
+  is_required: boolean;
+  min_quantity: number;
+  max_quantity: number;
+  accepted_file_types: string[];
+  max_file_size_mb: number;
+  display_order: number;
+  status: string; // Client-safe status
+  rejection_reason: string | null;
+  client_feedback: string | null;
+  files_received: number;
+  uploads: Array<{
+    id: string;
+    filename: string;
+    uploaded_at: string;
+    status: string;
+  }> | null;
+}
+
+// =============================================================================
+// STATUS CONFIG (using portal-safe status values)
+// =============================================================================
+
+const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
+  not_needed: { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not needed' },
+  upload_needed: { color: 'text-blue-600', bg: 'bg-blue-50', icon: Upload, label: 'Upload needed' },
+  under_review: { color: 'text-amber-600', bg: 'bg-amber-50', icon: Clock, label: 'Under review' },
+  processing: { color: 'text-purple-600', bg: 'bg-purple-50', icon: Loader2, label: 'Processing...' },
+  received: { color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2, label: 'Received ✓' },
+  needs_replacement: { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Please re-upload' },
+  expired: { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired' },
 };
 
 // Helper to get icon from doc type config
@@ -73,21 +99,23 @@ export default function DocumentCollectionPortal() {
   }
 
   if (error || !data) {
+    const errorMessage = error instanceof Error ? error.message : 'This document collection link is no longer valid.';
+    
     return (
       <PortalLayout>
         <Card className="max-w-md mx-auto">
           <CardHeader>
             <div className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
-              <CardTitle>Link Invalid or Expired</CardTitle>
+              <CardTitle>Link Issue</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              This document collection link is no longer valid. It may have expired or been revoked.
+              {errorMessage}
             </p>
             <p className="text-sm text-muted-foreground">
-              Please contact your insurance agent for a new link.
+              Please contact your insurance agent for assistance.
             </p>
           </CardContent>
         </Card>
@@ -95,8 +123,14 @@ export default function DocumentCollectionPortal() {
     );
   }
 
-  const { workspace, requirements, status_summary, branding } = data;
-  const accountName = workspace?.accounts?.name || 'Your Insurance Agent';
+  // Extract data from new secure response format
+  const { packet, requirements, progress, branding, allowed_actions } = data;
+  const clientName = packet?.client_name || packet?.account_name || 'Your Insurance Agent';
+
+  const submitComplete = usePortalSubmitComplete();
+  const progressPercent = progress?.total > 0 
+    ? Math.round((progress.completed / progress.total) * 100) 
+    : 0;
 
   return (
     <PortalLayout branding={branding}>
@@ -104,23 +138,38 @@ export default function DocumentCollectionPortal() {
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold mb-2">Document Upload Portal</h1>
         <p className="text-muted-foreground">
-          {workspace?.name || 'Document Request'} for {accountName}
+          {packet?.title || 'Document Request'}
         </p>
+        {packet?.client_name && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Welcome, {packet.client_name}
+          </p>
+        )}
+        {packet?.description && (
+          <p className="mt-4 text-muted-foreground max-w-lg mx-auto">
+            {packet.description}
+          </p>
+        )}
+        {!packet?.description && (
+          <p className="mt-4 text-muted-foreground max-w-lg mx-auto">
+            {PORTAL_INTRO_TEXT}
+          </p>
+        )}
       </div>
 
       {/* Progress Card */}
-      {status_summary && (
+      {progress && (
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">Your Progress</span>
               <span className="text-sm text-muted-foreground">
-                {status_summary.completed_count} of {status_summary.required_count} required documents
+                {progress.completed} of {progress.required} required documents
               </span>
             </div>
-            <Progress value={status_summary.progress_percent} className="h-3" />
+            <Progress value={progressPercent} className="h-3" />
             
-            {status_summary.all_required_complete && (
+            {progress.all_required_complete && (
               <Alert className="mt-4 bg-green-50 border-green-200">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700">
@@ -134,15 +183,44 @@ export default function DocumentCollectionPortal() {
 
       {/* Requirements List */}
       <div className="space-y-4">
-        {requirements?.map((req: CollectionRequirement) => (
+        {requirements?.map((req: PortalRequirement) => (
           <RequirementCard 
             key={req.id} 
             requirement={req} 
             token={token!}
+            canUpload={allowed_actions?.upload !== false}
             onUploadComplete={() => refetch()}
           />
         ))}
       </div>
+
+      {/* Submit Complete Button */}
+      {progress?.all_required_complete && (
+        <div className="mt-8 text-center">
+          <Button 
+            size="lg"
+            onClick={() => submitComplete.mutate(token!)}
+            disabled={submitComplete.isPending}
+          >
+            {submitComplete.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                I'm Done - Submit for Review
+              </>
+            )}
+          </Button>
+          {submitComplete.isSuccess && (
+            <p className="mt-2 text-green-600 text-sm">
+              ✓ Your documents have been submitted for review.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="mt-8 text-center text-sm text-muted-foreground">
@@ -159,16 +237,29 @@ export default function DocumentCollectionPortal() {
 // PORTAL LAYOUT
 // =============================================================================
 
+interface PortalBranding {
+  agency_name?: string;
+  logo_url?: string;
+  primary_color?: string;
+  accent_color?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  footer_text?: string;
+}
+
 function PortalLayout({ 
   children, 
   branding 
 }: { 
   children: React.ReactNode; 
-  branding?: any;
+  branding?: PortalBranding;
 }) {
   const agencyName = branding?.agency_name || 'Lewis Insurance';
   const primaryColor = branding?.primary_color || '#1e40af';
   const logoUrl = branding?.logo_url;
+  const contactPhone = branding?.contact_phone || '(386) 755-0050';
+  const contactEmail = branding?.contact_email;
+  const footerText = branding?.footer_text;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -188,10 +279,18 @@ function PortalLayout({
           )}
           
           <div className="flex items-center gap-4 text-white/80 text-sm">
-            <a href="tel:+13867550050" className="flex items-center gap-1 hover:text-white">
-              <Phone className="h-4 w-4" />
-              <span className="hidden sm:inline">(386) 755-0050</span>
-            </a>
+            {contactPhone && (
+              <a href={`tel:${contactPhone.replace(/[^0-9+]/g, '')}`} className="flex items-center gap-1 hover:text-white">
+                <Phone className="h-4 w-4" />
+                <span className="hidden sm:inline">{contactPhone}</span>
+              </a>
+            )}
+            {contactEmail && (
+              <a href={`mailto:${contactEmail}`} className="flex items-center gap-1 hover:text-white">
+                <Mail className="h-4 w-4" />
+                <span className="hidden sm:inline">{contactEmail}</span>
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -204,7 +303,11 @@ function PortalLayout({
       {/* Footer */}
       <footer className="border-t py-6 mt-auto">
         <div className="max-w-2xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} {agencyName}. All rights reserved.</p>
+          {footerText ? (
+            <p>{footerText}</p>
+          ) : (
+            <p>© {new Date().getFullYear()} {agencyName}. All rights reserved.</p>
+          )}
         </div>
       </footer>
     </div>
@@ -216,25 +319,28 @@ function PortalLayout({
 // =============================================================================
 
 interface RequirementCardProps {
-  requirement: CollectionRequirement;
+  requirement: PortalRequirement;
   token: string;
+  canUpload?: boolean;
   onUploadComplete: () => void;
 }
 
-function RequirementCard({ requirement, token, onUploadComplete }: RequirementCardProps) {
+function RequirementCard({ requirement, token, canUpload: canUploadProp = true, onUploadComplete }: RequirementCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const portalUpload = usePortalUpload();
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const status = statusConfig[requirement.status] || statusConfig.requested;
+  // Use portal-safe status values
+  const status = statusConfig[requirement.status] || statusConfig.upload_needed;
   const StatusIcon = status.icon;
-  const uploads = requirement.collection_uploads || [];
+  const uploads = requirement.uploads || [];
   const latestUpload = uploads[0];
 
-  const canUpload = ['requested', 'rejected'].includes(requirement.status);
-  const isComplete = requirement.status === 'accepted';
-  const isRejected = requirement.status === 'rejected';
+  // Determine if upload is allowed based on status and token permissions
+  const showUploadButton = canUploadProp && ['upload_needed', 'needs_replacement'].includes(requirement.status);
+  const isComplete = requirement.status === 'received';
+  const isRejected = requirement.status === 'needs_replacement';
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -365,7 +471,7 @@ function RequirementCard({ requirement, token, onUploadComplete }: RequirementCa
         )}
 
         {/* Upload Button */}
-        {canUpload && (
+        {showUploadButton && (
           <>
             <input
               ref={fileInputRef}

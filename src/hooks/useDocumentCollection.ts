@@ -623,7 +623,7 @@ export function useAgentUpload() {
 // =============================================================================
 
 /**
- * Validate a portal token and get packet data
+ * Validate a portal token and get packet data (secure, client-safe)
  */
 export function usePortalPacket(token: string | null) {
   return useQuery({
@@ -639,7 +639,7 @@ export function usePortalPacket(token: string | null) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            action: 'get_packet_data',
+            action: 'portal_get_packet',
             token,
           }),
         }
@@ -652,6 +652,40 @@ export function usePortalPacket(token: string | null) {
     },
     enabled: !!token,
     retry: 1,
+    staleTime: 30000, // Cache for 30 seconds
+  });
+}
+
+/**
+ * Mark portal submission as complete
+ */
+export function usePortalSubmitComplete() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-collection`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'portal_submit_complete',
+            token,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error);
+      
+      return result;
+    },
+    onSuccess: (_, token) => {
+      queryClient.invalidateQueries({ queryKey: ['portal-packet', token] });
+    },
   });
 }
 
