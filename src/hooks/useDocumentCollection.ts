@@ -133,19 +133,27 @@ export function useCollectionPackets(accountId: string | null) {
     queryFn: async () => {
       if (!accountId) return [];
 
-      const { data, error } = await supabase
-        .from('workspaces')
-        .select(`
-          *,
-          accounts (id, name, email, phone),
-          policies (id, policy_number, carrier_info)
-        `)
-        .eq('account_id', accountId)
-        .eq('task_type', 'document_collection')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('workspaces')
+          .select(`
+            *,
+            accounts (id, name, email, phone),
+            policies (id, policy_number, carrier_info)
+          `)
+          .eq('account_id', accountId)
+          .eq('task_type', 'document_collection')
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data as CollectionPacket[];
+        if (error) {
+          console.warn('[useCollectionPackets] Query error:', error);
+          return [];
+        }
+        return (data || []) as CollectionPacket[];
+      } catch (err) {
+        console.warn('[useCollectionPackets] Error:', err);
+        return [];
+      }
     },
     enabled: !!accountId,
   });
