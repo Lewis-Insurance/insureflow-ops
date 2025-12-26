@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { requireAuth, verifyResourceAccess } from "../_shared/auth.ts";
+import { createLogger } from "../_shared/logger.ts";
+import { ValidationError, NotFoundError, createErrorResponse } from "../_shared/error-handler.ts";
+
+const logger = createLogger("calculate-quote-score");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -305,6 +309,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  logger.logRequest(req);
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -319,18 +325,11 @@ serve(async (req) => {
     const authenticatedUser = authResult;
 
     const { quoteIds, accountId, rescore_all } = await req.json();
+    logger.info("Scoring quotes", { quoteIds, accountId, rescore_all });
 
     // Validate request
     if (!quoteIds && !accountId && !rescore_all) {
-      return new Response(
-        JSON.stringify({
-          error: "Either quoteIds, accountId, or rescore_all must be provided"
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
+      throw new ValidationError("Either quoteIds, accountId, or rescore_all must be provided");
     }
 
     // Build query for quotes to score
@@ -363,11 +362,10 @@ serve(async (req) => {
     if (fetchError) throw fetchError;
 
     if (!quotes || quotes.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No quotes found to score" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      throw new NotFoundError("No quotes found to score");
     }
+
+    logger.info("Found quotes to score", { count: quotes.length });
 
     // Calculate average premium for each account (for comparison)
     const accountAverages = new Map<string, number>();
@@ -450,6 +448,9 @@ serve(async (req) => {
       });
     }
 
+    logger.info("Quote scoring complete", { scoredCount: updates.length });
+    logger.logResponse(200);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -462,13 +463,7 @@ serve(async (req) => {
       }
     );
   } catch (error: unknown) {
-    console.error("Error in calculate-quote-score:", error);
-    return new Response(
-      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) || "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    logger.error("Quote scoring failed", { error: error instanceof Error ? error.message : String(error) });
+    return createErrorResponse(error, corsHeaders);
   }
 });
