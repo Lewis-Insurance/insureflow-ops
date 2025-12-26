@@ -340,7 +340,6 @@ export const useComparisonSubscription = (workspaceId: string | undefined) => {
           filter: `id=eq.${workspaceId}`,
         },
         (payload) => {
-          console.log("[useComparisonSubscription] Workspace updated:", payload.new.status);
           queryClient.invalidateQueries({ queryKey: ["comparison-workspace", workspaceId] });
         }
       )
@@ -353,7 +352,6 @@ export const useComparisonSubscription = (workspaceId: string | undefined) => {
           filter: `workspace_id=eq.${workspaceId}`,
         },
         () => {
-          console.log("[useComparisonSubscription] Snapshot changed");
           queryClient.invalidateQueries({ queryKey: ["policy-snapshots", workspaceId] });
         }
       )
@@ -366,7 +364,6 @@ export const useComparisonSubscription = (workspaceId: string | undefined) => {
           filter: `workspace_id=eq.${workspaceId}`,
         },
         () => {
-          console.log("[useComparisonSubscription] Comparison result changed");
           queryClient.invalidateQueries({ queryKey: ["comparison-result", workspaceId] });
         }
       )

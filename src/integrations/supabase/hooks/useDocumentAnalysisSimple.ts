@@ -51,14 +51,6 @@ export const useDocumentAnalysisSimple = () => {
 
   return useMutation({
     mutationFn: async (params: AnalyzeDocumentParams): Promise<AnalysisResult> => {
-      console.log('Calling ai-document-analysis-simple edge function...');
-      console.log('Parameters:', {
-        document_id: params.document_id,
-        file_name: params.file_name,
-        account_id: params.account_id,
-        user_id: params.user_id
-      });
-
       const { data, error } = await supabase.functions.invoke('ai-document-analysis-simple', {
         body: {
           document_id: params.document_id,
@@ -74,14 +66,8 @@ export const useDocumentAnalysisSimple = () => {
       }
 
       if (!data || !data.success) {
-        console.error('Analysis failed:', data);
         throw new Error(data?.error || 'Analysis failed');
       }
-
-      console.log('✅ Analysis successful!');
-      console.log('Page count:', data.page_count);
-      console.log('Text length:', data.text_length);
-      console.log('Coverages found:', data.analysis?.coverages?.length || 0);
 
       return data;
     },

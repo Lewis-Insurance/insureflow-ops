@@ -44,8 +44,6 @@ export function useDocumentManager(accountId?: string) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      console.log('Fetched documents:', data);
       setDocuments(data || []);
     } catch (err: any) {
       console.error('Error fetching documents:', err);
@@ -159,9 +157,7 @@ export function useDocumentManager(accountId?: string) {
       // Use the stored bucket or default to customer-docs
       const bucket = document.storage_bucket || 'customer-docs';
       const path = document.storage_path;
-      
-      console.log('Viewing document:', { id: document.id, bucket, path });
-      
+
       const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(path, 3600);
@@ -210,9 +206,7 @@ export function useDocumentManager(accountId?: string) {
       // Use the stored bucket or default to customer-docs
       const bucket = document.storage_bucket || 'customer-docs';
       const path = document.storage_path;
-      
-      console.log('Downloading document:', { id: document.id, bucket, path });
-      
+
       const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(path, 3600);

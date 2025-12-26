@@ -38,9 +38,6 @@ export default function AdminPage() {
     );
   }
 
-  // Debug: Log the profile role for troubleshooting
-  console.log('AdminPage - Profile:', profile, 'isAdmin:', isAdmin);
-
   // Redirect non-admin users
   if (!isAdmin && profile?.role !== 'admin') {
     return <Navigate to="/crm" replace />;

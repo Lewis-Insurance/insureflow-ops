@@ -57,11 +57,6 @@ export function useAuth() {
       }
 
       if (profileData) {
-        console.log('Profile loaded successfully:', {
-          id: profileData.id,
-          role: profileData.role,
-          is_staff: profileData.is_staff
-        });
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
@@ -71,8 +66,6 @@ export function useAuth() {
             : Boolean(profileData.notification_email),
           notification_sms: false // Default since field doesn't exist in database yet
         });
-      } else {
-        console.warn('No profile data found for user:', userId);
       }
     } catch (error) {
       console.error('Profile fetch exception:', error);

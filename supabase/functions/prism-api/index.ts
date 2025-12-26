@@ -223,24 +223,10 @@ async function runPrismAnalysis(
     }
   }
 
-  // Placeholder implementation - replace with actual Prism logic
-  const runId = crypto.randomUUID();
-  
-  // Simulate processing (replace with actual Prism agent loop)
-  const cycles = depth === 'insight' ? 1 : depth === 'synthesis' ? 2 : 3;
-  
-  // For now, return a placeholder response
-  // You'll need to implement the actual Prism reasoning loop
-  return {
-    run_id: runId,
-    status: 'complete',
-    cycles_completed: cycles,
-    final_output: `[Prism Analysis Placeholder]\n\nPrompt: ${prompt}\n\nMode: ${mode}\nDepth: ${depth}\n\nThis is a placeholder. Implement the actual Prism multi-agent reasoning logic here.`,
-    usage: {
-      total_tokens: 1000,
-      estimated_cost: 0.03,
-    },
-  };
+  // No external Prism service configured - return error
+  throw new Error(
+    'Prism AI service not configured. Please set PRISM_SERVICE_URL environment variable to enable multi-agent reasoning.'
+  );
 }
 
 // =============================================================================
