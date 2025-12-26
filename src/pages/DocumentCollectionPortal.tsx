@@ -86,6 +86,7 @@ function getDocTypeIcon(docTypeKey: string): React.ElementType {
 export default function DocumentCollectionPortal() {
   const { token } = useParams<{ token: string }>();
   const { data, isLoading, error, refetch } = usePortalPacket(token || null);
+  const submitComplete = usePortalSubmitComplete();
 
   if (isLoading) {
     return (
@@ -127,7 +128,6 @@ export default function DocumentCollectionPortal() {
   const { packet, requirements, progress, branding, allowed_actions } = data;
   const clientName = packet?.client_name || packet?.account_name || 'Your Insurance Agent';
 
-  const submitComplete = usePortalSubmitComplete();
   const progressPercent = progress?.total > 0 
     ? Math.round((progress.completed / progress.total) * 100) 
     : 0;
