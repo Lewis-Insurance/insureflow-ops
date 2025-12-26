@@ -14,14 +14,15 @@ export function usePoliciesQuotesData() {
   return useQuery({
     queryKey: ['policies-quotes-data'],
     queryFn: async (): Promise<PoliciesQuotesData> => {
-      // Get policies data
+      // Fetch policies data
       const { data: policiesData, error: policiesError } = await supabase
         .from('policies')
         .select(`
           line_of_business,
           carrier,
           account:accounts!policies_account_id_fkey(state)
-        `);
+        `)
+        .is('deleted_at', null);
 
       if (policiesError) {
         throw new Error(`Failed to fetch policies: ${policiesError.message}`);
@@ -42,18 +43,18 @@ export function usePoliciesQuotesData() {
         .sort((a, b) => b.count - a.count);
 
       // Policies by Line of Business Class (categorize into Personal/Commercial)
-      const personalLines = ['Auto', 'Home', 'Life', 'Personal Auto', 'Homeowners'];
-      const commercialLines = ['Commercial Auto', 'General Liability', 'Professional Liability', 'Workers Compensation', 'Property', 'Commercial Package'];
-      
+      const personalLines = ['Auto', 'Home', 'Life', 'Personal Auto', 'Homeowners', 'Renters', 'Umbrella'];
+      const commercialLines = ['Commercial Auto', 'General Liability', 'Professional Liability', 'Workers Compensation', 'Property', 'Commercial Package', 'BOP'];
+
       let personalCount = 0;
       let commercialCount = 0;
       let lifeHealthCount = 0;
 
       policies.forEach(policy => {
         if (policy.line_of_business) {
-          if (personalLines.some(line => policy.line_of_business?.includes(line))) {
+          if (personalLines.some(line => policy.line_of_business?.toLowerCase().includes(line.toLowerCase()))) {
             personalCount++;
-          } else if (commercialLines.some(line => policy.line_of_business?.includes(line))) {
+          } else if (commercialLines.some(line => policy.line_of_business?.toLowerCase().includes(line.toLowerCase()))) {
             commercialCount++;
           } else if (policy.line_of_business.toLowerCase().includes('life') || policy.line_of_business.toLowerCase().includes('health')) {
             lifeHealthCount++;
@@ -82,7 +83,7 @@ export function usePoliciesQuotesData() {
       // Policies by State
       const stateCounts: Record<string, number> = {};
       policies.forEach(policy => {
-        const state = policy.account?.state || '[Not Assigned]';
+        const state = (policy.account as any)?.state || '[Not Assigned]';
         stateCounts[state] = (stateCounts[state] || 0) + 1;
       });
 
@@ -90,21 +91,46 @@ export function usePoliciesQuotesData() {
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => b.count - a.count);
 
-      // For quotes, we'll use placeholder data since we don't have a quotes table yet
-      // In a real implementation, you'd query a quotes/opportunities table
-      const quotesByStage = [
-        { label: '[Not Assigned]', count: 0 },
-        { label: 'Prospect', count: 0 },
-        { label: 'Quote Requested', count: 0 },
-        { label: 'Quote Delivered', count: 0 },
-        { label: 'Follow Up', count: 0 },
-      ];
+      // Fetch quotes data from the quotes table
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select(`
+          id,
+          status,
+          carrier:carriers(name)
+        `)
+        .is('deleted_at', null);
 
-      const quotesByCarrier = [
-        { label: 'Progressive American Ins Co', count: 0 },
-        { label: 'Safe Harbor Ins Co', count: 0 },
-        { label: 'Universal Prop & Cas Ins', count: 0 },
-      ];
+      if (quotesError) {
+        console.error('Error fetching quotes:', quotesError);
+        // Continue with empty quotes data
+      }
+
+      const quotes = quotesData || [];
+
+      // Quotes by Stage/Status
+      const stageCounts: Record<string, number> = {};
+      quotes.forEach(quote => {
+        const status = quote.status || '[Not Assigned]';
+        // Map quote_status enum to display labels
+        const statusLabel = mapQuoteStatus(status);
+        stageCounts[statusLabel] = (stageCounts[statusLabel] || 0) + 1;
+      });
+
+      const quotesByStage = Object.entries(stageCounts)
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count);
+
+      // Quotes by Carrier
+      const quoteCarrierCounts: Record<string, number> = {};
+      quotes.forEach(quote => {
+        const carrierName = (quote.carrier as any)?.name || '[Unknown Carrier]';
+        quoteCarrierCounts[carrierName] = (quoteCarrierCounts[carrierName] || 0) + 1;
+      });
+
+      const quotesByCarrier = Object.entries(quoteCarrierCounts)
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count);
 
       return {
         policiesByLineOfBusiness,
@@ -117,4 +143,21 @@ export function usePoliciesQuotesData() {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+}
+
+// Map quote status enum values to user-friendly labels
+function mapQuoteStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    'open': 'Open',
+    'pending': 'Pending Review',
+    'quoted': 'Quote Delivered',
+    'won': 'Won',
+    'lost': 'Lost',
+    'expired': 'Expired',
+    'declined': 'Declined',
+    'draft': 'Draft',
+    'sent': 'Sent to Client',
+    'accepted': 'Accepted',
+  };
+  return statusMap[status.toLowerCase()] || status;
 }

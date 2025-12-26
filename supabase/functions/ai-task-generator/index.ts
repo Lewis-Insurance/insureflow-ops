@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
@@ -317,12 +316,11 @@ async function enhanceWithAIContext(
   triggerData: any,
   taskDescription: string
 ): Promise<{ context: string; suggestions: any }> {
-  // Call OpenAI/Claude to enhance task context
-  const lovableApiUrl = Deno.env.get("LOVABLE_API_URL") || "https://api.lovable.app/v1/chat";
-  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+  // Call OpenAI to enhance task context
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
 
-  if (!lovableApiKey) {
-    throw new Error("LOVABLE_API_KEY not configured");
+  if (!openaiApiKey) {
+    throw new Error("OPENAI_API_KEY not configured");
   }
 
   const systemPrompt = `You are an AI assistant helping generate actionable task context for insurance agents.
@@ -341,13 +339,14 @@ Provide:
 2. Specific action recommendations (bullet points)
 3. Key considerations or risks`;
 
-  const response = await fetch(lovableApiUrl, {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${lovableApiKey}`,
+      Authorization: `Bearer ${openaiApiKey}`,
     },
     body: JSON.stringify({
+      model: "gpt-5-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

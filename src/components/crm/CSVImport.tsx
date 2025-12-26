@@ -136,10 +136,10 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
     try {
       // Validate field mapping
       const requiredFields = availableFields.filter(f => f.required);
-      const mappedRequiredFields = requiredFields.filter(field => 
+      const mappedRequiredFields = requiredFields.filter(field =>
         Object.values(fieldMapping).includes(field.key)
       );
-      
+
       if (mappedRequiredFields.length < requiredFields.length) {
         toast({
           title: "Missing required fields",
@@ -150,57 +150,83 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
         return;
       }
 
-      // Simulate dry run processing (only in development)
-      if (import.meta.env.DEV) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      } else {
-        // Real CSV processing using Supabase RPC
-        const { data, error } = await supabase.rpc('process_csv_batch', { 
-          batch_id: 'temp-batch-id',
-          import_type: 'accounts',
-          field_mapping: fieldMapping
-        });
-        
-        if (error) throw error;
-        // Process successful - data contains batch results
-      }
-      
-      // Mock validation results
-      const mockRows: ImportRow[] = csvData.slice(0, 10).map((row, index) => ({
-        id: `row-${index}`,
-        row_number: index + 2,
-        raw_data: row,
-        validation_status: Math.random() > 0.8 ? 'invalid' : 'valid',
-        validation_errors: Math.random() > 0.8 ? ['Invalid email format'] : []
-      }));
-      
-      setImportRows(mockRows);
-      
-      const mockBatch: ImportBatch = {
-        id: 'batch-1',
+      // Real validation of CSV data
+      const validatedRows: ImportRow[] = csvData.map((row, index) => {
+        const errors: string[] = [];
+        const mappedData: Record<string, any> = {};
+
+        // Map CSV fields to database fields
+        for (const [csvField, dbField] of Object.entries(fieldMapping)) {
+          if (dbField && row[csvField] !== undefined) {
+            mappedData[dbField] = row[csvField];
+          }
+        }
+
+        // Validate required fields
+        for (const field of requiredFields) {
+          const value = mappedData[field.key];
+          if (!value || String(value).trim() === '') {
+            errors.push(`${field.label.replace(' *', '')} is required`);
+          }
+        }
+
+        // Validate email format
+        if (mappedData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mappedData.email)) {
+          errors.push('Invalid email format');
+        }
+
+        // Validate phone format (basic check)
+        if (mappedData.phone && !/^[\d\s\-()+ ]+$/.test(mappedData.phone)) {
+          errors.push('Invalid phone format');
+        }
+
+        // Validate date of birth format
+        if (mappedData.date_of_birth) {
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (!dateRegex.test(mappedData.date_of_birth)) {
+            errors.push('Date of birth should be YYYY-MM-DD format');
+          }
+        }
+
+        return {
+          id: `row-${index}`,
+          row_number: (row._row_number as number) || index + 2,
+          raw_data: { ...row, _mapped: mappedData },
+          validation_status: errors.length === 0 ? 'valid' : 'invalid',
+          validation_errors: errors
+        };
+      });
+
+      setImportRows(validatedRows);
+
+      const validCount = validatedRows.filter(r => r.validation_status === 'valid').length;
+      const errorCount = validatedRows.filter(r => r.validation_status === 'invalid').length;
+
+      const batch: ImportBatch = {
+        id: crypto.randomUUID(),
         import_type: importType,
         filename: csvFile?.name || 'unknown.csv',
         total_rows: csvData.length,
         processed_rows: csvData.length,
-        successful_rows: mockRows.filter(r => r.validation_status === 'valid').length,
-        error_rows: mockRows.filter(r => r.validation_status === 'invalid').length,
+        successful_rows: validCount,
+        error_rows: errorCount,
         status: 'staging',
         field_mapping: fieldMapping,
         validation_errors: [],
         created_at: new Date().toISOString()
       };
-      
-      setCurrentBatch(mockBatch);
+
+      setCurrentBatch(batch);
       setStep('preview');
-      
+
       toast({
-        title: "Dry run completed",
-        description: `${mockBatch.successful_rows} rows valid, ${mockBatch.error_rows} rows have errors.`,
+        title: "Validation completed",
+        description: `${validCount} rows valid, ${errorCount} rows have errors.`,
       });
     } catch (error) {
       toast({
-        title: "Error during dry run",
-        description: "Please check your file and try again.",
+        title: "Error during validation",
+        description: error instanceof Error ? error.message : "Please check your file and try again.",
         variant: "destructive",
       });
     } finally {
@@ -210,41 +236,128 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
 
   const executeImport = async () => {
     if (!currentBatch) return;
-    
+
     setLoading(true);
     setStep('processing');
-    
+
     try {
-      // Simulate import processing (only in development)
-      if (import.meta.env.DEV) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      } else {
-        // TODO: Replace with real import execution API - create execute_csv_import RPC
-        // For now, fallback to mock processing
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Get valid rows only
+      const validRows = importRows.filter(r => r.validation_status === 'valid');
+
+      if (validRows.length === 0) {
+        throw new Error('No valid rows to import');
       }
-      
+
+      // Get the current user's account
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Get user's account membership
+      const { data: membership } = await supabase
+        .from('account_memberships')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      const accountId = membership?.account_id;
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      if (importType === 'accounts') {
+        // Import accounts
+        const accountRecords = validRows.map(row => {
+          const mapped = row.raw_data._mapped || {};
+          return {
+            name: mapped.name,
+            type: mapped.type || 'household',
+            email: mapped.email || null,
+            phone: mapped.phone || null,
+            address_line1: mapped.address_line1 || null,
+            city: mapped.city || null,
+            state: mapped.state || null,
+            zip_code: mapped.zip_code || null,
+            source: mapped.source || 'csv_import',
+            created_by: user.id,
+          };
+        });
+
+        // Insert in batches of 100
+        for (let i = 0; i < accountRecords.length; i += 100) {
+          const batch = accountRecords.slice(i, i + 100);
+          const { data, error } = await supabase
+            .from('accounts')
+            .insert(batch)
+            .select('id');
+
+          if (error) {
+            console.error('Batch insert error:', error);
+            errorCount += batch.length;
+          } else {
+            successCount += data?.length || 0;
+          }
+        }
+      } else if (importType === 'contacts') {
+        // Import contacts
+        const contactRecords = validRows.map(row => {
+          const mapped = row.raw_data._mapped || {};
+          return {
+            first_name: mapped.first_name,
+            last_name: mapped.last_name,
+            email: mapped.email || null,
+            phone: mapped.phone || null,
+            date_of_birth: mapped.date_of_birth || null,
+            role: mapped.role || null,
+            source: mapped.source || 'csv_import',
+            account_id: accountId,
+            created_by: user.id,
+          };
+        });
+
+        // Insert in batches of 100
+        for (let i = 0; i < contactRecords.length; i += 100) {
+          const batch = contactRecords.slice(i, i + 100);
+          const { data, error } = await supabase
+            .from('contacts')
+            .insert(batch)
+            .select('id');
+
+          if (error) {
+            console.error('Batch insert error:', error);
+            errorCount += batch.length;
+          } else {
+            successCount += data?.length || 0;
+          }
+        }
+      }
+
       setCurrentBatch(prev => prev ? {
         ...prev,
-        status: 'completed'
+        status: 'completed',
+        successful_rows: successCount,
+        error_rows: errorCount,
       } : null);
-      
+
       setStep('complete');
       onImportComplete?.();
-      
+
       toast({
         title: "Import completed",
-        description: `Successfully imported ${currentBatch.successful_rows} records.`,
+        description: `Successfully imported ${successCount} ${importType}${errorCount > 0 ? `. ${errorCount} failed.` : '.'}`,
       });
     } catch (error) {
+      console.error('Import error:', error);
       setCurrentBatch(prev => prev ? {
         ...prev,
         status: 'failed'
       } : null);
-      
+
       toast({
         title: "Import failed",
-        description: "Please check the errors and try again.",
+        description: error instanceof Error ? error.message : "Please check the errors and try again.",
         variant: "destructive",
       });
     } finally {

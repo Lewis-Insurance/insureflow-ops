@@ -5,19 +5,22 @@
 // ============================================================================
 
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Loader2,
   CheckCircle2,
@@ -33,6 +36,14 @@ import {
 } from 'lucide-react';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
 import type { ServiceRequestType } from '@/types/portal';
+
+// Zod validation schema for service request
+const serviceRequestSchema = z.object({
+  title: z.string().trim().min(3, 'Subject must be at least 3 characters').max(200, 'Subject too long'),
+  details: z.string().trim().min(10, 'Please provide more details (at least 10 characters)').max(2000, 'Details too long (max 2000 characters)'),
+});
+
+type ServiceRequestFormValues = z.infer<typeof serviceRequestSchema>;
 
 const REQUEST_TYPES: { value: ServiceRequestType; label: string; icon: React.ReactNode; description: string }[] = [
   { value: 'add_vehicle', label: 'Add Vehicle', icon: <Car className="h-5 w-5" />, description: 'Add a new vehicle to your policy' },
@@ -59,24 +70,29 @@ interface ServiceRequestFormProps {
 export function ServiceRequestForm({ policyId, onSuccess }: ServiceRequestFormProps) {
   const [step, setStep] = useState<'type' | 'details' | 'success'>('type');
   const [requestType, setRequestType] = useState<ServiceRequestType | null>(null);
-  const [title, setTitle] = useState('');
-  const [details, setDetails] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
 
   const { createRequest } = useServiceRequests();
 
+  const form = useForm<ServiceRequestFormValues>({
+    resolver: zodResolver(serviceRequestSchema),
+    defaultValues: {
+      title: '',
+      details: '',
+    },
+  });
+
   const handleSelectType = (type: ServiceRequestType) => {
     setRequestType(type);
     const typeInfo = REQUEST_TYPES.find(t => t.value === type);
     if (typeInfo) {
-      setTitle(typeInfo.label);
+      form.setValue('title', typeInfo.label);
     }
     setStep('details');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFormSubmit = async (values: ServiceRequestFormValues) => {
     if (!requestType) return;
 
     setError(null);
@@ -84,8 +100,8 @@ export function ServiceRequestForm({ policyId, onSuccess }: ServiceRequestFormPr
     try {
       const id = await createRequest.mutateAsync({
         request_type: requestType,
-        request_title: title,
-        request_data: { details },
+        request_title: values.title,
+        request_data: { details: values.details },
         policy_id: policyId,
       });
 
@@ -100,8 +116,7 @@ export function ServiceRequestForm({ policyId, onSuccess }: ServiceRequestFormPr
   const handleReset = () => {
     setStep('type');
     setRequestType(null);
-    setTitle('');
-    setDetails('');
+    form.reset();
     setError(null);
     setRequestId(null);
   };
@@ -181,54 +196,70 @@ export function ServiceRequestForm({ policyId, onSuccess }: ServiceRequestFormPr
         </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Subject</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Brief description of your request"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="details">Details</Label>
-            <Textarea
-              id="details"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder="Please provide all relevant details for your request..."
-              rows={5}
-              required
-            />
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={createRequest.isPending}
-          >
-            {createRequest.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" />
-                Submit Request
-              </>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </Button>
-        </form>
+
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subject</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Brief description of your request"
+                      maxLength={200}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="details"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Details</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Please provide all relevant details for your request..."
+                      rows={5}
+                      maxLength={2000}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createRequest.isPending}
+            >
+              {createRequest.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Submit Request
+                </>
+              )}
+            </Button>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );

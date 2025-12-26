@@ -18,14 +18,35 @@ export function useSSNReveal() {
       return;
     }
 
+    if (!encryptedSSN) {
+      toast({
+        title: "No SSN Available",
+        description: "This contact does not have an encrypted SSN on file",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(prev => ({ ...prev, [contactId]: true }));
 
-      // For now, return placeholder since decrypt_ssn RPC may not exist
-      const data = "***-**-****"; // Placeholder for actual decrypted SSN
+      // Call the reveal_ssn RPC which decrypts and logs access
+      const { data, error } = await supabase
+        .rpc('reveal_ssn', {
+          p_contact_id: contactId,
+          p_encrypted_ssn: encryptedSSN,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('No data returned from decrypt function');
+      }
 
       setRevealedSSNs(prev => ({ ...prev, [contactId]: data }));
-      
+
       toast({
         title: "SSN Revealed",
         description: "Full SSN has been revealed for authorized viewing",
