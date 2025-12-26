@@ -4,6 +4,7 @@
 // ============================================
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -490,11 +491,11 @@ export function IntakeRenderer({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Custom branding footer */}
+      {/* Custom branding footer (sanitized for XSS protection) */}
       {template.branding?.footerHtml && (
         <div
           className="mt-8 text-center text-sm text-muted-foreground"
-          dangerouslySetInnerHTML={{ __html: template.branding.footerHtml }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(template.branding.footerHtml) }}
         />
       )}
     </div>

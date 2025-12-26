@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Search, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,7 @@ export const AIKnowledgeSearch = () => {
                   Read full answer...
                 </summary>
                 <div className="mt-2 pt-2 border-t prose prose-sm max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: searchResults.fullAnswer }} />
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(searchResults.fullAnswer) }} />
                 </div>
               </details>
             )}
