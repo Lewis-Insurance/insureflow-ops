@@ -137,19 +137,23 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
   }, [pullId, options, toast]);
 
   const initiatePull = useCallback(async () => {
+    console.log('[Canopy] initiatePull called');
     setIsLoading(true);
     setStatus('initiating');
     setError(null);
 
     try {
       // Load Canopy SDK if not already loaded
+      console.log('[Canopy] Loading SDK...');
       await loadCanopySDK();
+      console.log('[Canopy] SDK loaded');
 
       if (!window.CanopyConnect) {
         throw new Error('Canopy SDK not available');
       }
 
       // Call our edge function to create a pull session
+      console.log('[Canopy] Calling canopy-initiate function...');
       const { data, error: invokeError } = await supabase.functions.invoke('canopy-initiate', {
         body: {
           lead_id: options.leadId,
@@ -157,6 +161,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
           mode: options.mode,
         }
       });
+      console.log('[Canopy] Function response:', { data, invokeError });
 
       if (invokeError) {
         throw new Error(invokeError.message || 'Failed to initiate Canopy pull');
@@ -165,6 +170,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
       if (!data?.success) {
         throw new Error(data?.error || 'Failed to create pull session');
       }
+      console.log('[Canopy] Pull session created, opening widget...');
 
       setPullId(data.pull_id);
       setStatus('pending');

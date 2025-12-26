@@ -67,10 +67,13 @@ export function CanopyConnectButton({
   });
 
   const handleClick = async () => {
+    console.log('[CanopyButton] handleClick called, status:', status);
     if (status === 'complete' || status === 'error') {
       reset();
     }
+    console.log('[CanopyButton] calling initiatePull...');
     await initiatePull();
+    console.log('[CanopyButton] initiatePull returned');
   };
 
   // Determine icon based on status
