@@ -11,30 +11,61 @@ import {
 } from '@/lib/acord/pdfFiller';
 import type { PdfFillOptions, FieldTypeMap } from '@/types/acord';
 
-// Mock pdf-lib
-vi.mock('pdf-lib', () => ({
-  PDFDocument: {
-    load: vi.fn().mockResolvedValue({
-      getForm: vi.fn().mockReturnValue({
-        getFields: vi.fn().mockReturnValue([
-          { getName: () => 'applicant_name', constructor: { name: 'PDFTextField' } },
-          { getName: () => 'effective_date', constructor: { name: 'PDFTextField' } },
-          { getName: () => 'coverage_gl', constructor: { name: 'PDFCheckBox' } },
-        ]),
-        getTextField: vi.fn().mockReturnValue({
-          setText: vi.fn(),
-          setFontSize: vi.fn(),
+// Mock pdf-lib - all definitions must be inside the factory due to hoisting
+vi.mock('pdf-lib', () => {
+  // Define mock classes inside the factory
+  class MockPDFTextField {
+    private _text = '';
+    private _name: string;
+    getName() { return this._name; }
+    setText(text: string) { this._text = text; }
+    setFontSize() {}
+    getMaxLength() { return null; }
+    constructor(name: string) { this._name = name; }
+  }
+
+  class MockPDFCheckBox {
+    private _checked = false;
+    private _name: string;
+    getName() { return this._name; }
+    check() { this._checked = true; }
+    uncheck() { this._checked = false; }
+    constructor(name: string) { this._name = name; }
+  }
+
+  const textField1 = new MockPDFTextField('applicant_name');
+  const textField2 = new MockPDFTextField('effective_date');
+  const checkboxField = new MockPDFCheckBox('coverage_gl');
+
+  const fieldMap: Record<string, any> = {
+    applicant_name: textField1,
+    effective_date: textField2,
+    coverage_gl: checkboxField,
+  };
+
+  return {
+    PDFDocument: {
+      load: vi.fn().mockResolvedValue({
+        getForm: vi.fn().mockReturnValue({
+          getFields: vi.fn().mockReturnValue([textField1, textField2, checkboxField]),
+          getFieldMaybe: vi.fn().mockImplementation((name: string) => fieldMap[name] || undefined),
+          flatten: vi.fn(),
+          updateFieldAppearances: vi.fn(),
         }),
-        getCheckBox: vi.fn().mockReturnValue({
-          check: vi.fn(),
-          uncheck: vi.fn(),
+        embedFont: vi.fn().mockResolvedValue({
+          widthOfTextAtSize: vi.fn().mockReturnValue(100),
         }),
-        flatten: vi.fn(),
+        save: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
       }),
-      save: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    }),
-  },
-}));
+    },
+    PDFTextField: MockPDFTextField,
+    PDFCheckBox: MockPDFCheckBox,
+    PDFDropdown: class {},
+    PDFRadioGroup: class {},
+    StandardFonts: { Helvetica: 'Helvetica' },
+    rgb: vi.fn().mockReturnValue({ r: 0, g: 0, b: 0 }),
+  };
+});
 
 describe('PDF Filler', () => {
   describe('getFieldTypeFromName', () => {

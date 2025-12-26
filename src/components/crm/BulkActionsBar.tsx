@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { CheckSquare, UserCheck, Tag, FileText, X, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import type { Account, BulkAction } from '@/types/crm';
+
+interface TeamMember {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
 
 interface BulkActionsBarProps {
   selectedAccounts: Account[];
@@ -27,6 +34,42 @@ export function BulkActionsBar({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<string>('');
   const [actionParams, setActionParams] = useState<Record<string, string | number>>({});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Fetch team members when dialog opens
+  useEffect(() => {
+    if (isDialogOpen && (selectedAction === 'assign_owner' || selectedAction === 'create_tasks')) {
+      fetchTeamMembers();
+    }
+  }, [isDialogOpen, selectedAction]);
+
+  const fetchTeamMembers = async () => {
+    if (teamMembers.length > 0) return; // Already loaded
+
+    setLoadingMembers(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching team members:', error);
+        return;
+      }
+
+      setTeamMembers(data || []);
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const getDisplayName = (member: TeamMember) => {
+    return member.full_name || member.email || 'Unknown User';
+  };
 
   if (selectedAccounts.length === 0) return null;
 
@@ -67,12 +110,20 @@ export function BulkActionsBar({
             <Label htmlFor="owner">Assign to Owner</Label>
             <Select onValueChange={(value) => setActionParams({ ...actionParams, owner_id: value })}>
               <SelectTrigger>
-                <SelectValue placeholder="Select owner..." />
+                <SelectValue placeholder={loadingMembers ? "Loading..." : "Select owner..."} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="user1">John Smith</SelectItem>
-                <SelectItem value="user2">Sarah Johnson</SelectItem>
-                <SelectItem value="user3">Mike Davis</SelectItem>
+                {loadingMembers ? (
+                  <SelectItem value="" disabled>Loading team members...</SelectItem>
+                ) : teamMembers.length === 0 ? (
+                  <SelectItem value="" disabled>No team members found</SelectItem>
+                ) : (
+                  teamMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {getDisplayName(member)}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -134,12 +185,20 @@ export function BulkActionsBar({
                 <Label htmlFor="assignee">Assign to</Label>
                 <Select onValueChange={(value) => setActionParams({ ...actionParams, assignee_id: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select assignee..." />
+                    <SelectValue placeholder={loadingMembers ? "Loading..." : "Select assignee..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user1">John Smith</SelectItem>
-                    <SelectItem value="user2">Sarah Johnson</SelectItem>
-                    <SelectItem value="user3">Mike Davis</SelectItem>
+                    {loadingMembers ? (
+                      <SelectItem value="" disabled>Loading team members...</SelectItem>
+                    ) : teamMembers.length === 0 ? (
+                      <SelectItem value="" disabled>No team members found</SelectItem>
+                    ) : (
+                      teamMembers.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {getDisplayName(member)}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
