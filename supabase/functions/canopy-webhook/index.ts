@@ -206,11 +206,29 @@ interface CanopyDocument {
 }
 
 // HMAC-SHA256 signature verification
+// Canopy signature format: "t=timestamp,s=signature"
+// Signed payload: "{timestamp}.{body}"
 async function verifyCanopySignature(
   payload: string,
-  signature: string,
+  signatureHeader: string,
   secret: string
-): Promise<boolean> {
+): Promise<{ valid: boolean; timestamp?: number }> {
+  // Parse the signature header: "t=1234567890,s=abc123..."
+  const parts = signatureHeader.split(',');
+  const timestampPart = parts.find(p => p.startsWith('t='));
+  const signaturePart = parts.find(p => p.startsWith('s='));
+
+  if (!timestampPart || !signaturePart) {
+    console.log('[Canopy Webhook] Invalid signature header format');
+    return { valid: false };
+  }
+
+  const timestamp = timestampPart.slice(2);
+  const signature = signaturePart.slice(2);
+
+  // Build signed payload: "{timestamp}.{body}"
+  const signedPayload = `${timestamp}.${payload}`;
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -223,7 +241,7 @@ async function verifyCanopySignature(
   const signatureBytes = await crypto.subtle.sign(
     'HMAC',
     key,
-    encoder.encode(payload)
+    encoder.encode(signedPayload)
   );
 
   const expectedSignature = Array.from(new Uint8Array(signatureBytes))
@@ -232,7 +250,7 @@ async function verifyCanopySignature(
 
   // Constant-time comparison to prevent timing attacks
   if (signature.length !== expectedSignature.length) {
-    return false;
+    return { valid: false };
   }
 
   let result = 0;
@@ -240,7 +258,10 @@ async function verifyCanopySignature(
     result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
   }
 
-  return result === 0;
+  return {
+    valid: result === 0,
+    timestamp: parseInt(timestamp, 10)
+  };
 }
 
 serve(async (req) => {
@@ -281,36 +302,75 @@ serve(async (req) => {
     });
     console.log('[Canopy Webhook] Headers:', JSON.stringify(headers));
 
-    // Get signature from header (Canopy uses different header names)
-    const signature = req.headers.get('x-canopy-signature')
-      || req.headers.get('x-signature')
-      || req.headers.get('canopy-signature');
+    // Get signature from header - Canopy uses 'canopy-signature'
+    const signatureHeader = req.headers.get('canopy-signature')
+      || req.headers.get('x-canopy-signature');
 
     // Verify signature if secret is configured
     let signatureValid = false;
-    if (canopyWebhookSecret && signature) {
-      signatureValid = await verifyCanopySignature(rawBody, signature, canopyWebhookSecret);
+    let signatureTimestamp: number | undefined;
+    if (canopyWebhookSecret && signatureHeader) {
+      const verification = await verifyCanopySignature(rawBody, signatureHeader, canopyWebhookSecret);
+      signatureValid = verification.valid;
+      signatureTimestamp = verification.timestamp;
+
       if (!signatureValid) {
         console.warn('[Canopy Webhook] Signature verification failed, but continuing for debugging');
+      } else {
+        // Optionally check timestamp freshness (within 5 minutes)
+        const now = Math.floor(Date.now() / 1000);
+        if (signatureTimestamp && Math.abs(now - signatureTimestamp) > 300) {
+          console.warn('[Canopy Webhook] Signature timestamp too old, but continuing');
+        }
       }
     } else {
       console.log('[Canopy Webhook] Skipping signature verification (secret or signature not present)');
     }
 
     // Parse payload
-    const payload: CanopyWebhookPayload = JSON.parse(rawBody);
-    console.log(`Received Canopy webhook: ${payload.event} for pull ${payload.pull_id}`);
+    const rawPayload = JSON.parse(rawBody);
+    console.log('[Canopy Webhook] Raw payload:', JSON.stringify(rawPayload).substring(0, 500));
+
+    // Canopy uses different payload structures:
+    // 1. { status: "SUCCESS", pull_id: "...", data: {...} } - completion events
+    // 2. { event: "AUTH_STATUS", pull_id: "...", data: {...} } - some events use 'event'
+    // 3. { data: { updates: [{type: "DRIVER_UPDATED", ...}] }, pull_id: "..." } - incremental updates
+
+    // Normalize the event type from Canopy's various formats
+    let eventType: string;
+    if (rawPayload.event) {
+      // Direct event field
+      eventType = rawPayload.event;
+    } else if (rawPayload.status) {
+      // Status-based events (SUCCESS, ERROR, etc.)
+      eventType = rawPayload.status;
+    } else if (rawPayload.data?.updates?.length > 0) {
+      // Incremental update events
+      eventType = 'DATA_UPDATED';
+    } else if (rawPayload.data?.policy_id) {
+      // Policy stream event
+      eventType = 'POLICY_STREAM';
+    } else {
+      eventType = 'UNKNOWN';
+    }
+
+    const payload = {
+      ...rawPayload,
+      event: eventType, // Normalize event field
+    };
+
+    console.log(`[Canopy Webhook] Normalized event: ${eventType} for pull ${payload.pull_id}`);
 
     // Create Supabase client with service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Log webhook event for debugging
     const { error: logError } = await supabase.from('canopy_webhook_log').insert({
-      event_type: payload.event,
+      event_type: eventType,
       pull_id: payload.pull_id,
-      payload: payload,
+      payload: rawPayload,
       headers: headers,
-      signature: signature || 'none',
+      signature: signatureHeader || 'none',
       signature_valid: signatureValid,
     });
 
@@ -318,8 +378,8 @@ serve(async (req) => {
       console.error('Failed to log webhook:', logError);
     }
 
-    // Route by event type (Canopy sends UPPERCASE event names)
-    switch (payload.event) {
+    // Route by event type (handle both Canopy formats)
+    switch (eventType) {
       // Canopy UPPERCASE events (actual format they send)
       case 'AUTH_STATUS':
         await handleAuthStatus(supabase, payload);
@@ -333,10 +393,12 @@ serve(async (req) => {
         break;
 
       case 'COMPLETE':
+      case 'SUCCESS':  // Canopy also sends "SUCCESS" status
         await handlePullComplete(supabase, payload);
         break;
 
       case 'ERROR':
+      case 'FAILURE':  // Canopy also sends "FAILURE" status
         await handlePullError(supabase, payload);
         break;
 
@@ -371,8 +433,14 @@ serve(async (req) => {
         await handleDocumentsReady(supabase, payload);
         break;
 
+      case 'UNKNOWN':
       default:
-        console.log(`[Canopy Webhook] Unknown event type: ${payload.event}`);
+        console.log(`[Canopy Webhook] Unknown/unhandled event type: ${eventType}`);
+        // Still try to process if there's policy data
+        if (rawPayload.data?.policies || rawPayload.data?.updates) {
+          console.log('[Canopy Webhook] Found data in unknown event, processing...');
+          await handlePolicyAvailable(supabase, payload);
+        }
     }
 
     // Mark webhook as processed
@@ -675,8 +743,7 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
     const { data: newPull, error: createError } = await supabase.from('canopy_pulls')
       .insert({
         canopy_pull_id: payload.pull_id,
-        status: 'complete',
-        completed_at: new Date().toISOString(),
+        status: 'processing', // Set to processing first, will update after fetching
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -689,19 +756,6 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
     }
     pull = newPull;
     console.log(`[Canopy Webhook] Created pull record on complete: ${payload.pull_id}`);
-  } else {
-    // Update the existing record
-    const { error: updateError } = await supabase.from('canopy_pulls')
-      .update({
-        status: 'complete',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', pull.id);
-
-    if (updateError) {
-      console.error('Failed to update pull status:', updateError);
-    }
   }
 
   if (!pull) {
@@ -709,12 +763,156 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
     return;
   }
 
+  // =========================================================================
+  // FETCH COMPLETE DATA FROM CANOPY API
+  // =========================================================================
+  // CRITICAL: Webhook only contains pull_id - we MUST fetch full data via API
+  // API URL format: https://app.usecanopy.com/api/v1.0.0/teams/{teamId}/pulls/{pullId}
+  // Auth: x-canopy-client-id and x-canopy-client-secret headers (NOT Basic auth!)
+  // =========================================================================
+  const canopyClientId = Deno.env.get('CANOPY_CLIENT_ID');
+  const canopyClientSecret = Deno.env.get('CANOPY_CLIENT_SECRET');
+  const canopyTeamId = Deno.env.get('CANOPY_TEAM_ID');
+  const canopyApiBaseUrl = 'https://app.usecanopy.com/api/v1.0.0';
+
+  if (canopyClientId && canopyClientSecret && canopyTeamId) {
+    try {
+      const apiUrl = `${canopyApiBaseUrl}/teams/${canopyTeamId}/pulls/${payload.pull_id}`;
+      console.log(`[Canopy Webhook] Fetching complete data from: ${apiUrl}`);
+
+      const apiResponse = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'x-canopy-client-id': canopyClientId,
+          'x-canopy-client-secret': canopyClientSecret,
+        },
+      });
+
+      if (apiResponse.ok) {
+        const responseData = await apiResponse.json();
+        console.log(`[Canopy Webhook] API returned data (first 2000 chars):`, JSON.stringify(responseData).substring(0, 2000));
+
+        // Canopy API response structure: { success: true, pull: { ...pullData, policies: [...] } }
+        const pullData = responseData.pull || responseData;
+        let policies = pullData.policies || [];
+
+        console.log(`[Canopy Webhook] Pull consumer info: ${pullData.first_name} ${pullData.last_name}, email: ${pullData.account_email || pullData.email}`);
+
+        // If no policies in pull response, try fetching from the policies endpoint
+        if (policies.length === 0) {
+          console.log(`[Canopy Webhook] No policies in pull response, trying /policies endpoint...`);
+          try {
+            const policiesUrl = `${canopyApiBaseUrl}/teams/${canopyTeamId}/pulls/${payload.pull_id}/policies`;
+            console.log(`[Canopy Webhook] Fetching policies from: ${policiesUrl}`);
+
+            const policiesResponse = await fetch(policiesUrl, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'x-canopy-client-id': canopyClientId,
+                'x-canopy-client-secret': canopyClientSecret,
+              },
+            });
+
+            if (policiesResponse.ok) {
+              const policiesData = await policiesResponse.json();
+              console.log(`[Canopy Webhook] Policies endpoint returned:`, JSON.stringify(policiesData).substring(0, 2000));
+              // Handle different response formats
+              policies = policiesData.policies || policiesData.data || (Array.isArray(policiesData) ? policiesData : []);
+            } else {
+              console.log(`[Canopy Webhook] Policies endpoint returned ${policiesResponse.status}`);
+            }
+          } catch (policiesError) {
+            console.error(`[Canopy Webhook] Failed to fetch policies endpoint:`, policiesError);
+          }
+        }
+
+        console.log(`[Canopy Webhook] Total policies to process: ${policies.length}`);
+
+        // Process each policy from the API response
+        for (const policy of policies) {
+          console.log(`[Canopy Webhook] Processing policy:`, JSON.stringify(policy).substring(0, 500));
+          await processCanopyPolicy(supabase, pull.id, policy);
+        }
+
+        // Also process top-level drivers from pull.drivers if they exist
+        // These may be duplicates of vehicle drivers, but our upsert handles that
+        const pullLevelDrivers = pullData.drivers || [];
+        if (pullLevelDrivers.length > 0 && policies.length > 0) {
+          console.log(`[Canopy Webhook] Processing ${pullLevelDrivers.length} pull-level drivers`);
+          // Get the first policy ID to associate these drivers with
+          const { data: firstPolicy } = await supabase
+            .from('canopy_policies')
+            .select('id')
+            .eq('pull_id', pull.id)
+            .limit(1)
+            .single();
+
+          if (firstPolicy) {
+            for (const driver of pullLevelDrivers) {
+              await upsertDriver(supabase, firstPolicy.id, driver);
+            }
+          }
+        }
+
+        // Update pull with counts and consumer info from API
+        const policyCounts = await getPolicyCounts(supabase, pull.id);
+        await supabase.from('canopy_pulls').update({
+          policy_count: policyCounts.policies,
+          carrier_count: policyCounts.carriers,
+          // Store consumer info from the API response
+          metadata: {
+            consumer_first_name: pullData.first_name,
+            consumer_last_name: pullData.last_name,
+            consumer_email: pullData.account_email || pullData.email,
+            consumer_phone: pullData.mobile_phone || pullData.home_phone || pullData.phone,
+            insurance_provider: pullData.insurance_provider_name,
+          }
+        }).eq('id', pull.id);
+
+        console.log(`[Canopy Webhook] Processed ${policyCounts.policies} policies, stored in database`);
+
+        // Store the consumer data for lead creation
+        pull.consumer_data = {
+          first_name: pullData.first_name,
+          last_name: pullData.last_name,
+          email: pullData.account_email || pullData.email,
+          phone: pullData.mobile_phone || pullData.home_phone || pullData.phone,
+        };
+      } else {
+        const errorText = await apiResponse.text();
+        console.error(`[Canopy Webhook] API fetch failed with ${apiResponse.status}: ${errorText}`);
+      }
+    } catch (fetchError) {
+      console.error('[Canopy Webhook] Failed to fetch from API:', fetchError);
+      // Continue with webhook data
+    }
+  } else {
+    const missing = [];
+    if (!canopyClientId) missing.push('CANOPY_CLIENT_ID');
+    if (!canopyClientSecret) missing.push('CANOPY_CLIENT_SECRET');
+    if (!canopyTeamId) missing.push('CANOPY_TEAM_ID');
+    console.warn(`[Canopy Webhook] Missing API credentials: ${missing.join(', ')}. Cannot fetch full data.`);
+  }
+
+  // Update status to complete
+  await supabase.from('canopy_pulls')
+    .update({
+      status: 'complete',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', pull.id);
+
   let leadId = pull?.lead_id;
 
   // If no lead is linked, create one automatically from the Canopy data
   if (!leadId && pull?.id) {
     try {
-      leadId = await createLeadFromCanopyPull(supabase, pull.id);
+      // Pass consumer data from API if available
+      const consumerData = (pull as any).consumer_data;
+      leadId = await createLeadFromCanopyPull(supabase, pull.id, consumerData);
 
       if (leadId) {
         // Link the new lead to the pull
@@ -748,32 +946,484 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
   console.log(`Pull ${payload.pull_id} completed successfully`);
 }
 
+// Process a complete policy from the Canopy API
+// Canopy API returns a different structure than expected:
+// - policy.policy_id instead of policy.id
+// - policy.carrier_policy_number instead of policy.policy_number
+// - policy.expiry_date instead of policy.expiration_date
+// - policy.total_premium_cents (in cents!) instead of policy.premium.amount
+// - policy.carrier_name instead of policy.carrier.name
+// - Drivers are inside policy.vehicles[].drivers AND at pull level
+async function processCanopyPolicy(supabase: ReturnType<typeof createClient>, pullId: string, policy: any) {
+  // Get the policy ID (handle both formats)
+  const canopyPolicyId = policy.policy_id || policy.id;
+
+  if (!canopyPolicyId) {
+    console.error('[Canopy Webhook] Policy has no ID:', JSON.stringify(policy).substring(0, 200));
+    return;
+  }
+
+  console.log(`[Canopy Webhook] Processing policy ${canopyPolicyId}: ${policy.policy_type || policy.name}`);
+
+  // Check if policy already exists (avoid duplicates)
+  const { data: existingPolicy } = await supabase
+    .from('canopy_policies')
+    .select('id')
+    .eq('canopy_policy_id', canopyPolicyId)
+    .single();
+
+  let policyDbId: string;
+
+  // Convert premium from cents to dollars if needed
+  let premiumAmount = policy.premium?.amount;
+  if (!premiumAmount && policy.total_premium_cents) {
+    premiumAmount = policy.total_premium_cents / 100;
+  }
+
+  // Get carrier info (handle both formats)
+  const carrierName = policy.carrier?.name || policy.carrier_name || policy.carrier_friendly_name || 'Unknown';
+
+  const policyData = {
+    pull_id: pullId,
+    canopy_policy_id: canopyPolicyId,
+    carrier_name: carrierName,
+    carrier_code: policy.carrier?.code,
+    carrier_naic_code: policy.carrier?.naic_code,
+    policy_number: policy.policy_number || policy.carrier_policy_number,
+    policy_type: mapPolicyType(policy.policy_type),
+    effective_date: policy.effective_date,
+    expiration_date: policy.expiration_date || policy.expiry_date || policy.renewal_date,
+    premium_amount: premiumAmount,
+    premium_frequency: policy.premium?.frequency || policy.payment_frequency || 'semi-annual',
+    status: mapPolicyStatus(policy.status),
+    deductible: policy.deductible || (policy.deductible_cents ? policy.deductible_cents / 100 : null),
+    coverage_limits: policy.coverage_limits || {},
+    named_insureds: policy.named_insureds || [],
+    raw_data: policy,
+  };
+
+  if (existingPolicy) {
+    // Update existing policy
+    await supabase.from('canopy_policies').update(policyData).eq('id', existingPolicy.id);
+    policyDbId = existingPolicy.id;
+    console.log(`[Canopy Webhook] Updated existing policy ${policyDbId}`);
+  } else {
+    // Insert new policy
+    const { data: newPolicy, error: policyError } = await supabase
+      .from('canopy_policies')
+      .insert(policyData)
+      .select('id')
+      .single();
+
+    if (policyError) {
+      console.error('[Canopy Webhook] Failed to insert policy:', policyError);
+      return;
+    }
+    policyDbId = newPolicy.id;
+    console.log(`[Canopy Webhook] Inserted new policy ${policyDbId}`);
+  }
+
+  // Process vehicles - Canopy structure has drivers INSIDE vehicles
+  for (const vehicle of policy.vehicles || []) {
+    await upsertVehicle(supabase, policyDbId, vehicle);
+
+    // Process drivers that are attached to this vehicle
+    for (const driver of vehicle.drivers || []) {
+      await upsertDriver(supabase, policyDbId, driver);
+    }
+  }
+
+  // Process drivers at policy level (if any)
+  for (const driver of policy.drivers || []) {
+    await upsertDriver(supabase, policyDbId, driver);
+  }
+
+  // Process dwellings
+  for (const dwelling of policy.dwellings || []) {
+    await upsertDwelling(supabase, policyDbId, dwelling);
+  }
+
+  // Process claims
+  for (const claim of policy.claims || []) {
+    await upsertClaim(supabase, policyDbId, claim);
+  }
+
+  console.log(`[Canopy Webhook] Finished processing policy ${canopyPolicyId}`);
+}
+
+// Map Canopy policy status to our status
+function mapPolicyStatus(status: string | undefined): string {
+  if (!status) return 'active';
+  const statusMap: Record<string, string> = {
+    'ACTIVE': 'active',
+    'CANCELLED': 'cancelled',
+    'EXPIRED': 'expired',
+    'PENDING': 'pending',
+    'INACTIVE': 'inactive',
+  };
+  return statusMap[status.toUpperCase()] || status.toLowerCase();
+}
+
+// Upsert vehicle with deduplication
+// Canopy vehicle structure:
+// - vehicle.vehicle_id instead of just id
+// - vehicle.type instead of body_type
+// - vehicle.uses[] array instead of usage string
+// - vehicle.ownership_type instead of ownership
+// - vehicle.lien_holder, lien_holder_address
+// - vehicle.coverages[] is an ARRAY of objects with name, premium_cents, limit fields
+async function upsertVehicle(supabase: ReturnType<typeof createClient>, policyId: string, vehicle: any) {
+  let existingId: string | null = null;
+
+  if (vehicle.vin) {
+    const { data: existing } = await supabase
+      .from('canopy_vehicles')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('vin', vehicle.vin)
+      .single();
+    existingId = existing?.id;
+  }
+
+  // Parse coverages array into flat structure
+  const coverages = vehicle.coverages || [];
+  const coverageMap: Record<string, any> = {};
+  for (const cov of coverages) {
+    coverageMap[cov.name] = cov;
+  }
+
+  // Get garaging address
+  const garageAddr = vehicle.garaging_address || vehicle.GaragingAddress;
+
+  // Map uses array to usage type
+  const uses = vehicle.uses || [];
+  const usageType = uses.includes('COMMUTE') ? 'commute'
+    : uses.includes('BUSINESS') ? 'business'
+    : uses.includes('PLEASURE') || uses.includes('PERSONAL') ? 'pleasure'
+    : 'other';
+
+  const vehicleData = {
+    policy_id: policyId,
+    vin: vehicle.vin,
+    year: vehicle.year,
+    make: vehicle.make,
+    model: vehicle.model,
+    trim: vehicle.series || vehicle.trim,
+    body_type: vehicle.type || vehicle.body_type,
+    usage_type: usageType,
+    annual_mileage: vehicle.annual_mileage,
+    ownership: mapOwnership(vehicle.ownership_type || vehicle.ownership),
+    garage_address: garageAddr?.street || garageAddr?.full_address,
+    garage_city: garageAddr?.city,
+    garage_state: garageAddr?.state,
+    garage_zip: garageAddr?.zip,
+    // Parse coverages from array - amounts are in cents
+    liability_bi: coverageMap['BODILY_INJURY_LIABILITY']?.per_person_limit_cents
+      ? coverageMap['BODILY_INJURY_LIABILITY'].per_person_limit_cents / 100 : null,
+    liability_bi_total: coverageMap['BODILY_INJURY_LIABILITY']?.per_incident_limit_cents
+      ? coverageMap['BODILY_INJURY_LIABILITY'].per_incident_limit_cents / 100 : null,
+    liability_pd: coverageMap['PROPERTY_DAMAGE_LIABILITY']?.per_incident_limit_cents
+      ? coverageMap['PROPERTY_DAMAGE_LIABILITY'].per_incident_limit_cents / 100 : null,
+    collision_deductible: coverageMap['COLLISION']?.deductible_cents
+      ? coverageMap['COLLISION'].deductible_cents / 100 : null,
+    comprehensive_deductible: coverageMap['COMPREHENSIVE']?.deductible_cents
+      ? coverageMap['COMPREHENSIVE'].deductible_cents / 100 : null,
+    uninsured_motorist: coverageMap['UNINSURED_MOTORISTS']?.per_person_limit_cents
+      ? coverageMap['UNINSURED_MOTORISTS'].per_person_limit_cents / 100 : null,
+    underinsured_motorist: coverageMap['UNDERINSURED_MOTORISTS']?.per_person_limit_cents
+      ? coverageMap['UNDERINSURED_MOTORISTS'].per_person_limit_cents / 100 : null,
+    medical_payments: coverageMap['MEDICAL_PAYMENTS']?.per_person_limit_cents
+      ? coverageMap['MEDICAL_PAYMENTS'].per_person_limit_cents / 100 : null,
+    rental_reimbursement: coverageMap['RENTAL_REIMBURSEMENT']?.per_day_limit_cents
+      ? coverageMap['RENTAL_REIMBURSEMENT'].per_day_limit_cents / 100 : null,
+    towing_labor: coverageMap['EMERGENCY_ROAD_SERVICE']?.per_incident_limit_cents
+      ? coverageMap['EMERGENCY_ROAD_SERVICE'].per_incident_limit_cents / 100 : null,
+    // Store full coverages array
+    coverages: coverages,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_vehicles').update(vehicleData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_vehicles').insert(vehicleData);
+  }
+}
+
+// Upsert driver with deduplication
+// Canopy driver structure:
+// - driver_id (Canopy's ID)
+// - drivers_license: { number, state, status, issue_date, expiration_date } (can be null)
+// - date_of_birth_str: "MM/DD/YYYY" format instead of ISO date
+// - is_excluded boolean
+// - data_source: "CARRIER" | "CONSUMER"
+async function upsertDriver(supabase: ReturnType<typeof createClient>, policyId: string, driver: any) {
+  // Get driver ID from Canopy for deduplication
+  const canopyDriverId = driver.driver_id;
+
+  // Try to find existing driver by Canopy ID or license
+  let existingId: string | null = null;
+
+  // Get license info from nested object or flat fields
+  const license = driver.drivers_license || driver.license;
+  const licenseNumber = license?.number || driver.license_number;
+  const licenseState = license?.state || driver.license_state;
+
+  // First try by driver_id if available
+  if (canopyDriverId) {
+    // Check if we have a driver with matching first/last name for this policy
+    const { data: existing } = await supabase
+      .from('canopy_drivers')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('first_name', driver.first_name)
+      .eq('last_name', driver.last_name)
+      .single();
+    existingId = existing?.id;
+  }
+
+  // Fallback: check by license
+  if (!existingId && licenseNumber && licenseState) {
+    const { data: existing } = await supabase
+      .from('canopy_drivers')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('license_number', licenseNumber)
+      .eq('license_state', licenseState)
+      .single();
+    existingId = existing?.id;
+  }
+
+  // Parse date_of_birth from string format (MM/DD/YYYY)
+  let dateOfBirth = driver.date_of_birth;
+  if (!dateOfBirth && driver.date_of_birth_str) {
+    const parts = driver.date_of_birth_str.split('/');
+    if (parts.length === 3) {
+      // Convert MM/DD/YYYY to YYYY-MM-DD
+      dateOfBirth = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+    }
+  }
+
+  // Calculate years_licensed from age_licensed if available
+  let yearsLicensed = driver.years_licensed;
+  if (!yearsLicensed && driver.age_licensed && driver.age) {
+    yearsLicensed = driver.age - driver.age_licensed;
+  }
+
+  const driverData = {
+    policy_id: policyId,
+    first_name: driver.first_name,
+    last_name: driver.last_name,
+    middle_name: driver.middle_name,
+    suffix: driver.suffix,
+    date_of_birth: dateOfBirth,
+    gender: mapGender(driver.gender),
+    marital_status: mapMaritalStatus(driver.marital_status),
+    license_number: licenseNumber,
+    license_state: licenseState,
+    license_status: mapLicenseStatus(license?.status || driver.license_status),
+    license_issue_date: license?.issue_date || driver.license_issue_date,
+    license_expiration_date: license?.expiration_date || driver.license_expiration_date,
+    relation_to_insured: mapRelation(driver.relation_to_insured),
+    is_primary: driver.is_primary || false,
+    is_excluded: driver.is_excluded || false,
+    sr22_required: driver.sr22_required || false,
+    occupation: driver.occupation,
+    education_level: driver.education,
+    years_licensed: yearsLicensed,
+    violations: driver.violations || [],
+    accidents: driver.accidents || [],
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_drivers').update(driverData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_drivers').insert(driverData);
+  }
+}
+
+// Upsert dwelling with deduplication
+async function upsertDwelling(supabase: ReturnType<typeof createClient>, policyId: string, dwelling: any) {
+  let existingId: string | null = null;
+  const street = dwelling.address?.street;
+  const zip = dwelling.address?.zip;
+
+  if (street && zip) {
+    const { data: existing } = await supabase
+      .from('canopy_dwellings')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('address_line1', street)
+      .eq('zip', zip)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const dwellingData = {
+    policy_id: policyId,
+    address_line1: street,
+    address_line2: dwelling.address?.street2,
+    city: dwelling.address?.city,
+    state: dwelling.address?.state,
+    zip: zip,
+    county: dwelling.address?.county,
+    property_type: mapPropertyType(dwelling.property_type),
+    occupancy_type: mapOccupancyType(dwelling.occupancy_type),
+    year_built: dwelling.year_built,
+    square_footage: dwelling.square_footage,
+    stories: dwelling.stories,
+    construction_type: dwelling.construction_type,
+    exterior_type: dwelling.exterior_type,
+    roof_type: dwelling.roof_type,
+    roof_year: dwelling.roof_year,
+    foundation_type: dwelling.foundation_type,
+    heating_type: dwelling.heating_type,
+    electrical_type: dwelling.electrical_type,
+    plumbing_type: dwelling.plumbing_type,
+    dwelling_coverage: dwelling.coverages?.dwelling,
+    other_structures: dwelling.coverages?.other_structures,
+    personal_property: dwelling.coverages?.personal_property,
+    loss_of_use: dwelling.coverages?.loss_of_use,
+    liability_coverage: dwelling.coverages?.liability,
+    medical_payments: dwelling.coverages?.medical_payments,
+    deductible: dwelling.coverages?.deductible,
+    wind_hail_deductible: dwelling.coverages?.wind_hail_deductible,
+    hurricane_deductible: dwelling.coverages?.hurricane_deductible,
+    flood_coverage: dwelling.coverages?.flood || false,
+    earthquake_coverage: dwelling.coverages?.earthquake || false,
+    swimming_pool: dwelling.features?.swimming_pool || false,
+    trampoline: dwelling.features?.trampoline || false,
+    dog_breed: dwelling.features?.dog_breed,
+    security_system: dwelling.features?.security_system || false,
+    fire_alarm: dwelling.features?.fire_alarm || false,
+    sprinkler_system: dwelling.features?.sprinkler_system || false,
+    deadbolt_locks: dwelling.features?.deadbolt_locks || false,
+    gated_community: dwelling.features?.gated_community || false,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_dwellings').update(dwellingData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_dwellings').insert(dwellingData);
+  }
+}
+
+// Upsert claim with deduplication
+async function upsertClaim(supabase: ReturnType<typeof createClient>, policyId: string, claim: any) {
+  let existingId: string | null = null;
+
+  if (claim.claim_number) {
+    const { data: existing } = await supabase
+      .from('canopy_claims')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('claim_number', claim.claim_number)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const claimData = {
+    policy_id: policyId,
+    claim_number: claim.claim_number,
+    claim_date: claim.claim_date,
+    close_date: claim.close_date,
+    claim_type: claim.claim_type,
+    claim_category: claim.claim_category,
+    status: mapClaimStatus(claim.status),
+    amount_paid: claim.amount_paid,
+    amount_reserved: claim.amount_reserved,
+    deductible_applied: claim.deductible_applied,
+    description: claim.description,
+    at_fault: claim.at_fault,
+    subrogation: claim.subrogation || false,
+    claimant_name: claim.claimant_name,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_claims').update(claimData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_claims').insert(claimData);
+  }
+}
+
+// Get policy counts for the pull
+async function getPolicyCounts(supabase: ReturnType<typeof createClient>, pullId: string) {
+  const { data: policies } = await supabase
+    .from('canopy_policies')
+    .select('carrier_name')
+    .eq('pull_id', pullId);
+
+  return {
+    policies: policies?.length || 0,
+    carriers: [...new Set(policies?.map(p => p.carrier_name) || [])].length,
+  };
+}
+
+// Consumer data from Canopy API
+interface CanopyConsumerData {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+}
+
 // Create a new lead from Canopy pull data
 async function createLeadFromCanopyPull(
   supabase: ReturnType<typeof createClient>,
-  pullId: string
+  pullId: string,
+  consumerData?: CanopyConsumerData
 ): Promise<string | null> {
-  // Get the primary driver from the policies
-  const { data: drivers } = await supabase.from('canopy_drivers')
-    .select(`
-      *,
-      canopy_policies!inner (pull_id)
-    `)
-    .eq('canopy_policies.pull_id', pullId)
-    .eq('is_primary', true)
-    .limit(1);
+  console.log(`[Canopy Webhook] Creating lead from pull ${pullId} with consumer data:`, consumerData);
 
-  // If no primary driver, get the first driver
-  let driver = drivers?.[0];
-  if (!driver) {
-    const { data: anyDriver } = await supabase.from('canopy_drivers')
+  // Try to get consumer info from metadata if not provided directly
+  let firstName = consumerData?.first_name;
+  let lastName = consumerData?.last_name;
+  let email = consumerData?.email;
+  let phone = consumerData?.phone;
+
+  // If no consumer data passed, check the pull metadata
+  if (!firstName || !lastName) {
+    const { data: pullRecord } = await supabase.from('canopy_pulls')
+      .select('metadata')
+      .eq('id', pullId)
+      .single();
+
+    const metadata = pullRecord?.metadata as any;
+    if (metadata) {
+      firstName = firstName || metadata.consumer_first_name;
+      lastName = lastName || metadata.consumer_last_name;
+      email = email || metadata.consumer_email;
+      phone = phone || metadata.consumer_phone;
+    }
+  }
+
+  // Fallback: Get the primary driver from the policies
+  if (!firstName || !lastName) {
+    const { data: drivers } = await supabase.from('canopy_drivers')
       .select(`
         *,
         canopy_policies!inner (pull_id)
       `)
       .eq('canopy_policies.pull_id', pullId)
+      .eq('is_primary', true)
       .limit(1);
-    driver = anyDriver?.[0];
+
+    // If no primary driver, get the first driver
+    let driver = drivers?.[0];
+    if (!driver) {
+      const { data: anyDriver } = await supabase.from('canopy_drivers')
+        .select(`
+          *,
+          canopy_policies!inner (pull_id)
+        `)
+        .eq('canopy_policies.pull_id', pullId)
+        .limit(1);
+      driver = anyDriver?.[0];
+    }
+
+    if (driver) {
+      firstName = firstName || driver.first_name;
+      lastName = lastName || driver.last_name;
+    }
   }
 
   // Get policy types for this pull
@@ -792,26 +1442,25 @@ async function createLeadFromCanopyPull(
     .sort();
   const nextExpiration = expirationDates?.[0];
 
-  // Create the lead
+  // If we still don't have insurance types, default to auto (since this is Canopy)
+  const finalInsuranceTypes = insuranceTypes.length > 0 ? insuranceTypes : ['auto'];
+
+  console.log(`[Canopy Webhook] Creating lead: ${firstName} ${lastName}, email: ${email}, phone: ${phone}`);
+  console.log(`[Canopy Webhook] Insurance types: ${finalInsuranceTypes.join(', ')}, Carriers: ${carriers.join(', ')}`);
+
+  // Create the lead with all available consumer info
   const { data: newLead, error: leadError } = await supabase.from('leads')
     .insert({
-      first_name: driver?.first_name || 'Unknown',
-      last_name: driver?.last_name || 'Customer',
-      email: null, // Canopy doesn't typically provide email
-      phone: null, // Canopy doesn't typically provide phone
-      insurance_types: insuranceTypes,
-      lead_source: 'canopy_import',
+      first_name: firstName || 'Unknown',
+      last_name: lastName || 'Customer',
+      email: email || null,
+      phone: phone || null,
+      insurance_types: finalInsuranceTypes,
       lead_score: 75, // High score for verified Canopy data
       status: 'qualified',
-      metadata: {
-        canopy_pull_id: pullId,
-        current_carriers: carriers,
-        current_premium: totalPremium,
-        policy_expiration: nextExpiration,
-        driver_dob: driver?.date_of_birth,
-        driver_license_state: driver?.license_state,
-        imported_at: new Date().toISOString()
-      }
+      lead_source: 'canopy_import',
+      // Store Canopy-specific info in notes field
+      notes: `Imported from Canopy Connect. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium || 0}. Expiration: ${nextExpiration || 'N/A'}`
     })
     .select('id')
     .single();
