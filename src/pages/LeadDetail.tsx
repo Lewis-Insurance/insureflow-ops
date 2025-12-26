@@ -240,7 +240,7 @@ export default function LeadDetail() {
                 <Star className="h-3 w-3 mr-1" />
                 Score: {lead.lead_score}
               </Badge>
-              {lead.lead_source === 'canopy_import' && (
+              {(lead.source_details as any)?.source === 'canopy_import' && (
                 <Badge variant="secondary">Canopy Import</Badge>
               )}
             </div>

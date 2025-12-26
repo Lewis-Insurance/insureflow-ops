@@ -927,7 +927,7 @@ async function createLeadFromCanopyPull(
       email: email || null,
       phone: phone || null,
       insurance_types: finalInsuranceTypes,
-      lead_source: 'canopy_import',
+      source_details: { source: 'canopy_import', provider: 'canopy_connect' },
       lead_score: 75,
       status: 'qualified',
       notes: `Imported from Canopy Connect. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium || 0}. Expiration: ${nextExpiration || 'N/A'}`
