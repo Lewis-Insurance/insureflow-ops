@@ -1,8 +1,8 @@
 // ============================================================================
-// CANOPY IMPORT PAGE
+// CANOPY IMPORT DASHBOARD
 // ============================================================================
-// Dedicated page for importing insurance data via Canopy Connect
-// Supports both creating new leads and attaching to existing accounts
+// Dashboard for managing Canopy Connect insurance data imports
+// Shows shareable link, recent imports, and imported lead data
 // ============================================================================
 
 import React, { useState } from 'react';
@@ -11,68 +11,37 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { CanopyConnectButton } from '@/components/canopy/CanopyConnectButton';
-import { useCanopyPolicies, CanopyPullResult } from '@/hooks/useCanopyConnect';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Shield,
-  UserPlus,
-  Building,
-  Search,
+  Copy,
+  ExternalLink,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  ArrowRight,
   Car,
   Home,
   Umbrella,
-  FileText,
-  CheckCircle,
-  ArrowRight,
-  Clock,
-  AlertCircle,
+  RefreshCw,
+  Send,
+  Users,
 } from 'lucide-react';
-
-type ImportMode = 'create_lead' | 'attach_account';
-
-interface AccountSearchResult {
-  id: string;
-  name: string;
-  type: string;
-  created_at: string;
-}
 
 export default function CanopyImportPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<ImportMode>('create_lead');
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [accountSearch, setAccountSearch] = useState('');
-  const [completedPullId, setCompletedPullId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
 
-  // Search for accounts
-  const { data: accounts, isLoading: isSearching } = useQuery({
-    queryKey: ['accounts-search', accountSearch],
-    queryFn: async () => {
-      if (!accountSearch || accountSearch.length < 2) return [];
+  // The shareable Canopy link
+  const canopyLink = 'https://app.usecanopy.com/c/lewis-insurance';
 
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, name, type, created_at')
-        .ilike('name', `%${accountSearch}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data as AccountSearchResult[];
-    },
-    enabled: mode === 'attach_account' && accountSearch.length >= 2,
-  });
-
-  // Get recent imports
-  const { data: recentImports } = useQuery({
-    queryKey: ['canopy-recent-imports'],
+  // Get recent Canopy pulls/imports
+  const { data: recentPulls, isLoading: isPullsLoading, refetch: refetchPulls } = useQuery({
+    queryKey: ['canopy-pulls'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('canopy_pulls')
@@ -86,25 +55,48 @@ export default function CanopyImportPage() {
           completed_at,
           lead_id,
           account_id,
-          error_message
+          error_message,
+          metadata
         `)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(20);
 
       if (error) throw error;
       return data;
     },
   });
 
-  // Get policies for completed pull
-  const { policies: importedPolicies, isLoading: isPoliciesLoading } = useCanopyPolicies(completedPullId);
+  // Get leads created from Canopy imports
+  const { data: canopyLeads, isLoading: isLeadsLoading } = useQuery({
+    queryKey: ['canopy-leads'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('lead_source', 'canopy_import')
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-  const handleImportComplete = (result: CanopyPullResult) => {
-    setCompletedPullId(result.pullId);
+      if (error) throw error;
+      return data;
+    },
+  });
 
-    // If a new lead was created, offer to navigate to it
-    if (result.leadId) {
-      // You could show a toast or modal here
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(canopyLink);
+      setCopied(true);
+      toast({
+        title: 'Link copied!',
+        description: 'Share this link with customers to import their insurance data.',
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({
+        title: 'Copy failed',
+        description: 'Please copy the link manually.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -112,354 +104,278 @@ export default function CanopyImportPage() {
     navigate(`/leads/${leadId}`);
   };
 
-  const handleViewAccount = (accountId: string) => {
-    navigate(`/customers/${accountId}`);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'complete':
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Complete</Badge>;
+      case 'pending':
+      case 'processing':
+        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Processing</Badge>;
+      case 'error':
+        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" /> Error</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-6 max-w-4xl">
+      <div className="container mx-auto py-6 max-w-6xl">
         {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
-          <Shield className="w-8 h-8 text-white" />
+        <div className="flex items-center gap-4 mb-6">
+          <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Canopy Connect</h1>
+            <p className="text-muted-foreground">
+              Import verified insurance data from customers via Canopy Connect
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Import Insurance Data</h1>
-          <p className="text-muted-foreground">
-            Import verified insurance data from 400+ carriers using Canopy Connect
-          </p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Import Card */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Start New Import</CardTitle>
-              <CardDescription>
-                Choose how you want to use the imported insurance data
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Mode Selection */}
-              <RadioGroup
-                value={mode}
-                onValueChange={(v) => {
-                  setMode(v as ImportMode);
-                  setSelectedAccountId(null);
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label
-                    htmlFor="mode-create"
-                    className={`flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                      mode === 'create_lead'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-muted hover:border-muted-foreground/20'
-                    }`}
-                  >
-                    <RadioGroupItem value="create_lead" id="mode-create" className="mt-1" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <UserPlus className="w-4 h-4" />
-                        <span className="font-medium">Create New Lead</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Import data and automatically create a new qualified lead in the CRM
-                      </p>
-                    </div>
-                  </label>
-
-                  <label
-                    htmlFor="mode-attach"
-                    className={`flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                      mode === 'attach_account'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-muted hover:border-muted-foreground/20'
-                    }`}
-                  >
-                    <RadioGroupItem value="attach_account" id="mode-attach" className="mt-1" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Building className="w-4 h-4" />
-                        <span className="font-medium">Attach to Account</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Link imported data to an existing customer account for renewals
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </RadioGroup>
-
-              {/* Account Search (if attach mode) */}
-              {mode === 'attach_account' && (
-                <div className="space-y-4">
-                  <Separator />
-                  <div className="space-y-2">
-                    <Label>Search for Account</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Type to search accounts..."
-                        value={accountSearch}
-                        onChange={(e) => setAccountSearch(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Search Results */}
-                  {accounts && accounts.length > 0 && (
-                    <ScrollArea className="h-48 rounded-md border">
-                      <div className="p-2 space-y-1">
-                        {accounts.map((account) => (
-                          <button
-                            key={account.id}
-                            onClick={() => setSelectedAccountId(account.id)}
-                            className={`w-full flex items-center justify-between p-3 rounded-md text-left transition-colors ${
-                              selectedAccountId === account.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'hover:bg-muted'
-                            }`}
-                          >
-                            <div>
-                              <p className="font-medium">{account.name}</p>
-                              <p className={`text-sm ${selectedAccountId === account.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                {account.type} · Created {new Date(account.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            {selectedAccountId === account.id && (
-                              <CheckCircle className="w-5 h-5" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-
-                  {isSearching && (
-                    <p className="text-sm text-muted-foreground">Searching...</p>
-                  )}
-
-                  {accountSearch.length >= 2 && accounts?.length === 0 && !isSearching && (
-                    <p className="text-sm text-muted-foreground">No accounts found</p>
-                  )}
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Import Button */}
-              <div className="flex flex-col items-center gap-4 py-4">
-                <CanopyConnectButton
-                  mode={mode}
-                  accountId={mode === 'attach_account' ? selectedAccountId || undefined : undefined}
-                  onComplete={handleImportComplete}
-                  size="lg"
-                  className="w-full md:w-auto"
-                  disabled={mode === 'attach_account' && !selectedAccountId}
-                />
-                <p className="text-sm text-muted-foreground text-center max-w-md">
-                  You&apos;ll be redirected to securely connect with the customer&apos;s insurance carrier.
-                  No login credentials are stored by Lewis Insurance.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Imported Data Preview */}
-          {completedPullId && (
-            <Card className="mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Share Link Card */}
+            <Card className="border-2 border-primary/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  Import Complete
+                  <Send className="w-5 h-5" />
+                  Share with Customers
                 </CardTitle>
                 <CardDescription>
-                  Here&apos;s what was imported from the customer&apos;s insurance
+                  Send this link to customers. When they connect their insurance,
+                  their policy data will automatically appear here as a new lead.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={canopyLink}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <Button onClick={handleCopyLink} variant={copied ? "default" : "outline"}>
+                    {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href={canopyLink} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  <strong>How it works:</strong> Customer clicks link → Selects their carrier →
+                  Logs in securely → Policy data is imported → New lead is created automatically
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Recent Imports */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Imports</CardTitle>
+                  <CardDescription>
+                    Insurance data imported via Canopy Connect
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => refetchPulls()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {isPullsLoading ? (
+                  <p className="text-muted-foreground text-center py-8">Loading...</p>
+                ) : recentPulls && recentPulls.length > 0 ? (
+                  <div className="space-y-3">
+                    {recentPulls.map((pull) => (
+                      <div
+                        key={pull.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          {getStatusBadge(pull.status)}
+                          <div>
+                            <p className="font-medium">
+                              {pull.policy_count || 0} {pull.policy_count === 1 ? 'policy' : 'policies'} imported
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(pull.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        {pull.lead_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewLead(pull.lead_id!)}
+                          >
+                            View Lead <ArrowRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Shield className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <p>No imports yet</p>
+                    <p className="text-sm">Share the link above with customers to get started</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Leads from Canopy */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Leads from Canopy
+                </CardTitle>
+                <CardDescription>
+                  Leads automatically created from Canopy imports
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isPoliciesLoading ? (
-                  <p className="text-muted-foreground">Loading imported data...</p>
-                ) : importedPolicies.length > 0 ? (
-                  <div className="space-y-4">
-                    {importedPolicies.map((policy: any) => (
-                      <div key={policy.id} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {policy.policy_type === 'auto' && <Car className="w-4 h-4" />}
-                            {policy.policy_type === 'home' && <Home className="w-4 h-4" />}
-                            {policy.policy_type === 'umbrella' && <Umbrella className="w-4 h-4" />}
-                            <span className="font-medium capitalize">{policy.policy_type} Insurance</span>
+                {isLeadsLoading ? (
+                  <p className="text-muted-foreground text-center py-8">Loading...</p>
+                ) : canopyLeads && canopyLeads.length > 0 ? (
+                  <div className="space-y-3">
+                    {canopyLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => handleViewLead(lead.id)}
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {lead.first_name} {lead.last_name}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{lead.email || 'No email'}</span>
+                            {lead.insurance_types && (
+                              <span>• {(lead.insurance_types as string[]).join(', ')}</span>
+                            )}
                           </div>
-                          <Badge variant={policy.status === 'active' ? 'default' : 'secondary'}>
-                            {policy.status}
-                          </Badge>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Carrier</p>
-                            <p className="font-medium">{policy.carrier_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Premium</p>
-                            <p className="font-medium">
-                              ${policy.premium_amount?.toLocaleString()}/{policy.premium_frequency || 'year'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Expiration</p>
-                            <p className="font-medium">
-                              {policy.expiration_date
-                                ? new Date(policy.expiration_date).toLocaleDateString()
-                                : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Details</p>
-                            <p className="font-medium">
-                              {policy.canopy_vehicles?.length || 0} vehicles,{' '}
-                              {policy.canopy_drivers?.length || 0} drivers
-                            </p>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Score: {lead.lead_score || 0}</Badge>
+                          <ArrowRight className="w-4 h-4 text-muted-foreground" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">No policies found in this import</p>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <p>No leads from Canopy yet</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
-          )}
-        </div>
+          </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* How It Works */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">How It Works</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ol className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted text-sm">
-                    1
-                  </span>
-                  <div>
-                    <p className="font-medium">Customer Connects</p>
-                    <p className="text-sm text-muted-foreground">
-                      Securely log into their insurance carrier portal
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted text-sm">
-                    2
-                  </span>
-                  <div>
-                    <p className="font-medium">Data Extracted</p>
-                    <p className="text-sm text-muted-foreground">
-                      Policy, vehicle, driver, and coverage info is pulled
-                    </p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted text-sm">
-                    3
-                  </span>
-                  <div>
-                    <p className="font-medium">Ready for Quoting</p>
-                    <p className="text-sm text-muted-foreground">
-                      Pre-filled data enables instant comparison quotes
-                    </p>
-                  </div>
-                </li>
-              </ol>
-            </CardContent>
-          </Card>
-
-          {/* Recent Imports */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recent Imports</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recentImports && recentImports.length > 0 ? (
-                <div className="space-y-3">
-                  {recentImports.map((pull) => (
-                    <div
-                      key={pull.id}
-                      className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {pull.status === 'complete' && (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                        )}
-                        {pull.status === 'error' && (
-                          <AlertCircle className="w-4 h-4 text-red-500" />
-                        )}
-                        {!['complete', 'error'].includes(pull.status) && (
-                          <Clock className="w-4 h-4 text-yellow-500" />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium">
-                            {pull.policy_count || 0} policies
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(pull.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      {pull.lead_id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewLead(pull.lead_id!)}
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {pull.account_id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewAccount(pull.account_id!)}
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      )}
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* How It Works */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">How It Works</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-primary text-primary-foreground text-sm font-medium">
+                      1
+                    </span>
+                    <div>
+                      <p className="font-medium">Send Link</p>
+                      <p className="text-sm text-muted-foreground">
+                        Share the Canopy link with your customer via email, SMS, or in person
+                      </p>
                     </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-primary text-primary-foreground text-sm font-medium">
+                      2
+                    </span>
+                    <div>
+                      <p className="font-medium">Customer Connects</p>
+                      <p className="text-sm text-muted-foreground">
+                        They select their carrier and securely log in to authorize access
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-primary text-primary-foreground text-sm font-medium">
+                      3
+                    </span>
+                    <div>
+                      <p className="font-medium">Data Imported</p>
+                      <p className="text-sm text-muted-foreground">
+                        Policy, vehicle, driver, and coverage info is automatically pulled
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-primary text-primary-foreground text-sm font-medium">
+                      4
+                    </span>
+                    <div>
+                      <p className="font-medium">Lead Created</p>
+                      <p className="text-sm text-muted-foreground">
+                        A new qualified lead is created with all their insurance details
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </CardContent>
+            </Card>
+
+            {/* Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Import Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total Imports</span>
+                  <span className="font-bold text-lg">{recentPulls?.length || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Completed</span>
+                  <span className="font-bold text-lg text-green-600">
+                    {recentPulls?.filter(p => p.status === 'complete').length || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Leads Created</span>
+                  <span className="font-bold text-lg">{canopyLeads?.length || 0}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Supported Carriers */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">400+ Carriers Supported</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {['State Farm', 'Geico', 'Progressive', 'Allstate', 'Liberty Mutual', 'USAA', 'Farmers', 'Nationwide', '+392 more'].map((carrier) => (
+                    <Badge key={carrier} variant="secondary" className="text-xs">
+                      {carrier}
+                    </Badge>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No recent imports</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Supported Carriers */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">400+ Carriers Supported</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {['State Farm', 'Geico', 'Progressive', 'Allstate', 'Liberty Mutual', 'USAA', 'Farmers', 'Nationwide', '+392 more'].map((carrier) => (
-                  <Badge key={carrier} variant="secondary" className="text-xs">
-                    {carrier}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
       </div>
     </AppLayout>
   );

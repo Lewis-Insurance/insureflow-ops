@@ -60,16 +60,34 @@ declare global {
 // Load Canopy SDK script
 function loadCanopySDK(): Promise<void> {
   return new Promise((resolve, reject) => {
+    console.log('[Canopy SDK] Checking if already loaded...');
     if (window.CanopyConnect) {
+      console.log('[Canopy SDK] Already loaded');
       resolve();
       return;
     }
 
+    console.log('[Canopy SDK] Creating script element...');
     const script = document.createElement('script');
-    script.src = 'https://cdn.canopyconnect.com/v1/sdk.js';
+    script.src = 'https://cdn.usecanopy.com/v2/canopy-connect.js';
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Canopy SDK'));
+
+    script.onload = () => {
+      console.log('[Canopy SDK] Script loaded, checking window.CanopyConnect...');
+      console.log('[Canopy SDK] window.CanopyConnect =', window.CanopyConnect);
+      // Give it a moment to initialize
+      setTimeout(() => {
+        console.log('[Canopy SDK] After timeout, window.CanopyConnect =', window.CanopyConnect);
+        resolve();
+      }, 100);
+    };
+
+    script.onerror = (e) => {
+      console.error('[Canopy SDK] Script failed to load:', e);
+      reject(new Error('Failed to load Canopy SDK'));
+    };
+
+    console.log('[Canopy SDK] Appending script to head...');
     document.head.appendChild(script);
   });
 }
@@ -152,40 +170,43 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
         throw new Error('Canopy SDK not available');
       }
 
-      // Call our edge function to create a pull session
-      console.log('[Canopy] Calling canopy-initiate function...');
-      const { data, error: invokeError } = await supabase.functions.invoke('canopy-initiate', {
-        body: {
-          lead_id: options.leadId,
-          account_id: options.accountId,
-          mode: options.mode,
-        }
-      });
-      console.log('[Canopy] Function response:', { data, invokeError });
+      // Get public alias from environment
+      const publicAlias = import.meta.env.VITE_CANOPY_PUBLIC_ALIAS;
+      console.log('[Canopy] Public alias:', publicAlias);
 
-      if (invokeError) {
-        throw new Error(invokeError.message || 'Failed to initiate Canopy pull');
+      if (!publicAlias) {
+        throw new Error('VITE_CANOPY_PUBLIC_ALIAS not configured');
       }
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to create pull session');
-      }
-      console.log('[Canopy] Pull session created, opening widget...');
+      // Generate a unique session ID to track this pull
+      const sessionId = crypto.randomUUID();
+      console.log('[Canopy] Session ID:', sessionId);
 
-      setPullId(data.pull_id);
       setStatus('pending');
 
-      // Initialize Canopy widget
+      // Initialize Canopy widget with public alias
+      // See: https://docs.usecanopy.com/reference/using-the-sdk
       const handler = window.CanopyConnect.create({
-        clientId: data.client_id,
-        environment: data.environment || 'sandbox',
-        onSuccess: (canopyPullId: string) => {
-          console.log('Canopy pull successful:', canopyPullId);
+        publicAlias: publicAlias,
+        pullMetaData: {
+          sessionId: sessionId,
+          leadId: options.leadId || null,
+          accountId: options.accountId || null,
+          mode: options.mode || 'create_lead',
+          initiatedAt: new Date().toISOString(),
+        },
+        onSuccess: (pullData: unknown) => {
+          console.log('[Canopy] Pull successful:', pullData);
           setStatus('processing');
-          // Status will be updated via realtime subscription
+          // The webhook will receive the full data and store it
+          // We just show success to the user
+          toast({
+            title: 'Import started',
+            description: 'Processing insurance data...',
+          });
         },
         onError: (err: Error) => {
-          console.error('Canopy error:', err);
+          console.error('[Canopy] Error:', err);
           setError(err);
           setStatus('error');
           options.onError?.(err);
@@ -197,13 +218,15 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
           });
         },
         onExit: () => {
+          console.log('[Canopy] Widget closed');
           setIsLoading(false);
           options.onExit?.();
         }
       });
 
       // Open the Canopy widget
-      handler.open({ linkToken: data.link_token });
+      console.log('[Canopy] Opening widget...');
+      handler.open();
 
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error('Unknown error');
