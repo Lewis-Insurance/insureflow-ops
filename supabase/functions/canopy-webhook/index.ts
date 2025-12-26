@@ -8,14 +8,24 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
-// Webhook event types from Canopy
+// Webhook event types from Canopy (they use UPPERCASE format)
 type CanopyEventType =
   | 'pull.started'
   | 'pull.auth_status'
   | 'pull.policy_available'
   | 'pull.complete'
   | 'pull.error'
-  | 'pull.documents_ready';
+  | 'pull.documents_ready'
+  // Canopy actual event names (uppercase)
+  | 'AUTH_STATUS'
+  | 'COMPLETE'
+  | 'POLICY_AVAILABLE'
+  | 'POLICY_STREAM'
+  | 'DATA_UPDATED'
+  | 'ERROR'
+  | 'MONITORING_RECONNECT'
+  | 'SERVICING_WAITING_FOR_CONSENT'
+  | 'POLICIES_AVAILABLE';
 
 interface CanopyWebhookPayload {
   event: CanopyEventType;
@@ -308,8 +318,35 @@ serve(async (req) => {
       console.error('Failed to log webhook:', logError);
     }
 
-    // Route by event type
+    // Route by event type (Canopy sends UPPERCASE event names)
     switch (payload.event) {
+      // Canopy UPPERCASE events (actual format they send)
+      case 'AUTH_STATUS':
+        await handleAuthStatus(supabase, payload);
+        break;
+
+      case 'POLICY_AVAILABLE':
+      case 'POLICIES_AVAILABLE':
+      case 'POLICY_STREAM':
+      case 'DATA_UPDATED':
+        await handlePolicyAvailable(supabase, payload);
+        break;
+
+      case 'COMPLETE':
+        await handlePullComplete(supabase, payload);
+        break;
+
+      case 'ERROR':
+        await handlePullError(supabase, payload);
+        break;
+
+      case 'MONITORING_RECONNECT':
+      case 'SERVICING_WAITING_FOR_CONSENT':
+        // Log these but no specific handling needed
+        console.log(`[Canopy Webhook] Received ${payload.event} for ${payload.pull_id}`);
+        break;
+
+      // Legacy lowercase events (in case Canopy sends these too)
       case 'pull.started':
         await handlePullStarted(supabase, payload);
         break;
@@ -335,7 +372,7 @@ serve(async (req) => {
         break;
 
       default:
-        console.log(`Unknown event type: ${payload.event}`);
+        console.log(`[Canopy Webhook] Unknown event type: ${payload.event}`);
     }
 
     // Mark webhook as processed
