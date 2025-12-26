@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comparison Analyze Edge Function
  *

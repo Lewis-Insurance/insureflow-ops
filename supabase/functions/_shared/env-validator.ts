@@ -118,8 +118,15 @@ export const CommonEnvSpecs = {
     RESEND_API_KEY: 'Resend API key for email sending',
   },
   ai: {
-    // Note: LOVABLE_API_KEY is used for AI gateway routing
-    // Consider migrating to direct Azure OpenAI or Anthropic if not using this gateway
-    LOVABLE_API_KEY: 'AI gateway API key',
+    // OpenAI is the default AI provider (set AI_PROVIDER=openai)
+    OPENAI_API_KEY: 'OpenAI API key for AI features',
+  },
+  aiAnthropic: {
+    // Alternative: Anthropic Claude (set AI_PROVIDER=anthropic)
+    ANTHROPIC_API_KEY: 'Anthropic API key for Claude',
+  },
+  aiGemini: {
+    // Alternative: Google Gemini (set AI_PROVIDER=gemini)
+    GOOGLE_AI_API_KEY: 'Google AI API key for Gemini',
   },
 } as const;

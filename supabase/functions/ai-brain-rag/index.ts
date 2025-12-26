@@ -1,7 +1,8 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
+import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.ts';
+import { generateText, generateEmbedding } from '../_shared/ai-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,15 +15,13 @@ serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    // Validate environment variables
+    const env = validateEnvVars({
+      SUPABASE_URL: 'Supabase project URL',
+      SUPABASE_SERVICE_ROLE_KEY: 'Supabase service role key',
+    });
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -53,25 +52,8 @@ serve(async (req) => {
 
     switch (action) {
       case 'query': {
-        // Generate embedding for query
-        const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: query,
-          }),
-        });
-
-        if (!embeddingResponse.ok) {
-          throw new Error('Failed to generate query embedding');
-        }
-
-        const embeddingData = await embeddingResponse.json();
-        const queryEmbedding = embeddingData.data[0].embedding;
+        // Generate embedding for query using OpenAI
+        const queryEmbedding = await generateEmbedding(query);
 
         // Search knowledge base using vector similarity
         const { data: results, error: searchError } = await supabase.rpc('search_knowledge', {
@@ -90,38 +72,14 @@ serve(async (req) => {
           .join('\n\n---\n\n');
 
         // Generate AI response with RAG context
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'system',
-                content: `You are an AI assistant with access to the company's knowledge base. Use the following context to answer the user's question. If the context doesn't contain relevant information, say so and provide a general answer.
+        const systemPrompt = `You are an AI assistant with access to the company's knowledge base. Use the following context to answer the user's question. If the context doesn't contain relevant information, say so and provide a general answer.
 
 Context from knowledge base:
 ${contextText}
 
-Always cite which knowledge entries you used to answer the question.`
-              },
-              {
-                role: 'user',
-                content: query
-              }
-            ],
-          }),
-        });
+Always cite which knowledge entries you used to answer the question.`;
 
-        if (!aiResponse.ok) {
-          throw new Error('Failed to generate AI response');
-        }
-
-        const aiData = await aiResponse.json();
-        const answer = aiData.choices[0].message.content;
+        const answer = await generateText(query, systemPrompt);
 
         return new Response(
           JSON.stringify({
@@ -147,24 +105,7 @@ Always cite which knowledge entries you used to answer the question.`
         }
 
         // Generate embedding for content
-        const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: `${knowledge.title}\n${knowledge.content}`,
-          }),
-        });
-
-        if (!embeddingResponse.ok) {
-          throw new Error('Failed to generate embedding');
-        }
-
-        const embeddingData = await embeddingResponse.json();
-        const embedding = embeddingData.data[0].embedding;
+        const embedding = await generateEmbedding(`${knowledge.title}\n${knowledge.content}`);
 
         // Insert knowledge with embedding
         const { data: insertedKnowledge, error: insertError } = await supabase
@@ -211,22 +152,7 @@ Always cite which knowledge entries you used to answer the question.`
         for (const entry of knowledgeEntries || []) {
           try {
             // Generate embedding
-            const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'text-embedding-3-small',
-                input: `${entry.title}\n${entry.content}`,
-              }),
-            });
-
-            if (!embeddingResponse.ok) continue;
-
-            const embeddingData = await embeddingResponse.json();
-            const embedding = embeddingData.data[0].embedding;
+            const embedding = await generateEmbedding(`${entry.title}\n${entry.content}`);
 
             // Update knowledge entry
             await supabase
@@ -259,9 +185,15 @@ Always cite which knowledge entries you used to answer the question.`
 
   } catch (error: unknown) {
     console.error('Error in ai-brain-rag:', error);
+
+    // Check for config errors
+    if (error instanceof Error && error.message.includes('Missing required environment')) {
+      return configErrorResponse(error, corsHeaders);
+    }
+
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

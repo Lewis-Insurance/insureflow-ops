@@ -117,10 +117,10 @@ serve(async (req) => {
       drivers = driverData || [];
     }
 
-    // Call Lovable AI to generate the document
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    // Call OpenAI to generate the document
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const systemPrompt = `You are an expert insurance agent assistant. Your task is to create a comprehensive, professional quote document that agents can use to quickly assess and quote insurance coverage.
@@ -166,14 +166,14 @@ ${JSON.stringify(d, null, 2)}
 
 Create a well-formatted, professional quote document that our agents can use to provide an accurate quote. Include all relevant details and organize them logically.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

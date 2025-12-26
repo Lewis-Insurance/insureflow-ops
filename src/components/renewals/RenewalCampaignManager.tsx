@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,11 +12,11 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Calendar, 
-  Mail, 
-  Phone, 
-  MessageSquare, 
+import {
+  Calendar,
+  Mail,
+  Phone,
+  MessageSquare,
   CheckCircle2,
   Clock,
   Play,
@@ -24,26 +24,183 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RenewalCampaignManagerProps {
   renewalId: string;
 }
 
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  campaign_type: string;
+  created_at: string;
+}
+
+// Campaign templates with touchpoints
+const CAMPAIGN_TEMPLATES = {
+  standard: {
+    name: 'Standard Renewal Campaign',
+    touchpoints: [
+      { day: 0, type: 'email', action: 'Renewal reminder email' },
+      { day: 7, type: 'call', action: 'Check-in call' },
+      { day: 14, type: 'sms', action: 'Renewal reminder SMS' },
+    ]
+  },
+  high_risk: {
+    name: 'High Risk Renewal Campaign',
+    touchpoints: [
+      { day: 0, type: 'call', action: 'Urgent renewal call' },
+      { day: 1, type: 'email', action: 'Urgent renewal email' },
+      { day: 3, type: 'sms', action: 'Urgent renewal SMS' },
+      { day: 7, type: 'call', action: 'Follow-up call' },
+    ]
+  },
+  low_engagement: {
+    name: 'Low Engagement Campaign',
+    touchpoints: [
+      { day: 0, type: 'call', action: 'Re-engagement call' },
+      { day: 2, type: 'email', action: 'Value reminder email' },
+      { day: 7, type: 'sms', action: 'Check-in SMS' },
+    ]
+  },
+  price_sensitive: {
+    name: 'Price Sensitive Campaign',
+    touchpoints: [
+      { day: 0, type: 'email', action: 'Rate comparison email' },
+      { day: 3, type: 'call', action: 'Coverage review call' },
+      { day: 7, type: 'email', action: 'Discount opportunities email' },
+    ]
+  }
+};
+
 export default function RenewalCampaignManager({ renewalId }: RenewalCampaignManagerProps) {
   const [campaignType, setCampaignType] = useState<string>('standard');
   const [notes, setNotes] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+
+  // Load active campaigns for this renewal
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('nurture_campaigns')
+          .select('id, name, status, campaign_type, created_at')
+          .eq('renewal_id', renewalId)
+          .in('status', ['active', 'scheduled'])
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setActiveCampaigns((data || []) as Campaign[]);
+      } catch (err) {
+        console.error('Error loading campaigns:', err);
+      } finally {
+        setLoadingCampaigns(false);
+      }
+    };
+    loadCampaigns();
+  }, [renewalId]);
 
   const handleCreateCampaign = async () => {
     setIsCreating(true);
     try {
-      // TODO: Call edge function or mutation to create campaign
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const template = CAMPAIGN_TEMPLATES[campaignType as keyof typeof CAMPAIGN_TEMPLATES];
+
+      // Create the campaign
+      const { data: campaign, error: campaignError } = await supabase
+        .from('nurture_campaigns')
+        .insert({
+          name: template.name,
+          campaign_type: campaignType,
+          status: 'active',
+          renewal_id: renewalId,
+          notes: notes || null,
+          created_by: user.id,
+          touchpoint_config: template.touchpoints,
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      // Create scheduled tasks for each touchpoint
+      const tasks = template.touchpoints.map(tp => {
+        const scheduledDate = new Date();
+        scheduledDate.setDate(scheduledDate.getDate() + tp.day);
+
+        return {
+          title: tp.action,
+          description: `Campaign: ${template.name}\nType: ${tp.type}\nRenewal ID: ${renewalId}`,
+          priority: campaignType === 'high_risk' ? 'high' : 'medium',
+          status: 'pending',
+          due_date: scheduledDate.toISOString(),
+          created_by: user.id,
+          category: 'renewal',
+          metadata: {
+            campaign_id: campaign?.id,
+            touchpoint_type: tp.type,
+            touchpoint_day: tp.day,
+            renewal_id: renewalId,
+          }
+        };
+      });
+
+      const { error: tasksError } = await supabase.from('tasks').insert(tasks);
+      if (tasksError) {
+        console.error('Error creating tasks:', tasksError);
+        // Continue anyway - campaign was created
+      }
+
       toast.success('Campaign created successfully');
+      setActiveCampaigns(prev => [...prev, campaign as Campaign]);
+      setNotes('');
     } catch (error) {
-      toast.error('Failed to create campaign');
-      console.error(error);
+      console.error('Campaign creation error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create campaign');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handlePauseCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('nurture_campaigns')
+        .update({ status: 'paused' })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setActiveCampaigns(prev =>
+        prev.map(c => c.id === campaignId ? { ...c, status: 'paused' } : c)
+      );
+      toast.success('Campaign paused');
+    } catch (error) {
+      toast.error('Failed to pause campaign');
+    }
+  };
+
+  const handleResumeCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('nurture_campaigns')
+        .update({ status: 'active' })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setActiveCampaigns(prev =>
+        prev.map(c => c.id === campaignId ? { ...c, status: 'active' } : c)
+      );
+      toast.success('Campaign resumed');
+    } catch (error) {
+      toast.error('Failed to resume campaign');
     }
   };
 
@@ -208,11 +365,60 @@ export default function RenewalCampaignManager({ renewalId }: RenewalCampaignMan
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No active campaigns for this renewal</p>
-                <p className="text-sm">Create a campaign to get started</p>
-              </div>
+              {loadingCampaigns ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Clock className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                  <p>Loading campaigns...</p>
+                </div>
+              ) : activeCampaigns.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No active campaigns for this renewal</p>
+                  <p className="text-sm">Create a campaign to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div>
+                        <div className="font-medium">{campaign.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Created {new Date(campaign.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'}>
+                          {campaign.status === 'active' ? (
+                            <><CheckCircle2 className="h-3 w-3 mr-1" /> Active</>
+                          ) : (
+                            <><Pause className="h-3 w-3 mr-1" /> Paused</>
+                          )}
+                        </Badge>
+                        {campaign.status === 'active' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePauseCampaign(campaign.id)}
+                          >
+                            <Pause className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResumeCampaign(campaign.id)}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

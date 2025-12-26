@@ -1,8 +1,8 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { extractTextFromBlob, validateExtraction } from './pdf-extractor.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { getAIApiKey, getAIProvider } from '../_shared/ai-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -181,14 +181,10 @@ serve(async (req) => {
 
   try {
     // Validate environment variables
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
-    
-    if (!LOVABLE_API_KEY) {
-      throw new ConfigurationError('LOVABLE_API_KEY not configured');
-    }
+
     if (!SUPABASE_URL) {
       throw new ConfigurationError('SUPABASE_URL not configured');
     }
@@ -198,6 +194,11 @@ serve(async (req) => {
     if (!GOOGLE_VISION_API_KEY) {
       console.warn('GOOGLE_CLOUD_VISION_API_KEY not configured - OCR may fail');
     }
+
+    // Get AI API key (validates internally)
+    const AI_PROVIDER = getAIProvider();
+    const AI_API_KEY = getAIApiKey(AI_PROVIDER);
+    console.log(`Using AI provider: ${AI_PROVIDER}`);
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -854,11 +855,11 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       });
     }
 
-    console.log(`Calling Lovable AI with ${messages.length} messages`);
+    console.log(`Calling ${AI_PROVIDER} AI with ${messages.length} messages`);
 
-    const AI_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    const AI_URL = 'https://api.openai.com/v1/chat/completions';
     const headers = {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Authorization': `Bearer ${AI_API_KEY}`,
       'Content-Type': 'application/json',
     };
 
@@ -868,7 +869,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: 'google/gemini-2.5-pro',
+          model: 'gpt-5-mini',
           messages,
           temperature: 0.1,
           max_tokens: 4000,
@@ -885,7 +886,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
           throw new AIServiceError('Rate limit exceeded. Please try again in a moment.', 429);
         }
         if (response.status === 402) {
-          throw new AIServiceError('AI credits exhausted. Please add credits to your Lovable workspace.', 402);
+          throw new AIServiceError('AI credits exhausted. Please check your OpenAI billing.', 402);
         }
         if (response.status === 401) {
           throw new AIServiceError('Invalid API key.', 401);
@@ -1076,7 +1077,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
               method: "POST",
               headers,
               body: JSON.stringify({
-                model: "google/gemini-2.5-pro",
+                model: "gpt-5-mini",
                 messages: [
                   { 
                     role: "system", 
@@ -1134,7 +1135,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'gpt-5-mini',
         messages,
         temperature: 0.3,
         max_tokens: 4000,
@@ -1150,7 +1151,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
         throw new AIServiceError('Rate limit exceeded. Please try again in a moment.', 429);
       }
       if (streamResponse.status === 402) {
-        throw new AIServiceError('AI credits exhausted. Please add credits to your Lovable workspace.', 402);
+        throw new AIServiceError('AI credits exhausted. Please check your OpenAI billing.', 402);
       }
       
       throw new AIServiceError(`AI service error: ${streamResponse.status}`, streamResponse.status);

@@ -16,7 +16,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -76,7 +76,7 @@ serve(async (req) => {
           const needsOCR = item.file_name.match(/\.(jpg|jpeg|png|pdf)$/i);
           let ocrResult = null;
 
-          if (needsOCR && item.storage_path && LOVABLE_API_KEY) {
+          if (needsOCR && item.storage_path && OPENAI_API_KEY) {
             try {
               // Download file from storage
               const { data: fileData, error: downloadError } = await supabase.storage
@@ -91,14 +91,14 @@ serve(async (req) => {
               const dataUrl = `data:${fileData.type};base64,${base64}`;
 
               // Run OCR via AI
-              const ocrResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              const ocrResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  model: 'google/gemini-2.5-flash',
+                  model: 'gpt-5-mini',
                   messages: [
                     { 
                       role: 'system', 

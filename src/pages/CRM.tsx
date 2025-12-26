@@ -188,11 +188,144 @@ const CRMContent = memo(() => {
   }, []);
 
   const handleBulkAction = useCallback(async (action: Omit<BulkAction, 'id' | 'created_at' | 'created_by' | 'status' | 'progress' | 'success_count' | 'error_count' | 'errors'>) => {
-    // TODO: Implement bulk action processing via edge function or RPC
-    if (import.meta.env.DEV) {
-      // TODO: Implement bulk action processing via edge function or RPC
+    const { action_type, entity_ids, parameters } = action;
+
+    try {
+      switch (action_type) {
+        case 'assign_owner': {
+          const ownerId = parameters?.owner_id;
+          if (!ownerId) {
+            toast({ title: 'Error', description: 'Please select an owner', variant: 'destructive' });
+            return;
+          }
+          const { error } = await supabase
+            .from('accounts')
+            .update({ assigned_to: ownerId as string, updated_at: new Date().toISOString() })
+            .in('id', entity_ids);
+
+          if (error) throw error;
+          toast({ title: 'Success', description: `Assigned ${entity_ids.length} accounts to new owner` });
+          fetchAccounts();
+          break;
+        }
+
+        case 'add_tags': {
+          const tagsStr = parameters?.tags;
+          if (!tagsStr) {
+            toast({ title: 'Error', description: 'Please enter tags', variant: 'destructive' });
+            return;
+          }
+          const newTags = String(tagsStr).split(',').map(t => t.trim()).filter(Boolean);
+
+          // Update each account's tags
+          for (const accountId of entity_ids) {
+            const { data: account } = await supabase
+              .from('accounts')
+              .select('tags')
+              .eq('id', accountId)
+              .single();
+
+            const existingTags = (account?.tags as string[]) || [];
+            const mergedTags = [...new Set([...existingTags, ...newTags])];
+
+            await supabase
+              .from('accounts')
+              .update({ tags: mergedTags, updated_at: new Date().toISOString() })
+              .eq('id', accountId);
+          }
+
+          toast({ title: 'Success', description: `Added tags to ${entity_ids.length} accounts` });
+          fetchAccounts();
+          break;
+        }
+
+        case 'create_tasks': {
+          const title = parameters?.title;
+          if (!title) {
+            toast({ title: 'Error', description: 'Please enter a task title', variant: 'destructive' });
+            return;
+          }
+
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+
+          const tasks = entity_ids.map(accountId => ({
+            title: String(title),
+            description: parameters?.description ? String(parameters.description) : null,
+            priority: parameters?.priority ? String(parameters.priority) : 'medium',
+            status: 'pending',
+            account_id: accountId,
+            assigned_to: parameters?.assignee_id ? String(parameters.assignee_id) : user.id,
+            created_by: user.id,
+          }));
+
+          const { error } = await supabase.from('tasks').insert(tasks);
+          if (error) throw error;
+
+          toast({ title: 'Success', description: `Created ${entity_ids.length} tasks` });
+          break;
+        }
+
+        case 'export': {
+          const format = parameters?.format || 'csv';
+
+          // Get full account data
+          const { data: accountsToExport, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .in('id', entity_ids);
+
+          if (error) throw error;
+          if (!accountsToExport?.length) {
+            toast({ title: 'Error', description: 'No accounts to export', variant: 'destructive' });
+            return;
+          }
+
+          if (format === 'csv') {
+            // Generate CSV
+            const headers = ['Name', 'Type', 'Email', 'Phone', 'Address', 'City', 'State', 'ZIP', 'Created'];
+            const rows = accountsToExport.map(a => [
+              a.name || '',
+              a.type || '',
+              a.email || '',
+              a.phone || '',
+              a.address_line1 || '',
+              a.city || '',
+              a.state || '',
+              a.zip_code || '',
+              a.created_at ? new Date(a.created_at).toLocaleDateString() : ''
+            ]);
+
+            const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `accounts_export_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast({ title: 'Success', description: `Exported ${accountsToExport.length} accounts to CSV` });
+          } else {
+            toast({ title: 'Info', description: `${format.toUpperCase()} export coming soon. CSV exported instead.` });
+          }
+          break;
+        }
+
+        default:
+          toast({ title: 'Error', description: `Unknown action: ${action_type}`, variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Bulk action error:', err);
+      toast({
+        title: 'Bulk action failed',
+        description: err instanceof Error ? err.message : 'An error occurred',
+        variant: 'destructive'
+      });
     }
-  }, []);
+  }, [fetchAccounts]);
 
   const handleAccountSelection = useCallback((account: Account, selected: boolean) => {
     setSelectedAccounts(prev => 

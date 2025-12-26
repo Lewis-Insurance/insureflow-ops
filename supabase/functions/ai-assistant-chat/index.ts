@@ -1,8 +1,8 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
 import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.ts';
+import { chatCompletion, getAIProvider, type ChatMessage, type Tool, type AIResponse } from '../_shared/ai-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,8 +19,11 @@ serve(async (req) => {
     const env = validateEnvVars({
       SUPABASE_URL: 'Supabase project URL',
       SUPABASE_SERVICE_ROLE_KEY: 'Supabase service role key',
-      LOVABLE_API_KEY: 'Lovable AI gateway API key',
     });
+
+    // Get AI provider (validates API key internally)
+    const aiProvider = getAIProvider();
+    console.log(`Using AI provider: ${aiProvider}`);
 
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -345,37 +348,20 @@ When a user asks about any of these topics, use the appropriate tool to fetch re
 
 Current user context: ${context ? JSON.stringify(context) : 'General assistant'}`;
 
-    // Make initial API call with tools
-    const initialResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages
-        ],
-        tools,
-      }),
-    });
+    // Build chat messages
+    const chatMessages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...messages.map((m: any) => ({ role: m.role, content: m.content }))
+    ];
 
-    if (!initialResponse.ok) {
-      const errorText = await initialResponse.text();
-      console.error('AI API error:', initialResponse.status, errorText);
-      throw new Error(`AI API error: ${initialResponse.status}`);
-    }
-
-    const initialData = await initialResponse.json();
-    const firstMessage = initialData.choices[0].message;
+    // Make initial API call with tools using the new AI client
+    const initialResponse = await chatCompletion(chatMessages, tools as Tool[]);
 
     // Check if AI wants to use tools
-    if (firstMessage.tool_calls && firstMessage.tool_calls.length > 0) {
-      const toolResults = [];
+    if (initialResponse.tool_calls && initialResponse.tool_calls.length > 0) {
+      const toolResults: ChatMessage[] = [];
 
-      for (const toolCall of firstMessage.tool_calls) {
+      for (const toolCall of initialResponse.tool_calls) {
         const functionName = toolCall.function.name;
         const args = JSON.parse(toolCall.function.arguments);
         console.log('Tool call:', functionName, args);
@@ -736,42 +722,27 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
         }
 
         toolResults.push({
+          role: 'tool' as const,
+          content: JSON.stringify(result),
           tool_call_id: toolCall.id,
-          role: 'tool',
           name: functionName,
-          content: JSON.stringify(result)
         });
       }
 
+      // Build messages for second call including assistant's tool call and results
+      const followUpMessages: ChatMessage[] = [
+        ...chatMessages,
+        { role: 'assistant', content: '' }, // Placeholder for assistant's tool call request
+        ...toolResults
+      ];
+
       // Make second API call with tool results
-      const finalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages,
-            firstMessage,
-            ...toolResults
-          ],
-        }),
-      });
-
-      if (!finalResponse.ok) {
-        throw new Error('Failed to generate final response');
-      }
-
-      const finalData = await finalResponse.json();
-      const finalMessage = finalData.choices[0].message.content;
+      const finalResponse = await chatCompletion(followUpMessages, tools as Tool[]);
 
       return new Response(
-        JSON.stringify({ 
-          content: finalMessage,
-          tool_calls_made: toolResults.length 
+        JSON.stringify({
+          content: finalResponse.content,
+          tool_calls_made: toolResults.length
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -782,7 +753,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
 
     // No tool calls needed, return direct response
     return new Response(
-      JSON.stringify({ content: firstMessage.content }),
+      JSON.stringify({ content: initialResponse.content }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
