@@ -607,31 +607,173 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
     return;
   }
 
-  // If this pull is linked to a lead, update lead score
-  if (pull?.lead_id) {
+  let leadId = pull?.lead_id;
+
+  // If no lead is linked, create one automatically from the Canopy data
+  if (!leadId && pull?.id) {
     try {
-      // Call the lead score calculation function
-      await supabase.rpc('calculate_canopy_lead_score', { p_lead_id: pull.lead_id });
+      leadId = await createLeadFromCanopyPull(supabase, pull.id);
 
-      // Update the lead with the new score
-      const { data: scoreResult } = await supabase.rpc('calculate_canopy_lead_score', {
-        p_lead_id: pull.lead_id
-      });
+      if (leadId) {
+        // Link the new lead to the pull
+        await supabase.from('canopy_pulls')
+          .update({ lead_id: leadId })
+          .eq('id', pull.id);
 
-      if (scoreResult) {
-        await supabase.from('leads')
-          .update({
-            lead_score: scoreResult,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', pull.lead_id);
+        console.log(`Created new lead ${leadId} from Canopy pull ${payload.pull_id}`);
       }
+    } catch (createError) {
+      console.error('Failed to create lead from Canopy data:', createError);
+    }
+  }
+
+  // If we have a lead (existing or newly created), update lead score
+  if (leadId) {
+    try {
+      // Give Canopy-imported leads a high initial score (verified data)
+      await supabase.from('leads')
+        .update({
+          lead_score: 75, // High score for verified Canopy data
+          status: 'qualified',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId);
     } catch (scoreError) {
       console.error('Failed to update lead score:', scoreError);
     }
   }
 
   console.log(`Pull ${payload.pull_id} completed successfully`);
+}
+
+// Create a new lead from Canopy pull data
+async function createLeadFromCanopyPull(
+  supabase: ReturnType<typeof createClient>,
+  pullId: string
+): Promise<string | null> {
+  // Get the primary driver from the policies
+  const { data: drivers } = await supabase.from('canopy_drivers')
+    .select(`
+      *,
+      canopy_policies!inner (pull_id)
+    `)
+    .eq('canopy_policies.pull_id', pullId)
+    .eq('is_primary', true)
+    .limit(1);
+
+  // If no primary driver, get the first driver
+  let driver = drivers?.[0];
+  if (!driver) {
+    const { data: anyDriver } = await supabase.from('canopy_drivers')
+      .select(`
+        *,
+        canopy_policies!inner (pull_id)
+      `)
+      .eq('canopy_policies.pull_id', pullId)
+      .limit(1);
+    driver = anyDriver?.[0];
+  }
+
+  // Get policy types for this pull
+  const { data: policies } = await supabase.from('canopy_policies')
+    .select('policy_type, carrier_name, premium_amount, expiration_date')
+    .eq('pull_id', pullId);
+
+  const insuranceTypes = [...new Set(policies?.map(p => p.policy_type) || [])];
+  const carriers = [...new Set(policies?.map(p => p.carrier_name).filter(Boolean) || [])];
+  const totalPremium = policies?.reduce((sum, p) => sum + (p.premium_amount || 0), 0) || 0;
+
+  // Find the earliest expiration date
+  const expirationDates = policies
+    ?.map(p => p.expiration_date)
+    .filter(Boolean)
+    .sort();
+  const nextExpiration = expirationDates?.[0];
+
+  // Create the lead
+  const { data: newLead, error: leadError } = await supabase.from('leads')
+    .insert({
+      first_name: driver?.first_name || 'Unknown',
+      last_name: driver?.last_name || 'Customer',
+      email: null, // Canopy doesn't typically provide email
+      phone: null, // Canopy doesn't typically provide phone
+      insurance_types: insuranceTypes,
+      lead_source: 'canopy_import',
+      lead_score: 75, // High score for verified Canopy data
+      status: 'qualified',
+      metadata: {
+        canopy_pull_id: pullId,
+        current_carriers: carriers,
+        current_premium: totalPremium,
+        policy_expiration: nextExpiration,
+        driver_dob: driver?.date_of_birth,
+        driver_license_state: driver?.license_state,
+        imported_at: new Date().toISOString()
+      }
+    })
+    .select('id')
+    .single();
+
+  if (leadError) {
+    console.error('Failed to create lead:', leadError);
+    return null;
+  }
+
+  // Copy driver info to lead_auto_drivers if we have a driver and auto insurance
+  if (driver && insuranceTypes.includes('auto') && newLead?.id) {
+    const { data: allDrivers } = await supabase.from('canopy_drivers')
+      .select(`
+        *,
+        canopy_policies!inner (pull_id)
+      `)
+      .eq('canopy_policies.pull_id', pullId);
+
+    for (const d of allDrivers || []) {
+      await supabase.from('lead_auto_drivers').insert({
+        lead_id: newLead.id,
+        first_name: d.first_name,
+        last_name: d.last_name,
+        date_of_birth: d.date_of_birth,
+        gender: d.gender,
+        marital_status: d.marital_status,
+        license_number: d.license_number,
+        license_state: d.license_state,
+        relation_to_insured: d.relation_to_insured,
+        years_licensed: d.years_licensed,
+        accidents_violations: {
+          violations: d.violations || [],
+          accidents: d.accidents || []
+        }
+      });
+    }
+
+    // Copy vehicle info to lead_auto_vehicles
+    const { data: vehicles } = await supabase.from('canopy_vehicles')
+      .select(`
+        *,
+        canopy_policies!inner (pull_id)
+      `)
+      .eq('canopy_policies.pull_id', pullId);
+
+    for (const v of vehicles || []) {
+      await supabase.from('lead_auto_vehicles').insert({
+        lead_id: newLead.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        vin: v.vin,
+        ownership: v.ownership,
+        primary_use: v.usage_type,
+        annual_mileage: v.annual_mileage,
+        garage_address: [v.garage_address, v.garage_city, v.garage_state, v.garage_zip]
+          .filter(Boolean)
+          .join(', '),
+        safety_features: v.coverages || {}
+      });
+    }
+  }
+
+  return newLead?.id || null;
 }
 
 async function handlePullError(supabase: ReturnType<typeof createClient>, payload: CanopyWebhookPayload) {
