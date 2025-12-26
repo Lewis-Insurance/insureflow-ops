@@ -30,6 +30,7 @@ import { InsuranceDetailsPanel } from "@/components/leads/insurance/InsuranceDet
 import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
 import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
 import { CanopyDataDisplay } from "@/components/canopy/CanopyDataDisplay";
+import { CanopyConnectButton } from "@/components/canopy/CanopyConnectButton";
 import {
   Phone,
   Mail,
@@ -249,6 +250,15 @@ export default function LeadDetail() {
         <div className="flex gap-2">
           {!isEditing ? (
             <>
+              <CanopyConnectButton
+                leadId={leadId}
+                variant="outline"
+                size="default"
+                onComplete={() => {
+                  // Refetch lead data after import
+                  window.location.reload();
+                }}
+              />
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
