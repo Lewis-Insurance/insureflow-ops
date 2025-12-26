@@ -15,11 +15,8 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { requireAuth } from '../_shared/auth.ts';
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
 // =============================================================================
 // BAP EXTRACTION SYSTEM PROMPT
@@ -357,7 +354,12 @@ function formatEvidenceForPrompt(catalog: EvidenceCatalog): string {
 // =============================================================================
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
 
   const jobStartTime = Date.now();
   let jobId: string | null = null;
@@ -372,6 +374,12 @@ serve(async (req) => {
     if (!anthropicApiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
     const body: RequestBody = await req.json();

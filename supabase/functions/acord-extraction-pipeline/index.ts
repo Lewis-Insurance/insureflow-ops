@@ -13,11 +13,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireAuth } from '../_shared/auth.ts';
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -713,33 +710,36 @@ function parseDate(dateStr: string): Date | null {
 // ============================================
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
 
   const startTime = Date.now();
   let extractionId: string | null = null;
 
   try {
+    // Initialize Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+    const userId = authResult.id;
+
     const request: ExtractionRequest = await req.json();
 
     console.log('========================================');
     console.log('ACORD EXTRACTION PIPELINE - START');
     console.log('========================================');
     console.log('Document:', request.document_name);
-
-    // Initialize Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get user
-    const authHeader = req.headers.get('Authorization');
-    let userId: string | null = null;
-    if (authHeader) {
-      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-      userId = user?.id || null;
-    }
+    console.log('User:', userId);
 
     // Create extraction record
     const { data: extraction, error: insertError } = await supabase

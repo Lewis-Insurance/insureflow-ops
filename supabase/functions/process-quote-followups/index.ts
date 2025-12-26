@@ -473,31 +473,154 @@ async function createFollowUpTask(followup: any, supabaseClient: any) {
 }
 
 /**
- * Send follow-up email (placeholder - integrate with email-send function)
+ * Send follow-up email via internal edge function call
  */
 async function sendFollowUpEmail(followup: any, supabaseClient: any) {
-  // TODO: Integrate with email-send edge function
-  // For now, just log the timestamp
-  await supabaseClient
-    .from("quote_followups")
-    .update({ email_sent_at: new Date().toISOString() })
-    .eq("id", followup.id);
+  const quote = followup.quote;
+  const rule = followup.rule;
+  const account = quote.account;
 
-  console.log(`Email follow-up sent for ${followup.id}`);
+  // Get recipient email from account or quote
+  const recipientEmail = account?.email || quote.email;
+  if (!recipientEmail) {
+    console.log(`No email address found for follow-up ${followup.id}`);
+    return;
+  }
+
+  // Get email template content
+  let emailSubject = `Follow-up on your insurance quote`;
+  let emailBody = `
+    <p>Hi ${account?.name || 'there'},</p>
+    <p>We wanted to follow up on the quote we sent you for your ${quote.line_of_business || 'insurance'} coverage.</p>
+    <p>Quote Reference: ${quote.quote_ref || quote.id.slice(0, 8)}</p>
+    ${quote.premium ? `<p>Premium: $${quote.premium.toLocaleString()}</p>` : ''}
+    <p>If you have any questions or would like to proceed, please don't hesitate to reach out.</p>
+    <p>Best regards,<br/>Your Insurance Team</p>
+  `;
+
+  // Use template if specified in rule
+  if (rule.email_template_id) {
+    const { data: template } = await supabaseClient
+      .from("email_templates")
+      .select("subject, body")
+      .eq("id", rule.email_template_id)
+      .single();
+
+    if (template) {
+      emailSubject = template.subject
+        .replace("{{quote_ref}}", quote.quote_ref || quote.id.slice(0, 8))
+        .replace("{{account_name}}", account?.name || "");
+      emailBody = template.body
+        .replace("{{quote_ref}}", quote.quote_ref || quote.id.slice(0, 8))
+        .replace("{{account_name}}", account?.name || "")
+        .replace("{{premium}}", quote.premium?.toLocaleString() || "N/A")
+        .replace("{{line_of_business}}", quote.line_of_business || "insurance");
+    }
+  }
+
+  // Call email-send edge function internally
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/email-send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        to: recipientEmail,
+        subject: emailSubject,
+        body: emailBody,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`Email send failed for ${followup.id}:`, error);
+      return;
+    }
+
+    // Update follow-up with timestamp
+    await supabaseClient
+      .from("quote_followups")
+      .update({ email_sent_at: new Date().toISOString() })
+      .eq("id", followup.id);
+
+    console.log(`Email follow-up sent for ${followup.id} to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`Email send error for ${followup.id}:`, error);
+  }
 }
 
 /**
- * Send follow-up SMS (placeholder - integrate with twilio-sms function)
+ * Send follow-up SMS via internal edge function call
  */
 async function sendFollowUpSMS(followup: any, supabaseClient: any) {
-  // TODO: Integrate with twilio-sms edge function
-  // For now, just log the timestamp
-  await supabaseClient
-    .from("quote_followups")
-    .update({ sms_sent_at: new Date().toISOString() })
-    .eq("id", followup.id);
+  const quote = followup.quote;
+  const rule = followup.rule;
+  const account = quote.account;
 
-  console.log(`SMS follow-up sent for ${followup.id}`);
+  // Get recipient phone from account or quote
+  const recipientPhone = account?.phone || quote.phone;
+  if (!recipientPhone) {
+    console.log(`No phone number found for follow-up ${followup.id}`);
+    return;
+  }
+
+  // Build SMS message
+  let smsBody = `Hi${account?.name ? ` ${account.name}` : ''}! This is a friendly reminder about your ${quote.line_of_business || 'insurance'} quote (Ref: ${quote.quote_ref || quote.id.slice(0, 8)}).`;
+
+  if (quote.premium) {
+    smsBody += ` Premium: $${quote.premium.toLocaleString()}.`;
+  }
+
+  smsBody += ` Questions? Reply to this message or give us a call!`;
+
+  // Use template text if specified in rule
+  if (rule.sms_template_text) {
+    smsBody = rule.sms_template_text
+      .replace("{{quote_ref}}", quote.quote_ref || quote.id.slice(0, 8))
+      .replace("{{account_name}}", account?.name || "")
+      .replace("{{premium}}", quote.premium?.toLocaleString() || "N/A")
+      .replace("{{line_of_business}}", quote.line_of_business || "insurance");
+  }
+
+  // Call send-sms edge function internally
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        to_number: recipientPhone,
+        body: smsBody,
+        account_id: quote.account_id,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`SMS send failed for ${followup.id}:`, error);
+      return;
+    }
+
+    // Update follow-up with timestamp
+    await supabaseClient
+      .from("quote_followups")
+      .update({ sms_sent_at: new Date().toISOString() })
+      .eq("id", followup.id);
+
+    console.log(`SMS follow-up sent for ${followup.id} to ${recipientPhone}`);
+  } catch (error) {
+    console.error(`SMS send error for ${followup.id}:`, error);
+  }
 }
 
 /**

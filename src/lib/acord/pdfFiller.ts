@@ -304,6 +304,100 @@ function applyTransform(
   return result;
 }
 
+// ============================================
+// EXPORTED HELPER FUNCTIONS (for testing)
+// ============================================
+
+/**
+ * Determine field type based on naming patterns
+ */
+export function getFieldTypeFromName(fieldName: string): 'text' | 'checkbox' | 'date' | 'dropdown' | 'radio' {
+  const lowerName = fieldName.toLowerCase();
+
+  // Checkbox patterns
+  if (lowerName.startsWith('has_') ||
+      lowerName.startsWith('is_') ||
+      lowerName.startsWith('include_') ||
+      lowerName.startsWith('coverage_') ||
+      lowerName.includes('_yn') ||
+      lowerName.includes('_checkbox')) {
+    return 'checkbox';
+  }
+
+  // Date patterns
+  if (lowerName.includes('_date') ||
+      lowerName.endsWith('date') ||
+      lowerName.includes('dob') ||
+      lowerName.includes('effective') ||
+      lowerName.includes('expiration')) {
+    return 'text'; // Dates are filled as text
+  }
+
+  return 'text';
+}
+
+/**
+ * Format a field value based on type and options
+ */
+export function formatFieldValue(
+  value: any,
+  fieldType: string,
+  options: {
+    dateFormat?: string;
+    phoneFormat?: string;
+    uppercase?: boolean;
+    trim?: boolean;
+  }
+): any {
+  if (value === null || value === undefined) return '';
+
+  // Handle checkbox/boolean values
+  if (fieldType === 'checkbox') {
+    if (typeof value === 'boolean') return value;
+    const trueValues = ['true', '1', 'yes', 'y', 'on', 'checked', 'x'];
+    return trueValues.includes(String(value).toLowerCase());
+  }
+
+  let result = String(value);
+
+  // Apply trim
+  if (options.trim) {
+    result = result.trim();
+  }
+
+  // Apply uppercase
+  if (options.uppercase) {
+    result = result.toUpperCase();
+  }
+
+  // Format date
+  if (options.dateFormat && isDateValue(result)) {
+    result = formatDate(result, options.dateFormat);
+  }
+
+  // Format phone
+  if (options.phoneFormat && isPhoneValue(result)) {
+    result = formatPhone(result, options.phoneFormat);
+  }
+
+  return result;
+}
+
+/**
+ * Fill a PDF form with field values (alias for fillAcordPdf)
+ */
+export async function fillPdfForm(
+  templateBytes: Uint8Array | ArrayBuffer,
+  fieldValues: Record<string, any>,
+  fieldTypeMap: FieldTypeMap,
+  options: Partial<PdfFillOptions>
+): Promise<PdfFillResult> {
+  return fillAcordPdf(templateBytes, {
+    ...options,
+    fieldValues,
+  });
+}
+
 function toBooleanValue(value: string | boolean): boolean {
   if (typeof value === 'boolean') return value;
 
@@ -321,12 +415,18 @@ function formatDate(value: string, format: string): string {
     const date = new Date(value);
     if (isNaN(date.getTime())) return value;
 
+    // Use UTC methods to avoid timezone issues
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const shortYear = year.toString().slice(-2);
+
     // Common format patterns
     const patterns: Record<string, string> = {
-      'MM/DD/YYYY': `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`,
-      'MM/DD/YY': `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear().toString().slice(-2)}`,
-      'YYYY-MM-DD': `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`,
-      'MM-DD-YYYY': `${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}-${date.getFullYear()}`,
+      'MM/DD/YYYY': `${month}/${day}/${year}`,
+      'MM/DD/YY': `${month}/${day}/${shortYear}`,
+      'YYYY-MM-DD': `${year}-${month}-${day}`,
+      'MM-DD-YYYY': `${month}-${day}-${year}`,
     };
 
     return patterns[format] || patterns['MM/DD/YYYY'];

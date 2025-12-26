@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,7 +32,6 @@ import { POLICY_DATA_DISCLAIMER } from '@/types/portal';
 export default function PortalDashboard() {
   const { user, branding, loading, signOut, isAuthenticated } = usePortalAuth();
   const [activeTab, setActiveTab] = useState('id-cards');
-  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -46,8 +45,7 @@ export default function PortalDashboard() {
   }
 
   if (!isAuthenticated) {
-    navigate('/portal/login');
-    return null;
+    return <Navigate to="/portal/login" replace />;
   }
 
   return (

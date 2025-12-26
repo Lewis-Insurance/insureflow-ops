@@ -38,14 +38,7 @@ interface AcordTemplate {
   field_inventory: any[];
 }
 
-// ============================================
-// CORS HEADERS
-// ============================================
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
 // ============================================
 // MAIN HANDLER
@@ -53,9 +46,11 @@ const corsHeaders = {
 
 serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
     // Initialize Supabase client
