@@ -75,6 +75,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Leads"
                   to="/leads"
                 />
+                <NavItem
+                  icon={Shield}
+                  label="Canopy Import"
+                  to="/canopy-import"
+                  badge="NEW"
+                />
               </SidebarMenu>
 
               {/* Lewi AI Group */}
