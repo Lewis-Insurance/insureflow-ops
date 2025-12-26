@@ -98,6 +98,7 @@ const ModuleBuilderPage = React.lazy(() => import("./pages/ModuleBuilderPage"));
 const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
 const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
+const CanopyImportPage = React.lazy(() => import("./pages/CanopyImportPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -190,6 +191,16 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <AccountDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/canopy-import"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CanopyImportPage />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }
