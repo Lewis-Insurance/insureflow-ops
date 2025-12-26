@@ -6,6 +6,15 @@ import { initializeEnvironment } from "./config/validateEnv";
 import { runHealthCheck } from "./health-check";
 import { logger } from "./lib/logger";
 
+// Simple HTML escaping for error messages in startup error pages
+const escapeHtml = (text: string): string =>
+  text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 // Run health check first
 logger.debug('🏥 Running health check...');
 const healthCheck = runHealthCheck();
@@ -20,7 +29,7 @@ if (!healthCheck.success) {
           <h1 style="color: #dc2626; margin-bottom: 1rem;">⚠️ Configuration Error</h1>
           <p style="color: #6b7280; margin-bottom: 1rem;">The application failed health checks:</p>
           <ul style="color: #ef4444; text-align: left; margin: 0 auto; max-width: 400px;">
-            ${healthCheck.errors.map(err => `<li>${err}</li>`).join('')}
+            ${healthCheck.errors.map(err => `<li>${escapeHtml(err)}</li>`).join('')}
           </ul>
           <p style="color: #9ca3af; margin-top: 1.5rem; font-size: 0.875rem;">Please check browser console for details.</p>
         </div>
@@ -46,7 +55,7 @@ try {
           <div style="text-align: center; max-width: 500px; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <h1 style="color: #dc2626; margin-bottom: 1rem;">⚠️ Initialization Error</h1>
             <p style="color: #6b7280;">The application failed to start. Please contact support.</p>
-            <p style="color: #9ca3af; margin-top: 1rem; font-size: 0.875rem;">Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+            <p style="color: #9ca3af; margin-top: 1rem; font-size: 0.875rem;">Error: ${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</p>
           </div>
         </div>
       `;

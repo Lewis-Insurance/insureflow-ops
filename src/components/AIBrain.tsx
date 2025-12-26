@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { 
-  Brain, Search, Sparkles, RefreshCw, Plus, 
+import DOMPurify from 'dompurify';
+import {
+  Brain, Search, Sparkles, RefreshCw, Plus,
   Database, Shield, Zap, Loader2, Tag, Download, Upload, FileText, Check, Trash2
 } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
@@ -399,7 +400,7 @@ const InsuranceAIBrain = () => {
                     Read full answer...
                   </summary>
                   <div className="mt-2 pt-2 border-t prose prose-sm max-w-none">
-                    <div dangerouslySetInnerHTML={{ __html: searchResults.fullAnswer }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(searchResults.fullAnswer) }} />
                   </div>
                 </details>
               )}

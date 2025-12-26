@@ -1,11 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { requireAuth } from '../_shared/auth.ts';
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
 // System prompt for the AI that helps build modules
 const MODULE_BUILDER_SYSTEM_PROMPT = `You are Lewi, an AI assistant that helps insurance agency staff create custom AI tools (called "modules"). Your job is to interview the user about what they want to build, then generate a complete module configuration.
@@ -102,9 +98,11 @@ You understand: Policy types (Auto, Home, Commercial, WC, GL, Umbrella, E&O, D&O
 
 serve(async (req) => {
     // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
-    }
+    const corsResponse = handleCors(req);
+    if (corsResponse) return corsResponse;
+
+    const origin = req.headers.get('origin');
+    const corsHeaders = getCorsHeaders(origin);
 
     try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -113,18 +111,12 @@ serve(async (req) => {
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        // Get auth token
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            throw new Error('No authorization header');
+        // Require authentication
+        const authResult = await requireAuth(req, supabase, corsHeaders);
+        if (authResult instanceof Response) {
+            return authResult;
         }
-
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-        if (authError || !user) {
-            throw new Error('Unauthorized');
-        }
+        const user = authResult;
 
         const body = await req.json();
         const { action, session_id, message, module_id } = body;

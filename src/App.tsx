@@ -756,53 +756,65 @@ const App = () => (
                 <Route
                   path="/coverage-gap-analysis/:accountId"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CoverageGapAnalysis />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CoverageGapAnalysis />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/coverage-gap/:analysisId"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CoverageGapDetail />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CoverageGapDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/issues"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <IssueTracker />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <IssueTracker />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/issues/new"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <ReportIssue />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ReportIssue />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/issues/:issueId"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <IssueDetail />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <IssueDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/predictive-analytics"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <PredictiveAnalytics />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <PredictiveAnalytics />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 {/* Redirect old /operations route to Command Center */}
-                <Route path="/operations" element={<CommandCenterPage />} />
+                <Route path="/operations" element={<ProtectedRoute><CommandCenterPage /></ProtectedRoute>} />
                 {/* Client Portal Routes (Public) */}
                 <Route
                   path="/portal/login"
@@ -832,41 +844,51 @@ const App = () => (
                 <Route
                   path="/carrier-templates"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CarrierTemplatesPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CarrierTemplatesPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/carrier-templates/:id"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CarrierTemplateBuilder />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CarrierTemplateBuilder />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/carrier-templates/:id/edit"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CarrierTemplateBuilder />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CarrierTemplateBuilder />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/extraction-review"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <ExtractionReviewQueue />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ExtractionReviewQueue />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/extraction-review/:id"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <ExtractionReviewDetail />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ExtractionReviewDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route

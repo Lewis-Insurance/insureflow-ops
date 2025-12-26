@@ -547,10 +547,6 @@ export default function PublicIntake() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Custom CSS from branding */}
-      {template.branding?.customCss && (
-        <style dangerouslySetInnerHTML={{ __html: template.branding.customCss }} />
-      )}
     </div>
   );
 }

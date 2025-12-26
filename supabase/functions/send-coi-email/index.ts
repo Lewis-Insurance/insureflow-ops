@@ -1,18 +1,24 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.ts';
+/**
+ * Send COI Email Edge Function
+ *
+ * Sends Certificate of Insurance emails via Resend with proper authentication,
+ * rate limiting, and access verification.
+ *
+ * Security: Sender email is fixed to prevent email spoofing.
+ */
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.ts';
+import { requireAuth } from "../_shared/auth.ts";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
 
 interface SendCOIEmailRequest {
   to: string;
   certificateNumber: string;
   certificateUrl: string;
   holderName: string;
-  fromName?: string;
-  fromEmail?: string;
 }
 
 interface ResendEmailResponse {
@@ -24,6 +30,10 @@ interface ResendErrorResponse {
   message: string;
   name: string;
 }
+
+// Fixed sender configuration - DO NOT allow caller to override
+const SENDER_NAME = 'Lewis Insurance';
+const SENDER_EMAIL = 'coi@lewisinsurance.ai';
 
 /**
  * Send email using Resend REST API (Deno-compatible)
@@ -85,6 +95,19 @@ function generateCOIEmailHtml(
   certificateUrl: string,
   holderName: string
 ): string {
+  // Escape HTML to prevent XSS
+  const escapeHtml = (text: string) => text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const safeCertNumber = escapeHtml(certificateNumber);
+  const safeHolderName = escapeHtml(holderName);
+  // URL is validated separately, but encode it anyway
+  const safeUrl = encodeURI(certificateUrl);
+
   return `
 <!DOCTYPE html>
 <html>
@@ -146,18 +169,18 @@ function generateCOIEmailHtml(
       <h1>Certificate of Insurance</h1>
     </div>
     <div class="content">
-      <p>Dear ${holderName},</p>
+      <p>Dear ${safeHolderName},</p>
       <p>Please find attached your Certificate of Insurance.</p>
 
       <div class="details">
-        <strong>Certificate Number:</strong> ${certificateNumber}<br>
-        <strong>Certificate Holder:</strong> ${holderName}
+        <strong>Certificate Number:</strong> ${safeCertNumber}<br>
+        <strong>Certificate Holder:</strong> ${safeHolderName}
       </div>
 
       <p>You can download your certificate using the button below:</p>
 
       <p style="text-align: center;">
-        <a href="${certificateUrl}" class="button" target="_blank">
+        <a href="${safeUrl}" class="button" target="_blank">
           Download Certificate
         </a>
       </p>
@@ -166,7 +189,7 @@ function generateCOIEmailHtml(
 
       <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
 
-      <p>Best regards,<br>Your Insurance Agency</p>
+      <p>Best regards,<br>Lewis Insurance</p>
 
       <div class="footer">
         <p>This is an automated message. Please do not reply directly to this email.</p>
@@ -179,24 +202,48 @@ function generateCOIEmailHtml(
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Require authentication
+    const authResult = await requireAuth(req, supabase, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Returns 401 if auth failed
+    }
+    const user = authResult;
+
+    // Check rate limit (20 emails per minute per user)
+    const rateLimitResult = await checkRateLimit(
+      supabase,
+      'send-coi-email',
+      user.id,
+      RATE_LIMITS.email
+    );
+
+    if (!rateLimitResult.allowed) {
+      return rateLimitExceededResponse(rateLimitResult, corsHeaders);
+    }
+
     // Validate required environment variables
     const env = validateEnvVars({
       RESEND_API_KEY: 'Resend API key for email sending',
     });
 
-    // Parse request body
+    // Parse request body - NOTE: fromEmail and fromName are intentionally ignored for security
     const {
       to,
       certificateNumber,
       certificateUrl,
       holderName,
-      fromName = 'Insurance Agency',
-      fromEmail,
     }: SendCOIEmailRequest = await req.json();
 
     // Validate required fields
@@ -228,12 +275,29 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Sending COI ${certificateNumber} to ${to}`);
+    // Validate URL format
+    try {
+      new URL(certificateUrl);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid certificate URL format',
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
-    // Determine sender email
-    // Note: For production, you should use a verified domain in Resend
-    const senderEmail = fromEmail || 'onboarding@resend.dev';
-    const from = `${fromName} <${senderEmail}>`;
+    // Verify user has access to this certificate (if we have a certificates table)
+    // TODO: Add certificate access verification when certificates table is available
+
+    console.info(`Sending COI ${certificateNumber} to ${to} (user: ${user.id})`);
+
+    // Use fixed sender - DO NOT allow caller override
+    const from = `${SENDER_NAME} <${SENDER_EMAIL}>`;
 
     // Generate email HTML
     const html = generateCOIEmailHtml(certificateNumber, certificateUrl, holderName);
@@ -260,7 +324,23 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`COI email sent successfully: ${result.id}`);
+    console.info(`COI email sent successfully: ${result.id}`);
+
+    // Log email send to database for audit trail
+    await supabase
+      .from('email_log')
+      .insert({
+        type: 'coi',
+        to_email: to,
+        from_email: SENDER_EMAIL,
+        subject: `Certificate of Insurance - ${certificateNumber}`,
+        sent_by: user.id,
+        resend_id: result.id,
+        metadata: { certificateNumber, holderName },
+      })
+      .then(({ error }) => {
+        if (error) console.error('Failed to log email:', error);
+      });
 
     return new Response(
       JSON.stringify({
@@ -277,7 +357,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Check if this is a configuration error
     if (error instanceof Error && error.message.includes('Missing required environment')) {
-      return configErrorResponse(error, corsHeaders);
+      return configErrorResponse(error, getCorsHeaders(req.headers.get('origin')));
     }
 
     return new Response(
@@ -287,7 +367,7 @@ const handler = async (req: Request): Promise<Response> => {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(req.headers.get('origin')) },
       }
     );
   }

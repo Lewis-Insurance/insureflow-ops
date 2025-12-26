@@ -57,15 +57,15 @@ export function useAuth() {
       }
 
       if (profileData) {
-        console.log('Profile loaded successfully:', { 
-          id: profileData.id, 
-          role: profileData.role, 
-          is_staff: false 
+        console.log('Profile loaded successfully:', {
+          id: profileData.id,
+          role: profileData.role,
+          is_staff: profileData.is_staff
         });
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
-          is_staff: false,
+          is_staff: profileData.is_staff ?? false,
           notification_email: typeof profileData.notification_email === 'string' 
             ? profileData.notification_email === 'true' 
             : Boolean(profileData.notification_email),
