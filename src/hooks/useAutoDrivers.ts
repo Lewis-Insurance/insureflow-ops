@@ -19,8 +19,17 @@ export const useAutoDrivers = (leadId: string) => {
   return useQuery({
     queryKey: ['auto-drivers', leadId],
     queryFn: async (): Promise<AutoDriver[]> => {
-      // TABLE DISABLED: lead_auto_drivers does not exist in schema
-      return [];
+      const { data, error } = await supabase
+        .from('lead_auto_drivers' as any)
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('is_primary', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching auto drivers:', error);
+        return [];
+      }
+      return data || [];
     },
     enabled: !!leadId,
   });

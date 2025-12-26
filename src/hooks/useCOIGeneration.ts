@@ -366,7 +366,6 @@ export function useCOIGeneration() {
 
     // Check if already generating to prevent duplicate requests
     if (pendingGenerations.current.has(key)) {
-      console.log('Generation already in progress for', key);
       return pendingGenerations.current.get(key)!;
     }
 
@@ -658,15 +657,6 @@ export function useCOIGeneration() {
     const { concurrency = 3, onProgress, onItemComplete } = options || {};
     const results: BatchCOIResult[] = new Array(coiDataList.length);
     const queue = new COIQueue(concurrency);
-
-    // Listen to queue events
-    queue.addEventListener('task:complete', (e: any) => {
-      console.log(`COI ${e.detail.metadata.certificateNumber} completed in ${e.detail.duration}ms`);
-    });
-
-    queue.addEventListener('queue:empty', (e: any) => {
-      console.log('All COIs processed:', e.detail);
-    });
 
     const tasks = coiDataList.map((item, index) => async () => {
       try {
