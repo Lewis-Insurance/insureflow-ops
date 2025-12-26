@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
+import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,15 +15,14 @@ serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    // Validate all required environment variables upfront
+    const env = validateEnvVars({
+      SUPABASE_URL: 'Supabase project URL',
+      SUPABASE_SERVICE_ROLE_KEY: 'Supabase service role key',
+      LOVABLE_API_KEY: 'Lovable AI gateway API key',
+    });
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -349,7 +349,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
     const initialResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${env.LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -747,7 +747,7 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
       const finalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': `Bearer ${env.LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -791,9 +791,15 @@ Current user context: ${context ? JSON.stringify(context) : 'General assistant'}
 
   } catch (error: unknown) {
     console.error('Error in ai-assistant-chat:', error);
+
+    // Check if this is a configuration error (missing env vars)
+    if (error instanceof Error && error.message.includes('Missing required environment')) {
+      return configErrorResponse(error, corsHeaders);
+    }
+
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? (error instanceof Error ? error.message : String(error)) : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
