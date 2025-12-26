@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface SearchResult {
   entity_type: 'contact' | 'account' | 'business' | 'policy';
@@ -27,7 +28,7 @@ export function useGlobalSearch() {
       setError(null);
 
       const trimmedQuery = query.trim();
-      console.log('Searching for:', trimmedQuery);
+      logger.debug('Global search for:', trimmedQuery);
 
       // Fallback to manual search with broader criteria
       const [accountResponse, contactResponse, businessResponse, policyResponse] = await Promise.allSettled([
@@ -74,9 +75,7 @@ export function useGlobalSearch() {
       
       // Process account results
       if (accountResponse.status === 'fulfilled' && accountResponse.value.data) {
-        console.log('Account results:', accountResponse.value.data);
-        console.log('Account response status:', accountResponse.value.status);
-        console.log('Account response error:', accountResponse.value.error);
+        logger.debug('Account results count:', accountResponse.value.data.length);
         results.push(...accountResponse.value.data.map(account => ({
           entity_type: 'account' as const,
           id: account.id,
@@ -90,7 +89,7 @@ export function useGlobalSearch() {
 
       // Process contact results
       if (contactResponse.status === 'fulfilled' && contactResponse.value.data) {
-        console.log('Contact results:', contactResponse.value.data);
+        logger.debug('Contact results:', contactResponse.value.data);
         results.push(...contactResponse.value.data.map(contact => ({
           entity_type: 'contact' as const,
           id: contact.id,
@@ -104,7 +103,7 @@ export function useGlobalSearch() {
 
       // Process business results
       if (businessResponse.status === 'fulfilled' && businessResponse.value.data) {
-        console.log('Business results:', businessResponse.value.data);
+        logger.debug('Business results:', businessResponse.value.data);
         results.push(...businessResponse.value.data.map(business => ({
           entity_type: 'business' as const,
           id: business.id,
@@ -118,7 +117,7 @@ export function useGlobalSearch() {
 
       // Process policy results
       if (policyResponse.status === 'fulfilled' && policyResponse.value.data) {
-        console.log('Policy results:', policyResponse.value.data);
+        logger.debug('Policy results:', policyResponse.value.data);
         results.push(...policyResponse.value.data.map(policy => ({
           entity_type: 'policy' as const,
           id: policy.id,
@@ -131,7 +130,7 @@ export function useGlobalSearch() {
         console.error('Policy search failed:', policyResponse.reason);
       }
 
-      console.log('Final search results:', results);
+      logger.debug('Final search results:', results);
       setResults(results);
 
     } catch (err: any) {

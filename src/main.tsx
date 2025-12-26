@@ -4,13 +4,14 @@ import App from "./App.tsx";
 import "./index.css";
 import { initializeEnvironment } from "./config/validateEnv";
 import { runHealthCheck } from "./health-check";
+import { logger } from "./lib/logger";
 
 // Run health check first
-console.log('🏥 Running health check...');
+logger.debug('🏥 Running health check...');
 const healthCheck = runHealthCheck();
 
 if (!healthCheck.success) {
-  console.error('❌ Health check failed:', healthCheck.errors);
+  logger.error('❌ Health check failed:', healthCheck.errors);
   const rootEl = document.getElementById("root");
   if (rootEl) {
     rootEl.innerHTML = `
@@ -31,11 +32,11 @@ if (!healthCheck.success) {
 
 // Validate environment variables before starting the app
 try {
-  console.log('🔧 Initializing environment...');
+  logger.debug('🔧 Initializing environment...');
   initializeEnvironment();
-  console.log('✅ Environment initialized');
+  logger.debug('✅ Environment initialized');
 } catch (error) {
-  console.error('❌ Failed to initialize application:', error);
+  logger.error('❌ Failed to initialize application:', error);
   // In production, show a user-friendly error page
   if (import.meta.env.PROD) {
     const rootEl = document.getElementById("root");
@@ -54,15 +55,15 @@ try {
   }
 }
 
-console.log('🚀 Starting React app...');
+logger.debug('🚀 Starting React app...');
 try {
   const rootElement = document.getElementById("root");
   if (!rootElement) {
     throw new Error('Root element not found');
   }
   createRoot(rootElement).render(<App />);
-  console.log('✅ React app rendered');
+  logger.debug('✅ React app rendered');
 } catch (error) {
-  console.error('❌ Failed to render React app:', error);
+  logger.error('❌ Failed to render React app:', error);
   throw error;
 }
