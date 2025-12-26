@@ -57,10 +57,14 @@ export function useAuth() {
       }
 
       if (profileData) {
+        // Determine is_staff from role or explicit flag
+        const staffRoles = ['admin', 'staff', 'producer', 'csr', 'accounting', 'owner'];
+        const isStaffByRole = staffRoles.includes(profileData.role || '');
+
         setProfile({
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
-          is_staff: profileData.is_staff ?? false,
+          is_staff: profileData.is_staff ?? isStaffByRole,
           notification_email: typeof profileData.notification_email === 'string' 
             ? profileData.notification_email === 'true' 
             : Boolean(profileData.notification_email),
