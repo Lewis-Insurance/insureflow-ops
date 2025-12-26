@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
+import { handleBoundaryError } from '@/lib/errorTracking';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -115,13 +115,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
-    
-    // Log error for monitoring
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
+    // Report to error tracking service (Sentry in production)
+    handleBoundaryError(error, errorInfo, this.props.level || 'component');
+
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
-    
+
     // Auto-retry after 5 seconds for component-level errors
     if (this.props.level === 'component') {
       this.resetTimeoutId = window.setTimeout(() => {

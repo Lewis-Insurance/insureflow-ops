@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { createLogger } from "../_shared/logger.ts";
+import { createErrorResponse } from "../_shared/error-handler.ts";
+
+const logger = createLogger("ai-task-generator");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,6 +47,8 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  logger.logRequest(req);
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -65,7 +71,7 @@ serve(async (req) => {
     const request: TaskGenerationRequest = await req.json();
     const { triggerType, triggerData, ruleId, enhanceWithAI = true } = request;
 
-    console.log("Task generation request:", { triggerType, ruleId, enhanceWithAI });
+    logger.info("Task generation request", { triggerType, ruleId, enhanceWithAI });
 
     // Find matching rules
     let rules: TaskGenerationRule[] = [];
@@ -94,6 +100,7 @@ serve(async (req) => {
     }
 
     if (rules.length === 0) {
+      logger.info("No active rules found for trigger type", { triggerType });
       return new Response(
         JSON.stringify({
           success: false,
@@ -104,7 +111,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Found ${rules.length} matching rules`);
+    logger.info("Found matching rules", { count: rules.length });
 
     // Generate tasks from each matching rule
     const generatedTasks = [];
@@ -115,7 +122,7 @@ serve(async (req) => {
         if (rule.conditions && Object.keys(rule.conditions).length > 0) {
           const conditionsMet = checkConditions(rule.conditions, triggerData);
           if (!conditionsMet) {
-            console.log(`Conditions not met for rule: ${rule.name}`);
+            logger.debug("Conditions not met for rule", { ruleName: rule.name });
             continue;
           }
         }
@@ -134,7 +141,7 @@ serve(async (req) => {
             aiContext = aiEnhancement.context;
             aiSuggestions = aiEnhancement.suggestions;
           } catch (aiError) {
-            console.error("AI enhancement failed:", aiError);
+            logger.warn("AI enhancement failed, continuing without", { error: aiError instanceof Error ? aiError.message : String(aiError) });
             // Continue without AI enhancement
           }
         }
@@ -198,7 +205,7 @@ serve(async (req) => {
           .single();
 
         if (taskError) {
-          console.error("Task creation error:", taskError);
+          logger.error("Task creation failed", { ruleName: rule.name, error: taskError.message });
 
           // Log failure
           await supabaseClient.from("generated_tasks_log").insert({
@@ -238,9 +245,9 @@ serve(async (req) => {
           dueDate,
         });
 
-        console.log(`Successfully generated task: ${taskTitle}`);
+        logger.info("Successfully generated task", { taskTitle, taskId: task.id });
       } catch (ruleError: unknown) {
-        console.error(`Error processing rule ${rule.name}:`, ruleError);
+        logger.error("Error processing rule", { ruleName: rule.name, error: ruleError instanceof Error ? ruleError.message : String(ruleError) });
 
         // Log failure
         await supabaseClient.from("generated_tasks_log").insert({
@@ -255,6 +262,9 @@ serve(async (req) => {
       }
     }
 
+    logger.info("Task generation complete", { generatedCount: generatedTasks.length });
+    logger.logResponse(200);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -264,14 +274,8 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("Task generation error:", error);
-    return new Response(
-      JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      }
-    );
+    logger.error("Task generation failed", { error: error instanceof Error ? error.message : String(error) });
+    return createErrorResponse(error, corsHeaders);
   }
 });
 
