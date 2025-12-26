@@ -12,6 +12,7 @@ import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import { PendingFollowupsWidget } from '@/components/quotes/PendingFollowupsWidget';
 import { MyAORenewalsCard } from '@/components/dashboard/MyAORenewalsCard';
+import { CanopyStatsCard } from '@/components/canopy/CanopyStatsCard';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -42,13 +43,16 @@ const DashboardContent = React.memo(() => {
         <MyAORenewalsCard />
       </ErrorBoundary>
 
-      {/* Upcoming Tasks and Pending Follow-Ups */}
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Upcoming Tasks, Pending Follow-Ups, and Canopy Stats */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <ErrorBoundary level="component">
           <UpcomingTasksCard />
         </ErrorBoundary>
         <ErrorBoundary level="component">
           <PendingFollowupsWidget limit={5} />
+        </ErrorBoundary>
+        <ErrorBoundary level="component">
+          <CanopyStatsCard />
         </ErrorBoundary>
       </div>
 

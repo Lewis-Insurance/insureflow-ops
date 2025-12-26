@@ -26,7 +26,10 @@ import {
   XCircle,
   Clock,
   ChevronRight,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface CanopyDataDisplayProps {
   pullId?: string;
@@ -135,6 +138,25 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
     enabled: !!policies?.length,
   });
 
+  // Get all documents
+  const { data: documents } = useQuery({
+    queryKey: ['canopy-documents', effectivePullId],
+    queryFn: async () => {
+      if (!effectivePullId || !policies?.length) return [];
+      const policyIds = policies.map(p => p.id);
+      const { data, error } = await supabase
+        .from('canopy_documents')
+        .select('*')
+        .in('policy_id', policyIds);
+      if (error) {
+        console.log('Documents query error (table may not exist):', error);
+        return [];
+      }
+      return data;
+    },
+    enabled: !!policies?.length,
+  });
+
   if (!effectivePullId) {
     return (
       <Card>
@@ -182,13 +204,14 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
               {policies.length} {policies.length === 1 ? 'policy' : 'policies'} •
               {vehicles?.length || 0} vehicles •
               {drivers?.length || 0} drivers
+              {documents?.length ? ` • ${documents.length} documents` : ''}
             </p>
           </div>
         </div>
       )}
 
       <Tabs defaultValue="policies" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="policies" className="flex items-center gap-1">
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Policies</span>
@@ -213,6 +236,11 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
             <AlertTriangle className="w-4 h-4" />
             <span className="hidden sm:inline">Claims</span>
             <Badge variant="secondary" className="ml-1">{claims?.length || 0}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="flex items-center gap-1">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Docs</span>
+            <Badge variant="secondary" className="ml-1">{documents?.length || 0}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -268,6 +296,17 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
               <p className="font-medium">No claims on record</p>
               <p className="text-sm">Clean claims history</p>
             </div>
+          )}
+        </TabsContent>
+
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="space-y-4">
+          {documents?.length ? (
+            documents.map((doc: any) => (
+              <DocumentCard key={doc.id} document={doc} />
+            ))
+          ) : (
+            <EmptyState icon={Download} message="No documents available" />
           )}
         </TabsContent>
       </Tabs>
@@ -641,6 +680,86 @@ function ClaimCard({ claim }: { claim: any }) {
         </div>
         {claim.description && (
           <p className="mt-4 text-sm text-muted-foreground">{claim.description}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// DOCUMENT CARD
+// ============================================================================
+
+function DocumentCard({ document }: { document: any }) {
+  const getDocumentTypeLabel = (type: string | null | undefined): string => {
+    const labels: Record<string, string> = {
+      'id_card': 'Insurance ID Card',
+      'dec_page': 'Declaration Page',
+      'policy_doc': 'Policy Document',
+      'endorsement': 'Endorsement',
+      'certificate': 'Certificate of Insurance',
+      'other': 'Other Document',
+    };
+    return labels[type || 'other'] || 'Document';
+  };
+
+  const handleDownload = () => {
+    if (document.file_url) {
+      window.open(document.file_url, '_blank');
+    } else if (document.storage_path) {
+      // TODO: Generate signed URL for Supabase storage download
+      console.log('Download from storage:', document.storage_path);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FileText className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-medium">{getDocumentTypeLabel(document.document_type)}</p>
+              <p className="text-sm text-muted-foreground">
+                {document.file_name || 'Unnamed document'}
+              </p>
+              {document.created_at && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Added {formatDate(document.created_at)}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {(document.file_url || document.storage_path) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                className="flex items-center gap-1"
+              >
+                {document.file_url ? (
+                  <>
+                    <ExternalLink className="w-4 h-4" />
+                    View
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Download
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+        {document.downloaded && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+            <CheckCircle className="w-3 h-3" />
+            Saved to your files
+          </div>
         )}
       </CardContent>
     </Card>

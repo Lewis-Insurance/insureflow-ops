@@ -1458,7 +1458,7 @@ async function createLeadFromCanopyPull(
       insurance_types: finalInsuranceTypes,
       lead_score: 75, // High score for verified Canopy data
       status: 'qualified',
-      lead_source: 'canopy_import',
+      source_details: { source: 'canopy_import', provider: 'canopy_connect' },
       // Store Canopy-specific info in notes field
       notes: `Imported from Canopy Connect. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium || 0}. Expiration: ${nextExpiration || 'N/A'}`
     })
