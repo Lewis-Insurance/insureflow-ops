@@ -41,6 +41,27 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // SECURITY: Validate API key from header
+    const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
+    const expectedApiKey = Deno.env.get('LEAD_CAPTURE_API_KEY')
+
+    // Fail closed: if env var not set, reject all requests
+    if (!expectedApiKey) {
+      console.error('LEAD_CAPTURE_API_KEY not configured - rejecting request')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (apiKey !== expectedApiKey) {
+      console.error('Invalid API key for lead capture webhook')
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

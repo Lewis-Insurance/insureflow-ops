@@ -19,6 +19,7 @@ import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
 import { memoize } from '@/lib/performance';
+import { logger } from '@/lib/logger';
 import { usePermissions } from '@/hooks/usePermissions';
 import { SearchResult } from '@/hooks/useGlobalSearch';
 import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
@@ -157,9 +158,8 @@ const CRMContent = memo(() => {
   }, [editingAccount, updateAccount]);
 
   const handleEdit = useCallback((account: Account) => {
-    console.log('Edit button clicked for account:', account);
+    logger.debug('Edit button clicked for account:', account.id);
     setEditingAccount(account);
-    console.log('editingAccount state set to:', account);
   }, []);
 
   const handleDelete = useCallback(async (accountId: string) => {
@@ -237,7 +237,7 @@ const CRMContent = memo(() => {
       });
     }
     
-    console.log('Navigating to:', result);
+    logger.debug('Navigating to:', result.type, result.id);
   }, []);
 
   return (
