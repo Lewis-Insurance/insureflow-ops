@@ -66,19 +66,34 @@ export default function CanopyImportPage() {
     },
   });
 
-  // Get leads created from Canopy imports
+  // Get leads created from Canopy imports (or all recent leads to show something)
   const { data: canopyLeads, isLoading: isLeadsLoading } = useQuery({
     queryKey: ['canopy-leads'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First try to get leads with canopy_import source
+      const { data: canopyData, error: canopyError } = await supabase
         .from('leads')
         .select('*')
         .eq('lead_source', 'canopy_import')
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
-      return data;
+      if (canopyError) throw canopyError;
+
+      // If we have Canopy leads, return them
+      if (canopyData && canopyData.length > 0) {
+        return canopyData;
+      }
+
+      // Otherwise, get the most recent leads with any source
+      const { data: recentData, error: recentError } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (recentError) throw recentError;
+      return recentData;
     },
   });
 
@@ -234,10 +249,14 @@ export default function CanopyImportPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Leads from Canopy
+                  {canopyLeads?.some(l => l.lead_source === 'canopy_import')
+                    ? 'Leads from Canopy'
+                    : 'Recent Leads'}
                 </CardTitle>
                 <CardDescription>
-                  Leads automatically created from Canopy imports
+                  {canopyLeads?.some(l => l.lead_source === 'canopy_import')
+                    ? 'Leads automatically created from Canopy imports'
+                    : 'Your most recent leads (configure webhook to auto-import from Canopy)'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
