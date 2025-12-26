@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,8 +117,9 @@ export default function CanopyImportPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
-      {/* Header */}
+    <AppLayout>
+      <div className="container mx-auto py-6 max-w-4xl">
+        {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
           <Shield className="w-8 h-8 text-white" />
@@ -458,6 +460,7 @@ export default function CanopyImportPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
