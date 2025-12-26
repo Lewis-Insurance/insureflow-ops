@@ -25,16 +25,19 @@ serve(async (req) => {
       return signed?.signedUrl || '';
     }
 
-    // Verify webhook secret if configured
+    // SECURITY: Verify webhook secret - fail closed if not configured
     const providedSecret = req.headers.get('x-parse-secret');
-    if (parseSecret && providedSecret !== parseSecret) {
+    if (!parseSecret) {
+      console.error('INBOUND_PARSE_SECRET not configured - rejecting request');
+      return new Response('Server configuration error', { status: 500 });
+    }
+    if (providedSecret !== parseSecret) {
+      console.error('Invalid parse secret - rejecting request');
       return new Response('Unauthorized', { status: 401 });
     }
 
     const payload = await req.json();
     const { from, to, subject, text, html, messageId, inReplyTo } = payload;
-
-    console.log('Inbound email from:', from);
 
     // Check allowlist
     const { data: allowedDomain } = await supabase
