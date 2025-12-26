@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { CanopyDataDisplay } from '@/components/canopy/CanopyDataDisplay';
 import {
   Shield,
   Copy,
@@ -29,6 +30,8 @@ import {
   RefreshCw,
   Send,
   Users,
+  Eye,
+  X,
 } from 'lucide-react';
 
 export default function CanopyImportPage() {
@@ -66,26 +69,33 @@ export default function CanopyImportPage() {
     },
   });
 
-  // Get leads created from Canopy imports (or all recent leads to show something)
+  // Get leads that have linked canopy_pulls, or recent leads
   const { data: canopyLeads, isLoading: isLeadsLoading } = useQuery({
     queryKey: ['canopy-leads'],
     queryFn: async () => {
-      // First try to get leads with canopy_import source
-      const { data: canopyData, error: canopyError } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('lead_source', 'canopy_import')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Get leads that are linked to canopy pulls
+      const { data: canopyPullLeads } = await supabase
+        .from('canopy_pulls')
+        .select('lead_id')
+        .not('lead_id', 'is', null);
 
-      if (canopyError) throw canopyError;
+      const canopyLeadIds = canopyPullLeads?.map(p => p.lead_id).filter(Boolean) || [];
 
-      // If we have Canopy leads, return them
-      if (canopyData && canopyData.length > 0) {
-        return canopyData;
+      if (canopyLeadIds.length > 0) {
+        const { data: linkedLeads, error: linkedError } = await supabase
+          .from('leads')
+          .select('*')
+          .in('id', canopyLeadIds)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (linkedError) throw linkedError;
+        if (linkedLeads && linkedLeads.length > 0) {
+          return linkedLeads.map(l => ({ ...l, isCanopyLead: true }));
+        }
       }
 
-      // Otherwise, get the most recent leads with any source
+      // Fallback: get recent leads
       const { data: recentData, error: recentError } = await supabase
         .from('leads')
         .select('*')
@@ -93,7 +103,7 @@ export default function CanopyImportPage() {
         .limit(10);
 
       if (recentError) throw recentError;
-      return recentData;
+      return recentData?.map(l => ({ ...l, isCanopyLead: false })) || [];
     },
   });
 
@@ -249,14 +259,14 @@ export default function CanopyImportPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  {canopyLeads?.some(l => l.lead_source === 'canopy_import')
+                  {canopyLeads?.some(l => l.isCanopyLead)
                     ? 'Leads from Canopy'
                     : 'Recent Leads'}
                 </CardTitle>
                 <CardDescription>
-                  {canopyLeads?.some(l => l.lead_source === 'canopy_import')
+                  {canopyLeads?.some(l => l.isCanopyLead)
                     ? 'Leads automatically created from Canopy imports'
-                    : 'Your most recent leads (configure webhook to auto-import from Canopy)'}
+                    : 'Your most recent leads (Canopy imports will appear here)'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
