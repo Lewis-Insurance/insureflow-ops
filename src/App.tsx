@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DashboardSkeleton } from "@/components/ui/skeleton-components";
 import { ThemeProvider } from "next-themes";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 // Lazy load pages for code splitting
 const Index = React.lazy(() => import("./pages/Index"));
@@ -136,97 +137,121 @@ const App = () => (
                 <Route
                   path="/dashboard"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <ProducerDashboard />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ProducerDashboard />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/dashboard/agency"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <AgencyDashboard />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <AgencyDashboard />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/leads"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <Leads />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <Leads />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/leads/analytics"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <LeadAnalyticsDashboard />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <LeadAnalyticsDashboard />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/crm"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CRM />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CRM />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/crm/accounts/:accountId"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <AccountDetail />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <AccountDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/customers"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CustomersPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CustomersPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/customers/:id"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CustomerDetail />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CustomerDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/customers/:id/edit"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CustomerEdit />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CustomerEdit />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/policies"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <PoliciesPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <PoliciesPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/renewals"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <RenewalsPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <RenewalsPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/renewals/intelligence"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <RenewalIntelligencePage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <RenewalIntelligencePage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
@@ -344,9 +369,11 @@ const App = () => (
                 <Route
                   path="/admin"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <AdminPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute requireAdmin>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <AdminPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route

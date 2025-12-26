@@ -10,6 +10,7 @@
  */
 
 import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -852,7 +853,7 @@ export function AIResultsDisplay({
     );
   };
 
-  // HTML format - render raw HTML
+  // HTML format - render raw HTML (sanitized for XSS protection)
   const renderHtmlFormat = () => {
     const html = result.proposal_html as string || result.html as string || '';
 
@@ -861,7 +862,7 @@ export function AIResultsDisplay({
         <CardContent className="p-6">
           <div
             className="prose dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
           />
         </CardContent>
       </Card>

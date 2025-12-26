@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -708,7 +709,7 @@ export default function RenewalRateWatchPage() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[600px] w-full border rounded-lg p-4 bg-white">
-                    <div dangerouslySetInnerHTML={{ __html: report.content_html }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(report.content_html) }} />
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -776,7 +777,7 @@ export default function RenewalRateWatchPage() {
                         <div className="text-sm text-muted-foreground">Subject:</div>
                         <div className="font-medium">{emailDraft.subject}</div>
                       </div>
-                      <div dangerouslySetInnerHTML={{ __html: emailDraft.body_html }} />
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(emailDraft.body_html) }} />
                     </div>
                   )}
                 </CardContent>
