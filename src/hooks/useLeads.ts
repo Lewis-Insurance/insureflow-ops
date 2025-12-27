@@ -40,7 +40,8 @@ export function useLeads(filters?: LeadFilters) {
       // First, get total count with same filters
       let countQuery = supabase
         .from('leads')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       // Apply same filters to count query
       if (filters?.status && filters.status.length > 0) {
@@ -80,6 +81,7 @@ export function useLeads(filters?: LeadFilters) {
           source:lead_sources(name),
           assigned:profiles!leads_assigned_to_fkey(full_name)
         `)
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -173,6 +175,7 @@ export function useLeadsByStage() {
           source:lead_sources(name),
           assigned:profiles!leads_assigned_to_fkey(full_name)
         `)
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .order('lead_score', { ascending: false });
 
       if (error) throw error;
