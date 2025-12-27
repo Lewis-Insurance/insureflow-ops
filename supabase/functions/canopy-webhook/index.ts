@@ -856,6 +856,61 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
           }
         }
 
+        // Check for documents in pull data or policies
+        // Canopy may return documents as part of the pull response
+        const pullDocuments = pullData.documents || [];
+        if (pullDocuments.length > 0) {
+          console.log(`[Canopy Webhook] Found ${pullDocuments.length} documents in pull data`);
+          // Get first policy to associate documents with
+          const { data: firstPolicy } = await supabase
+            .from('canopy_policies')
+            .select('id')
+            .eq('pull_id', pull.id)
+            .limit(1)
+            .single();
+
+          if (firstPolicy) {
+            for (const doc of pullDocuments) {
+              await supabase.from('canopy_documents').insert({
+                policy_id: firstPolicy.id,
+                document_type: mapDocumentType(doc.type || doc.document_type || 'other'),
+                file_url: doc.url || doc.download_url,
+                file_name: doc.name || doc.file_name || 'Document',
+                mime_type: doc.mime_type || 'application/pdf',
+                downloaded: false
+              });
+            }
+          }
+        }
+
+        // Also check for ID cards in policies
+        for (const policy of policies) {
+          if (policy.id_cards?.length > 0 || policy.documents?.length > 0) {
+            const policyDocs = [...(policy.id_cards || []), ...(policy.documents || [])];
+            console.log(`[Canopy Webhook] Found ${policyDocs.length} documents in policy ${policy.policy_id || policy.id}`);
+
+            // Get our policy ID
+            const { data: ourPolicy } = await supabase
+              .from('canopy_policies')
+              .select('id')
+              .eq('canopy_policy_id', policy.policy_id || policy.id)
+              .single();
+
+            if (ourPolicy) {
+              for (const doc of policyDocs) {
+                await supabase.from('canopy_documents').insert({
+                  policy_id: ourPolicy.id,
+                  document_type: mapDocumentType(doc.type || 'id_card'),
+                  file_url: doc.url || doc.download_url || doc.pdf_url,
+                  file_name: doc.name || doc.file_name || 'ID Card',
+                  mime_type: doc.mime_type || 'application/pdf',
+                  downloaded: false
+                });
+              }
+            }
+          }
+        }
+
         // Update pull with counts and consumer info from API
         const policyCounts = await getPolicyCounts(supabase, pull.id);
         await supabase.from('canopy_pulls').update({
@@ -1044,8 +1099,24 @@ async function processCanopyPolicy(supabase: ReturnType<typeof createClient>, pu
   }
 
   // Process claims
+  const claimsCount = policy.claims?.length || 0;
+  console.log(`[Canopy Webhook] Policy ${canopyPolicyId} has ${claimsCount} claims`);
+  if (claimsCount > 0) {
+    console.log(`[Canopy Webhook] Claims data:`, JSON.stringify(policy.claims).substring(0, 500));
+  }
   for (const claim of policy.claims || []) {
     await upsertClaim(supabase, policyDbId, claim);
+  }
+
+  // Log documents for this policy
+  const idCardsCount = policy.id_cards?.length || 0;
+  const docsCount = policy.documents?.length || 0;
+  console.log(`[Canopy Webhook] Policy ${canopyPolicyId} has ${idCardsCount} ID cards, ${docsCount} documents`);
+  if (idCardsCount > 0) {
+    console.log(`[Canopy Webhook] ID cards:`, JSON.stringify(policy.id_cards).substring(0, 500));
+  }
+  if (docsCount > 0) {
+    console.log(`[Canopy Webhook] Documents:`, JSON.stringify(policy.documents).substring(0, 500));
   }
 
   console.log(`[Canopy Webhook] Finished processing policy ${canopyPolicyId}`);
