@@ -20,7 +20,10 @@ export function useLeadMetrics(dateRange?: { start: string; end: string }) {
   return useQuery({
     queryKey: ['lead-metrics', dateRange],
     queryFn: async () => {
-      let query = supabase.from('leads').select('*', { count: 'exact' });
+      let query = supabase
+        .from('leads')
+        .select('*', { count: 'exact' })
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (dateRange) {
         query = query
@@ -66,7 +69,8 @@ export function useConversionFunnel(dateRange?: { start: string; end: string }) 
     queryFn: async () => {
       let query = supabase
         .from('leads')
-        .select('status, created_at');
+        .select('status, created_at')
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (dateRange) {
         query = query
@@ -151,17 +155,6 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
   return useQuery({
     queryKey: ['lead-source-performance', dateRange],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: membership } = await supabase
-        .from('account_memberships')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!membership) throw new Error('No account membership found');
-
       let query = supabase
         .from('leads')
         .select(`
@@ -175,7 +168,7 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
             type
           )
         `)
-        .eq('account_id', membership.account_id);
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (dateRange) {
         query = query
@@ -300,7 +293,8 @@ export function useLeadTrends(period: 'week' | 'month' | 'quarter' = 'month') {
       const { data, error } = await supabase
         .from('leads')
         .select('created_at, status')
-        .gte('created_at', startDate.toISOString());
+        .gte('created_at', startDate.toISOString())
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) {
         console.error('Error fetching trends:', error);
@@ -339,7 +333,8 @@ export function useLeadScoreDistribution() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leads')
-        .select('lead_score, status');
+        .select('lead_score, status')
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) {
         console.error('Error fetching score distribution:', error);
@@ -383,21 +378,11 @@ export function usePipelineVelocity(dateRange?: { start: string; end: string }) 
   return useQuery({
     queryKey: ['pipeline-velocity', dateRange],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: membership } = await supabase
-        .from('account_memberships')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!membership) throw new Error('No account membership found');
-
+      // Query all leads the user has access to via RLS
       let query = supabase
         .from('leads')
         .select('status, created_at, last_contact_at, converted_at, updated_at')
-        .eq('account_id', membership.account_id);
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (dateRange) {
         query = query
@@ -488,17 +473,7 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
   return useQuery({
     queryKey: ['producer-performance', dateRange],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: membership } = await supabase
-        .from('account_memberships')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!membership) throw new Error('No account membership found');
-
+      // Query all leads the user has access to via RLS
       let query = supabase
         .from('leads')
         .select(`
@@ -511,7 +486,7 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
             full_name
           )
         `)
-        .eq('account_id', membership.account_id)
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .not('assigned_to', 'is', null);
 
       if (dateRange) {
@@ -620,22 +595,11 @@ export function useInsuranceTypePerformance(
   return useQuery({
     queryKey: ['insurance-type-performance', dateRange],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get user's account
-      const { data: membership } = await supabase
-        .from('account_memberships')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!membership) throw new Error('No account membership found');
-
+      // Query all leads the user has access to via RLS
       let query = supabase
         .from('leads')
         .select('insurance_types, status, estimated_premium')
-        .eq('account_id', membership.account_id);
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (dateRange) {
         query = query
