@@ -483,7 +483,8 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
           created_at,
           last_contact_at,
           profiles!leads_assigned_to_fkey (
-            full_name
+            full_name,
+            email
           )
         `)
         .is('deleted_at', null) // Exclude soft-deleted leads
@@ -513,7 +514,7 @@ export function useProducerPerformance(dateRange?: { start: string; end: string 
 
       leads?.forEach((lead: any) => {
         const producerId = lead.assigned_to;
-        const producerName = lead.profiles?.full_name || 'Unknown';
+        const producerName = lead.profiles?.full_name || lead.profiles?.email || 'Unknown Producer';
 
         if (!producerMap.has(producerId)) {
           producerMap.set(producerId, {
