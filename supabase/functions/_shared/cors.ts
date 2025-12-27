@@ -9,6 +9,9 @@ const ALLOWED_ORIGINS = [
   'https://lewisinsurance.ai',
   'https://www.lewisinsurance.ai',
   'https://lewisinsurance.netlify.app',
+  // Customer portal website
+  'https://lewisinsurance.com',
+  'https://www.lewisinsurance.com',
 ];
 
 // Add development origins if not in production
@@ -17,8 +20,10 @@ if (env === 'development' || env === 'local') {
   ALLOWED_ORIGINS.push(
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:3001',  // Next.js portal dev
     'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000'
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
   );
 }
 

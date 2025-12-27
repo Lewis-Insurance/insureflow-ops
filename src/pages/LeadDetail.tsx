@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -118,6 +119,57 @@ export default function LeadDetail() {
     enabled: !!leadId,
   });
 
+  // Get primary driver as name fallback for Canopy imports
+  const { data: primaryDriver } = useQuery({
+    queryKey: ['canopy-primary-driver', canopyPull?.id],
+    queryFn: async () => {
+      if (!canopyPull?.id) return null;
+
+      // First get all policy IDs for this pull
+      const { data: policies } = await supabase
+        .from('canopy_policies')
+        .select('id')
+        .eq('pull_id', canopyPull.id);
+
+      if (!policies || policies.length === 0) return null;
+
+      const policyIds = policies.map(p => p.id);
+
+      // Try to get primary driver from those policies
+      const { data: primaryDrivers } = await supabase
+        .from('canopy_drivers')
+        .select('first_name, last_name')
+        .in('policy_id', policyIds)
+        .eq('is_primary', true)
+        .limit(1);
+
+      if (primaryDrivers && primaryDrivers.length > 0) {
+        return primaryDrivers[0];
+      }
+
+      // Fallback to first driver if no primary
+      const { data: anyDrivers } = await supabase
+        .from('canopy_drivers')
+        .select('first_name, last_name')
+        .in('policy_id', policyIds)
+        .limit(1);
+
+      return anyDrivers?.[0] || null;
+    },
+    enabled: !!canopyPull?.id,
+  });
+
+  // Compute display name - use lead name, or fall back to primary driver from Canopy
+  const displayName = useMemo(() => {
+    const firstName = lead?.first_name && lead.first_name !== 'Unknown'
+      ? lead.first_name
+      : primaryDriver?.first_name || 'Unknown';
+    const lastName = lead?.last_name && lead.last_name !== 'Customer'
+      ? lead.last_name
+      : primaryDriver?.last_name || 'Customer';
+    return { firstName, lastName, fullName: `${firstName} ${lastName}` };
+  }, [lead?.first_name, lead?.last_name, primaryDriver]);
+
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
     values: lead ? {
@@ -184,7 +236,7 @@ export default function LeadDetail() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6">
+      <AppLayout>
         <div className="space-y-4 animate-pulse">
           <div className="h-8 bg-muted rounded w-1/4"></div>
           <div className="h-4 bg-muted rounded w-1/2"></div>
@@ -195,13 +247,13 @@ export default function LeadDetail() {
             ))}
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (!lead) {
     return (
-      <div className="container mx-auto py-6">
+      <AppLayout>
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -216,12 +268,13 @@ export default function LeadDetail() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -231,7 +284,7 @@ export default function LeadDetail() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">
-              {lead.first_name} {lead.last_name}
+              {displayName.fullName}
             </h1>
             <div className="flex items-center gap-2 mt-1">
               <Badge className={getStatusColor(lead.status)}>
@@ -568,9 +621,10 @@ export default function LeadDetail() {
           open={addQuoteOpen}
           onOpenChange={setAddQuoteOpen}
           accountId={lead.account_id || leadId || ''}
-          accountName={`${lead.first_name} ${lead.last_name}`}
+          accountName={displayName.fullName}
         />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
