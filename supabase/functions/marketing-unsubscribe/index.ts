@@ -284,12 +284,40 @@ async function verifyToken(req: Request, supabase: SupabaseClient) {
 
 async function decodeToken(supabase: SupabaseClient, token: string): Promise<UnsubscribeToken | null> {
   try {
-    // Token is base64 encoded JSON signed with HMAC
-    const secret = Deno.env.get('UNSUBSCRIBE_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const secret = Deno.env.get('UNSUBSCRIBE_SECRET');
+    if (!secret) {
+      console.error('UNSUBSCRIBE_SECRET not configured - rejecting token');
+      return null;
+    }
 
-    // Simple token format: base64(JSON)
-    // In production, add HMAC signature verification
-    const decoded = atob(token);
+    // Token format: base64(JSON).signature
+    const parts = token.split('.');
+    if (parts.length !== 2) {
+      console.error('Invalid token format - missing signature');
+      return null;
+    }
+
+    const [payload, signature] = parts;
+
+    // Verify HMAC signature
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+    const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
+
+    if (signature !== expectedSignature) {
+      console.error('Invalid token signature');
+      return null;
+    }
+
+    const decoded = atob(payload);
     const data = JSON.parse(decoded) as UnsubscribeToken;
 
     // Check expiry
@@ -659,7 +687,12 @@ function renderErrorPage(message: string): string {
  * Generate an unsubscribe token (utility function)
  * Call this when creating emails to generate the token
  */
-export function generateUnsubscribeToken(data: UnsubscribeToken): string {
+export async function generateUnsubscribeToken(data: UnsubscribeToken): Promise<string> {
+  const secret = Deno.env.get('UNSUBSCRIBE_SECRET');
+  if (!secret) {
+    throw new Error('UNSUBSCRIBE_SECRET not configured');
+  }
+
   // Set expiry to 90 days from now
   const tokenData: UnsubscribeToken = {
     ...data,
@@ -667,6 +700,21 @@ export function generateUnsubscribeToken(data: UnsubscribeToken): string {
   };
 
   // Base64 encode the JSON
-  // In production, add HMAC signature for security
-  return btoa(JSON.stringify(tokenData));
+  const payload = btoa(JSON.stringify(tokenData));
+
+  // Sign with HMAC-SHA256
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const signature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
+
+  // Return payload.signature format
+  return `${payload}.${signature}`;
 }
