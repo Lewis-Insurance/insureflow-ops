@@ -12,7 +12,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, MapPin, Calendar, DollarSign, ExternalLink, Shield, Car, User, FileText } from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Phone, Mail, MapPin, Calendar, DollarSign, ExternalLink, Shield, Car, User, FileText, Home, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface LeadDetailPanelProps {
@@ -24,9 +30,9 @@ interface LeadDetailPanelProps {
 export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelProps) {
   const navigate = useNavigate();
 
-  // Query for Canopy data linked to this lead
+  // Query for Canopy data linked to this lead - FULL DATA
   const { data: canopyPull } = useQuery({
-    queryKey: ['canopy-pull-for-lead-panel', lead?.id],
+    queryKey: ['canopy-pull-for-lead-panel-full', lead?.id],
     queryFn: async () => {
       if (!lead?.id) return null;
       const { data, error } = await supabase
@@ -37,11 +43,18 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
           policy_count,
           carrier_count,
           completed_at,
+          metadata,
           canopy_policies (
             id,
             carrier_name,
             policy_type,
-            premium_amount
+            policy_number,
+            premium_amount,
+            premium_frequency,
+            status,
+            effective_date,
+            expiration_date,
+            deductible
           )
         `)
         .eq('lead_id', lead.id)
@@ -52,6 +65,54 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
       return data;
     },
     enabled: !!lead?.id && open,
+  });
+
+  // Fetch vehicles for the policies
+  const { data: vehicles } = useQuery({
+    queryKey: ['canopy-vehicles-for-lead-panel', canopyPull?.id],
+    queryFn: async () => {
+      if (!canopyPull?.canopy_policies?.length) return [];
+      const policyIds = (canopyPull.canopy_policies as any[]).map(p => p.id);
+      const { data, error } = await supabase
+        .from('canopy_vehicles')
+        .select('*')
+        .in('policy_id', policyIds);
+      if (error) return [];
+      return data;
+    },
+    enabled: !!canopyPull?.canopy_policies?.length,
+  });
+
+  // Fetch drivers for the policies
+  const { data: drivers } = useQuery({
+    queryKey: ['canopy-drivers-for-lead-panel', canopyPull?.id],
+    queryFn: async () => {
+      if (!canopyPull?.canopy_policies?.length) return [];
+      const policyIds = (canopyPull.canopy_policies as any[]).map(p => p.id);
+      const { data, error } = await supabase
+        .from('canopy_drivers')
+        .select('*')
+        .in('policy_id', policyIds);
+      if (error) return [];
+      return data;
+    },
+    enabled: !!canopyPull?.canopy_policies?.length,
+  });
+
+  // Fetch dwellings for the policies
+  const { data: dwellings } = useQuery({
+    queryKey: ['canopy-dwellings-for-lead-panel', canopyPull?.id],
+    queryFn: async () => {
+      if (!canopyPull?.canopy_policies?.length) return [];
+      const policyIds = (canopyPull.canopy_policies as any[]).map(p => p.id);
+      const { data, error } = await supabase
+        .from('canopy_dwellings')
+        .select('*')
+        .in('policy_id', policyIds);
+      if (error) return [];
+      return data;
+    },
+    enabled: !!canopyPull?.canopy_policies?.length,
   });
 
   if (!lead) return null;
@@ -218,7 +279,7 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
             </div>
           </div>
 
-          {/* Canopy Imported Data */}
+          {/* Canopy Imported Data - FULL DISPLAY */}
           {canopyPull && (
             <>
               <Separator />
@@ -227,56 +288,292 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
                   <Shield className="h-4 w-4 text-blue-600" />
                   Imported Insurance Data
                 </h3>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">Policies</p>
-                      <p className="text-lg font-bold text-blue-700">{canopyPull.policy_count || 0}</p>
-                    </div>
-                    <div className="p-3 bg-purple-50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">Carriers</p>
-                      <p className="text-lg font-bold text-purple-700">{canopyPull.carrier_count || 0}</p>
-                    </div>
-                    <div className="p-3 bg-green-50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">Status</p>
-                      <p className="text-lg font-bold text-green-700 capitalize">{canopyPull.status}</p>
-                    </div>
-                  </div>
 
-                  {/* Policy Summary */}
-                  {canopyPull.canopy_policies && canopyPull.canopy_policies.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">Policies:</p>
-                      {(canopyPull.canopy_policies as any[]).map((policy: any) => (
-                        <div key={policy.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{policy.carrier_name}</span>
-                            <Badge variant="outline" className="text-xs">{policy.policy_type}</Badge>
-                          </div>
-                          {policy.premium_amount && (
-                            <span className="text-sm font-medium">
-                              ${policy.premium_amount.toLocaleString()}/yr
-                            </span>
-                          )}
+                {/* Summary Stats */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  <div className="p-2 bg-blue-50 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Policies</p>
+                    <p className="text-lg font-bold text-blue-700">{canopyPull.policy_count || 0}</p>
+                  </div>
+                  <div className="p-2 bg-purple-50 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Carriers</p>
+                    <p className="text-lg font-bold text-purple-700">{canopyPull.carrier_count || 0}</p>
+                  </div>
+                  <div className="p-2 bg-orange-50 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Vehicles</p>
+                    <p className="text-lg font-bold text-orange-700">{vehicles?.length || 0}</p>
+                  </div>
+                  <div className="p-2 bg-green-50 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Drivers</p>
+                    <p className="text-lg font-bold text-green-700">{drivers?.length || 0}</p>
+                  </div>
+                </div>
+
+                <Accordion type="multiple" className="w-full" defaultValue={["policies"]}>
+                  {/* Policies Accordion */}
+                  {canopyPull.canopy_policies && (canopyPull.canopy_policies as any[]).length > 0 && (
+                    <AccordionItem value="policies">
+                      <AccordionTrigger className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          Policies ({(canopyPull.canopy_policies as any[]).length})
                         </div>
-                      ))}
-                    </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-3">
+                          {(canopyPull.canopy_policies as any[]).map((policy: any) => (
+                            <div key={policy.id} className="p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{policy.carrier_name}</span>
+                                  <Badge variant="outline" className="text-xs capitalize">{policy.policy_type}</Badge>
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs ${policy.status === 'active' ? 'bg-green-100 text-green-800' : ''}`}
+                                  >
+                                    {policy.status || 'Active'}
+                                  </Badge>
+                                </div>
+                                {policy.premium_amount && (
+                                  <span className="font-semibold text-green-700">
+                                    ${policy.premium_amount.toLocaleString()}/{policy.premium_frequency || 'yr'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                {policy.policy_number && (
+                                  <div>Policy #: <span className="text-foreground">{policy.policy_number}</span></div>
+                                )}
+                                {policy.effective_date && (
+                                  <div>Effective: <span className="text-foreground">{format(new Date(policy.effective_date), 'MM/dd/yyyy')}</span></div>
+                                )}
+                                {policy.expiration_date && (
+                                  <div>Expires: <span className="text-foreground font-medium">{format(new Date(policy.expiration_date), 'MM/dd/yyyy')}</span></div>
+                                )}
+                                {policy.deductible && (
+                                  <div>Deductible: <span className="text-foreground">${policy.deductible.toLocaleString()}</span></div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   )}
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-2"
-                    onClick={() => {
-                      onOpenChange(false);
-                      navigate(`/leads/${lead.id}`);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    View All Imported Data (Vehicles, Drivers, Coverages)
-                  </Button>
-                </div>
+                  {/* Vehicles Accordion */}
+                  {vehicles && vehicles.length > 0 && (
+                    <AccordionItem value="vehicles">
+                      <AccordionTrigger className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4 text-orange-600" />
+                          Vehicles ({vehicles.length})
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-3">
+                          {vehicles.map((vehicle: any) => (
+                            <div key={vehicle.id} className="p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">
+                                  {vehicle.year} {vehicle.make} {vehicle.model}
+                                </span>
+                                {vehicle.ownership && (
+                                  <Badge variant="outline" className="text-xs capitalize">{vehicle.ownership}</Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                {vehicle.vin && (
+                                  <div>VIN: <span className="text-foreground font-mono">{vehicle.vin}</span></div>
+                                )}
+                                {vehicle.usage_type && (
+                                  <div>Usage: <span className="text-foreground capitalize">{vehicle.usage_type}</span></div>
+                                )}
+                                {vehicle.annual_mileage && (
+                                  <div>Annual Miles: <span className="text-foreground">{vehicle.annual_mileage.toLocaleString()}</span></div>
+                                )}
+                                {vehicle.body_type && (
+                                  <div>Body: <span className="text-foreground capitalize">{vehicle.body_type}</span></div>
+                                )}
+                              </div>
+                              {/* Coverages */}
+                              {(vehicle.liability_bi || vehicle.liability_pd || vehicle.collision_deductible || vehicle.comprehensive_deductible) && (
+                                <div className="mt-2 pt-2 border-t border-muted">
+                                  <p className="text-xs font-medium mb-1">Coverages:</p>
+                                  <div className="grid grid-cols-2 gap-1 text-xs">
+                                    {vehicle.liability_bi && (
+                                      <div className="text-muted-foreground">BI: <span className="text-foreground">${vehicle.liability_bi.toLocaleString()}</span></div>
+                                    )}
+                                    {vehicle.liability_pd && (
+                                      <div className="text-muted-foreground">PD: <span className="text-foreground">${vehicle.liability_pd.toLocaleString()}</span></div>
+                                    )}
+                                    {vehicle.collision_deductible && (
+                                      <div className="text-muted-foreground">Collision Ded: <span className="text-foreground">${vehicle.collision_deductible}</span></div>
+                                    )}
+                                    {vehicle.comprehensive_deductible && (
+                                      <div className="text-muted-foreground">Comp Ded: <span className="text-foreground">${vehicle.comprehensive_deductible}</span></div>
+                                    )}
+                                    {vehicle.uninsured_motorist && (
+                                      <div className="text-muted-foreground">UM: <span className="text-foreground">${vehicle.uninsured_motorist.toLocaleString()}</span></div>
+                                    )}
+                                    {vehicle.medical_payments && (
+                                      <div className="text-muted-foreground">Med Pay: <span className="text-foreground">${vehicle.medical_payments.toLocaleString()}</span></div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+
+                  {/* Drivers Accordion */}
+                  {drivers && drivers.length > 0 && (
+                    <AccordionItem value="drivers">
+                      <AccordionTrigger className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-green-600" />
+                          Drivers ({drivers.length})
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-3">
+                          {drivers.map((driver: any) => (
+                            <div key={driver.id} className="p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">
+                                  {driver.first_name} {driver.last_name}
+                                </span>
+                                <div className="flex gap-1">
+                                  {driver.is_primary && (
+                                    <Badge variant="default" className="text-xs">Primary</Badge>
+                                  )}
+                                  {driver.relation_to_insured && (
+                                    <Badge variant="outline" className="text-xs capitalize">{driver.relation_to_insured}</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                {driver.date_of_birth && (
+                                  <div>DOB: <span className="text-foreground">{format(new Date(driver.date_of_birth), 'MM/dd/yyyy')}</span></div>
+                                )}
+                                {driver.gender && (
+                                  <div>Gender: <span className="text-foreground capitalize">{driver.gender}</span></div>
+                                )}
+                                {driver.marital_status && (
+                                  <div>Marital: <span className="text-foreground capitalize">{driver.marital_status}</span></div>
+                                )}
+                                {driver.license_state && (
+                                  <div>License: <span className="text-foreground">{driver.license_state} {driver.license_number ? `- ${driver.license_number.slice(-4)}` : ''}</span></div>
+                                )}
+                                {driver.years_licensed && (
+                                  <div>Years Licensed: <span className="text-foreground">{driver.years_licensed}</span></div>
+                                )}
+                                {driver.license_status && (
+                                  <div>Status: <span className={`text-foreground capitalize ${driver.license_status === 'valid' ? 'text-green-600' : ''}`}>{driver.license_status}</span></div>
+                                )}
+                              </div>
+                              {/* Violations/Accidents */}
+                              {((driver.violations && driver.violations.length > 0) || (driver.accidents && driver.accidents.length > 0)) && (
+                                <div className="mt-2 pt-2 border-t border-muted">
+                                  <div className="flex items-center gap-1 text-xs text-amber-600">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {driver.violations?.length > 0 && (
+                                      <span>{driver.violations.length} violation(s)</span>
+                                    )}
+                                    {driver.accidents?.length > 0 && (
+                                      <span>{driver.accidents.length} accident(s)</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+
+                  {/* Dwellings Accordion */}
+                  {dwellings && dwellings.length > 0 && (
+                    <AccordionItem value="dwellings">
+                      <AccordionTrigger className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <Home className="h-4 w-4 text-purple-600" />
+                          Properties ({dwellings.length})
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-3">
+                          {dwellings.map((dwelling: any) => (
+                            <div key={dwelling.id} className="p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">
+                                  {dwelling.address_line1}
+                                </span>
+                                {dwelling.property_type && (
+                                  <Badge variant="outline" className="text-xs capitalize">{dwelling.property_type.replace('_', ' ')}</Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mb-2">
+                                {[dwelling.city, dwelling.state, dwelling.zip].filter(Boolean).join(', ')}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                {dwelling.year_built && (
+                                  <div>Year Built: <span className="text-foreground">{dwelling.year_built}</span></div>
+                                )}
+                                {dwelling.square_footage && (
+                                  <div>Sq Ft: <span className="text-foreground">{dwelling.square_footage.toLocaleString()}</span></div>
+                                )}
+                                {dwelling.construction_type && (
+                                  <div>Construction: <span className="text-foreground capitalize">{dwelling.construction_type}</span></div>
+                                )}
+                                {dwelling.roof_type && (
+                                  <div>Roof: <span className="text-foreground capitalize">{dwelling.roof_type}</span></div>
+                                )}
+                              </div>
+                              {/* Coverages */}
+                              {(dwelling.dwelling_coverage || dwelling.personal_property || dwelling.liability_coverage) && (
+                                <div className="mt-2 pt-2 border-t border-muted">
+                                  <p className="text-xs font-medium mb-1">Coverages:</p>
+                                  <div className="grid grid-cols-2 gap-1 text-xs">
+                                    {dwelling.dwelling_coverage && (
+                                      <div className="text-muted-foreground">Dwelling: <span className="text-foreground">${dwelling.dwelling_coverage.toLocaleString()}</span></div>
+                                    )}
+                                    {dwelling.personal_property && (
+                                      <div className="text-muted-foreground">Personal Property: <span className="text-foreground">${dwelling.personal_property.toLocaleString()}</span></div>
+                                    )}
+                                    {dwelling.liability_coverage && (
+                                      <div className="text-muted-foreground">Liability: <span className="text-foreground">${dwelling.liability_coverage.toLocaleString()}</span></div>
+                                    )}
+                                    {dwelling.deductible && (
+                                      <div className="text-muted-foreground">Deductible: <span className="text-foreground">${dwelling.deductible.toLocaleString()}</span></div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+                </Accordion>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 mt-4"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/leads/${lead.id}`);
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Full Lead Details
+                </Button>
               </div>
             </>
           )}

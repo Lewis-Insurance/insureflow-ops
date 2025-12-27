@@ -5,8 +5,8 @@
 // Shows policies, vehicles, drivers, dwellings, and claims
 // ============================================================================
 
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +28,11 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface CanopyDataDisplayProps {
   pullId?: string;
@@ -38,6 +41,10 @@ interface CanopyDataDisplayProps {
 }
 
 export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyDataDisplayProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   // Get pull ID from lead if not provided directly
   const { data: pullFromLead } = useQuery({
     queryKey: ['canopy-pull-from-lead', leadId],
@@ -57,6 +64,66 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
   });
 
   const effectivePullId = pullId || pullFromLead?.id;
+  const canopyPullId = pullFromLead?.canopy_pull_id;
+
+  // Refresh data from Canopy API
+  const handleRefreshFromCanopy = async () => {
+    const pullIdToRefresh = canopyPullId || effectivePullId;
+
+    if (!pullIdToRefresh) {
+      toast({
+        title: 'Cannot refresh',
+        description: 'No pull ID available',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('canopy-reprocess', {
+        body: {
+          pullId: pullIdToRefresh,
+          force: true
+        }
+      });
+
+      if (error) throw error;
+
+      // Check the response from the edge function
+      if (data?.success) {
+        toast({
+          title: 'Refresh complete',
+          description: `Updated ${data.policies || 0} policies, ${data.documents || 0} documents`,
+        });
+      } else {
+        toast({
+          title: 'Refresh issue',
+          description: data?.message || 'Could not refresh from Canopy API',
+          variant: 'destructive',
+        });
+      }
+
+      // Invalidate queries to refetch the updated data
+      queryClient.invalidateQueries({ queryKey: ['canopy-policies', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-vehicles', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-drivers', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-dwellings', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-claims', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-documents', effectivePullId] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-pull-from-lead', leadId] });
+
+      setIsRefreshing(false);
+    } catch (err) {
+      console.error('Failed to refresh:', err);
+      toast({
+        title: 'Refresh failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      setIsRefreshing(false);
+    }
+  };
 
   // Get all policies for this pull
   const { data: policies, isLoading: policiesLoading } = useQuery({
@@ -194,19 +261,35 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
   return (
     <div className="space-y-6">
       {showHeader && (
-        <div className="flex items-center gap-4">
-          <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
-            <Shield className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Imported Insurance Data</h3>
+              <p className="text-sm text-muted-foreground">
+                {policies.length} {policies.length === 1 ? 'policy' : 'policies'} •
+                {vehicles?.length || 0} vehicles •
+                {drivers?.length || 0} drivers
+                {documents?.length ? ` • ${documents.length} documents` : ''}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold">Imported Insurance Data</h3>
-            <p className="text-sm text-muted-foreground">
-              {policies.length} {policies.length === 1 ? 'policy' : 'policies'} •
-              {vehicles?.length || 0} vehicles •
-              {drivers?.length || 0} drivers
-              {documents?.length ? ` • ${documents.length} documents` : ''}
-            </p>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshFromCanopy}
+            disabled={isRefreshing}
+            title="Re-fetch data from Canopy API"
+          >
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </div>
       )}
 
@@ -303,10 +386,15 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
         <TabsContent value="documents" className="space-y-4">
           {documents?.length ? (
             documents.map((doc: any) => (
-              <DocumentCard key={doc.id} document={doc} />
+              <DocumentCard key={doc.id} document={doc} canopyPullId={canopyPullId} />
             ))
           ) : (
-            <EmptyState icon={Download} message="No documents available" />
+            <div className="text-center py-8 text-muted-foreground">
+              <Download className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="font-medium">No documents available</p>
+              <p className="text-sm mt-1">Documents like ID cards and declarations pages depend on the carrier.</p>
+              <p className="text-xs mt-2 text-muted-foreground/70">Not all carriers provide documents through Canopy Connect.</p>
+            </div>
           )}
         </TabsContent>
       </Tabs>
@@ -690,7 +778,10 @@ function ClaimCard({ claim }: { claim: any }) {
 // DOCUMENT CARD
 // ============================================================================
 
-function DocumentCard({ document }: { document: any }) {
+function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?: string }) {
+  const [isLoading, setIsLoading] = React.useState(false);
+  const { toast } = useToast();
+
   const getDocumentTypeLabel = (type: string | null | undefined): string => {
     const labels: Record<string, string> = {
       'id_card': 'Insurance ID Card',
@@ -703,13 +794,89 @@ function DocumentCard({ document }: { document: any }) {
     return labels[type || 'other'] || 'Document';
   };
 
-  const handleDownload = () => {
-    if (document.file_url) {
-      window.open(document.file_url, '_blank');
-    } else if (document.storage_path) {
-      // TODO: Generate signed URL for Supabase storage download
-      console.log('Download from storage:', document.storage_path);
+  // Check if document is stored locally in Supabase Storage
+  const isStoredLocally = document.downloaded && document.storage_path;
+
+  // Handle viewing locally stored document
+  const handleViewDocument = async () => {
+    if (!isStoredLocally) return;
+
+    setIsLoading(true);
+    try {
+      const bucket = document.storage_bucket || 'canopy-documents';
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
+
+      if (error) {
+        console.error('Failed to get signed URL:', error);
+        toast({
+          title: 'Download failed',
+          description: 'Could not access the document. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Error downloading document:', err);
+      toast({
+        title: 'Download failed',
+        description: 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Open Canopy's consumer portal - this is where consumers can access their documents
+  const openCanopyPortal = () => {
+    // Open the consumer portal, NOT the API URL
+    window.open('https://app.usecanopy.com/consumer', '_blank');
+  };
+
+  // Determine which action to take on button click
+  const handleButtonClick = () => {
+    if (isStoredLocally) {
+      handleViewDocument();
+    } else {
+      // If not stored locally, always open the consumer portal
+      // Canopy doesn't expose documents via API - consumer must access through portal
+      openCanopyPortal();
+    }
+  };
+
+  // Determine button state and label
+  const getButtonContent = () => {
+    if (isLoading) {
+      return (
+        <>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading...
+        </>
+      );
+    }
+
+    if (isStoredLocally) {
+      return (
+        <>
+          <Download className="w-4 h-4" />
+          View
+        </>
+      );
+    }
+
+    // Not stored locally - show portal link
+    return (
+      <>
+        <ExternalLink className="w-4 h-4" />
+        Open Portal
+      </>
+    );
   };
 
   return (
@@ -717,8 +884,8 @@ function DocumentCard({ document }: { document: any }) {
       <CardContent className="py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FileText className="w-5 h-5 text-blue-600" />
+            <div className={`p-2 rounded-lg ${isStoredLocally ? 'bg-green-100' : 'bg-amber-100'}`}>
+              <FileText className={`w-5 h-5 ${isStoredLocally ? 'text-green-600' : 'text-amber-600'}`} />
             </div>
             <div>
               <p className="font-medium">{getDocumentTypeLabel(document.document_type)}</p>
@@ -733,32 +900,30 @@ function DocumentCard({ document }: { document: any }) {
             </div>
           </div>
           <div className="flex gap-2">
-            {(document.file_url || document.storage_path) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownload}
-                className="flex items-center gap-1"
-              >
-                {document.file_url ? (
-                  <>
-                    <ExternalLink className="w-4 h-4" />
-                    View
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Download
-                  </>
-                )}
-              </Button>
-            )}
+            <Button
+              variant={isStoredLocally ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleButtonClick}
+              disabled={isLoading}
+              className="flex items-center gap-1"
+              title={isStoredLocally ? "View document" : "Open Canopy consumer portal to access documents"}
+            >
+              {getButtonContent()}
+            </Button>
           </div>
         </div>
-        {document.downloaded && (
+        {isStoredLocally && (
           <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
             <CheckCircle className="w-3 h-3" />
             Saved to your files
+          </div>
+        )}
+        {!isStoredLocally && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            <p className="text-amber-600 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Documents require consumer access through Canopy's portal
+            </p>
           </div>
         )}
       </CardContent>
