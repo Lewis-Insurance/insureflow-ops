@@ -833,10 +833,10 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
     }
   };
 
-  // Open Canopy's consumer portal - this is where consumers can access their documents
-  const openCanopyPortal = () => {
-    // Open the consumer portal, NOT the API URL
-    window.open('https://app.usecanopy.com/consumer', '_blank');
+  // Open Canopy's agent dashboard - this is where agency staff can view documents
+  const openCanopyDashboard = () => {
+    // Open the Canopy dashboard where agents can access pull data and documents
+    window.open('https://app.usecanopy.com', '_blank');
   };
 
   // Determine which action to take on button click
@@ -844,9 +844,9 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
     if (isStoredLocally) {
       handleViewDocument();
     } else {
-      // If not stored locally, always open the consumer portal
-      // Canopy doesn't expose documents via API - consumer must access through portal
-      openCanopyPortal();
+      // If not stored locally, open Canopy's agent dashboard
+      // Canopy doesn't expose document downloads via API
+      openCanopyDashboard();
     }
   };
 
@@ -870,11 +870,11 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
       );
     }
 
-    // Not stored locally - show portal link
+    // Not stored locally - show dashboard link
     return (
       <>
         <ExternalLink className="w-4 h-4" />
-        Open Portal
+        View in Canopy
       </>
     );
   };
@@ -906,7 +906,7 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
               onClick={handleButtonClick}
               disabled={isLoading}
               className="flex items-center gap-1"
-              title={isStoredLocally ? "View document" : "Open Canopy consumer portal to access documents"}
+              title={isStoredLocally ? "View document" : "Open Canopy dashboard to view documents"}
             >
               {getButtonContent()}
             </Button>
@@ -922,7 +922,7 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
           <div className="mt-2 text-xs text-muted-foreground">
             <p className="text-amber-600 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
-              Documents require consumer access through Canopy's portal
+              View documents in Canopy dashboard
             </p>
           </div>
         )}
