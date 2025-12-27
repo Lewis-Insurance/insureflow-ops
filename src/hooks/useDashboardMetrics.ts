@@ -103,8 +103,11 @@ export function useDashboardMetrics(producerId?: string) {
       const quarterEnd = new Date(today.getFullYear(), quarter * 3 + 3, 0, 23, 59, 59, 999);
 
       // Build query with optional producer filter
-      let leadsQuery = supabase.from('leads').select('*');
-      
+      let leadsQuery = supabase
+        .from('leads')
+        .select('*')
+        .is('deleted_at', null); // Exclude soft-deleted leads
+
       if (producerId) {
         leadsQuery = leadsQuery.eq('assigned_to', producerId);
       }
@@ -117,9 +120,10 @@ export function useDashboardMetrics(producerId?: string) {
       let mtdQuery = supabase
         .from('leads')
         .select('*')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
-      
+
       if (producerId) {
         mtdQuery = mtdQuery.eq('assigned_to', producerId);
       }
@@ -131,9 +135,10 @@ export function useDashboardMetrics(producerId?: string) {
       let todayQuery = supabase
         .from('leads')
         .select('*')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', dayStart.toISOString())
         .lte('created_at', dayEnd.toISOString());
-      
+
       if (producerId) {
         todayQuery = todayQuery.eq('assigned_to', producerId);
       }
@@ -145,9 +150,10 @@ export function useDashboardMetrics(producerId?: string) {
       let weekQuery = supabase
         .from('leads')
         .select('*')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', weekStart.toISOString())
         .lte('created_at', weekEnd.toISOString());
-      
+
       if (producerId) {
         weekQuery = weekQuery.eq('assigned_to', producerId);
       }
@@ -159,9 +165,10 @@ export function useDashboardMetrics(producerId?: string) {
       let quarterQuery = supabase
         .from('leads')
         .select('*')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', quarterStart.toISOString())
         .lte('created_at', quarterEnd.toISOString());
-      
+
       if (producerId) {
         quarterQuery = quarterQuery.eq('assigned_to', producerId);
       }
@@ -311,6 +318,7 @@ export function useProducerLeaderboard() {
         const { data: leads } = await supabase
           .from('leads')
           .select('*')
+          .is('deleted_at', null) // Exclude soft-deleted leads
           .eq('assigned_to', producer.id)
           .gte('created_at', monthStart.toISOString())
           .lte('created_at', monthEnd.toISOString());
@@ -348,7 +356,8 @@ export function usePipelineHealth() {
     queryFn: async () => {
       const { data: leads, error } = await supabase
         .from('leads')
-        .select('*');
+        .select('*')
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) throw error;
 
@@ -394,6 +403,7 @@ export function useHistoricalTrend(days: number = 30, producerId?: string) {
       let query = supabase
         .from('leads')
         .select('created_at, status, current_premium')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', startDate.toISOString());
 
       if (producerId) {

@@ -47,6 +47,7 @@ export function useLeadProjections(
       const { data: leads, error } = await supabase
         .from('leads')
         .select('*, lead_activities(*)')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
 
@@ -183,6 +184,7 @@ export function useMultiMetricProjections(
       const { data: leads, error } = await supabase
         .from('leads')
         .select('*, lead_activities(*)')
+        .is('deleted_at', null) // Exclude soft-deleted leads
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
 
