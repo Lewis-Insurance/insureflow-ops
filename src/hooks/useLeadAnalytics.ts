@@ -194,9 +194,9 @@ export function useLeadSourcePerformance(dateRange?: { start: string; end: strin
       }>();
 
       leads?.forEach((lead: any) => {
-        const sourceId = lead.source_id || 'unknown';
-        const sourceName = lead.lead_sources?.name || 'Unknown Source';
-        const sourceType = lead.lead_sources?.type || 'unknown';
+        const sourceId = lead.source_id || 'direct';
+        const sourceName = lead.lead_sources?.name || 'Direct / No Source';
+        const sourceType = lead.lead_sources?.type || 'direct';
 
         if (!sourceMap.has(sourceId)) {
           sourceMap.set(sourceId, {
