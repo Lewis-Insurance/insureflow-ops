@@ -24,7 +24,8 @@ export function usePipelineStats() {
     queryFn: async () => {
       const { data: leads, error } = await supabase
         .from('leads')
-        .select('status, current_premium, lead_score');
+        .select('status, current_premium, lead_score')
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) throw error;
 
@@ -64,7 +65,8 @@ export function useLeadSourcePerformance() {
           status,
           current_premium,
           source:lead_sources(id, name)
-        `);
+        `)
+        .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) throw error;
 
