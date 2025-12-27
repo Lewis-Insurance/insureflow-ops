@@ -10,6 +10,7 @@ import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumen
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
+import { InviteToPortalButton } from '@/components/customers/InviteToPortalButton';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
@@ -225,6 +226,11 @@ export default function CustomerDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <InviteToPortalButton
+              accountId={account.id}
+              accountName={account.name}
+              defaultEmail={account.email}
+            />
             <Button
               variant="outline"
               onClick={() => navigate(`/coi-generator?accountId=${account.id}`)}
