@@ -412,15 +412,16 @@ export function useMoveLeadToStage() {
   });
 }
 
-// Delete lead mutation
+// Delete lead mutation (soft delete)
 export function useDeleteLead() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (leadId: string) => {
+      // Soft delete by setting deleted_at timestamp
       const { error } = await supabase
         .from('leads')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', leadId);
 
       if (error) throw error;
