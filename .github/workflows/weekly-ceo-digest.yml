@@ -6,9 +6,12 @@
 # Required GitHub Secrets:
 # - CRON_SECRET: Secret key matching CRON_SECRET in Supabase Edge Functions
 # - SUPABASE_URL: Your Supabase project URL
-# - AGENCY_WORKSPACE_IDS: Comma-separated list of agency workspace UUIDs to process
+# - CEO_MASTER_WORKSPACE_ID: The agency workspace with is_ceo_master=TRUE
 #
-# To add more agencies, update the AGENCY_WORKSPACE_IDS secret.
+# CEO Master Mode:
+# When is_ceo_master=TRUE is set on a workspace's ceo_digest_settings,
+# the function aggregates metrics from ALL agencies in a single digest.
+# Only ONE call is needed - the master workspace handles aggregation.
 
 name: Weekly CEO Digest
 
@@ -53,86 +56,58 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          AGENCY_WORKSPACE_IDS: ${{ secrets.AGENCY_WORKSPACE_IDS }}
+          CEO_MASTER_WORKSPACE_ID: ${{ secrets.CEO_MASTER_WORKSPACE_ID }}
         run: |
           # Determine parameters
           FORCE="${{ github.event.inputs.force || 'false' }}"
           TEST_MODE="${{ github.event.inputs.test_mode || 'false' }}"
           SPECIFIC_AGENCY="${{ github.event.inputs.agency_workspace_id }}"
 
-          # If a specific agency is provided, use it; otherwise, use all from secret
-          if [ -n "$SPECIFIC_AGENCY" ]; then
-            AGENCY_IDS="$SPECIFIC_AGENCY"
-          else
-            AGENCY_IDS="$AGENCY_WORKSPACE_IDS"
-          fi
+          # Use specific agency if provided, otherwise use CEO master workspace
+          AGENCY_ID="${SPECIFIC_AGENCY:-$CEO_MASTER_WORKSPACE_ID}"
 
           echo "Starting weekly CEO digest trigger..."
           echo "Force: $FORCE"
           echo "Test Mode: $TEST_MODE"
-          echo "Agencies to process: $(echo $AGENCY_IDS | tr ',' '\n' | wc -l | tr -d ' ')"
+          echo "CEO Master Workspace: $AGENCY_ID"
 
-          # Split agency IDs by comma and process each
-          IFS=',' read -ra AGENCIES <<< "$AGENCY_IDS"
+          # Build URL with query parameters
+          URL="${SUPABASE_URL}/functions/v1/weekly-ceo-digest?agency_workspace_id=${AGENCY_ID}"
 
-          SUCCESS_COUNT=0
-          FAIL_COUNT=0
+          if [ "$FORCE" = "true" ]; then
+            URL="${URL}&force=true"
+          fi
 
-          for AGENCY_ID in "${AGENCIES[@]}"; do
-            # Trim whitespace
-            AGENCY_ID=$(echo "$AGENCY_ID" | tr -d '[:space:]')
-
-            if [ -z "$AGENCY_ID" ]; then
-              continue
-            fi
-
-            echo ""
-            echo "Processing agency: $AGENCY_ID"
-
-            # Build URL with query parameters
-            URL="${SUPABASE_URL}/functions/v1/weekly-ceo-digest?agency_workspace_id=${AGENCY_ID}"
-
-            if [ "$FORCE" = "true" ]; then
-              URL="${URL}&force=true"
-            fi
-
-            if [ "$TEST_MODE" = "true" ]; then
-              URL="${URL}&test=true"
-            fi
-
-            # Make the request
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -X POST "$URL" \
-              -H "Content-Type: application/json" \
-              -H "X-Cron-Secret: $CRON_SECRET")
-
-            # Extract HTTP status code (last line)
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-            # Extract response body (all but last line)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-
-            echo "HTTP Status: $HTTP_CODE"
-            echo "Response: $BODY"
-
-            if [ "$HTTP_CODE" = "200" ]; then
-              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-              echo "Success for agency $AGENCY_ID"
-            else
-              FAIL_COUNT=$((FAIL_COUNT + 1))
-              echo "::warning::Failed for agency $AGENCY_ID (HTTP $HTTP_CODE)"
-            fi
-          done
+          if [ "$TEST_MODE" = "true" ]; then
+            URL="${URL}&test=true"
+          fi
 
           echo ""
-          echo "========================================="
-          echo "Summary:"
-          echo "  Successful: $SUCCESS_COUNT"
-          echo "  Failed: $FAIL_COUNT"
-          echo "========================================="
+          echo "Calling CEO digest function..."
 
-          if [ "$FAIL_COUNT" -gt 0 ]; then
-            echo "::warning::Some digest triggers failed. Check the logs above."
-            # Don't fail the workflow for individual failures
+          # Make the request
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+
+          # Extract HTTP status code (last line)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          # Extract response body (all but last line)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo ""
+            echo "========================================="
+            echo "CEO Digest triggered successfully!"
+            echo "========================================="
+          else
+            echo ""
+            echo "::error::CEO Digest failed (HTTP $HTTP_CODE)"
+            exit 1
           fi
 
       - name: Report Results
