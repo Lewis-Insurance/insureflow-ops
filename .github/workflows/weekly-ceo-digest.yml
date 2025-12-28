@@ -1,0 +1,159 @@
+# Weekly CEO Digest Scheduler
+#
+# Triggers the weekly-ceo-digest edge function on a schedule.
+# Runs every Monday at 8:00 AM ET (13:00 UTC).
+#
+# Required GitHub Secrets:
+# - CRON_SECRET: Secret key matching CRON_SECRET in Supabase Edge Functions
+# - SUPABASE_URL: Your Supabase project URL
+# - AGENCY_WORKSPACE_IDS: Comma-separated list of agency workspace UUIDs to process
+#
+# To add more agencies, update the AGENCY_WORKSPACE_IDS secret.
+
+name: Weekly CEO Digest
+
+on:
+  schedule:
+    # Run every Monday at 8:00 AM Eastern Time
+    # Note: GitHub Actions uses UTC, so 8:00 AM ET = 13:00 UTC (EST) or 12:00 UTC (EDT)
+    # Using 13:00 UTC to cover both EST and EDT
+    - cron: '0 13 * * 1'
+
+  # Allow manual triggering for testing
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force resend even if already sent this week'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      test_mode:
+        description: 'Test mode (skip actual email sending)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      agency_workspace_id:
+        description: 'Specific agency workspace ID (optional, leave empty for all)'
+        required: false
+        type: string
+
+jobs:
+  trigger-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger Weekly CEO Digest
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          AGENCY_WORKSPACE_IDS: ${{ secrets.AGENCY_WORKSPACE_IDS }}
+        run: |
+          # Determine parameters
+          FORCE="${{ github.event.inputs.force || 'false' }}"
+          TEST_MODE="${{ github.event.inputs.test_mode || 'false' }}"
+          SPECIFIC_AGENCY="${{ github.event.inputs.agency_workspace_id }}"
+
+          # If a specific agency is provided, use it; otherwise, use all from secret
+          if [ -n "$SPECIFIC_AGENCY" ]; then
+            AGENCY_IDS="$SPECIFIC_AGENCY"
+          else
+            AGENCY_IDS="$AGENCY_WORKSPACE_IDS"
+          fi
+
+          echo "Starting weekly CEO digest trigger..."
+          echo "Force: $FORCE"
+          echo "Test Mode: $TEST_MODE"
+          echo "Agencies to process: $(echo $AGENCY_IDS | tr ',' '\n' | wc -l | tr -d ' ')"
+
+          # Split agency IDs by comma and process each
+          IFS=',' read -ra AGENCIES <<< "$AGENCY_IDS"
+
+          SUCCESS_COUNT=0
+          FAIL_COUNT=0
+
+          for AGENCY_ID in "${AGENCIES[@]}"; do
+            # Trim whitespace
+            AGENCY_ID=$(echo "$AGENCY_ID" | tr -d '[:space:]')
+
+            if [ -z "$AGENCY_ID" ]; then
+              continue
+            fi
+
+            echo ""
+            echo "Processing agency: $AGENCY_ID"
+
+            # Build URL with query parameters
+            URL="${SUPABASE_URL}/functions/v1/weekly-ceo-digest?agency_workspace_id=${AGENCY_ID}"
+
+            if [ "$FORCE" = "true" ]; then
+              URL="${URL}&force=true"
+            fi
+
+            if [ "$TEST_MODE" = "true" ]; then
+              URL="${URL}&test=true"
+            fi
+
+            # Make the request
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST "$URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: $CRON_SECRET")
+
+            # Extract HTTP status code (last line)
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+            # Extract response body (all but last line)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            echo "HTTP Status: $HTTP_CODE"
+            echo "Response: $BODY"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              echo "Success for agency $AGENCY_ID"
+            else
+              FAIL_COUNT=$((FAIL_COUNT + 1))
+              echo "::warning::Failed for agency $AGENCY_ID (HTTP $HTTP_CODE)"
+            fi
+          done
+
+          echo ""
+          echo "========================================="
+          echo "Summary:"
+          echo "  Successful: $SUCCESS_COUNT"
+          echo "  Failed: $FAIL_COUNT"
+          echo "========================================="
+
+          if [ "$FAIL_COUNT" -gt 0 ]; then
+            echo "::warning::Some digest triggers failed. Check the logs above."
+            # Don't fail the workflow for individual failures
+          fi
+
+      - name: Report Results
+        if: always()
+        run: |
+          echo "Weekly CEO Digest trigger completed."
+          echo "Workflow run: ${{ github.run_id }}"
+          echo "Trigger: ${{ github.event_name }}"
+
+  # Optional: Send Slack notification on failure
+  notify-on-failure:
+    needs: trigger-digest
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Send Failure Notification
+        run: |
+          echo "The weekly CEO digest workflow failed."
+          echo "Check the GitHub Actions logs for details."
+          # Add Slack/email notification here if needed
+          # Example with Slack:
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"Weekly CEO Digest workflow failed!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -100,6 +100,8 @@ const LewisAIHub = React.lazy(() => import("./pages/ai/LewisAIHub"));
 const AIModuleExecute = React.lazy(() => import("./pages/ai/AIModuleExecute"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const CanopyImportPage = React.lazy(() => import("./pages/CanopyImportPage"));
+const CEODigestSettings = React.lazy(() => import("./pages/CEODigestSettings"));
+const CEODigestHistory = React.lazy(() => import("./pages/CEODigestHistory"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -394,6 +396,26 @@ const App = () => (
                     <ProtectedRoute requireAdmin>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <AdminPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/digest-settings"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CEODigestSettings />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/digest-history"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CEODigestHistory />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }
