@@ -259,7 +259,7 @@ Deno.serve(async (req: Request) => {
       let accountsQuery = supabase
         .from('accounts')
         .select('id, agency_workspace_id, name')
-        .eq('deleted_at', null);
+        .is('deleted_at', null);
 
       if (agencyWorkspaceId) {
         accountsQuery = accountsQuery.eq('agency_workspace_id', agencyWorkspaceId);
