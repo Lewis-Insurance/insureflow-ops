@@ -43,6 +43,17 @@ interface DigestSettings {
   recipients: string[];
   include_pii: boolean;
   thresholds: Record<string, number>;
+  is_ceo_master: boolean; // When true, aggregates ALL agency workspaces
+}
+
+interface AgencyBreakdown {
+  agency_workspace_id: string;
+  agency_name: string;
+  leads_new: number;
+  quotes_created: number;
+  policies_bound: number;
+  premium_written: number;
+  tasks_overdue: number;
 }
 
 interface FactsPacket {
@@ -52,7 +63,9 @@ interface FactsPacket {
     timezone: string;
     week_label: string;
     generated_at: string;
-    agency_workspace_id: string;
+    agency_workspace_id?: string;
+    scope?: 'single_agency' | 'all_agencies';
+    agency_count?: number;
   };
   kpis: Record<string, number>;
   deltas_vs_previous_week: Record<string, {
@@ -72,6 +85,7 @@ interface FactsPacket {
     message: string;
     evidence: Record<string, unknown>;
   }>;
+  by_agency?: AgencyBreakdown[]; // Per-agency breakdown for CEO view
   missing_data: string[];
 }
 
@@ -372,6 +386,7 @@ function generateEmailHtml(
 ): string {
   const baseUrl = Deno.env.get('APP_URL') || 'https://lewisinsurance.ai';
   const markdownHtml = markdownToHtml(aiOutput.markdown);
+  const isCeoMaster = facts.meta.scope === 'all_agencies';
 
   // Generate actions list
   const actionsHtml = aiOutput.ceo_actions
@@ -411,6 +426,56 @@ function generateEmailHtml(
     `
     : '';
 
+  // Generate per-agency breakdown for CEO mode
+  const agencyBreakdownHtml = isCeoMaster && facts.by_agency && facts.by_agency.length > 0
+    ? `
+      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px; margin: 24px 0;">
+        <h3 style="color: #0369a1; margin: 0 0 16px 0;">📊 Performance by Agency</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="background-color: #e0f2fe;">
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #7dd3fc;">Agency</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #7dd3fc;">Leads</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #7dd3fc;">Quotes</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #7dd3fc;">Bound</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #7dd3fc;">Premium</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #7dd3fc;">Overdue</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${facts.by_agency.map((agency: AgencyBreakdown) => `
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #e0f2fe;">
+                  <strong>${agency.agency_name}</strong>
+                </td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e0f2fe;">
+                  ${agency.leads_new}
+                </td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e0f2fe;">
+                  ${agency.quotes_created}
+                </td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e0f2fe;">
+                  ${agency.policies_bound}
+                </td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e0f2fe;">
+                  $${Number(agency.premium_written).toLocaleString()}
+                </td>
+                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e0f2fe; ${agency.tasks_overdue > 0 ? 'color: #dc2626; font-weight: bold;' : ''}">
+                  ${agency.tasks_overdue}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+    : '';
+
+  // Header subtitle based on mode
+  const headerSubtitle = isCeoMaster
+    ? `${facts.meta.week_label} • All Agencies (${facts.meta.agency_count || 0})`
+    : facts.meta.week_label;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -421,8 +486,8 @@ function generateEmailHtml(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 680px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); border-radius: 12px 12px 0 0; padding: 24px; color: white;">
-    <h1 style="margin: 0; font-size: 24px;">Weekly CEO Digest</h1>
-    <p style="margin: 8px 0 0 0; opacity: 0.9;">${facts.meta.week_label}</p>
+    <h1 style="margin: 0; font-size: 24px;">${isCeoMaster ? '🏢 Executive CEO Digest' : 'Weekly CEO Digest'}</h1>
+    <p style="margin: 8px 0 0 0; opacity: 0.9;">${headerSubtitle}</p>
   </div>
 
   <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
@@ -431,6 +496,8 @@ function generateEmailHtml(
     <div style="margin-bottom: 24px;">
       ${markdownHtml}
     </div>
+
+    ${agencyBreakdownHtml}
 
     <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-top: 24px;">
       <h3 style="margin: 0 0 16px 0; color: #1f2937;">Recommended Actions</h3>
@@ -457,7 +524,7 @@ function generateEmailHtml(
 }
 
 /**
- * Send email via Resend
+ * Send email via configured provider (SendGrid, Resend, or Postmark)
  */
 async function sendEmail(
   to: string[],
@@ -465,37 +532,122 @@ async function sendEmail(
   html: string,
   previewText: string,
   logger: ReturnType<typeof createLogger>
-): Promise<{ success: boolean; result: Record<string, unknown> }> {
-  const apiKey = Deno.env.get('RESEND_API_KEY');
-  const fromEmail = Deno.env.get('FROM_EMAIL') || 'digest@lewisinsurance.ai';
+): Promise<{ success: boolean; result: Record<string, unknown>; provider: string }> {
+  // Check for provider configuration - prioritize EMAIL_PROVIDER for consistency
+  const provider = Deno.env.get('EMAIL_PROVIDER') || 'sendgrid';
+  const apiKey = Deno.env.get('EMAIL_PROVIDER_API_KEY') || Deno.env.get('SENDGRID_API_KEY') || Deno.env.get('RESEND_API_KEY');
+  const fromEmail = Deno.env.get('OUTBOUND_FROM') || Deno.env.get('FROM_EMAIL') || 'digest@lewisinsurance.ai';
 
   if (!apiKey) {
-    throw new AppError('RESEND_API_KEY not configured', 500);
+    throw new AppError('Email API key not configured (EMAIL_PROVIDER_API_KEY or SENDGRID_API_KEY)', 500);
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to,
-      subject,
-      html,
-      text: previewText,
-    }),
-  });
+  logger.info('Sending email', { provider, recipientCount: to.length, subject });
 
-  const result = await response.json();
+  let response: Response;
 
-  if (!response.ok) {
-    logger.error('Resend API error', new Error(JSON.stringify(result)));
-    return { success: false, result };
+  if (provider === 'sendgrid') {
+    // SendGrid API
+    response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: to.map(email => ({ email })),
+        }],
+        from: { email: fromEmail, name: 'InsureFlow' },
+        subject,
+        content: [
+          { type: 'text/plain', value: previewText },
+          { type: 'text/html', value: html },
+        ],
+      }),
+    });
+
+    // SendGrid returns 202 for success with empty body
+    if (response.status === 202) {
+      logger.info('SendGrid accepted email for delivery');
+      return {
+        success: true,
+        result: { status: 202, message: 'Email accepted for delivery' },
+        provider: 'sendgrid',
+      };
+    }
+
+    const result = await response.json().catch(() => ({ error: 'Failed to parse response' }));
+    if (!response.ok) {
+      logger.error('SendGrid API error', new Error(JSON.stringify(result)));
+      return { success: false, result, provider: 'sendgrid' };
+    }
+    return { success: true, result, provider: 'sendgrid' };
+
+  } else if (provider === 'resend') {
+    // Resend API
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to,
+        subject,
+        html,
+        text: previewText,
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      logger.error('Resend API error', new Error(JSON.stringify(result)));
+      return { success: false, result, provider: 'resend' };
+    }
+    return { success: true, result, provider: 'resend' };
+
+  } else if (provider === 'postmark') {
+    // Postmark API - send to each recipient
+    const results: Record<string, unknown>[] = [];
+    let allSuccess = true;
+
+    for (const recipient of to) {
+      response = await fetch('https://api.postmarkapp.com/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Postmark-Server-Token': apiKey,
+        },
+        body: JSON.stringify({
+          From: fromEmail,
+          To: recipient,
+          Subject: subject,
+          HtmlBody: html,
+          TextBody: previewText,
+          MessageStream: 'outbound',
+        }),
+      });
+
+      const result = await response.json();
+      results.push(result);
+      if (!response.ok) {
+        logger.error('Postmark API error', new Error(JSON.stringify(result)));
+        allSuccess = false;
+      }
+    }
+
+    return {
+      success: allSuccess,
+      result: { messages: results },
+      provider: 'postmark',
+    };
+
+  } else {
+    throw new AppError(`Unknown email provider: ${provider}`, 500);
   }
-
-  return { success: true, result };
 }
 
 /**
@@ -686,16 +838,37 @@ Deno.serve(async (req: Request) => {
         .update({ status: 'computing' })
         .eq('id', runId);
 
-      // Compute facts via RPC
-      logger.info('Computing digest facts');
-      const { data: facts, error: factsError } = await supabase.rpc('get_weekly_ceo_digest_facts', {
-        p_agency_workspace_id: agencyWorkspaceId,
-        p_period_start: periodStart.toISOString(),
-        p_period_end: periodEnd.toISOString(),
-        p_timezone: digestSettings.timezone,
-        p_include_pii: digestSettings.include_pii,
-        p_thresholds: digestSettings.thresholds,
-      });
+      // Compute facts via RPC - use all-agencies RPC if CEO master mode
+      const isCeoMaster = digestSettings.is_ceo_master === true;
+      logger.info('Computing digest facts', { isCeoMaster, agencyWorkspaceId });
+
+      let facts: FactsPacket;
+      let factsError: { message: string } | null = null;
+
+      if (isCeoMaster) {
+        // CEO Master mode: Aggregate ALL agency workspaces
+        const result = await supabase.rpc('get_ceo_digest_facts_all_agencies', {
+          p_period_start: periodStart.toISOString(),
+          p_period_end: periodEnd.toISOString(),
+          p_timezone: digestSettings.timezone,
+          p_include_pii: digestSettings.include_pii,
+          p_thresholds: digestSettings.thresholds,
+        });
+        facts = result.data as FactsPacket;
+        factsError = result.error;
+      } else {
+        // Single agency mode
+        const result = await supabase.rpc('get_weekly_ceo_digest_facts', {
+          p_agency_workspace_id: agencyWorkspaceId,
+          p_period_start: periodStart.toISOString(),
+          p_period_end: periodEnd.toISOString(),
+          p_timezone: digestSettings.timezone,
+          p_include_pii: digestSettings.include_pii,
+          p_thresholds: digestSettings.thresholds,
+        });
+        facts = result.data as FactsPacket;
+        factsError = result.error;
+      }
 
       if (factsError) {
         throw new AppError(`Failed to compute facts: ${factsError.message}`, 500);
@@ -748,12 +921,12 @@ Deno.serve(async (req: Request) => {
       const emailHtml = generateEmailHtml(aiOutput, factsPacket, runId);
 
       // Send email (unless test mode)
-      let emailResult: { success: boolean; result: Record<string, unknown> };
+      let emailResult: { success: boolean; result: Record<string, unknown>; provider: string };
       let emailsSent = 0;
 
       if (testMode) {
         logger.info('Test mode - skipping email send');
-        emailResult = { success: true, result: { test_mode: true } };
+        emailResult = { success: true, result: { test_mode: true }, provider: 'test' };
         emailsSent = 0;
       } else {
         emailResult = await sendEmail(
@@ -772,7 +945,7 @@ Deno.serve(async (req: Request) => {
         .from('ceo_digest_runs')
         .update({
           status: finalStatus,
-          email_provider: 'resend',
+          email_provider: emailResult.provider,
           email_result: emailResult.result,
           emails_sent: emailsSent,
           completed_at: new Date().toISOString(),
