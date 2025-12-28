@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Database } from '@/integrations/supabase/types';
 import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
+import { logger } from '@/lib/logger';
 
 // Types
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -320,7 +321,7 @@ export function useUpdateLead() {
           });
 
         if (confirmationError) {
-          console.error('Failed to create follow-up confirmation:', confirmationError);
+          logger.error('Failed to create follow-up confirmation:', confirmationError);
           // Don't throw error - the lead update was successful
         }
       }

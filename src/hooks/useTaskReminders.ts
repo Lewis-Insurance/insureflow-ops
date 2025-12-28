@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface TaskReminder {
   id: string;
@@ -34,8 +35,8 @@ export function useTaskReminders() {
 
       if (error) throw error;
       setReminders(data || []);
-    } catch (error: any) {
-      console.error('Error fetching reminders:', error);
+    } catch (error) {
+      logger.error('Error fetching reminders:', error);
       toast({
         title: 'Error',
         description: 'Failed to load reminders',
@@ -69,8 +70,8 @@ export function useTaskReminders() {
       });
 
       return data;
-    } catch (error: any) {
-      console.error('Error creating reminder:', error);
+    } catch (error) {
+      logger.error('Error creating reminder:', error);
       toast({
         title: 'Error',
         description: 'Failed to create reminder',
@@ -95,8 +96,8 @@ export function useTaskReminders() {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error updating reminder:', error);
+    } catch (error) {
+      logger.error('Error updating reminder:', error);
       toast({
         title: 'Error',
         description: 'Failed to update reminder',
@@ -121,8 +122,8 @@ export function useTaskReminders() {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error deleting reminder:', error);
+    } catch (error) {
+      logger.error('Error deleting reminder:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete reminder',

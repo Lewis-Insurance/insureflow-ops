@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 
 // ============================================
@@ -363,7 +364,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to lock field:', error);
+      logger.error('Failed to lock field:', error);
       return false;
     }
   }, [session, toast]);
@@ -386,7 +387,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to unlock field:', error);
+      logger.error('Failed to unlock field:', error);
       return false;
     }
   }, [session]);
@@ -475,7 +476,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return data.id;
     } catch (error) {
-      console.error('Failed to add comment:', error);
+      logger.error('Failed to add comment:', error);
       return null;
     }
   }, [toast]);
@@ -505,7 +506,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('Failed to reply to comment:', error);
+      logger.error('Failed to reply to comment:', error);
       return false;
     }
   }, []);
@@ -531,7 +532,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to resolve comment:', error);
+      logger.error('Failed to resolve comment:', error);
       return false;
     }
   }, [toast]);
@@ -579,7 +580,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
         })),
       }));
     } catch (error) {
-      console.error('Failed to get comments:', error);
+      logger.error('Failed to get comments:', error);
       return [];
     }
   }, []);
@@ -633,7 +634,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to request change:', error);
+      logger.error('Failed to request change:', error);
       return false;
     }
   }, [toast]);
@@ -689,7 +690,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to approve change:', error);
+      logger.error('Failed to approve change:', error);
       return false;
     }
   }, [toast]);
@@ -720,7 +721,7 @@ export function useFormCollaboration(): UseFormCollaborationReturn {
 
       return true;
     } catch (error) {
-      console.error('Failed to reject change:', error);
+      logger.error('Failed to reject change:', error);
       return false;
     }
   }, [toast]);

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProcessedDocument {
@@ -136,7 +137,7 @@ export function useDocumentIntelligence() {
 
       setDocuments(processed);
     } catch (err: any) {
-      console.error('Error fetching documents:', err);
+      logger.error('Error fetching documents:', err);
       toast({
         title: "Error",
         description: "Failed to fetch documents",
@@ -203,7 +204,7 @@ export function useDocumentIntelligence() {
         }
       }
     } catch (err) {
-      console.error('Error polling batch status:', err);
+      logger.error('Error polling batch status:', err);
     }
   }, [fetchDocuments, toast]);
 
@@ -266,7 +267,7 @@ export function useDocumentIntelligence() {
           });
 
         if (uploadError) {
-          console.error(`Failed to upload ${file.name}:`, uploadError);
+          logger.error(`Failed to upload ${file.name}:`, uploadError);
           continue;
         }
 
@@ -317,7 +318,7 @@ export function useDocumentIntelligence() {
       pollBatchStatus(batchId);
 
     } catch (err: any) {
-      console.error('Error uploading documents:', err);
+      logger.error('Error uploading documents:', err);
       toast({
         title: "Upload Failed",
         description: err.message || "Failed to upload documents",
@@ -353,7 +354,7 @@ export function useDocumentIntelligence() {
 
       setSearchResults(data.results || []);
     } catch (err: any) {
-      console.error('Error searching documents:', err);
+      logger.error('Error searching documents:', err);
       toast({
         title: "Search Failed",
         description: err.message || "Failed to search documents",
@@ -387,7 +388,7 @@ export function useDocumentIntelligence() {
 
       setInsights(data.insights || []);
     } catch (err: any) {
-      console.error('Error generating insights:', err);
+      logger.error('Error generating insights:', err);
       toast({
         title: "Insights Generation Failed",
         description: err.message || "Failed to generate insights",
@@ -419,7 +420,7 @@ export function useDocumentIntelligence() {
 
       window.open(data.signedUrl, '_blank');
     } catch (err: any) {
-      console.error('Error viewing document:', err);
+      logger.error('Error viewing document:', err);
       toast({
         title: "View Failed",
         description: err.message || "Failed to view document",
@@ -456,7 +457,7 @@ export function useDocumentIntelligence() {
 
       toast({ title: "Success", description: "Document download started" });
     } catch (err: any) {
-      console.error('Error downloading document:', err);
+      logger.error('Error downloading document:', err);
       toast({
         title: "Download Failed",
         description: err.message || "Failed to download document",
@@ -483,7 +484,7 @@ export function useDocumentIntelligence() {
         description: "Document deleted successfully",
       });
     } catch (err: any) {
-      console.error('Error deleting document:', err);
+      logger.error('Error deleting document:', err);
       toast({
         title: "Delete Failed",
         description: err.message || "Failed to delete document",

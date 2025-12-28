@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface Profile {
   id: string;
@@ -27,7 +28,7 @@ export function useProfiles() {
       if (error) throw error;
       setProfiles(data || []);
     } catch (error) {
-      console.error('Error fetching profiles:', error);
+      logger.error('Error fetching profiles:', error);
     } finally {
       setLoading(false);
     }

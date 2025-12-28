@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export type CanopyPullStatus = 'idle' | 'initiating' | 'pending' | 'authenticated' | 'processing' | 'complete' | 'error';
 
@@ -60,34 +61,34 @@ declare global {
 // Load Canopy SDK script
 function loadCanopySDK(): Promise<void> {
   return new Promise((resolve, reject) => {
-    console.log('[Canopy SDK] Checking if already loaded...');
+    logger.debug('[Canopy SDK] Checking if already loaded...');
     if (window.CanopyConnect) {
-      console.log('[Canopy SDK] Already loaded');
+      logger.debug('[Canopy SDK] Already loaded');
       resolve();
       return;
     }
 
-    console.log('[Canopy SDK] Creating script element...');
+    logger.debug('[Canopy SDK] Creating script element...');
     const script = document.createElement('script');
     script.src = 'https://cdn.usecanopy.com/v2/canopy-connect.js';
     script.async = true;
 
     script.onload = () => {
-      console.log('[Canopy SDK] Script loaded, checking window.CanopyConnect...');
-      console.log('[Canopy SDK] window.CanopyConnect =', window.CanopyConnect);
+      logger.debug('[Canopy SDK] Script loaded, checking window.CanopyConnect...');
+      logger.debug('[Canopy SDK] window.CanopyConnect =', window.CanopyConnect);
       // Give it a moment to initialize
       setTimeout(() => {
-        console.log('[Canopy SDK] After timeout, window.CanopyConnect =', window.CanopyConnect);
+        logger.debug('[Canopy SDK] After timeout, window.CanopyConnect =', window.CanopyConnect);
         resolve();
       }, 100);
     };
 
     script.onerror = (e) => {
-      console.error('[Canopy SDK] Script failed to load:', e);
+      logger.error('[Canopy SDK] Script failed to load:', e);
       reject(new Error('Failed to load Canopy SDK'));
     };
 
-    console.log('[Canopy SDK] Appending script to head...');
+    logger.debug('[Canopy SDK] Appending script to head...');
     document.head.appendChild(script);
   });
 }
@@ -155,16 +156,16 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
   }, [pullId, options, toast]);
 
   const initiatePull = useCallback(async () => {
-    console.log('[Canopy] initiatePull called');
+    logger.debug('[Canopy] initiatePull called');
     setIsLoading(true);
     setStatus('initiating');
     setError(null);
 
     try {
       // Load Canopy SDK if not already loaded
-      console.log('[Canopy] Loading SDK...');
+      logger.debug('[Canopy] Loading SDK...');
       await loadCanopySDK();
-      console.log('[Canopy] SDK loaded');
+      logger.debug('[Canopy] SDK loaded');
 
       if (!window.CanopyConnect) {
         throw new Error('Canopy SDK not available');
@@ -172,7 +173,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
 
       // Get public alias from environment
       const publicAlias = import.meta.env.VITE_CANOPY_PUBLIC_ALIAS;
-      console.log('[Canopy] Public alias:', publicAlias);
+      logger.debug('[Canopy] Public alias:', publicAlias);
 
       if (!publicAlias) {
         throw new Error('VITE_CANOPY_PUBLIC_ALIAS not configured');
@@ -180,7 +181,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
 
       // Generate a unique session ID to track this pull
       const sessionId = crypto.randomUUID();
-      console.log('[Canopy] Session ID:', sessionId);
+      logger.debug('[Canopy] Session ID:', sessionId);
 
       setStatus('pending');
 
@@ -196,7 +197,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
           initiatedAt: new Date().toISOString(),
         },
         onSuccess: (pullData: unknown) => {
-          console.log('[Canopy] Pull successful:', pullData);
+          logger.debug('[Canopy] Pull successful:', pullData);
           setStatus('processing');
           // The webhook will receive the full data and store it
           // We just show success to the user
@@ -206,7 +207,7 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
           });
         },
         onError: (err: Error) => {
-          console.error('[Canopy] Error:', err);
+          logger.error('[Canopy] Error:', err);
           setError(err);
           setStatus('error');
           options.onError?.(err);
@@ -218,14 +219,14 @@ export function useCanopyConnect(options: UseCanopyConnectOptions = {}): UseCano
           });
         },
         onExit: () => {
-          console.log('[Canopy] Widget closed');
+          logger.debug('[Canopy] Widget closed');
           setIsLoading(false);
           options.onExit?.();
         }
       });
 
       // Open the Canopy widget
-      console.log('[Canopy] Opening widget...');
+      logger.debug('[Canopy] Opening widget...');
       handler.open();
 
     } catch (err) {

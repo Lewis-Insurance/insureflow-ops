@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 export type AutoVehicle = {
   id?: string;
@@ -31,7 +32,7 @@ export const useAutoVehicles = (leadId: string) => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching auto vehicles:', error);
+        logger.error('Error fetching auto vehicles:', error);
         return [];
       }
       return data || [];
@@ -59,7 +60,7 @@ export const useAddAutoVehicle = () => {
       toast.success('Vehicle added successfully');
     },
     onError: (error: any) => {
-      console.error('Error adding vehicle:', error);
+      logger.error('Error adding vehicle:', error);
       toast.error(`Failed to add vehicle: ${error.message}`);
     },
   });
@@ -85,7 +86,7 @@ export const useUpdateAutoVehicle = () => {
       toast.success('Vehicle updated successfully');
     },
     onError: (error: any) => {
-      console.error('Error updating vehicle:', error);
+      logger.error('Error updating vehicle:', error);
       toast.error(`Failed to update vehicle: ${error.message}`);
     },
   });
@@ -109,7 +110,7 @@ export const useDeleteAutoVehicle = () => {
       toast.success('Vehicle removed successfully');
     },
     onError: (error: any) => {
-      console.error('Error deleting vehicle:', error);
+      logger.error('Error deleting vehicle:', error);
       toast.error(`Failed to remove vehicle: ${error.message}`);
     },
   });

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AORenewal, AORenewalTerm } from "./useAORenewals";
+import { logger } from '@/lib/logger';
 
 export interface CarrierBreakdown {
   carrier: string;
@@ -80,7 +81,7 @@ export function useAORenewalAnalytics(dateRange?: DateRange) {
       const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching AO renewal analytics:", error);
+        logger.error("Error fetching AO renewal analytics:", error);
         throw error;
       }
 
@@ -229,7 +230,7 @@ export function useAORenewalKPIs() {
         .select("status, current_premium, moved_premium, moved_carrier");
 
       if (error) {
-        console.error("Error fetching AO renewal KPIs:", error);
+        logger.error("Error fetching AO renewal KPIs:", error);
         throw error;
       }
 

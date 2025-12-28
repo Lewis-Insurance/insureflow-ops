@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
@@ -79,7 +80,7 @@ export function useWorkspaceJobs(workspaceId?: string) {
         setJobs((data as JobRow[]) ?? []);
         data?.forEach((j: any) => seen.add(j.id));
       } catch (e) {
-        console.error('fetchJobs', e);
+        logger.error('fetchJobs', e);
         toast({ title: 'Error', description: 'Failed to load jobs', variant: 'destructive' });
       } finally {
         if (mounted) setLoading(false);

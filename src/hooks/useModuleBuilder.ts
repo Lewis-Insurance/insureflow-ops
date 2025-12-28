@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 // Types
 export interface BuilderMessage {
@@ -137,7 +138,7 @@ export function useStartBuilderSession() {
             return data as { session_id: string; message: BuilderMessage; status: string };
         },
         onError: (error: Error) => {
-            console.error('Builder start error:', error);
+            logger.error('Builder start error:', error);
             toast({
                 title: 'Error starting builder',
                 description: error.message || 'Failed to connect to the AI service',
@@ -170,7 +171,7 @@ export function useSendBuilderMessage() {
             };
         },
         onError: (error: Error) => {
-            console.error('Builder message error:', error);
+            logger.error('Builder message error:', error);
             toast({
                 title: 'Error sending message',
                 description: error.message,

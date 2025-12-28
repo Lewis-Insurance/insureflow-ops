@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { TaskStatus, TaskPriority } from './useTasks';
+import { logger } from '@/lib/logger';
 
 export type { TaskStatus, TaskPriority };
 
@@ -23,8 +24,8 @@ export function useTaskBulkActions() {
         description: `Updated ${taskIds.length} task(s)`,
       });
       return true;
-    } catch (error: any) {
-      console.error('Error bulk updating status:', error);
+    } catch (error) {
+      logger.error('Error bulk updating status:', error);
       toast({
         title: 'Error',
         description: 'Failed to update tasks',
@@ -51,8 +52,8 @@ export function useTaskBulkActions() {
         description: `Updated priority for ${taskIds.length} task(s)`,
       });
       return true;
-    } catch (error: any) {
-      console.error('Error bulk updating priority:', error);
+    } catch (error) {
+      logger.error('Error bulk updating priority:', error);
       toast({
         title: 'Error',
         description: 'Failed to update task priority',
@@ -79,8 +80,8 @@ export function useTaskBulkActions() {
         description: `Assigned ${taskIds.length} task(s)`,
       });
       return true;
-    } catch (error: any) {
-      console.error('Error bulk assigning tasks:', error);
+    } catch (error) {
+      logger.error('Error bulk assigning tasks:', error);
       toast({
         title: 'Error',
         description: 'Failed to assign tasks',
@@ -107,8 +108,8 @@ export function useTaskBulkActions() {
         description: `Deleted ${taskIds.length} task(s)`,
       });
       return true;
-    } catch (error: any) {
-      console.error('Error bulk deleting tasks:', error);
+    } catch (error) {
+      logger.error('Error bulk deleting tasks:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete tasks',

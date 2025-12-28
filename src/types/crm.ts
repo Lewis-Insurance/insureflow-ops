@@ -16,7 +16,7 @@ export interface Account {
   source?: string | null;
   lead_source_detail?: string | null;
   notes?: string | null;
-  custom?: Record<string, any> | null;
+  custom?: Record<string, unknown> | null;
   team_id?: string | null;
   owner_agent_id?: string | null;
   business_id?: string | null;
@@ -47,8 +47,8 @@ export interface Contact {
   ssn_last4?: string | null;
   best_call_time?: string | null;
   preferred_contact_method?: 'phone' | 'email' | 'sms' | 'mail' | null;
-  address_residential?: Record<string, any> | null;
-  address_mailing?: Record<string, any> | null;
+  address_residential?: Record<string, unknown> | null;
+  address_mailing?: Record<string, unknown> | null;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null;
   marital_status?: 'single' | 'married' | 'divorced' | 'widowed' | 'separated' | null;
   tags?: string[] | null;
@@ -136,7 +136,7 @@ export interface ActivityEvent {
   type: string;
   entity_type?: string;
   entity_id?: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
   occurred_at: string;
   created_at: string;
 }
@@ -222,7 +222,7 @@ export interface SavedView {
   id: string;
   name: string;
   description?: string;
-  filters: Record<string, any>;
+  filters: Record<string, unknown>;
   view_type: string;
   created_by: string;
   organization_shared: boolean;
@@ -236,13 +236,13 @@ export interface BulkAction {
   action_type: string;
   entity_type: string;
   entity_ids: string[];
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   progress: number;
   total_count: number;
   success_count: number;
   error_count: number;
-  errors: any[];
+  errors: Array<{ message: string; entityId?: string; code?: string }>;
   created_by: string;
   started_at?: string;
   completed_at?: string;
@@ -290,7 +290,7 @@ export interface ImportBatch {
   error_rows: number;
   status: 'staging' | 'processing' | 'completed' | 'failed';
   field_mapping?: Record<string, string> | null;
-  validation_errors: any[] | null;
+  validation_errors: Array<{ row?: number; field?: string; message: string }> | null;
   imported_by: string;
   started_at?: string | null;
   completed_at?: string | null;
@@ -306,7 +306,7 @@ export interface ConsentRecord {
   evidence_ref?: string;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string;
-  location_data?: any;
+  location_data?: Record<string, unknown>;
   notes?: string;
   granted_at: string;
   expires_at?: string;
@@ -326,8 +326,8 @@ export interface AuditLog {
   session_id?: string | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
-  changed_fields?: any | null; // Using any to match Json type
-  metadata?: any | null; // Using any to match Json type
+  changed_fields?: Record<string, { old: unknown; new: unknown }> | null;
+  metadata?: Record<string, unknown> | null;
   occurred_at: string;
   created_at: string;
 }
@@ -342,8 +342,8 @@ export interface DetailedAuditLog {
   session_id?: string | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
-  changed_fields?: any | null; // Using any to match Json type
-  metadata?: any | null; // Using any to match Json type
+  changed_fields?: Record<string, { old: unknown; new: unknown }> | null;
+  metadata?: Record<string, unknown> | null;
   occurred_at: string;
   created_at: string;
 }
@@ -355,7 +355,7 @@ export interface TwilioConsent {
   channel: 'sms' | 'voice';
   event: 'consent_granted' | 'consent_revoked';
   method?: string | null;
-  evidence?: any | null; // Using any to match Json type
+  evidence?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -371,7 +371,7 @@ export interface ConsentEvidence {
   evidence_ref?: string | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
-  location_data?: any | null; // Using any to match Json type
+  location_data?: Record<string, unknown> | null;
   notes?: string | null;
   created_by?: string | null;
   created_at: string;
@@ -382,10 +382,10 @@ export interface UserSession {
   id: string;
   user_id: string;
   session_token: string;
-  device_info?: Record<string, any> | null;
+  device_info?: Record<string, unknown> | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
-  location_data?: Record<string, any> | null;
+  location_data?: Record<string, unknown> | null;
   last_active: string;
   expires_at: string;
   created_at: string;
@@ -401,7 +401,7 @@ export interface ImpersonationLog {
   ended_at?: string | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
-  actions_taken?: Record<string, any>[] | null;
+  actions_taken?: Array<Record<string, unknown>> | null;
   created_at: string;
 }
 
@@ -425,10 +425,10 @@ export interface ImportStaging {
   id: string;
   batch_id: string;
   row_number: number;
-  raw_data: any; // Using any to match Json type
-  mapped_data?: any | null; // Using any to match Json type
+  raw_data: Record<string, unknown>;
+  mapped_data?: Record<string, unknown> | null;
   validation_status: string; // More flexible than strict union
-  validation_errors?: any[] | null; // Using any to match Json type
+  validation_errors?: Array<{ field?: string; message: string }> | null;
   entity_id?: string | null;
   created_at: string;
 }
@@ -451,7 +451,7 @@ export interface DuplicateDetectionRule {
   id: string;
   entity_type: string;
   rule_name: string;
-  match_fields: Record<string, any>;
+  match_fields: Record<string, unknown>;
   threshold: number;
   is_active: boolean;
   created_at: string;
@@ -465,7 +465,7 @@ export interface MergeHistory {
   entity_type: string;
   survivor_id: string;
   merged_ids: string[];
-  merge_data: Record<string, any>;
+  merge_data: Record<string, unknown>;
   merged_by: string;
   created_at: string;
 }
@@ -526,7 +526,7 @@ export interface ProfileAccessLog {
   target_user_id: string;
   accessor_user_id?: string | null;
   action: string;
-  details?: Record<string, any> | null;
+  details?: Record<string, unknown> | null;
   ip_address?: unknown; // Database type is inet/unknown
   user_agent?: string | null;
   created_at: string;

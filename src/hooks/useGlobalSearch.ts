@@ -84,7 +84,7 @@ export function useGlobalSearch() {
           phone: account.phone
         })));
       } else if (accountResponse.status === 'rejected') {
-        console.error('Account search failed:', accountResponse.reason);
+        logger.error('Account search failed:', accountResponse.reason);
       }
 
       // Process contact results
@@ -98,7 +98,7 @@ export function useGlobalSearch() {
           phone: contact.phone_mobile || contact.phone_home || contact.phone_work
         })));
       } else if (contactResponse.status === 'rejected') {
-        console.error('Contact search failed:', contactResponse.reason);
+        logger.error('Contact search failed:', contactResponse.reason);
       }
 
       // Process business results
@@ -112,7 +112,7 @@ export function useGlobalSearch() {
           phone: null
         })));
       } else if (businessResponse.status === 'rejected') {
-        console.error('Business search failed:', businessResponse.reason);
+        logger.error('Business search failed:', businessResponse.reason);
       }
 
       // Process policy results
@@ -127,15 +127,15 @@ export function useGlobalSearch() {
           subtitle: `${policy.carrier_info?.name || policy.carrier || 'Unknown Carrier'} - ${policy.line_of_business || 'Unknown Line'} ${policy.account?.name ? `(${policy.account.name})` : ''}`
         })));
       } else if (policyResponse.status === 'rejected') {
-        console.error('Policy search failed:', policyResponse.reason);
+        logger.error('Policy search failed:', policyResponse.reason);
       }
 
       logger.debug('Final search results:', results);
       setResults(results);
 
     } catch (err: any) {
-      console.error('Global search error:', err);
-      console.error('Full error object:', err);
+      logger.error('Global search error:', err);
+      logger.error('Full error object:', err);
       setError(err.message || 'Search failed');
       toast({
         title: "Search Error",

@@ -1,14 +1,15 @@
 /**
  * Error Tracking Service
  *
- * Production-ready error tracking infrastructure.
- * Currently logs to console but designed to easily integrate with Sentry.
+ * Production-ready error tracking with Sentry integration.
  *
- * To enable Sentry:
- * 1. npm install @sentry/react
- * 2. Set VITE_SENTRY_DSN in environment
- * 3. Uncomment Sentry.init() in initErrorTracking()
+ * Setup:
+ * 1. @sentry/react is installed
+ * 2. Set VITE_SENTRY_DSN in environment variables (Netlify)
+ * 3. Call initErrorTracking() in main.tsx before rendering
  */
+
+import * as Sentry from '@sentry/react';
 
 interface ErrorContext {
   userId?: string;
@@ -31,6 +32,14 @@ const isProduction = import.meta.env.PROD;
 
 // Track initialization state
 let isInitialized = false;
+let sentryEnabled = false;
+
+/**
+ * Check if Sentry is enabled
+ */
+export function isSentryEnabled(): boolean {
+  return sentryEnabled;
+}
 
 /**
  * Initialize error tracking service
@@ -41,27 +50,55 @@ export function initErrorTracking(): void {
 
   const dsn = import.meta.env.VITE_SENTRY_DSN;
 
-  if (dsn && isProduction) {
-    // Sentry integration (uncomment when @sentry/react is installed)
-    // import * as Sentry from '@sentry/react';
-    // Sentry.init({
-    //   dsn,
-    //   environment: import.meta.env.MODE,
-    //   release: import.meta.env.VITE_APP_VERSION || '1.0.0',
-    //   tracesSampleRate: 0.1, // 10% of transactions
-    //   replaysSessionSampleRate: 0.1,
-    //   replaysOnErrorSampleRate: 1.0,
-    //   integrations: [
-    //     new Sentry.BrowserTracing(),
-    //     new Sentry.Replay(),
-    //   ],
-    // });
-    console.info('[ErrorTracking] Sentry DSN configured but @sentry/react not installed');
+  if (dsn) {
+    try {
+      Sentry.init({
+        dsn,
+        environment: import.meta.env.MODE || 'production',
+        release: import.meta.env.VITE_APP_VERSION || '2.0.0',
+        // Performance Monitoring
+        tracesSampleRate: isProduction ? 0.1 : 1.0, // 10% in prod, 100% in dev
+        // Session Replay
+        replaysSessionSampleRate: 0.1, // 10% of sessions
+        replaysOnErrorSampleRate: 1.0, // 100% when errors occur
+        integrations: [
+          Sentry.browserTracingIntegration(),
+          Sentry.replayIntegration({
+            maskAllText: true,
+            blockAllMedia: true,
+          }),
+        ],
+        // Filter out noisy errors
+        ignoreErrors: [
+          'ResizeObserver loop limit exceeded',
+          'ResizeObserver loop completed with undelivered notifications',
+          'Non-Error promise rejection captured',
+          /Network request failed/i,
+          /Load failed/i,
+          /Failed to fetch/i,
+          /AbortError/i,
+          /ChunkLoadError/i,
+        ],
+        // Don't send errors from localhost in production mode
+        beforeSend(event) {
+          if (window.location.hostname === 'localhost' && isProduction) {
+            return null;
+          }
+          return event;
+        },
+      });
+      sentryEnabled = true;
+      console.info('[ErrorTracking] Sentry initialized successfully');
+    } catch (err) {
+      console.warn('[ErrorTracking] Failed to initialize Sentry:', err);
+    }
   } else if (!isProduction) {
     console.info('[ErrorTracking] Running in development mode - errors logged to console');
+  } else {
+    console.warn('[ErrorTracking] No VITE_SENTRY_DSN configured - errors logged to console only');
   }
 
-  // Set up global error handlers
+  // Set up global error handlers (always, as fallback)
   window.addEventListener('error', (event) => {
     captureException(event.error || new Error(event.message), {
       extra: {
@@ -87,16 +124,19 @@ export function initErrorTracking(): void {
  */
 export function setUser(user: { id: string; email?: string; name?: string } | null): void {
   if (!user) {
-    // Clear user context
-    // Sentry.setUser(null);
+    if (sentryEnabled) {
+      Sentry.setUser(null);
+    }
     return;
   }
 
-  // Sentry.setUser({
-  //   id: user.id,
-  //   email: user.email,
-  //   username: user.name,
-  // });
+  if (sentryEnabled) {
+    Sentry.setUser({
+      id: user.id,
+      email: user.email,
+      username: user.name,
+    });
+  }
 
   if (!isProduction) {
     console.debug('[ErrorTracking] User context set:', user.id);
@@ -115,16 +155,16 @@ export function captureException(error: Error, context?: ErrorContext): void {
     timestamp: new Date().toISOString(),
   };
 
-  if (isProduction) {
-    // Sentry.captureException(error, {
-    //   extra: context?.extra,
-    //   tags: {
-    //     page: context?.page,
-    //     component: context?.component,
-    //     action: context?.action,
-    //   },
-    // });
-
+  if (sentryEnabled) {
+    Sentry.captureException(error, {
+      extra: context?.extra,
+      tags: {
+        page: context?.page,
+        component: context?.component,
+        action: context?.action,
+      },
+    });
+  } else if (isProduction) {
     // Fallback: Log structured error to console for log aggregation
     console.error('[ERROR]', JSON.stringify(errorData));
   } else {
@@ -140,8 +180,9 @@ export function captureException(error: Error, context?: ErrorContext): void {
  * Capture a message (non-error event)
  */
 export function captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info'): void {
-  if (isProduction) {
-    // Sentry.captureMessage(message, level);
+  if (sentryEnabled) {
+    Sentry.captureMessage(message, level);
+  } else if (isProduction) {
     console.log(`[${level.toUpperCase()}]`, message);
   } else {
     console.log(`[ErrorTracking] ${level}:`, message);
@@ -152,12 +193,14 @@ export function captureMessage(message: string, level: 'info' | 'warning' | 'err
  * Add a breadcrumb for debugging context
  */
 export function addBreadcrumb(data: BreadcrumbData): void {
-  // Sentry.addBreadcrumb({
-  //   category: data.category,
-  //   message: data.message,
-  //   level: data.level || 'info',
-  //   data: data.data,
-  // });
+  if (sentryEnabled) {
+    Sentry.addBreadcrumb({
+      category: data.category,
+      message: data.message,
+      level: data.level || 'info',
+      data: data.data,
+    });
+  }
 
   if (!isProduction) {
     console.debug(`[Breadcrumb] ${data.category}: ${data.message}`, data.data);
@@ -170,19 +213,30 @@ export function addBreadcrumb(data: BreadcrumbData): void {
 export function startTransaction(name: string, op: string): { finish: () => void } {
   const startTime = performance.now();
 
-  // const transaction = Sentry.startTransaction({ name, op });
+  // Note: Sentry v8 uses startSpan instead of startTransaction
+  // For now, we use manual timing with breadcrumbs
+  addBreadcrumb({
+    category: 'performance',
+    message: `Started: ${op}/${name}`,
+    level: 'info',
+  });
 
   return {
     finish: () => {
       const duration = performance.now() - startTime;
+
+      addBreadcrumb({
+        category: 'performance',
+        message: `Finished: ${op}/${name}`,
+        level: 'info',
+        data: { duration_ms: duration },
+      });
+
       if (!isProduction) {
         console.debug(`[Performance] ${op}/${name}: ${duration.toFixed(2)}ms`);
-      } else {
-        // transaction.finish();
-        // Log for production monitoring
-        if (duration > 3000) {
-          console.warn(`[PERF] Slow operation: ${op}/${name} took ${duration.toFixed(0)}ms`);
-        }
+      } else if (duration > 3000) {
+        // Log slow operations even in production
+        console.warn(`[PERF] Slow operation: ${op}/${name} took ${duration.toFixed(0)}ms`);
       }
     },
   };
@@ -220,3 +274,15 @@ export function handleBoundaryError(error: Error, errorInfo: React.ErrorInfo): v
     },
   });
 }
+
+/**
+ * Get Sentry React ErrorBoundary component
+ * Use this to wrap components that need error boundary with Sentry integration
+ */
+export const SentryErrorBoundary = Sentry.ErrorBoundary;
+
+/**
+ * Profiler component for performance monitoring
+ * Wrap routes or heavy components with this
+ */
+export const SentryProfiler = Sentry.withProfiler;

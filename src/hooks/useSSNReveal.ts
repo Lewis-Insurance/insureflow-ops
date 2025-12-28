@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { usePermissions } from './usePermissions';
+import { logger } from '@/lib/logger';
 
 export function useSSNReveal() {
   const [revealedSSNs, setRevealedSSNs] = useState<Record<string, string>>({});
@@ -52,7 +53,7 @@ export function useSSNReveal() {
         description: "Full SSN has been revealed for authorized viewing",
       });
     } catch (err: any) {
-      console.error('SSN reveal error:', err);
+      logger.error('SSN reveal error:', err);
       toast({
         title: "SSN Reveal Failed",
         description: err.message || 'Failed to reveal SSN',

@@ -3,6 +3,7 @@
 // ============================================================================
 // Displays comprehensive insurance data imported from Canopy Connect
 // Shows policies, vehicles, drivers, dwellings, and claims
+// Includes 2-way sync features: monitoring, change detection, and servicing
 // ============================================================================
 
 import React, { useState } from 'react';
@@ -30,9 +31,20 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
+  Activity,
+  Settings,
+  History,
+  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+
+// 2-Way Sync Components
+import { MonitoringStatusCard, MonitoringEnableButton } from './monitoring';
+import { ServicingActionsPanel, AddVehicleModal } from './servicing';
+import { ChangeDetectionBadge, PolicyChangesSummary } from './changes';
+import { CommercialDataSection } from './commercial';
 
 interface CanopyDataDisplayProps {
   pullId?: string;
@@ -42,6 +54,8 @@ interface CanopyDataDisplayProps {
 
 export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyDataDisplayProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('policies');
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -115,7 +129,7 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
 
       setIsRefreshing(false);
     } catch (err) {
-      console.error('Failed to refresh:', err);
+      logger.error('Failed to refresh:', err);
       toast({
         title: 'Refresh failed',
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -216,7 +230,7 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
         .select('*')
         .in('policy_id', policyIds);
       if (error) {
-        console.log('Documents query error (table may not exist):', error);
+        logger.debug('Documents query error (table may not exist):', error);
         return [];
       }
       return data;
@@ -267,7 +281,15 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">Imported Insurance Data</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold">Imported Insurance Data</h3>
+                {effectivePullId && (
+                  <ChangeDetectionBadge
+                    pullId={effectivePullId}
+                    onViewDetails={() => setActiveTab('changes')}
+                  />
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {policies.length} {policies.length === 1 ? 'policy' : 'policies'} •
                 {vehicles?.length || 0} vehicles •
@@ -276,54 +298,80 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshFromCanopy}
-            disabled={isRefreshing}
-            title="Re-fetch data from Canopy API"
-          >
-            {isRefreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
+          <div className="flex items-center gap-2">
+            {effectivePullId && (
+              <MonitoringEnableButton
+                pullId={effectivePullId}
+                canopyPullId={canopyPullId}
+                variant="outline"
+                size="sm"
+              />
             )}
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshFromCanopy}
+              disabled={isRefreshing}
+              title="Re-fetch data from Canopy API"
+            >
+              {isRefreshing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
         </div>
       )}
 
-      <Tabs defaultValue="policies" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="policies" className="flex items-center gap-1">
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Policies</span>
-            <Badge variant="secondary" className="ml-1">{policies?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{policies?.length || 0}</Badge>
           </TabsTrigger>
           <TabsTrigger value="vehicles" className="flex items-center gap-1">
             <Car className="w-4 h-4" />
             <span className="hidden sm:inline">Vehicles</span>
-            <Badge variant="secondary" className="ml-1">{vehicles?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{vehicles?.length || 0}</Badge>
           </TabsTrigger>
           <TabsTrigger value="drivers" className="flex items-center gap-1">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Drivers</span>
-            <Badge variant="secondary" className="ml-1">{drivers?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{drivers?.length || 0}</Badge>
           </TabsTrigger>
           <TabsTrigger value="dwellings" className="flex items-center gap-1">
             <Home className="w-4 h-4" />
             <span className="hidden sm:inline">Properties</span>
-            <Badge variant="secondary" className="ml-1">{dwellings?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{dwellings?.length || 0}</Badge>
           </TabsTrigger>
           <TabsTrigger value="claims" className="flex items-center gap-1">
             <AlertTriangle className="w-4 h-4" />
             <span className="hidden sm:inline">Claims</span>
-            <Badge variant="secondary" className="ml-1">{claims?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{claims?.length || 0}</Badge>
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-1">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Docs</span>
-            <Badge variant="secondary" className="ml-1">{documents?.length || 0}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden lg:inline">{documents?.length || 0}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="commercial" className="flex items-center gap-1">
+            <Briefcase className="w-4 h-4" />
+            <span className="hidden sm:inline">Commercial</span>
+          </TabsTrigger>
+          <TabsTrigger value="changes" className="flex items-center gap-1">
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Changes</span>
+          </TabsTrigger>
+          <TabsTrigger value="monitoring" className="flex items-center gap-1">
+            <Activity className="w-4 h-4" />
+            <span className="hidden sm:inline">Monitor</span>
+          </TabsTrigger>
+          <TabsTrigger value="servicing" className="flex items-center gap-1">
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Actions</span>
           </TabsTrigger>
         </TabsList>
 
@@ -397,7 +445,104 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
             </div>
           )}
         </TabsContent>
+
+        {/* Commercial Tab */}
+        <TabsContent value="commercial" className="space-y-4">
+          {effectivePullId ? (
+            <CommercialDataSection pullId={effectivePullId} />
+          ) : (
+            <EmptyState icon={Briefcase} message="No commercial data available" />
+          )}
+        </TabsContent>
+
+        {/* Changes Tab */}
+        <TabsContent value="changes" className="space-y-4">
+          {effectivePullId ? (
+            <PolicyChangesSummary pullId={effectivePullId} />
+          ) : (
+            <EmptyState icon={History} message="No policy data to compare" />
+          )}
+        </TabsContent>
+
+        {/* Monitoring Tab */}
+        <TabsContent value="monitoring" className="space-y-4">
+          {effectivePullId ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <MonitoringStatusCard pullId={effectivePullId} />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="w-5 h-5" />
+                    About Monitoring
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  <p>
+                    Policy monitoring automatically checks for changes to the customer's insurance
+                    data on a regular schedule (minimum 30 days).
+                  </p>
+                  <p>
+                    When changes are detected, you'll see them in the <strong>Changes</strong> tab
+                    and can review what's different from the previous snapshot.
+                  </p>
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700">
+                    <p className="font-medium">Billing Note</p>
+                    <p className="text-xs mt-1">
+                      Each monitoring refresh is billed as a Canopy Pull. Use monitoring for
+                      high-value accounts where ongoing policy tracking provides ROI.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <EmptyState icon={Activity} message="No pull data for monitoring" />
+          )}
+        </TabsContent>
+
+        {/* Servicing Tab */}
+        <TabsContent value="servicing" className="space-y-4">
+          {effectivePullId ? (
+            <ServicingActionsPanel
+              pullId={effectivePullId}
+              canopyPullId={canopyPullId}
+              onAddVehicle={() => setShowAddVehicleModal(true)}
+              onAddDriver={() => {
+                toast({
+                  title: 'Coming Soon',
+                  description: 'Add driver functionality will be available soon.',
+                });
+              }}
+              onRequestIdCard={() => {
+                toast({
+                  title: 'Coming Soon',
+                  description: 'ID card request functionality will be available soon.',
+                });
+              }}
+              onRequestDeclarations={() => {
+                toast({
+                  title: 'Coming Soon',
+                  description: 'Declarations request functionality will be available soon.',
+                });
+              }}
+            />
+          ) : (
+            <EmptyState icon={Settings} message="No pull data for servicing actions" />
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Add Vehicle Modal */}
+      {effectivePullId && (
+        <AddVehicleModal
+          open={showAddVehicleModal}
+          onOpenChange={setShowAddVehicleModal}
+          pullId={effectivePullId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['canopy-vehicles', effectivePullId] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -809,7 +954,7 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
         .createSignedUrl(document.storage_path, 3600); // 1 hour expiry
 
       if (error) {
-        console.error('Failed to get signed URL:', error);
+        logger.error('Failed to get signed URL:', error);
         toast({
           title: 'Download failed',
           description: 'Could not access the document. Please try again.',
@@ -822,7 +967,7 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
         window.open(data.signedUrl, '_blank');
       }
     } catch (err) {
-      console.error('Error downloading document:', err);
+      logger.error('Error downloading document:', err);
       toast({
         title: 'Download failed',
         description: 'An unexpected error occurred.',

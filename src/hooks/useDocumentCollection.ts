@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 // =============================================================================
 // TYPES
@@ -146,12 +147,12 @@ export function useCollectionPackets(accountId: string | null) {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.warn('[useCollectionPackets] Query error:', error);
+          logger.warn('[useCollectionPackets] Query error:', error);
           return [];
         }
         return (data || []) as CollectionPacket[];
       } catch (err) {
-        console.warn('[useCollectionPackets] Error:', err);
+        logger.warn('[useCollectionPackets] Error:', err);
         return [];
       }
     },

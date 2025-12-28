@@ -6,6 +6,8 @@
  * so we use safe defaults based on the hardcoded Supabase client config.
  */
 
+import { logger } from '@/lib/logger';
+
 interface EnvConfig {
   // Feature Flags
   enableSignup: boolean;
@@ -65,14 +67,14 @@ export function validateEnvironment(): ValidationResult {
  */
 export function logValidationResults(result: ValidationResult): void {
   if (result.warnings.length > 0) {
-    console.warn('⚠️  Environment warnings:');
-    result.warnings.forEach(warning => console.warn(`  - ${warning}`));
+    logger.warn('⚠️  Environment warnings:');
+    result.warnings.forEach(warning => logger.warn(`  - ${warning}`));
   }
 
   if (result.isValid) {
-    console.log('✅ Environment validation passed');
+    logger.info('✅ Environment validation passed');
     if (import.meta.env.DEV) {
-      console.log('Environment configuration:', {
+      logger.debug('Environment configuration:', {
         environment: import.meta.env.MODE,
         supabaseProjectId: 'lrqajzwcmdwahnjyidgv',
         enableSignup: result.config.enableSignup,

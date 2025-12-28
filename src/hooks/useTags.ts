@@ -30,11 +30,12 @@ export function useTags(accountId?: string) {
       if (error) throw error;
       setTags(data || []);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       toast({
         title: "Error loading tags",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -61,10 +62,10 @@ export function useTags(accountId?: string) {
 
       await fetchTags();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error creating tag",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -89,10 +90,10 @@ export function useTags(accountId?: string) {
 
       await fetchTags();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error updating tag",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -114,10 +115,10 @@ export function useTags(accountId?: string) {
       });
 
       await fetchTags();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error deleting tag",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -144,10 +145,10 @@ export function useTags(accountId?: string) {
 
       await fetchTags();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error adding tag",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -168,10 +169,10 @@ export function useTags(accountId?: string) {
         title: "Tag removed",
         description: "Tag has been removed from customer.",
       });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error removing tag",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -195,10 +196,10 @@ export function useTags(accountId?: string) {
 
       await fetchTags();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error creating default tags",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;

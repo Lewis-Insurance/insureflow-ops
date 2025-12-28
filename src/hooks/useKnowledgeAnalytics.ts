@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 
 // ============================================================================
@@ -140,7 +141,7 @@ export function useLogKnowledgeUsage() {
     },
     // Silent logging - no toast notifications
     onError: (error: Error) => {
-      console.error("Failed to log knowledge usage:", error.message);
+      logger.error("Failed to log knowledge usage:", error.message);
     },
   });
 }
@@ -164,7 +165,7 @@ export function useLogKnowledgeSearch() {
     },
     // Silent logging - no toast notifications
     onError: (error: Error) => {
-      console.error("Failed to log knowledge search:", error.message);
+      logger.error("Failed to log knowledge search:", error.message);
     },
   });
 }

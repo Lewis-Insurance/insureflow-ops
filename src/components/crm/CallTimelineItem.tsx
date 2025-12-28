@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Phone, 
-  PhoneIncoming, 
-  PhoneOutgoing, 
-  Clock, 
+import {
+  Phone,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Clock,
   Mic,
   Play,
   ExternalLink
@@ -27,7 +27,7 @@ interface CallSession {
   disposition?: string;
   consent_played?: boolean;
   recording_url?: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 interface CallTimelineItemProps {
@@ -36,7 +36,7 @@ interface CallTimelineItemProps {
   compact?: boolean;
 }
 
-export function CallTimelineItem({ call, onPlayRecording, compact = false }: CallTimelineItemProps) {
+export const CallTimelineItem = memo(function CallTimelineItem({ call, onPlayRecording, compact = false }: CallTimelineItemProps) {
   const getStatusColor = (disposition?: string) => {
     switch (disposition) {
       case 'completed':
@@ -219,4 +219,4 @@ export function CallTimelineItem({ call, onPlayRecording, compact = false }: Cal
       </CardContent>
     </Card>
   );
-}
+});

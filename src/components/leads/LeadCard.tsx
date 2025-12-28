@@ -1,13 +1,14 @@
 // src/components/leads/LeadCard.tsx
+import { memo } from 'react';
 import { Lead } from '@/types/leads';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  TrendingUp, 
+import {
+  Mail,
+  Phone,
+  MapPin,
+  TrendingUp,
   Calendar,
   DollarSign,
   User
@@ -19,9 +20,18 @@ interface LeadCardProps {
   lead: Lead;
   isDragging?: boolean;
   compact?: boolean;
+  onClick?: () => void;
+  /** Called on mouse enter - use for prefetching */
+  onMouseEnter?: () => void;
 }
 
-export function LeadCard({ lead, isDragging = false, compact = false }: LeadCardProps) {
+export const LeadCard = memo(function LeadCard({
+  lead,
+  isDragging = false,
+  compact = false,
+  onClick,
+  onMouseEnter,
+}: LeadCardProps) {
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600 bg-green-50';
     if (score >= 60) return 'text-blue-600 bg-blue-50';
@@ -40,6 +50,8 @@ export function LeadCard({ lead, isDragging = false, compact = false }: LeadCard
         isDragging && 'shadow-lg ring-2 ring-primary',
         compact && 'p-2'
       )}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
@@ -136,4 +148,4 @@ export function LeadCard({ lead, isDragging = false, compact = false }: LeadCard
       )}
     </Card>
   );
-}
+});

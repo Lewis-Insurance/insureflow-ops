@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { TaskCategory, TaskPriority } from './useTasks';
+import { logger } from '@/lib/logger';
 
 export type TriggerEvent = 
   | 'quote_requested'
@@ -23,9 +24,9 @@ export interface TaskTemplate {
   priority: TaskPriority;
   estimated_duration_hours?: number;
   task_order: number;
-  dependencies?: any;
+  dependencies?: Record<string, unknown> | null;
   is_active: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,8 +59,8 @@ export function useTaskTemplates() {
       if (error) throw error;
       setTemplates(data as TaskTemplate[] || []);
       return (data as TaskTemplate[]) || [];
-    } catch (error: any) {
-      console.error('Error fetching templates:', error);
+    } catch (error) {
+      logger.error('Error fetching templates:', error);
       toast({
         title: 'Error',
         description: 'Failed to load task templates',
@@ -73,7 +74,7 @@ export function useTaskTemplates() {
 
   const createTemplate = useCallback(async (templateData: Partial<TaskTemplate>) => {
     try {
-      const insertData: any = {
+      const insertData = {
         name: templateData.name,
         description: templateData.description,
         category: templateData.category || 'general',
@@ -100,11 +101,11 @@ export function useTaskTemplates() {
 
       await fetchTemplates();
       return data;
-    } catch (error: any) {
-      console.error('Error creating template:', error);
+    } catch (error) {
+      logger.error('Error creating template:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create task template',
+        description: error instanceof Error ? error.message : 'Failed to create task template',
         variant: 'destructive',
       });
       return null;
@@ -127,11 +128,11 @@ export function useTaskTemplates() {
 
       await fetchTemplates();
       return true;
-    } catch (error: any) {
-      console.error('Error updating template:', error);
+    } catch (error) {
+      logger.error('Error updating template:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update task template',
+        description: error instanceof Error ? error.message : 'Failed to update task template',
         variant: 'destructive',
       });
       return false;
@@ -154,11 +155,11 @@ export function useTaskTemplates() {
 
       await fetchTemplates();
       return true;
-    } catch (error: any) {
-      console.error('Error deleting template:', error);
+    } catch (error) {
+      logger.error('Error deleting template:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete task template',
+        description: error instanceof Error ? error.message : 'Failed to delete task template',
         variant: 'destructive',
       });
       return false;
@@ -190,11 +191,11 @@ export function useTaskTemplates() {
       }
 
       return result;
-    } catch (error: any) {
-      console.error('Error generating tasks:', error);
+    } catch (error) {
+      logger.error('Error generating tasks:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to generate tasks from templates',
+        description: error instanceof Error ? error.message : 'Failed to generate tasks from templates',
         variant: 'destructive',
       });
       return null;

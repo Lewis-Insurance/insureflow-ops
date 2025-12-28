@@ -1,0 +1,82 @@
+name: Document Task Processor
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Number of documents to process'
+        required: false
+        type: number
+        default: 10
+      dry_run:
+        description: 'Dry run (preview only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  SUPABASE_URL: https://lrqajzwcmdwahnjyidgv.supabase.co
+
+jobs:
+  process-documents:
+    name: Process Document Queue
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Process Document Tasks
+        id: process
+        run: |
+          BATCH_SIZE="${{ github.event.inputs.batch_size || 10 }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          PARAMS="batch_size=${BATCH_SIZE}"
+          if [ "$DRY_RUN" = "true" ]; then
+            PARAMS="$PARAMS&dry_run=true"
+          fi
+
+          echo "Processing documents with params: $PARAMS"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${SUPABASE_URL}/functions/v1/process-document-tasks?${PARAMS}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Document processing failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          # Extract stats for summary
+          DOCS_PROCESSED=$(echo "$BODY" | jq -r '.stats.documents_processed // 0')
+          TASKS_SUGGESTED=$(echo "$BODY" | jq -r '.stats.tasks_suggested // 0')
+
+          echo "documents_processed=$DOCS_PROCESSED" >> $GITHUB_OUTPUT
+          echo "tasks_suggested=$TASKS_SUGGESTED" >> $GITHUB_OUTPUT
+
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Document Task Processor Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Documents Processed:** ${{ steps.process.outputs.documents_processed || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tasks Suggested:** ${{ steps.process.outputs.tasks_suggested || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Full Response" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.process.outputs.result }}' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import type {
   ClientContext,
   ClientRawData,
@@ -198,7 +199,7 @@ export class ClientContextBuilder {
       .single();
 
     if (error) {
-      console.error('Error fetching account:', error);
+      logger.error('Error fetching account:', error);
       return null;
     }
 
@@ -230,7 +231,7 @@ export class ClientContextBuilder {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching contacts:', error);
+      logger.error('Error fetching contacts:', error);
       return [];
     }
 
@@ -261,7 +262,7 @@ export class ClientContextBuilder {
       .order('expiration_date', { ascending: false });
 
     if (error) {
-      console.error('Error fetching policies:', error);
+      logger.error('Error fetching policies:', error);
       return [];
     }
 
@@ -311,7 +312,7 @@ export class ClientContextBuilder {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching claims:', error);
+      logger.error('Error fetching claims:', error);
       return [];
     }
 
@@ -335,7 +336,7 @@ export class ClientContextBuilder {
       .limit(50);
 
     if (error) {
-      console.error('Error fetching documents:', error);
+      logger.error('Error fetching documents:', error);
       return [];
     }
 
@@ -362,7 +363,7 @@ export class ClientContextBuilder {
       .limit(100);
 
     if (error) {
-      console.error('Error fetching tasks:', error);
+      logger.error('Error fetching tasks:', error);
       return [];
     }
 
@@ -387,7 +388,7 @@ export class ClientContextBuilder {
       .limit(50);
 
     if (error) {
-      console.error('Error fetching calls:', error);
+      logger.error('Error fetching calls:', error);
       return [];
     }
 
@@ -409,7 +410,7 @@ export class ClientContextBuilder {
       .limit(50);
 
     if (error) {
-      console.error('Error fetching messages:', error);
+      logger.error('Error fetching messages:', error);
       return [];
     }
 
@@ -433,7 +434,7 @@ export class ClientContextBuilder {
       .limit(100);
 
     if (error) {
-      console.error('Error fetching events:', error);
+      logger.error('Error fetching events:', error);
       return [];
     }
 
@@ -461,7 +462,7 @@ export class ClientContextBuilder {
       .limit(30);
 
     if (error) {
-      console.error('Error fetching quotes:', error);
+      logger.error('Error fetching quotes:', error);
       return [];
     }
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useCanopyConnect, CanopyPullResult } from '@/hooks/useCanopyConnect';
 import { Shield, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export interface CanopyConnectButtonProps {
   /** Link to an existing lead */
@@ -67,13 +68,13 @@ export function CanopyConnectButton({
   });
 
   const handleClick = async () => {
-    console.log('[CanopyButton] handleClick called, status:', status);
+    logger.debug('[CanopyButton] handleClick called, status:', status);
     if (status === 'complete' || status === 'error') {
       reset();
     }
-    console.log('[CanopyButton] calling initiatePull...');
+    logger.debug('[CanopyButton] calling initiatePull...');
     await initiatePull();
-    console.log('[CanopyButton] initiatePull returned');
+    logger.debug('[CanopyButton] initiatePull returned');
   };
 
   // Determine icon based on status

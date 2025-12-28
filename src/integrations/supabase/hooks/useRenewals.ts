@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -362,7 +363,7 @@ export const useCreateRenewal = () => {
       toast.success("Renewal created successfully");
     },
     onError: (error: Error) => {
-      console.error("Error creating renewal:", error);
+      logger.error("Error creating renewal:", error);
       toast.error("Failed to create renewal");
     },
   });
@@ -398,7 +399,7 @@ export const useUpdateRenewal = () => {
       toast.success("Renewal updated successfully");
     },
     onError: (error: Error) => {
-      console.error("Error updating renewal:", error);
+      logger.error("Error updating renewal:", error);
       toast.error("Failed to update renewal");
     },
   });
@@ -424,7 +425,7 @@ export const useDeleteRenewal = () => {
       toast.success("Renewal deleted successfully");
     },
     onError: (error: Error) => {
-      console.error("Error deleting renewal:", error);
+      logger.error("Error deleting renewal:", error);
       toast.error("Failed to delete renewal");
     },
   });
@@ -475,7 +476,7 @@ export const useUpdateRenewalStatus = () => {
       toast.success("Renewal status updated");
     },
     onError: (error: Error) => {
-      console.error("Error updating renewal status:", error);
+      logger.error("Error updating renewal status:", error);
       toast.error("Failed to update renewal status");
     },
   });
@@ -514,7 +515,7 @@ export const useAssignRenewal = () => {
       toast.success("Renewal assigned successfully");
     },
     onError: (error: Error) => {
-      console.error("Error assigning renewal:", error);
+      logger.error("Error assigning renewal:", error);
       toast.error("Failed to assign renewal");
     },
   });
@@ -559,7 +560,7 @@ export const useUpdateRenewalRisk = () => {
       queryClient.invalidateQueries({ queryKey: ["renewal", data.id] });
     },
     onError: (error: Error) => {
-      console.error("Error updating renewal risk:", error);
+      logger.error("Error updating renewal risk:", error);
       toast.error("Failed to update renewal risk");
     },
   });
@@ -606,7 +607,7 @@ export const useLogRenewalContact = () => {
       toast.success("Contact logged");
     },
     onError: (error: Error) => {
-      console.error("Error logging contact:", error);
+      logger.error("Error logging contact:", error);
       toast.error("Failed to log contact");
     },
   });
@@ -643,7 +644,7 @@ export const useBulkUpdateRenewals = () => {
       toast.success(`${data.length} renewals updated successfully`);
     },
     onError: (error: Error) => {
-      console.error("Error bulk updating renewals:", error);
+      logger.error("Error bulk updating renewals:", error);
       toast.error("Failed to update renewals");
     },
   });

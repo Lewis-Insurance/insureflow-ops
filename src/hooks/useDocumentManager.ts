@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { usePermissions } from './usePermissions';
+import { logger } from '@/lib/logger';
 
 export interface DocumentRecord {
   id: string;
@@ -46,7 +47,7 @@ export function useDocumentManager(accountId?: string) {
       if (error) throw error;
       setDocuments(data || []);
     } catch (err: any) {
-      console.error('Error fetching documents:', err);
+      logger.error('Error fetching documents:', err);
       toast({
         title: "Error",
         description: "Failed to fetch documents",
@@ -131,7 +132,7 @@ export function useDocumentManager(accountId?: string) {
       
       return docRecord;
     } catch (err: any) {
-      console.error('Error uploading document:', err);
+      logger.error('Error uploading document:', err);
       toast({
         title: "Upload Failed",
         description: err.message || "Failed to upload document",
@@ -163,14 +164,14 @@ export function useDocumentManager(accountId?: string) {
         .createSignedUrl(path, 3600);
         
       if (error) {
-        console.error('Storage error:', error);
+        logger.error('Storage error:', error);
         throw error;
       }
-      
+
       if (!data?.signedUrl) {
         throw new Error('No signed URL returned');
       }
-      
+
       // Open the document using anchor tag
       const a = window.document.createElement('a');
       a.href = data.signedUrl;
@@ -182,7 +183,7 @@ export function useDocumentManager(accountId?: string) {
       
       return true;
     } catch (err: any) {
-      console.error('Error viewing document:', err);
+      logger.error('Error viewing document:', err);
       toast({
         title: "View Failed",
         description: err.message || "Failed to view document",
@@ -212,14 +213,14 @@ export function useDocumentManager(accountId?: string) {
         .createSignedUrl(path, 3600);
         
       if (error) {
-        console.error('Storage error:', error);
+        logger.error('Storage error:', error);
         throw error;
       }
-      
+
       if (!data?.signedUrl) {
         throw new Error('No signed URL returned');
       }
-      
+
       const link = window.document.createElement('a');
       link.href = data.signedUrl;
       link.download = document.name;
@@ -229,7 +230,7 @@ export function useDocumentManager(accountId?: string) {
 
       toast({ title: "Success", description: "Document download started" });
     } catch (err: any) {
-      console.error('Error downloading document:', err);
+      logger.error('Error downloading document:', err);
       toast({
         title: "Download Failed",
         description: err.message || "Failed to download document",
@@ -279,7 +280,7 @@ export function useDocumentManager(accountId?: string) {
       await fetchDocuments();
       return updated;
     } catch (err: any) {
-      console.error('Error replacing document file:', err);
+      logger.error('Error replacing document file:', err);
       toast({
         title: 'Replace Failed',
         description: err.message || 'Failed to replace document file',
@@ -314,7 +315,7 @@ export function useDocumentManager(accountId?: string) {
 
       await fetchDocuments();
     } catch (err: any) {
-      console.error('Error deleting document:', err);
+      logger.error('Error deleting document:', err);
       toast({
         title: "Delete Failed",
         description: err.message || "Failed to delete document",
@@ -344,7 +345,7 @@ export function useDocumentManager(accountId?: string) {
       
       return data;
     } catch (err: any) {
-      console.error('Error checking integrity:', err);
+      logger.error('Error checking integrity:', err);
       toast({
         title: 'Check Failed',
         description: err.message || 'Failed to check document integrity',

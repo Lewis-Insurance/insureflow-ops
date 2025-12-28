@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, startOfMonth, subDays, subMonths, format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export interface LeadMetrics {
   total_leads: number;
@@ -34,7 +35,7 @@ export function useLeadMetrics(dateRange?: { start: string; end: string }) {
       const { data: allLeads, error } = await query;
 
       if (error) {
-        console.error('Error fetching lead metrics:', error);
+        logger.error('Error fetching lead metrics:', error);
         throw error;
       }
 
@@ -81,7 +82,7 @@ export function useConversionFunnel(dateRange?: { start: string; end: string }) 
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching funnel data:', error);
+        logger.error('Error fetching funnel data:', error);
         throw error;
       }
 
@@ -297,7 +298,7 @@ export function useLeadTrends(period: 'week' | 'month' | 'quarter' = 'month') {
         .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) {
-        console.error('Error fetching trends:', error);
+        logger.error('Error fetching trends:', error);
         throw error;
       }
 
@@ -337,7 +338,7 @@ export function useLeadScoreDistribution() {
         .is('deleted_at', null); // Exclude soft-deleted leads
 
       if (error) {
-        console.error('Error fetching score distribution:', error);
+        logger.error('Error fetching score distribution:', error);
         throw error;
       }
 

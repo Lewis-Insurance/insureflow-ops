@@ -11,6 +11,22 @@ export interface QuoteCoverage {
   extracted_from_document: boolean;
 }
 
+export interface BelowMinimumLimit {
+  coverage: string;
+  limit: number;
+  minimum: number;
+}
+
+export interface ScoringWeightsUsed {
+  price: number;
+  coverage: number;
+  carrier: number;
+  deductible: number;
+  value: number;
+  profile_id: string | null;
+  profile_name: string | null;
+}
+
 export interface RankedQuote {
   id: string;
   account_id: string;
@@ -21,6 +37,7 @@ export interface RankedQuote {
   quote_score: number;
   price_score: number;
   coverage_completeness_score: number;
+  coverage_limit_adequacy_score: number | null; // 0-25, new field
   carrier_rating_score: number;
   deductible_score: number;
   value_score: number;
@@ -29,6 +46,22 @@ export interface RankedQuote {
   status: string | null;
   rank_in_account: number;
   total_quotes_for_account: number;
+  scoring_weight_profile_id: string | null; // New field
+  scoring_metadata?: {
+    missing_critical_coverages?: string[];
+    below_minimum_limits?: BelowMinimumLimit[];
+    coverage_tiers?: { coverage: string; tier: string; limit: number }[];
+    completeness_points?: number;
+    adequacy_points?: number;
+    weights_used?: ScoringWeightsUsed;
+    raw_scores?: {
+      price: number;
+      coverage: number;
+      carrier: number;
+      deductible: number;
+      value: number;
+    };
+  };
   carrier_info?: {
     id: string;
     name: string;

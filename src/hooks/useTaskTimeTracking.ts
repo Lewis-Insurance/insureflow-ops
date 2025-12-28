@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface TimeEntry {
   id: string;
@@ -38,8 +39,8 @@ export function useTaskTimeTracking(taskId: string) {
       // Find active entry (one without end time)
       const active = timeEntries.find(e => !e.ended_at);
       setActiveEntry(active || null);
-    } catch (error: any) {
-      console.error('Error fetching time entries:', error);
+    } catch (error) {
+      logger.error('Error fetching time entries:', error);
       toast({
         title: 'Error',
         description: 'Failed to load time entries',
@@ -75,8 +76,8 @@ export function useTaskTimeTracking(taskId: string) {
       });
       
       return data;
-    } catch (error: any) {
-      console.error('Error starting timer:', error);
+    } catch (error) {
+      logger.error('Error starting timer:', error);
       toast({
         title: 'Error',
         description: 'Failed to start timer',
@@ -114,8 +115,8 @@ export function useTaskTimeTracking(taskId: string) {
       });
       
       return true;
-    } catch (error: any) {
-      console.error('Error stopping timer:', error);
+    } catch (error) {
+      logger.error('Error stopping timer:', error);
       toast({
         title: 'Error',
         description: 'Failed to stop timer',
@@ -142,8 +143,8 @@ export function useTaskTimeTracking(taskId: string) {
       });
       
       return true;
-    } catch (error: any) {
-      console.error('Error deleting time entry:', error);
+    } catch (error) {
+      logger.error('Error deleting time entry:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete time entry',

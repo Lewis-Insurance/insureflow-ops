@@ -28,10 +28,10 @@ export function useKnowledgeGaps() {
 
       if (error) throw error;
       setGaps(data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     } finally {
@@ -54,10 +54,10 @@ export function useKnowledgeGaps() {
       });
 
       fetchGaps();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }
@@ -78,10 +78,10 @@ export function useKnowledgeGaps() {
       });
 
       fetchGaps();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }

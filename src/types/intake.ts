@@ -70,7 +70,7 @@ export interface IntakeQuestion {
   section?: string;
   order: number;
   helpText?: string;
-  defaultValue?: any;
+  defaultValue?: string | number | boolean | string[] | null;
 }
 
 export type QuestionType =
@@ -118,7 +118,7 @@ export interface SelectOption {
 export interface ConditionalDisplay {
   dependsOn: string;
   operator: ConditionalOperator;
-  value: any;
+  value: string | number | boolean | string[] | null;
   showWhenTrue?: boolean;
 }
 
@@ -156,8 +156,8 @@ export interface IntakeSubmission {
   account_id?: string;
   access_token_hash: string;
   token_expires_at: string;
-  responses: Record<string, any>;
-  draft_responses?: Record<string, any>;
+  responses: Record<string, unknown>;
+  draft_responses?: Record<string, unknown>;
   last_draft_save?: string;
   client_name?: string;
   client_email?: string;
@@ -210,7 +210,7 @@ export interface EnrichmentCache {
   id: string;
   lookup_key: string;
   lookup_type: EnrichmentType;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   source: string;
   cost_cents: number;
   fetched_at: string;
@@ -297,7 +297,7 @@ export interface VinDecoderResult {
 
 export interface AutoSaveState {
   intakeId: string;
-  responses: Record<string, any>;
+  responses: Record<string, unknown>;
   savedAt: string;
   currentSection?: number;
   currentQuestion?: string;

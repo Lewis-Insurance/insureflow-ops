@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export interface DashboardMetrics {
   today: {
@@ -194,7 +195,7 @@ export function useDashboardMetrics(producerId?: string) {
             monthlyGoal = goals.monthly_target || 100;
           }
         } catch (error) {
-          console.log('Producer goals not available, using defaults');
+          logger.debug('Producer goals not available, using defaults');
         }
       }
 

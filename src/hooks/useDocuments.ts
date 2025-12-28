@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface Document {
   id: string;
@@ -56,7 +57,7 @@ export function useDocuments(options: UseDocumentsOptions = {}) {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching documents:', error);
+        logger.error('Error fetching documents:', error);
         throw new Error(`Failed to fetch documents: ${error.message}`);
       }
 
@@ -111,7 +112,7 @@ export function useDeleteDocument() {
           .remove([doc.storage_path]);
 
         if (storageError) {
-          console.warn('Failed to delete from storage:', storageError);
+          logger.warn('Failed to delete from storage:', storageError);
           // Continue with database deletion even if storage fails
         }
       }
@@ -181,7 +182,7 @@ export function useDocumentUrl(storagePath: string | undefined) {
         .createSignedUrl(storagePath, 3600); // 1 hour expiry
 
       if (error) {
-        console.error('Error creating signed URL:', error);
+        logger.error('Error creating signed URL:', error);
         return null;
       }
 

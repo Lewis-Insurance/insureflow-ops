@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '../client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface AnalyzeDocumentParams {
   document_id: string;
@@ -61,7 +62,7 @@ export const useDocumentAnalysisSimple = () => {
       });
 
       if (error) {
-        console.error('Edge function error:', error);
+        logger.error('Edge function error:', error);
         throw new Error(`Analysis failed: ${error.message}`);
       }
 
@@ -78,7 +79,7 @@ export const useDocumentAnalysisSimple = () => {
       });
     },
     onError: (error: Error) => {
-      console.error('Analysis mutation error:', error);
+      logger.error('Analysis mutation error:', error);
       toast({
         title: "Analysis Failed",
         description: error.message,

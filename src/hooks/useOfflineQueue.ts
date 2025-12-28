@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface QueuedDocument {
   id: string;
@@ -186,7 +187,7 @@ export function useOfflineQueue() {
         failedCount: docs.filter(d => d.status === 'failed').length,
       }));
     } catch (error) {
-      console.error('Failed to load queue:', error);
+      logger.error('Failed to load queue:', error);
     }
   }, []);
 
@@ -294,7 +295,7 @@ export function useOfflineQueue() {
 
       return true;
     } catch (error: any) {
-      console.error('Document processing failed:', error);
+      logger.error('Document processing failed:', error);
 
       const newRetryCount = doc.retryCount + 1;
       if (newRetryCount >= MAX_RETRIES) {
@@ -343,7 +344,7 @@ export function useOfflineQueue() {
         });
       }
     } catch (error) {
-      console.error('Sync failed:', error);
+      logger.error('Sync failed:', error);
       toast({
         title: 'Sync failed',
         description: 'Some documents could not be processed',

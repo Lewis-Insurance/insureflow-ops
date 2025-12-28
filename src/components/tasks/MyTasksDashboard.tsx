@@ -11,6 +11,7 @@ import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatInTimeZone } from 'date-fns-tz';
+import { logger } from '@/lib/logger';
 const TZ = 'America/New_York';
 
 interface MyTasksDashboardProps {
@@ -32,7 +33,7 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
         const { data: { user } } = await supabase.auth.getUser();
         setCurrentUserId(user?.id || null);
       } catch (error) {
-        console.error('Auth error:', error);
+        logger.error('Auth error:', error);
       }
     };
     getCurrentUser();
@@ -70,16 +71,16 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
 
   useEffect(() => {
     if (currentUserId && tasks.length > 0) {
-      console.log('Current User ID:', currentUserId);
-      console.log('Tasks:', tasks.map(t => ({
+      logger.debug('Current User ID:', currentUserId);
+      logger.debug('Tasks:', tasks.map(t => ({
         title: t.title,
         assignee_id: t.assignee_id,
         due_at: t.due_at,
         status: t.status,
         isAssignedToMe: t.assignee_id === currentUserId
       })));
-      console.log('Completed tasks count:', tasks.filter(t => t.status === 'completed').length);
-      console.log('Completed & assigned to me:', tasks.filter(t => t.status === 'completed' && t.assignee_id === currentUserId).length);
+      logger.debug('Completed tasks count:', tasks.filter(t => t.status === 'completed').length);
+      logger.debug('Completed & assigned to me:', tasks.filter(t => t.status === 'completed' && t.assignee_id === currentUserId).length);
     }
   }, [tasks, currentUserId]);
 

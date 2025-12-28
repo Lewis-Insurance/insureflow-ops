@@ -10,6 +10,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
 import {
   PolicySnapshot,
   SnapshotField,
@@ -174,7 +175,7 @@ export class PolicySnapshotExtractor {
     // Validate response
     const validationErrors = this.validateExtractionResponse(response, profile);
     if (validationErrors.length > 0) {
-      console.warn('[Extractor] Validation errors:', validationErrors);
+      logger.warn('[Extractor] Validation errors:', validationErrors);
     }
 
     // Phase 2: Retry for low-confidence fields (if needed)
@@ -363,7 +364,7 @@ export class PolicySnapshotExtractor {
         }
       }
     } catch (e) {
-      console.warn('[Extractor] Retry parsing failed:', e);
+      logger.warn('[Extractor] Retry parsing failed:', e);
     }
 
     return originalResponse;
@@ -986,7 +987,7 @@ export class PolicySnapshotExtractor {
         });
     } catch (e) {
       // Ignore if table doesn't exist
-      console.warn('[Extractor] Failed to record prompt run:', e);
+      logger.warn('[Extractor] Failed to record prompt run:', e);
     }
   }
 }

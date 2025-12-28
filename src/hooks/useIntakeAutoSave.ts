@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import type { AutoSaveState, RestorePrompt } from '@/types/intake';
 
@@ -84,7 +85,7 @@ export function useIntakeAutoSave({
         setHasUnsavedChanges(true);
         pendingChangesRef.current = responses;
       } catch (error) {
-        console.error('Failed to save to localStorage:', error);
+        logger.error('Failed to save to localStorage:', error);
       }
     },
     [intakeId, storageKey, enabled]
@@ -102,7 +103,7 @@ export function useIntakeAutoSave({
 
       return state;
     } catch (error) {
-      console.error('Failed to restore from localStorage:', error);
+      logger.error('Failed to restore from localStorage:', error);
       return null;
     }
   }, [intakeId, storageKey]);
@@ -143,7 +144,7 @@ export function useIntakeAutoSave({
       } catch (error) {
         const err = error instanceof Error ? error : new Error('Failed to save');
         onSaveError?.(err);
-        console.error('Failed to save to server:', error);
+        logger.error('Failed to save to server:', error);
         return false;
       } finally {
         setIsSaving(false);
@@ -172,7 +173,7 @@ export function useIntakeAutoSave({
         savedAt: data.last_draft_save || new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Failed to restore from server:', error);
+      logger.error('Failed to restore from server:', error);
       return null;
     }
   }, [submissionId, intakeId]);
@@ -242,10 +243,10 @@ export function useIntakeAutoSave({
           })
           .eq('id', submissionId)
           .then(() => {
-            console.log('Final auto-save completed');
+            logger.debug('Final auto-save completed');
           })
           .catch((error) => {
-            console.error('Final auto-save failed:', error);
+            logger.error('Final auto-save failed:', error);
           });
       }
     };

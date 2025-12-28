@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "version": ">= 3.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "node": "18.18.0"
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "image": "latest"
+      },
+      "env": {
+        "NO_FLIPPER": "1"
+      },
+      "cache": {
+        "disabled": true
+      }
+    },
+    "development-device": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      },
+      "env": {
+        "NO_FLIPPER": "1"
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal"
+    },
+    "production": {
+      "extends": "base"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
