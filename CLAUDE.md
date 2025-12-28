@@ -1105,7 +1105,15 @@ insureflow-ops/
 
 ## Change Log
 
-### 2024-12-28 (Predictive Analytics Suite)
+### 2024-12-28 (Predictive Analytics Suite + CEO Digest Schema Fixes)
+- ✅ **CEO Digest Schema Fixes**
+  - Fixed `quote_status` enum values: `'sent'/'accepted'/'declined'` → `'open'/'won'/'lost'`
+  - Fixed `quotes.policy_type` → `quotes.line_of_business`
+  - Fixed `policies.created_by` → used `quotes.created_by` for top_agents
+  - Fixed `tasks.agency_workspace_id` → join through `tasks.account_id` → `accounts.agency_workspace_id`
+  - Migration files: `20251228500000-500003_fix_ceo_digest_*.sql`
+  - Workflow: Simplified for CEO master mode (single call aggregates all agencies)
+
 - ✅ **Predictive Analytics: Retention Risk Scoring**
   - Edge function: `run-retention-scoring` with deterministic scoring
   - Database: `retention_model_configs`, `policy_renewal_risk_scores`, `account_churn_risk_scores`
