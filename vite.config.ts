@@ -117,18 +117,9 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     // Enable source maps for production debugging (can disable for smaller builds)
     sourcemap: mode === 'production' ? false : true,
-    // Minification options
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: mode === 'production', // Remove console logs in production
-        drop_debugger: mode === 'production',
-        passes: 2, // Multiple passes for better compression
-      },
-      mangle: {
-        safari10: true, // Safari 10 compatibility
-      },
-    },
+    // Minification options - use esbuild (default) for better Safari compatibility
+    // Terser was causing 'undefined is not an object (evaluating e.RegExp)' on Safari
+    minify: 'esbuild',
     // Target modern browsers for smaller bundle
     target: 'es2020',
     // CSS code splitting
