@@ -22,14 +22,14 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build application
         run: npm run build
         env:
           NODE_ENV: production
           VITE_SUPABASE_URL: https://lrqajzwcmdwahnjyidgv.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_CANOPY_PUBLIC_ALIAS: lewis-insurance
           VITE_ENABLE_SIGNUP: 'false'
           VITE_REQUIRE_MFA: 'false'
