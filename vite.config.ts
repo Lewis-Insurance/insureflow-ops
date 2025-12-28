@@ -79,10 +79,10 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('yup') || id.includes('ajv') || id.includes('joi')) {
               return 'vendor-validation';
             }
-            // HTTP / API clients
-            if (id.includes('axios') || id.includes('ky') || id.includes('got')) {
-              return 'vendor-http';
-            }
+            // HTTP / API clients - DISABLED: was breaking core-js polyfills on Safari
+            // if (id.includes('axios') || id.includes('ky') || id.includes('got')) {
+            //   return 'vendor-http';
+            // }
             // State management
             if (id.includes('zustand') || id.includes('jotai') || id.includes('recoil') || id.includes('redux')) {
               return 'vendor-state';
