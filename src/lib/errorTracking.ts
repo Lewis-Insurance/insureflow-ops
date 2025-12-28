@@ -266,11 +266,12 @@ export async function withErrorTracking<T>(
  * React Error Boundary integration helper
  * Use this as the onError prop for ErrorBoundary component
  */
-export function handleBoundaryError(error: Error, errorInfo: React.ErrorInfo): void {
+export function handleBoundaryError(error: Error, errorInfo: React.ErrorInfo, level: string = 'component'): void {
   captureException(error, {
     component: 'ErrorBoundary',
     extra: {
       componentStack: errorInfo.componentStack,
+      level,
     },
   });
 }
