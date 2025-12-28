@@ -5,6 +5,7 @@ import { asMessage, handleSupabaseError } from '@/lib/errors';
 import { useAccountMemberships } from './useAccountMemberships';
 import { updateRecentlyAccessedAccount } from '@/components/crm/RecentlyAccessed';
 import type { Database } from '@/integrations/supabase/types';
+import { logger } from '@/lib/logger';
 import type {
   CRMFilters,
   Account,
@@ -222,7 +223,7 @@ export function useCRMData() {
         } catch (cleanupError) {
           // Log cleanup failure but don't throw
           if (import.meta.env.DEV) {
-            console.error('Failed to cleanup account after membership failure:', cleanupError);
+            logger.error('Failed to cleanup account after membership failure:', cleanupError);
           }
         }
         throw new Error('Failed to create account membership - account creation aborted');
@@ -239,7 +240,7 @@ export function useCRMData() {
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
-            console.warn('Failed to log account creation event:', error);
+            logger.warn('Failed to log account creation event:', error);
           }
         });
 
@@ -328,7 +329,7 @@ export function useCRMData() {
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
-            console.warn('Failed to log account update event:', error);
+            logger.warn('Failed to log account update event:', error);
           }
         });
 
@@ -382,7 +383,7 @@ export function useCRMData() {
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
-            console.warn('Failed to log contact creation event:', error);
+            logger.warn('Failed to log contact creation event:', error);
           }
         });
 
@@ -455,7 +456,7 @@ export function useCRMData() {
         })
         .then(({ error }) => {
           if (error && import.meta.env.DEV) {
-            console.warn('Failed to log account deletion event:', error);
+            logger.warn('Failed to log account deletion event:', error);
           }
         });
 

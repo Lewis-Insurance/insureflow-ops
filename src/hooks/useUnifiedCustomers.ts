@@ -42,14 +42,15 @@ export function useUnifiedCustomers() {
       });
 
       if (error) throw error;
-      
+
       setCustomers(data || []);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       toast({
         title: "Error loading customers",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -91,10 +92,10 @@ export function useUnifiedCustomers() {
       // Refresh customers list
       await fetchCustomers();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error creating customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -111,7 +112,7 @@ export function useUnifiedCustomers() {
     status: string;
   }>) => {
     try {
-      const accountUpdates: any = {};
+      const accountUpdates: Record<string, unknown> = {};
       
       if (updates.name) accountUpdates.name = updates.name;
       if (updates.email) accountUpdates.email = updates.email;
@@ -138,10 +139,10 @@ export function useUnifiedCustomers() {
       // Refresh customers list
       await fetchCustomers();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error updating customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -164,10 +165,10 @@ export function useUnifiedCustomers() {
 
       // Refresh customers list
       await fetchCustomers();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error deleting customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;

@@ -1,0 +1,125 @@
+name: Predictive Analytics Suite
+
+on:
+  schedule:
+    # Retention scoring: Daily at 6 AM UTC
+    - cron: '0 6 * * *'
+    # Coverage gap detection: Daily at 7 AM UTC
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Job to run'
+        required: true
+        type: choice
+        options:
+          - retention_scoring
+          - coverage_gap_detection
+          - all
+      dry_run:
+        description: 'Dry run (preview only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  SUPABASE_URL: https://lrqajzwcmdwahnjyidgv.supabase.co
+
+jobs:
+  retention-scoring:
+    name: Run Retention Scoring
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_type == 'retention_scoring' || github.event.inputs.job_type == 'all') ||
+      github.event.schedule == '0 6 * * *'
+
+    steps:
+      - name: Run Retention Scoring
+        id: retention
+        run: |
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          PARAMS="days_ahead=60"
+          if [ "$DRY_RUN" = "true" ]; then
+            PARAMS="$PARAMS&dry_run=true"
+          fi
+
+          echo "Running retention scoring with params: $PARAMS"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${SUPABASE_URL}/functions/v1/run-retention-scoring?${PARAMS}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Retention scoring failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Retention Scoring Results" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.retention.outputs.result }}' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  coverage-gap-detection:
+    name: Run Coverage Gap Detection
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_type == 'coverage_gap_detection' || github.event.inputs.job_type == 'all') ||
+      github.event.schedule == '0 7 * * *'
+
+    steps:
+      - name: Run Coverage Gap Detection
+        id: gaps
+        run: |
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          PARAMS="create_tasks=true"
+          if [ "$DRY_RUN" = "true" ]; then
+            PARAMS="$PARAMS&dry_run=true"
+          fi
+
+          echo "Running coverage gap detection with params: $PARAMS"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${SUPABASE_URL}/functions/v1/run-coverage-gap-detection?${PARAMS}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Coverage gap detection failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Coverage Gap Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.gaps.outputs.result }}' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

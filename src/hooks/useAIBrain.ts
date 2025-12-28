@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export function useAIBrain() {
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,7 @@ export function useAIBrain() {
       });
 
       if (error) {
-        console.warn('RPC failed, falling back to knowledge_base table:', error);
+        logger.warn('RPC failed, falling back to knowledge_base table:', error);
 
         // Fallback to reading from knowledge_base table
         const { data: viewData, error: viewError } = await supabase
@@ -33,7 +34,7 @@ export function useAIBrain() {
           .limit(5);
 
         if (viewError) {
-          console.error('Fallback query failed:', viewError);
+          logger.error('Fallback query failed:', viewError);
           throw viewError;
         }
 
@@ -54,10 +55,10 @@ export function useAIBrain() {
         confidence: result?.confidence || 0,
         fallback: false
       };
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Query Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive"
       });
       return null;
@@ -90,10 +91,10 @@ export function useAIBrain() {
       });
       
       return data;
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Failed to add knowledge",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive"
       });
       return null;
@@ -117,10 +118,10 @@ export function useAIBrain() {
       });
       
       return data;
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Update Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive"
       });
     } finally {

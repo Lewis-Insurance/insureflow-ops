@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { logger } from '@/lib/logger';
 
 // ============================================
 // Types
@@ -70,7 +71,7 @@ export const useDocumentAnalysis = () => {
         user_id: options.userId
       };
 
-      console.log('[Document Analysis] Calling ai-document-analysis-azure with:', requestBody);
+      logger.debug('[Document Analysis] Calling ai-document-analysis-azure with:', requestBody);
       
       const { data, error } = await supabase.functions.invoke(
         'ai-document-analysis-azure',
@@ -79,17 +80,17 @@ export const useDocumentAnalysis = () => {
         }
       );
 
-      console.log('[Document Analysis] Response:', { data, error });
+      logger.debug('[Document Analysis] Response:', { data, error });
 
       setProgress(90);
 
       if (error) {
-        console.error('[Document Analysis] Supabase function error:', error);
+        logger.error('[Document Analysis] Supabase function error:', error);
         throw error;
       }
 
       if (!data?.success) {
-        console.error('[Document Analysis] Function returned failure:', data);
+        logger.error('[Document Analysis] Function returned failure:', data);
         throw new Error(data?.error || 'Analysis failed');
       }
 
@@ -103,7 +104,7 @@ export const useDocumentAnalysis = () => {
       return data as DocumentAnalysisResult;
 
     } catch (error) {
-      console.error('[Document Analysis] Error:', error);
+      logger.error('[Document Analysis] Error:', error);
       
       // Extract the full error message
       let errorMessage = 'Unknown error occurred';
@@ -278,7 +279,7 @@ export const useDocumentUploadAndAnalysis = () => {
       };
 
     } catch (error) {
-      console.error('[Upload & Analysis] Error:', error);
+      logger.error('[Upload & Analysis] Error:', error);
       
       toast({
         title: 'Upload Failed',
@@ -469,7 +470,7 @@ export const useDocumentComparison = () => {
       };
 
     } catch (error) {
-      console.error('[Document Comparison] Error:', error);
+      logger.error('[Document Comparison] Error:', error);
       
       toast({
         title: 'Comparison Failed',

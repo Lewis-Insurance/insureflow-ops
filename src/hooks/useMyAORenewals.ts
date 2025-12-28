@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AORenewal } from "./useAORenewals";
+import { logger } from '@/lib/logger';
 
 export interface MyAORenewalsStats {
   count: number;
@@ -60,7 +61,7 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
       const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching my AO renewals:", error);
+        logger.error("Error fetching my AO renewals:", error);
         throw error;
       }
 
@@ -124,7 +125,7 @@ export function useMyAORenewalsCount() {
         .in("status", ["pending", "contacted", "quoted"]); // Only active statuses
 
       if (error) {
-        console.error("Error fetching my AO renewals count:", error);
+        logger.error("Error fetching my AO renewals count:", error);
         throw error;
       }
 

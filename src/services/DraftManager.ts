@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export type FieldStatus = 'AUTO_APPLIED' | 'NEEDS_REVIEW' | 'NEEDS_VERIFICATION' | 'NOT_FOUND' | 'CONFLICT' | 'CRM_PREFILL' | 'USER_ENTERED';
 
@@ -360,7 +361,7 @@ class DraftManagerService {
           .delete()
           .eq('id', draftId);
       } catch (error) {
-        console.error('Failed to delete server draft:', error);
+        logger.error('Failed to delete server draft:', error);
       }
     }
   }
@@ -473,7 +474,7 @@ class DraftManagerService {
         serverVersion: data.version,
       };
     } catch (error) {
-      console.error('Failed to get server draft:', error);
+      logger.error('Failed to get server draft:', error);
       return null;
     }
   }
@@ -505,7 +506,7 @@ class DraftManagerService {
       draft.syncState = 'SYNCED';
       draft.serverVersion = draft.version;
     } catch (error) {
-      console.error('Failed to sync draft:', error);
+      logger.error('Failed to sync draft:', error);
       draft.syncState = 'LOCAL_ONLY';
     }
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export interface AtRiskRenewal {
   id: string;
@@ -62,12 +63,12 @@ export const useAtRiskRenewals = () => {
           .order('risk_score', { ascending: false });
 
         if (error) {
-          console.warn('Error fetching at-risk renewals:', error.message);
+          logger.warn('Error fetching at-risk renewals:', error.message);
           return [] as AtRiskRenewal[];
         }
         return (data || []) as AtRiskRenewal[];
       } catch (err) {
-        console.error('Error in at-risk renewals:', err);
+        logger.error('Error in at-risk renewals:', err);
         return [] as AtRiskRenewal[];
       }
     },
@@ -88,7 +89,7 @@ export const useRenewalIntelligenceSummary = () => {
 
         // If table doesn't exist or error, return empty summary
         if (error) {
-          console.warn('Error fetching renewals for intelligence:', error.message);
+          logger.warn('Error fetching renewals for intelligence:', error.message);
           return {
             total_renewals: 0,
             renewals_next_30_days: 0,
@@ -122,7 +123,7 @@ export const useRenewalIntelligenceSummary = () => {
           activeCampaigns = campaigns?.length || 0;
         } catch {
           // renewal_campaigns table may not exist
-          console.warn('renewal_campaigns table not found');
+          logger.warn('renewal_campaigns table not found');
         }
 
         const summary: RenewalIntelligenceSummary = {
@@ -140,7 +141,7 @@ export const useRenewalIntelligenceSummary = () => {
 
         return summary;
       } catch (err) {
-        console.error('Error in renewal intelligence summary:', err);
+        logger.error('Error in renewal intelligence summary:', err);
         // Return empty summary on error
         return {
           total_renewals: 0,

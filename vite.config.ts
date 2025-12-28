@@ -26,11 +26,91 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Disable code splitting to prevent module initialization errors
-    // All vendor code will be in a single bundle for reliability
     rollupOptions: {
       output: {
-        manualChunks: undefined, // Disable manual chunking - let Vite handle it automatically
+        manualChunks: (id) => {
+          // Vendor chunking for optimal caching and loading
+          if (id.includes('node_modules')) {
+            // PDF libraries - large, rarely used (load on demand)
+            if (id.includes('jspdf') || id.includes('pdf-lib') || id.includes('html2canvas')) {
+              return 'vendor-pdf';
+            }
+            // Chart libraries (recharts + d3)
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory')) {
+              return 'vendor-charts';
+            }
+            // Drag and drop
+            if (id.includes('dnd') || id.includes('beautiful-dnd')) {
+              return 'vendor-dnd';
+            }
+            // Date utilities
+            if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) {
+              return 'vendor-dates';
+            }
+            // TanStack (React Query, Table) - before react check
+            if (id.includes('@tanstack')) {
+              return 'vendor-tanstack';
+            }
+            // Radix UI components
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            // Icons (Lucide)
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            // Form handling
+            if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform')) {
+              return 'vendor-forms';
+            }
+            // Supabase
+            if (id.includes('@supabase') || id.includes('supabase')) {
+              return 'vendor-supabase';
+            }
+            // Editor / Rich text
+            if (id.includes('tiptap') || id.includes('prosemirror') || id.includes('lexical')) {
+              return 'vendor-editor';
+            }
+            // Animation
+            if (id.includes('framer-motion') || id.includes('react-spring')) {
+              return 'vendor-animation';
+            }
+            // Validation / Schema
+            if (id.includes('yup') || id.includes('ajv') || id.includes('joi')) {
+              return 'vendor-validation';
+            }
+            // HTTP / API clients
+            if (id.includes('axios') || id.includes('ky') || id.includes('got')) {
+              return 'vendor-http';
+            }
+            // State management
+            if (id.includes('zustand') || id.includes('jotai') || id.includes('recoil') || id.includes('redux')) {
+              return 'vendor-state';
+            }
+            // Markdown / Syntax highlighting
+            if (id.includes('marked') || id.includes('highlight') || id.includes('prism')) {
+              return 'vendor-markdown';
+            }
+            // Core React (just react and react-dom)
+            if (id.includes('/react@') || id.includes('/react-dom@') || id.includes('react-dom/')) {
+              return 'vendor-react-core';
+            }
+            // React Router
+            if (id.includes('react-router') || id.includes('@remix-run/router')) {
+              return 'vendor-router';
+            }
+            // Other React ecosystem (react-* packages)
+            if (id.includes('react-')) {
+              return 'vendor-react-ecosystem';
+            }
+            // Utility libraries
+            if (id.includes('lodash') || id.includes('ramda') || id.includes('immer')) {
+              return 'vendor-utils';
+            }
+            // Everything else
+            return 'vendor-misc';
+          }
+        },
       },
     },
     // Optimize chunk size

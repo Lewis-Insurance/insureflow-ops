@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { 
-  Plus, Upload, Brain, AlertCircle, CheckCircle, 
+import {
+  Plus, Upload, Brain, AlertCircle, CheckCircle,
   Database, FileText, Download, Trash2, Edit,
   TrendingUp, HelpCircle, BookOpen, Tag
 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { useKnowledgeGaps } from '@/hooks/useKnowledgeGaps';
 import { useAIBrain } from '@/hooks/useAIBrain';
@@ -27,7 +28,7 @@ const KnowledgeManager = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [importTable, setImportTable] = useState<'kb_entries' | 'kb_sources'>('kb_entries');
-  const [selectedGap, setSelectedGap] = useState<any>(null);
+  const [selectedGap, setSelectedGap] = useState<{ id: string; question: string; frequency: number } | null>(null);
   const [csvContent, setCsvContent] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
@@ -51,7 +52,7 @@ const KnowledgeManager = () => {
   ];
 
   // Convert a knowledge gap into knowledge entry
-  const convertGapToKnowledge = (gap: any) => {
+  const convertGapToKnowledge = (gap: { id: string; question: string; frequency: number }) => {
     setSelectedGap(gap);
     setNewEntry({
       title: gap.question,
@@ -105,10 +106,10 @@ const KnowledgeManager = () => {
       });
       
       fetchKnowledgeBase();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }
@@ -167,8 +168,8 @@ const KnowledgeManager = () => {
         
         // Convert to CSV format for existing import logic
         const csvLines = ['product_line,topic,question,answer_short,answer_canonical,tags,carrier,program,jurisdiction'];
-        entries.forEach((entry: any) => {
-          const tags = Array.isArray(entry.tags) ? entry.tags.split(',').join('|') : entry.tags;
+        entries.forEach((entry: { category?: string; title: string; content: string; tags?: string | string[]; carrier?: string; jurisdiction?: string }) => {
+          const tags = Array.isArray(entry.tags) ? entry.tags.join('|') : (entry.tags || '');
           const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
           csvLines.push([
             escapeCsv(entry.category || 'general'),
@@ -184,11 +185,11 @@ const KnowledgeManager = () => {
         });
         
         setCsvContent(csvLines.join('\n'));
-      } catch (error: any) {
-        console.error('Document parsing error:', error);
+      } catch (error) {
+        logger.error('Document parsing error:', error);
         toast({
           title: "Document Parsing Failed",
-          description: error.message || 'Failed to parse document',
+          description: error instanceof Error ? error.message : 'Failed to parse document',
           variant: "destructive",
         });
         setUploadedFileName('');
@@ -238,16 +239,16 @@ const KnowledgeManager = () => {
       
       const entries = lines.slice(1).map(line => {
         const values = line.match(/(".*?"|[^,]+)/g) || [];
-        const entry: any = {};
+        const entry: Record<string, string> = {};
         headers.forEach((header, index) => {
           entry[header] = values[index]?.replace(/^"|"$/g, '').trim() || '';
         });
         return entry;
       });
-      
+
       // Process each entry based on table type
       for (const [index, entry] of entries.entries()) {
-        let rowData: any;
+        let rowData: Record<string, unknown>;
         
         if (table === 'kb_entries') {
           // Generate a unique record_id
@@ -288,7 +289,7 @@ const KnowledgeManager = () => {
         
         const { error } = await supabase.from(table).insert(rowData);
         if (error) {
-          console.error(`Error inserting row ${index + 1}:`, error);
+          logger.error(`Error inserting row ${index + 1}:`, error);
           // Continue with other rows even if one fails
         }
       }
@@ -302,10 +303,10 @@ const KnowledgeManager = () => {
       if (table === 'kb_entries') {
         fetchKnowledgeBase();
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Import Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }

@@ -57,6 +57,8 @@ export type SignatureRequestStatus =
 export interface CreateSignatureRequestInput {
   acordFormId: string;
   formNumber: string;
+  documentUrl: string;
+  documentName: string;
   signers: Omit<SignerInfo, 'id' | 'status' | 'signedAt'>[];
   message?: string;
   expirationDays?: number;
@@ -115,64 +117,81 @@ export function useSignature(): UseSignatureReturn {
       setError(null);
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
+        // Get session for auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Not authenticated');
 
-        // Generate signature request structure
-        const { anchors, signerAssignments } = generateSignatureRequest(
-          input.formNumber,
-          input.signers.map(s => ({ role: s.role, email: s.email, name: s.name }))
+        // Generate signature fields from form config
+        const config = getSignatureConfig(input.formNumber);
+        const signatureFields = config?.anchors.map((anchor, index) => {
+          const signerIndex = input.signers.findIndex(s => s.role === anchor.role);
+          return {
+            type: anchor.type === 'signature' ? 'signature' : anchor.type === 'date' ? 'date_signed' : 'text',
+            page: anchor.page,
+            x: anchor.position?.x || 10,
+            y: anchor.position?.y || 80,
+            width: anchor.position?.width || 200,
+            height: anchor.position?.height || 30,
+            signer_index: signerIndex >= 0 ? signerIndex : 0,
+            name: anchor.fieldName,
+            required: anchor.required,
+          };
+        }) || [];
+
+        // Call edge function to create signature request via Dropbox Sign
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/esign-create-request`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              document_url: input.documentUrl,
+              document_name: input.documentName,
+              signers: input.signers.map(s => ({
+                email: s.email,
+                name: s.name,
+                role: s.role,
+                order: s.order,
+              })),
+              form_number: input.formNumber,
+              acord_form_id: input.acordFormId,
+              message: input.message,
+              expires_in_days: input.expirationDays || 14,
+              signature_fields: signatureFields.length > 0 ? signatureFields : undefined,
+            }),
+          }
         );
 
-        // Calculate expiration
-        const expirationDays = input.expirationDays || 14;
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + expirationDays);
+        const result = await response.json();
 
-        // Create signers with IDs
-        const signers: SignerInfo[] = input.signers.map((s, idx) => ({
-          id: `signer_${Date.now()}_${idx}`,
-          ...s,
-          status: 'pending',
-        }));
-
-        // Create request record
-        const { data, error: createError } = await supabase
-          .from('signature_requests')
-          .insert({
-            acord_form_id: input.acordFormId,
-            form_number: input.formNumber,
-            status: 'draft',
-            signers,
-            anchors,
-            message: input.message,
-            expires_at: expiresAt.toISOString(),
-            created_by: user.id,
-          })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-        // In production, this would integrate with Dropbox Sign/DocuSign:
-        // 1. Upload the PDF to the eSignature provider
-        // 2. Create signature request with signer info
-        // 3. Store the external request ID
-        // 4. Update status to 'sent'
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to create signature request');
+        }
 
         toast({
-          title: 'Signature request created',
-          description: `Request sent to ${signers.length} signer${signers.length > 1 ? 's' : ''}`,
+          title: 'Signature request sent',
+          description: `Request sent to ${input.signers.length} signer${input.signers.length > 1 ? 's' : ''}`,
         });
 
         return {
-          id: data.id,
-          acordFormId: data.acord_form_id,
-          formNumber: data.form_number,
-          status: data.status,
-          signers,
-          expiresAt: data.expires_at,
-          createdAt: data.created_at,
+          id: result.data.id,
+          acordFormId: input.acordFormId,
+          formNumber: input.formNumber,
+          status: result.data.status,
+          signers: result.data.signers.map((s: { email: string; name: string; status: string }, idx: number) => ({
+            id: `signer_${Date.now()}_${idx}`,
+            role: input.signers[idx]?.role || 'applicant',
+            name: s.name,
+            email: s.email,
+            status: s.status,
+            order: idx + 1,
+          })),
+          externalRequestId: result.data.external_request_id,
+          expiresAt: result.data.expires_at,
+          createdAt: new Date().toISOString(),
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create request';

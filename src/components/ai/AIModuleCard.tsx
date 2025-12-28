@@ -1,11 +1,11 @@
 /**
  * AI Module Card Component
- * 
+ *
  * Displays an AI module in the Lewis AI Hub grid.
  * Shows icon, name, description, usage stats, and category badge.
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,7 +101,7 @@ interface AIModuleCardProps {
   className?: string;
 }
 
-export function AIModuleCard({ module, className }: AIModuleCardProps) {
+export const AIModuleCard = memo(function AIModuleCard({ module, className }: AIModuleCardProps) {
   const navigate = useNavigate();
   
   const IconComponent = ICON_MAP[module.icon] || FileText;
@@ -150,7 +150,7 @@ export function AIModuleCard({ module, className }: AIModuleCardProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 // Skeleton loader for module cards
 export function AIModuleCardSkeleton() {

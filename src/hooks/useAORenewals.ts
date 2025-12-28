@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 // Types
 export type AORenewalStatus = "pending" | "contacted" | "quoted" | "renewed" | "lost" | "cancelled" | "moved";
@@ -251,7 +252,7 @@ export const useCreateAORenewal = () => {
       toast.success("Renewal created successfully");
     },
     onError: (error) => {
-      console.error("Error creating renewal:", error);
+      logger.error("Error creating renewal:", error);
       toast.error("Failed to create renewal");
     },
   });
@@ -291,7 +292,7 @@ export const useUpdateAORenewal = () => {
       toast.success("Renewal updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating renewal:", error);
+      logger.error("Error updating renewal:", error);
       toast.error("Failed to update renewal");
     },
   });
@@ -313,7 +314,7 @@ export const useDeleteAORenewal = () => {
       toast.success("Renewal deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting renewal:", error);
+      logger.error("Error deleting renewal:", error);
       toast.error("Failed to delete renewal");
     },
   });
@@ -351,7 +352,7 @@ export const useUpdateAORenewalStatus = () => {
       toast.success("Status updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating status:", error);
+      logger.error("Error updating status:", error);
       toast.error("Failed to update status");
     },
   });
@@ -378,7 +379,7 @@ export const useBulkUpdateAORenewals = () => {
       toast.success(`${data.length} renewals updated successfully`);
     },
     onError: (error) => {
-      console.error("Error bulk updating renewals:", error);
+      logger.error("Error bulk updating renewals:", error);
       toast.error("Failed to update renewals");
     },
   });
@@ -410,7 +411,7 @@ export const useBulkDeleteAllAORenewals = () => {
       toast.success("All renewal data cleared successfully");
     },
     onError: (error) => {
-      console.error("Error deleting all renewals:", error);
+      logger.error("Error deleting all renewals:", error);
       toast.error("Failed to clear renewal data");
     },
   });
@@ -454,7 +455,7 @@ export const useImportAORenewals = () => {
             .maybeSingle();
 
           if (checkError) {
-            console.error("Error checking for duplicates:", checkError);
+            logger.error("Error checking for duplicates:", checkError);
             result.errors.push(
               `Error checking duplicate for ${renewal.policy_number}: ${checkError.message}`
             );
@@ -470,7 +471,7 @@ export const useImportAORenewals = () => {
                 .eq("id", existing.id);
 
               if (updateError) {
-                console.error("Error updating renewal:", updateError);
+                logger.error("Error updating renewal:", updateError);
                 result.errors.push(
                   `Error updating ${renewal.policy_number}: ${updateError.message}`
                 );
@@ -508,7 +509,7 @@ export const useImportAORenewals = () => {
             .insert([insertData]);
 
           if (insertError) {
-            console.error("Error inserting renewal:", insertError);
+            logger.error("Error inserting renewal:", insertError);
             result.errors.push(
               `Error inserting ${renewal.policy_number}: ${insertError.message}`
             );
@@ -517,7 +518,7 @@ export const useImportAORenewals = () => {
             result.successful++;
           }
         } catch (error) {
-          console.error("Unexpected error processing renewal:", error);
+          logger.error("Unexpected error processing renewal:", error);
           result.errors.push(
             `Unexpected error for ${renewal.policy_number}: ${
               error instanceof Error ? error.message : "Unknown error"
@@ -542,7 +543,7 @@ export const useImportAORenewals = () => {
       }
     },
     onError: (error) => {
-      console.error("Import failed:", error);
+      logger.error("Import failed:", error);
       toast.error("Failed to import renewals. Please try again.");
     },
   });

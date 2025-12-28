@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserPlus, Loader2, Check, AlertCircle } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface InviteToPortalButtonProps {
   accountId: string;
@@ -98,7 +99,7 @@ export function InviteToPortalButton({
         throw new Error(data.error || 'Failed to send invitation');
       }
     } catch (error) {
-      console.error('Invitation error:', error);
+      logger.error('Invitation error:', error);
       toast({
         title: 'Failed to send invitation',
         description: error instanceof Error ? error.message : 'Please try again later.',

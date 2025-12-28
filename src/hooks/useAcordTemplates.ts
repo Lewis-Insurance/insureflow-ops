@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import type { AcordTemplate, FieldInventoryItem, FieldSchemaItem, SectionDefinition } from '@/types/acord';
 import { ingestAcordTemplate, validatePdfForAcord, IngestionOptions } from '@/lib/acord/templateIngestion';
@@ -176,7 +177,7 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
           .eq('is_current', true);
 
         if (updateError) {
-          console.warn('Failed to update existing current template:', updateError);
+          logger.warn('Failed to update existing current template:', updateError);
         }
 
         // Insert template record

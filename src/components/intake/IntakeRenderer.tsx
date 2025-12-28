@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import DOMPurify from 'dompurify';
+import { logger } from '@/lib/logger';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -78,6 +79,7 @@ export function IntakeRenderer({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Group questions by section
   const sections = useMemo(() => {
@@ -307,6 +309,7 @@ export function IntakeRenderer({
   const handleSubmit = async () => {
     setShowSubmitDialog(false);
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       await onSubmit(responses);
@@ -315,7 +318,8 @@ export function IntakeRenderer({
       // Clear localStorage draft
       localStorage.removeItem(`intake_draft_${template.id}`);
     } catch (error) {
-      console.error('Submission failed:', error);
+      logger.error('Submission failed:', error);
+      setSubmitError('Failed to submit form. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -432,6 +436,14 @@ export function IntakeRenderer({
                 disabled={readOnly}
               />
             ))}
+
+          {/* Submission error alert */}
+          {submitError && (
+            <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">{submitError}</p>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           <div className="flex gap-2">

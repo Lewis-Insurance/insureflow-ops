@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface RecurrenceRule {
   id: string;
@@ -19,13 +20,13 @@ export interface RecurrenceRule {
 }
 
 export function useRecurringTasks() {
-  const [recurrenceRules, setRecurrenceRules] = useState<any[]>([]);
+  const [recurrenceRules, setRecurrenceRules] = useState<RecurrenceRule[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchRecurrenceRules = useCallback(async (taskId?: string) => {
     try {
       setLoading(true);
-      let query: any = supabase
+      let query = supabase
         .from('task_recurrence_rules')
         .select('*')
         .order('created_at', { ascending: false });
@@ -37,9 +38,9 @@ export function useRecurringTasks() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setRecurrenceRules(data || []);
-    } catch (error: any) {
-      console.error('Error fetching recurrence rules:', error);
+      setRecurrenceRules((data || []) as RecurrenceRule[]);
+    } catch (error) {
+      logger.error('Error fetching recurrence rules:', error);
       toast({
         title: 'Error',
         description: 'Failed to load recurrence rules',
@@ -54,7 +55,7 @@ export function useRecurringTasks() {
     try {
       const { data, error } = await supabase
         .from('task_recurrence_rules')
-        .insert(ruleData as any)
+        .insert(ruleData)
         .select()
         .single();
 
@@ -66,8 +67,8 @@ export function useRecurringTasks() {
       });
 
       return data;
-    } catch (error: any) {
-      console.error('Error creating recurrence rule:', error);
+    } catch (error) {
+      logger.error('Error creating recurrence rule:', error);
       toast({
         title: 'Error',
         description: 'Failed to create recurring task',
@@ -81,7 +82,7 @@ export function useRecurringTasks() {
     try {
       const { error } = await supabase
         .from('task_recurrence_rules')
-        .update(updates as any)
+        .update(updates)
         .eq('id', ruleId);
 
       if (error) throw error;
@@ -92,8 +93,8 @@ export function useRecurringTasks() {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error updating recurrence rule:', error);
+    } catch (error) {
+      logger.error('Error updating recurrence rule:', error);
       toast({
         title: 'Error',
         description: 'Failed to update recurrence rule',
@@ -118,8 +119,8 @@ export function useRecurringTasks() {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error deleting recurrence rule:', error);
+    } catch (error) {
+      logger.error('Error deleting recurrence rule:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove recurring task',
@@ -144,8 +145,8 @@ export function useRecurringTasks() {
       });
 
       return data;
-    } catch (error: any) {
-      console.error('Error generating task instance:', error);
+    } catch (error) {
+      logger.error('Error generating task instance:', error);
       toast({
         title: 'Error',
         description: 'Failed to generate next task',

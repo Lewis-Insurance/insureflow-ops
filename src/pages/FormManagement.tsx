@@ -66,10 +66,12 @@ import {
   RefreshCw,
   ArrowUpDown,
   GitCompare,
+  FileSignature,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
+import { SignatureRequestModal } from '@/components/signatures';
 import { ACORD_FORMS } from '@/types/acord';
 import type { AcordForm, SignatureStatus, SubmissionStatus } from '@/types/acord';
 
@@ -107,6 +109,8 @@ export default function FormManagement() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [templates, setTemplates] = useState<{ id: string; form_number: string; form_name: string }[]>([]);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureForm, setSignatureForm] = useState<FormWithDetails | null>(null);
 
   // Load forms
   useEffect(() => {
@@ -647,6 +651,16 @@ export default function FormManagement() {
                             <Download className="h-4 w-4 mr-2" />
                             Download PDF
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSignatureForm(form);
+                              setShowSignatureModal(true);
+                            }}
+                            disabled={!form.pdf_url || form.signature_status === 'signed'}
+                          >
+                            <FileSignature className="h-4 w-4 mr-2" />
+                            Send for Signature
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleCloneForm(form.id)}>
                             <Copy className="h-4 w-4 mr-2" />
@@ -674,6 +688,28 @@ export default function FormManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Signature Request Modal */}
+      {signatureForm && (
+        <SignatureRequestModal
+          open={showSignatureModal}
+          onOpenChange={(open) => {
+            setShowSignatureModal(open);
+            if (!open) setSignatureForm(null);
+          }}
+          documentUrl={signatureForm.pdf_url || ''}
+          documentName={`ACORD ${signatureForm.templateFormNumber} - ${signatureForm.accountName || 'Form'}`}
+          formNumber={signatureForm.templateFormNumber}
+          acordFormId={signatureForm.id}
+          onSuccess={(requestId) => {
+            loadForms();
+            toast({
+              title: 'Signature request created',
+              description: 'The document has been sent for signature.',
+            });
+          }}
+        />
+      )}
     </div>
     </AppLayout>
   );

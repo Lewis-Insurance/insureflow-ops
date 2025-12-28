@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
 import { DocumentFocusSelector } from './DocumentFocusSelector';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface DocumentUploadWithAnalysisProps {
   accountId?: string;
@@ -46,7 +47,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     const fetchAnalysisData = async () => {
       if (!completedAnalysisId) return;
 
-      console.log('Fetching analysis data for ID:', completedAnalysisId);
+      logger.debug('Fetching analysis data for ID:', completedAnalysisId);
       setIsLoadingAnalysis(true);
 
       try {
@@ -57,22 +58,22 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
           .maybeSingle();
 
         if (error) {
-          console.error('Error fetching analysis:', error);
+          logger.error('Error fetching analysis:', error);
           setErrorMessage(`Failed to load analysis: ${error.message}`);
           return;
         }
 
         if (!data) {
-          console.warn('No analysis data found for ID:', completedAnalysisId);
+          logger.warn('No analysis data found for ID:', completedAnalysisId);
           setErrorMessage('Analysis not found. Please try again.');
           return;
         }
 
-        console.log('Analysis data loaded:', data);
+        logger.debug('Analysis data loaded:', data);
         setAnalysisData(data);
-      } catch (err: any) {
-        console.error('Fetch error:', err);
-        setErrorMessage(`Failed to load results: ${err.message}`);
+      } catch (err) {
+        logger.error('Fetch error:', err);
+        setErrorMessage(`Failed to load results: ${err instanceof Error ? err.message : 'Unknown error'}`);
       } finally {
         setIsLoadingAnalysis(false);
       }
@@ -99,7 +100,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
     setUploadedFileName(fileName);
 
     try {
-      console.log('=== STARTING UPLOAD ===');
+      logger.debug('=== STARTING UPLOAD ===');
       setUploadProgress(20);
       
       // Step 1: Upload to Supabase Storage
@@ -119,7 +120,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         .from('documents')
         .getPublicUrl(filePath);
 
-      console.log('File uploaded:', publicUrl);
+      logger.debug('File uploaded:', publicUrl);
       setUploadProgress(50);
 
       // Step 3: Get current user
@@ -146,11 +147,11 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
 
       if (docError) throw docError;
 
-      console.log('Document record created:', documentRecord.id);
+      logger.debug('Document record created:', documentRecord.id);
       setUploadProgress(70);
 
       // Step 5: Call Azure analysis with proper document UUID
-      console.log('Calling ai-document-analysis-azure...');
+      logger.debug('Calling ai-document-analysis-azure...');
       setUploadProgress(80);
       
       const { data: analysisResult, error: analysisError } = await supabase.functions.invoke(
@@ -168,14 +169,14 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         }
       );
 
-      console.log('Analysis result:', analysisResult);
+      logger.debug('Analysis result:', analysisResult);
 
       if (analysisError) throw analysisError;
 
       setUploadProgress(100);
 
       if (analysisResult?.analysis_id) {
-        console.log('Setting analysis ID:', analysisResult.analysis_id);
+        logger.debug('Setting analysis ID:', analysisResult.analysis_id);
         setCompletedAnalysisId(analysisResult.analysis_id);
       } else {
         throw new Error('No analysis_id returned');
@@ -186,9 +187,9 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
       }
 
       setSelectedFile(null);
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      setErrorMessage(error?.message || 'Upload failed');
+    } catch (error) {
+      logger.error('Upload error:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
     } finally {
       setIsProcessing(false);
     }

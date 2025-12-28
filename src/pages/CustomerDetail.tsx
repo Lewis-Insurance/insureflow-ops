@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, CheckSquare, Plus, Mail, Award, Inbox } from 'lucide-react';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
+import { logger } from '@/lib/logger';
 
 interface Account {
   id: string;
@@ -74,7 +75,7 @@ class ErrorBoundaryWrapper extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('DocumentCollectionBoard error:', error, errorInfo);
+    logger.error('DocumentCollectionBoard error:', error, errorInfo);
   }
 
   render() {
@@ -133,7 +134,7 @@ export default function CustomerDetail() {
         .maybeSingle();
 
       if (accountError) {
-        console.error('Account fetch error:', accountError);
+        logger.error('Account fetch error:', accountError);
         toast({
           title: 'Error',
           description: 'Failed to load customer details: ' + accountError.message,

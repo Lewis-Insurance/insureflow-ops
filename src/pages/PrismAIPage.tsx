@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { logger } from '@/lib/logger';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -190,7 +191,7 @@ export default function PrismAIPage() {
         setIsSavingApiKey(false);
         return;
       } catch (error) {
-        console.error('Error removing API key:', error);
+        logger.error('Error removing API key:', error);
         toast({
           title: 'Error',
           description: 'Failed to remove API key',
@@ -370,7 +371,7 @@ export default function PrismAIPage() {
         description: `${client.name}: ${context.dataSummary.activePoliciesCount} policies, ${context.dataSummary.claimsCount} claims`,
       });
     } catch (error) {
-      console.error('Error loading client context:', error);
+      logger.error('Error loading client context:', error);
       toast({
         title: 'Error loading client',
         description: error instanceof Error ? error.message : 'Failed to load client data',

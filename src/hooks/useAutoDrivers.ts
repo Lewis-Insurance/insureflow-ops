@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 export type AutoDriver = {
   id?: string;
@@ -26,7 +27,7 @@ export const useAutoDrivers = (leadId: string) => {
         .order('is_primary', { ascending: false });
 
       if (error) {
-        console.error('Error fetching auto drivers:', error);
+        logger.error('Error fetching auto drivers:', error);
         return [];
       }
       return data || [];
@@ -68,7 +69,7 @@ export const useAddAutoDriver = () => {
       toast.success('Driver added successfully');
     },
     onError: (error: any) => {
-      console.error('Error adding driver:', error);
+      logger.error('Error adding driver:', error);
       toast.error(`Failed to add driver: ${error.message}`);
     },
   });
@@ -109,7 +110,7 @@ export const useUpdateAutoDriver = () => {
       toast.success('Driver updated successfully');
     },
     onError: (error: any) => {
-      console.error('Error updating driver:', error);
+      logger.error('Error updating driver:', error);
       toast.error(`Failed to update driver: ${error.message}`);
     },
   });
@@ -133,7 +134,7 @@ export const useDeleteAutoDriver = () => {
       toast.success('Driver removed successfully');
     },
     onError: (error: any) => {
-      console.error('Error deleting driver:', error);
+      logger.error('Error deleting driver:', error);
       toast.error(`Failed to remove driver: ${error.message}`);
     },
   });

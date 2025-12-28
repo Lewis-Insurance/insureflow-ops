@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 export interface MovedCarrier {
   id: string;
@@ -26,7 +27,7 @@ export function useMovedCarriers() {
         .order("display_order", { ascending: true });
 
       if (error) {
-        console.error("Error fetching moved carriers:", error);
+        logger.error("Error fetching moved carriers:", error);
         throw error;
       }
 
@@ -49,7 +50,7 @@ export function useAllMovedCarriers() {
         .order("display_order", { ascending: true });
 
       if (error) {
-        console.error("Error fetching all moved carriers:", error);
+        logger.error("Error fetching all moved carriers:", error);
         throw error;
       }
 
@@ -99,7 +100,7 @@ export function useAddMovedCarrier() {
       toast.success("Carrier added successfully");
     },
     onError: (error) => {
-      console.error("Error adding carrier:", error);
+      logger.error("Error adding carrier:", error);
       toast.error(error instanceof Error ? error.message : "Failed to add carrier");
     },
   });
@@ -141,7 +142,7 @@ export function useUpdateMovedCarrier() {
       toast.success("Carrier updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating carrier:", error);
+      logger.error("Error updating carrier:", error);
       toast.error(error instanceof Error ? error.message : "Failed to update carrier");
     },
   });
@@ -168,7 +169,7 @@ export function useDeleteMovedCarrier() {
       toast.success("Carrier deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting carrier:", error);
+      logger.error("Error deleting carrier:", error);
       toast.error("Failed to delete carrier");
     },
   });

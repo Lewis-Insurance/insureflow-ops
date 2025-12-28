@@ -11,6 +11,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 // =============================================================================
 // TYPES
@@ -274,7 +275,7 @@ export function useUploadExploreDocument() {
           document_extraction_id: data.id,
           conversation_id: conversationId,
         },
-      }).catch((err) => console.error('Processing trigger error:', err));
+      }).catch((err) => logger.error('Processing trigger error:', err));
 
       return data;
     },

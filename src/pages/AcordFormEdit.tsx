@@ -49,8 +49,10 @@ import {
   History,
   UserPlus,
   FileSearch,
+  FileSignature,
 } from 'lucide-react';
 import { DocumentImportModal } from '@/components/acord/DocumentImportModal';
+import { SignatureRequestModal, SignatureStatusTracker } from '@/components/signatures';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
@@ -123,6 +125,7 @@ export default function AcordFormEdit() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
 
   // Load form data
   useEffect(() => {
@@ -542,6 +545,12 @@ export default function AcordFormEdit() {
               {generating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               Generate PDF
             </Button>
+            {form.pdf_url && form.signature_status !== 'signed' && (
+              <Button variant="outline" onClick={() => setShowSignatureModal(true)}>
+                <FileSignature className="h-4 w-4 mr-2" />
+                Send for Signature
+              </Button>
+            )}
           </div>
         </div>
 
@@ -652,6 +661,20 @@ export default function AcordFormEdit() {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Signature Status */}
+            {form.signature_status !== 'unsigned' && (
+              <SignatureStatusTracker
+                acordFormId={id!}
+                compact
+                onResend={() => {
+                  toast({
+                    title: 'Reminder sent',
+                    description: 'A signature reminder has been sent.',
+                  });
+                }}
+              />
             )}
           </div>
 
@@ -778,6 +801,25 @@ export default function AcordFormEdit() {
           acordFormId={id || ''}
           templateFormNumber={template?.form_number}
           onFieldsExtracted={handleDocumentImport}
+        />
+
+        {/* Signature Request Modal */}
+        <SignatureRequestModal
+          open={showSignatureModal}
+          onOpenChange={setShowSignatureModal}
+          documentUrl={form?.pdf_url || ''}
+          documentName={`ACORD ${template?.form_number} - ${account?.name || 'Form'}`}
+          formNumber={template?.form_number}
+          acordFormId={id}
+          defaultSigners={account ? [{ name: account.name, email: account.email }] : []}
+          onSuccess={(requestId) => {
+            // Reload form data to show updated signature status
+            if (id) loadFormData(id);
+            toast({
+              title: 'Signature request created',
+              description: 'The document has been sent for signature.',
+            });
+          }}
         />
       </div>
     </AppLayout>

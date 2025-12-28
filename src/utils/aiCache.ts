@@ -13,6 +13,8 @@
  * - Analytics and hit rate tracking
  */
 
+import { logger } from '@/lib/logger';
+
 // ============================================================================
 // Types and Interfaces
 // ============================================================================
@@ -217,7 +219,7 @@ class LocalStorageCache {
 
       return entry;
     } catch (e) {
-      console.error('LocalStorage cache read error:', e);
+      logger.error('LocalStorage cache read error:', e);
       localStorage.removeItem(key);
       return null;
     }
@@ -239,13 +241,13 @@ class LocalStorageCache {
     try {
       localStorage.setItem(key, compressed);
     } catch (e) {
-      console.error('LocalStorage cache write error:', e);
+      logger.error('LocalStorage cache write error:', e);
       // Quota exceeded, try evicting more
       this.evictOldest();
       try {
         localStorage.setItem(key, compressed);
       } catch (e2) {
-        console.error('LocalStorage cache write failed after eviction:', e2);
+        logger.error('LocalStorage cache write failed after eviction:', e2);
       }
     }
   }
@@ -280,7 +282,7 @@ class IndexedDBCache {
       const request = indexedDB.open(CONFIG.indexedDB.name, CONFIG.indexedDB.version);
 
       request.onerror = () => {
-        console.error('IndexedDB initialization error:', request.error);
+        logger.error('IndexedDB initialization error:', request.error);
         resolve(); // Don't reject, just log error
       };
 
@@ -335,11 +337,11 @@ class IndexedDBCache {
         };
 
         request.onerror = () => {
-          console.error('IndexedDB cache read error:', request.error);
+          logger.error('IndexedDB cache read error:', request.error);
           resolve(null);
         };
       } catch (e) {
-        console.error('IndexedDB cache read error:', e);
+        logger.error('IndexedDB cache read error:', e);
         resolve(null);
       }
     });
@@ -361,11 +363,11 @@ class IndexedDBCache {
         };
 
         request.onerror = () => {
-          console.error('IndexedDB cache write error:', request.error);
+          logger.error('IndexedDB cache write error:', request.error);
           resolve();
         };
       } catch (e) {
-        console.error('IndexedDB cache write error:', e);
+        logger.error('IndexedDB cache write error:', e);
         resolve();
       }
     });
@@ -398,11 +400,11 @@ class IndexedDBCache {
         };
 
         request.onerror = () => {
-          console.error('IndexedDB eviction error:', request.error);
+          logger.error('IndexedDB eviction error:', request.error);
           resolve();
         };
       } catch (e) {
-        console.error('IndexedDB eviction error:', e);
+        logger.error('IndexedDB eviction error:', e);
         resolve();
       }
     });
@@ -420,11 +422,11 @@ class IndexedDBCache {
 
         request.onsuccess = () => resolve();
         request.onerror = () => {
-          console.error('IndexedDB clear error:', request.error);
+          logger.error('IndexedDB clear error:', request.error);
           resolve();
         };
       } catch (e) {
-        console.error('IndexedDB clear error:', e);
+        logger.error('IndexedDB clear error:', e);
         resolve();
       }
     });
@@ -447,11 +449,11 @@ class IndexedDBCache {
         };
 
         request.onerror = () => {
-          console.error('IndexedDB size calculation error:', request.error);
+          logger.error('IndexedDB size calculation error:', request.error);
           resolve(0);
         };
       } catch (e) {
-        console.error('IndexedDB size calculation error:', e);
+        logger.error('IndexedDB size calculation error:', e);
         resolve(0);
       }
     });
@@ -592,7 +594,7 @@ export class AICacheManager {
   async warmCache(queries: Array<{ query: string; context?: string }>): Promise<void> {
     // This would be called on app load with common queries
     // For now, it's a placeholder for future implementation
-    console.log('Cache warming with', queries.length, 'queries');
+    logger.debug('Cache warming with', queries.length, 'queries');
   }
 
   private updateStats(startTime: number): void {

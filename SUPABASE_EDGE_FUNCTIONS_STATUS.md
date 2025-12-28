@@ -1,7 +1,7 @@
 # Supabase Edge Functions Status Report
 
 ## Summary
-- **Total Functions:** 49 (+ 1 shared utilities folder)
+- **Total Functions:** 51 (+ 1 shared utilities folder)
 - **Status:** Ready for deployment
 - **Deno Runtime:** All functions use Deno runtime
 - **TypeScript:** All functions use TypeScript with relaxed checking
@@ -37,31 +37,33 @@
 | 23 | email-inbound | Process inbound emails | Supabase | ✅ Ready |
 | 24 | email-inbound-lite | Lightweight email processing | Supabase | ✅ Ready |
 | 25 | email-send | Send outbound emails | Email API | ✅ Ready |
-| 26 | generate-coi-data | Generate COI (Certificate of Insurance) | Supabase | ✅ Ready |
-| 27 | generate-insurance-quote-doc | Generate quote documents | Supabase | ✅ Ready |
-| 28 | lead-capture-webhook | Webhook for lead capture | Supabase | ✅ Ready |
-| 29 | lead-scoring-engine | Advanced lead scoring | Supabase, AI | ✅ Ready |
-| 30 | lewi_analyze | Lewi AI analysis | Supabase, AI | ✅ Ready (@ts-nocheck) |
-| 31 | nurture-campaign-processor | Process nurture campaigns | Supabase | ✅ Ready |
-| 32 | ocr-document | OCR processing | Google Vision | ✅ Ready |
-| 33 | on_parse_complete | Post-parse processing | Supabase | ✅ Ready (@ts-nocheck) |
-| 34 | parse-document-ocr | Parse documents with OCR | Google Vision | ✅ Ready |
-| 35 | parse-pdf-knowledge | Extract knowledge from PDFs | Supabase | ✅ Ready |
-| 36 | parseur-webhook | Parseur integration webhook | Parseur API | ✅ Ready (@ts-nocheck) |
-| 37 | phone-verification | Verify phone numbers | Twilio | ✅ Ready |
-| 38 | process-data-export | Export data processing | Supabase | ✅ Ready |
-| 39 | process-document-batch | Batch document processing | Supabase | ✅ Ready |
-| 40 | process-quote-followups | Automated quote follow-ups | Supabase | ✅ Ready (@ts-nocheck) |
-| 41 | renewal-risk-batch | Batch renewal risk calc | Supabase | ✅ Ready |
-| 42 | send-coi-email | Email COI certificates | Email API | ⚠️ Disabled (npm package incompatible) |
-| 43 | setup-mfa | Multi-factor auth setup | Supabase Auth | ✅ Ready |
-| 44 | submit-comparison | Submit comparison requests | Supabase | ✅ Ready |
-| 45 | twilio-recording-webhook | Twilio recording webhook | Twilio | ✅ Ready |
-| 46 | twilio-sms | Send SMS via Twilio | Twilio | ✅ Ready |
-| 47 | twilio-voice | Twilio voice calls | Twilio | ✅ Ready |
-| 48 | twilio-voice-webhook | Twilio voice webhook | Twilio | ✅ Ready |
-| 49 | upload-to-google-drive | Upload files to Google Drive | Google Drive API | ✅ Ready |
-| 50 | worker-comparison | Background comparison worker | Supabase | ✅ Ready |
+| 26 | esign-create-request | Create signature requests via Dropbox Sign | Dropbox Sign API | ✅ Ready |
+| 27 | esign-webhook | Handle signature completion events | Supabase | ✅ Ready |
+| 28 | generate-coi-data | Generate COI (Certificate of Insurance) | Supabase | ✅ Ready |
+| 29 | generate-insurance-quote-doc | Generate quote documents | Supabase | ✅ Ready |
+| 30 | lead-capture-webhook | Webhook for lead capture | Supabase | ✅ Ready |
+| 31 | lead-scoring-engine | Advanced lead scoring | Supabase, AI | ✅ Ready |
+| 32 | lewi_analyze | Lewi AI analysis | Supabase, AI | ✅ Ready (@ts-nocheck) |
+| 33 | nurture-campaign-processor | Process nurture campaigns | Supabase | ✅ Ready |
+| 34 | ocr-document | OCR processing | Google Vision | ✅ Ready |
+| 35 | on_parse_complete | Post-parse processing | Supabase | ✅ Ready (@ts-nocheck) |
+| 36 | parse-document-ocr | Parse documents with OCR | Google Vision | ✅ Ready |
+| 37 | parse-pdf-knowledge | Extract knowledge from PDFs | Supabase | ✅ Ready |
+| 38 | parseur-webhook | Parseur integration webhook | Parseur API | ✅ Ready (@ts-nocheck) |
+| 39 | phone-verification | Verify phone numbers | Twilio | ✅ Ready |
+| 40 | process-data-export | Export data processing | Supabase | ✅ Ready |
+| 41 | process-document-batch | Batch document processing | Supabase | ✅ Ready |
+| 42 | process-quote-followups | Automated quote follow-ups | Supabase | ✅ Ready (@ts-nocheck) |
+| 43 | renewal-risk-batch | Batch renewal risk calc | Supabase | ✅ Ready |
+| 44 | send-coi-email | Email COI certificates | Email API | ⚠️ Disabled (npm package incompatible) |
+| 45 | setup-mfa | Multi-factor auth setup | Supabase Auth | ✅ Ready |
+| 46 | submit-comparison | Submit comparison requests | Supabase | ✅ Ready |
+| 47 | twilio-recording-webhook | Twilio recording webhook | Twilio | ✅ Ready |
+| 48 | twilio-sms | Send SMS via Twilio | Twilio | ✅ Ready |
+| 49 | twilio-voice | Twilio voice calls | Twilio | ✅ Ready |
+| 50 | twilio-voice-webhook | Twilio voice webhook | Twilio | ✅ Ready |
+| 51 | upload-to-google-drive | Upload files to Google Drive | Google Drive API | ✅ Ready |
+| 52 | worker-comparison | Background comparison worker | Supabase | ✅ Ready |
 
 ---
 
@@ -130,6 +132,11 @@ TWILIO_PHONE_NUMBER=your_twilio_phone
 ```bash
 RESEND_API_KEY=your_resend_key
 POSTMARK_API_KEY=your_postmark_key  # Alternative
+```
+
+### eSignature (Dropbox Sign):
+```bash
+DROPBOX_ACCESS_TOKEN=your_dropbox_sign_api_key
 ```
 
 ### Document Parsing:
@@ -241,6 +248,10 @@ supabase functions list --project-ref lrqajzwcmdwahnjyidgv
 - admin-approvals
 - admin-create-user
 - admin-list-users
+
+### eSignature Integration (2)
+- esign-create-request
+- esign-webhook
 
 ### Insurance Operations (4)
 - compare-insurance-options

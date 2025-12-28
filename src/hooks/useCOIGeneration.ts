@@ -9,6 +9,7 @@ import { useAuth } from './useAuth';
 import { retry } from '@/lib/utils/retry';
 import { COIQueue } from '@/lib/utils/queue';
 import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
+import { logger } from '@/lib/logger';
 
 enum COIErrorType {
   VALIDATION = 'VALIDATION',
@@ -112,7 +113,7 @@ export function useCOIGeneration() {
         delay: 1000,
         backoffMultiplier: 2,
         onRetry: (attempt, error) => {
-          console.log(`Upload retry attempt ${attempt}/${maxAttempts}:`, error.message);
+          logger.debug(`Upload retry attempt ${attempt}/${maxAttempts}:`, error.message);
           toast({
             title: 'Retrying upload...',
             description: `Attempt ${attempt} of ${maxAttempts}`,
@@ -132,10 +133,10 @@ export function useCOIGeneration() {
         .remove([fileName]);
 
       if (error) {
-        console.error('Failed to cleanup file:', fileName, error);
+        logger.error('Failed to cleanup file:', fileName, error);
       }
     } catch (error) {
-      console.error('Cleanup error:', error);
+      logger.error('Cleanup error:', error);
     }
   };
 
@@ -156,7 +157,7 @@ export function useCOIGeneration() {
         created_at: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Failed to log COI activity:', error);
+      logger.error('Failed to log COI activity:', error);
       // Don't throw - logging is non-critical
     }
   };
@@ -318,7 +319,7 @@ export function useCOIGeneration() {
 
       return publicUrl;
     } catch (error: any) {
-      console.error('COI generation error:', error);
+      logger.error('COI generation error:', error);
 
       const errorType = categorizeError(error);
 
@@ -341,7 +342,7 @@ export function useCOIGeneration() {
         const fileName = `coi_${coiData.certificate_number}_${Date.now()}.pdf`;
         await cleanupFailedUpload(fileName);
       } catch (cleanupError) {
-        console.error('Cleanup error:', cleanupError);
+        logger.error('Cleanup error:', cleanupError);
       }
 
       toast({
@@ -431,7 +432,7 @@ export function useCOIGeneration() {
 
       return pdfBase64;
     } catch (error: any) {
-      console.error('Preview error:', error);
+      logger.error('Preview error:', error);
       toast({
         title: 'Preview Failed',
         description: error.message || 'Failed to generate preview',
@@ -475,7 +476,7 @@ export function useCOIGeneration() {
         // Update progress
         onProgress?.(i + 1, total);
       } catch (error: any) {
-        console.error(`Failed to generate COI for ${item.coiId}:`, error);
+        logger.error(`Failed to generate COI for ${item.coiId}:`, error);
         results.push({
           id: item.coiId,
           url: null,
@@ -523,7 +524,7 @@ export function useCOIGeneration() {
         percentage: (totalSize / limit) * 100,
       };
     } catch (error) {
-      console.error('Error checking storage quota:', error);
+      logger.error('Error checking storage quota:', error);
       return { used: 0, limit: 0, percentage: 0 };
     }
   };
@@ -622,7 +623,7 @@ export function useCOIGeneration() {
         .eq('id', ticketId);
 
       if (updateError) {
-        console.error('Failed to update ticket metadata:', updateError);
+        logger.error('Failed to update ticket metadata:', updateError);
         // Don't throw - email was sent successfully
       }
 
@@ -636,7 +637,7 @@ export function useCOIGeneration() {
         description: `Certificate emailed to ${emailValidation.sanitized}`,
       });
     } catch (error: any) {
-      console.error('Email delivery error:', error);
+      logger.error('Email delivery error:', error);
       toast({
         title: 'Email Failed',
         description: error.message || 'Failed to email certificate',
@@ -720,13 +721,13 @@ export function useCOIGeneration() {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking COI existence:', error);
+        logger.error('Error checking COI existence:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('Error checking COI existence:', error);
+      logger.error('Error checking COI existence:', error);
       return null;
     }
   };
@@ -756,7 +757,7 @@ export function useCOIGeneration() {
         description: 'Your certificate is being downloaded',
       });
     } catch (error: any) {
-      console.error('Download error:', error);
+      logger.error('Download error:', error);
       toast({
         title: 'Download Failed',
         description: error.message || 'Failed to download certificate',

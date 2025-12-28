@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // Types
@@ -291,7 +292,7 @@ export function useGenerateTaskSilent() {
       queryClient.invalidateQueries({ queryKey: ["generated-tasks-log"] });
     },
     onError: (error: Error) => {
-      console.error("Silent task generation failed:", error);
+      logger.error("Silent task generation failed:", error);
     },
   });
 }

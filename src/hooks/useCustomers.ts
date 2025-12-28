@@ -44,29 +44,30 @@ export function useCustomers(accountId?: string) {
       if (error) throw error;
       
       // Map the data from customers_search_v1 to Customer interface
-      const mappedCustomers: Customer[] = (data || []).map((item: any) => ({
-        id: item.account_id,
-        account_id: item.account_id,
-        name: item.display_name || 'Unnamed Customer',
-        email: item.primary_email,
-        phone: item.primary_phone,
-        city: item.city,
-        state: item.state,
-        postal_code: item.postal_code,
-        status: item.status || 'active',
-        type: item.type || 'individual',
-        notes_summary: item.notes_summary,
-        created_at: item.created_at,
-        updated_at: item.updated_at
+      const mappedCustomers: Customer[] = (data || []).map((item: Record<string, unknown>) => ({
+        id: item.account_id as string,
+        account_id: item.account_id as string,
+        name: (item.display_name as string) || 'Unnamed Customer',
+        email: item.primary_email as string | undefined,
+        phone: item.primary_phone as string | undefined,
+        city: item.city as string | undefined,
+        state: item.state as string | undefined,
+        postal_code: item.postal_code as string | undefined,
+        status: (item.status as string) || 'active',
+        type: (item.type as string) || 'individual',
+        notes_summary: item.notes_summary as string | undefined,
+        created_at: item.created_at as string,
+        updated_at: item.updated_at as string
       }));
       
       setCustomers(mappedCustomers);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       toast({
         title: "Error loading customers",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -104,10 +105,10 @@ export function useCustomers(accountId?: string) {
       // Refresh customers list
       await fetchCustomers();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error creating customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -145,10 +146,10 @@ export function useCustomers(accountId?: string) {
       // Refresh customers list
       await fetchCustomers();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error updating customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -171,10 +172,10 @@ export function useCustomers(accountId?: string) {
 
       // Refresh customers list
       await fetchCustomers();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error deleting customer",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;

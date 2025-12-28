@@ -146,7 +146,62 @@ export interface AcordForm {
   updated_at: string;
 }
 
+/**
+ * ACORD Form Signature Status (stored in acord_forms.signature_status)
+ * This is the high-level status shown on ACORD forms in the UI.
+ */
 export type SignatureStatus = 'unsigned' | 'pending' | 'signed' | 'declined' | 'expired';
+
+/**
+ * Signature Request Workflow Status (stored in signature_requests.status)
+ * This tracks the detailed workflow state of a signature request.
+ * Matches database constraint: draft, pending, sent, partial, completed, declined, expired, cancelled
+ */
+export type SignatureRequestStatus =
+  | 'draft'       // Request created but not sent
+  | 'pending'     // Request pending (awaiting action)
+  | 'sent'        // Request sent, awaiting signatures
+  | 'partial'     // Some signers have signed
+  | 'completed'   // All signers have signed
+  | 'declined'    // Signer declined
+  | 'expired'     // Request expired
+  | 'cancelled';  // Request cancelled
+
+/**
+ * Map signature request workflow status to ACORD form display status
+ */
+export function requestStatusToFormStatus(requestStatus: SignatureRequestStatus): SignatureStatus {
+  switch (requestStatus) {
+    case 'draft': return 'unsigned';
+    case 'pending':
+    case 'sent':
+    case 'partial': return 'pending';
+    case 'completed': return 'signed';
+    case 'declined': return 'declined';
+    case 'expired': return 'expired';
+    case 'cancelled': return 'unsigned'; // Reset to unsigned if cancelled
+  }
+}
+
+/**
+ * Get display-friendly signature status label
+ */
+export function getSignatureStatusLabel(status: SignatureStatus | SignatureRequestStatus): string {
+  switch (status) {
+    case 'unsigned':
+    case 'draft': return 'Not Sent';
+    case 'pending':
+    case 'sent': return 'Awaiting Signatures';
+    case 'partial': return 'Partially Signed';
+    case 'signed':
+    case 'completed': return 'Signed';
+    case 'declined': return 'Declined';
+    case 'expired': return 'Expired';
+    case 'cancelled': return 'Cancelled';
+    default: return status;
+  }
+}
+
 export type SubmissionStatus = 'draft' | 'ready' | 'submitted' | 'accepted' | 'rejected' | 'pending_info';
 
 export interface AcordFormSection {

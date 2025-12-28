@@ -8,6 +8,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { buildClientContext } from '@/services/clientIntelligence';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import type {
   ClientContext,
@@ -137,7 +138,7 @@ export function useClientIntelligence(options: UseClientIntelligenceOptions) {
             }
           }
         } catch (e) {
-          console.log('Could not parse structured response, using raw output');
+          logger.debug('Could not parse structured response, using raw output');
         }
       }
 
@@ -402,7 +403,7 @@ export function useClientSearch(searchQuery: string) {
         .limit(20);
 
       if (error) {
-        console.error('Error searching clients:', error);
+        logger.error('Error searching clients:', error);
         return [];
       }
 
@@ -429,7 +430,7 @@ export function useRecentClients(limit: number = 10) {
         .limit(limit);
 
       if (error) {
-        console.error('Error fetching recent clients:', error);
+        logger.error('Error fetching recent clients:', error);
         return [];
       }
 

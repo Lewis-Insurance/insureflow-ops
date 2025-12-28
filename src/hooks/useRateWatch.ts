@@ -8,6 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 // =============================================================================
 // TYPES
@@ -358,7 +359,7 @@ export function useDeleteRateWatchDocument() {
 
       // Continue even if storage delete fails (file might not exist)
       if (storageError) {
-        console.warn('Storage delete warning:', storageError);
+        logger.warn('Storage delete warning:', storageError);
       }
 
       // Delete record
@@ -393,7 +394,7 @@ export async function getRateWatchDocumentUrl(filePath: string): Promise<string 
     .createSignedUrl(filePath, 3600); // 1 hour
 
   if (error) {
-    console.error('Error creating signed URL:', error);
+    logger.error('Error creating signed URL:', error);
     return null;
   }
 

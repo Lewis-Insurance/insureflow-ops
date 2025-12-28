@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface SMSMessage {
   id: string;
@@ -89,13 +90,13 @@ export const useSMSMessages = (filters?: SMSFilters) => {
         const { data, error } = await query.limit(500);
 
         if (error) {
-          console.warn('Error fetching SMS messages:', error.message);
+          logger.warn('Error fetching SMS messages:', error.message);
           return [] as SMSMessage[];
         }
 
         return (data || []) as SMSMessage[];
       } catch (err) {
-        console.error('Error in SMS messages:', err);
+        logger.error('Error in SMS messages:', err);
         return [] as SMSMessage[];
       }
     },
@@ -119,7 +120,7 @@ export const useSMSConversations = () => {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.warn('Error fetching SMS conversations:', error.message);
+          logger.warn('Error fetching SMS conversations:', error.message);
           return [] as SMSConversation[];
         }
 
@@ -161,7 +162,7 @@ export const useSMSConversations = () => {
 
         return Array.from(conversationsMap.values());
       } catch (err) {
-        console.error('Error in SMS conversations:', err);
+        logger.error('Error in SMS conversations:', err);
         return [] as SMSConversation[];
       }
     },
@@ -187,13 +188,13 @@ export const useSMSConversation = (phoneNumber: string | null) => {
           .order('created_at', { ascending: true });
 
         if (error) {
-          console.warn('Error fetching conversation:', error.message);
+          logger.warn('Error fetching conversation:', error.message);
           return [] as SMSMessage[];
         }
 
         return (data || []) as SMSMessage[];
       } catch (err) {
-        console.error('Error in conversation:', err);
+        logger.error('Error in conversation:', err);
         return [] as SMSMessage[];
       }
     },
@@ -343,7 +344,7 @@ export const useSMSStats = () => {
           .select('direction, status, created_at');
 
         if (error) {
-          console.warn('Error fetching SMS stats:', error.message);
+          logger.warn('Error fetching SMS stats:', error.message);
           return {
             total: 0,
             inbound: 0,
@@ -368,7 +369,7 @@ export const useSMSStats = () => {
 
         return stats;
       } catch (err) {
-        console.error('Error in SMS stats:', err);
+        logger.error('Error in SMS stats:', err);
         return {
           total: 0,
           inbound: 0,

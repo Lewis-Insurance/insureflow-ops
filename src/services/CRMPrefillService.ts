@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { FieldStatus, DraftField } from './DraftManager';
 
 export interface CRMAccount {
@@ -163,7 +164,7 @@ class CRMPrefillServiceClass {
 
       return data as CRMAccount;
     } catch (error) {
-      console.error('Failed to load account:', error);
+      logger.error('Failed to load account:', error);
       return null;
     }
   }
@@ -193,7 +194,7 @@ class CRMPrefillServiceClass {
 
       return (data || []) as CRMPolicy[];
     } catch (error) {
-      console.error('Failed to load prior policies:', error);
+      logger.error('Failed to load prior policies:', error);
       return [];
     }
   }
@@ -448,7 +449,7 @@ class CRMPrefillServiceClass {
         created_by: action.userId,
       });
     } catch (error) {
-      console.error('Failed to log prefill action:', error);
+      logger.error('Failed to log prefill action:', error);
       // Don't throw - logging failure shouldn't block operation
     }
   }

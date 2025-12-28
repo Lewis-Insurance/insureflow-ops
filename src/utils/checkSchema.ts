@@ -1,5 +1,6 @@
 // src/utils/checkSchema.ts
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 /**
  * Check if a table exists and get its columns
@@ -14,30 +15,30 @@ export async function checkTableSchema(tableName: string) {
       .limit(0);
     
     if (error) {
-      console.error(`❌ Table "${tableName}" does not exist or you don't have access`);
-      console.error('Error:', error);
+      logger.error(`❌ Table "${tableName}" does not exist or you don't have access`);
+      logger.error('Error:', error);
       return { exists: false, error };
     }
-    
-    console.log(`✅ Table "${tableName}" exists`);
-    
+
+    logger.info(`✅ Table "${tableName}" exists`);
+
     // Get a sample row to see actual columns
     const { data: sample } = await supabase
       .from(tableName)
       .select('*')
       .limit(1)
       .single();
-    
+
     if (sample) {
-      console.log(`📋 Columns in "${tableName}":`, Object.keys(sample));
-      console.log('Sample data:', sample);
+      logger.info(`📋 Columns in "${tableName}":`, Object.keys(sample));
+      logger.debug('Sample data:', sample);
     } else {
-      console.log(`📋 Table is empty, fetching column info...`);
+      logger.info(`📋 Table is empty, fetching column info...`);
     }
     
     return { exists: true, sample };
   } catch (err) {
-    console.error(`❌ Error checking table "${tableName}":`, err);
+    logger.error(`❌ Error checking table "${tableName}":`, err);
     return { exists: false, error: err };
   }
 }
@@ -46,20 +47,20 @@ export async function checkTableSchema(tableName: string) {
  * Check multiple tables at once
  */
 export async function checkAllTables(tableNames: string[]) {
-  console.log('🔍 Checking database schema...\n');
-  
+  logger.info('🔍 Checking database schema...\n');
+
   const results: Record<string, any> = {};
-  
+
   for (const tableName of tableNames) {
-    console.log(`\n--- Checking: ${tableName} ---`);
+    logger.info(`\n--- Checking: ${tableName} ---`);
     results[tableName] = await checkTableSchema(tableName);
   }
-  
-  console.log('\n📊 Summary:');
+
+  logger.info('\n📊 Summary:');
   Object.entries(results).forEach(([table, result]) => {
-    console.log(`  ${result.exists ? '✅' : '❌'} ${table}`);
+    logger.info(`  ${result.exists ? '✅' : '❌'} ${table}`);
   });
-  
+
   return results;
 }
 
@@ -67,8 +68,8 @@ export async function checkAllTables(tableNames: string[]) {
  * Verify the schema we need for renewal risk hooks
  */
 export async function verifyRenewalRiskSchema() {
-  console.log('🔍 Verifying Renewal Risk Schema Requirements...\n');
-  
+  logger.info('🔍 Verifying Renewal Risk Schema Requirements...\n');
+
   const requiredTables = [
     'renewals',
     'renewal_risk_history',
@@ -77,9 +78,9 @@ export async function verifyRenewalRiskSchema() {
     'profiles',
     'policies'
   ];
-  
+
   const results = await checkAllTables(requiredTables);
-  
+
   // Check if renewals table has risk fields
   if (results.renewals?.exists) {
     const { data: renewal } = await supabase
@@ -87,10 +88,10 @@ export async function verifyRenewalRiskSchema() {
       .select('*')
       .limit(1)
       .single();
-    
+
     const requiredFields = [
       'risk_score',
-      'risk_level', 
+      'risk_level',
       'risk_factors',
       'last_risk_calculation',
       'days_since_last_contact',
@@ -102,18 +103,18 @@ export async function verifyRenewalRiskSchema() {
       'engagement_score',
       'sentiment_score'
     ];
-    
-    console.log('\n🔍 Checking renewals table for risk fields:');
+
+    logger.info('\n🔍 Checking renewals table for risk fields:');
     if (renewal) {
       requiredFields.forEach(field => {
         const exists = field in renewal;
-        console.log(`  ${exists ? '✅' : '❌'} ${field}`);
+        logger.info(`  ${exists ? '✅' : '❌'} ${field}`);
       });
     } else {
-      console.log('  ⚠️ Renewals table is empty, cannot verify fields');
+      logger.warn('  ⚠️ Renewals table is empty, cannot verify fields');
     }
   }
-  
+
   return results;
 }
 

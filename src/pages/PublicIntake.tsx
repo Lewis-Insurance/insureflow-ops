@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/lib/logger';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -196,7 +197,7 @@ export default function PublicIntake() {
 
       setValidation({ valid: true, expired: false, submission: submissionData, template: parsedTemplate });
     } catch (error) {
-      console.error('Token validation error:', error);
+      logger.error('Token validation error:', error);
       setValidation({
         valid: false,
         expired: false,
@@ -265,7 +266,9 @@ export default function PublicIntake() {
 
       // Increment counter
       const newCount = (data.request_count || 0) + 1;
-      const maxRequests = template?.settings.rateLimit?.maxRequests || 10;
+      // Note: template is not available at this point (called before template is fetched)
+      // Use default max requests; template-specific limits can be checked after validation
+      const maxRequests = 10;
 
       if (newCount > maxRequests) {
         // Block for the remainder of the window
@@ -288,7 +291,7 @@ export default function PublicIntake() {
 
       return { blocked: false };
     } catch (error) {
-      console.error('Rate limit check error:', error);
+      logger.error('Rate limit check error:', error);
       return { blocked: false }; // Fail open
     }
   };
@@ -325,32 +328,49 @@ export default function PublicIntake() {
 
     // Check honeypot
     if (honeypot) {
-      console.log('Honeypot triggered');
+      logger.debug('Honeypot triggered');
       return;
     }
 
-    await supabase
-      .from('intake_submissions')
-      .update({
-        client_email: clientEmail,
-        client_name: clientName,
-      })
-      .eq('id', submission.id);
+    try {
+      const { error } = await supabase
+        .from('intake_submissions')
+        .update({
+          client_email: clientEmail,
+          client_name: clientName,
+        })
+        .eq('id', submission.id);
 
-    setShowEmailCapture(false);
+      if (error) {
+        logger.error('Failed to save email:', error);
+        // Continue anyway - user can still fill the form
+      }
+      setShowEmailCapture(false);
+    } catch (error) {
+      logger.error('Email submission error:', error);
+      setShowEmailCapture(false);
+    }
   };
 
   const handleSaveDraft = async (responses: Record<string, any>) => {
     if (!submission) return;
 
-    await supabase
-      .from('intake_submissions')
-      .update({
-        draft_responses: responses,
-        last_draft_save: new Date().toISOString(),
-        status: 'in_progress',
-      })
-      .eq('id', submission.id);
+    try {
+      const { error } = await supabase
+        .from('intake_submissions')
+        .update({
+          draft_responses: responses,
+          last_draft_save: new Date().toISOString(),
+          status: 'in_progress',
+        })
+        .eq('id', submission.id);
+
+      if (error) {
+        logger.error('Failed to save draft:', error);
+      }
+    } catch (error) {
+      logger.error('Draft save error:', error);
+    }
   };
 
   const handleSubmit = async (responses: Record<string, any>) => {
@@ -358,31 +378,41 @@ export default function PublicIntake() {
 
     // Final honeypot check
     if (honeypot) {
-      console.log('Honeypot triggered on submit');
+      logger.debug('Honeypot triggered on submit');
       // Pretend to succeed but don't save
       return;
     }
 
-    await supabase
-      .from('intake_submissions')
-      .update({
-        responses,
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-      })
-      .eq('id', submission.id);
+    try {
+      const { error } = await supabase
+        .from('intake_submissions')
+        .update({
+          responses,
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+        })
+        .eq('id', submission.id);
 
-    // Clear local storage
-    autoSave.clearSavedData();
+      if (error) {
+        logger.error('Failed to submit form:', error);
+        throw error;
+      }
 
-    // Send notification emails (would be done via edge function)
-    // This is just a placeholder
-    if (template?.settings.sendConfirmationEmail && clientEmail) {
-      console.log('Would send confirmation email to:', clientEmail);
-    }
+      // Clear local storage
+      autoSave.clearSavedData();
 
-    if (template?.settings.notifyOnSubmission?.length) {
-      console.log('Would notify:', template.settings.notifyOnSubmission);
+      // Send notification emails (would be done via edge function)
+      // This is just a placeholder
+      if (template?.settings.sendConfirmationEmail && clientEmail) {
+        logger.debug('Would send confirmation email to:', clientEmail);
+      }
+
+      if (template?.settings.notifyOnSubmission?.length) {
+        logger.debug('Would notify:', template.settings.notifyOnSubmission);
+      }
+    } catch (error) {
+      logger.error('Form submission error:', error);
+      throw error; // Re-throw so IntakeRenderer can handle it
     }
   };
 

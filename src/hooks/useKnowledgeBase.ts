@@ -11,7 +11,7 @@ export interface KnowledgeEntry {
   source: string;
   created_at: string;
   updated_at: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export function useKnowledgeBase() {
@@ -53,28 +53,33 @@ export function useKnowledgeBase() {
         return 'products';
       };
 
-      const entriesFromKbEntries: KnowledgeEntry[] = (kbEntriesRes.data || []).map((row: any) => {
-        const tagsRaw: string = row.tags || '';
+      const entriesFromKbEntries: KnowledgeEntry[] = (kbEntriesRes.data || []).map((row: Record<string, unknown>) => {
+        const tagsRaw: string = (row.tags as string) || '';
         const tags = tagsRaw
           ? tagsRaw.split(/[|,]/).map((t: string) => t.trim()).filter(Boolean)
           : [];
-        const title = row.question_canonical && row.question_canonical.trim().length > 0
-          ? row.question_canonical
-          : `${row.product_line || 'General'}: ${row.topic || 'Topic'}`;
-        const category = mapCategory(row.product_line, row.topic, row.question_canonical);
+        const questionCanonical = row.question_canonical as string | null;
+        const productLine = row.product_line as string | null;
+        const topic = row.topic as string | null;
+        const title = questionCanonical && questionCanonical.trim().length > 0
+          ? questionCanonical
+          : `${productLine || 'General'}: ${topic || 'Topic'}`;
+        const category = mapCategory(productLine, topic, questionCanonical);
         const nowIso = new Date().toISOString();
+        const carrier = row.carrier as string | null;
+        const programOrForm = row.program_or_form as string | null;
         return {
-          id: row.record_id,
+          id: row.record_id as string,
           title,
-          content: row.answer_canonical_markdown || row.faq_short_answer || '',
+          content: (row.answer_canonical_markdown as string) || (row.faq_short_answer as string) || '',
           category,
           tags,
-          source: row.carrier ? `${row.carrier}${row.program_or_form ? ' • ' + row.program_or_form : ''}` : (row.source_type || 'Import'),
+          source: carrier ? `${carrier}${programOrForm ? ' • ' + programOrForm : ''}` : ((row.source_type as string) || 'Import'),
           created_at: nowIso,
           updated_at: nowIso,
           metadata: {
-            product_line: row.product_line,
-            topic: row.topic,
+            product_line: productLine,
+            topic: topic,
             jurisdiction: row.jurisdiction,
             confidence: row.confidence,
             seo_snippet: row.seo_snippet,
@@ -93,10 +98,10 @@ export function useKnowledgeBase() {
         categories: uniqueCategories.size,
         lastUpdated: (entriesFromKnowledgeBase[0]?.updated_at) || new Date().toISOString(),
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     } finally {
@@ -120,10 +125,10 @@ export function useKnowledgeBase() {
 
       // Refresh the list
       fetchKnowledgeBase();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }
@@ -145,10 +150,10 @@ export function useKnowledgeBase() {
 
       // Refresh the list
       fetchKnowledgeBase();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     }

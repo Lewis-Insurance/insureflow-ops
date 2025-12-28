@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 
 // ============================================================================
@@ -88,7 +89,7 @@ export function useUpdateKnowledge() {
         });
       } catch (versionError) {
         // Version table might not exist yet - log but don't fail
-        console.warn('Could not create version history:', versionError);
+        logger.warn('Could not create version history:', versionError);
       }
 
       // 3. Update the main record
@@ -171,7 +172,7 @@ export function useKnowledgeVersions(knowledgeId: string | null) {
 
       if (error) {
         // Table might not exist - return empty array
-        console.warn('Version history not available:', error);
+        logger.warn('Version history not available:', error);
         return [];
       }
 

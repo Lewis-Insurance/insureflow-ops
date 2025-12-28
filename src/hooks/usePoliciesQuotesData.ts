@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface PoliciesQuotesData {
   policiesByLineOfBusiness: Array<{ label: string; count: number }>;
@@ -102,7 +103,7 @@ export function usePoliciesQuotesData() {
         .is('deleted_at', null);
 
       if (quotesError) {
-        console.error('Error fetching quotes:', quotesError);
+        logger.error('Error fetching quotes:', quotesError);
         // Continue with empty quotes data
       }
 

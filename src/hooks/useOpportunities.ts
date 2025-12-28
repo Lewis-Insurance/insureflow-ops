@@ -35,11 +35,12 @@ export function useOpportunities(customerId?: string) {
       if (error) throw error;
       setOpportunities(data || []);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       toast({
         title: "Error loading opportunities",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -64,10 +65,10 @@ export function useOpportunities(customerId?: string) {
 
       await fetchOpportunities();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error creating opportunity",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -92,10 +93,10 @@ export function useOpportunities(customerId?: string) {
 
       await fetchOpportunities();
       return data;
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error updating opportunity",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;
@@ -117,10 +118,10 @@ export function useOpportunities(customerId?: string) {
       });
 
       await fetchOpportunities();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error deleting opportunity",
-        description: err.message,
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: "destructive",
       });
       throw err;

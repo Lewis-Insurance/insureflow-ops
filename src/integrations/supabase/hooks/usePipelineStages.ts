@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface PipelineStage {
   id: string;
@@ -48,7 +49,7 @@ export const usePipelineStages = () => {
         .single();
 
       if (membershipError) {
-        console.warn('No account membership found:', membershipError);
+        logger.warn('No account membership found:', membershipError);
         // Return empty array if no account membership
         return [];
       }

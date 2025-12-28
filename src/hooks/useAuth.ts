@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { asMessage } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 interface UserProfile {
   id: string;
@@ -36,7 +37,7 @@ export function useAuth() {
         .maybeSingle();
       
       if (error) {
-        console.error('Profile fetch error:', error);
+        logger.error('Profile fetch error:', error);
         toast({
           title: "Profile Error",
           description: `Failed to load profile: ${error.message}`,
@@ -72,7 +73,7 @@ export function useAuth() {
         });
       }
     } catch (error) {
-      console.error('Profile fetch exception:', error);
+      logger.error('Profile fetch exception:', error);
       // Fallback profile on any error to prevent infinite loading
       const fallbackProfile: UserProfile = {
         id: userId,

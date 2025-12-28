@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface Notification {
   id: string;
@@ -13,7 +14,7 @@ export interface Notification {
   is_read: boolean;
   read_at?: string;
   action_url?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
@@ -33,10 +34,10 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications((data || []) as any);
+      setNotifications((data || []) as Notification[]);
       setUnreadCount(data?.filter(n => !n.is_read).length || 0);
-    } catch (error: any) {
-      console.error('Error fetching notifications:', error);
+    } catch (error) {
+      logger.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -51,12 +52,12 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error: any) {
-      console.error('Error marking notification as read:', error);
+    } catch (error) {
+      logger.error('Error marking notification as read:', error);
     }
   }, []);
 
@@ -82,8 +83,8 @@ export function useNotifications() {
         title: 'Success',
         description: 'All notifications marked as read',
       });
-    } catch (error: any) {
-      console.error('Error marking all notifications as read:', error);
+    } catch (error) {
+      logger.error('Error marking all notifications as read:', error);
       toast({
         title: 'Error',
         description: 'Failed to mark all as read',
@@ -106,8 +107,8 @@ export function useNotifications() {
         const notification = notifications.find(n => n.id === notificationId);
         return notification && !notification.is_read ? Math.max(0, prev - 1) : prev;
       });
-    } catch (error: any) {
-      console.error('Error deleting notification:', error);
+    } catch (error) {
+      logger.error('Error deleting notification:', error);
     }
   }, [notifications]);
 

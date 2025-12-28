@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { fromZonedTime } from 'date-fns-tz';
+import { logger } from '@/lib/logger';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -24,8 +25,8 @@ export interface Task {
   assigned_by?: string;
   created_by?: string;
   parent_task_id?: string;
-  dependencies?: any;
-  metadata?: any;
+  dependencies?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -99,8 +100,8 @@ export function useTasks(accountId?: string) {
       if (error) throw error;
       setTasks(data as Task[] || []);
       return (data as Task[]) || [];
-    } catch (error: any) {
-      console.error('Error fetching tasks:', error);
+    } catch (error) {
+      logger.error('Error fetching tasks:', error);
       toast({
         title: 'Error',
         description: 'Failed to load tasks',
@@ -154,11 +155,11 @@ export function useTasks(accountId?: string) {
 
       await fetchTasks(lastFiltersRef.current);
       return data;
-    } catch (error: any) {
-      console.error('Error creating task:', error);
+    } catch (error) {
+      logger.error('Error creating task:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create task',
+        description: error instanceof Error ? error.message : 'Failed to create task',
         variant: 'destructive',
       });
       return null;
@@ -181,11 +182,11 @@ export function useTasks(accountId?: string) {
 
       await fetchTasks(lastFiltersRef.current);
       return true;
-    } catch (error: any) {
-      console.error('Error updating task:', error);
+    } catch (error) {
+      logger.error('Error updating task:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update task',
+        description: error instanceof Error ? error.message : 'Failed to update task',
         variant: 'destructive',
       });
       return false;
@@ -208,11 +209,11 @@ export function useTasks(accountId?: string) {
 
       await fetchTasks(lastFiltersRef.current);
       return true;
-    } catch (error: any) {
-      console.error('Error deleting task:', error);
+    } catch (error) {
+      logger.error('Error deleting task:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete task',
+        description: error instanceof Error ? error.message : 'Failed to delete task',
         variant: 'destructive',
       });
       return false;
@@ -246,8 +247,8 @@ export function useTasks(accountId?: string) {
       );
 
       return comments;
-    } catch (error: any) {
-      console.error('Error fetching comments:', error);
+    } catch (error) {
+      logger.error('Error fetching comments:', error);
       return [];
     }
   }, []);
@@ -272,8 +273,8 @@ export function useTasks(accountId?: string) {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error adding comment:', error);
+    } catch (error) {
+      logger.error('Error adding comment:', error);
       toast({
         title: 'Error',
         description: 'Failed to add comment',
@@ -296,8 +297,8 @@ export function useTasks(accountId?: string) {
 
       if (error) throw error;
       return data || [];
-    } catch (error: any) {
-      console.error('Error fetching attachments:', error);
+    } catch (error) {
+      logger.error('Error fetching attachments:', error);
       return [];
     }
   }, []);
@@ -322,8 +323,8 @@ export function useTasks(accountId?: string) {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error attaching document:', error);
+    } catch (error) {
+      logger.error('Error attaching document:', error);
       toast({
         title: 'Error',
         description: 'Failed to attach document',
@@ -348,8 +349,8 @@ export function useTasks(accountId?: string) {
       });
 
       return true;
-    } catch (error: any) {
-      console.error('Error removing attachment:', error);
+    } catch (error) {
+      logger.error('Error removing attachment:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove attachment',
@@ -375,8 +376,8 @@ export function useTasks(accountId?: string) {
         description: 'Assigned your unassigned tasks to you',
       });
       return true;
-    } catch (error: any) {
-      console.error('Error backfilling assignments:', error);
+    } catch (error) {
+      logger.error('Error backfilling assignments:', error);
       toast({
         title: 'Error',
         description: 'Failed to assign unassigned tasks',
@@ -404,8 +405,8 @@ export function useTasks(accountId?: string) {
         description: 'Set default due dates for tasks without dates',
       });
       return true;
-    } catch (error: any) {
-      console.error('Error backfilling due dates:', error);
+    } catch (error) {
+      logger.error('Error backfilling due dates:', error);
       return false;
     }
   }, []);

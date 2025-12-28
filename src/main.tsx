@@ -5,6 +5,10 @@ import "./index.css";
 import { initializeEnvironment } from "./config/validateEnv";
 import { runHealthCheck } from "./health-check";
 import { logger } from "./lib/logger";
+import { initErrorTracking } from "./lib/errorTracking";
+
+// Initialize error tracking first (before anything else)
+initErrorTracking();
 
 // Simple HTML escaping for error messages in startup error pages
 const escapeHtml = (text: string): string =>

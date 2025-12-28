@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export interface ChecklistItem {
   id: string;
@@ -30,8 +31,8 @@ export function useChecklistItems(taskId: string) {
 
       if (error) throw error;
       setItems(data || []);
-    } catch (error: any) {
-      console.error('Error fetching checklist items:', error);
+    } catch (error) {
+      logger.error('Error fetching checklist items:', error);
       toast({
         title: 'Error',
         description: 'Failed to load checklist items',
@@ -65,8 +66,8 @@ export function useChecklistItems(taskId: string) {
         description: 'Checklist item added',
       });
       return data;
-    } catch (error: any) {
-      console.error('Error adding checklist item:', error);
+    } catch (error) {
+      logger.error('Error adding checklist item:', error);
       toast({
         title: 'Error',
         description: 'Failed to add checklist item',
@@ -88,8 +89,8 @@ export function useChecklistItems(taskId: string) {
       setItems(prev => prev.map(item =>
         item.id === itemId ? { ...item, is_completed: isCompleted } : item
       ));
-    } catch (error: any) {
-      console.error('Error toggling checklist item:', error);
+    } catch (error) {
+      logger.error('Error toggling checklist item:', error);
       toast({
         title: 'Error',
         description: 'Failed to update checklist item',
@@ -115,8 +116,8 @@ export function useChecklistItems(taskId: string) {
         title: 'Success',
         description: 'Checklist item updated',
       });
-    } catch (error: any) {
-      console.error('Error updating checklist item:', error);
+    } catch (error) {
+      logger.error('Error updating checklist item:', error);
       toast({
         title: 'Error',
         description: 'Failed to update checklist item',
@@ -140,8 +141,8 @@ export function useChecklistItems(taskId: string) {
         title: 'Success',
         description: 'Checklist item deleted',
       });
-    } catch (error: any) {
-      console.error('Error deleting checklist item:', error);
+    } catch (error) {
+      logger.error('Error deleting checklist item:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete checklist item',

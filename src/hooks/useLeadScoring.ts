@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 
 interface ScoringResult {
@@ -159,7 +160,7 @@ export function useAutoScoreLead() {
     },
     onError: (error: Error) => {
       // Silent fail for auto-scoring - don't interrupt user flow
-      console.error("Auto-scoring failed:", error);
+      logger.error("Auto-scoring failed:", error);
     },
   });
 }

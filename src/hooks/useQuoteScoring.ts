@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 
 interface QuoteScoringResult {
@@ -122,7 +123,7 @@ export function useAutoScoreQuote() {
     },
     onError: (error: Error) => {
       // Silent fail for auto-scoring - don't interrupt user flow
-      console.error("Auto-scoring failed:", error);
+      logger.error("Auto-scoring failed:", error);
     },
   });
 }
@@ -165,7 +166,7 @@ export function useRankedQuotesByAccount(accountId: string | null | undefined) {
       });
 
       if (error) {
-        console.error("RPC failed, falling back to direct query:", error);
+        logger.error("RPC failed, falling back to direct query:", error);
 
         // Fallback to direct query
         const { data: fallbackData, error: fallbackError } = await supabase
