@@ -44,7 +44,53 @@
 
 **Project ID:** `lrqajzwcmdwahnjyidgv`
 **Project URL:** `https://lrqajzwcmdwahnjyidgv.supabase.co`
-**Database:** PostgreSQL 17
+**Database:** PostgreSQL (verify with `SELECT version();` in SQL Editor)
+
+### Multi-Tenancy Model
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     agency_workspaces                            │
+│  (The top-level tenant boundary - represents an insurance agency)│
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+        ▼                           ▼
+┌───────────────────┐    ┌────────────────────────────┐
+│     accounts      │    │ agency_workspace_memberships │
+│ (Customers/Clients│    │ (Staff: owner, admin,       │
+│  of the agency)   │    │  producer, csr)             │
+└────────┬──────────┘    └────────────────────────────┘
+         │
+         ▼
+┌───────────────────────────────────┐
+│       account_memberships          │
+│ (Optional: customer portal access) │
+└───────────────────────────────────┘
+```
+
+**Key Rules:**
+- `agency_workspace_id` is the primary tenant boundary for RLS
+- Staff access data through `agency_workspace_memberships`
+- Customer data scoped via `accounts.agency_workspace_id`
+- All operational tables (leads, policies, quotes, tasks) belong to an account, which belongs to a workspace
+
+#### Agency Workspaces (Tenant)
+- `id` (UUID, primary key)
+- `name` (TEXT) - Agency name
+- `slug` (TEXT, unique) - URL-friendly identifier
+- `settings` (JSONB) - Agency-level configuration
+- `subscription_tier` (TEXT) - free, starter, professional, enterprise
+- `created_at`, `updated_at` (TIMESTAMPTZ)
+
+#### Agency Workspace Memberships (Staff)
+- `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces)
+- `user_id` (UUID, references auth.users)
+- `role` (TEXT) - owner, admin, producer, csr
+- `status` (TEXT) - active, invited, suspended
+- RLS: Users can only see memberships for workspaces they belong to
 
 ### Core Tables
 
@@ -72,6 +118,7 @@
 
 #### Accounts (Customers)
 - `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces) - **Tenant boundary**
 - `name` (TEXT)
 - `type` (TEXT) - individual, business
 - `account_status` (TEXT) - active, inactive, suspended
@@ -95,6 +142,41 @@
 - `status` (TEXT) - draft, sent, accepted, declined, expired
 - `quote_score` (INTEGER 0-100) - Multi-dimensional ranking score
 - `created_at`, `updated_at` (TIMESTAMPTZ)
+
+#### Tasks
+- `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces)
+- `entity_type` (TEXT) - lead, account, policy, quote, renewal
+- `entity_id` (UUID) - Reference to related entity
+- `title` (TEXT)
+- `description` (TEXT)
+- `status` (TEXT) - pending, in_progress, completed, cancelled
+- `priority` (TEXT) - low, medium, high, urgent
+- `due_at` (TIMESTAMPTZ)
+- `assigned_to` (UUID, references auth.users)
+- `completed_at` (TIMESTAMPTZ)
+- `source` (TEXT) - manual, ai_generated, system, workflow
+- `confidence` (NUMERIC) - AI confidence score (0-1)
+- `evidence` (JSONB) - Supporting data for AI-generated tasks
+- `ai_generated` (BOOLEAN) - Whether task was AI-generated
+- `created_at`, `updated_at` (TIMESTAMPTZ)
+- RLS: Users can access tasks in their workspace
+
+#### Communications (Activity Log)
+- `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces)
+- `entity_type` (TEXT) - lead, account, policy
+- `entity_id` (UUID) - Reference to related entity
+- `type` (TEXT) - call, email, sms, note, meeting
+- `direction` (TEXT) - inbound, outbound, internal
+- `subject` (TEXT)
+- `content` (TEXT)
+- `status` (TEXT) - pending, sent, delivered, failed
+- `external_id` (TEXT) - Twilio SID, email message ID, etc.
+- `metadata` (JSONB) - Provider-specific data
+- `created_by` (UUID, references auth.users)
+- `created_at` (TIMESTAMPTZ)
+- RLS: Users can access communications in their workspace
 
 #### Auto Insurance Specific Tables
 
@@ -139,6 +221,34 @@
 - `query_text` (TEXT)
 - `helpful` (BOOLEAN) - User feedback
 - `created_at` (TIMESTAMPTZ)
+
+#### CEO Weekly Digest
+
+**ceo_digest_settings:**
+- `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces)
+- `enabled` (BOOLEAN) - Enable/disable digest
+- `timezone` (TEXT) - e.g., 'America/New_York'
+- `send_day_of_week` (INTEGER 0-6) - 0=Sunday, 1=Monday, etc.
+- `send_time_local` (TEXT) - e.g., '08:00'
+- `recipients` (JSONB) - Array of email addresses
+- `include_pii` (BOOLEAN) - Include full names in digest
+- `thresholds` (JSONB) - Alert threshold configuration
+- RLS: Agency admins/owners only
+
+**ceo_digest_runs:**
+- `id` (UUID, primary key)
+- `agency_workspace_id` (UUID, references agency_workspaces)
+- `period_start`, `period_end` (TIMESTAMPTZ) - Week covered
+- `week_label` (TEXT) - e.g., 'Week of Dec 16-22, 2024'
+- `recipients` (JSONB) - Recipients for this run
+- `facts` (JSONB) - Computed metrics packet
+- `ai_output` (JSONB) - AI-generated summary
+- `ai_provider`, `ai_model` (TEXT) - AI provider details
+- `status` (TEXT) - created, computing, generating, sending, sent, skipped, failed
+- `idempotency_key` (TEXT) - Prevents duplicate sends
+- `email_result` (JSONB) - Email provider response
+- RLS: Agency admins/owners only
 
 #### Analytics Views
 
@@ -224,89 +334,58 @@ RESEND_API_KEY=your_resend_key
 # Document Processing
 PARSEUR_API_KEY=your_parseur_key
 PARSEUR_WEBHOOK_SECRET=your_webhook_secret
+
+# eSignature (Dropbox Sign)
+DROPBOX_ACCESS_TOKEN=your_dropbox_sign_api_key
 ```
 
 ---
 
 ## Edge Functions
 
-### Supabase Edge Functions (49 total)
+### Supabase Edge Functions
 
 **Location:** `/supabase/functions/`
+**Count:** Run `ls -d supabase/functions/*/ | grep -v _shared | wc -l` (currently ~112)
 
-#### AI & Machine Learning (10)
-- `ai-assistant-chat` - AI chatbot with knowledge base RAG
-- `ai-brain-rag` - Retrieval Augmented Generation engine
-- `ai-compose-email` - AI email composition
-- `ai-document-analysis` - Document analysis
-- `ai-document-analysis-azure` - Azure Document Intelligence
-- `ai-document-analysis-simple` - Simple document parsing
-- `ai-document-intelligence` - Advanced document AI
-- `ai-task-generator` - Auto-generate tasks from data
-- `analyze-coverage-gaps` - Identify insurance coverage gaps
-- `lewi_analyze` - Lewi AI analysis
+#### Authentication Patterns
 
-#### Document Processing (11)
-- `analyze-insurance-document` - Parse insurance documents
-- `check-document-integrity` - Verify document integrity
-- `classify-document` - Auto-classify document types
-- `ocr-document` - OCR processing with Google Vision
-- `on_parse_complete` - Post-parse processing
-- `parse-document-ocr` - Parse documents with OCR
-- `parse-pdf-knowledge` - Extract knowledge from PDFs
-- `parseur-webhook` - Parseur integration webhook
-- `process-document-batch` - Batch document processing
-- `upload-to-google-drive` - Upload to Google Drive
-- `azure-diagnostics` - Azure API diagnostics
+| Pattern | Description | Functions |
+|---------|-------------|-----------|
+| **JWT Required** | Standard user auth via `requireAuth()` | Most user-facing functions |
+| **CRON_SECRET** | Header-based auth for scheduled jobs | `weekly-ceo-digest`, `run-retention-scoring`, `run-coverage-gap-detection`, `process-document-tasks`, `nurture-campaign-processor` |
+| **Service Role Only** | Internal functions called by other functions | `decrypt-ssn`, `context-indexer` |
+| **Public Webhook** | External provider callbacks (verify signature) | `canopy-webhook`, `parseur-webhook`, `esign-webhook`, `twilio-*-webhook` |
+| **verify_jwt=false** | Functions with custom auth logic | Webhooks, public endpoints |
 
-#### Scoring & Analytics (5)
-- `calculate-lead-score` - Lead scoring algorithm
-- `calculate-quote-score` - Quote scoring algorithm (multi-dimensional)
-- `calculate-renewal-risk` - Renewal churn prediction
-- `lead-scoring-engine` - Advanced lead scoring
-- `renewal-risk-batch` - Batch renewal risk calculation
+#### Key Function Categories
 
-#### Communication (9)
-- `email-inbound` - Process inbound emails
-- `email-inbound-lite` - Lightweight email processing
-- `email-send` - Send outbound emails
-- `send-coi-email` - Email COI certificates (currently disabled)
-- `twilio-recording-webhook` - Twilio recording webhook
-- `twilio-sms` - Send SMS via Twilio
-- `twilio-voice` - Twilio voice calls
-- `twilio-voice-webhook` - Twilio voice webhook
-- `phone-verification` - Verify phone numbers
+**AI & ML:** `ai-assistant-chat`, `ai-brain-rag`, `ai-document-analysis`, `ai-task-generator`, `lewi_analyze`, `prism-api`
 
-#### Workflows & Automation (7)
-- `nurture-campaign-processor` - Process nurture campaigns
-- `process-quote-followups` - Automated quote follow-ups
-- `process-data-export` - Export data processing
-- `lead-capture-webhook` - Webhook for lead capture
-- `setup-mfa` - Multi-factor auth setup
-- `analyze-workspace` - Workspace analytics
-- `worker-comparison` - Background comparison worker
+**Document Processing:** `ocr-document`, `parse-document-ocr`, `classify-document`, `check-document-integrity`, `pdf-generation-worker`, ACORD extractors (`extract-*-policy`)
 
-#### Admin & User Management (3)
-- `admin-approvals` - Admin approval workflows
-- `admin-create-user` - Create users via admin
-- `admin-list-users` - List all users
+**Scoring/Analytics:** `calculate-lead-score`, `calculate-quote-score`, `calculate-renewal-risk`, `run-retention-scoring`, `run-coverage-gap-detection`
 
-#### Insurance Operations (4)
-- `compare-insurance-options` - Compare policy options
-- `generate-coi-data` - Generate COI certificates
-- `generate-insurance-quote-doc` - Generate quote documents
-- `submit-comparison` - Submit comparison requests
+**Communication:** `email-send`, `email-inbound`, `send-sms`, `twilio-voice`, `send-coi-email`, `push-notifications`
 
-#### Workspace Management (1)
-- `create_workspace` - Create new workspace
+**Canopy Integration:** `canopy-initiate`, `canopy-webhook`, `canopy-fetch-pull`, `canopy-monitoring`, `canopy-servicing`, `canopy-reprocess`
+
+**Scheduled Jobs (CRON_SECRET):**
+- `weekly-ceo-digest` - Monday 8AM ET
+- `run-retention-scoring` - Daily 6AM UTC
+- `run-coverage-gap-detection` - Daily 7AM UTC
+- `process-document-tasks` - Every 15 min
+- `nurture-campaign-processor` - Configurable
+
+**Admin:** `admin-create-user`, `admin-list-users`, `admin-approvals`, `admin-update-password`
+
+**Workspace:** `create_workspace`, `analyze-workspace`
 
 ---
 
 ## TypeScript Configuration
 
-### Relaxed Type Checking
-
-The project uses relaxed TypeScript settings to avoid build issues:
+### Type Checking Settings
 
 ```json
 // tsconfig.app.json
@@ -321,32 +400,10 @@ The project uses relaxed TypeScript settings to avoid build issues:
 }
 ```
 
-### @ts-nocheck Directives
-
-The following files have TypeScript checking disabled via `// @ts-nocheck`:
-
-**Edge Functions (10):**
-- ai-task-generator/index.ts
-- analyze-coverage-gaps/index.ts
-- analyze-workspace/index.ts
-- azure-diagnostics/index.ts
-- calculate-quote-score/index.ts
-- create_workspace/index.ts
-- lewi_analyze/index.ts
-- on_parse_complete/index.ts
-- parseur-webhook/index.ts
-- process-quote-followups/index.ts
-
-**Hooks (7):**
-- src/hooks/useTaskGeneration.ts
-- src/hooks/useTaskReminders.ts
-- src/hooks/useTaskTemplates.ts
-- src/hooks/useUnifiedCustomers.ts
-- src/hooks/useWorkspaceJobs.ts
-- src/integrations/supabase/hooks/useLeadInsuranceDetails.ts
-- src/integrations/supabase/hooks/useNurtureCampaigns.ts
-
-**Reason:** These files had TypeScript strict mode errors that couldn't be easily resolved. The `@ts-nocheck` directive allows them to deploy while maintaining runtime functionality.
+**Note:** Strict mode is disabled project-wide. To compensate:
+- Use Zod for runtime validation on API inputs, form data, and external data
+- TypeScript still catches most type errors at build time
+- All `@ts-nocheck` directives were removed in Dec 2024 remediation
 
 ---
 
@@ -446,6 +503,52 @@ supabase gen types typescript --project-id lrqajzwcmdwahnjyidgv > src/integratio
 
 **File:** `src/components/ai/AIAssistantChat.tsx`
 
+### CEO Weekly Digest
+
+**Automated weekly performance reports for agency executives.**
+
+**How it works:**
+1. GitHub Action triggers every Monday at 8:00 AM ET
+2. Edge function computes deterministic metrics via RPC
+3. AI (GPT-4o or Claude) generates executive summary
+4. HTML email sent via Resend to configured recipients
+5. Run history stored for audit trail
+
+**Key Components:**
+- Edge Function: `weekly-ceo-digest`
+- RPC Function: `get_weekly_ceo_digest_facts()`
+- GitHub Action: `.github/workflows/weekly-ceo-digest.yml`
+- Admin UI: `/admin/digest-settings`, `/admin/digest-history`
+- Hook: `src/hooks/useCEODigest.ts`
+
+**Metrics Included:**
+- Leads: new, contacted, qualified, quoted, won, lost
+- Quotes: created, qualified, quoted
+- Policies: bound, premium written
+- Tasks: overdue count
+- Week-over-week deltas with percentage changes
+- Configurable alert thresholds
+
+**Security:**
+- CRON_SECRET header authentication
+- Idempotency keys prevent duplicate sends
+- RLS restricts access to agency admins/owners
+
+**Configuration (Supabase Edge Function Secrets):**
+```env
+CRON_SECRET=your_cron_secret_here
+OPENAI_API_KEY=your_openai_key  # or ANTHROPIC_API_KEY
+RESEND_API_KEY=your_resend_key
+FROM_EMAIL=digest@yourdomain.com  # optional
+```
+
+**GitHub Secrets:**
+```
+CRON_SECRET=must_match_supabase
+SUPABASE_URL=https://your-project.supabase.co
+AGENCY_WORKSPACE_IDS=uuid1,uuid2,uuid3
+```
+
 ### Document Analysis
 
 **Supported formats:**
@@ -467,19 +570,7 @@ supabase gen types typescript --project-id lrqajzwcmdwahnjyidgv > src/integratio
 
 ## Known Issues & Workarounds
 
-### 1. Send COI Email Function Disabled
-
-**Issue:** `send-coi-email` edge function uses npm package `resend` which is incompatible with Deno runtime.
-
-**Status:** Temporarily disabled (returns 503)
-
-**Workaround:**
-- Manual COI emailing
-- Or replace with Deno-compatible email service
-
-**File:** `supabase/functions/send-coi-email/index.ts`
-
-### 2. TypeScript Strict Mode
+### 1. TypeScript Strict Mode
 
 **Issue:** Build was failing with strict TypeScript checking enabled.
 
@@ -545,6 +636,138 @@ All sensitive data tables have RLS enabled to ensure users can only access their
 - Supabase anon key: Public (safe for frontend)
 - Service role key: Server-side only (edge functions)
 - CORS configured on edge functions
+
+### AI & PII Handling Policy
+
+**What we send to AI providers (OpenAI, Anthropic):**
+- Document text (after PII redaction)
+- Policy types and coverage categories
+- Premium amounts (aggregated/rounded)
+- Task descriptions and titles
+- Knowledge base content
+- Agent first names (for personalization)
+
+**What we NEVER send to AI providers:**
+- Full SSN (only last 4 if needed)
+- Full driver license numbers
+- Full VIN (only last 6 for verification)
+- Credit card / bank account numbers
+- Full dates of birth (only year for age calculation)
+- Full addresses (only city/state/zip)
+- Email addresses of customers
+- Phone numbers
+
+**Redaction Implementation:**
+- `process-document-tasks` uses `redactPII()` before AI processing
+- Patterns: SSN (`\d{3}-\d{2}-\d{4}`), credit cards, license numbers
+- Redacted text replaced with `[REDACTED_SSN]`, `[REDACTED_CC]`, etc.
+
+**AI Output Storage:**
+- CEO digest AI output stored in `ceo_digest_runs.ai_output`
+- Document insights stored in `document_insights`
+- Retention period: 90 days for AI outputs
+- Audit trail maintained for compliance
+
+### User Roles Hierarchy
+
+```
+profiles.role     | is_staff | Access Level
+------------------|----------|---------------------------
+admin             | true     | Full access + user management
+agent/producer    | true     | Account/policy CRUD, reports
+csr               | true     | Read + limited writes
+customer          | false    | Portal access to own data only
+```
+
+**Role precedence:** `role` is authoritative for permissions. `is_staff=true` is required for any staff role and grants access to staff-only UI sections.
+
+---
+
+## Golden Paths (Key Workflows)
+
+### Lead → Quote → Policy Bound
+
+```
+1. Lead created (leads table, status='new')
+2. Lead contacted (status='contacted', communications logged)
+3. Lead qualified (status='qualified', account created)
+4. Quote requested (quotes table, status='draft')
+5. Quote scored (calculate-quote-score, quote_score set)
+6. Quote sent (status='sent', email via email-send)
+7. Quote accepted (status='accepted')
+8. Policy bound (policies table, status='active')
+```
+
+**Key tables:** `leads`, `accounts`, `quotes`, `policies`, `communications`
+**Key functions:** `calculate-quote-score`, `email-send`, `lead-scoring-engine`
+**Failure modes:** Check Supabase function logs, email provider dashboard
+
+### Document Upload → AI Analysis → Tasks
+
+```
+1. Document uploaded (Supabase Storage)
+2. Analysis queued (document_analysis_jobs, status='queued')
+3. OCR processed (ocr-document or ai-document-analysis-azure)
+4. PII redacted (redactPII in process-document-tasks)
+5. AI extracts insights (rule-based + optional AI)
+6. Tasks suggested (document_insights, status='pending_review')
+7. User approves/edits (status='approved', task created in tasks table)
+```
+
+**Key tables:** `document_analysis_jobs`, `document_insights`, `tasks`
+**Key functions:** `process-document-tasks`, `ai-document-analysis`
+**Failure modes:** Check `document_analysis_jobs.error`, OCR provider logs
+
+### Weekly CEO Digest Flow
+
+```
+1. GitHub Action triggers Monday 8AM ET
+2. Calls weekly-ceo-digest with CRON_SECRET
+3. RPC get_weekly_ceo_digest_facts() computes metrics
+4. AI generates summary (GPT-4o or Claude)
+5. Email sent via SendGrid/Resend
+6. Run logged in ceo_digest_runs
+```
+
+**Key tables:** `ceo_digest_settings`, `ceo_digest_runs`
+**Key function:** `weekly-ceo-digest`
+**Failure modes:** Check `ceo_digest_runs.error`, email provider logs
+
+---
+
+## Invariant Rules
+
+These rules MUST be maintained across all code changes:
+
+1. **All customer data must be scoped by `agency_workspace_id`** and enforced by RLS. No direct table access without RLS.
+
+2. **Service role keys only in edge functions.** Never expose in frontend code or client-side.
+
+3. **Emails never include full PII.** Use `include_pii=false` by default in digest settings.
+
+4. **AI outputs are not authoritative.** All AI-suggested tasks require human approval before creation.
+
+5. **Idempotency on scheduled jobs.** All CRON jobs must use idempotency keys to prevent duplicate processing.
+
+6. **Soft deletes only.** Use `deleted_at` timestamp instead of hard deletes for audit trail.
+
+7. **All external webhooks must verify signatures.** Canopy, Parseur, Dropbox Sign, Twilio all require signature verification.
+
+8. **CRON_SECRET required for all scheduled functions.** No public access to batch processing endpoints.
+
+---
+
+## Truth Table (Sources of Truth)
+
+| Area | Source of Truth | Verify Command |
+|------|-----------------|----------------|
+| Edge function count | Filesystem | `ls -d supabase/functions/*/ \| grep -v _shared \| wc -l` |
+| DB schema | Migrations | `supabase db diff` or Supabase Dashboard |
+| Scheduled jobs | GitHub Actions | `.github/workflows/*.yml` |
+| RLS policies | Migrations | `supabase/migrations/*.sql` |
+| TypeScript types | Generated | `supabase gen types typescript` |
+| Postgres version | Database | `SELECT version();` in SQL Editor |
+| Function secrets | Supabase Dashboard | Settings → Edge Functions → Secrets |
 
 ---
 
@@ -733,7 +956,8 @@ insureflow-ops/
 │   ├── pages/            # Page components
 │   └── lib/              # Utility functions
 ├── supabase/
-│   ├── functions/        # Edge functions (49)
+│   ├── functions/        # Edge functions (~112, run count command)
+│   │   └── _shared/      # Shared utilities (auth, logger, cors)
 │   └── migrations/       # Database migrations
 ├── public/               # Static assets
 ├── .env                  # Local environment variables
@@ -839,23 +1063,35 @@ insureflow-ops/
 
 ### Planned Features
 
-1. **Multi-dimensional Quote Ranking** - Rank quotes across price, coverage, carrier quality
-2. **Predictive Analytics** - Churn prediction, renewal risk scoring
-3. **AI Task Generation** - Auto-generate tasks from document analysis
-4. **Coverage Gap Analysis** - Identify cross-sell opportunities
+1. ~~**Multi-dimensional Quote Ranking**~~ ✅ Completed Dec 2024
+   - Coverage limit adequacy scoring (0-25 pts)
+   - Customizable scoring weight profiles per agency/account
+   - Below-minimum limit warnings in scoring metadata
+2. ~~**Predictive Analytics**~~ ✅ Completed Dec 2024 - Retention/churn prediction, renewal risk scoring
+3. ~~**AI Task Generation**~~ ✅ Completed Dec 2024 - Auto-generate tasks from document analysis
+4. ~~**Coverage Gap Analysis**~~ ✅ Completed Dec 2024 - Cross-sell opportunity detection
 5. **Smart Email Composer** - AI-powered email generation
 6. **Document Classification** - Auto-classify uploaded documents
-7. **Performance Monitoring** - Implement Sentry or similar
+7. ~~**Performance Monitoring**~~ ✅ Sentry integration complete Dec 2024
+8. ~~**Canopy 2-Way Sync**~~ ✅ Completed Dec 2024 - Monitoring, Servicing, Commercial Lines
+9. **Mobile App (Expo)** - iOS/Android agent app
+10. ~~**ACORD Form PDF Generation**~~ ✅ Completed Dec 2024 - Full template-based form system
+11. ~~**CEO Weekly Digest**~~ ✅ Completed Dec 2024 - AI-powered executive reports
+12. **Producer Leaderboards** - Gamified performance tracking with badges
+13. **Carrier Appointment Tracker** - Manage carrier appointments and credentials
+14. **Commission Tracking** - Track commissions by policy, producer, carrier
+15. **Client Portal Enhancements** - Self-service policy management for customers
+16. **Renewal Pipeline Dashboard** - Visual renewal workflow with drag-drop stages
 
 ### Technical Debt
 
 1. ~~Remove `@ts-nocheck` from files after fixing type issues~~ ✅ Completed Dec 2024
-2. Replace disabled `send-coi-email` function with Deno-compatible solution
+2. ~~Replace disabled `send-coi-email` function with Deno-compatible solution~~ ✅ Uses Resend REST API
 3. ~~Implement comprehensive test coverage~~ ✅ Vitest configured, initial tests added
-4. Add Storybook for component documentation
-5. Optimize bundle size with code splitting
-6. ~~Add performance monitoring~~ ✅ Error tracking infrastructure ready (Sentry-compatible)
-7. Fix existing ACORD tests to match actual module exports
+4. ~~Add Storybook for component documentation~~ ✅ Storybook 8.x configured with UI stories
+5. ~~Optimize bundle size with code splitting~~ ✅ Route-based lazy loading + 16 vendor chunks
+6. ~~Add performance monitoring~~ ✅ Sentry error tracking with session replay
+7. ~~Fix existing ACORD tests to match actual module exports~~ ✅ Completed Dec 2024
 
 ---
 
@@ -868,6 +1104,90 @@ insureflow-ops/
 ---
 
 ## Change Log
+
+### 2024-12-28 (Predictive Analytics Suite)
+- ✅ **Predictive Analytics: Retention Risk Scoring**
+  - Edge function: `run-retention-scoring` with deterministic scoring
+  - Database: `retention_model_configs`, `policy_renewal_risk_scores`, `account_churn_risk_scores`
+  - Configurable weights: contact recency, claims, payments, tenure, bundle count
+  - Risk levels: low, medium, high, critical with explainable top factors
+  - Auto-generates retention tasks for high/critical risk policies
+  - GitHub Action: Daily at 6 AM UTC
+  - Hook: `useRetentionRiskScores.ts` with summary, policy/account scores
+  - UI: `RetentionDashboard.tsx` with tabs for policies, accounts, upcoming renewals
+  - Tests: `retentionScoring.test.ts` with scoring engine unit tests
+
+- ✅ **AI Task Generation from Documents**
+  - Edge function: `process-document-tasks` with queue-based processing
+  - Database: `document_analysis_jobs`, `document_insights`
+  - PII redaction before AI processing (SSN, credit cards, licenses)
+  - Rule-based extraction V1 (claims, renewals, endorsements, COI, quotes)
+  - Suggested tasks with confidence scores and evidence
+  - Human-in-the-loop approval workflow
+  - GitHub Action: Every 15 minutes
+  - Hook: `useDocumentInsights.ts` with approval/dismiss mutations
+  - UI: `AITaskApprovalPanel.tsx` with edit-before-approve dialog
+  - Enhanced tasks table: `source`, `confidence`, `evidence`, `ai_generated` columns
+
+- ✅ **Coverage Gap Analysis**
+  - Edge function: `run-coverage-gap-detection` with rule engine
+  - Database: `coverage_gap_rules`, `coverage_gap_opportunities`
+  - 6 default rules: auto_no_home, home_no_auto, high_liability_no_umbrella, single_policy_bundle, commercial_no_cyber, commercial_no_epli
+  - RPC: `get_account_insurance_profile()`, `list_coverage_gap_opportunities()`
+  - Opportunity status workflow: new → contacted → quoted → converted/dismissed
+  - GitHub Action: Daily at 7 AM UTC
+  - Hook: `useCoverageGapOpportunities.ts` with status updates
+  - UI: `CoverageGapsDashboard.tsx` with opportunity list and rules config
+  - Tests: `coverageGapDetection.test.ts` with rule evaluation unit tests
+
+- ✅ **Shared Analytics Infrastructure**
+  - `analytics_job_runs` table for audit trail across all analytics jobs
+  - Idempotency keys prevent duplicate processing
+  - Job status tracking: created, running, completed, failed
+  - Stats and error tracking per run
+
+### 2024-12-27 (CEO Weekly Digest)
+- ✅ **CEO Weekly Digest** - Automated executive performance reports
+  - Edge function: `weekly-ceo-digest` with AI summarization (GPT-4o/Claude)
+  - Database: `ceo_digest_settings`, `ceo_digest_runs` tables with RLS
+  - RPC: `get_weekly_ceo_digest_facts()` computes deterministic metrics
+  - GitHub Action: Scheduled trigger every Monday 8AM ET
+  - Admin UI: Settings page (`/admin/digest-settings`) + History (`/admin/digest-history`)
+  - Hook: `useCEODigest.ts` with settings, runs, and trigger mutations
+  - Tests: 26 unit tests for utilities and types
+  - Security: CRON_SECRET authentication, idempotency keys
+  - Email: Resend integration with branded HTML template
+  - Key files: `weekly-ceo-digest/index.ts`, `useCEODigest.ts`, `CEODigestSettings.tsx`, `CEODigestHistory.tsx`
+
+### 2024-12-27 (Quote Ranking + Tech Debt + Canopy 2-Way Sync + ACORD Forms)
+- ✅ **ACORD Form PDF Generation** (verified complete)
+  - `/acord-templates` page: Upload, validate, version ACORD PDF templates
+  - `/acord-forms` page: Create, manage, filter forms by account
+  - Form editor: Section-based fields, auto-save, account data pull, document import
+  - PDF generation via `pdf-generation-worker` edge function + pdf-lib
+  - eSignature integration (Dropbox Sign ready)
+  - Audit history, completion tracking, validation
+  - Key files: `AcordTemplates.tsx`, `FormManagement.tsx`, `AcordFormEdit.tsx`, `pdfFiller.ts`
+- ✅ **Quote Ranking Enhancements**
+  - Coverage limit adequacy scoring with configurable thresholds
+  - Customizable scoring weight profiles (agency/account level)
+  - New tables: `coverage_limit_standards`, `scoring_weight_profiles`
+  - Updated `calculate-quote-score` edge function with limit parsing
+  - New hooks: `useCoverageLimitStandards`, `useScoringWeightProfiles`
+  - New UI: `CoverageLimitStandardsEditor`, `ScoringWeightsEditor`
+- ✅ **Technical Debt Quick Wins**
+  - Sentry error tracking fully integrated (`@sentry/react`)
+  - Storybook 8.x with Button, Badge, Card stories
+  - Route-based code splitting verified (90+ lazy-loaded pages)
+  - Vendor chunking optimized (16 split bundles)
+- ✅ **Canopy 2-Way Sync**
+  - Monitoring API: Auto-refresh policies every 30 days, reconnect handling
+  - Servicing API: Add/remove vehicles, drivers, update coverages, request ID cards
+  - Commercial Lines: Fleet vehicles, GL/BOP, Workers Comp, business locations
+  - Change Detection: Snapshot diffing, coverage/premium change alerts
+  - ACORD Prefill: `get_canopy_commercial_prefill()` function
+  - 10 new tables: snapshots, monitorings, servicing_actions, commercial_vehicles, etc.
+  - 16 UI components in `src/components/canopy/`
 
 ### 2024-12-25 (Comprehensive Remediation)
 - ✅ **Phase 0**: Security hardening (XSS fixes with DOMPurify, auth guards)
@@ -898,6 +1218,6 @@ insureflow-ops/
 
 ---
 
-**Last Updated:** December 25, 2024
+**Last Updated:** December 28, 2025
 **Status:** ✅ Production Deployed
-**Version:** 2.0.0
+**Version:** 2.3.0
