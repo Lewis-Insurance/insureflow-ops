@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -124,11 +125,12 @@ export default function DecPageImport() {
   const isProcessing = isUploading || isParsing;
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <FileText className="h-8 w-8" />
+    <AppLayout>
+      <div className="container mx-auto py-6 max-w-4xl space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <FileText className="h-8 w-8" />
           Import Dec Page
         </h1>
         <p className="text-muted-foreground mt-1">
@@ -457,6 +459,7 @@ export default function DecPageImport() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
