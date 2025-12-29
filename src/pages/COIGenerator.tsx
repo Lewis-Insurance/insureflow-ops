@@ -460,7 +460,7 @@ export default function COIGenerator() {
                             {p.status || 'draft'}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {p.policy_type || p.line_of_business}
+                            {p.line_of_business}
                           </span>
                         </div>
                       </SelectItem>
