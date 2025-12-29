@@ -173,7 +173,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
       try {
         const { data, error } = await supabase
           .from('policies')
-          .select('id, policy_number, policy_type, carrier')
+          .select('id, policy_number, line_of_business, carrier')
           .eq('account_id', selectedCustomer.id)
           .order('policy_number');
 
@@ -207,7 +207,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
           customer_email: selectedCustomer?.email,
           customer_phone: selectedCustomer?.phone,
           policy_number: selectedPolicy?.policy_number,
-          policy_type: selectedPolicy?.policy_type,
+          policy_type: selectedPolicy?.line_of_business,
           carrier: selectedPolicy?.carrier,
         };
       }
@@ -323,7 +323,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                     <div className="flex-1">
                       <div className="font-medium">{selectedPolicy.policy_number}</div>
                       <div className="text-sm text-muted-foreground">
-                        {selectedPolicy.policy_type} - {selectedPolicy.carrier}
+                        {selectedPolicy.line_of_business} - {selectedPolicy.carrier}
                       </div>
                     </div>
                     <Button
@@ -349,7 +349,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                     <SelectContent className="bg-background">
                       {policies.map((policy) => (
                         <SelectItem key={policy.id} value={policy.id}>
-                          {policy.policy_number} - {policy.policy_type}
+                          {policy.policy_number} - {policy.line_of_business}
                         </SelectItem>
                       ))}
                     </SelectContent>

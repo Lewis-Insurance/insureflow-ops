@@ -380,7 +380,7 @@ export default function PaymentList() {
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Policy</p>
                     <p>
-                      {selectedPayment.policy.policy_number} ({selectedPayment.policy.policy_type})
+                      {selectedPayment.policy.policy_number} ({selectedPayment.policy.line_of_business})
                     </p>
                   </div>
                 )}

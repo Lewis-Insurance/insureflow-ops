@@ -135,7 +135,7 @@ export interface PremiumPayment {
   deleted_at: string | null;
   // Joined fields
   payment_method?: PaymentMethod;
-  policy?: { policy_number: string; policy_type: string };
+  policy?: { policy_number: string; line_of_business: string };
   account?: { name: string };
   day_sheet?: DaySheet;
 }

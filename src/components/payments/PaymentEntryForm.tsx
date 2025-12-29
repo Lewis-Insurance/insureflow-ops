@@ -49,7 +49,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface PolicyOption {
   id: string;
   policy_number: string;
-  policy_type: string;
+  line_of_business: string;
   account_id: string;
   account_name: string;
 }
@@ -135,7 +135,7 @@ export function PaymentEntryForm({
           .select(`
             id,
             policy_number,
-            policy_type,
+            line_of_business,
             account_id,
             account:accounts(name)
           `)
@@ -149,7 +149,7 @@ export function PaymentEntryForm({
           (data || []).map((p: any) => ({
             id: p.id,
             policy_number: p.policy_number,
-            policy_type: p.policy_type,
+            line_of_business: p.line_of_business,
             account_id: p.account_id,
             account_name: p.account?.name || 'Unknown',
           }))
@@ -260,7 +260,7 @@ export function PaymentEntryForm({
                                     <div className="flex flex-col">
                                       <span className="font-medium">{policy.policy_number}</span>
                                       <span className="text-sm text-muted-foreground">
-                                        {policy.account_name} - {policy.policy_type}
+                                        {policy.account_name} - {policy.line_of_business}
                                       </span>
                                     </div>
                                   </CommandItem>
