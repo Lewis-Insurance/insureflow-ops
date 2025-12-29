@@ -1,0 +1,97 @@
+{
+  "name": "V3: Payment Overdue Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"payment.overdue.check\",\n  \"idempotency_key\": \"payment:overdue:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"overdue_thresholds\": [\n      {\n        \"days_overdue\": 1,\n        \"action\": \"send_reminder\",\n        \"template\": \"payment_reminder_gentle\",\n        \"channels\": [\"email\"]\n      },\n      {\n        \"days_overdue\": 7,\n        \"action\": \"send_warning\",\n        \"template\": \"payment_reminder_urgent\",\n        \"channels\": [\"email\", \"sms\"]\n      },\n      {\n        \"days_overdue\": 14,\n        \"action\": \"create_task\",\n        \"priority\": \"high\",\n        \"task_title\": \"Payment 14+ Days Overdue\"\n      },\n      {\n        \"days_overdue\": 30,\n        \"action\": \"escalate\",\n        \"notify\": \"account_manager\",\n        \"cancel_warning\": true\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "check-overdue",
+      "name": "Check Overdue Payments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data;\nconst summary = {\n  processed_at: new Date().toISOString(),\n  total_overdue: data.total_overdue || 0,\n  reminders_sent: data.reminders_sent || 0,\n  warnings_sent: data.warnings_sent || 0,\n  tasks_created: data.tasks_created || 0,\n  escalations: data.escalations || 0,\n  total_overdue_amount: data.total_amount || 0\n};\n\nconsole.log('Payment Overdue Summary:', JSON.stringify(summary));\nreturn summary;"
+      },
+      "id": "log-summary",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Check Overdue Payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Overdue Payments": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "billing",
+      "id": "billing-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

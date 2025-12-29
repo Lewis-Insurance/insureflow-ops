@@ -1,0 +1,125 @@
+{
+  "name": "V3: Claim Filed Response",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"claim.response.send\",\n  \"idempotency_key\": \"claim:response:{{ $json.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"claim_id\": \"{{ $json.entity_id }}\",\n    \"account_id\": \"{{ $json.payload.account_id }}\",\n    \"policy_id\": \"{{ $json.payload.policy_id }}\",\n    \"claim_type\": \"{{ $json.payload.claim_type }}\",\n    \"send_acknowledgment\": true,\n    \"template\": \"claim_acknowledgment\"\n  }\n}",
+        "options": {}
+      },
+      "id": "send-ack",
+      "name": "Send Acknowledgment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"claim:task:{{ $json.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"claim\",\n    \"entity_id\": \"{{ $json.entity_id }}\",\n    \"title\": \"New Claim: Contact Customer\",\n    \"description\": \"Claim filed for {{ $json.payload.claim_type }}. Contact customer within 4 hours to gather details and provide support.\",\n    \"priority\": \"urgent\",\n    \"due_in_minutes\": 240,\n    \"category\": \"claims\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Claims Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"claim:notify:{{ $json.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"type\": \"internal_notification\",\n    \"recipients\": \"claims_team\",\n    \"subject\": \"New Claim Filed: {{ $json.payload.claim_type }}\",\n    \"body\": \"A new {{ $json.payload.claim_type }} claim has been filed for account {{ $json.payload.account_id }}. Immediate attention required.\",\n    \"priority\": \"urgent\"\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-team",
+      "name": "Notify Claims Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send Acknowledgment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Claims Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Acknowledgment": {
+      "main": [
+        [
+          {
+            "node": "Notify Claims Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "claims",
+      "id": "claims-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

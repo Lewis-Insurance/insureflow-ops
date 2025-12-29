@@ -1,0 +1,164 @@
+{
+  "name": "V3: Carrier Appetite Match",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"carrier.appetite.match\",\n  \"idempotency_key\": \"appetite:{{ $json.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.entity_id }}\",\n    \"line_of_business\": \"{{ $json.payload.insurance_types[0] || 'auto' }}\",\n    \"risk_factors\": {\n      \"state\": \"{{ $json.payload.state }}\",\n      \"zip\": \"{{ $json.payload.zip }}\",\n      \"industry_code\": \"{{ $json.payload.industry_code }}\",\n      \"years_in_business\": {{ $json.payload.years_in_business || 0 }},\n      \"revenue\": {{ $json.payload.annual_revenue || 0 }},\n      \"employees\": {{ $json.payload.employee_count || 0 }}\n    },\n    \"return_top_n\": 5\n  }\n}",
+        "options": {}
+      },
+      "id": "match-carriers",
+      "name": "Match Carriers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.matched_carriers.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-matches",
+      "name": "Has Matches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"lead.carriers.recommend\",\n  \"idempotency_key\": \"carriers:recommend:{{ $json.data.lead_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.data.lead_id }}\",\n    \"recommended_carriers\": {{ JSON.stringify($json.data.matched_carriers) }},\n    \"notify_producer\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "save-recommendations",
+      "name": "Save Recommendations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"appetite:task:{{ $json.data.lead_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"lead\",\n    \"entity_id\": \"{{ $json.data.lead_id }}\",\n    \"title\": \"No Carrier Match - Manual Review\",\n    \"description\": \"No automatic carrier appetite match found. Review risk factors and identify potential markets.\",\n    \"priority\": \"medium\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-review-task",
+      "name": "Create Review Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Match Carriers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Carriers": {
+      "main": [
+        [
+          {
+            "node": "Has Matches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Matches?": {
+      "main": [
+        [
+          {
+            "node": "Save Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "carrier",
+      "id": "carrier-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

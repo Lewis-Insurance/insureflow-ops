@@ -1,0 +1,158 @@
+{
+  "name": "V1: Aging Lead Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"lead.aging.escalate\",\n  \"idempotency_key\": \"aging:batch:{{ $today.toISOString().slice(0,13) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"aging_threshold_hours\": 48,\n    \"statuses\": [\"new\", \"contacted\"],\n    \"escalation_action\": \"reassign_or_notify\"\n  }\n}",
+        "options": {}
+      },
+      "id": "find-aging-leads",
+      "name": "Find Aging Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.escalated_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-escalations",
+      "name": "Any Escalations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"aging:notify:{{ $today.toISOString().slice(0,13) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"type\": \"internal_notification\",\n    \"recipients\": \"managers\",\n    \"subject\": \"Lead Aging Alert: {{ $json.data.escalated_count }} leads need attention\",\n    \"body\": \"{{ $json.data.escalated_count }} leads have been sitting without activity for over 48 hours and have been escalated.\",\n    \"priority\": \"high\"\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-managers",
+      "name": "Notify Managers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-aging",
+      "name": "No Aging Leads",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Every 4 Hours": {
+      "main": [
+        [
+          {
+            "node": "Find Aging Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Aging Leads": {
+      "main": [
+        [
+          {
+            "node": "Any Escalations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Escalations?": {
+      "main": [
+        [
+          {
+            "node": "Notify Managers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Aging Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

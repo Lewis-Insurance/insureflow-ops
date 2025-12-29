@@ -1,0 +1,136 @@
+{
+  "name": "V2: Cross-Sell Opportunity Detection",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze new policy for cross-sell opportunities\nconst payload = $input.first().json.payload;\nconst lob = payload.line_of_business;\n\nconst opportunities = [];\n\n// Cross-sell matrix\nconst crossSellMatrix = {\n  'auto': ['home', 'umbrella', 'life'],\n  'home': ['auto', 'umbrella', 'flood', 'life'],\n  'life': ['disability', 'long_term_care'],\n  'commercial_auto': ['commercial_property', 'gl', 'workers_comp'],\n  'commercial_property': ['commercial_auto', 'gl', 'cyber', 'umbrella'],\n  'gl': ['commercial_property', 'workers_comp', 'epli']\n};\n\nconst suggestions = crossSellMatrix[lob] || [];\n\n// Create opportunities with timing\nsuggestions.forEach((suggestedLob, index) => {\n  opportunities.push({\n    suggested_lob: suggestedLob,\n    priority: index === 0 ? 'high' : 'medium',\n    delay_days: (index + 1) * 30,  // Stagger outreach\n    reason: `Customer has ${lob}, may need ${suggestedLob}`\n  });\n});\n\nreturn {\n  account_id: payload.account_id,\n  policy_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  current_lob: lob,\n  opportunities: opportunities,\n  has_opportunities: opportunities.length > 0\n};"
+      },
+      "id": "detect-opportunities",
+      "name": "Detect Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_opportunities }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-opps",
+      "name": "Has Opportunities?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"cross_sell.opportunities.create\",\n  \"idempotency_key\": \"xsell:{{ $json.policy_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"account_id\": \"{{ $json.account_id }}\",\n    \"source_policy_id\": \"{{ $json.policy_id }}\",\n    \"current_lob\": \"{{ $json.current_lob }}\",\n    \"opportunities\": {{ JSON.stringify($json.opportunities) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "create-opportunities",
+      "name": "Create Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-opps",
+      "name": "No Opportunities",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Detect Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Has Opportunities?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Opportunities?": {
+      "main": [
+        [
+          {
+            "node": "Create Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "cross-sell",
+      "id": "cross-sell-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

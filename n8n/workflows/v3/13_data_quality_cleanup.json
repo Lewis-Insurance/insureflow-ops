@@ -1,0 +1,183 @@
+{
+  "name": "V3: Data Quality Cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily Off-Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"data.quality.check\",\n  \"idempotency_key\": \"dq:check:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"checks\": [\n      {\n        \"type\": \"missing_email\",\n        \"entity\": \"accounts\",\n        \"auto_fix\": false\n      },\n      {\n        \"type\": \"missing_phone\",\n        \"entity\": \"accounts\",\n        \"auto_fix\": false\n      },\n      {\n        \"type\": \"invalid_phone_format\",\n        \"entity\": \"accounts\",\n        \"auto_fix\": true\n      },\n      {\n        \"type\": \"invalid_email_format\",\n        \"entity\": \"accounts\",\n        \"auto_fix\": false\n      },\n      {\n        \"type\": \"duplicate_accounts\",\n        \"similarity_threshold\": 0.9,\n        \"auto_fix\": false\n      },\n      {\n        \"type\": \"orphaned_policies\",\n        \"entity\": \"policies\",\n        \"auto_fix\": false\n      },\n      {\n        \"type\": \"stale_leads\",\n        \"days_inactive\": 180,\n        \"auto_archive\": true\n      },\n      {\n        \"type\": \"expired_quotes\",\n        \"days_past_expiry\": 30,\n        \"auto_close\": true\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "run-checks",
+      "name": "Run Quality Checks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Summarize data quality results\nconst data = $input.first().json.data;\n\nconst summary = {\n  processed_at: new Date().toISOString(),\n  total_issues: data.total_issues || 0,\n  auto_fixed: data.auto_fixed || 0,\n  requires_review: data.requires_review || 0,\n  by_type: data.by_type || {},\n  archived_leads: data.archived_leads || 0,\n  closed_quotes: data.closed_quotes || 0\n};\n\nconsole.log('Data Quality Summary:', JSON.stringify(summary));\n\nreturn {\n  ...summary,\n  should_notify: summary.requires_review > 10\n};"
+      },
+      "id": "summarize",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_notify }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "should-notify",
+      "name": "Should Notify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"dq:notify:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"type\": \"internal_notification\",\n    \"recipients\": \"data_admins\",\n    \"subject\": \"Data Quality Alert: {{ $json.requires_review }} issues need attention\",\n    \"body\": \"Auto-fixed {{ $json.auto_fixed }} issues. {{ $json.requires_review }} require manual review. Archived {{ $json.archived_leads }} stale leads, closed {{ $json.closed_quotes }} expired quotes.\"\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-admins",
+      "name": "Notify Admins",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "done",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1160, 380]
+    }
+  ],
+  "connections": {
+    "Daily Off-Hours": {
+      "main": [
+        [
+          {
+            "node": "Run Quality Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Quality Checks": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Results": {
+      "main": [
+        [
+          {
+            "node": "Should Notify?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Notify?": {
+      "main": [
+        [
+          {
+            "node": "Notify Admins",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "data-quality",
+      "id": "data-quality-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

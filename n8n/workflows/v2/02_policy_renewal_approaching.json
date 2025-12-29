@@ -1,0 +1,97 @@
+{
+  "name": "V2: Policy Renewal Approaching",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"policy.renewal.process\",\n  \"idempotency_key\": \"renewal:batch:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"renewal_windows\": [\n      {\n        \"days_out\": 90,\n        \"action\": \"create_task\",\n        \"task_title\": \"90-Day Renewal Review\"\n      },\n      {\n        \"days_out\": 60,\n        \"action\": \"send_renewal_notice\",\n        \"template\": \"renewal_60_day\"\n      },\n      {\n        \"days_out\": 30,\n        \"action\": \"send_renewal_notice\",\n        \"template\": \"renewal_30_day\",\n        \"include_sms\": true\n      },\n      {\n        \"days_out\": 14,\n        \"action\": \"escalate\",\n        \"priority\": \"high\"\n      },\n      {\n        \"days_out\": 7,\n        \"action\": \"urgent_outreach\",\n        \"priority\": \"urgent\"\n      }\n    ],\n    \"exclude_renewed\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "process-renewals",
+      "name": "Process Renewals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log renewal processing results\nconst data = $input.first().json.data;\nconst summary = {\n  processed_at: new Date().toISOString(),\n  total_renewals: data.total_processed || 0,\n  by_window: data.by_window || {},\n  tasks_created: data.tasks_created || 0,\n  emails_sent: data.emails_sent || 0,\n  sms_sent: data.sms_sent || 0,\n  escalations: data.escalations || 0\n};\n\nconsole.log('Renewal Processing Summary:', JSON.stringify(summary));\nreturn summary;"
+      },
+      "id": "log-summary",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Process Renewals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Renewals": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "renewal",
+      "id": "renewal-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

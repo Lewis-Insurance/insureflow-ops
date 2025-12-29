@@ -1,0 +1,84 @@
+{
+  "name": "V1: Lead Source Detection",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract source data from payload\nconst payload = $input.first().json.payload;\n\n// Parse UTM parameters if present\nconst utmParams = {\n  utm_source: payload.utm_source || null,\n  utm_medium: payload.utm_medium || null,\n  utm_campaign: payload.utm_campaign || null,\n  utm_term: payload.utm_term || null,\n  utm_content: payload.utm_content || null\n};\n\n// Determine lead source\nlet source = payload.source || 'direct';\nlet sourceDetail = null;\n\nif (utmParams.utm_source) {\n  source = utmParams.utm_source;\n  sourceDetail = utmParams.utm_medium || utmParams.utm_campaign;\n} else if (payload.referrer) {\n  // Parse referrer to determine source\n  const referrer = payload.referrer.toLowerCase();\n  if (referrer.includes('google')) source = 'google';\n  else if (referrer.includes('facebook')) source = 'facebook';\n  else if (referrer.includes('linkedin')) source = 'linkedin';\n  else if (referrer.includes('yelp')) source = 'yelp';\n  else source = 'referral';\n  sourceDetail = payload.referrer;\n}\n\nreturn {\n  lead_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  source: source,\n  source_detail: sourceDetail,\n  utm_params: utmParams,\n  raw_payload: payload\n};"
+      },
+      "id": "parse-source",
+      "name": "Parse Source Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"lead.source.capture\",\n  \"idempotency_key\": \"source:{{ $json.lead_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.lead_id }}\",\n    \"source\": \"{{ $json.source }}\",\n    \"source_detail\": {{ $json.source_detail ? '\"' + $json.source_detail + '\"' : 'null' }},\n    \"utm_params\": {{ JSON.stringify($json.utm_params) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "update-source",
+      "name": "Update Lead Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Parse Source Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Source Data": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "lead",
+      "id": "lead-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,164 @@
+{
+  "name": "V3: COI Auto-Generation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"coi.generate\",\n  \"idempotency_key\": \"coi:{{ $json.entity_id }}:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"policy_id\": \"{{ $json.entity_id }}\",\n    \"account_id\": \"{{ $json.payload.account_id }}\",\n    \"certificate_holder\": {{ $json.payload.certificate_holder ? JSON.stringify($json.payload.certificate_holder) : 'null' }},\n    \"additional_insured\": {{ $json.payload.additional_insured || false }},\n    \"waiver_of_subrogation\": {{ $json.payload.waiver_of_subrogation || false }},\n    \"primary_noncontributory\": {{ $json.payload.primary_noncontributory || false }},\n    \"format\": \"pdf\",\n    \"auto_email\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "generate-coi",
+      "name": "Generate COI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.pdf_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "generated-ok",
+      "name": "Generated OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"coi:email:{{ $json.data.coi_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"type\": \"email\",\n    \"template\": \"coi_delivery\",\n    \"to_email\": \"{{ $json.data.recipient_email }}\",\n    \"subject\": \"Certificate of Insurance\",\n    \"attachments\": [\"{{ $json.data.pdf_url }}\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "send-coi",
+      "name": "Email COI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"coi:task:{{ $json.data.policy_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"policy\",\n    \"entity_id\": \"{{ $json.data.policy_id }}\",\n    \"title\": \"COI Generation Failed\",\n    \"description\": \"Auto-generation failed. Please create COI manually.\",\n    \"priority\": \"high\",\n    \"category\": \"certificate\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Manual Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Generate COI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate COI": {
+      "main": [
+        [
+          {
+            "node": "Generated OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generated OK?": {
+      "main": [
+        [
+          {
+            "node": "Email COI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Manual Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "coi",
+      "id": "coi-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

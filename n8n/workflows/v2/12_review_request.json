@@ -1,0 +1,67 @@
+{
+  "name": "V2: Review Request Campaign",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"campaign.review.schedule\",\n  \"idempotency_key\": \"review:{{ $json.payload.account_id }}:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"account_id\": \"{{ $json.payload.account_id }}\",\n    \"trigger_policy_id\": \"{{ $json.entity_id }}\",\n    \"delay_days\": 60,\n    \"campaign_type\": \"review_request\",\n    \"platforms\": [\"google\", \"yelp\"],\n    \"template\": \"review_request_happy_customer\"\n  }\n}",
+        "options": {}
+      },
+      "id": "schedule-review",
+      "name": "Schedule Review Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Schedule Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "campaign",
+      "id": "campaign-tag"
+    },
+    {
+      "name": "review",
+      "id": "review-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

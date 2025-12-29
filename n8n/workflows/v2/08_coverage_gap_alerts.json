@@ -1,0 +1,162 @@
+{
+  "name": "V2: Coverage Gap Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"coverage.gap.detect\",\n  \"idempotency_key\": \"gap:batch:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"gap_types\": [\n      {\n        \"type\": \"liability_below_standard\",\n        \"threshold\": 300000,\n        \"applies_to\": [\"auto\", \"home\", \"umbrella\"]\n      },\n      {\n        \"type\": \"missing_umbrella\",\n        \"condition\": \"has_auto_or_home_over_500k\"\n      },\n      {\n        \"type\": \"missing_flood\",\n        \"condition\": \"home_in_flood_zone\"\n      },\n      {\n        \"type\": \"outdated_home_value\",\n        \"years_since_update\": 3\n      },\n      {\n        \"type\": \"missing_business_coverage\",\n        \"condition\": \"home_office_detected\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "detect-gaps",
+      "name": "Detect Coverage Gaps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.gaps_found }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-gaps",
+      "name": "Any Gaps?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"coverage.gap.notify\",\n  \"idempotency_key\": \"gap:notify:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"gaps\": {{ JSON.stringify($json.data.gaps || []) }},\n    \"create_tasks\": true,\n    \"notify_producers\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-gaps",
+      "name": "Create Gap Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-gaps",
+      "name": "No Gaps Found",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Detect Coverage Gaps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Coverage Gaps": {
+      "main": [
+        [
+          {
+            "node": "Any Gaps?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Gaps?": {
+      "main": [
+        [
+          {
+            "node": "Create Gap Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Gaps Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "coverage",
+      "id": "coverage-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,97 @@
+{
+  "name": "V2: Birthday & Anniversary Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily at 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"customer.milestones.check\",\n  \"idempotency_key\": \"milestones:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"milestone_types\": [\n      {\n        \"type\": \"birthday\",\n        \"days_advance\": 0,\n        \"action\": \"send_greeting\",\n        \"template\": \"birthday_greeting\"\n      },\n      {\n        \"type\": \"policy_anniversary\",\n        \"days_advance\": 7,\n        \"action\": \"create_task\",\n        \"task_title\": \"Policy Anniversary Thank You\"\n      },\n      {\n        \"type\": \"customer_anniversary\",\n        \"years\": [1, 5, 10],\n        \"action\": \"send_appreciation\",\n        \"template\": \"customer_anniversary\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "check-milestones",
+      "name": "Check Milestones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log milestone processing\nconst data = $input.first().json.data;\nconst summary = {\n  processed_at: new Date().toISOString(),\n  birthdays_sent: data.birthdays_sent || 0,\n  anniversaries_tasks: data.anniversary_tasks || 0,\n  appreciation_sent: data.appreciation_sent || 0\n};\n\nconsole.log('Milestone Processing:', JSON.stringify(summary));\nreturn summary;"
+      },
+      "id": "log-summary",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Daily at 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Check Milestones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Milestones": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "engagement",
+      "id": "engagement-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

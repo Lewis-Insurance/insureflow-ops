@@ -1,0 +1,149 @@
+{
+  "name": "V1: Compliance Consent Check",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"compliance.consent.check\",\n  \"idempotency_key\": \"consent:{{ $json.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.entity_id }}\",\n    \"email\": \"{{ $json.payload.email }}\",\n    \"phone\": \"{{ $json.payload.phone }}\",\n    \"source\": \"{{ $json.payload.source || 'website' }}\",\n    \"ip_address\": \"{{ $json.payload.ip_address }}\",\n    \"user_agent\": \"{{ $json.payload.user_agent }}\",\n    \"consent_timestamp\": \"{{ $json.created_at }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "check-consent",
+      "name": "Check/Record Consent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.tcpa_compliant }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-tcpa",
+      "name": "TCPA Issue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"tcpa:task:{{ $json.data.lead_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"lead\",\n    \"entity_id\": \"{{ $json.data.lead_id }}\",\n    \"title\": \"TCPA Compliance Review Required\",\n    \"description\": \"This lead requires manual consent verification before outbound calls/texts. Reason: {{ $json.data.compliance_issue }}\",\n    \"priority\": \"high\",\n    \"category\": \"compliance\",\n    \"due_in_minutes\": 30\n  }\n}",
+        "options": {}
+      },
+      "id": "create-compliance-task",
+      "name": "Create Compliance Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "compliant",
+      "name": "Compliant",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check/Record Consent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check/Record Consent": {
+      "main": [
+        [
+          {
+            "node": "TCPA Issue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TCPA Issue?": {
+      "main": [
+        [
+          {
+            "node": "Create Compliance Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compliant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "compliance",
+      "id": "compliance-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

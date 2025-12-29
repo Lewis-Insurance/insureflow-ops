@@ -1,0 +1,178 @@
+{
+  "name": "V2: SMS Ingest → Ticket/Activity",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "insureflow/sms-ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "SMS Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-header-auth",
+          "name": "InsureFlow Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true }) }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse SMS and determine action\nconst sms = $input.first().json.body;\n\nconst fromPhone = sms.from_phone || sms.From;\nconst body = sms.body || sms.Body || '';\nconst messageSid = sms.message_sid || sms.MessageSid;\n\n// Check if this looks like a service request or just a reply\nconst bodyLower = body.toLowerCase();\nlet action = 'log_activity';  // Default: just log as communication\nlet category = 'general';\nlet priority = 'medium';\n\n// Keywords that suggest a service request\nif (bodyLower.includes('help') || bodyLower.includes('need') || bodyLower.includes('question')) {\n  action = 'create_ticket';\n} else if (bodyLower.includes('claim') || bodyLower.includes('accident')) {\n  action = 'create_ticket';\n  category = 'claims';\n  priority = 'high';\n} else if (bodyLower.includes('cancel')) {\n  action = 'create_ticket';\n  category = 'cancellation';\n  priority = 'high';\n} else if (bodyLower.includes('id card') || bodyLower.includes('insurance card')) {\n  action = 'create_ticket';\n  category = 'document_request';\n} else if (bodyLower.includes('certificate') || bodyLower.includes('coi')) {\n  action = 'create_ticket';\n  category = 'certificate';\n  priority = 'high';\n}\n\n// Keywords that are just replies (don't create ticket)\nif (bodyLower === 'ok' || bodyLower === 'thanks' || bodyLower === 'thank you' || bodyLower === 'yes' || bodyLower === 'no') {\n  action = 'log_activity';\n}\n\nreturn {\n  from_phone: fromPhone,\n  body: body,\n  message_sid: messageSid,\n  action: action,\n  category: category,\n  priority: priority\n};"
+      },
+      "id": "parse-sms",
+      "name": "Parse SMS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.action }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "create_ticket",
+              "outputKey": "create_ticket"
+            },
+            {
+              "value2": "log_activity",
+              "outputKey": "log_activity"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route-action",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"ticket.create.from_sms\",\n  \"idempotency_key\": \"sms:ticket:{{ $json.message_sid }}\",\n  \"agency_workspace_id\": \"lookup\",\n  \"params\": {\n    \"from_phone\": \"{{ $json.from_phone }}\",\n    \"body\": \"{{ $json.body }}\",\n    \"category\": \"{{ $json.category }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"source\": \"sms\",\n    \"source_message_id\": \"{{ $json.message_sid }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-ticket",
+      "name": "Create Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"activity.log\",\n  \"idempotency_key\": \"sms:activity:{{ $json.message_sid }}\",\n  \"agency_workspace_id\": \"lookup\",\n  \"params\": {\n    \"phone\": \"{{ $json.from_phone }}\",\n    \"type\": \"sms_inbound\",\n    \"content\": \"{{ $json.body }}\",\n    \"source_message_id\": \"{{ $json.message_sid }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "log-activity",
+      "name": "Log Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "SMS Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse SMS": {
+      "main": [
+        [
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "sms",
+      "id": "sms-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,97 @@
+{
+  "name": "V1: Quote Status Progression",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"quote.status.progress\",\n  \"idempotency_key\": \"status:{{ $json.entity_id }}:sent:{{ $today.toISOString().slice(0,13) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"quote_id\": \"{{ $json.entity_id }}\",\n    \"account_id\": \"{{ $json.payload.account_id }}\",\n    \"from_status\": \"draft\",\n    \"to_status\": \"sent\",\n    \"notification\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "progress-status",
+      "name": "Progress Quote Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"quote:task:followup:{{ $json.data.quote_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"quote\",\n    \"entity_id\": \"{{ $json.data.quote_id }}\",\n    \"title\": \"Follow up on sent quote\",\n    \"description\": \"Quote was sent. Follow up to discuss options and answer questions.\",\n    \"priority\": \"high\",\n    \"due_in_minutes\": 1440\n  }\n}",
+        "options": {}
+      },
+      "id": "create-followup",
+      "name": "Create Follow-up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Progress Quote Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Progress Quote Status": {
+      "main": [
+        [
+          {
+            "node": "Create Follow-up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "quote",
+      "id": "quote-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,162 @@
+{
+  "name": "V3: Audit Preparation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Monthly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"audit.upcoming.identify\",\n  \"idempotency_key\": \"audit:identify:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"audit_windows\": [\n      {\n        \"months_ahead\": 3,\n        \"action\": \"notify_account_manager\"\n      },\n      {\n        \"months_ahead\": 2,\n        \"action\": \"request_financials\"\n      },\n      {\n        \"months_ahead\": 1,\n        \"action\": \"prepare_documents\"\n      }\n    ],\n    \"policy_types\": [\"workers_comp\", \"gl\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "identify-audits",
+      "name": "Identify Upcoming Audits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.audits_identified }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-audits",
+      "name": "Any Audits?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"audit.prepare.batch\",\n  \"idempotency_key\": \"audit:prepare:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"audits\": {{ JSON.stringify($json.data.audits || []) }},\n    \"send_customer_notifications\": true,\n    \"create_tasks\": true,\n    \"request_documents\": [\"payroll_records\", \"financials\", \"employee_roster\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "prepare-audits",
+      "name": "Prepare Audits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-audits",
+      "name": "No Audits",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Monthly": {
+      "main": [
+        [
+          {
+            "node": "Identify Upcoming Audits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Upcoming Audits": {
+      "main": [
+        [
+          {
+            "node": "Any Audits?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Audits?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Audits",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Audits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "audit",
+      "id": "audit-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}
