@@ -52,6 +52,7 @@ BEGIN
       policy_type,
       carrier,
       renewal_date,
+      expiration_date,
       current_premium,
       status,
       priority,
@@ -64,10 +65,10 @@ BEGIN
       v_policy.policy_type,
       v_policy.carrier,
       v_policy.expiration_date,
+      v_policy.expiration_date,
       v_policy.premium,
       CASE
-        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'urgent'
-        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '60 days' THEN 'in_progress'
+        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'in_progress'
         ELSE 'upcoming'
       END,
       CASE
