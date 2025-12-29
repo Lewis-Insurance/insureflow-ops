@@ -1,4 +1,4 @@
-import { MainLayout } from '@/components/layout/MainLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { BulkImport } from '@/components/crm/BulkImport';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,7 +11,7 @@ export default function BulkImportPage() {
   };
 
   return (
-    <MainLayout>
+    <AppLayout>
       <div className="container mx-auto py-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Bulk Import</h1>
@@ -25,6 +25,6 @@ export default function BulkImportPage() {
           className="max-w-4xl"
         />
       </div>
-    </MainLayout>
+    </AppLayout>
   );
 }
