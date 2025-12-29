@@ -353,8 +353,8 @@ export function validatePolicies(
 /**
  * Map contact_type to account type for database
  */
-export function mapContactTypeToAccountType(contactType: 'individual' | 'business'): 'household' | 'business' {
-  return contactType === 'individual' ? 'household' : 'business';
+export function mapContactTypeToAccountType(contactType: 'individual' | 'business'): 'household' | 'commercial_business' {
+  return contactType === 'individual' ? 'household' : 'commercial_business';
 }
 
 /**
