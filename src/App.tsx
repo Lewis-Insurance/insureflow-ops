@@ -112,6 +112,9 @@ const BankReconciliation = React.lazy(() => import("./pages/BankReconciliation")
 // Training Materials Module
 const TrainingMaterials = React.lazy(() => import("./pages/TrainingMaterials"));
 
+// Dec Page Import for Requoting
+const DecPageImport = React.lazy(() => import("./pages/DecPageImport"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -581,6 +584,17 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <TrainingMaterials />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Dec Page Import for Requoting */}
+                <Route
+                  path="/import-dec-page"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <DecPageImport />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }
