@@ -221,10 +221,9 @@ serve(async (req) => {
 
     await supabase
       .from('document_analysis')
-      .update({ 
+      .update({
         ocr_text: fullText,
-        ocr_char_count: charCount,
-        total_pages: totalPages,
+        raw_ocr_text: fullText, // Also store in raw_ocr_text if exists
         pages_analyzed: `1-${totalPages}`,
         processing_status: 'ocr_complete'
       })
@@ -315,12 +314,15 @@ Return ONLY valid JSON:
           analysis_id: analysisRecord.id,
           total_pages: totalPages,
           pages_analyzed: `1-${totalPages}`,
-          analysis: analysisResult
+          confidence_score: 85, // Default confidence for successful analysis
+          analysis: analysisResult,
+          data: analysisResult, // Alias for compatibility
+          extracted_data: analysisResult // Another alias for compatibility
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     } else {
-      // No AI analysis, just return OCR
+      // No AI analysis, just return OCR with raw text for manual parsing
       await supabase
         .from('document_analysis')
         .update({
@@ -329,12 +331,25 @@ Return ONLY valid JSON:
         })
         .eq('id', analysisRecord.id);
 
+      // Return basic structure with raw text for client-side parsing
+      const basicAnalysis = {
+        raw_text: fullText.substring(0, 50000), // Limit size for response
+        document_type: 'unknown',
+        insured_name: '',
+        policy_number: ''
+      };
+
       return new Response(
         JSON.stringify({
           success: true,
           analysis_id: analysisRecord.id,
           total_pages: totalPages,
-          pages_analyzed: `1-${totalPages}`
+          pages_analyzed: `1-${totalPages}`,
+          confidence_score: 50, // Lower confidence without AI
+          analysis: basicAnalysis,
+          data: basicAnalysis,
+          extracted_data: basicAnalysis,
+          raw_text: fullText.substring(0, 50000)
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -342,7 +357,10 @@ Return ONLY valid JSON:
 
   } catch (error: any) {
     console.error('========================================');
-    console.error('[Document Analysis] Error:', (error instanceof Error ? error.message : String(error)));
+    console.error('[Document Analysis] FULL ERROR:');
+    console.error('Error message:', (error instanceof Error ? error.message : String(error)));
+    console.error('Error stack:', error?.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     console.error('========================================');
     
     if (documentId) {
