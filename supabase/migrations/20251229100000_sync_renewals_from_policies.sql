@@ -72,9 +72,9 @@ BEGIN
         ELSE 'upcoming'
       END,
       CASE
-        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'high'
-        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '60 days' THEN 'medium'
-        ELSE 'low'
+        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'urgent'
+        WHEN v_policy.expiration_date <= CURRENT_DATE + INTERVAL '60 days' THEN 'high'
+        ELSE 'normal'
       END,
       NOW(),
       NOW()
