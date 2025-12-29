@@ -48,6 +48,8 @@ export interface DecPageParseResult {
   raw_text?: string;
   analysis_id?: string;
   document_url?: string;
+  storage_path?: string;
+  original_filename?: string;
 }
 
 export interface ParsedVehicle {
@@ -210,6 +212,62 @@ export function useDecPageImport() {
       const analysis = analysisData.analysis || analysisData.data || {};
       const extractedData = analysis.extracted_data || analysis;
 
+      // Helper to extract address from various formats
+      const extractAddress = () => {
+        // Try property.address first (common in home policies)
+        if (extractedData.property?.address) {
+          const addr = extractedData.property.address;
+          if (typeof addr === 'string') {
+            // Parse "123 Main St, City, ST 12345" format
+            const parts = addr.split(',').map((s: string) => s.trim());
+            if (parts.length >= 3) {
+              const stateZip = parts[parts.length - 1].split(' ');
+              return {
+                street: parts[0],
+                city: parts[1],
+                state: stateZip[0],
+                zip: stateZip[1],
+              };
+            }
+            return { street: addr, city: '', state: '', zip: '' };
+          }
+        }
+        // Try explicit insured_address object
+        if (extractedData.insured_address) {
+          return {
+            street: extractedData.insured_address.street || extractedData.insured_address.address,
+            city: extractedData.insured_address.city,
+            state: extractedData.insured_address.state,
+            zip: extractedData.insured_address.zip || extractedData.insured_address.postal_code,
+          };
+        }
+        // Try flat address fields
+        return {
+          street: extractedData.address || extractedData.street_address || extractedData.mailing_address,
+          city: extractedData.city,
+          state: extractedData.state,
+          zip: extractedData.zip || extractedData.postal_code || extractedData.zip_code,
+        };
+      };
+
+      // Helper to extract premium from various formats
+      const extractPremium = (): number | undefined => {
+        const raw = extractedData.total_premium || extractedData.premium;
+        if (!raw) return undefined;
+        // If it's already a number, return it
+        if (typeof raw === 'number') return raw;
+        // If it's an object with total, extract that
+        if (typeof raw === 'object' && raw.total) {
+          const total = raw.total;
+          return typeof total === 'number' ? total : parseFloat(String(total).replace(/[^0-9.]/g, ''));
+        }
+        // If it's a string, parse it
+        if (typeof raw === 'string') {
+          return parseFloat(raw.replace(/[^0-9.]/g, ''));
+        }
+        return undefined;
+      };
+
       // Parse insured information
       const insured: ParsedInsured = {
         first_name: extractedData.insured_first_name ||
@@ -221,12 +279,7 @@ export function useDecPageImport() {
         full_name: extractedData.named_insured || extractedData.insured_name,
         email: extractedData.email || extractedData.insured_email,
         phone: extractedData.phone || extractedData.insured_phone,
-        address: {
-          street: extractedData.address || extractedData.insured_address?.street,
-          city: extractedData.city || extractedData.insured_address?.city,
-          state: extractedData.state || extractedData.insured_address?.state,
-          zip: extractedData.zip || extractedData.insured_address?.zip,
-        },
+        address: extractAddress(),
       };
 
       // Parse policy information
@@ -236,7 +289,7 @@ export function useDecPageImport() {
         carrier: extractedData.carrier || extractedData.insurance_company,
         effective_date: extractedData.effective_date,
         expiration_date: extractedData.expiration_date,
-        premium: extractedData.total_premium || extractedData.premium,
+        premium: extractPremium(),
         coverages: extractedData.coverages || [],
       };
 
@@ -274,6 +327,8 @@ export function useDecPageImport() {
         raw_text: analysis.raw_text,
         analysis_id: analysisData.analysis_id,
         document_url: documentUrl,
+        storage_path: fileName,
+        original_filename: file.name,
       };
 
       setProgress(100);
@@ -383,6 +438,34 @@ export function useDecPageImport() {
         }));
 
         await supabase.from('lead_auto_drivers').insert(driverInserts);
+      }
+
+      // Link the uploaded document to the lead
+      if (parseResult.storage_path && lead.id) {
+        // Try to update existing document record
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({
+            related_entity_id: lead.id,
+            related_entity_type: 'lead',
+            document_type: 'dec_page',
+          })
+          .eq('storage_path', parseResult.storage_path);
+
+        // If no existing record (RLS blocked original insert), create one with service role isn't available,
+        // so we'll try an insert with the lead's account_id which should pass RLS
+        if (updateError) {
+          logger.info('[Dec Page Import] Creating new document link for lead');
+          await supabase.from('documents').insert({
+            filename: parseResult.original_filename || 'dec-page.pdf',
+            storage_path: parseResult.storage_path,
+            kind: 'dec_page',
+            document_type: 'dec_page',
+            related_entity_id: lead.id,
+            related_entity_type: 'lead',
+            account_id: membership?.account_id || null,
+          });
+        }
       }
 
       return lead;
