@@ -10,6 +10,11 @@ import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumen
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
+import { AddPolicyModal } from '@/components/customers/AddPolicyModal';
+import { AddPaymentModal } from '@/components/customers/AddPaymentModal';
+import { AddDocumentModal } from '@/components/customers/AddDocumentModal';
+import { AddCallLogModal } from '@/components/customers/AddCallLogModal';
+import { QuickActionsBar } from '@/components/customers/QuickActionsBar';
 import { InviteToPortalButton } from '@/components/customers/InviteToPortalButton';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { AICustomerActions } from '@/components/customers/AICustomerActions';
@@ -107,6 +112,10 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [addPolicyOpen, setAddPolicyOpen] = useState(false);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [addDocumentOpen, setAddDocumentOpen] = useState(false);
+  const [addCallLogOpen, setAddCallLogOpen] = useState(false);
   const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [emailComposerOpen, setEmailComposerOpen] = useState(false);
@@ -243,10 +252,23 @@ export default function CustomerDetail() {
           </div>
         </div>
 
+        {/* Quick Actions Bar */}
+        <QuickActionsBar
+          onAddNote={() => setAddNoteOpen(true)}
+          onAddTask={() => setAddTaskOpen(true)}
+          onAddPayment={() => setAddPaymentOpen(true)}
+          onAddPolicy={() => setAddPolicyOpen(true)}
+          onAddDocument={() => setAddDocumentOpen(true)}
+          onAddCallLog={() => setAddCallLogOpen(true)}
+        />
+
         {/* Customer Information Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Comprehensive Contact Information */}
-          <CustomerContactInfo account={account} />
+          <CustomerContactInfo
+            account={account}
+            onSendEmail={() => setEmailComposerOpen(true)}
+          />
 
           {/* AI Assistant Actions */}
           <AICustomerActions accountId={account.id} accountName={account.name} />
@@ -334,6 +356,26 @@ export default function CustomerDetail() {
       <AddTaskModal
         open={addTaskOpen}
         onOpenChange={setAddTaskOpen}
+        accountId={account.id}
+      />
+      <AddPolicyModal
+        open={addPolicyOpen}
+        onOpenChange={setAddPolicyOpen}
+        accountId={account.id}
+      />
+      <AddPaymentModal
+        open={addPaymentOpen}
+        onOpenChange={setAddPaymentOpen}
+        accountId={account.id}
+      />
+      <AddDocumentModal
+        open={addDocumentOpen}
+        onOpenChange={setAddDocumentOpen}
+        accountId={account.id}
+      />
+      <AddCallLogModal
+        open={addCallLogOpen}
+        onOpenChange={setAddCallLogOpen}
         accountId={account.id}
       />
       {selectedTask && (
