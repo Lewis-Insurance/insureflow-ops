@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePolicies } from '@/hooks/usePolicies';
-import { Shield, Calendar, DollarSign, Building, Plus } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
@@ -80,11 +80,11 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           Policies & Quotes ({policies.length})
         </CardTitle>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setAddQuoteOpen(true)}>
+          <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => setAddQuoteOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Quote
           </Button>
-          <Button size="sm" onClick={() => setAddPolicyOpen(true)}>
+          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setAddPolicyOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Policy
           </Button>
@@ -182,35 +182,40 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                   </div>
                 </div>
 
-                 {/* Actions */}
+                 {/* Actions - Colorful Buttons */}
                 <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" asChild>
+                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
                     <Link to={`/policies/${policy.id}`}>
+                      <Eye className="h-4 w-4 mr-1" />
                       View Policy
                     </Link>
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => {
+                  <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
                     setSelectedPolicy(policy);
                     setEditPolicyOpen(true);
                   }}>
+                    <Pencil className="h-4 w-4 mr-1" />
                     Edit Policy
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => {
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
                     setSelectedPolicyId(policy.id);
                     setAddNoteOpen(true);
                   }}>
+                    <FileText className="h-4 w-4 mr-1" />
                     Add Note
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => {
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
                     setSelectedPolicyId(policy.id);
                     setAddTaskOpen(true);
                   }}>
+                    <CheckSquare className="h-4 w-4 mr-1" />
                     Add Task
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => {
+                  <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
                     setSelectedPolicyId(policy.id);
                     setUploadDocOpen(true);
                   }}>
+                    <FolderOpen className="h-4 w-4 mr-1" />
                     Documents
                   </Button>
                 </div>
