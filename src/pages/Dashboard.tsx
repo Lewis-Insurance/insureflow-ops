@@ -13,6 +13,7 @@ import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import { PendingFollowupsWidget } from '@/components/quotes/PendingFollowupsWidget';
 import { MyAORenewalsCard } from '@/components/dashboard/MyAORenewalsCard';
 import { CanopyStatsCard } from '@/components/canopy/CanopyStatsCard';
+import { DashboardGlobalSearch } from '@/components/dashboard/DashboardGlobalSearch';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -37,6 +38,11 @@ const DashboardContent = React.memo(() => {
           </p>
         </div>
       </div>
+
+      {/* Prominent Global Search */}
+      <ErrorBoundary level="component">
+        <DashboardGlobalSearch />
+      </ErrorBoundary>
 
       {/* My AO Renewals */}
       <ErrorBoundary level="component">
