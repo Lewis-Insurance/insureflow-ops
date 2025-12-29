@@ -115,6 +115,9 @@ const TrainingMaterials = React.lazy(() => import("./pages/TrainingMaterials"));
 // Dec Page Import for Requoting
 const DecPageImport = React.lazy(() => import("./pages/DecPageImport"));
 
+// Bulk Import
+const BulkImportPage = React.lazy(() => import("./pages/BulkImportPage"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -595,6 +598,17 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <DecPageImport />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Bulk Import */}
+                <Route
+                  path="/bulk-import"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <BulkImportPage />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }
