@@ -171,6 +171,8 @@ export function useDecPageImport() {
       setProgress(50);
 
       // 4. Call AI document analysis
+      logger.info('[Dec Page Import] Calling AI analysis with URL:', documentUrl);
+
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
         'ai-document-analysis-azure',
         {
@@ -188,12 +190,14 @@ export function useDecPageImport() {
 
       if (analysisError) {
         logger.error('[Dec Page Import] Analysis error:', analysisError);
-        throw new Error('Failed to analyze document');
+        console.error('[Dec Page Import] Full error:', JSON.stringify(analysisError, null, 2));
+        throw new Error(`Analysis failed: ${analysisError.message || analysisError.name || 'Unknown error'}`);
       }
 
       if (!analysisData?.success) {
         logger.error('[Dec Page Import] Analysis failed:', analysisData);
-        throw new Error(analysisData?.error || 'Document analysis failed');
+        console.error('[Dec Page Import] Full response:', JSON.stringify(analysisData, null, 2));
+        throw new Error(analysisData?.error || analysisData?.message || 'Document analysis failed');
       }
 
       setProgress(90);
