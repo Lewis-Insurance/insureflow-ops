@@ -154,7 +154,7 @@ export function useBulkImport() {
   const parseFiles = useCallback(async (
     contactsFile: File | null,
     policiesFile: File | null
-  ): Promise<boolean> => {
+  ): Promise<ParsedFiles | null> => {
     try {
       if (!contactsFile) {
         toast({
@@ -162,7 +162,7 @@ export function useBulkImport() {
           description: 'Contacts file is required',
           variant: 'destructive',
         });
-        return false;
+        return null;
       }
 
       const contactsContent = await contactsFile.text();
@@ -174,14 +174,16 @@ export function useBulkImport() {
         policies = parseCSV(policiesContent);
       }
 
+      const parsedFiles: ParsedFiles = {
+        contacts,
+        policies,
+        contactsFileName: contactsFile.name,
+        policiesFileName: policiesFile?.name || '',
+      };
+
       setState(prev => ({
         ...prev,
-        parsedFiles: {
-          contacts,
-          policies,
-          contactsFileName: contactsFile.name,
-          policiesFileName: policiesFile?.name || '',
-        },
+        parsedFiles,
         step: 'preview',
         error: null,
       }));
@@ -191,7 +193,7 @@ export function useBulkImport() {
         description: `${contacts.length} contacts, ${policies.length} policies`,
       });
 
-      return true;
+      return parsedFiles;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to parse files';
       setState(prev => ({ ...prev, error: message }));
@@ -200,15 +202,15 @@ export function useBulkImport() {
         description: message,
         variant: 'destructive',
       });
-      return false;
+      return null;
     }
   }, []);
 
   /**
    * Validate parsed records
    */
-  const validateRecords = useCallback(async (skipNonPrimary: boolean = true): Promise<boolean> => {
-    const { parsedFiles } = state;
+  const validateRecords = useCallback(async (skipNonPrimary: boolean = true, overrideParsedFiles?: ParsedFiles): Promise<boolean> => {
+    const parsedFiles = overrideParsedFiles || state.parsedFiles;
     if (!parsedFiles) {
       toast({
         title: 'Error',

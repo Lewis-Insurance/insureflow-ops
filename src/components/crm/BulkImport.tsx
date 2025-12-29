@@ -77,10 +77,10 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
   };
 
   const handleParse = async () => {
-    const success = await parseFiles(contactsFile, policiesFile);
-    if (success) {
-      // Automatically validate after parsing
-      await validateRecords(skipDuplicates);
+    const parsedFiles = await parseFiles(contactsFile, policiesFile);
+    if (parsedFiles) {
+      // Automatically validate after parsing, passing the parsed files directly
+      await validateRecords(skipDuplicates, parsedFiles);
     }
   };
 
