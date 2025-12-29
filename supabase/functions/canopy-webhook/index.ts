@@ -1155,12 +1155,36 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
       leadId = await createLeadFromCanopyPull(supabase, pull.id, consumerData);
 
       if (leadId) {
-        // Link the new lead to the pull
-        await supabase.from('canopy_pulls')
+        // Link the new lead to the pull - with error handling and retry
+        const { error: linkError } = await supabase.from('canopy_pulls')
           .update({ lead_id: leadId })
           .eq('id', pull.id);
 
-        logger.info('Created new lead from Canopy pull', { leadId, pullId: payload.pull_id });
+        if (linkError) {
+          logger.error('Failed to link lead to canopy_pulls', {
+            leadId,
+            pullId: pull.id,
+            error: linkError.message
+          });
+
+          // Retry once after a short delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { error: retryError } = await supabase.from('canopy_pulls')
+            .update({ lead_id: leadId })
+            .eq('id', pull.id);
+
+          if (retryError) {
+            logger.error('Retry failed - lead created but not linked to pull', {
+              leadId,
+              pullId: pull.id,
+              error: retryError.message
+            });
+          } else {
+            logger.info('Successfully linked lead on retry', { leadId, pullId: pull.id });
+          }
+        } else {
+          logger.info('Created and linked new lead from Canopy pull', { leadId, pullId: payload.pull_id });
+        }
       }
     } catch (createError) {
       logger.error('Failed to create lead from Canopy data', { error: createError instanceof Error ? createError.message : String(createError) });
