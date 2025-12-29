@@ -79,6 +79,8 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
       if (uploadError) throw uploadError;
 
       // Create document record
+      // document_type must be one of: policy, quote, dec_page, endorsement, claim_form, coi, bill,
+      // loss_run, application, renewal, cancellation, binder, certificate, inspection, unknown
       const { error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -87,7 +89,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           mime_type: file.type,
           file_size: file.size,
           kind: 'ao_policy',
-          document_type: 'current_policy',
+          document_type: 'policy',
           related_entity_type: 'ao_renewal',
           related_entity_id: renewalId,
         });
