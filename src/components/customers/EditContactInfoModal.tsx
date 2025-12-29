@@ -169,11 +169,11 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Edit Customer Information</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div>
             <Label htmlFor="name">Customer Name *</Label>
             <Input
@@ -311,14 +311,16 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
           </div>
+
+        {/* Sticky Footer with Buttons */}
+        <div className="flex justify-end gap-2 pt-4 border-t bg-background sticky bottom-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={loading} className="bg-green-600 hover:bg-green-700">
+            {loading ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
