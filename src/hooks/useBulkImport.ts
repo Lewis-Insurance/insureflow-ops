@@ -66,25 +66,38 @@ const initialState: BulkImportState = {
  * Column name aliases - maps common variations to expected names
  */
 const COLUMN_ALIASES: Record<string, string> = {
-  // Policy columns
+  // Policy columns - effective date
   'eff_date': 'effective_date',
   'effdate': 'effective_date',
+  'eff': 'effective_date',
   'effective': 'effective_date',
   'effectivedate': 'effective_date',
   'effective date': 'effective_date',
   'policy_effective_date': 'effective_date',
+  'policy_eff_date': 'effective_date',
   'start_date': 'effective_date',
   'startdate': 'effective_date',
+  'inception_date': 'effective_date',
+  'inceptiondate': 'effective_date',
+  'inception': 'effective_date',
+  'policy_start': 'effective_date',
 
+  // Policy columns - expiration date
   'exp_date': 'expiration_date',
   'expdate': 'expiration_date',
+  'exp': 'expiration_date',
   'expiration': 'expiration_date',
   'expirationdate': 'expiration_date',
   'expiration date': 'expiration_date',
   'policy_expiration_date': 'expiration_date',
+  'policy_exp_date': 'expiration_date',
   'end_date': 'expiration_date',
   'enddate': 'expiration_date',
   'renewal_date': 'expiration_date',
+  'renewaldate': 'expiration_date',
+  'renewal': 'expiration_date',
+  'policy_end': 'expiration_date',
+  'term_end': 'expiration_date',
 
   'policy_num': 'policy_number',
   'policynum': 'policy_number',
