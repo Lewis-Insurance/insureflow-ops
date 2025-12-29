@@ -97,7 +97,7 @@ function parseCSV(csvContent: string): StatementLine[] {
       lineType = 'fee';
     } else if (typeValue.includes('interest') || description.toLowerCase().includes('interest')) {
       lineType = 'interest';
-    } else if (typeValue.includes('transfer') || description.toLowerCase().includes('transfer')) {
+    } else if (typeValue.includes('transfer') || description.toLowerCase().includes('transfer') || description.toLowerCase().includes(' xfr ')) {
       lineType = 'transfer';
     }
 
