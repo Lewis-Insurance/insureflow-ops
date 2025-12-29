@@ -103,6 +103,12 @@ const CanopyImportPage = React.lazy(() => import("./pages/CanopyImportPage"));
 const CEODigestSettings = React.lazy(() => import("./pages/CEODigestSettings"));
 const CEODigestHistory = React.lazy(() => import("./pages/CEODigestHistory"));
 
+// Payment Tracking Module
+const PaymentList = React.lazy(() => import("./pages/PaymentList"));
+const DaySheets = React.lazy(() => import("./pages/DaySheets"));
+const DaySheetDetail = React.lazy(() => import("./pages/DaySheetDetail"));
+const BankReconciliation = React.lazy(() => import("./pages/BankReconciliation"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -522,6 +528,47 @@ const App = () => (
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <FinancialPage />
                     </ErrorBoundary>
+                  }
+                />
+                {/* Payment Tracking Module */}
+                <Route
+                  path="/payments"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <PaymentList />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/day-sheets"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <DaySheets />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/day-sheets/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <DaySheetDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/reconciliation"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <BankReconciliation />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route

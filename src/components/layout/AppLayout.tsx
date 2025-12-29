@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug, FilePlus2, ClipboardList, ScrollText, Award, Workflow, FileType, FileStack, Eye, Activity } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug, FilePlus2, ClipboardList, ScrollText, Award, Workflow, FileType, FileStack, Eye, Activity, Receipt, Landmark, FileSpreadsheet } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
@@ -206,6 +206,25 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={MessageSquare}
                   label="SMS"
                   to="/sms"
+                />
+              </NavGroup>
+
+              {/* Accounting Group */}
+              <NavGroup label="Accounting" defaultOpen={false}>
+                <NavItem
+                  icon={DollarSign}
+                  label="Payments"
+                  to="/payments"
+                />
+                <NavItem
+                  icon={Receipt}
+                  label="Day Sheets"
+                  to="/day-sheets"
+                />
+                <NavItem
+                  icon={Landmark}
+                  label="Bank Reconciliation"
+                  to="/reconciliation"
                 />
               </NavGroup>
 
