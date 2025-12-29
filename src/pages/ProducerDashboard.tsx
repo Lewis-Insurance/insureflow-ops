@@ -35,6 +35,7 @@ import { Link } from 'react-router-dom';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import QuickAddTaskBar from '@/components/tasks/QuickAddTaskBar';
 import { CustomerSearchWidget, PolicySearchWidget, UpcomingRenewalsWidget, WorkspaceWidgets } from '@/components/dashboard/WorkspaceWidgets';
+import { DashboardGlobalSearch } from '@/components/dashboard/DashboardGlobalSearch';
 
 export default function ProducerDashboard() {
   const { user } = useAuth();
@@ -72,6 +73,9 @@ export default function ProducerDashboard() {
             </p>
           </div>
         </div>
+
+        {/* Prominent Global Search */}
+        <DashboardGlobalSearch />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
