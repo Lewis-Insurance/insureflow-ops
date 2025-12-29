@@ -212,7 +212,7 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                   <TableCell>
                     <div className="flex items-center gap-1 font-medium">
                       <DollarSign className="h-3 w-3 text-muted-foreground" />
-                      {policy.premium.toLocaleString()}
+                      {policy.premium?.toLocaleString() ?? '-'}
                     </div>
                   </TableCell>
 

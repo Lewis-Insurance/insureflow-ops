@@ -286,10 +286,14 @@ export function LeadListView() {
         accessorKey: 'source_details',
         header: 'Source',
         cell: ({ row }) => {
-          const source = row.getValue('source_details') as string | undefined;
+          const source = row.getValue('source_details');
+          // Handle both string and object types
+          const sourceText = typeof source === 'string'
+            ? source
+            : (source as Record<string, unknown>)?.source_file as string | undefined;
           return (
             <span className="text-sm capitalize">
-              {source?.replace('_', ' ') || '-'}
+              {sourceText?.replace('_', ' ') || '-'}
             </span>
           );
         },
