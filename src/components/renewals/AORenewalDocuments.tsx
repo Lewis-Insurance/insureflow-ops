@@ -43,14 +43,17 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
   const [isUploading, setIsUploading] = useState(false);
 
   // Fetch documents linked to this renewal
+  // Documents are stored with related_entity_type='policy' and kind='ao_policy'
+  // to work within database constraints while still linking to the renewal ID
   const { data: documents, isLoading } = useQuery({
     queryKey: ['ao-renewal-documents', renewalId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
         .select('id, filename, storage_path, mime_type, file_size, created_at, document_type')
-        .eq('related_entity_type', 'ao_renewal')
+        .eq('related_entity_type', 'policy')
         .eq('related_entity_id', renewalId)
+        .eq('kind', 'ao_policy')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -81,6 +84,9 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
       // Create document record
       // document_type must be one of: policy, quote, dec_page, endorsement, claim_form, coi, bill,
       // loss_run, application, renewal, cancellation, binder, certificate, inspection, unknown
+      // related_entity_type must be one of: account, policy, quote, claim
+      // We use 'renewal' for document_type (valid) but 'policy' for related_entity_type
+      // since the ao_renewals are policy-related and we store the renewal ID
       const { error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -89,8 +95,8 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           mime_type: file.type,
           file_size: file.size,
           kind: 'ao_policy',
-          document_type: 'policy',
-          related_entity_type: 'ao_renewal',
+          document_type: 'renewal',
+          related_entity_type: 'policy',
           related_entity_id: renewalId,
         });
 
