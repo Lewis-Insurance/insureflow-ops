@@ -54,6 +54,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
         .eq('related_entity_type', 'policy')
         .eq('related_entity_id', renewalId)
         .eq('kind', 'ao_policy')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -122,7 +123,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
     },
   });
 
-  // Delete document mutation
+  // Delete document mutation (soft delete)
   const deleteMutation = useMutation({
     mutationFn: async (doc: RenewalDocument) => {
       // Delete from storage
@@ -132,10 +133,10 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
 
       if (storageError) console.error('Storage delete error:', storageError);
 
-      // Delete record
+      // Soft delete record by setting deleted_at
       const { error: deleteError } = await supabase
         .from('documents')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', doc.id);
 
       if (deleteError) throw deleteError;
