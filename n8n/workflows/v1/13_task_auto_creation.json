@@ -1,0 +1,136 @@
+{
+  "name": "V1: Task Auto-Creation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine task based on event type\nconst input = $input.first().json;\nconst event_type = input.event_type;\nconst payload = input.payload;\n\nlet task = null;\n\nswitch(event_type) {\n  case 'lead.created':\n    task = {\n      title: 'New Lead: Initial Contact',\n      description: `New lead ${payload.first_name || ''} ${payload.last_name || ''} needs initial contact.`,\n      priority: 'high',\n      due_in_minutes: 30,\n      entity_type: 'lead',\n      entity_id: input.entity_id,\n      category: 'sales'\n    };\n    break;\n    \n  case 'quote.sent':\n    task = {\n      title: 'Quote Follow-up Call',\n      description: `Quote sent for ${payload.line_of_business}. Schedule follow-up call.`,\n      priority: 'high',\n      due_in_minutes: 1440, // 24 hours\n      entity_type: 'quote',\n      entity_id: input.entity_id,\n      category: 'sales'\n    };\n    break;\n    \n  case 'document.uploaded':\n    if (payload.classification === 'unknown' || !payload.classification) {\n      task = {\n        title: 'Classify Uploaded Document',\n        description: `Document \"${payload.filename}\" needs manual classification.`,\n        priority: 'low',\n        due_in_minutes: 480, // 8 hours\n        entity_type: 'document',\n        entity_id: input.entity_id,\n        category: 'admin'\n      };\n    }\n    break;\n    \n  case 'policy.activated':\n    task = {\n      title: 'Welcome Call - New Policy',\n      description: `Policy ${payload.policy_number} is now active. Make welcome call.`,\n      priority: 'medium',\n      due_in_minutes: 2880, // 48 hours\n      entity_type: 'policy',\n      entity_id: input.entity_id,\n      category: 'service'\n    };\n    break;\n    \n  case 'ticket.created':\n    if (payload.priority === 'urgent') {\n      task = {\n        title: `URGENT: ${payload.subject}`,\n        description: `Service ticket ${payload.ticket_number} requires immediate attention.`,\n        priority: 'urgent',\n        due_in_minutes: 60,\n        entity_type: 'service_ticket',\n        entity_id: input.entity_id,\n        category: 'service'\n      };\n    }\n    break;\n}\n\nreturn {\n  should_create_task: task !== null,\n  task: task,\n  agency_workspace_id: input.agency_workspace_id,\n  event_type: event_type\n};"
+      },
+      "id": "determine-task",
+      "name": "Determine Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_create_task }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "should-create",
+      "name": "Should Create?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"auto:{{ $json.event_type }}:{{ $json.task.entity_id }}:{{ $today.toISOString().slice(0,13) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"{{ $json.task.entity_type }}\",\n    \"entity_id\": \"{{ $json.task.entity_id }}\",\n    \"title\": \"{{ $json.task.title }}\",\n    \"description\": \"{{ $json.task.description }}\",\n    \"priority\": \"{{ $json.task.priority }}\",\n    \"category\": \"{{ $json.task.category }}\",\n    \"due_in_minutes\": {{ $json.task.due_in_minutes }},\n    \"auto_generated\": true,\n    \"source_event\": \"{{ $json.event_type }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-task",
+      "name": "No Task Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Determine Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Task": {
+      "main": [
+        [
+          {
+            "node": "Should Create?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create?": {
+      "main": [
+        [
+          {
+            "node": "Create Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Task Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "task",
+      "id": "task-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

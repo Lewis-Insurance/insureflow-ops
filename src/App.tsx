@@ -109,6 +109,9 @@ const DaySheets = React.lazy(() => import("./pages/DaySheets"));
 const DaySheetDetail = React.lazy(() => import("./pages/DaySheetDetail"));
 const BankReconciliation = React.lazy(() => import("./pages/BankReconciliation"));
 
+// Training Materials Module
+const TrainingMaterials = React.lazy(() => import("./pages/TrainingMaterials"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -567,6 +570,17 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <BankReconciliation />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Training Materials Module */}
+                <Route
+                  path="/training"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <TrainingMaterials />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

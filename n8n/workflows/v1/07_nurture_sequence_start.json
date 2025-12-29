@@ -1,0 +1,84 @@
+{
+  "name": "V1: Nurture Sequence Start",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine nurture sequence based on lead data\nconst payload = $input.first().json.payload;\nconst event_type = $input.first().json.event_type;\n\nlet sequenceType = 'general';\nlet delayDays = 1;\n\n// Select sequence based on insurance type\nconst insuranceTypes = payload.insurance_types || [];\nif (insuranceTypes.includes('commercial') || insuranceTypes.includes('business')) {\n  sequenceType = 'commercial';\n  delayDays = 2; // Longer cycle for commercial\n} else if (insuranceTypes.includes('auto')) {\n  sequenceType = 'auto';\n} else if (insuranceTypes.includes('home') || insuranceTypes.includes('homeowners')) {\n  sequenceType = 'home';\n} else if (insuranceTypes.includes('life')) {\n  sequenceType = 'life';\n  delayDays = 3; // Life insurance needs more nurturing\n}\n\n// Adjust based on status change\nif (event_type === 'lead.status_changed') {\n  if (payload.new_status === 'nurturing') {\n    delayDays = 0; // Start immediately\n  }\n}\n\nreturn {\n  lead_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  sequence_type: sequenceType,\n  delay_days: delayDays,\n  email: payload.email,\n  first_name: payload.first_name || 'there'\n};"
+      },
+      "id": "determine-sequence",
+      "name": "Determine Sequence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"nurture.sequence.start\",\n  \"idempotency_key\": \"nurture:{{ $json.lead_id }}:{{ $json.sequence_type }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.lead_id }}\",\n    \"sequence_type\": \"{{ $json.sequence_type }}\",\n    \"start_delay_days\": {{ $json.delay_days }},\n    \"personalization\": {\n      \"first_name\": \"{{ $json.first_name }}\",\n      \"email\": \"{{ $json.email }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "start-nurture",
+      "name": "Start Nurture Sequence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Determine Sequence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Sequence": {
+      "main": [
+        [
+          {
+            "node": "Start Nurture Sequence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "nurture",
+      "id": "nurture-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

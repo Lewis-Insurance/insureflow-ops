@@ -1,0 +1,136 @@
+{
+  "name": "V1: Missing Info Request",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check for missing critical info\nconst payload = $input.first().json.payload;\nconst missingFields = [];\n\nif (!payload.email || payload.email.trim() === '') {\n  missingFields.push('email');\n}\nif (!payload.phone || payload.phone.trim() === '') {\n  missingFields.push('phone');\n}\nif (!payload.first_name || payload.first_name.trim() === '') {\n  missingFields.push('first_name');\n}\nif (!payload.last_name || payload.last_name.trim() === '') {\n  missingFields.push('last_name');\n}\n\n// Check insurance-specific fields\nif (!payload.insurance_types || payload.insurance_types.length === 0) {\n  missingFields.push('insurance_types');\n}\n\nreturn {\n  lead_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  has_missing_fields: missingFields.length > 0,\n  missing_fields: missingFields,\n  email: payload.email,\n  phone: payload.phone\n};"
+      },
+      "id": "check-missing",
+      "name": "Check Missing Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_missing_fields }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-missing",
+      "name": "Has Missing Fields?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"lead.missing_info.request\",\n  \"idempotency_key\": \"missing:{{ $json.lead_id }}:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"lead_id\": \"{{ $json.lead_id }}\",\n    \"missing_fields\": {{ JSON.stringify($json.missing_fields) }},\n    \"send_email\": {{ $json.email ? true : false }},\n    \"send_sms\": {{ $json.phone ? true : false }}\n  }\n}",
+        "options": {}
+      },
+      "id": "request-info",
+      "name": "Send Info Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "complete",
+      "name": "Info Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check Missing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Missing Fields": {
+      "main": [
+        [
+          {
+            "node": "Has Missing Fields?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Missing Fields?": {
+      "main": [
+        [
+          {
+            "node": "Send Info Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Info Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "lead",
+      "id": "lead-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

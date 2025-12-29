@@ -1,0 +1,84 @@
+{
+  "name": "V1: Quote Need Packet Send",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine what documents are needed based on line of business\nconst payload = $input.first().json.payload;\nconst lob = payload.line_of_business || 'auto';\n\nlet requiredDocs = [];\nlet templateName = 'general_application_packet';\n\nswitch(lob.toLowerCase()) {\n  case 'auto':\n    requiredDocs = ['drivers_license', 'current_dec_page', 'vehicle_registration'];\n    templateName = 'auto_application_packet';\n    break;\n  case 'home':\n  case 'homeowners':\n    requiredDocs = ['current_dec_page', 'property_photos', 'mortgage_statement'];\n    templateName = 'home_application_packet';\n    break;\n  case 'commercial':\n  case 'business':\n    requiredDocs = ['current_policies', 'loss_runs', 'financial_statements', 'business_license'];\n    templateName = 'commercial_application_packet';\n    break;\n  case 'life':\n    requiredDocs = ['medical_history', 'beneficiary_info'];\n    templateName = 'life_application_packet';\n    break;\n  default:\n    requiredDocs = ['current_dec_page', 'id_document'];\n}\n\nreturn {\n  quote_id: $input.first().json.entity_id,\n  account_id: payload.account_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  line_of_business: lob,\n  required_docs: requiredDocs,\n  template_name: templateName\n};"
+      },
+      "id": "determine-docs",
+      "name": "Determine Required Docs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"quote.need_packet.send\",\n  \"idempotency_key\": \"packet:{{ $json.quote_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"quote_id\": \"{{ $json.quote_id }}\",\n    \"account_id\": \"{{ $json.account_id }}\",\n    \"template_name\": \"{{ $json.template_name }}\",\n    \"required_documents\": {{ JSON.stringify($json.required_docs) }},\n    \"line_of_business\": \"{{ $json.line_of_business }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "send-packet",
+      "name": "Send Application Packet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Determine Required Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Required Docs": {
+      "main": [
+        [
+          {
+            "node": "Send Application Packet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "quote",
+      "id": "quote-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

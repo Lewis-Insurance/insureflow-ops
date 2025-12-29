@@ -1,0 +1,112 @@
+{
+  "name": "V2: Service Ticket SLA & Assignment",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate SLA based on category and priority\nconst payload = $input.first().json.payload;\nconst category = payload.category;\nconst priority = payload.priority;\n\n// SLA matrix (in hours)\nconst slaMatrix = {\n  urgent: { response: 1, resolution: 4 },\n  high: { response: 4, resolution: 24 },\n  medium: { response: 8, resolution: 48 },\n  low: { response: 24, resolution: 72 }\n};\n\n// Category adjustments\nconst categoryAdjustments = {\n  claims: 0.5,  // 50% faster for claims\n  cancellation: 0.75,\n  billing: 1,\n  endorsement: 1,\n  certificate: 0.5,\n  general: 1\n};\n\nconst baseSla = slaMatrix[priority] || slaMatrix.medium;\nconst adjustment = categoryAdjustments[category] || 1;\n\nconst slaHours = {\n  response: Math.round(baseSla.response * adjustment),\n  resolution: Math.round(baseSla.resolution * adjustment)\n};\n\n// Calculate due dates\nconst now = new Date();\nconst responseDue = new Date(now.getTime() + slaHours.response * 60 * 60 * 1000);\nconst resolutionDue = new Date(now.getTime() + slaHours.resolution * 60 * 60 * 1000);\n\nreturn {\n  ticket_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  category: category,\n  priority: priority,\n  sla_response_hours: slaHours.response,\n  sla_resolution_hours: slaHours.resolution,\n  sla_response_due: responseDue.toISOString(),\n  sla_resolution_due: resolutionDue.toISOString()\n};"
+      },
+      "id": "calculate-sla",
+      "name": "Calculate SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"ticket.sla.set\",\n  \"idempotency_key\": \"sla:{{ $json.ticket_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"ticket_id\": \"{{ $json.ticket_id }}\",\n    \"sla_response_due\": \"{{ $json.sla_response_due }}\",\n    \"sla_resolution_due\": \"{{ $json.sla_resolution_due }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "set-sla",
+      "name": "Set SLA on Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"ticket.assign.auto\",\n  \"idempotency_key\": \"assign:{{ $json.ticket_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"ticket_id\": \"{{ $json.ticket_id }}\",\n    \"category\": \"{{ $json.category }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"assignment_strategy\": \"round_robin_by_category\"\n  }\n}",
+        "options": {}
+      },
+      "id": "auto-assign",
+      "name": "Auto-Assign Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Calculate SLA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate SLA": {
+      "main": [
+        [
+          {
+            "node": "Set SLA on Ticket",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Auto-Assign Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "ticket",
+      "id": "ticket-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

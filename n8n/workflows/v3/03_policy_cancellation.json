@@ -1,0 +1,155 @@
+{
+  "name": "V3: Policy Cancellation Processing",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine cancellation type and actions\nconst payload = $input.first().json.payload;\n\nconst cancelReason = payload.cancel_reason || 'unknown';\nlet retentionEligible = false;\nlet retentionTemplate = null;\nlet retentionPriority = 'medium';\n\n// Determine if we should attempt retention\nswitch(cancelReason) {\n  case 'price':\n  case 'premium_increase':\n    retentionEligible = true;\n    retentionTemplate = 'retention_price';\n    retentionPriority = 'high';\n    break;\n  case 'service':\n  case 'unhappy':\n    retentionEligible = true;\n    retentionTemplate = 'retention_service';\n    retentionPriority = 'urgent';\n    break;\n  case 'moving':\n  case 'relocation':\n    retentionEligible = true;\n    retentionTemplate = 'retention_moving';\n    break;\n  case 'sold_property':\n  case 'sold_vehicle':\n    retentionEligible = false; // Can't retain, but cross-sell\n    break;\n  case 'non_payment':\n  case 'fraud':\n  case 'underwriting':\n    retentionEligible = false;\n    break;\n  default:\n    retentionEligible = true;\n    retentionTemplate = 'retention_general';\n}\n\nreturn {\n  policy_id: $input.first().json.entity_id,\n  account_id: payload.account_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  cancel_reason: cancelReason,\n  retention_eligible: retentionEligible,\n  retention_template: retentionTemplate,\n  retention_priority: retentionPriority,\n  effective_date: payload.cancellation_effective_date\n};"
+      },
+      "id": "analyze-cancellation",
+      "name": "Analyze Cancellation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.retention_eligible }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "retention-check",
+      "name": "Retention Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"policy.retention.attempt\",\n  \"idempotency_key\": \"retention:{{ $json.policy_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"policy_id\": \"{{ $json.policy_id }}\",\n    \"account_id\": \"{{ $json.account_id }}\",\n    \"cancel_reason\": \"{{ $json.cancel_reason }}\",\n    \"template\": \"{{ $json.retention_template }}\",\n    \"create_task\": true,\n    \"task_priority\": \"{{ $json.retention_priority }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "attempt-retention",
+      "name": "Attempt Retention",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"policy.cancellation.process\",\n  \"idempotency_key\": \"cancel:process:{{ $json.policy_id }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"policy_id\": \"{{ $json.policy_id }}\",\n    \"account_id\": \"{{ $json.account_id }}\",\n    \"send_confirmation\": true,\n    \"schedule_winback\": true,\n    \"winback_delay_days\": 30\n  }\n}",
+        "options": {}
+      },
+      "id": "process-cancellation",
+      "name": "Process Cancellation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Analyze Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Retention Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retention Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Attempt Retention",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "policy",
+      "id": "policy-tag"
+    },
+    {
+      "name": "retention",
+      "id": "retention-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

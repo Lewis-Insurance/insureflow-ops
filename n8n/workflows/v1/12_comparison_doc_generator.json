@@ -1,0 +1,168 @@
+{
+  "name": "V1: Comparison Document Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"quote.comparison_doc.generate\",\n  \"idempotency_key\": \"comparison:{{ $json.entity_id }}:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"quote_id\": \"{{ $json.entity_id }}\",\n    \"account_id\": \"{{ $json.payload.account_id }}\",\n    \"line_of_business\": \"{{ $json.payload.line_of_business }}\",\n    \"include_sections\": [\n      \"premium_comparison\",\n      \"coverage_comparison\",\n      \"deductible_comparison\",\n      \"carrier_ratings\",\n      \"recommendation\"\n    ],\n    \"format\": \"pdf\",\n    \"branding\": \"agency_default\"\n  }\n}",
+        "options": {}
+      },
+      "id": "generate-comparison",
+      "name": "Generate Comparison Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.document_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-generated",
+      "name": "Doc Generated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"comparison:email:{{ $json.data.quote_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"type\": \"email\",\n    \"template\": \"quote_comparison\",\n    \"to_account_id\": \"{{ $json.data.account_id }}\",\n    \"subject\": \"Your Insurance Quote Comparison\",\n    \"attachments\": [\"{{ $json.data.document_url }}\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Email Comparison",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"comparison:error:{{ $json.data.quote_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"quote\",\n    \"entity_id\": \"{{ $json.data.quote_id }}\",\n    \"title\": \"Comparison Doc Generation Failed\",\n    \"description\": \"Failed to auto-generate comparison document. Please create manually.\",\n    \"priority\": \"medium\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-error-task",
+      "name": "Create Error Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Generate Comparison Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Comparison Doc": {
+      "main": [
+        [
+          {
+            "node": "Doc Generated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc Generated?": {
+      "main": [
+        [
+          {
+            "node": "Email Comparison",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Error Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "quote",
+      "id": "quote-tag"
+    },
+    {
+      "name": "document",
+      "id": "document-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

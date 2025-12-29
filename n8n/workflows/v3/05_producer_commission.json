@@ -1,0 +1,110 @@
+{
+  "name": "V3: Producer Commission Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Monthly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"commission.calculate.batch\",\n  \"idempotency_key\": \"commission:monthly:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"period\": \"previous_month\",\n    \"include_new_business\": true,\n    \"include_renewals\": true,\n    \"include_bonuses\": true,\n    \"generate_statements\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "calculate-commissions",
+      "name": "Calculate Commissions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"commission.statements.send\",\n  \"idempotency_key\": \"commission:send:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"period\": \"previous_month\",\n    \"send_to_producers\": true,\n    \"send_to_principals\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "send-statements",
+      "name": "Send Statements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monthly": {
+      "main": [
+        [
+          {
+            "node": "Calculate Commissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Commissions": {
+      "main": [
+        [
+          {
+            "node": "Send Statements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "commission",
+      "id": "commission-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

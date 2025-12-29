@@ -1,0 +1,162 @@
+{
+  "name": "V3: Compliance Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"compliance.check.batch\",\n  \"idempotency_key\": \"compliance:weekly:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"checks\": [\n      {\n        \"type\": \"license_expiry\",\n        \"entity\": \"producers\",\n        \"warning_days\": 60\n      },\n      {\n        \"type\": \"ce_requirements\",\n        \"entity\": \"producers\",\n        \"warning_days\": 90\n      },\n      {\n        \"type\": \"eo_coverage\",\n        \"entity\": \"agency\",\n        \"warning_days\": 60\n      },\n      {\n        \"type\": \"carrier_appointments\",\n        \"entity\": \"producers\",\n        \"check_active\": true\n      },\n      {\n        \"type\": \"document_retention\",\n        \"entity\": \"policies\",\n        \"retention_years\": 7\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "run-checks",
+      "name": "Run Compliance Checks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.issues_found }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-issues",
+      "name": "Any Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"compliance.report.send\",\n  \"idempotency_key\": \"compliance:report:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"issues\": {{ JSON.stringify($json.data.issues || []) }},\n    \"recipients\": \"compliance_officers\",\n    \"create_tasks\": true,\n    \"priority_by_urgency\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "send-report",
+      "name": "Send Compliance Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "all-clear",
+      "name": "All Clear",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Weekly": {
+      "main": [
+        [
+          {
+            "node": "Run Compliance Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Compliance Checks": {
+      "main": [
+        [
+          {
+            "node": "Any Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Issues?": {
+      "main": [
+        [
+          {
+            "node": "Send Compliance Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "compliance",
+      "id": "compliance-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

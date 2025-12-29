@@ -1,0 +1,149 @@
+{
+  "name": "V3: Risk Profile Scoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"risk.profile.score\",\n  \"idempotency_key\": \"risk:{{ $json.entity_id }}:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"{{ $json.entity_type }}\",\n    \"entity_id\": \"{{ $json.entity_id }}\",\n    \"scoring_factors\": [\n      \"claims_history\",\n      \"payment_history\",\n      \"coverage_adequacy\",\n      \"years_as_customer\",\n      \"multi_policy\",\n      \"risk_characteristics\"\n    ],\n    \"external_data\": {\n      \"check_mvr\": true,\n      \"check_clue\": true,\n      \"check_credit\": false\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "score-risk",
+      "name": "Score Risk Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.risk_score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "high-risk",
+      "name": "High Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"task.create\",\n  \"idempotency_key\": \"risk:review:{{ $json.data.entity_id }}\",\n  \"agency_workspace_id\": \"{{ $json.data.agency_workspace_id }}\",\n  \"params\": {\n    \"entity_type\": \"{{ $json.data.entity_type }}\",\n    \"entity_id\": \"{{ $json.data.entity_id }}\",\n    \"title\": \"High Risk Profile Review\",\n    \"description\": \"Risk score: {{ $json.data.risk_score }}. Review for potential remarket or non-renewal.\",\n    \"priority\": \"high\",\n    \"category\": \"underwriting\"\n  }\n}",
+        "options": {}
+      },
+      "id": "create-review",
+      "name": "Create Review Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "acceptable-risk",
+      "name": "Acceptable Risk",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Score Risk Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Risk Profile": {
+      "main": [
+        [
+          {
+            "node": "High Risk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Risk?": {
+      "main": [
+        [
+          {
+            "node": "Create Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acceptable Risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "risk",
+      "id": "risk-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

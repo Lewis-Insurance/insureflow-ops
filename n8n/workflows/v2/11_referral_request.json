@@ -1,0 +1,140 @@
+{
+  "name": "V2: Referral Request Campaign",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine if customer qualifies for referral request\nconst payload = $input.first().json.payload;\n\n// Qualification criteria:\n// - Policy has been active for at least 30 days\n// - No claims in last 6 months\n// - Good payment history\n// - Haven't been asked in last 90 days\n\nconst now = new Date();\nconst effectiveDate = new Date(payload.effective_date);\nconst daysSinceEffective = Math.floor((now - effectiveDate) / (1000 * 60 * 60 * 24));\n\nconst qualifies = daysSinceEffective >= 30;\nconst delayDays = 45 - daysSinceEffective; // Send at 45 days if just activated\n\nreturn {\n  account_id: payload.account_id,\n  policy_id: $input.first().json.entity_id,\n  agency_workspace_id: $input.first().json.agency_workspace_id,\n  line_of_business: payload.line_of_business,\n  qualifies_for_referral: qualifies,\n  delay_days: Math.max(0, delayDays),\n  days_since_effective: daysSinceEffective\n};"
+      },
+      "id": "check-qualification",
+      "name": "Check Qualification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qualifies_for_referral }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "qualifies",
+      "name": "Qualifies?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"campaign.referral.schedule\",\n  \"idempotency_key\": \"referral:{{ $json.account_id }}:{{ $today.toISOString().slice(0,7) }}\",\n  \"agency_workspace_id\": \"{{ $json.agency_workspace_id }}\",\n  \"params\": {\n    \"account_id\": \"{{ $json.account_id }}\",\n    \"trigger_policy_id\": \"{{ $json.policy_id }}\",\n    \"delay_days\": {{ $json.delay_days }},\n    \"campaign_type\": \"referral_request\",\n    \"template\": \"referral_request_{{ $json.line_of_business }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "schedule-referral",
+      "name": "Schedule Referral Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "not-qualified",
+      "name": "Not Qualified",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 380]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Qualification": {
+      "main": [
+        [
+          {
+            "node": "Qualifies?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualifies?": {
+      "main": [
+        [
+          {
+            "node": "Schedule Referral Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Qualified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "campaign",
+      "id": "campaign-tag"
+    },
+    {
+      "name": "referral",
+      "id": "referral-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

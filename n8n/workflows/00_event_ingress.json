@@ -1,0 +1,316 @@
+{
+  "name": "InsureFlow Event Ingress",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "insureflow/event",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "insureflow-event-ingress",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-header-auth",
+          "name": "InsureFlow Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, event_id: $json.event_id, received_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.event_type }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "lead.created",
+              "outputKey": "lead_created"
+            },
+            {
+              "value2": "lead.status_changed",
+              "outputKey": "lead_status_changed"
+            },
+            {
+              "value2": "quote.sent",
+              "outputKey": "quote_sent"
+            },
+            {
+              "value2": "policy.activated",
+              "outputKey": "policy_activated"
+            },
+            {
+              "value2": "document.uploaded",
+              "outputKey": "document_uploaded"
+            },
+            {
+              "value2": "ticket.created",
+              "outputKey": "ticket_created"
+            },
+            {
+              "value2": "policy.renewal_approaching",
+              "outputKey": "renewal_approaching"
+            },
+            {
+              "value2": "payment.overdue",
+              "outputKey": "payment_overdue"
+            },
+            {
+              "value2": "claim.filed",
+              "outputKey": "claim_filed"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "event-router",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v1_lead_created_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-lead-created",
+      "name": "Lead Created Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 80]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v1_lead_status_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-lead-status",
+      "name": "Lead Status Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 180]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v1_quote_sent_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-quote-sent",
+      "name": "Quote Sent Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 280]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v2_policy_activated_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-policy-activated",
+      "name": "Policy Activated Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 380]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v1_document_uploaded_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-document-uploaded",
+      "name": "Document Uploaded Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 480]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v2_ticket_created_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-ticket-created",
+      "name": "Ticket Created Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 580]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v2_renewal_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-renewal",
+      "name": "Renewal Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 680]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v3_payment_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-payment",
+      "name": "Payment Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 780]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.v3_claim_workflow_id }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "call-claim",
+      "name": "Claim Flow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 880]
+    }
+  ],
+  "connections": {
+    "Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route by Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Event Type": {
+      "main": [
+        [
+          {
+            "node": "Lead Created Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lead Status Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quote Sent Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Policy Activated Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Document Uploaded Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ticket Created Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Renewal Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Payment Flow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claim Flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "insureflow",
+      "id": "insureflow-tag"
+    },
+    {
+      "name": "production",
+      "id": "production-tag"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "insureflow-ops"
+  },
+  "pinData": {},
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,162 @@
+{
+  "name": "V2: Win-Back Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"campaign.winback.identify\",\n  \"idempotency_key\": \"winback:batch:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"criteria\": [\n      {\n        \"type\": \"policy_lapsed\",\n        \"days_since_expiry\": [30, 60, 90, 180, 365],\n        \"exclude_cancelled_for_cause\": true\n      },\n      {\n        \"type\": \"quote_declined\",\n        \"days_since_decline\": [30, 90, 180],\n        \"exclude_if_policy_elsewhere\": true\n      },\n      {\n        \"type\": \"lead_went_cold\",\n        \"days_since_last_activity\": 90,\n        \"statuses\": [\"nurturing\", \"lost\"]\n      }\n    ],\n    \"campaign_sequences\": {\n      \"30_days\": \"winback_recent\",\n      \"90_days\": \"winback_moderate\",\n      \"180_days\": \"winback_aged\",\n      \"365_days\": \"winback_anniversary\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "identify-winbacks",
+      "name": "Identify Win-Backs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.candidates_found }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-candidates",
+      "name": "Any Candidates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"campaign.winback.start\",\n  \"idempotency_key\": \"winback:start:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"candidates\": {{ JSON.stringify($json.data.candidates || []) }},\n    \"batch_size\": 50,\n    \"stagger_hours\": 4\n  }\n}",
+        "options": {}
+      },
+      "id": "start-campaigns",
+      "name": "Start Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-candidates",
+      "name": "No Candidates",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Weekly": {
+      "main": [
+        [
+          {
+            "node": "Identify Win-Backs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Win-Backs": {
+      "main": [
+        [
+          {
+            "node": "Any Candidates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Candidates?": {
+      "main": [
+        [
+          {
+            "node": "Start Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "campaign",
+      "id": "campaign-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

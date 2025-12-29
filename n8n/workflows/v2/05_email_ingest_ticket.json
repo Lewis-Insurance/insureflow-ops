@@ -1,0 +1,117 @@
+{
+  "name": "V2: Email Ingest → Ticket Creation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "insureflow/email-ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Email Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-header-auth",
+          "name": "InsureFlow Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, received_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse email and determine ticket info\nconst email = $input.first().json.body;\n\n// Extract key info\nconst fromEmail = email.from_email || email.from;\nconst subject = email.subject || 'No Subject';\nconst body = email.body_text || email.body_plain || email.body_html || '';\nconst attachments = email.attachments || [];\n\n// Try to match to existing account\nconst matchEmail = fromEmail.toLowerCase().trim();\n\n// Categorize based on subject/body keywords\nlet category = 'general';\nlet priority = 'medium';\n\nconst subjectLower = subject.toLowerCase();\nconst bodyLower = body.toLowerCase();\n\nif (subjectLower.includes('claim') || bodyLower.includes('claim')) {\n  category = 'claims';\n  priority = 'high';\n} else if (subjectLower.includes('cancel') || bodyLower.includes('cancel')) {\n  category = 'cancellation';\n  priority = 'high';\n} else if (subjectLower.includes('bill') || bodyLower.includes('payment') || bodyLower.includes('invoice')) {\n  category = 'billing';\n} else if (subjectLower.includes('certificate') || subjectLower.includes('coi')) {\n  category = 'certificate';\n  priority = 'high';\n} else if (subjectLower.includes('change') || subjectLower.includes('endorsement') || subjectLower.includes('add driver') || subjectLower.includes('add vehicle')) {\n  category = 'endorsement';\n}\n\n// Check for urgent keywords\nif (subjectLower.includes('urgent') || subjectLower.includes('asap') || subjectLower.includes('emergency')) {\n  priority = 'urgent';\n}\n\nreturn {\n  from_email: fromEmail,\n  subject: subject,\n  body_preview: body.substring(0, 500),\n  category: category,\n  priority: priority,\n  has_attachments: attachments.length > 0,\n  attachment_count: attachments.length,\n  original_message_id: email.message_id\n};"
+      },
+      "id": "parse-email",
+      "name": "Parse Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"ticket.create.from_email\",\n  \"idempotency_key\": \"email:{{ $json.original_message_id || $now.toISOString() }}\",\n  \"agency_workspace_id\": \"lookup\",\n  \"params\": {\n    \"from_email\": \"{{ $json.from_email }}\",\n    \"subject\": \"{{ $json.subject }}\",\n    \"body\": \"{{ $json.body_preview }}\",\n    \"category\": \"{{ $json.category }}\",\n    \"priority\": \"{{ $json.priority }}\",\n    \"source\": \"email\",\n    \"source_message_id\": \"{{ $json.original_message_id }}\",\n    \"has_attachments\": {{ $json.has_attachments }}\n  }\n}",
+        "options": {}
+      },
+      "id": "create-ticket",
+      "name": "Create Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Email Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "email",
+      "id": "email-tag"
+    },
+    {
+      "name": "ticket",
+      "id": "ticket-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

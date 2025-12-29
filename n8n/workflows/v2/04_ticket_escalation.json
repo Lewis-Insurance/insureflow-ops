@@ -1,0 +1,162 @@
+{
+  "name": "V2: Service Ticket Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"ticket.escalation.check\",\n  \"idempotency_key\": \"escalation:batch:{{ $today.toISOString().slice(0,16) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"check_types\": [\n      {\n        \"type\": \"sla_response_breach\",\n        \"threshold_percent\": 80,\n        \"action\": \"warn_assignee\"\n      },\n      {\n        \"type\": \"sla_response_breach\",\n        \"threshold_percent\": 100,\n        \"action\": \"escalate_to_manager\"\n      },\n      {\n        \"type\": \"sla_resolution_breach\",\n        \"threshold_percent\": 75,\n        \"action\": \"warn_assignee\"\n      },\n      {\n        \"type\": \"sla_resolution_breach\",\n        \"threshold_percent\": 100,\n        \"action\": \"escalate_to_manager\"\n      },\n      {\n        \"type\": \"no_response_hours\",\n        \"threshold\": 4,\n        \"for_priority\": [\"urgent\", \"high\"],\n        \"action\": \"notify_team\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "check-escalations",
+      "name": "Check for Escalations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.escalated_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-escalations",
+      "name": "Any Escalations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"escalation:alert:{{ $today.toISOString().slice(0,16) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"type\": \"internal_notification\",\n    \"recipients\": \"service_managers\",\n    \"subject\": \"SLA Alert: {{ $json.data.escalated_count }} tickets need attention\",\n    \"body\": \"{{ $json.data.breached_count }} SLA breaches, {{ $json.data.warning_count }} warnings.\",\n    \"priority\": \"high\"\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-managers",
+      "name": "Notify Managers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-escalations",
+      "name": "No Escalations",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check for Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Escalations": {
+      "main": [
+        [
+          {
+            "node": "Any Escalations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Escalations?": {
+      "main": [
+        [
+          {
+            "node": "Notify Managers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "id": "v2-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "ticket",
+      "id": "ticket-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

@@ -1,0 +1,162 @@
+{
+  "name": "V1: Quote Expiry Rescue",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 12 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"quote.expiry_rescue.run\",\n  \"idempotency_key\": \"expiry:batch:{{ $today.toISOString().slice(0,13) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"days_until_expiry\": [3, 7],\n    \"statuses\": [\"sent\"],\n    \"actions\": {\n      \"3_days\": {\n        \"send_email\": true,\n        \"send_sms\": true,\n        \"create_task\": true,\n        \"priority\": \"urgent\"\n      },\n      \"7_days\": {\n        \"send_email\": true,\n        \"send_sms\": false,\n        \"create_task\": true,\n        \"priority\": \"high\"\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "find-expiring",
+      "name": "Find Expiring Quotes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.rescued_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "has-expiring",
+      "name": "Any Expiring?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"expiry:summary:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"type\": \"internal_notification\",\n    \"recipients\": \"sales_team\",\n    \"subject\": \"Quote Expiry Alert: {{ $json.data.rescued_count }} quotes expiring soon\",\n    \"body\": \"{{ $json.data.expiring_3_days || 0 }} quotes expiring in 3 days, {{ $json.data.expiring_7_days || 0 }} quotes expiring in 7 days. Rescue campaigns initiated.\"\n  }\n}",
+        "options": {}
+      },
+      "id": "notify-team",
+      "name": "Notify Sales Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 220],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-expiring",
+      "name": "No Expiring Quotes",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 380]
+    }
+  ],
+  "connections": {
+    "Every 12 Hours": {
+      "main": [
+        [
+          {
+            "node": "Find Expiring Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Expiring Quotes": {
+      "main": [
+        [
+          {
+            "node": "Any Expiring?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Expiring?": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Expiring Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "id": "v1-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "quote",
+      "id": "quote-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}

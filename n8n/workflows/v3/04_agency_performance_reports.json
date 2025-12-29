@@ -1,0 +1,110 @@
+{
+  "name": "V3: Agency Performance Reports",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Weekly Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"report.performance.generate\",\n  \"idempotency_key\": \"perf:weekly:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"all\",\n  \"params\": {\n    \"report_type\": \"weekly_performance\",\n    \"period\": \"last_7_days\",\n    \"metrics\": [\n      \"new_leads\",\n      \"lead_conversion_rate\",\n      \"quotes_sent\",\n      \"policies_written\",\n      \"premium_written\",\n      \"retention_rate\",\n      \"average_response_time\",\n      \"nps_score\",\n      \"tasks_completed\",\n      \"tickets_resolved\"\n    ],\n    \"compare_to\": \"previous_period\",\n    \"include_producer_breakdown\": true,\n    \"include_lob_breakdown\": true\n  }\n}",
+        "options": {}
+      },
+      "id": "generate-report",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/automation-gateway",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"message.queue\",\n  \"idempotency_key\": \"perf:email:{{ $today.toISOString().slice(0,10) }}\",\n  \"agency_workspace_id\": \"system\",\n  \"params\": {\n    \"type\": \"email\",\n    \"template\": \"weekly_performance_report\",\n    \"recipients\": \"agency_principals\",\n    \"subject\": \"Weekly Performance Report - {{ $today.toISOString().slice(0,10) }}\",\n    \"data\": {{ JSON.stringify($json.data || {}) }},\n    \"attachments\": [\"{{ $json.data.pdf_url }}\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "send-report",
+      "name": "Send to Principals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "insureflow-api-key",
+          "name": "InsureFlow API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Monday": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Send to Principals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "v3",
+      "id": "v3-tag"
+    },
+    {
+      "name": "scheduled",
+      "id": "scheduled-tag"
+    },
+    {
+      "name": "reporting",
+      "id": "reporting-tag"
+    }
+  ],
+  "versionId": "1.0.0"
+}
