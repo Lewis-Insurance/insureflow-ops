@@ -295,18 +295,15 @@ export async function processPolicies(
           import_batch_id: batchId,
         };
 
-        // Insert policy - use upsert to handle duplicates
+        // Insert policy - handle duplicates by catching unique constraint error
         const { data: insertedPolicy, error: policyError } = await supabase
           .from('policies')
-          .upsert(policyData, {
-            onConflict: 'policy_number',
-            ignoreDuplicates: true
-          })
+          .insert(policyData)
           .select('id');
 
         if (policyError) {
-          // If it's a duplicate error, skip silently
-          if (policyError.code === '23505') {
+          // If it's a duplicate error (unique constraint violation), skip silently
+          if (policyError.code === '23505' || policyError.message?.includes('duplicate')) {
             console.warn(`Skipping duplicate policy_number: ${policy.policy_number}`);
           } else {
             throw new Error(`Policy insert failed: ${policyError.message}`);
