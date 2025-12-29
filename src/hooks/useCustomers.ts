@@ -31,7 +31,7 @@ export function useCustomers(accountId?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0) => {
+  const fetchCustomers = async (searchQuery = '', limit = 2000, offset = 0) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.rpc('customers_search_v1', {
