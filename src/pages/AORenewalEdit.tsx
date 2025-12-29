@@ -18,6 +18,7 @@ import { useProfiles } from '@/hooks/useProfiles';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
+import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -430,6 +431,15 @@ export default function AORenewalEdit() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Documents Section */}
+        {renewal && (
+          <AORenewalDocuments
+            renewalId={renewal.id}
+            customerName={renewal.customer_name}
+            policyNumber={renewal.policy_number}
+          />
+        )}
 
         {/* Quotes Section */}
         {renewal && (
