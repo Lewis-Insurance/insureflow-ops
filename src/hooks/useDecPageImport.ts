@@ -149,22 +149,22 @@ export function useDecPageImport() {
 
       const documentUrl = urlData.publicUrl;
 
-      // 3. Create document record
+      // 3. Create document record (using correct column names)
       const { data: docRecord, error: docError } = await supabase
         .from('documents')
         .insert({
-          file_name: file.name,
-          file_path: fileName,
-          file_type: file.type,
+          filename: file.name,
+          storage_path: fileName,
+          mime_type: file.type,
           file_size: file.size,
-          uploaded_by: user.id,
-          category: 'dec_page',
+          kind: 'dec_page',
         })
         .select()
         .single();
 
       if (docError) {
         logger.error('[Dec Page Import] Document record error:', docError);
+        console.error('[Dec Page Import] Doc insert error:', JSON.stringify(docError, null, 2));
         // Continue anyway - analysis is more important
       }
 
