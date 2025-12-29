@@ -28,10 +28,11 @@ export interface UnifiedCustomer {
 
 export function useUnifiedCustomers() {
   const [customers, setCustomers] = useState<UnifiedCustomer[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', limit = 25, offset = 0, sort = 'updated_at_desc') => {
+  const fetchCustomers = async (searchQuery = '', limit = 2000, offset = 0, sort = 'updated_at_desc') => {
     try {
       setLoading(true);
       const { data, error } = await supabase.rpc('unified_customer_search', {
@@ -44,6 +45,7 @@ export function useUnifiedCustomers() {
       if (error) throw error;
 
       setCustomers(data || []);
+      setTotalCount(data?.length || 0);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -181,6 +183,7 @@ export function useUnifiedCustomers() {
 
   return {
     customers,
+    totalCount,
     loading,
     error,
     fetchCustomers,
