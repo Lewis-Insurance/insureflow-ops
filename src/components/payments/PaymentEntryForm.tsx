@@ -130,18 +130,37 @@ export function PaymentEntryForm({
     const searchPolicies = async () => {
       setIsSearching(true);
       try {
-        const { data, error } = await supabase
+        // First try to search by policy number or carrier
+        let { data, error } = await supabase
           .from('policies')
           .select(`
             id,
             policy_number,
             line_of_business,
             account_id,
-            account:accounts(name)
+            account:accounts!inner(name)
           `)
-          .or(`policy_number.ilike.%${policySearch}%`)
-          .eq('status', 'active')
-          .limit(10);
+          .or(`policy_number.ilike.%${policySearch}%,carrier.ilike.%${policySearch}%`)
+          .limit(20);
+
+        // If no results, try searching by account name
+        if (!error && (!data || data.length === 0)) {
+          const accountResult = await supabase
+            .from('policies')
+            .select(`
+              id,
+              policy_number,
+              line_of_business,
+              account_id,
+              account:accounts!inner(name)
+            `)
+            .ilike('account.name', `%${policySearch}%`)
+            .limit(20);
+
+          if (!accountResult.error) {
+            data = accountResult.data;
+          }
+        }
 
         if (error) throw error;
 
