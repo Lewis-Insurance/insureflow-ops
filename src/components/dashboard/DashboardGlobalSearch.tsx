@@ -6,34 +6,57 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGlobalSearch, SearchResult } from '@/hooks/useGlobalSearch';
-import { useDebouncedCallback } from '@/hooks/useDebounce';
 
 export function DashboardGlobalSearch() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { results, loading, search, clearResults } = useGlobalSearch();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounce search to avoid too many API calls
-  const debouncedSearch = useDebouncedCallback(search, 300, [search]);
-
-  const handleQueryChange = useCallback((value: string) => {
-    setQuery(value);
-    if (value.trim()) {
-      setShowResults(true);
-      debouncedSearch(value);
-    } else {
-      setShowResults(false);
-      clearResults();
+  // Debounce the search - only trigger after user stops typing for 400ms
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  }, [debouncedSearch, clearResults]);
+
+    if (query.trim()) {
+      debounceTimerRef.current = setTimeout(() => {
+        setDebouncedQuery(query);
+      }, 400);
+    } else {
+      setDebouncedQuery('');
+      clearResults();
+      setShowResults(false);
+    }
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [query, clearResults]);
+
+  // Trigger search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.trim()) {
+      search(debouncedQuery);
+      setShowResults(true);
+    }
+  }, [debouncedQuery, search]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+  }, []);
 
   const handleResultClick = useCallback((result: SearchResult) => {
     setShowResults(false);
     setQuery('');
+    setDebouncedQuery('');
     clearResults();
 
     // Navigate to the appropriate page based on entity type
@@ -57,6 +80,7 @@ export function DashboardGlobalSearch() {
 
   const handleClear = useCallback(() => {
     setQuery('');
+    setDebouncedQuery('');
     setShowResults(false);
     clearResults();
     inputRef.current?.focus();
@@ -65,6 +89,13 @@ export function DashboardGlobalSearch() {
   const handleSearchClick = useCallback(() => {
     inputRef.current?.focus();
   }, []);
+
+  const handleQuickSearch = useCallback((term: string) => {
+    setQuery(term);
+    setDebouncedQuery(term);
+    search(term);
+    setShowResults(true);
+  }, [search]);
 
   // Close results when clicking outside
   useEffect(() => {
@@ -123,6 +154,9 @@ export function DashboardGlobalSearch() {
     }
   };
 
+  // Determine if we should show the dropdown
+  const shouldShowDropdown = showResults && (loading || results.length > 0 || (debouncedQuery.trim() && !loading));
+
   return (
     <div ref={containerRef} className="relative w-full">
       {/* Main Search Container */}
@@ -134,6 +168,7 @@ export function DashboardGlobalSearch() {
               onClick={handleSearchClick}
               className="h-14 px-6 bg-green-600 hover:bg-green-700 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
               size="lg"
+              type="button"
             >
               <Search className="h-6 w-6 mr-2" />
               Search
@@ -144,12 +179,12 @@ export function DashboardGlobalSearch() {
               <Input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => handleQueryChange(e.target.value)}
+                onChange={handleInputChange}
                 placeholder="Search by customer name, policy number, address, email, phone..."
                 className="h-14 text-lg pl-4 pr-12 border-2 border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-green-500"
                 onFocus={() => {
                   setIsFocused(true);
-                  if (query.trim() && results.length > 0) {
+                  if (debouncedQuery.trim() && results.length > 0) {
                     setShowResults(true);
                   }
                 }}
@@ -161,6 +196,7 @@ export function DashboardGlobalSearch() {
                   size="sm"
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                   onClick={handleClear}
+                  type="button"
                 >
                   <X className="h-5 w-5" />
                 </Button>
@@ -168,21 +204,20 @@ export function DashboardGlobalSearch() {
             </div>
           </div>
 
-          {/* Search Hints */}
+          {/* Search Hints - only show when input is empty */}
           {!query && (
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="text-sm text-muted-foreground">Try:</span>
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQueryChange('auto')}>auto policies</Badge>
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQueryChange('home')}>home policies</Badge>
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQueryChange('32')}>zip codes</Badge>
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQueryChange('@')}>emails</Badge>
+              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQuickSearch('auto')}>auto policies</Badge>
+              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQuickSearch('home')}>home policies</Badge>
+              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent" onClick={() => handleQuickSearch('lewis')}>customer name</Badge>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Search Results Dropdown */}
-      {showResults && (
+      {shouldShowDropdown && (
         <Card className="absolute top-full left-0 right-0 z-50 mt-2 max-h-[500px] overflow-y-auto bg-background border-2 border-green-500/50 shadow-xl">
           <CardContent className="p-3">
             {loading && (
@@ -192,10 +227,10 @@ export function DashboardGlobalSearch() {
               </div>
             )}
 
-            {!loading && results.length === 0 && query.trim() && (
+            {!loading && results.length === 0 && debouncedQuery.trim() && (
               <div className="text-center py-8">
                 <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-muted-foreground">No results found for "{query}"</p>
+                <p className="text-muted-foreground">No results found for "{debouncedQuery}"</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">Try searching by name, policy number, email, or phone</p>
               </div>
             )}
@@ -210,6 +245,7 @@ export function DashboardGlobalSearch() {
                     key={`${result.entity_type}-${result.id}`}
                     className="w-full text-left p-4 rounded-lg hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors border border-transparent hover:border-green-200 dark:hover:border-green-800"
                     onClick={() => handleResultClick(result)}
+                    type="button"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
