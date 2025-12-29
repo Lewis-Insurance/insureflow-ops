@@ -22,7 +22,8 @@ export function usePoliciesByAccount(accountId: string) {
           )
         `)
         .eq('account_id', accountId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) {
         throw new Error(`Failed to fetch policies: ${error.message}`);
