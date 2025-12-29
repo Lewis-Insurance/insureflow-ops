@@ -171,6 +171,10 @@ export function useDecPageImport() {
       setProgress(50);
 
       // 4. Call AI document analysis
+      // Generate a UUID for tracking if document record wasn't created
+      // (document_id column expects UUID format, not file path)
+      const trackingId = docRecord?.id || crypto.randomUUID();
+
       logger.info('[Dec Page Import] Calling AI analysis with URL:', documentUrl);
 
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
@@ -178,7 +182,7 @@ export function useDecPageImport() {
         {
           body: {
             document_url: documentUrl,
-            document_id: docRecord?.id || fileName,
+            document_id: trackingId,
             file_name: file.name,
             user_id: user.id,
             analysis_mode: 'parse',
