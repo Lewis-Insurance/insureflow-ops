@@ -62,7 +62,8 @@ export function usePolicies(filters: PolicyFilters = {}) {
             code
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
       // Apply filters
       if (filters.search) {
@@ -143,16 +144,17 @@ export function usePolicyStats() {
       const { data, error } = await supabase
         .from('policies')
         .select(`
-          status, 
-          carrier, 
-          line_of_business, 
-          effective_date, 
+          status,
+          carrier,
+          line_of_business,
+          effective_date,
           expiration_date,
           mga_info:mgas!policies_mga_id_fkey(
             id,
             name
           )
-        `);
+        `)
+        .limit(5000);
 
       if (error) {
         throw new Error(`Failed to fetch policy stats: ${error.message}`);
