@@ -1,7 +1,27 @@
 import { z } from 'zod';
 
-// Phone number regex - flexible to handle various formats like (XXX) XXX-XXXX
-const phoneRegex = /^[\d\s\-().\+]+$/;
+// Phone number regex - flexible to handle various formats like (XXX) XXX-XXXX, extensions (x123, ext 123)
+// Allow digits, spaces, common separators, and extension text
+const phoneRegex = /^[\d\s\-().\+]+(?:\s*(?:x|ext\.?|extension)\s*\d+)?$/i;
+
+/**
+ * Strip common phone prefixes like O:, W:, H:, M:, F: (Office, Work, Home, Mobile, Fax)
+ */
+function stripPhonePrefix(phone: string): string {
+  if (!phone) return '';
+  // Remove common prefixes like "O:", "W:", "H:", "M:", "F:", "Office:", "Work:", etc.
+  return phone.replace(/^(?:O|W|H|M|F|Office|Work|Home|Mobile|Fax|Cell|Phone)\s*:\s*/i, '').trim();
+}
+
+/**
+ * Extract first email from a field that might contain multiple emails
+ */
+function extractFirstEmail(email: string): string {
+  if (!email) return '';
+  // Split on common separators: semicolon, comma, space, or slash
+  const emails = email.split(/[;,\s\/]+/).filter(e => e.includes('@'));
+  return emails[0]?.trim().toLowerCase() || '';
+}
 
 // US State codes
 const US_STATES = [
@@ -29,19 +49,19 @@ export const ContactImportSchema = z.object({
   dba: z.string().optional().transform(v => v?.trim() || ''),
   email_primary: z.string()
     .optional()
-    .transform(v => v?.trim().toLowerCase() || '')
+    .transform(v => extractFirstEmail(v || ''))
     .refine(v => !v || z.string().email().safeParse(v).success, {
       message: 'Invalid email format'
     }),
   email_secondary: z.string()
     .optional()
-    .transform(v => v?.trim().toLowerCase() || '')
+    .transform(v => extractFirstEmail(v || ''))
     .refine(v => !v || z.string().email().safeParse(v).success, {
       message: 'Invalid secondary email format'
     }),
   phone_primary: z.string()
     .optional()
-    .transform(v => v?.trim() || '')
+    .transform(v => stripPhonePrefix(v || ''))
     .refine(v => !v || phoneRegex.test(v), {
       message: 'Invalid phone format'
     }),
@@ -95,13 +115,15 @@ export const PolicyImportSchema = z.object({
   policy_number: z.string().min(1, 'Policy number is required'),
   product_type: z.string().min(1, 'Product type is required'),
   effective_date: z.string()
-    .min(1, 'Effective date is required')
-    .refine(v => !isNaN(Date.parse(v)), {
+    .optional()
+    .transform(v => v?.trim() || '')
+    .refine(v => !v || !isNaN(Date.parse(v)), {
       message: 'Invalid effective date format'
     }),
   expiration_date: z.string()
-    .min(1, 'Expiration date is required')
-    .refine(v => !isNaN(Date.parse(v)), {
+    .optional()
+    .transform(v => v?.trim() || '')
+    .refine(v => !v || !isNaN(Date.parse(v)), {
       message: 'Invalid expiration date format'
     }),
   premium: z.union([
@@ -115,7 +137,8 @@ export const PolicyImportSchema = z.object({
   status: z.string().optional().default('active'),
   source_file: z.string().optional(),
 }).refine(data => {
-  // Expiration must be after effective
+  // Only validate date order if both dates are provided
+  if (!data.effective_date || !data.expiration_date) return true;
   const effective = new Date(data.effective_date);
   const expiration = new Date(data.expiration_date);
   return expiration > effective;

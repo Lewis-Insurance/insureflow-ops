@@ -281,14 +281,14 @@ export async function processPolicies(
         // Get carrier ID
         const carrierId = carrierMap.get(policy.carrier) || null;
 
-        // Build policy record
+        // Build policy record - convert empty date strings to null
         const policyData = {
           account_id: accountId,
           carrier_id: carrierId,
           policy_number: policy.policy_number,
           line_of_business: mapProductTypeToLineOfBusiness(policy.product_type),
-          effective_date: policy.effective_date,
-          expiration_date: policy.expiration_date,
+          effective_date: policy.effective_date || null,
+          expiration_date: policy.expiration_date || null,
           premium: policy.premium || null,
           status: policy.status || 'active',
           import_batch_id: batchId,
