@@ -29,7 +29,7 @@ export function usePayments(filters: PaymentFilters = {}) {
         .select(`
           *,
           payment_method:payment_methods(id, name, type),
-          policy:policies(policy_number, policy_type),
+          policy:policies(policy_number, line_of_business),
           account:accounts(name),
           day_sheet:day_sheets(sheet_date, status, sheet_number)
         `)
@@ -92,7 +92,7 @@ export function usePayment(id: string) {
         .select(`
           *,
           payment_method:payment_methods(id, name, type),
-          policy:policies(policy_number, policy_type),
+          policy:policies(policy_number, line_of_business),
           account:accounts(name),
           day_sheet:day_sheets(sheet_date, status, sheet_number)
         `)
@@ -117,7 +117,7 @@ export function usePaymentsByDaySheet(daySheetId: string) {
         .select(`
           *,
           payment_method:payment_methods(id, name, type),
-          policy:policies(policy_number, policy_type),
+          policy:policies(policy_number, line_of_business),
           account:accounts(name)
         `)
         .eq('day_sheet_id', daySheetId)

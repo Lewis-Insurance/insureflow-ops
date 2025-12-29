@@ -284,7 +284,8 @@ export async function processPolicies(
         // Build policy record - convert empty date strings to null
         const policyData = {
           account_id: accountId,
-          carrier_id: carrierId,
+          carrier: policy.carrier, // Required: carrier name
+          carrier_id: carrierId,   // Optional: FK to carriers table
           policy_number: policy.policy_number,
           line_of_business: mapProductTypeToLineOfBusiness(policy.product_type),
           effective_date: policy.effective_date || null,
@@ -294,16 +295,25 @@ export async function processPolicies(
           import_batch_id: batchId,
         };
 
-        // Insert policy
-        const { error: policyError } = await supabase
+        // Insert policy - use upsert to handle duplicates
+        const { data: insertedPolicy, error: policyError } = await supabase
           .from('policies')
-          .insert(policyData);
+          .upsert(policyData, {
+            onConflict: 'policy_number',
+            ignoreDuplicates: true
+          })
+          .select('id');
 
         if (policyError) {
-          throw new Error(`Policy insert failed: ${policyError.message}`);
+          // If it's a duplicate error, skip silently
+          if (policyError.code === '23505') {
+            console.warn(`Skipping duplicate policy_number: ${policy.policy_number}`);
+          } else {
+            throw new Error(`Policy insert failed: ${policyError.message}`);
+          }
+        } else {
+          policiesCreated++;
         }
-
-        policiesCreated++;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         errors.push({
