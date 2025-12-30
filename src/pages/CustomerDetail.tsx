@@ -19,6 +19,7 @@ import { InviteToPortalButton } from '@/components/customers/InviteToPortalButto
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
+import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileText, CheckSquare, Plus, Mail, Award, Inbox } from 'lucide-react';
@@ -320,6 +321,14 @@ export default function CustomerDetail() {
 
         {/* Policies & Quotes Section */}
         <CustomerPoliciesSection accountId={account.id} />
+
+        {/* Payment History Section */}
+        <PaymentHistoryWidget
+          accountId={account.id}
+          title="Payment History"
+          maxItems={10}
+          showPolicyColumn={true}
+        />
 
         {/* Document Collection Section */}
         <ErrorBoundaryWrapper>

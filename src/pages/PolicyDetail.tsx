@@ -28,6 +28,8 @@ import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
 import { Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock, Briefcase } from 'lucide-react';
 import { PolicyManualDetailsModal } from '@/components/policies/PolicyManualDetailsModal';
 import { DocumentsList } from '@/components/documents/DocumentsList';
+import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
+import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -38,6 +40,7 @@ export default function PolicyDetail() {
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [manualDetailsOpen, setManualDetailsOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // Extraction hooks
   const extractWC = useExtractWCPolicy();
@@ -224,12 +227,7 @@ export default function PolicyDetail() {
             )}
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => {
-                toast({
-                  title: "Make Payment",
-                  description: "Payment processing feature coming soon.",
-                });
-              }}
+              onClick={() => setPaymentModalOpen(true)}
             >
               <CreditCard className="h-4 w-4 mr-2" />
               Make Payment
@@ -754,6 +752,16 @@ export default function PolicyDetail() {
           </Card>
         </div>
 
+        {/* Payment History Section */}
+        {policyId && (
+          <PaymentHistoryWidget
+            policyId={policyId}
+            title="Payment History"
+            maxItems={5}
+            showPolicyColumn={false}
+          />
+        )}
+
         {/* Inland Marine Details Section */}
         {isInlandMarine && policyId && (
           <InlandMarinePolicyDetails policyId={policyId} />
@@ -847,6 +855,18 @@ export default function PolicyDetail() {
             initialInsuredItems={policy.insured_items}
             initialWcDetails={(policy as any).wc_details}
             onSaved={refetch}
+          />
+          <RecordPaymentModal
+            open={paymentModalOpen}
+            onOpenChange={setPaymentModalOpen}
+            policyId={policy.id}
+            accountId={policy.account?.id}
+            onSuccess={() => {
+              toast({
+                title: "Payment Recorded",
+                description: "Payment has been successfully recorded.",
+              });
+            }}
           />
         </>
       )}
