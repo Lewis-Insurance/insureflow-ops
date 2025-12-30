@@ -58,6 +58,68 @@ const LEAD_SOURCES = [
   'Other',
 ];
 
+// Helper function to parse a full address string into components
+function parseFullAddress(fullAddress: string): {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+} {
+  const result = { street: '', city: '', state: '', zip: '' };
+
+  if (!fullAddress) return result;
+
+  // Try to extract zip code (5 digits or 5+4 format)
+  const zipMatch = fullAddress.match(/\b(\d{5}(?:-\d{4})?)\b/);
+  if (zipMatch) {
+    result.zip = zipMatch[1];
+  }
+
+  // Try to find state abbreviation (2 uppercase letters, possibly followed by zip)
+  const stateMatch = fullAddress.match(/\b([A-Z]{2})\s*(?:\d{5}|$)/i);
+  if (stateMatch) {
+    result.state = stateMatch[1].toUpperCase();
+  }
+
+  // Remove zip and state from address for further parsing
+  let remaining = fullAddress
+    .replace(/\b\d{5}(?:-\d{4})?\b/, '')
+    .replace(/\b[A-Z]{2}\s*$/i, '')
+    .trim();
+
+  // Split by comma to separate street from city
+  const parts = remaining.split(',').map(p => p.trim()).filter(p => p);
+
+  if (parts.length >= 2) {
+    // First part is likely the street address
+    result.street = parts[0];
+    // Last part (before state/zip) is likely the city
+    // Check if the last part contains a state abbreviation
+    const lastPart = parts[parts.length - 1];
+    const cityStateMatch = lastPart.match(/^(.+?)\s+([A-Z]{2})$/i);
+    if (cityStateMatch) {
+      result.city = cityStateMatch[1].trim();
+      result.state = cityStateMatch[2].toUpperCase();
+    } else {
+      result.city = lastPart;
+    }
+  } else if (parts.length === 1) {
+    // Try to parse "123 Main St Springfield IL 62701" format (no commas)
+    // This is tricky - we'll assume the state is always a 2-letter code
+    const noCommaMatch = remaining.match(/^(.+?)\s+([A-Za-z\s]+?)\s+([A-Z]{2})$/i);
+    if (noCommaMatch) {
+      result.street = noCommaMatch[1].trim();
+      result.city = noCommaMatch[2].trim();
+      result.state = noCommaMatch[3].toUpperCase();
+    } else {
+      // Can't parse, put everything in street
+      result.street = remaining;
+    }
+  }
+
+  return result;
+}
+
 interface PolicyData {
   policy_number: string;
   carrier: string;
@@ -222,8 +284,21 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       if (extracted.insured_name) newFormData.name = extracted.insured_name;
 
       // Try to get address from property object or direct fields
-      const address = extracted.property?.address || extracted.insured_address || '';
-      if (address) newFormData.address_line1 = address;
+      const fullAddress = extracted.property?.address || extracted.insured_address || '';
+
+      // Parse address - try to extract street, city, state, zip from full address
+      // Common formats: "123 Main St, Springfield, IL 62701" or "123 Main St, Springfield IL 62701"
+      if (fullAddress) {
+        const addressParts = parseFullAddress(fullAddress);
+        if (addressParts.street) newFormData.address_line1 = addressParts.street;
+        if (addressParts.city) newFormData.city = addressParts.city;
+        if (addressParts.state && US_STATES.includes(addressParts.state)) {
+          newFormData.state = addressParts.state;
+        }
+        if (addressParts.zip) newFormData.zip_code = addressParts.zip;
+      }
+
+      // Also check for separately extracted fields (override parsed values if present)
       if (extracted.insured_city) newFormData.city = extracted.insured_city;
       if (extracted.insured_state) {
         const stateUpper = String(extracted.insured_state).toUpperCase();
@@ -693,31 +768,35 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                   </div>
                   <div>
                     <Label htmlFor="carrier">Carrier *</Label>
-                    <Select value={policyData.carrier} onValueChange={(value) => handlePolicyChange('carrier', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select carrier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {carriers.map(carrier => (
-                          <SelectItem key={carrier.id} value={carrier.name}>{carrier.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="carrier"
+                      list="carrier-suggestions"
+                      value={policyData.carrier}
+                      onChange={(e) => handlePolicyChange('carrier', e.target.value)}
+                      placeholder="Type or select carrier"
+                    />
+                    <datalist id="carrier-suggestions">
+                      {carriers.map(carrier => (
+                        <option key={carrier.id} value={carrier.name} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="line_of_business">Line of Business</Label>
-                    <Select value={policyData.line_of_business} onValueChange={(value) => handlePolicyChange('line_of_business', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {linesOfBusiness.map(lob => (
-                          <SelectItem key={lob.id} value={lob.name}>{lob.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="line_of_business"
+                      list="lob-suggestions"
+                      value={policyData.line_of_business}
+                      onChange={(e) => handlePolicyChange('line_of_business', e.target.value)}
+                      placeholder="Type or select"
+                    />
+                    <datalist id="lob-suggestions">
+                      {linesOfBusiness.map(lob => (
+                        <option key={lob.id} value={lob.name} />
+                      ))}
+                    </datalist>
                   </div>
                   <div>
                     <Label htmlFor="premium">Premium</Label>
