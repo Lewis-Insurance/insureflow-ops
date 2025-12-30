@@ -165,6 +165,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
   const [parsing, setParsing] = useState(false);
   const [parseStatus, setParseStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -241,6 +242,9 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       if (uploadError) {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
+
+      // Store the file path for later when we save the customer/policy
+      setUploadedFilePath(fileName);
 
       // Get signed URL for the uploaded file
       const { data: urlData } = await supabase.storage
@@ -397,6 +401,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
   const clearUploadedFile = () => {
     setUploadedFile(null);
+    setUploadedFilePath(null);
     setParseStatus('idle');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -439,10 +444,12 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         return;
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      let createdPolicyId: string | null = null;
+
       // Create policy if enabled and has required data
       if (includePolicy && policyData.policy_number && policyData.carrier) {
-        const { data: { user } } = await supabase.auth.getUser();
-
         const policyInsertData = {
           account_id: newCustomer.id,
           insured_user_id: user?.id || null,
@@ -457,9 +464,11 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           status: policyData.status,
         };
 
-        const { error: policyError } = await supabase
+        const { data: newPolicy, error: policyError } = await supabase
           .from('policies')
-          .insert([policyInsertData]);
+          .insert([policyInsertData])
+          .select('id')
+          .single();
 
         if (policyError) {
           toast({
@@ -468,15 +477,53 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
             variant: 'destructive',
           });
         } else {
-          toast({
-            title: 'Success',
-            description: 'Customer and policy added successfully',
-          });
+          createdPolicyId = newPolicy?.id || null;
         }
+      }
+
+      // Save uploaded document to customer's documents if we have one
+      if (uploadedFile && uploadedFilePath) {
+        try {
+          // Create a document record linking to the customer (and policy if created)
+          const documentRecord = {
+            account_id: newCustomer.id,
+            policy_id: createdPolicyId,
+            filename: uploadedFile.name,
+            file_path: uploadedFilePath,
+            file_type: uploadedFile.type,
+            file_size: uploadedFile.size,
+            document_type: 'dec_page',
+            uploaded_by: user?.id || null,
+            status: 'processed',
+          };
+
+          const { error: docError } = await supabase
+            .from('documents')
+            .insert([documentRecord]);
+
+          if (docError) {
+            console.error('Failed to save document record:', docError);
+            // Don't fail the whole operation, just log the error
+          }
+        } catch (docErr) {
+          console.error('Error saving document:', docErr);
+        }
+      }
+
+      // Show success message
+      if (includePolicy && policyData.policy_number && policyData.carrier && createdPolicyId) {
+        toast({
+          title: 'Success',
+          description: uploadedFile
+            ? 'Customer, policy, and document added successfully'
+            : 'Customer and policy added successfully',
+        });
       } else {
         toast({
           title: 'Success',
-          description: 'Customer added successfully',
+          description: uploadedFile
+            ? 'Customer and document added successfully'
+            : 'Customer added successfully',
         });
       }
 
@@ -498,6 +545,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       setPolicyData(initialPolicyData);
       setIncludePolicy(false);
       setUploadedFile(null);
+      setUploadedFilePath(null);
       setParseStatus('idle');
       setErrors({});
       onOpenChange(false);

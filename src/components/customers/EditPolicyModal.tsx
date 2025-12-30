@@ -51,6 +51,7 @@ interface Policy {
   effective_date: string;
   expiration_date: string;
   billing_frequency: string | null;
+  billing_method: string | null;
   policy_term: string | null;
   status: string;
   payment_type: string | null;
@@ -72,6 +73,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
     effective_date: '',
     expiration_date: '',
     billing_frequency: 'annual',
+    billing_method: '',
     policy_term: '',
     status: 'active',
     payment_type: 'direct',
@@ -94,6 +96,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         effective_date: policy.effective_date ? formatDateForDisplay(policy.effective_date) : '',
         expiration_date: policy.expiration_date ? formatDateForDisplay(policy.expiration_date) : '',
         billing_frequency: policy.billing_frequency || 'annual',
+        billing_method: policy.billing_method || '',
         policy_term: policy.policy_term || '',
         status: policy.status || 'active',
         payment_type: policy.payment_type || 'direct',
@@ -133,6 +136,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         effective_date: formatDateForStorage(formData.effective_date),
         expiration_date: formatDateForStorage(formData.expiration_date),
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
+        billing_method: formData.billing_method ? formData.billing_method as 'direct_bill' | 'agency_bill' : null,
         policy_term: formData.policy_term || null,
         status: formData.status,
         payment_type: formData.payment_type as 'direct' | 'agency',
@@ -286,15 +290,29 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly_bill">Monthly Bill</SelectItem>
-                  <SelectItem value="monthly_ach">Monthly ACH</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
                   <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="escrow">Escrow</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="billing_method">Billing Method</Label>
+              <Select value={formData.billing_method} onValueChange={(value) => handleInputChange('billing_method', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select billing method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="direct_bill">Direct Bill</SelectItem>
+                  <SelectItem value="agency_bill">Agency Bill</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div></div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

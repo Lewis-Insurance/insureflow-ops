@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, CreditCard, Hash, Briefcase } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
@@ -222,6 +222,18 @@ export default function PolicyDetail() {
                 New Certificate
               </Button>
             )}
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => {
+                toast({
+                  title: "Make Payment",
+                  description: "Payment processing feature coming soon.",
+                });
+              }}
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Make Payment
+            </Button>
             <Button variant="outline" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Policy
@@ -237,6 +249,33 @@ export default function PolicyDetail() {
               <CardTitle>Policy Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Named Insured Info */}
+              {(policy.named_insured || policy.dba || policy.fein) && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    {policy.named_insured && (
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium text-muted-foreground">Named Insured</label>
+                        <p className="font-semibold">{policy.named_insured}</p>
+                      </div>
+                    )}
+                    {policy.dba && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">DBA</label>
+                        <p>{policy.dba}</p>
+                      </div>
+                    )}
+                    {policy.fein && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">FEIN</label>
+                        <p className="font-mono">{policy.fein}</p>
+                      </div>
+                    )}
+                  </div>
+                  <Separator />
+                </>
+              )}
+
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -263,31 +302,37 @@ export default function PolicyDetail() {
                       <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
                     )}
                   </div>
+                  {policy.carrier_naic && (
+                    <p className="text-xs text-muted-foreground mt-1">NAIC: {policy.carrier_naic}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Premium</label>
-                  <div className="flex items-center gap-1 text-lg font-semibold">
-                    <DollarSign className="h-4 w-4" />
-                    <span>{formatCurrency(policy.premium)}</span>
-                  </div>
-                  {policy.billing_frequency && (
-                    <p className="text-sm text-muted-foreground">
-                      / {policy.billing_frequency}
-                    </p>
-                  )}
+                  <label className="text-sm font-medium text-muted-foreground">MGA</label>
+                  <p>{policy.mga || 'N/A'}</p>
                 </div>
               </div>
 
               <Separator />
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Issue Date</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>
+                      {policy.issue_date
+                        ? new Date(policy.issue_date).toLocaleDateString()
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Effective Date</label>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      {policy.effective_date 
+                      {policy.effective_date
                         ? new Date(policy.effective_date).toLocaleDateString()
                         : 'N/A'}
                     </span>
@@ -298,27 +343,117 @@ export default function PolicyDetail() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      {policy.expiration_date 
+                      {policy.expiration_date
                         ? new Date(policy.expiration_date).toLocaleDateString()
                         : 'N/A'}
                     </span>
                   </div>
                 </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Policy Term</label>
+                  <p>{policy.policy_term ? `${policy.policy_term} months` : 'N/A'}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Premium & Fees */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Premium</label>
+                  <div className="flex items-center gap-1 text-lg font-semibold">
+                    <DollarSign className="h-4 w-4" />
+                    <span>{formatCurrency(policy.premium)}</span>
+                  </div>
+                </div>
+                {policy.agency_fee && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Agency Fee</label>
+                    <p>{formatCurrency(policy.agency_fee)}</p>
+                  </div>
+                )}
+                {policy.taxes_fees && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Taxes & Fees</label>
+                    <p>{formatCurrency(policy.taxes_fees)}</p>
+                  </div>
+                )}
+                {policy.total_premium && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Total Premium</label>
+                    <div className="flex items-center gap-1 text-lg font-semibold text-green-600">
+                      <DollarSign className="h-4 w-4" />
+                      <span>{formatCurrency(policy.total_premium)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
 
               {/* Billing Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Billing Method</label>
-                  <p>{policy.billing_method || 'N/A'}</p>
+                  <p className="capitalize">{policy.billing_method?.replace('_', ' ') || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Billing Frequency</label>
+                  <p className="capitalize">{policy.billing_frequency || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Payment Type</label>
-                  <p>{policy.payment_type || 'N/A'}</p>
+                  <p className="capitalize">{policy.payment_type?.replace('_', ' ') || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <Badge variant={getStatusColor(policy.status || 'active')}>
+                    {policy.status || 'Active'}
+                  </Badge>
                 </div>
               </div>
+
+              {/* Coverage Summary */}
+              {policy.coverage && typeof policy.coverage === 'object' && Object.keys(policy.coverage).length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Coverage Summary</label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(policy.coverage).map(([key, value]) => (
+                        <div key={key} className="bg-muted/50 p-2 rounded">
+                          <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
+                          <p className="font-medium">{typeof value === 'number' ? formatCurrency(value) : String(value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Insured Items */}
+              {policy.insured_items && Array.isArray(policy.insured_items) && policy.insured_items.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Insured Items</label>
+                    <div className="space-y-2">
+                      {policy.insured_items.map((item: any, idx: number) => (
+                        <div key={idx} className="bg-muted/50 p-3 rounded flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{item.description || item.name || `Item ${idx + 1}`}</p>
+                            {item.vin && <p className="text-xs text-muted-foreground">VIN: {item.vin}</p>}
+                            {item.year && item.make && item.model && (
+                              <p className="text-xs text-muted-foreground">{item.year} {item.make} {item.model}</p>
+                            )}
+                          </div>
+                          {item.value && <p className="font-semibold">{formatCurrency(item.value)}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -694,6 +829,7 @@ export default function PolicyDetail() {
               effective_date: policy.effective_date,
               expiration_date: policy.expiration_date,
               billing_frequency: policy.billing_frequency,
+              billing_method: policy.billing_method,
               policy_term: policy.policy_term,
               status: policy.status,
               payment_type: policy.payment_type
