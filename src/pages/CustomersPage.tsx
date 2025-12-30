@@ -7,16 +7,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ActionMenu } from '@/components/customers/ActionMenu';
+import { AddCustomerModal } from '@/components/customers/AddCustomerModal';
 import { useUnifiedCustomers } from '@/hooks/useUnifiedCustomers';
 import { useTags } from '@/hooks/useTags';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+
   // Use unified customers hook that works with the accounts table
   const { customers, loading, fetchCustomers } = useUnifiedCustomers();
   const { tags, seedDefaultTags } = useTags();  // Remove mock account ID for now
+
+  const handleCustomerAdded = () => {
+    fetchCustomers(searchQuery); // Refresh the customer list
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -70,7 +76,7 @@ export default function CustomersPage() {
               <Plus className="mr-2 h-4 w-4" />
               Setup Tags
             </Button>
-            <Button>
+            <Button onClick={() => setAddCustomerOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Customer
             </Button>
@@ -189,7 +195,7 @@ export default function CustomersPage() {
                 }
               </p>
               {!searchQuery && (
-                <Button>
+                <Button onClick={() => setAddCustomerOpen(true)}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add Customer
                 </Button>
@@ -198,6 +204,12 @@ export default function CustomersPage() {
           </Card>
         )}
       </div>
+
+      <AddCustomerModal
+        open={addCustomerOpen}
+        onOpenChange={setAddCustomerOpen}
+        onSuccess={handleCustomerAdded}
+      />
     </AppLayout>
   );
 }

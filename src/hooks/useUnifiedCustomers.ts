@@ -32,20 +32,37 @@ export function useUnifiedCustomers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', limit = 2000, offset = 0, sort = 'updated_at_desc') => {
+  const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc') => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('unified_customer_search', {
-        p_filters: { q: searchQuery },
-        p_limit: limit,
-        p_offset: offset,
-        p_sort: sort
-      });
 
-      if (error) throw error;
+      // Use pagination to handle >1000 customers (Supabase default API limit)
+      const allCustomers: UnifiedCustomer[] = [];
+      const pageSize = 1000;
+      let offset = 0;
+      let hasMore = true;
 
-      setCustomers(data || []);
-      setTotalCount(data?.length || 0);
+      while (hasMore) {
+        const { data, error } = await supabase.rpc('unified_customer_search', {
+          p_filters: { q: searchQuery },
+          p_limit: pageSize,
+          p_offset: offset,
+          p_sort: sort
+        });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allCustomers.push(...data);
+          hasMore = data.length === pageSize; // If we got a full page, there might be more
+          offset += pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setCustomers(allCustomers);
+      setTotalCount(allCustomers.length);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

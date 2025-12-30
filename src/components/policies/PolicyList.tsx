@@ -69,8 +69,32 @@ function isExpiringSoon(expirationDate: string): boolean {
   const now = new Date();
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(now.getDate() + 30);
-  
+
   return expDate > now && expDate <= thirtyDaysFromNow;
+}
+
+function isExpired(expirationDate: string): boolean {
+  const expDate = new Date(expirationDate);
+  const now = new Date();
+  return expDate < now;
+}
+
+function getStatusBadgeClasses(status: string): string {
+  switch (status?.toLowerCase()) {
+    case 'active':
+      return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700';
+    case 'expired':
+      return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700';
+    case 'cancelled':
+    case 'canceled':
+      return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700';
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700';
+    case 'suspended':
+      return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-700';
+  }
 }
 
 export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProps) {
@@ -196,12 +220,18 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
 
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <div className={`flex items-center gap-1 text-sm ${isExpired(policy.expiration_date) ? 'text-red-600 font-bold dark:text-red-400' : ''}`}>
+                        <Calendar className={`h-3 w-3 ${isExpired(policy.expiration_date) ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`} />
                         {format(new Date(policy.expiration_date), 'MMM dd, yyyy')}
                       </div>
-                      {isExpiringSoon(policy.expiration_date) && (
-                        <Badge variant="secondary" className="text-xs">
+                      {isExpired(policy.expiration_date) && (
+                        <Badge variant="destructive" className="text-xs">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Expired
+                        </Badge>
+                      )}
+                      {!isExpired(policy.expiration_date) && isExpiringSoon(policy.expiration_date) && (
+                        <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Expires Soon
                         </Badge>
@@ -217,7 +247,10 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                   </TableCell>
 
                   <TableCell>
-                    <Badge variant={getStatusVariant(policy.status || 'unknown')} className="flex items-center gap-1 w-fit">
+                    <Badge
+                      variant="outline"
+                      className={`flex items-center gap-1 w-fit ${getStatusBadgeClasses(policy.status || 'unknown')}`}
+                    >
                       {getStatusIcon(policy.status || 'unknown')}
                       {policy.status || 'Unknown'}
                     </Badge>
