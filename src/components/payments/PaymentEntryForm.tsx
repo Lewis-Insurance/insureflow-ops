@@ -79,6 +79,7 @@ export function PaymentEntryForm({
 
   const [policySearch, setPolicySearch] = useState('');
   const [policies, setPolicies] = useState<PolicyOption[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyOption | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [policyPopoverOpen, setPolicyPopoverOpen] = useState(false);
 
@@ -187,6 +188,7 @@ export function PaymentEntryForm({
   const handlePolicySelect = (policy: PolicyOption) => {
     form.setValue('policy_id', policy.id);
     form.setValue('account_id', policy.account_id);
+    setSelectedPolicy(policy); // Store the selected policy
     setPolicyPopoverOpen(false);
     setPolicySearch('');
   };
@@ -203,6 +205,7 @@ export function PaymentEntryForm({
       });
 
       form.reset();
+      setSelectedPolicy(null); // Clear selected policy on success
       onSuccess?.({
         receipt_number: result.receipt_number,
         change_given: result.change_given,
@@ -216,7 +219,8 @@ export function PaymentEntryForm({
     }
   };
 
-  const selectedPolicy = policies.find((p) => p.id === form.watch('policy_id'));
+  // Reset selected policy when form is reset
+  const watchedPolicyId = form.watch('policy_id');
 
   return (
     <Card>
@@ -236,28 +240,29 @@ export function PaymentEntryForm({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Policy (Optional)</FormLabel>
-                  <Popover open={policyPopoverOpen} onOpenChange={setPolicyPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn(
-                            'justify-between',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {selectedPolicy
-                            ? `${selectedPolicy.policy_number} - ${selectedPolicy.account_name}`
-                            : 'Search for a policy...'}
-                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
+                  <div className="flex gap-2">
+                    <Popover open={policyPopoverOpen} onOpenChange={setPolicyPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              'justify-between flex-1',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {selectedPolicy
+                              ? `${selectedPolicy.policy_number} - ${selectedPolicy.account_name}`
+                              : 'Search by customer name or policy number...'}
+                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
                     <PopoverContent className="w-[400px] p-0" align="start">
                       <Command>
                         <CommandInput
-                          placeholder="Search by policy number..."
+                          placeholder="Search by customer name or policy #..."
                           value={policySearch}
                           onValueChange={setPolicySearch}
                         />
@@ -290,7 +295,23 @@ export function PaymentEntryForm({
                         </CommandList>
                       </Command>
                     </PopoverContent>
-                  </Popover>
+                    </Popover>
+                    {selectedPolicy && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPolicy(null);
+                          form.setValue('policy_id', null);
+                          form.setValue('account_id', null);
+                        }}
+                        className="px-2"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
