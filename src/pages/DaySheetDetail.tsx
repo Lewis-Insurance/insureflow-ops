@@ -70,7 +70,7 @@ export default function DaySheetDetail() {
 
   const { data: daySheet, isLoading: isLoadingSheet } = useDaySheet(id!);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments({
-    daySheetId: id,
+    day_sheet_id: id,
   });
   const { data: bankAccounts = [] } = useBankAccounts();
   const closeDaySheet = useCloseDaySheet();
