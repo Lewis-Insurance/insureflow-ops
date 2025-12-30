@@ -45,7 +45,8 @@ export function GlobalSearch({
     // Navigate to the appropriate page based on entity type
     switch (result.entity_type) {
       case 'account':
-        navigate(`/crm/accounts/${result.id}`);
+        // Navigate to full customer detail page
+        navigate(`/customers/${result.id}`);
         break;
       case 'contact':
         navigate(`/customers/${result.id}`);
@@ -54,7 +55,8 @@ export function GlobalSearch({
         navigate(`/policies/${result.id}`);
         break;
       case 'business':
-        // Navigate to business detail page when available
+        // Navigate to full customer detail page for businesses too
+        navigate(`/customers/${result.id}`);
         break;
       default:
         break;
