@@ -7,12 +7,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { DollarSign } from 'lucide-react';
 
 interface Policy {
   id: string;
   policy_number: string;
   carrier: string | null;
+  account_id: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
 }
 
 interface AddPaymentModalProps {
@@ -22,21 +30,13 @@ interface AddPaymentModalProps {
   onSuccess?: () => void;
 }
 
-const PAYMENT_METHODS = [
-  { value: 'check', label: 'Check' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'ach', label: 'ACH/Bank Transfer' },
-  { value: 'money_order', label: 'Money Order' },
-  { value: 'other', label: 'Other' },
-];
-
 export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: AddPaymentModalProps) {
   const [policies, setPolicies] = useState<Policy[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [formData, setFormData] = useState({
     policy_id: '',
     amount: '',
-    payment_method: 'check',
+    payment_method_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     reference_number: '',
     notes: '',
@@ -44,11 +44,13 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
   const [loading, setLoading] = useState(false);
   const [loadingPolicies, setLoadingPolicies] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch policies for this account
   useEffect(() => {
     if (open && accountId) {
       fetchPolicies();
+      fetchPaymentMethods();
     }
   }, [open, accountId]);
 
@@ -57,7 +59,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
     try {
       const { data, error } = await supabase
         .from('policies')
-        .select('id, policy_number, carrier')
+        .select('id, policy_number, carrier, account_id')
         .eq('account_id', accountId)
         .order('policy_number');
 
@@ -67,6 +69,26 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
       console.error('Failed to fetch policies:', error);
     } finally {
       setLoadingPolicies(false);
+    }
+  }
+
+  async function fetchPaymentMethods() {
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('id, name, type')
+        .eq('is_active', true)
+        .order('display_order');
+
+      if (error) throw error;
+      setPaymentMethods(data || []);
+
+      // Set default payment method if available
+      if (data && data.length > 0 && !formData.payment_method_id) {
+        setFormData(prev => ({ ...prev, payment_method_id: data[0].id }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch payment methods:', error);
     }
   }
 
@@ -89,6 +111,15 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
       return;
     }
 
+    if (!formData.payment_method_id) {
+      toast({
+        title: 'Error',
+        description: 'Please select a payment method',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -101,56 +132,41 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
         return;
       }
 
-      // Get the selected policy details for the note
+      const amount = parseFloat(formData.amount);
       const selectedPolicy = policies.find(p => p.id === formData.policy_id);
-      const policyDisplay = selectedPolicy
-        ? `${selectedPolicy.policy_number}${selectedPolicy.carrier ? ` (${selectedPolicy.carrier})` : ''}`
-        : formData.policy_id;
 
-      const paymentMethodLabel = PAYMENT_METHODS.find(m => m.value === formData.payment_method)?.label || formData.payment_method;
-      const amount = parseFloat(formData.amount).toFixed(2);
-
-      // Record as a communication/activity note
+      // Insert into premium_payments table
       const { error } = await supabase
-        .from('communications')
+        .from('premium_payments')
         .insert({
+          policy_id: formData.policy_id,
           account_id: accountId,
-          agent_id: user.id,
-          type: 'note',
-          direction: 'outbound',
-          subject: `Payment Recorded: $${amount}`,
-          body: [
-            `Payment of $${amount} recorded`,
-            `Policy: ${policyDisplay}`,
-            `Method: ${paymentMethodLabel}`,
-            formData.reference_number ? `Reference: ${formData.reference_number}` : null,
-            formData.notes ? `Notes: ${formData.notes}` : null,
-          ].filter(Boolean).join('\n'),
-          occurred_at: formData.payment_date,
-          meta: {
-            type: 'payment',
-            amount: parseFloat(formData.amount),
-            policy_id: formData.policy_id,
-            policy_number: selectedPolicy?.policy_number,
-            carrier: selectedPolicy?.carrier,
-            payment_method: formData.payment_method,
-            reference_number: formData.reference_number || null,
-            payment_date: formData.payment_date,
-          },
+          payment_method_id: formData.payment_method_id,
+          amount: amount,
+          received_date: formData.payment_date,
+          received_by: user.id,
+          payment_source: 'in_person',
+          status: 'recorded',
+          reference_number: formData.reference_number || null,
+          notes: formData.notes || null,
+          payer_name: null,
         });
 
       if (error) throw error;
 
       toast({
         title: 'Success',
-        description: `Payment of $${amount} recorded`,
+        description: `Payment of $${amount.toFixed(2)} recorded`,
       });
+
+      // Invalidate payment queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
 
       // Reset form
       setFormData({
         policy_id: '',
         amount: '',
-        payment_method: 'check',
+        payment_method_id: paymentMethods[0]?.id || '',
         payment_date: new Date().toISOString().split('T')[0],
         reference_number: '',
         notes: '',
@@ -241,16 +257,16 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
             <div>
               <Label htmlFor="payment_method">Payment Method</Label>
               <Select
-                value={formData.payment_method}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method: value }))}
+                value={formData.payment_method_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method_id: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHODS.map(method => (
-                    <SelectItem key={method.value} value={method.value}>
-                      {method.label}
+                  {paymentMethods.map(method => (
+                    <SelectItem key={method.id} value={method.id}>
+                      {method.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
