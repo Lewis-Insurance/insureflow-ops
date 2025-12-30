@@ -136,7 +136,7 @@ export default function LewisAIHub() {
               {isAdmin && (
                 <Card
                   className="cursor-pointer border-dashed border-2 hover:border-primary/50 hover:bg-muted/50 transition-all"
-                  onClick={() => navigate('/ai/create-module')}
+                  onClick={() => navigate('/module-builder')}
                 >
                   <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[160px] text-center">
                     <div className="p-3 rounded-full bg-muted mb-3">
