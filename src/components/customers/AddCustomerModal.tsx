@@ -187,28 +187,26 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         throw new Error('Failed to get signed URL');
       }
 
-      // Call document analysis edge function
+      // Get current user for the document analysis
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Generate a unique document ID
+      const documentId = crypto.randomUUID();
+
+      // Get the public URL for the document
+      const { data: publicUrlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(fileName);
+
+      // Call document analysis edge function with correct parameters
       const { data: analysisResult, error: analysisError } = await supabase.functions
         .invoke('ai-document-analysis-azure', {
           body: {
-            documentUrl: urlData.signedUrl,
-            documentType: 'dec_page',
-            extractFields: [
-              'insured_name',
-              'insured_address',
-              'insured_city',
-              'insured_state',
-              'insured_zip',
-              'insured_phone',
-              'insured_email',
-              'policy_number',
-              'carrier_name',
-              'line_of_business',
-              'effective_date',
-              'expiration_date',
-              'premium',
-              'policy_type',
-            ],
+            document_url: publicUrlData.publicUrl,
+            document_id: documentId,
+            file_name: file.name,
+            account_id: null, // No account yet, we're creating one
+            user_id: user?.id || null,
           },
         });
 
@@ -216,16 +214,19 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         throw new Error(`Analysis failed: ${analysisError.message}`);
       }
 
-      // Extract data from analysis result
-      const extracted = analysisResult?.extractedData || analysisResult?.fields || {};
+      // Extract data from analysis result - check various possible field names
+      const extracted = analysisResult?.analysis || analysisResult?.data || analysisResult?.extracted_data || {};
 
       // Auto-fill customer form
       const newFormData = { ...formData };
       if (extracted.insured_name) newFormData.name = extracted.insured_name;
-      if (extracted.insured_address) newFormData.address_line1 = extracted.insured_address;
+
+      // Try to get address from property object or direct fields
+      const address = extracted.property?.address || extracted.insured_address || '';
+      if (address) newFormData.address_line1 = address;
       if (extracted.insured_city) newFormData.city = extracted.insured_city;
       if (extracted.insured_state) {
-        const stateUpper = extracted.insured_state.toUpperCase();
+        const stateUpper = String(extracted.insured_state).toUpperCase();
         if (US_STATES.includes(stateUpper)) {
           newFormData.state = stateUpper;
         }
@@ -234,9 +235,10 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       if (extracted.insured_phone) newFormData.phone = extracted.insured_phone;
       if (extracted.insured_email) newFormData.email = extracted.insured_email;
 
-      // Determine account type from line of business
-      const lob = (extracted.line_of_business || extracted.policy_type || '').toLowerCase();
-      if (lob.includes('commercial') || lob.includes('business') || lob.includes('gl') || lob.includes('bop')) {
+      // Determine account type from document_type or line of business
+      const docType = (extracted.document_type || '').toLowerCase();
+      const lob = (extracted.line_of_business || '').toLowerCase();
+      if (docType.includes('commercial') || lob.includes('commercial') || lob.includes('business') || lob.includes('gl') || lob.includes('bop')) {
         newFormData.type = 'commercial_business';
       }
 
@@ -246,7 +248,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       // Auto-fill policy data
       const newPolicyData = { ...policyData };
       if (extracted.policy_number) newPolicyData.policy_number = extracted.policy_number;
-      if (extracted.carrier_name) newPolicyData.carrier = extracted.carrier_name;
+      // AI returns 'carrier' not 'carrier_name'
+      if (extracted.carrier) newPolicyData.carrier = extracted.carrier;
       if (extracted.line_of_business) newPolicyData.line_of_business = extracted.line_of_business;
       if (extracted.effective_date) {
         // Try to parse and format the date
@@ -261,9 +264,12 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           newPolicyData.expiration_date = date.toISOString().split('T')[0];
         }
       }
-      if (extracted.premium) {
-        // Clean up premium value
-        const premiumStr = String(extracted.premium).replace(/[$,]/g, '');
+      // Premium can be an object {total, frequency} or a simple value
+      const premiumValue = typeof extracted.premium === 'object'
+        ? extracted.premium?.total
+        : extracted.premium;
+      if (premiumValue) {
+        const premiumStr = String(premiumValue).replace(/[$,]/g, '');
         const premiumNum = parseFloat(premiumStr);
         if (!isNaN(premiumNum)) {
           newPolicyData.premium = premiumNum.toString();
@@ -272,7 +278,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       setPolicyData(newPolicyData);
 
       // Enable policy creation if we extracted policy data
-      if (extracted.policy_number || extracted.carrier_name) {
+      if (extracted.policy_number || extracted.carrier) {
         setIncludePolicy(true);
       }
 
