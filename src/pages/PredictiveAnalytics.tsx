@@ -17,6 +17,7 @@ import {
   usePendingInterventions,
   useCreateIntervention,
   useUpdateInterventionStatus,
+  useCalculateAllRiskScores,
   type AtRiskCustomer,
   type ChurnRiskLevel,
 } from '@/hooks/usePredictiveAnalytics';
@@ -54,6 +55,8 @@ import {
   Target,
   CheckCircle2,
   XCircle,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -72,6 +75,7 @@ export default function PredictiveAnalytics() {
   // Mutations
   const createInterventionMutation = useCreateIntervention();
   const updateInterventionMutation = useUpdateInterventionStatus();
+  const calculateAllScores = useCalculateAllRiskScores();
 
   // Filter customers
   const filteredCustomers = atRiskCustomers.filter((customer) => {
@@ -102,11 +106,30 @@ export default function PredictiveAnalytics() {
     <AppLayout>
       <div className="container mx-auto py-8 space-y-8">
         {/* Page Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Predictive Analytics</h1>
-          <p className="text-muted-foreground">
-            AI-powered insights to proactively prevent churn and maximize customer lifetime value
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Predictive Analytics</h1>
+            <p className="text-muted-foreground">
+              AI-powered insights to proactively prevent churn and maximize customer lifetime value
+            </p>
+          </div>
+          <Button
+            onClick={() => calculateAllScores.mutate()}
+            disabled={calculateAllScores.isPending}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            {calculateAllScores.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Analyze All Customers
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Stats Cards */}
