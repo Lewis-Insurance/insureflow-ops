@@ -136,11 +136,11 @@ const initialPolicyData: PolicyData = {
   policy_number: '',
   carrier: '',
   line_of_business: '',
-  policy_term: '12',
+  policy_term: '6', // Default to 6-month (semi-annual) term
   premium: '',
   effective_date: '',
   expiration_date: '',
-  billing_frequency: 'annual',
+  billing_frequency: 'semiannual',
   status: 'active',
 };
 
@@ -485,16 +485,15 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       if (uploadedFile && uploadedFilePath) {
         try {
           // Create a document record linking to the customer (and policy if created)
+          // Using correct column names from documents table schema
           const documentRecord = {
             account_id: newCustomer.id,
             policy_id: createdPolicyId,
             filename: uploadedFile.name,
-            file_path: uploadedFilePath,
-            file_type: uploadedFile.type,
+            storage_path: uploadedFilePath,
+            mime_type: uploadedFile.type,
             file_size: uploadedFile.size,
-            document_type: 'dec_page',
-            uploaded_by: user?.id || null,
-            status: 'processed',
+            kind: 'application',
           };
 
           const { error: docError } = await supabase
@@ -503,7 +502,10 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
           if (docError) {
             console.error('Failed to save document record:', docError);
-            // Don't fail the whole operation, just log the error
+            toast({
+              title: 'Note',
+              description: 'Customer saved but document record failed: ' + docError.message,
+            });
           }
         } catch (docErr) {
           console.error('Error saving document:', docErr);
