@@ -3,13 +3,14 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Building2, Users, Shield } from 'lucide-react';
+import { Plus, Building2, Users, Shield, FileText } from 'lucide-react';
 // Temporarily comment out potentially problematic imports
 // import { CompanyManagement } from '@/components/admin/CompanyManagement';
 // import { CarrierManagement } from '@/components/admin/CarrierManagement';
 import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
 import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
+import { LinesOfBusinessManagement } from '@/components/admin/LinesOfBusinessManagement';
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { EnhancedUserDirectory } from '@/components/admin/EnhancedUserDirectory';
@@ -56,7 +57,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="users-enhanced" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Users (Basic)
@@ -72,6 +73,10 @@ export default function AdminPage() {
             <TabsTrigger value="contacts" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Contacts
+            </TabsTrigger>
+            <TabsTrigger value="policy-types" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Policy Types
             </TabsTrigger>
             <TabsTrigger value="business-types" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
@@ -120,6 +125,23 @@ export default function AdminPage() {
                 <CarrierManagementTab />
               </TabsContent>
             </Tabs>
+          </TabsContent>
+
+          <TabsContent value="policy-types" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Lines of Business
+                </CardTitle>
+                <CardDescription>
+                  Configure policy types like Auto, Home, Commercial, Workers' Comp, etc.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LinesOfBusinessManagement />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="business-types" className="space-y-6">
