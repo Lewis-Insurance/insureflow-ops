@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -34,14 +34,16 @@ import {
   CreditCard,
   Building2,
   AlertCircle,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { useDaySheet, useCloseDaySheet } from '@/hooks/useDaySheets';
 import { usePayments } from '@/hooks/usePayments';
 import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
-import { DaySheetPrintView } from '@/components/payments/DaySheetPrintView';
 import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
+import { downloadDaySheetPDF, printDaySheetPDF } from '@/components/payments/DaySheetPDF';
 import type { PremiumPayment } from '@/types/payments';
 
 const statusColors = {
@@ -57,12 +59,11 @@ export default function DaySheetDetail() {
 
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
   const [closeNotes, setCloseNotes] = useState('');
   const [createDeposit, setCreateDeposit] = useState(true);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
-  const printRef = useRef<HTMLDivElement>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const { data: daySheet, isLoading: isLoadingSheet } = useDaySheet(id!);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments({
@@ -71,19 +72,16 @@ export default function DaySheetDetail() {
   const { data: bankAccounts = [] } = useBankAccounts();
   const closeDaySheet = useCloseDaySheet();
 
-  // Check if we should open the close dialog or print dialog from URL params
+  // Check if we should open the close dialog or trigger print from URL params
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'close' && daySheet?.status === 'open') {
       setShowCloseDialog(true);
-    } else if (action === 'print' && daySheet) {
-      setShowPrintDialog(true);
-      // Auto-trigger print after dialog renders
-      setTimeout(() => {
-        window.print();
-      }, 100);
+    } else if (action === 'print' && daySheet && payments) {
+      // Auto-trigger PDF print
+      handlePrintDaySheet();
     }
-  }, [searchParams, daySheet]);
+  }, [searchParams, daySheet, payments]);
 
   // Set default bank account
   useEffect(() => {
@@ -116,12 +114,68 @@ export default function DaySheetDetail() {
     }
   };
 
-  const handlePrintDaySheet = () => {
-    setShowPrintDialog(true);
-    // Delay print to allow dialog to render
-    setTimeout(() => {
-      window.print();
-    }, 100);
+  const handlePrintDaySheet = async () => {
+    if (!daySheet) return;
+    setIsPrinting(true);
+    try {
+      await printDaySheetPDF(
+        {
+          id: daySheet.id,
+          sheet_date: daySheet.sheet_date,
+          sheet_number: daySheet.sheet_number || undefined,
+          status: daySheet.status,
+          total_cash: daySheet.total_cash || 0,
+          total_checks: daySheet.total_checks || 0,
+          total_credit_cards: daySheet.total_credit_cards || 0,
+          total_debit_cards: daySheet.total_debit_cards || 0,
+          total_ach: daySheet.total_ach || 0,
+          total_agency_bill: daySheet.total_agency_bill || 0,
+          total_other: daySheet.total_other || 0,
+          grand_total: daySheet.grand_total || 0,
+          payment_count: daySheet.payment_count || 0,
+          check_count: daySheet.check_count || 0,
+          notes: daySheet.notes || undefined,
+        },
+        payments,
+        'Lewis Insurance Agency'
+      );
+    } catch (error) {
+      console.error('Failed to print PDF:', error);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleDownloadDaySheet = async () => {
+    if (!daySheet) return;
+    setIsPrinting(true);
+    try {
+      await downloadDaySheetPDF(
+        {
+          id: daySheet.id,
+          sheet_date: daySheet.sheet_date,
+          sheet_number: daySheet.sheet_number || undefined,
+          status: daySheet.status,
+          total_cash: daySheet.total_cash || 0,
+          total_checks: daySheet.total_checks || 0,
+          total_credit_cards: daySheet.total_credit_cards || 0,
+          total_debit_cards: daySheet.total_debit_cards || 0,
+          total_ach: daySheet.total_ach || 0,
+          total_agency_bill: daySheet.total_agency_bill || 0,
+          total_other: daySheet.total_other || 0,
+          grand_total: daySheet.grand_total || 0,
+          payment_count: daySheet.payment_count || 0,
+          check_count: daySheet.check_count || 0,
+          notes: daySheet.notes || undefined,
+        },
+        payments,
+        'Lewis Insurance Agency'
+      );
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleViewPayment = (payment: PremiumPayment) => {
@@ -191,8 +245,20 @@ export default function DaySheetDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePrintDaySheet}>
-            <Printer className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={handleDownloadDaySheet} disabled={isPrinting}>
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Download PDF
+          </Button>
+          <Button variant="outline" onClick={handlePrintDaySheet} disabled={isPrinting}>
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4 mr-2" />
+            )}
             Print
           </Button>
           {daySheet.status === 'open' && (
@@ -473,51 +539,6 @@ export default function DaySheetDetail() {
             daySheetId={id}
             onSuccess={() => setShowNewPaymentDialog(false)}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Print Dialog */}
-      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible">
-          <DialogHeader className="no-print">
-            <DialogTitle>Print Preview</DialogTitle>
-            <DialogDescription>
-              Review the day sheet before printing.
-            </DialogDescription>
-          </DialogHeader>
-          <DaySheetPrintView
-            ref={printRef}
-            daySheet={{
-              id: daySheet?.id || '',
-              sheet_date: daySheet?.sheet_date || '',
-              sheet_number: daySheet?.sheet_number || undefined,
-              status: daySheet?.status || 'open',
-              total_cash: daySheet?.total_cash || 0,
-              total_checks: daySheet?.total_checks || 0,
-              total_credit_cards: daySheet?.total_credit_cards || 0,
-              total_debit_cards: daySheet?.total_debit_cards || 0,
-              total_ach: daySheet?.total_ach || 0,
-              total_agency_bill: daySheet?.total_agency_bill || 0,
-              total_other: daySheet?.total_other || 0,
-              grand_total: daySheet?.grand_total || 0,
-              payment_count: daySheet?.payment_count || 0,
-              check_count: daySheet?.check_count || 0,
-              notes: daySheet?.notes || undefined,
-              opened_at: daySheet?.opened_at || undefined,
-              closed_at: daySheet?.closed_at || undefined,
-            }}
-            payments={payments}
-            agencyName="Lewis Insurance Agency"
-          />
-          <DialogFooter className="no-print">
-            <Button variant="outline" onClick={() => setShowPrintDialog(false)}>
-              Close
-            </Button>
-            <Button onClick={() => window.print()}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
