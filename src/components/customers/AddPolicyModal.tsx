@@ -41,6 +41,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
     effective_date: '',
     expiration_date: '',
     billing_frequency: 'semiannual', // Default to semi-annual
+    billing_method: 'direct_bill', // Default to direct bill
     policy_term: 'semiannual', // Default to semi-annual
     status: 'active',
   });
@@ -308,6 +309,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         effective_date: formData.effective_date,
         expiration_date: formData.expiration_date,
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
+        billing_method: formData.billing_method as 'direct_bill' | 'agency_bill',
         policy_term: formData.policy_term || null,
         status: formData.status,
       };
@@ -381,6 +383,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         effective_date: '',
         expiration_date: '',
         billing_frequency: 'semiannual',
+        billing_method: 'direct_bill',
         policy_term: 'semiannual',
         status: 'active',
       });
@@ -595,12 +598,10 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly_bill">Monthly Bill</SelectItem>
-                  <SelectItem value="monthly_ach">Monthly ACH</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="quarterly">Quarterly</SelectItem>
                   <SelectItem value="semiannual">Semi-Annual</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="escrow">Escrow</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -619,7 +620,18 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
                 </SelectContent>
               </Select>
             </div>
-            <div></div>
+            <div>
+              <Label htmlFor="billing_method">Billing Method</Label>
+              <Select value={formData.billing_method} onValueChange={(value) => handleInputChange('billing_method', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="direct_bill">Direct Bill</SelectItem>
+                  <SelectItem value="agency_bill">Agency Bill</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
