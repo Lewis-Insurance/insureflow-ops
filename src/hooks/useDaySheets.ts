@@ -12,8 +12,15 @@ export const daySheetKeys = {
   current: () => [...daySheetKeys.all, 'current'] as const,
 };
 
+// Extended filters interface to support both naming conventions
+interface ExtendedDaySheetFilters extends DaySheetFilters {
+  startDate?: string;
+  endDate?: string;
+  status?: 'open' | 'closed' | 'deposited' | DaySheetFilters['status'];
+}
+
 // Fetch day sheets with filters
-export function useDaySheets(filters: DaySheetFilters = {}) {
+export function useDaySheets(filters: ExtendedDaySheetFilters = {}) {
   return useQuery({
     queryKey: daySheetKeys.list(filters),
     queryFn: async () => {
@@ -23,15 +30,25 @@ export function useDaySheets(filters: DaySheetFilters = {}) {
         .is('deleted_at', null)
         .order('sheet_date', { ascending: false });
 
-      // Apply filters
-      if (filters.status?.length) {
-        query = query.in('status', filters.status);
+      // Apply filters - support both naming conventions
+      const statusFilter = filters.status;
+      if (statusFilter) {
+        // Handle both single string and array formats
+        const statusArray = Array.isArray(statusFilter) ? statusFilter : [statusFilter];
+        if (statusArray.length > 0) {
+          query = query.in('status', statusArray);
+        }
       }
-      if (filters.date_from) {
-        query = query.gte('sheet_date', filters.date_from);
+
+      // Support both date_from/date_to and startDate/endDate
+      const dateFrom = filters.date_from || filters.startDate;
+      const dateTo = filters.date_to || filters.endDate;
+
+      if (dateFrom) {
+        query = query.gte('sheet_date', dateFrom);
       }
-      if (filters.date_to) {
-        query = query.lte('sheet_date', filters.date_to);
+      if (dateTo) {
+        query = query.lte('sheet_date', dateTo);
       }
 
       const { data, error } = await query;
