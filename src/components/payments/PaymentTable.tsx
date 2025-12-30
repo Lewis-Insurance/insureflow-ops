@@ -162,7 +162,7 @@ export function PaymentTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Receipt #</TableHead>
+              <TableHead>Customer</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Payer</TableHead>
               <TableHead>Method</TableHead>
@@ -187,8 +187,15 @@ export function PaymentTable({
 
                 return (
                   <TableRow key={payment.id}>
-                    <TableCell className="font-mono text-sm">
-                      {payment.receipt_number}
+                    <TableCell>
+                      <div className="font-medium">
+                        {(payment as any).account?.name || 'Unknown'}
+                      </div>
+                      {payment.receipt_number && (
+                        <div className="text-xs text-muted-foreground font-mono">
+                          #{payment.receipt_number}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {format(new Date(payment.received_date), 'MMM d, yyyy')}
