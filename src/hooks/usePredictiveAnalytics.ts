@@ -206,6 +206,7 @@ export function useCalculateRiskScores() {
 /**
  * Calculate risk scores for all accounts in batches
  * Processes 25 customers at a time to avoid timeout
+ * Uses pagination to handle more than 1000 accounts (Supabase default limit)
  */
 export function useCalculateAllRiskScores(
   onProgress?: (current: number, total: number) => void
@@ -214,14 +215,33 @@ export function useCalculateAllRiskScores(
 
   return useMutation({
     mutationFn: async () => {
-      // First, get all account IDs
-      const { data: accounts, error: accountsError } = await supabase
-        .from('accounts')
-        .select('id')
-        .order('created_at', { ascending: false });
+      // Fetch all account IDs with pagination (Supabase defaults to 1000 row limit)
+      const allAccounts: { id: string }[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      if (accountsError) throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
-      if (!accounts || accounts.length === 0) throw new Error('No accounts found');
+      while (hasMore) {
+        const { data: accounts, error: accountsError } = await supabase
+          .from('accounts')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (accountsError) throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+
+        if (accounts && accounts.length > 0) {
+          allAccounts.push(...accounts);
+          hasMore = accounts.length === pageSize; // If we got a full page, there might be more
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allAccounts.length === 0) throw new Error('No accounts found');
+
+      const accounts = allAccounts;
 
       const accountIds = accounts.map(a => a.id);
       const batchSize = 25;
@@ -466,28 +486,47 @@ export function usePendingInterventions(assignedToUserId?: string) {
 
 /**
  * Get dashboard summary statistics
+ * Uses pagination to handle more than 1000 customer scores (Supabase default limit)
  */
 export function useRiskDashboardStats() {
   return useQuery({
     queryKey: ['risk-dashboard-stats'],
     queryFn: async () => {
-      const { data: scores, error} = await supabase
-        .from('customer_risk_scores')
-        .select('*')
-        .gt('expires_at', new Date().toISOString());
+      // Fetch all scores with pagination (Supabase defaults to 1000 row limit)
+      const allScores: any[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: scores, error } = await supabase
+          .from('customer_risk_scores')
+          .select('churn_risk_level, churn_probability, predicted_lifetime_value')
+          .gt('expires_at', new Date().toISOString())
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      const total = scores?.length || 0;
-      const critical = scores?.filter((s: any) => s.churn_risk_level === 'critical').length || 0;
-      const high = scores?.filter((s: any) => s.churn_risk_level === 'high').length || 0;
-      const medium = scores?.filter((s: any) => s.churn_risk_level === 'medium').length || 0;
-      const low = scores?.filter((s: any) => s.churn_risk_level === 'low').length || 0;
+        if (error) throw error;
 
-      const totalLTV = scores?.reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0) || 0;
+        if (scores && scores.length > 0) {
+          allScores.push(...scores);
+          hasMore = scores.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const scores = allScores;
+      const total = scores.length;
+      const critical = scores.filter((s: any) => s.churn_risk_level === 'critical').length;
+      const high = scores.filter((s: any) => s.churn_risk_level === 'high').length;
+      const medium = scores.filter((s: any) => s.churn_risk_level === 'medium').length;
+      const low = scores.filter((s: any) => s.churn_risk_level === 'low').length;
+
+      const totalLTV = scores.reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0);
       const ltvAtRisk = scores
-        ?.filter((s: any) => s.churn_probability >= 50)
-        .reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0) || 0;
+        .filter((s: any) => s.churn_probability >= 50)
+        .reduce((sum: number, s: any) => sum + (s.predicted_lifetime_value || 0), 0);
 
       const avgChurnProbability = total > 0
         ? scores.reduce((sum: number, s: any) => sum + s.churn_probability, 0) / total
