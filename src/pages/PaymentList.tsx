@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -120,6 +121,7 @@ export default function PaymentList() {
   ];
 
   return (
+    <AppLayout>
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -414,5 +416,6 @@ export default function PaymentList() {
         </DialogContent>
       </Dialog>
     </div>
+    </AppLayout>
   );
 }
