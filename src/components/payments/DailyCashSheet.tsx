@@ -77,41 +77,41 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
     const emptyRowsNeeded = Math.max(0, minRows - sortedPayments.length);
 
     return (
-      <div ref={ref} className="daily-cash-sheet bg-white p-6 font-mono text-sm">
+      <div ref={ref} className="daily-cash-sheet p-6 font-mono text-sm" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
-          <div className="text-sm font-bold">
+          <div className="text-sm font-bold" style={{ color: '#000000' }}>
             {format(parseISO(sheetDate), 'MM/dd/yy')}
           </div>
           <div className="text-center flex-1">
-            <h1 className="text-xl font-bold tracking-wide">DAILY CASH</h1>
+            <h1 className="text-xl font-bold tracking-wide" style={{ color: '#000000' }}>DAILY CASH</h1>
           </div>
           <div className="w-16"></div>
         </div>
 
         {/* Main Table */}
-        <table className="w-full border-collapse border border-black">
+        <table className="w-full border-collapse" style={{ border: '1px solid #000000', color: '#000000' }}>
           <thead>
-            <tr>
-              <th className="border border-black p-2 text-left font-normal w-[18%]">
+            <tr style={{ backgroundColor: '#f3f4f6' }}>
+              <th className="p-2 text-left font-normal w-[18%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Name Insured
               </th>
-              <th className="border border-black p-2 text-left font-normal w-[14%]">
+              <th className="p-2 text-left font-normal w-[14%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Company
               </th>
-              <th className="border border-black p-2 text-center font-normal w-[14%]">
+              <th className="p-2 text-center font-normal w-[14%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Cash to Escrow
               </th>
-              <th className="border border-black p-2 text-center font-normal w-[14%]">
+              <th className="p-2 text-center font-normal w-[14%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 M/O or Check<br />to Escrow
               </th>
-              <th className="border border-black p-2 text-center font-normal w-[14%]">
+              <th className="p-2 text-center font-normal w-[14%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Paid to Company
               </th>
-              <th className="border border-black p-2 text-center font-normal w-[16%]">
+              <th className="p-2 text-center font-normal w-[16%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Cash/Check/Money<br />Order/Credit<br />Card/EFT
               </th>
-              <th className="border border-black p-2 text-center font-normal w-[10%]">
+              <th className="p-2 text-center font-normal w-[10%]" style={{ border: '1px solid #000000', color: '#000000' }}>
                 Check#
               </th>
             </tr>
@@ -124,10 +124,10 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
               const carrier = payment.policy?.carrier || '-';
 
               return (
-                <tr key={payment.id}>
-                  <td className="border border-black p-2">{customerName}</td>
-                  <td className="border border-black p-2">{carrier}</td>
-                  <td className="border border-black p-2 text-right">
+                <tr key={payment.id} style={{ backgroundColor: '#ffffff' }}>
+                  <td className="p-2" style={{ border: '1px solid #000000', color: '#000000' }}>{customerName}</td>
+                  <td className="p-2" style={{ border: '1px solid #000000', color: '#000000' }}>{carrier}</td>
+                  <td className="p-2 text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                     {category === 'cash' && (
                       <>
                         <span className="mr-1">$</span>
@@ -135,7 +135,7 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
                       </>
                     )}
                   </td>
-                  <td className="border border-black p-2 text-right">
+                  <td className="p-2 text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                     {category === 'check' && (
                       <>
                         <span className="mr-1">$</span>
@@ -143,7 +143,7 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
                       </>
                     )}
                   </td>
-                  <td className="border border-black p-2 text-right">
+                  <td className="p-2 text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                     {category === 'company' && (
                       <>
                         <span className="mr-1">$</span>
@@ -151,10 +151,10 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
                       </>
                     )}
                   </td>
-                  <td className="border border-black p-2 text-center">
+                  <td className="p-2 text-center" style={{ border: '1px solid #000000', color: '#000000' }}>
                     {getPaymentTypeAbbr(payment.payment_method?.type)}
                   </td>
-                  <td className="border border-black p-2 text-center">
+                  <td className="p-2 text-center" style={{ border: '1px solid #000000', color: '#000000' }}>
                     {payment.check_number || ''}
                   </td>
                 </tr>
@@ -163,14 +163,14 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
 
             {/* Empty rows to fill page */}
             {Array.from({ length: emptyRowsNeeded }).map((_, idx) => (
-              <tr key={`empty-${idx}`}>
-                <td className="border border-black p-2 h-8"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
+              <tr key={`empty-${idx}`} style={{ backgroundColor: '#ffffff' }}>
+                <td className="p-2 h-8" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
               </tr>
             ))}
           </tbody>
@@ -178,37 +178,37 @@ export const DailyCashSheet = forwardRef<HTMLDivElement, DailyCashSheetProps>(
 
         {/* Totals Section */}
         <div className="mt-0">
-          <table className="border-collapse">
+          <table className="border-collapse" style={{ color: '#000000' }}>
             <tbody>
-              <tr>
-                <td className="border border-black p-2 w-[18%]"></td>
-                <td className="border border-black p-2 w-[14%] font-bold">Totals</td>
-                <td className="border border-black p-2 w-[14%] text-right">
+              <tr style={{ backgroundColor: '#ffffff' }}>
+                <td className="p-2 w-[18%]" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2 w-[14%] font-bold" style={{ border: '1px solid #000000', color: '#000000' }}>Totals</td>
+                <td className="p-2 w-[14%] text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                   <span className="mr-1">$</span>
                   {formatCurrency(totals.cash) || '-'}
                 </td>
-                <td className="border border-black p-2 w-[14%] text-right">
+                <td className="p-2 w-[14%] text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                   <span className="mr-1">$</span>
                   {formatCurrency(totals.check) || '-'}
                 </td>
-                <td className="border border-black p-2 w-[14%] text-right">
+                <td className="p-2 w-[14%] text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                   <span className="mr-1">$</span>
                   {formatCurrency(totals.company) || '-'}
                 </td>
-                <td className="border border-black p-2 w-[16%]"></td>
-                <td className="border border-black p-2 w-[10%]"></td>
+                <td className="p-2 w-[16%]" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2 w-[10%]" style={{ border: '1px solid #000000' }}></td>
               </tr>
-              <tr>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2 font-bold">Total to Deposit</td>
-                <td className="border border-black p-2 text-right">
+              <tr style={{ backgroundColor: '#ffffff' }}>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2 font-bold" style={{ border: '1px solid #000000', color: '#000000' }}>Total to Deposit</td>
+                <td className="p-2 text-right" style={{ border: '1px solid #000000', color: '#000000' }}>
                   <span className="mr-1">$</span>
                   {formatCurrency(totalToDeposit) || '-'}
                 </td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
-                <td className="border border-black p-2"></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
+                <td className="p-2" style={{ border: '1px solid #000000' }}></td>
               </tr>
             </tbody>
           </table>
