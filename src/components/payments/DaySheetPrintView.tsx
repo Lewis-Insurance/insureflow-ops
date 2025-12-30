@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import type { PremiumPayment } from '@/types/payments';
 
 interface DaySheetData {
@@ -76,7 +76,7 @@ export const DaySheetPrintView = forwardRef<HTMLDivElement, DaySheetPrintViewPro
           <h1 className="text-2xl font-bold">{agencyName}</h1>
           <h2 className="text-xl font-semibold mt-2">Daily Payment Sheet</h2>
           <p className="text-lg mt-1">
-            {format(new Date(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
+            {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
           </p>
           {daySheet.sheet_number && (
             <p className="text-sm text-gray-600 mt-1">Sheet #: {daySheet.sheet_number}</p>

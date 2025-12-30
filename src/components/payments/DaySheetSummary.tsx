@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -86,7 +86,7 @@ export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSumm
             </div>
             <div>
               <CardTitle className="text-lg">
-                {format(new Date(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
+                {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
               </CardTitle>
               {daySheet.sheet_number && (
                 <p className="text-sm text-muted-foreground font-mono">{daySheet.sheet_number}</p>

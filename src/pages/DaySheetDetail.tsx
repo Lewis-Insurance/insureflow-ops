@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -176,7 +176,7 @@ export default function DaySheetDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">
-                {format(new Date(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
+                {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
               </h1>
               <Badge className={statusColors[daySheet.status]}>
                 {daySheet.status === 'open' && <Clock className="h-3 w-3 mr-1" />}

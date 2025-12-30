@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -298,7 +298,7 @@ export default function DaySheets() {
                       onClick={() => navigate(`/day-sheets/${sheet.id}`)}
                     >
                       <TableCell className="font-medium">
-                        {format(new Date(sheet.sheet_date), 'MMM d, yyyy')}
+                        {format(parseISO(sheet.sheet_date), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {sheet.sheet_number || '-'}
