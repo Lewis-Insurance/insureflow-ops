@@ -42,91 +42,107 @@ export function usePolicies(filters: PolicyFilters = {}) {
   return useQuery({
     queryKey: ['policies', filters],
     queryFn: async () => {
-      let query = supabase
-        .from('policies')
-        .select(`
-          *,
-          account:accounts!policies_account_id_fkey(
-            id,
-            name,
-            type,
-            zip_code
-          ),
-          carrier_info:carriers!policies_carrier_id_fkey(
-            id,
-            name
-          ),
-          mga_info:mgas!policies_mga_id_fkey(
-            id,
-            name,
-            code
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5000);
+      // Use pagination to handle >1000 policies (Supabase default API limit)
+      const allPolicies: PolicyWithAccount[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      // Apply filters
-      if (filters.search) {
-        const searchCondition = sanitizeMultiFieldSearch(filters.search, ['policy_number', 'carrier', 'line_of_business']);
-        query = query.or(searchCondition);
-      }
+      while (hasMore) {
+        let query = supabase
+          .from('policies')
+          .select(`
+            *,
+            account:accounts!policies_account_id_fkey(
+              id,
+              name,
+              type,
+              zip_code
+            ),
+            carrier_info:carriers!policies_carrier_id_fkey(
+              id,
+              name
+            ),
+            mga_info:mgas!policies_mga_id_fkey(
+              id,
+              name,
+              code
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (filters.policyNumber) {
-        const sanitized = sanitizeForILike(filters.policyNumber);
-        query = query.ilike('policy_number', `%${sanitized}%`);
-      }
+        // Apply filters
+        if (filters.search) {
+          const searchCondition = sanitizeMultiFieldSearch(filters.search, ['policy_number', 'carrier', 'line_of_business']);
+          query = query.or(searchCondition);
+        }
 
-      if (filters.effectiveDateFrom) {
-        query = query.gte('effective_date', filters.effectiveDateFrom);
-      }
+        if (filters.policyNumber) {
+          const sanitized = sanitizeForILike(filters.policyNumber);
+          query = query.ilike('policy_number', `%${sanitized}%`);
+        }
 
-      if (filters.effectiveDateTo) {
-        query = query.lte('effective_date', filters.effectiveDateTo);
-      }
+        if (filters.effectiveDateFrom) {
+          query = query.gte('effective_date', filters.effectiveDateFrom);
+        }
 
-      if (filters.expirationDateFrom) {
-        query = query.gte('expiration_date', filters.expirationDateFrom);
-      }
+        if (filters.effectiveDateTo) {
+          query = query.lte('effective_date', filters.effectiveDateTo);
+        }
 
-      if (filters.expirationDateTo) {
-        query = query.lte('expiration_date', filters.expirationDateTo);
-      }
+        if (filters.expirationDateFrom) {
+          query = query.gte('expiration_date', filters.expirationDateFrom);
+        }
 
-      if (filters.carrier) {
-        const sanitized = sanitizeForILike(filters.carrier);
-        query = query.ilike('carrier', `%${sanitized}%`);
-      }
+        if (filters.expirationDateTo) {
+          query = query.lte('expiration_date', filters.expirationDateTo);
+        }
 
-      if (filters.mga) {
-        query = query.eq('mga_id', filters.mga);
-      }
+        if (filters.carrier) {
+          const sanitized = sanitizeForILike(filters.carrier);
+          query = query.ilike('carrier', `%${sanitized}%`);
+        }
 
-      if (filters.lineOfBusiness) {
-        const sanitized = sanitizeForILike(filters.lineOfBusiness);
-        query = query.ilike('line_of_business', `%${sanitized}%`);
-      }
+        if (filters.mga) {
+          query = query.eq('mga_id', filters.mga);
+        }
 
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
+        if (filters.lineOfBusiness) {
+          const sanitized = sanitizeForILike(filters.lineOfBusiness);
+          query = query.ilike('line_of_business', `%${sanitized}%`);
+        }
 
-      const { data, error } = await query;
+        if (filters.status) {
+          query = query.eq('status', filters.status);
+        }
 
-      if (error) {
-        throw new Error(`Failed to fetch policies: ${error.message}`);
+        const { data, error } = await query;
+
+        if (error) {
+          throw new Error(`Failed to fetch policies: ${error.message}`);
+        }
+
+        if (data && data.length > 0) {
+          allPolicies.push(...(data as PolicyWithAccount[]));
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
       // Filter by business type and zip code if provided (from related account)
-      let filteredData = data as PolicyWithAccount[];
+      let filteredData = allPolicies;
 
       if (filters.businessType) {
-        filteredData = filteredData.filter(policy => 
+        filteredData = filteredData.filter(policy =>
           policy.account?.type?.toLowerCase().includes(filters.businessType!.toLowerCase())
         );
       }
 
       if (filters.zipCode) {
-        filteredData = filteredData.filter(policy => 
+        filteredData = filteredData.filter(policy =>
           policy.account?.zip_code?.includes(filters.zipCode!)
         );
       }
@@ -141,25 +157,42 @@ export function usePolicyStats() {
   return useQuery({
     queryKey: ['policy-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('policies')
-        .select(`
-          status,
-          carrier,
-          line_of_business,
-          effective_date,
-          expiration_date,
-          mga_info:mgas!policies_mga_id_fkey(
-            id,
-            name
-          )
-        `)
-        .limit(5000);
+      // Use pagination to handle >1000 policies (Supabase default API limit)
+      const allPolicies: any[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      if (error) {
-        throw new Error(`Failed to fetch policy stats: ${error.message}`);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('policies')
+          .select(`
+            status,
+            carrier,
+            line_of_business,
+            effective_date,
+            expiration_date,
+            mga_info:mgas!policies_mga_id_fkey(
+              id,
+              name
+            )
+          `)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) {
+          throw new Error(`Failed to fetch policy stats: ${error.message}`);
+        }
+
+        if (data && data.length > 0) {
+          allPolicies.push(...data);
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
+      const data = allPolicies;
       const now = new Date();
       const stats = {
         total: data.length,
