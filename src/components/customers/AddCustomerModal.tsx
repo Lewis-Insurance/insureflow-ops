@@ -124,6 +124,7 @@ interface PolicyData {
   policy_number: string;
   carrier: string;
   line_of_business: string;
+  policy_term: string;
   premium: string;
   effective_date: string;
   expiration_date: string;
@@ -135,6 +136,7 @@ const initialPolicyData: PolicyData = {
   policy_number: '',
   carrier: '',
   line_of_business: '',
+  policy_term: '12',
   premium: '',
   effective_date: '',
   expiration_date: '',
@@ -447,6 +449,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           policy_number: policyData.policy_number.trim(),
           carrier: policyData.carrier.trim(),
           line_of_business: policyData.line_of_business.trim() || null,
+          policy_term: policyData.policy_term || null,
           premium: policyData.premium ? parseFloat(policyData.premium.replace(/,/g, '')) : null,
           effective_date: policyData.effective_date || null,
           expiration_date: policyData.expiration_date || null,
@@ -782,21 +785,35 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                     </datalist>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="line_of_business">Line of Business</Label>
+                    <Label htmlFor="line_of_business">Policy Type</Label>
                     <Input
                       id="line_of_business"
                       list="lob-suggestions"
                       value={policyData.line_of_business}
                       onChange={(e) => handlePolicyChange('line_of_business', e.target.value)}
-                      placeholder="Type or select"
+                      placeholder="e.g., Auto, Home"
                     />
                     <datalist id="lob-suggestions">
                       {linesOfBusiness.map(lob => (
                         <option key={lob.id} value={lob.name} />
                       ))}
                     </datalist>
+                  </div>
+                  <div>
+                    <Label htmlFor="policy_term">Policy Term</Label>
+                    <Select value={policyData.policy_term} onValueChange={(value) => handlePolicyChange('policy_term', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select term" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 Month</SelectItem>
+                        <SelectItem value="3">3 Months</SelectItem>
+                        <SelectItem value="6">6 Months</SelectItem>
+                        <SelectItem value="12">12 Months</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="premium">Premium</Label>
@@ -876,8 +893,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           </div>
         </div>
 
-        {/* Sticky Footer */}
-        <div className="flex justify-end gap-2 pt-4 border-t bg-background sticky bottom-0">
+        {/* Footer - Fixed at bottom */}
+        <div className="flex justify-end gap-2 pt-4 border-t mt-4 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
