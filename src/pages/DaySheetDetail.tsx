@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -145,6 +146,7 @@ export default function DaySheetDetail() {
   const depositableAmount = (daySheet.total_cash || 0) + (daySheet.total_checks || 0);
 
   return (
+    <AppLayout>
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -454,5 +456,6 @@ export default function DaySheetDetail() {
         </DialogContent>
       </Dialog>
     </div>
+    </AppLayout>
   );
 }
