@@ -66,6 +66,7 @@ export default function PredictiveAnalytics() {
   const [selectedCustomer, setSelectedCustomer] = useState<AtRiskCustomer | null>(null);
   const [showInterventionDialog, setShowInterventionDialog] = useState(false);
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Queries
   const { data: atRiskCustomers = [], isLoading: loadingCustomers } = useAtRiskCustomers(50); // 50% threshold
@@ -75,7 +76,18 @@ export default function PredictiveAnalytics() {
   // Mutations
   const createInterventionMutation = useCreateIntervention();
   const updateInterventionMutation = useUpdateInterventionStatus();
-  const calculateAllScores = useCalculateAllRiskScores();
+  const calculateAllScores = useCalculateAllRiskScores((current, total) => {
+    setProgress({ current, total });
+  });
+
+  const handleAnalyzeAll = () => {
+    setProgress({ current: 0, total: 0 });
+    calculateAllScores.mutate(undefined, {
+      onSettled: () => {
+        setProgress(null);
+      },
+    });
+  };
 
   // Filter customers
   const filteredCustomers = atRiskCustomers.filter((customer) => {
@@ -114,14 +126,17 @@ export default function PredictiveAnalytics() {
             </p>
           </div>
           <Button
-            onClick={() => calculateAllScores.mutate()}
+            onClick={handleAnalyzeAll}
             disabled={calculateAllScores.isPending}
             className="bg-purple-600 hover:bg-purple-700"
           >
             {calculateAllScores.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Analyzing...
+                {progress && progress.total > 0
+                  ? `Analyzing ${progress.current} of ${progress.total}...`
+                  : 'Starting analysis...'
+                }
               </>
             ) : (
               <>

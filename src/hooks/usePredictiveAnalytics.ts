@@ -204,32 +204,85 @@ export function useCalculateRiskScores() {
 }
 
 /**
- * Calculate risk scores for all accounts (background job)
+ * Calculate risk scores for all accounts in batches
+ * Processes 25 customers at a time to avoid timeout
  */
-export function useCalculateAllRiskScores() {
+export function useCalculateAllRiskScores(
+  onProgress?: (current: number, total: number) => void
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('calculate-customer-risk', {
-        body: { calculateAll: true },
-      });
+      // First, get all account IDs
+      const { data: accounts, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id')
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Risk calculation failed');
+      if (accountsError) throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+      if (!accounts || accounts.length === 0) throw new Error('No accounts found');
 
-      return data;
+      const accountIds = accounts.map(a => a.id);
+      const batchSize = 25;
+      const batches = [];
+
+      // Split into batches
+      for (let i = 0; i < accountIds.length; i += batchSize) {
+        batches.push(accountIds.slice(i, i + batchSize));
+      }
+
+      let totalAnalyzed = 0;
+      const allResults: any[] = [];
+
+      // Report initial progress
+      onProgress?.(0, accountIds.length);
+
+      // Process each batch
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+
+        const { data, error } = await supabase.functions.invoke('calculate-customer-risk', {
+          body: { accountIds: batch },
+        });
+
+        if (error) {
+          console.error(`Batch ${i + 1} error:`, error);
+          // Continue with next batch instead of failing completely
+        } else if (data?.success) {
+          totalAnalyzed += data.analyzed || 0;
+          if (data.results) {
+            allResults.push(...data.results);
+          }
+        }
+
+        // Report progress after each batch
+        onProgress?.((i + 1) * batchSize, accountIds.length);
+
+        // Small delay between batches to avoid rate limiting
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      return {
+        success: true,
+        analyzed: totalAnalyzed,
+        total: accountIds.length,
+        results: allResults,
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
       queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard-stats'] });
 
-      toast.success(`Analyzed ${data.analyzed} customers`, {
-        description: 'All risk scores have been updated',
+      toast.success(`Analyzed ${data.analyzed} of ${data.total} customers`, {
+        description: 'Risk scores have been updated',
       });
     },
     onError: (error: Error) => {
-      toast.error('Bulk risk calculation failed', {
+      toast.error('Risk calculation failed', {
         description: error.message,
       });
     },
