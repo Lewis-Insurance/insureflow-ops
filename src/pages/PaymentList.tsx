@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
+import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import { usePayments, useVoidPayment } from '@/hooks/usePayments';
 import { useCurrentDaySheet } from '@/hooks/useDaySheets';
 import type { PremiumPayment } from '@/types/payments';
@@ -46,6 +47,7 @@ export default function PaymentList() {
   });
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PremiumPayment | null>(null);
+  const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
   const { data: payments = [], isLoading } = usePayments({
@@ -87,6 +89,10 @@ export default function PaymentList() {
 
   const handleViewPayment = (payment: PremiumPayment) => {
     setSelectedPayment(payment);
+  };
+
+  const handleEditPayment = (payment: PremiumPayment) => {
+    setEditingPayment(payment);
   };
 
   const handlePrintReceipt = (payment: PremiumPayment) => {
@@ -285,6 +291,7 @@ export default function PaymentList() {
                 payments={payments}
                 isLoading={isLoading}
                 onViewPayment={handleViewPayment}
+                onEditPayment={handleEditPayment}
                 onPrintReceipt={handlePrintReceipt}
                 onVoidPayment={handleVoidPayment}
               />
@@ -294,6 +301,7 @@ export default function PaymentList() {
                 payments={payments.filter((p) => p.status === 'recorded')}
                 isLoading={isLoading}
                 onViewPayment={handleViewPayment}
+                onEditPayment={handleEditPayment}
                 onPrintReceipt={handlePrintReceipt}
                 onVoidPayment={handleVoidPayment}
               />
@@ -303,6 +311,7 @@ export default function PaymentList() {
                 payments={payments.filter((p) => p.status === 'deposited')}
                 isLoading={isLoading}
                 onViewPayment={handleViewPayment}
+                onEditPayment={handleEditPayment}
                 onPrintReceipt={handlePrintReceipt}
                 onVoidPayment={handleVoidPayment}
               />
@@ -312,6 +321,7 @@ export default function PaymentList() {
                 payments={payments.filter((p) => p.status === 'voided')}
                 isLoading={isLoading}
                 onViewPayment={handleViewPayment}
+                onEditPayment={handleEditPayment}
                 onPrintReceipt={handlePrintReceipt}
                 onVoidPayment={handleVoidPayment}
               />
@@ -417,6 +427,14 @@ export default function PaymentList() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Payment Modal */}
+      <EditPaymentModal
+        open={!!editingPayment}
+        onOpenChange={(open) => !open && setEditingPayment(null)}
+        payment={editingPayment}
+        onSuccess={() => setEditingPayment(null)}
+      />
     </div>
     </AppLayout>
   );

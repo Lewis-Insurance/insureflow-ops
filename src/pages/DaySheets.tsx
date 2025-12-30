@@ -31,6 +31,7 @@ import {
   DollarSign,
   Receipt,
   Filter,
+  Printer,
 } from 'lucide-react';
 import { useDaySheets, useCurrentDaySheet } from '@/hooks/useDaySheets';
 import { DaySheetSummary } from '@/components/payments/DaySheetSummary';
@@ -126,6 +127,13 @@ export default function DaySheets() {
               <Button className="w-full" onClick={() => navigate('/payments/new')}>
                 <DollarSign className="h-4 w-4 mr-2" />
                 Record Payment
+              </Button>
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => navigate(`/day-sheets/${currentDaySheet.id}?action=print`)}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Today&apos;s Day Sheet
               </Button>
               <Button
                 variant="outline"

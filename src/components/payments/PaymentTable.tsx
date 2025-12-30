@@ -35,7 +35,8 @@ import {
   Banknote,
   CreditCard,
   Building2,
-  Receipt
+  Receipt,
+  Pencil
 } from 'lucide-react';
 import type { PremiumPayment, PaymentMethodType } from '@/types/payments';
 
@@ -43,6 +44,7 @@ interface PaymentTableProps {
   payments: PremiumPayment[];
   isLoading?: boolean;
   onViewPayment?: (payment: PremiumPayment) => void;
+  onEditPayment?: (payment: PremiumPayment) => void;
   onPrintReceipt?: (payment: PremiumPayment) => void;
   onVoidPayment?: (payment: PremiumPayment) => void;
 }
@@ -70,6 +72,7 @@ export function PaymentTable({
   payments,
   isLoading,
   onViewPayment,
+  onEditPayment,
   onPrintReceipt,
   onVoidPayment,
 }: PaymentTableProps) {
@@ -237,6 +240,12 @@ export function PaymentTable({
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
+                          {payment.status === 'recorded' && (
+                            <DropdownMenuItem onClick={() => onEditPayment?.(payment)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit Payment
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => onPrintReceipt?.(payment)}>
                             <Printer className="h-4 w-4 mr-2" />
                             Print Receipt

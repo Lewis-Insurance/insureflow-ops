@@ -39,6 +39,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
     payment_method_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     reference_number: '',
+    payer_name: '',
     notes: '',
   });
   const [loading, setLoading] = useState(false);
@@ -149,7 +150,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
           status: 'recorded',
           reference_number: formData.reference_number || null,
           notes: formData.notes || null,
-          payer_name: null,
+          payer_name: formData.payer_name || null,
         });
 
       if (error) throw error;
@@ -169,6 +170,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
         payment_method_id: paymentMethods[0]?.id || '',
         payment_date: new Date().toISOString().split('T')[0],
         reference_number: '',
+        payer_name: '',
         notes: '',
       });
       onOpenChange(false);
@@ -281,6 +283,16 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
                 placeholder="Check # or Trans ID"
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="payer_name">Payer Name</Label>
+            <Input
+              id="payer_name"
+              value={formData.payer_name}
+              onChange={(e) => setFormData(prev => ({ ...prev, payer_name: e.target.value }))}
+              placeholder="Name on check or card"
+            />
           </div>
 
           <div>

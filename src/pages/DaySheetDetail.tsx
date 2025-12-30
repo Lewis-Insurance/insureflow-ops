@@ -41,6 +41,7 @@ import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
 import { DaySheetPrintView } from '@/components/payments/DaySheetPrintView';
+import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import type { PremiumPayment } from '@/types/payments';
 
 const statusColors = {
@@ -57,6 +58,7 @@ export default function DaySheetDetail() {
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
   const [closeNotes, setCloseNotes] = useState('');
   const [createDeposit, setCreateDeposit] = useState(true);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
@@ -69,10 +71,17 @@ export default function DaySheetDetail() {
   const { data: bankAccounts = [] } = useBankAccounts();
   const closeDaySheet = useCloseDaySheet();
 
-  // Check if we should open the close dialog from URL params
+  // Check if we should open the close dialog or print dialog from URL params
   useEffect(() => {
-    if (searchParams.get('action') === 'close' && daySheet?.status === 'open') {
+    const action = searchParams.get('action');
+    if (action === 'close' && daySheet?.status === 'open') {
       setShowCloseDialog(true);
+    } else if (action === 'print' && daySheet) {
+      setShowPrintDialog(true);
+      // Auto-trigger print after dialog renders
+      setTimeout(() => {
+        window.print();
+      }, 100);
     }
   }, [searchParams, daySheet]);
 
@@ -118,6 +127,10 @@ export default function DaySheetDetail() {
   const handleViewPayment = (payment: PremiumPayment) => {
     // Could navigate to payment detail or show modal
     console.log('View payment:', payment.id);
+  };
+
+  const handleEditPayment = (payment: PremiumPayment) => {
+    setEditingPayment(payment);
   };
 
   const handlePrintReceipt = (payment: PremiumPayment) => {
@@ -296,6 +309,7 @@ export default function DaySheetDetail() {
             payments={payments}
             isLoading={isLoadingPayments}
             onViewPayment={handleViewPayment}
+            onEditPayment={handleEditPayment}
             onPrintReceipt={handlePrintReceipt}
           />
         </CardContent>
@@ -506,6 +520,14 @@ export default function DaySheetDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Payment Modal */}
+      <EditPaymentModal
+        open={!!editingPayment}
+        onOpenChange={(open) => !open && setEditingPayment(null)}
+        payment={editingPayment}
+        onSuccess={() => setEditingPayment(null)}
+      />
     </div>
     </AppLayout>
   );

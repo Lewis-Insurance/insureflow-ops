@@ -246,16 +246,27 @@ Return ONLY valid JSON:
 {
   "policy_number": "",
   "insured_name": "",
+  "insured_address": "",
+  "insured_city": "",
+  "insured_state": "",
+  "insured_zip": "",
+  "insured_phone": "",
+  "insured_email": "",
   "carrier": "",
-  "document_type": "auto_policy|home_policy|commercial_policy",
+  "line_of_business": "",
+  "document_type": "auto_policy|home_policy|commercial_policy|application",
   "effective_date": "YYYY-MM-DD",
   "expiration_date": "YYYY-MM-DD",
+  "policy_term_months": 6,
   "coverages": [{"name": "", "limit": "", "deductible": "", "premium": ""}],
   "vehicles": [{"year": "", "make": "", "model": "", "vin": ""}],
+  "drivers": [{"name": "", "dob": "", "license_number": ""}],
   "property": {"address": "", "type": ""},
   "premium": {"total": "", "frequency": ""},
   "key_details": []
-}`;
+}
+
+IMPORTANT: Look carefully for phone numbers, email addresses, and the insured's mailing address. These are often at the top of applications or dec pages. Phone numbers may be formatted as (XXX) XXX-XXXX or XXX-XXX-XXXX.`;
 
       const aiResponse = await fetch(
         `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
