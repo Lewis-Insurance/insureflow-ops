@@ -108,8 +108,9 @@ export function EditPaymentModal({ open, onOpenChange, payment, onSuccess }: Edi
         description: 'Payment updated successfully',
       });
 
-      // Invalidate payment queries to refresh the data
+      // Invalidate payment and day sheet queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['day-sheets'] });
       queryClient.invalidateQueries({ queryKey: ['day-sheet'] });
 
       onOpenChange(false);

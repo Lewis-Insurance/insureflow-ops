@@ -36,6 +36,7 @@ import {
   AlertCircle,
   Download,
   Loader2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useDaySheet, useCloseDaySheet } from '@/hooks/useDaySheets';
 import { usePayments } from '@/hooks/usePayments';
@@ -44,6 +45,7 @@ import { PaymentTable } from '@/components/payments/PaymentTable';
 import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
 import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import { downloadDaySheetPDF, printDaySheetPDF } from '@/components/payments/DaySheetPDF';
+import { DailyCashDialog } from '@/components/payments/DailyCashDialog';
 import type { PremiumPayment } from '@/types/payments';
 
 const statusColors = {
@@ -59,6 +61,7 @@ export default function DaySheetDetail() {
 
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
+  const [showDailyCashDialog, setShowDailyCashDialog] = useState(false);
   const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
   const [closeNotes, setCloseNotes] = useState('');
   const [createDeposit, setCreateDeposit] = useState(true);
@@ -260,6 +263,10 @@ export default function DaySheetDetail() {
               <Printer className="h-4 w-4 mr-2" />
             )}
             Print
+          </Button>
+          <Button variant="outline" onClick={() => setShowDailyCashDialog(true)}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Daily Cash
           </Button>
           {daySheet.status === 'open' && (
             <>
@@ -548,6 +555,14 @@ export default function DaySheetDetail() {
         onOpenChange={(open) => !open && setEditingPayment(null)}
         payment={editingPayment}
         onSuccess={() => setEditingPayment(null)}
+      />
+
+      {/* Daily Cash Sheet Dialog */}
+      <DailyCashDialog
+        open={showDailyCashDialog}
+        onOpenChange={setShowDailyCashDialog}
+        sheetDate={daySheet.sheet_date}
+        payments={payments}
       />
     </div>
     </AppLayout>
