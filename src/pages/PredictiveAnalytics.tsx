@@ -299,13 +299,13 @@ export default function PredictiveAnalytics() {
                               {/* Customer Name & Risk */}
                               <div className="flex items-center gap-3">
                                 <h3 className="font-semibold text-lg">
-                                  {customer.account_name}
+                                  {customer.account_name || 'Unknown'}
                                 </h3>
-                                <Badge variant={getRiskBadgeVariant(customer.churn_risk_level)}>
-                                  {customer.churn_probability}% Churn Risk
+                                <Badge variant={getRiskBadgeVariant(customer.churn_risk_level || 'low')}>
+                                  {customer.churn_probability ?? 0}% Churn Risk
                                 </Badge>
                                 <Badge variant="outline">
-                                  {customer.churn_risk_level.toUpperCase()}
+                                  {(customer.churn_risk_level || 'unknown').toUpperCase()}
                                 </Badge>
                               </div>
 
@@ -314,7 +314,7 @@ export default function PredictiveAnalytics() {
                                 <div>
                                   <div className="text-xs text-muted-foreground">Renewal Risk</div>
                                   <div className="font-semibold">
-                                    {customer.renewal_risk_probability}%
+                                    {customer.renewal_risk_probability ?? 0}%
                                   </div>
                                 </div>
                                 <div>
@@ -326,13 +326,13 @@ export default function PredictiveAnalytics() {
                                 <div>
                                   <div className="text-xs text-muted-foreground">Days to Renewal</div>
                                   <div className="font-semibold">
-                                    {customer.days_until_renewal || 'N/A'}
+                                    {customer.days_until_renewal ?? 'N/A'}
                                   </div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground">Active Policies</div>
                                   <div className="font-semibold">
-                                    {customer.active_policies}
+                                    {customer.active_policies ?? 0}
                                   </div>
                                 </div>
                               </div>
