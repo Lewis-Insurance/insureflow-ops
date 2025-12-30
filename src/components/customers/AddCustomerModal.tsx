@@ -331,7 +331,27 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       if (extracted.policy_number) newPolicyData.policy_number = extracted.policy_number;
       // AI returns 'carrier' not 'carrier_name'
       if (extracted.carrier) newPolicyData.carrier = extracted.carrier;
-      if (extracted.line_of_business) newPolicyData.line_of_business = extracted.line_of_business;
+
+      // Map line_of_business - check both line_of_business and document_type
+      if (extracted.line_of_business) {
+        newPolicyData.line_of_business = extracted.line_of_business;
+      } else if (extracted.document_type) {
+        // Map document_type values to friendly line of business names
+        const docTypeMap: Record<string, string> = {
+          'auto_policy': 'Auto',
+          'auto': 'Auto',
+          'home_policy': 'Home',
+          'home': 'Home',
+          'homeowners': 'Home',
+          'commercial_policy': 'Commercial',
+          'commercial': 'Commercial',
+          'application': '', // Don't set LOB for generic applications
+        };
+        const mappedLob = docTypeMap[extracted.document_type.toLowerCase()];
+        if (mappedLob) {
+          newPolicyData.line_of_business = mappedLob;
+        }
+      }
       if (extracted.effective_date) {
         // Try to parse and format the date
         const date = new Date(extracted.effective_date);
@@ -489,11 +509,15 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           const documentRecord = {
             account_id: newCustomer.id,
             policy_id: createdPolicyId,
+            name: uploadedFile.name, // Display name shown in UI
             filename: uploadedFile.name,
             storage_path: uploadedFilePath,
+            storage_bucket: 'documents',
             mime_type: uploadedFile.type,
             file_size: uploadedFile.size,
+            size_bytes: uploadedFile.size,
             kind: 'application',
+            category: 'application',
           };
 
           const { error: docError } = await supabase

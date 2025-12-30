@@ -158,12 +158,33 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
 
       // Extract data from analysis result
       const extracted = analysisResult?.analysis || analysisResult?.data || analysisResult?.extracted_data || {};
+      console.log('Extracted data from document:', extracted);
 
       // Auto-fill policy form
       const newFormData = { ...formData };
       if (extracted.policy_number) newFormData.policy_number = extracted.policy_number;
       if (extracted.carrier) newFormData.carrier = extracted.carrier;
-      if (extracted.line_of_business) newFormData.line_of_business = extracted.line_of_business;
+
+      // Map line_of_business - check both line_of_business and document_type
+      if (extracted.line_of_business) {
+        newFormData.line_of_business = extracted.line_of_business;
+      } else if (extracted.document_type) {
+        // Map document_type values to friendly line of business names
+        const docTypeMap: Record<string, string> = {
+          'auto_policy': 'Auto',
+          'auto': 'Auto',
+          'home_policy': 'Home',
+          'home': 'Home',
+          'homeowners': 'Home',
+          'commercial_policy': 'Commercial',
+          'commercial': 'Commercial',
+          'application': '', // Don't set LOB for generic applications
+        };
+        const mappedLob = docTypeMap[extracted.document_type.toLowerCase()];
+        if (mappedLob) {
+          newFormData.line_of_business = mappedLob;
+        }
+      }
 
       if (extracted.effective_date) {
         const date = new Date(extracted.effective_date);
@@ -201,8 +222,10 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
       }
 
       // Auto-detect if this is auto insurance, default to semi-annual
-      const lob = (extracted.line_of_business || '').toLowerCase();
-      if (lob.includes('auto') || lob.includes('vehicle') || lob.includes('car')) {
+      // Use the mapped line_of_business which includes document_type mapping
+      const lob = (newFormData.line_of_business || extracted.line_of_business || '').toLowerCase();
+      const docType = (extracted.document_type || '').toLowerCase();
+      if (lob.includes('auto') || lob.includes('vehicle') || lob.includes('car') || docType.includes('auto')) {
         if (!extracted.policy_term_months) {
           newFormData.policy_term = 'semiannual';
           newFormData.billing_frequency = 'semiannual';
@@ -310,11 +333,15 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
           const documentRecord = {
             account_id: accountId,
             policy_id: newPolicy.id,
+            name: uploadedFile.name, // Display name shown in UI
             filename: uploadedFile.name,
             storage_path: uploadedFilePath,
+            storage_bucket: 'documents',
             mime_type: uploadedFile.type,
             file_size: uploadedFile.size,
+            size_bytes: uploadedFile.size,
             kind: 'application',
+            category: 'application',
           };
 
           const { error: docError } = await supabase
