@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentManager } from '@/hooks/useDocumentManager';
 import { UploadDocModal } from './UploadDocModal';
-import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain } from 'lucide-react';
+import { EditDocumentModal } from './EditDocumentModal';
+import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain, Pencil } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
@@ -30,6 +31,7 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
   
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [repairDocId, setRepairDocId] = useState<string | null>(null);
+  const [editingDocument, setEditingDocument] = useState<any>(null);
   
   const handleUploadSuccess = () => {
     // Refresh the documents list after successful upload
@@ -154,7 +156,9 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                     <FileType className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium truncate">{document.name}</h4>
+                        <h4 className="font-medium truncate">
+                          {document.name || document.filename || 'Unnamed Document'}
+                        </h4>
                         {document.category && (
                           <Badge variant={getCategoryColor(document.category)} className="text-xs">
                             {document.category}
@@ -230,6 +234,14 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setEditingDocument(document)}
+                          title="Edit document info"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleReplace(document)}
                           title="Replace file"
                         >
@@ -270,6 +282,17 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
         onOpenChange={setUploadModalOpen}
         accountId={accountId}
         onSuccess={handleUploadSuccess}
+      />
+
+      {/* Edit Document Modal */}
+      <EditDocumentModal
+        open={!!editingDocument}
+        onOpenChange={(open) => !open && setEditingDocument(null)}
+        document={editingDocument}
+        onSuccess={() => {
+          setEditingDocument(null);
+          fetchDocuments();
+        }}
       />
     </Card>
   );
