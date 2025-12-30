@@ -136,6 +136,24 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
       const amount = parseFloat(formData.amount);
       const selectedPolicy = policies.find(p => p.id === formData.policy_id);
 
+      // Get user's org_id from profile
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      // Get or create today's day sheet
+      let daySheetId: string | null = null;
+      if (profile?.org_id) {
+        const { data: sheetId, error: sheetError } = await supabase
+          .rpc('get_or_create_day_sheet', { p_org_id: profile.org_id });
+
+        if (!sheetError && sheetId) {
+          daySheetId = sheetId;
+        }
+      }
+
       // Insert into premium_payments table
       const { error } = await supabase
         .from('premium_payments')
@@ -151,6 +169,8 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
           reference_number: formData.reference_number || null,
           notes: formData.notes || null,
           payer_name: formData.payer_name || null,
+          day_sheet_id: daySheetId,
+          org_id: profile?.org_id || null,
         });
 
       if (error) throw error;
@@ -160,8 +180,10 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
         description: `Payment of $${amount.toFixed(2)} recorded`,
       });
 
-      // Invalidate payment queries to refresh the data
+      // Invalidate payment and day sheet queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['day-sheets'] });
+      queryClient.invalidateQueries({ queryKey: ['day-sheet'] });
 
       // Reset form
       setFormData({
