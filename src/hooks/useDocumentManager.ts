@@ -144,6 +144,34 @@ export function useDocumentManager(accountId?: string) {
     }
   }, [accountId, canManageDocuments, fetchDocuments]);
 
+  // Try multiple buckets to find the document (helper used by view/download)
+  const tryGetSignedUrlForDoc = async (doc: DocumentRecord): Promise<string | null> => {
+    const path = doc.storage_path;
+    // Try buckets in order of likelihood
+    const bucketsToTry = doc.storage_bucket
+      ? [doc.storage_bucket, 'documents', 'customer-docs']
+      : ['documents', 'customer-docs']; // New uploads go to 'documents'
+
+    for (const bucket of bucketsToTry) {
+      try {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+        if (!error && data?.signedUrl) {
+          // Update the document's storage_bucket if it was wrong/missing
+          if (!doc.storage_bucket || doc.storage_bucket !== bucket) {
+            await supabase
+              .from('documents')
+              .update({ storage_bucket: bucket })
+              .eq('id', doc.id);
+          }
+          return data.signedUrl;
+        }
+      } catch {
+        // Try next bucket
+      }
+    }
+    return null;
+  };
+
   const viewDocument = useCallback(async (document: DocumentRecord): Promise<boolean> => {
     if (!canManageDocuments) {
       toast({
@@ -155,32 +183,21 @@ export function useDocumentManager(accountId?: string) {
     }
 
     try {
-      // Use the stored bucket or default to customer-docs
-      const bucket = document.storage_bucket || 'customer-docs';
-      const path = document.storage_path;
+      const signedUrl = await tryGetSignedUrlForDoc(document);
 
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 3600);
-        
-      if (error) {
-        logger.error('Storage error:', error);
-        throw error;
-      }
-
-      if (!data?.signedUrl) {
-        throw new Error('No signed URL returned');
+      if (!signedUrl) {
+        throw new Error('Document file not found in storage');
       }
 
       // Open the document using anchor tag
       const a = window.document.createElement('a');
-      a.href = data.signedUrl;
+      a.href = signedUrl;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
       window.document.body.appendChild(a);
       a.click();
       window.document.body.removeChild(a);
-      
+
       return true;
     } catch (err: any) {
       logger.error('Error viewing document:', err);
@@ -204,26 +221,15 @@ export function useDocumentManager(accountId?: string) {
     }
 
     try {
-      // Use the stored bucket or default to customer-docs
-      const bucket = document.storage_bucket || 'customer-docs';
-      const path = document.storage_path;
+      const signedUrl = await tryGetSignedUrlForDoc(document);
 
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 3600);
-        
-      if (error) {
-        logger.error('Storage error:', error);
-        throw error;
-      }
-
-      if (!data?.signedUrl) {
-        throw new Error('No signed URL returned');
+      if (!signedUrl) {
+        throw new Error('Document file not found in storage');
       }
 
       const link = window.document.createElement('a');
-      link.href = data.signedUrl;
-      link.download = document.name;
+      link.href = signedUrl;
+      link.download = document.name || document.filename || 'document';
       window.document.body.appendChild(link);
       link.click();
       window.document.body.removeChild(link);
@@ -363,15 +369,7 @@ export function useDocumentManager(accountId?: string) {
   }, [accountId, fetchDocuments]);
 
   const getDocumentUrl = useCallback(async (document: DocumentRecord): Promise<string | null> => {
-    try {
-      const bucket = document.storage_bucket || 'customer-docs';
-      const path = document.storage_path;
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-      if (error || !data?.signedUrl) return null;
-      return data.signedUrl;
-    } catch {
-      return null;
-    }
+    return tryGetSignedUrlForDoc(document);
   }, []);
 
   return {
