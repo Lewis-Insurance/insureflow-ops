@@ -627,6 +627,57 @@ export function useRefreshChurnPredictions() {
   });
 }
 
+/**
+ * Record the actual outcome for a prediction
+ */
+export function useRecordPredictionOutcome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      predictionId,
+      outcome,
+      outcomeDate,
+    }: {
+      predictionId: string;
+      outcome: 'churned' | 'renewed';
+      outcomeDate: string;
+    }) => {
+      // Update the customer_risk_scores record with actual outcome
+      const { data, error } = await supabase
+        .from('customer_risk_scores')
+        .update({
+          scoring_metadata: {
+            actual_outcome: outcome,
+            outcome_date: outcomeDate,
+            outcome_recorded_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', predictionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['at-risk-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['churn-predictions'] });
+
+      toast.success('Outcome recorded', {
+        description: 'Customer outcome has been updated',
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to record outcome', {
+        description: error.message,
+      });
+    },
+  });
+}
+
 // =============================================================================
 // Utility Functions
 // =============================================================================

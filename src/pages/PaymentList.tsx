@@ -23,6 +23,8 @@ import {
   CreditCard,
   Banknote,
   Building2,
+  Printer,
+  XCircle,
 } from 'lucide-react';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';

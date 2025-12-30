@@ -18,6 +18,7 @@ import {
   useCreateIntervention,
   useUpdateInterventionStatus,
   useCalculateAllRiskScores,
+  useRecordPredictionOutcome,
   type AtRiskCustomer,
   type ChurnRiskLevel,
 } from '@/hooks/usePredictiveAnalytics';
@@ -68,10 +69,13 @@ export default function PredictiveAnalytics() {
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // Queries
-  const { data: atRiskCustomers = [], isLoading: loadingCustomers } = useAtRiskCustomers(50); // 50% threshold
-  const { data: stats } = useRiskDashboardStats();
-  const { data: interventions = [] } = usePendingInterventions();
+  // Queries - with error handling for missing tables
+  const { data: atRiskCustomers = [], isLoading: loadingCustomers, isError: customersError } = useAtRiskCustomers(50); // 50% threshold
+  const { data: stats, isError: statsError } = useRiskDashboardStats();
+  const { data: interventions = [], isError: interventionsError } = usePendingInterventions();
+
+  // Check if there's a database error (tables might not exist)
+  const hasDbError = customersError || statsError || interventionsError;
 
   // Mutations
   const createInterventionMutation = useCreateIntervention();
@@ -147,6 +151,24 @@ export default function PredictiveAnalytics() {
           </Button>
         </div>
 
+        {/* Database Error State */}
+        {hasDbError && (
+          <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200">Database Setup Required</h3>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    The predictive analytics tables may not be set up yet. Click "Analyze All Customers" to initialize risk scoring,
+                    or run the predictive analytics migration in Supabase.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -184,7 +206,7 @@ export default function PredictiveAnalytics() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${(stats?.revenueAtRisk || 0).toLocaleString()}
+                ${(stats?.ltvAtRisk || 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
                 Requires immediate attention
@@ -387,35 +409,41 @@ export default function PredictiveAnalytics() {
                           <div className="flex items-start justify-between">
                             <div className="space-y-2">
                               <div className="flex items-center gap-3">
-                                <h4 className="font-semibold">{intervention.intervention_title}</h4>
-                                <Badge>{intervention.intervention_type.replace('_', ' ')}</Badge>
+                                <h4 className="font-semibold capitalize">
+                                  {intervention.intervention_type?.replace(/_/g, ' ') || 'Intervention'}
+                                </h4>
+                                <Badge>{intervention.priority}</Badge>
                                 <Badge variant="outline">{intervention.status}</Badge>
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                {intervention.intervention_description}
-                              </p>
+                              {intervention.outcome_notes && (
+                                <p className="text-sm text-muted-foreground">
+                                  {intervention.outcome_notes}
+                                </p>
+                              )}
                               <div className="flex gap-4 text-sm">
-                                <div>
-                                  <span className="text-muted-foreground">Scheduled:</span>{' '}
-                                  {intervention.scheduled_date}
-                                </div>
-                                {intervention.churn_risk_at_intervention && (
+                                {intervention.scheduled_for && (
                                   <div>
-                                    <span className="text-muted-foreground">Risk Level:</span>{' '}
-                                    {intervention.churn_risk_at_intervention}
+                                    <span className="text-muted-foreground">Scheduled:</span>{' '}
+                                    {new Date(intervention.scheduled_for).toLocaleDateString()}
                                   </div>
                                 )}
-                                {intervention.roi && (
+                                {intervention.pre_intervention_churn_probability && (
                                   <div>
-                                    <span className="text-muted-foreground">ROI:</span>{' '}
-                                    {intervention.roi}%
+                                    <span className="text-muted-foreground">Risk at Intervention:</span>{' '}
+                                    {intervention.pre_intervention_churn_probability}%
+                                  </div>
+                                )}
+                                {intervention.estimated_value_saved && (
+                                  <div>
+                                    <span className="text-muted-foreground">Value Saved:</span>{' '}
+                                    ${intervention.estimated_value_saved.toLocaleString()}
                                   </div>
                                 )}
                               </div>
                             </div>
-                            {intervention.was_successful !== null && (
+                            {intervention.customer_retained !== null && (
                               <div className="flex items-center gap-2">
-                                {intervention.was_successful ? (
+                                {intervention.customer_retained ? (
                                   <CheckCircle2 className="h-6 w-6 text-green-500" />
                                 ) : (
                                   <XCircle className="h-6 w-6 text-red-500" />
@@ -498,12 +526,9 @@ function InterventionForm({
 }) {
   const createInterventionMutation = useCreateIntervention();
   const [formData, setFormData] = useState({
-    intervention_type: 'proactive_call' as const,
-    intervention_title: '',
-    intervention_description: '',
-    scheduled_date: new Date().toISOString().split('T')[0],
-    offer_type: '',
-    offer_value: '',
+    intervention_type: 'check_in_call' as const,
+    priority: 'medium' as const,
+    scheduled_for: new Date().toISOString().split('T')[0],
     notes: '',
   });
 
@@ -513,16 +538,13 @@ function InterventionForm({
 
     await createInterventionMutation.mutateAsync({
       account_id: customer.account_id,
-      prediction_id: customer.id,
+      risk_score_id: customer.id,
       intervention_type: formData.intervention_type,
-      intervention_title: formData.intervention_title,
-      intervention_description: formData.intervention_description,
-      churn_risk_at_intervention: customer.churn_risk_level,
-      triggered_by_score: customer.churn_probability,
-      scheduled_date: formData.scheduled_date,
-      offer_type: formData.offer_type || undefined,
-      offer_value: formData.offer_value ? parseFloat(formData.offer_value) : undefined,
-      notes: formData.notes || undefined,
+      priority: formData.priority,
+      pre_intervention_churn_probability: customer.churn_probability,
+      scheduled_for: new Date(formData.scheduled_for).toISOString(),
+      outcome_notes: formData.notes || null,
+      status: 'scheduled',
     });
 
     onSuccess();
@@ -542,39 +564,36 @@ function InterventionForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="proactive_call">Proactive Call</SelectItem>
-            <SelectItem value="special_offer">Special Offer</SelectItem>
+            <SelectItem value="check_in_call">Check-in Call</SelectItem>
             <SelectItem value="coverage_review">Coverage Review</SelectItem>
-            <SelectItem value="loyalty_program">Loyalty Program</SelectItem>
-            <SelectItem value="rate_freeze">Rate Freeze</SelectItem>
-            <SelectItem value="service_upgrade">Service Upgrade</SelectItem>
-            <SelectItem value="personal_visit">Personal Visit</SelectItem>
-            <SelectItem value="customer_appreciation">Customer Appreciation</SelectItem>
+            <SelectItem value="premium_discount_offer">Premium Discount Offer</SelectItem>
+            <SelectItem value="payment_plan_adjustment">Payment Plan Adjustment</SelectItem>
+            <SelectItem value="loyalty_reward">Loyalty Reward</SelectItem>
+            <SelectItem value="service_recovery">Service Recovery</SelectItem>
+            <SelectItem value="proactive_claim_support">Proactive Claim Support</SelectItem>
+            <SelectItem value="policy_optimization">Policy Optimization</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div>
-        <label className="text-sm font-medium">Title</label>
-        <Input
-          required
-          value={formData.intervention_title}
-          onChange={(e) => setFormData({ ...formData, intervention_title: e.target.value })}
-          placeholder="e.g., Retention call - rate review"
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-medium">Description</label>
-        <Textarea
-          required
-          value={formData.intervention_description}
-          onChange={(e) =>
-            setFormData({ ...formData, intervention_description: e.target.value })
+        <label className="text-sm font-medium">Priority</label>
+        <Select
+          value={formData.priority}
+          onValueChange={(value: any) =>
+            setFormData({ ...formData, priority: value })
           }
-          placeholder="Describe the intervention strategy..."
-          rows={3}
-        />
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div>
@@ -582,30 +601,9 @@ function InterventionForm({
         <Input
           type="date"
           required
-          value={formData.scheduled_date}
-          onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+          value={formData.scheduled_for}
+          onChange={(e) => setFormData({ ...formData, scheduled_for: e.target.value })}
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Offer Type (Optional)</label>
-          <Input
-            value={formData.offer_type}
-            onChange={(e) => setFormData({ ...formData, offer_type: e.target.value })}
-            placeholder="e.g., Rate discount"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Offer Value (Optional)</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={formData.offer_value}
-            onChange={(e) => setFormData({ ...formData, offer_value: e.target.value })}
-            placeholder="0.00"
-          />
-        </div>
       </div>
 
       <div>
@@ -613,8 +611,8 @@ function InterventionForm({
         <Textarea
           value={formData.notes}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="Additional context..."
-          rows={2}
+          placeholder="Additional context about this intervention..."
+          rows={3}
         />
       </div>
 
