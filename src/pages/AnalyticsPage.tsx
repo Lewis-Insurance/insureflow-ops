@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -252,6 +253,7 @@ export default function AnalyticsPage() {
   }, [trendData]);
 
   return (
+    <AppLayout>
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -640,5 +642,6 @@ export default function AnalyticsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </AppLayout>
   );
 }
