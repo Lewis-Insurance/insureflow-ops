@@ -123,67 +123,68 @@ All colors MUST be HSL.
   }
 }
 
-/* Print Styles - Hide everything except print content */
+/* Print Styles */
 @media print {
-  /* Hide all UI elements */
-  body > *:not(.print-container),
-  header,
-  nav,
-  aside,
-  footer,
-  .sidebar,
-  .no-print,
-  [role="dialog"] > div:first-child, /* Dialog backdrop */
-  [data-radix-dialog-overlay],
-  button,
-  .fixed,
-  .sticky {
-    display: none !important;
-  }
-
-  /* Make the print content full page */
-  .print-view {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0.5in !important;
-    background: white !important;
-    color: black !important;
-    font-size: 11pt !important;
-    line-height: 1.4 !important;
-    z-index: 99999 !important;
-  }
-
-  /* Show the dialog content that contains the print view */
-  [role="dialog"],
-  [data-radix-dialog-content],
-  [role="dialog"] .print-view {
-    display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    max-height: none !important;
-    overflow: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: white !important;
-    transform: none !important;
-  }
-
-  /* Reset page margins */
+  /* Reset page */
   @page {
     size: letter;
     margin: 0.5in;
   }
 
-  /* Ensure backgrounds print */
+  /* Hide elements with no-print class */
+  .no-print,
+  [class*="DialogHeader"],
+  [class*="DialogFooter"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide everything in root except the portal */
+  #root {
+    visibility: hidden !important;
+  }
+
+  /* But show the dialog portal */
+  [data-radix-portal] {
+    visibility: visible !important;
+  }
+
+  /* Remove dialog overlay styling */
+  [data-radix-dialog-overlay] {
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Remove dialog container styling */
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Show and style print content */
+  .print-view {
+    visibility: visible !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+  }
+
+  /* Ensure colors print */
   * {
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
