@@ -117,7 +117,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
           account_id: accountId,
           agent_id: user.id,
           type: 'note',
-          direction: 'internal',
+          direction: 'outbound',
           subject: `Payment Recorded: $${amount}`,
           body: [
             `Payment of $${amount} recorded`,
