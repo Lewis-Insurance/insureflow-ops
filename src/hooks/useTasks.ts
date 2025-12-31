@@ -362,19 +362,25 @@ export function useTasks(accountId?: string) {
 
   const backfillAssignmentsForUser = useCallback(async (userId: string) => {
     try {
-      const { error } = await supabase
+      // Assign ALL unassigned tasks to the current user
+      // This includes auto-generated tasks from templates
+      const { data, error } = await supabase
         .from('tasks')
         .update({ assignee_id: userId })
         .is('assignee_id', null)
-        .eq('created_by', userId);
+        .in('status', ['pending', 'in_progress'])
+        .select('id');
 
       if (error) throw error;
 
-      await fetchTasks(lastFiltersRef.current);
-      toast({
-        title: 'Updated',
-        description: 'Assigned your unassigned tasks to you',
-      });
+      const count = data?.length || 0;
+      if (count > 0) {
+        await fetchTasks(lastFiltersRef.current);
+        toast({
+          title: 'Tasks Assigned',
+          description: `${count} unassigned task${count !== 1 ? 's' : ''} assigned to you`,
+        });
+      }
       return true;
     } catch (error) {
       logger.error('Error backfilling assignments:', error);
