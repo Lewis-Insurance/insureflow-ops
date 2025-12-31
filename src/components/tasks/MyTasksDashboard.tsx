@@ -181,8 +181,8 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
   };
 
   const renderTaskCard = (task: Task) => (
-    <Card 
-      key={task.id} 
+    <Card
+      key={task.id}
       className="hover:shadow-md transition-shadow cursor-pointer"
       onClick={(e) => handleTaskClick(task, e)}
     >
@@ -200,28 +200,45 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
               {task.priority}
             </Badge>
           </div>
-          
+
           {task.description && (
             <p className="text-sm text-muted-foreground line-clamp-2">
               {task.description}
             </p>
           )}
 
-          {/* Customer & Policy Info from metadata */}
-          {task.metadata && (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {((task.metadata).renewal_customer_name || (task.metadata).customer_name) && (
-                <Badge variant="secondary" className="font-normal">
-                  {(task.metadata).renewal_customer_name || (task.metadata).customer_name}
-                </Badge>
-              )}
-              {((task.metadata).renewal_policy_number || (task.metadata).policy_number) && (
-                <Badge variant="outline" className="font-normal">
-                  Policy: {(task.metadata).renewal_policy_number || (task.metadata).policy_number}
-                </Badge>
-              )}
-            </div>
-          )}
+          {/* Customer & Policy Info from joined data */}
+          <div className="flex flex-wrap gap-2 text-xs">
+            {task.account?.name && (
+              <Badge variant="secondary" className="font-normal bg-blue-50 text-blue-700 border-blue-200">
+                👤 {task.account.name}
+              </Badge>
+            )}
+            {task.policy && (
+              <Badge variant="outline" className="font-normal">
+                📋 {task.policy.policy_number} • {task.policy.carrier}
+              </Badge>
+            )}
+            {/* Fallback to metadata if no joined data */}
+            {!task.account?.name && task.metadata && (
+              <>
+                {((task.metadata as Record<string, string>).renewal_customer_name || (task.metadata as Record<string, string>).customer_name) && (
+                  <Badge variant="secondary" className="font-normal">
+                    👤 {(task.metadata as Record<string, string>).renewal_customer_name || (task.metadata as Record<string, string>).customer_name}
+                  </Badge>
+                )}
+              </>
+            )}
+            {!task.policy && task.metadata && (
+              <>
+                {((task.metadata as Record<string, string>).renewal_policy_number || (task.metadata as Record<string, string>).policy_number) && (
+                  <Badge variant="outline" className="font-normal">
+                    📋 {(task.metadata as Record<string, string>).renewal_policy_number || (task.metadata as Record<string, string>).policy_number}
+                  </Badge>
+                )}
+              </>
+            )}
+          </div>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             {task.due_at && (

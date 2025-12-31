@@ -26,6 +26,7 @@ const taskSchema = z.object({
 interface Task {
   id: string;
   account_id?: string;
+  policy_id?: string;
   title: string;
   description?: string;
   details?: string;
@@ -35,14 +36,22 @@ interface Task {
   assignee_id?: string;
   created_at: string;
   updated_at: string;
+  category?: string;
+  metadata?: Record<string, unknown> | null;
   account?: {
     id: string;
     name: string;
-  };
+  } | null;
+  policy?: {
+    id: string;
+    policy_number: string;
+    carrier: string;
+    line_of_business: string;
+  } | null;
   assignee?: {
     id: string;
     full_name: string;
-  };
+  } | null;
 }
 
 interface TaskEditModalProps {
@@ -209,24 +218,43 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
 
         <div className="space-y-6">
           {/* Task Info Header */}
-          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{task.account?.name}</span>
+          <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+            {/* Customer & Policy Context */}
+            {(task.account?.name || task.policy) && (
+              <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-border/50">
+                {task.account?.name && (
+                  <Badge variant="secondary" className="text-sm font-medium bg-blue-100 text-blue-800 border-blue-300">
+                    👤 Customer: {task.account.name}
+                  </Badge>
+                )}
+                {task.policy && (
+                  <Badge variant="outline" className="text-sm font-medium">
+                    📋 Policy: {task.policy.policy_number} • {task.policy.carrier} ({task.policy.line_of_business})
+                  </Badge>
+                )}
+              </div>
+            )}
+            {/* Meta info row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Created {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                {task.category && (
+                  <Badge variant="outline" className="text-xs">
+                    {task.category}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Created {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                {getStatusBadge(formData.status)}
+                <span className={`text-xs font-medium uppercase ${getPriorityColor(formData.priority)}`}>
+                  {formData.priority}
                 </span>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {getStatusBadge(formData.status)}
-              <span className={`text-xs font-medium uppercase ${getPriorityColor(formData.priority)}`}>
-                {formData.priority}
-              </span>
             </div>
           </div>
 
