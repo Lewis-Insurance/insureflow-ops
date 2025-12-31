@@ -141,3 +141,24 @@ verify_jwt = false
 
 [functions.upload-to-google-drive]
 verify_jwt = true
+
+[functions.canopy-document-proxy]
+verify_jwt = false
+
+[functions.canopy-reprocess]
+verify_jwt = true
+
+[functions.canopy-fetch-pull]
+verify_jwt = true
+
+[functions.canopy-webhook]
+verify_jwt = false
+
+[functions.canopy-initiate]
+verify_jwt = true
+
+[functions.canopy-monitoring]
+verify_jwt = true
+
+[functions.canopy-servicing]
+verify_jwt = true
