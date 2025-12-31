@@ -33,6 +33,10 @@ export interface Task {
   entity_type?: string;
   entity_id?: string;
   customer_id?: string;
+  // Joined data
+  account?: { id: string; name: string } | null;
+  policy?: { id: string; policy_number: string; carrier: string; line_of_business: string } | null;
+  assignee?: { id: string; full_name: string } | null;
 }
 
 export interface TaskComment {
@@ -76,7 +80,12 @@ export function useTasks(accountId?: string) {
       lastFiltersRef.current = filters;
       let query = supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          account:accounts(id, name),
+          policy:policies(id, policy_number, carrier, line_of_business),
+          assignee:profiles!tasks_assignee_id_fkey(id, full_name)
+        `)
         .order('created_at', { ascending: false });
 
       if (accountId) {

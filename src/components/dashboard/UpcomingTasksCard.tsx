@@ -45,7 +45,11 @@ export function UpcomingTasksCard() {
       // Fetch tasks due this week that are assigned to current user OR unassigned
       const { data, error } = await supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          account:accounts(id, name),
+          policy:policies(id, policy_number, carrier, line_of_business)
+        `)
         .lte('due_at', weekEnd.toISOString())
         .in('status', ['pending', 'in_progress'])
         .or(`assignee_id.eq.${user.id},assignee_id.is.null`)
@@ -127,7 +131,7 @@ export function UpcomingTasksCard() {
             className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
             onClick={() => navigate(`/tasks?filter=${filterParam}`)}
           >
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2">
                 <h4 className="font-medium">{task.title}</h4>
                 {getPriorityBadge(task.priority)}
@@ -137,6 +141,21 @@ export function UpcomingTasksCard() {
                   </Badge>
                 )}
               </div>
+              {/* Customer & Policy Context */}
+              {((task as any).account?.name || (task as any).policy) && (
+                <div className="flex flex-wrap gap-2">
+                  {(task as any).account?.name && (
+                    <Badge variant="secondary" className="text-xs font-normal bg-blue-50 text-blue-700">
+                      👤 {(task as any).account.name}
+                    </Badge>
+                  )}
+                  {(task as any).policy && (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      📋 {(task as any).policy.policy_number} • {(task as any).policy.carrier}
+                    </Badge>
+                  )}
+                </div>
+              )}
               {task.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {task.description}
