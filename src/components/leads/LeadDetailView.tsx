@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,7 +38,6 @@ import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { InsuranceDetailsPanel } from "./insurance/InsuranceDetailsPanel";
 import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
 import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
-import { CanopyDataDisplayRedesign } from "@/components/canopy/CanopyDataDisplayRedesign";
 import {
   Phone,
   Mail,
@@ -55,6 +55,9 @@ import {
   FileText,
   Plus,
   TrendingUp,
+  Shield,
+  Car,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -101,6 +104,7 @@ interface LeadDetailViewProps {
 }
 
 export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewProps) => {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
@@ -110,14 +114,14 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
 
-  // Query for Canopy pull ID linked to this lead
+  // Query for Canopy pull summary linked to this lead
   const { data: canopyPull } = useQuery({
-    queryKey: ['canopy-pull-for-lead-detail', leadId],
+    queryKey: ['canopy-pull-summary-for-lead', leadId],
     queryFn: async () => {
       if (!leadId) return null;
       const { data, error } = await supabase
         .from('canopy_pulls')
-        .select('id')
+        .select('id, policy_count, carrier_count, created_at, consumer_first_name, consumer_last_name')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -406,11 +410,42 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                 </div>
               </div>
 
-              {/* Canopy Imported Data */}
+              {/* Canopy Imported Data Summary */}
               {canopyPull && (
                 <>
                   <Separator />
-                  <CanopyDataDisplayRedesign pullId={canopyPull.id} />
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      IMPORTED INSURANCE DATA
+                    </h3>
+                    <div className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Shield className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {canopyPull.consumer_first_name} {canopyPull.consumer_last_name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {canopyPull.policy_count || 0} {canopyPull.policy_count === 1 ? 'Policy' : 'Policies'} • {canopyPull.carrier_count || 0} {canopyPull.carrier_count === 1 ? 'Carrier' : 'Carriers'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          onOpenChange(false);
+                          navigate(`/leads/${leadId}`);
+                        }}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View Full Insurance Details
+                      </Button>
+                    </div>
+                  </div>
                 </>
               )}
 
