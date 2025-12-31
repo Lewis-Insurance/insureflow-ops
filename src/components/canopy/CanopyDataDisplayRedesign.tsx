@@ -57,6 +57,7 @@ interface CanopyDataDisplayRedesignProps {
 
 export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayRedesignProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadingDocId, setLoadingDocId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -252,6 +253,58 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
       toast({ title: 'Refresh failed', variant: 'destructive' });
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleViewDocument = async (doc: { id: string; file_url?: string | null; canopy_document_id?: string | null; file_name?: string | null; document_type?: string | null }) => {
+    setLoadingDocId(doc.id);
+    try {
+      // Extract document ID from file_url if available, otherwise use canopy_document_id
+      let documentId = doc.canopy_document_id;
+      if (!documentId && doc.file_url) {
+        const match = doc.file_url.match(/documents\/([a-f0-9-]+)\/download/);
+        if (match) {
+          documentId = match[1];
+        }
+      }
+
+      if (!documentId) {
+        toast({
+          title: 'Cannot view document',
+          description: 'Document ID not available',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Call the proxy function
+      const { data, error } = await supabase.functions.invoke('canopy-document-proxy', {
+        body: { documentId, id: doc.id },
+      });
+
+      if (error) {
+        // Try to open via direct URL as fallback if document ID exists
+        if (doc.file_url) {
+          window.open(doc.file_url, '_blank');
+          return;
+        }
+        throw error;
+      }
+
+      // The function returns raw bytes, we need to handle it differently
+      // For now, let's use a URL-based approach
+      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canopy-document-proxy?documentId=${documentId}`;
+      window.open(proxyUrl, '_blank');
+
+    } catch (err) {
+      logger.error('Failed to view document:', err);
+      toast({
+        title: 'Failed to load document',
+        description: 'Could not retrieve document from Canopy',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingDocId(null);
     }
   };
 
@@ -826,28 +879,54 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
         <CardContent>
           {documents && documents.length > 0 ? (
             <div className="space-y-2">
-              {documents.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-4 h-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{doc.title || doc.document_type || 'Document'}</p>
-                      <p className="text-xs text-muted-foreground">{doc.file_name || 'Document'}</p>
+              {documents.map(doc => {
+                const hasDocumentAccess = doc.canopy_document_id || doc.file_url;
+                const isLoading = loadingDocId === doc.id;
+
+                return (
+                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {doc.document_type === 'id_card' ? (
+                        <IdCard className="w-5 h-5 text-muted-foreground" />
+                      ) : doc.document_type === 'dec_page' ? (
+                        <FileText className="w-5 h-5 text-primary" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="font-medium capitalize">
+                          {doc.document_type?.replace(/_/g, ' ') || doc.title || 'Document'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{doc.file_name || 'Document'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {doc.downloaded && doc.storage_path ? (
+                        <Badge variant="outline" className="text-xs">
+                          <CheckCircle className="w-3 h-3 mr-1" />Saved
+                        </Badge>
+                      ) : null}
+                      {hasDocumentAccess && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewDocument(doc)}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <ExternalLink className="w-4 h-4 mr-1" />
+                              View
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {doc.downloaded && doc.storage_path ? (
-                      <Badge variant="outline" className="text-xs">
-                        <CheckCircle className="w-3 h-3 mr-1" />Saved
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">
-                        <ExternalLink className="w-3 h-3 mr-1" />Canopy
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
