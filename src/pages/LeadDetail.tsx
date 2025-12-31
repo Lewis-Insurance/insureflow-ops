@@ -30,7 +30,7 @@ import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { InsuranceDetailsPanel } from "@/components/leads/insurance/InsuranceDetailsPanel";
 import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
 import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
-import { CanopyDataDisplay } from "@/components/canopy/CanopyDataDisplay";
+import { CanopyDataDisplayRedesign } from "@/components/canopy/CanopyDataDisplayRedesign";
 import { CanopyConnectButton } from "@/components/canopy/CanopyConnectButton";
 import {
   Phone,
@@ -584,17 +584,7 @@ export default function LeadDetail() {
 
       {/* Canopy Data (if imported from Canopy) */}
       {canopyPull && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Imported Insurance Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CanopyDataDisplay pullId={canopyPull.id} />
-          </CardContent>
-        </Card>
+        <CanopyDataDisplayRedesign pullId={canopyPull.id} />
       )}
 
       {/* Delete Confirmation Dialog */}

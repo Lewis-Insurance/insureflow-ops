@@ -1376,6 +1376,31 @@ async function processCanopyPolicy(supabase: ReturnType<typeof createClient>, pu
     }
   }
 
+  // Process agents
+  for (const agent of policy.agents || []) {
+    await upsertAgent(supabase, policyDbId, agent);
+  }
+
+  // Process driving records at policy level
+  for (const record of policy.driving_records || []) {
+    if (record.driver_id) {
+      const { data: driver } = await supabase
+        .from('canopy_drivers')
+        .select('id')
+        .eq('policy_id', policyDbId)
+        .limit(1)
+        .single();
+      if (driver) {
+        await upsertDrivingRecord(supabase, driver.id, record);
+      }
+    }
+  }
+
+  // Process loss events at policy level
+  for (const event of policy.loss_events || []) {
+    await upsertLossEvent(supabase, pullId, { ...event, policy_id: policyDbId });
+  }
+
   logger.info('Finished processing policy', { canopyPolicyId, isCommercial: isCommercialPolicy(mappedPolicyType) });
 }
 
@@ -1390,6 +1415,213 @@ function mapPolicyStatus(status: string | undefined): string {
     'INACTIVE': 'inactive',
   };
   return statusMap[status.toUpperCase()] || status.toLowerCase();
+}
+
+// ============================================================================
+// NEW DATA TYPE HANDLERS (driving_records, loss_events, agents, addresses)
+// ============================================================================
+
+// Upsert driving record
+async function upsertDrivingRecord(
+  supabase: ReturnType<typeof createClient>,
+  driverId: string,
+  record: any
+): Promise<void> {
+  let existingId: string | null = null;
+  const canopyRecordId = record.driving_record_id || record.id;
+
+  if (canopyRecordId) {
+    const { data: existing } = await supabase
+      .from('canopy_driving_records')
+      .select('id')
+      .eq('driver_id', driverId)
+      .eq('canopy_driving_record_id', canopyRecordId)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const fineAmount = record.fine_amount_cents
+    ? record.fine_amount_cents / 100
+    : record.fine_amount;
+
+  const recordData = {
+    driver_id: driverId,
+    canopy_driving_record_id: canopyRecordId,
+    record_type: record.type || record.record_type,
+    record_date: record.date || record.record_date || record.violation_date,
+    description: record.description,
+    state: record.state,
+    points: record.points,
+    conviction_date: record.conviction_date,
+    fine_amount: fineAmount,
+    is_at_fault: record.at_fault ?? record.is_at_fault,
+    is_major_violation: record.is_major || record.is_major_violation,
+    source: record.data_source || record.source,
+    raw_data: record,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_driving_records').update(recordData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_driving_records').insert(recordData);
+  }
+}
+
+// Upsert loss event
+async function upsertLossEvent(
+  supabase: ReturnType<typeof createClient>,
+  pullId: string,
+  event: any
+): Promise<void> {
+  let existingId: string | null = null;
+  const canopyEventId = event.loss_event_id || event.id;
+
+  if (canopyEventId) {
+    const { data: existing } = await supabase
+      .from('canopy_loss_events')
+      .select('id')
+      .eq('pull_id', pullId)
+      .eq('canopy_loss_event_id', canopyEventId)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const lossAmount = event.loss_amount_cents ? event.loss_amount_cents / 100 : event.loss_amount;
+  const paidAmount = event.paid_amount_cents ? event.paid_amount_cents / 100 : event.paid_amount || event.amount_paid;
+  const reservedAmount = event.reserved_amount_cents ? event.reserved_amount_cents / 100 : event.reserved_amount;
+  const deductibleAmount = event.deductible_cents ? event.deductible_cents / 100 : event.deductible;
+
+  const eventData = {
+    pull_id: pullId,
+    canopy_loss_event_id: canopyEventId,
+    policy_id: event.policy_id,
+    claim_number: event.claim_number,
+    event_type: event.type || event.event_type || event.loss_type,
+    event_date: event.date || event.event_date || event.loss_date,
+    description: event.description,
+    loss_amount: lossAmount,
+    paid_amount: paidAmount,
+    reserved_amount: reservedAmount,
+    deductible_amount: deductibleAmount,
+    status: event.status,
+    is_catastrophe: event.is_catastrophe || event.cat_event,
+    catastrophe_number: event.catastrophe_number || event.cat_number,
+    cause_of_loss: event.cause || event.cause_of_loss,
+    property_type: event.property_type,
+    raw_data: event,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_loss_events').update(eventData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_loss_events').insert(eventData);
+  }
+}
+
+// Upsert agent
+async function upsertAgent(
+  supabase: ReturnType<typeof createClient>,
+  policyId: string,
+  agent: any
+): Promise<void> {
+  let existingId: string | null = null;
+  const canopyAgentId = agent.agent_id || agent.id;
+
+  if (canopyAgentId) {
+    const { data: existing } = await supabase
+      .from('canopy_agents')
+      .select('id')
+      .eq('policy_id', policyId)
+      .eq('canopy_agent_id', canopyAgentId)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const agentData = {
+    policy_id: policyId,
+    canopy_agent_id: canopyAgentId,
+    agent_type: agent.type || agent.agent_type || 'primary',
+    name: agent.name || `${agent.first_name || ''} ${agent.last_name || ''}`.trim(),
+    first_name: agent.first_name,
+    last_name: agent.last_name,
+    agency_name: agent.agency || agent.agency_name,
+    phone: agent.phone || agent.phone_number,
+    email: agent.email,
+    address_line1: agent.address?.street || agent.address_line1,
+    address_line2: agent.address?.street2 || agent.address_line2,
+    city: agent.address?.city || agent.city,
+    state: agent.address?.state || agent.state,
+    zip: agent.address?.zip || agent.zip,
+    license_number: agent.license_number || agent.producer_code,
+    raw_data: agent,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_agents').update(agentData).eq('id', existingId);
+  } else {
+    await supabase.from('canopy_agents').insert(agentData);
+  }
+}
+
+// Upsert address
+async function upsertAddress(
+  supabase: ReturnType<typeof createClient>,
+  pullId: string,
+  address: any,
+  addressType: string = 'mailing'
+): Promise<string | null> {
+  let existingId: string | null = null;
+  const canopyAddressId = address.address_id || address.id;
+
+  if (canopyAddressId) {
+    const { data: existing } = await supabase
+      .from('canopy_addresses')
+      .select('id')
+      .eq('pull_id', pullId)
+      .eq('canopy_address_id', canopyAddressId)
+      .single();
+    existingId = existing?.id;
+  }
+
+  if (!existingId && address.street && address.zip) {
+    const { data: existing } = await supabase
+      .from('canopy_addresses')
+      .select('id')
+      .eq('pull_id', pullId)
+      .eq('address_line1', address.street)
+      .eq('zip', address.zip)
+      .single();
+    existingId = existing?.id;
+  }
+
+  const addressData = {
+    pull_id: pullId,
+    canopy_address_id: canopyAddressId,
+    address_type: addressType,
+    address_line1: address.street || address.address_line1 || address.line1,
+    address_line2: address.street2 || address.address_line2 || address.line2,
+    city: address.city,
+    state: address.state,
+    zip: address.zip || address.postal_code,
+    county: address.county,
+    country: address.country || 'US',
+    latitude: address.latitude || address.lat,
+    longitude: address.longitude || address.lng || address.lon,
+    is_verified: address.is_verified ?? address.verified,
+    raw_data: address,
+  };
+
+  if (existingId) {
+    await supabase.from('canopy_addresses').update(addressData).eq('id', existingId);
+    return existingId;
+  } else {
+    const { data: inserted } = await supabase
+      .from('canopy_addresses')
+      .insert(addressData)
+      .select('id')
+      .single();
+    return inserted?.id || null;
+  }
 }
 
 // Upsert vehicle with deduplication
@@ -1430,8 +1662,13 @@ async function upsertVehicle(supabase: ReturnType<typeof createClient>, policyId
     : uses.includes('PLEASURE') || uses.includes('PERSONAL') ? 'pleasure'
     : 'other';
 
+  // Parse lien holder info
+  const lienHolder = vehicle.lien_holder || vehicle.lienholder;
+  const lienHolderAddr = vehicle.lien_holder_address || lienHolder?.address;
+
   const vehicleData = {
     policy_id: policyId,
+    canopy_vehicle_id: vehicle.vehicle_id || vehicle.id,
     vin: vehicle.vin,
     year: vehicle.year,
     make: vehicle.make,
@@ -1439,12 +1676,25 @@ async function upsertVehicle(supabase: ReturnType<typeof createClient>, policyId
     trim: vehicle.series || vehicle.trim,
     body_type: vehicle.type || vehicle.body_type,
     usage_type: usageType,
+    uses: vehicle.uses || [],
     annual_mileage: vehicle.annual_mileage,
     ownership: mapOwnership(vehicle.ownership_type || vehicle.ownership),
+    purchase_date: vehicle.purchase_date,
     garage_address: garageAddr?.street || garageAddr?.full_address,
     garage_city: garageAddr?.city,
     garage_state: garageAddr?.state,
     garage_zip: garageAddr?.zip,
+    // Lien holder info
+    lien_holder_name: lienHolder?.name || vehicle.lien_holder_name,
+    lien_holder_address: lienHolderAddr?.street,
+    lien_holder_city: lienHolderAddr?.city,
+    lien_holder_state: lienHolderAddr?.state,
+    lien_holder_zip: lienHolderAddr?.zip,
+    // Vehicle features
+    anti_theft: vehicle.features?.anti_theft || vehicle.anti_theft,
+    airbags: vehicle.features?.airbags || vehicle.airbags,
+    anti_lock_brakes: vehicle.features?.anti_lock_brakes || vehicle.abs,
+    daytime_running_lights: vehicle.features?.daytime_running_lights,
     // Parse coverages from array - amounts are in cents
     liability_bi: coverageMap['BODILY_INJURY_LIABILITY']?.per_person_limit_cents
       ? coverageMap['BODILY_INJURY_LIABILITY'].per_person_limit_cents / 100 : null,
@@ -1539,6 +1789,7 @@ async function upsertDriver(supabase: ReturnType<typeof createClient>, policyId:
 
   const driverData = {
     policy_id: policyId,
+    canopy_driver_id: canopyDriverId,
     first_name: driver.first_name,
     last_name: driver.last_name,
     middle_name: driver.middle_name,
@@ -1551,21 +1802,42 @@ async function upsertDriver(supabase: ReturnType<typeof createClient>, policyId:
     license_status: mapLicenseStatus(license?.status || driver.license_status),
     license_issue_date: license?.issue_date || driver.license_issue_date,
     license_expiration_date: license?.expiration_date || driver.license_expiration_date,
+    license_class: license?.class || driver.license_class,
     relation_to_insured: mapRelation(driver.relation_to_insured),
     is_primary: driver.is_primary || false,
     is_excluded: driver.is_excluded || false,
     sr22_required: driver.sr22_required || false,
+    fr44_required: driver.fr44_required || false,
     occupation: driver.occupation,
     education_level: driver.education,
     years_licensed: yearsLicensed,
+    age_licensed: driver.age_licensed,
+    good_student: driver.good_student || false,
+    defensive_driver: driver.defensive_driver || driver.defensive_driving_course || false,
     violations: driver.violations || [],
     accidents: driver.accidents || [],
+    data_source: driver.data_source,
   };
+
+  let driverDbId: string;
 
   if (existingId) {
     await supabase.from('canopy_drivers').update(driverData).eq('id', existingId);
+    driverDbId = existingId;
   } else {
-    await supabase.from('canopy_drivers').insert(driverData);
+    const { data: inserted } = await supabase
+      .from('canopy_drivers')
+      .insert(driverData)
+      .select('id')
+      .single();
+    driverDbId = inserted?.id;
+  }
+
+  // Process driving records attached to this driver
+  if (driverDbId && driver.driving_records?.length > 0) {
+    for (const record of driver.driving_records) {
+      await upsertDrivingRecord(supabase, driverDbId, record);
+    }
   }
 }
 
@@ -1586,27 +1858,69 @@ async function upsertDwelling(supabase: ReturnType<typeof createClient>, policyI
     existingId = existing?.id;
   }
 
+  // Parse property_data from Canopy's format
+  const propData = dwelling.property_data || {};
+  const mortgagee = dwelling.mortgagee || dwelling.mortgage_holder || {};
+  const mortgageeAddr = mortgagee.address || {};
+
+  // Parse amounts from cents
+  const replacementCost = dwelling.replacement_cost_cents
+    ? dwelling.replacement_cost_cents / 100
+    : dwelling.replacement_cost;
+  const marketValue = dwelling.market_value_cents
+    ? dwelling.market_value_cents / 100
+    : dwelling.market_value;
+
   const dwellingData = {
     policy_id: policyId,
+    canopy_dwelling_id: dwelling.dwelling_id || dwelling.id,
     address_line1: street,
     address_line2: dwelling.address?.street2,
     city: dwelling.address?.city,
     state: dwelling.address?.state,
     zip: zip,
     county: dwelling.address?.county,
-    property_type: mapPropertyType(dwelling.property_type),
-    occupancy_type: mapOccupancyType(dwelling.occupancy_type),
-    year_built: dwelling.year_built,
-    square_footage: dwelling.square_footage,
-    stories: dwelling.stories,
-    construction_type: dwelling.construction_type,
-    exterior_type: dwelling.exterior_type,
-    roof_type: dwelling.roof_type,
-    roof_year: dwelling.roof_year,
-    foundation_type: dwelling.foundation_type,
-    heating_type: dwelling.heating_type,
-    electrical_type: dwelling.electrical_type,
-    plumbing_type: dwelling.plumbing_type,
+    property_type: mapPropertyType(dwelling.property_type || propData.property_type),
+    occupancy_type: mapOccupancyType(dwelling.occupancy_type || propData.occupancy_type),
+    year_built: dwelling.year_built || propData.year_built,
+    square_footage: dwelling.square_footage || propData.square_footage,
+    stories: dwelling.stories || propData.stories,
+    construction_type: dwelling.construction_type || propData.construction_type,
+    exterior_type: dwelling.exterior_type || propData.exterior_type,
+    roof_type: dwelling.roof_type || propData.roof_type,
+    roof_year: dwelling.roof_year || propData.roof_year,
+    foundation_type: dwelling.foundation_type || propData.foundation_type,
+    heating_type: dwelling.heating_type || propData.heating_type,
+    electrical_type: dwelling.electrical_type || propData.electrical_type,
+    plumbing_type: dwelling.plumbing_type || propData.plumbing_type,
+    // Property data from Canopy
+    bedrooms: propData.bedrooms || dwelling.bedrooms,
+    bathrooms: propData.bathrooms || dwelling.bathrooms,
+    basement_type: propData.basement_type || dwelling.basement_type,
+    basement_finished_pct: propData.basement_finished_pct,
+    garage_type: propData.garage_type || dwelling.garage_type,
+    garage_size: propData.garage_size,
+    pool_type: propData.pool_type,
+    fence_type: propData.fence_type,
+    wiring_type: propData.wiring_type || dwelling.wiring_type,
+    plumbing_year: propData.plumbing_year,
+    electrical_year: propData.electrical_year,
+    hvac_year: propData.hvac_year,
+    water_heater_year: propData.water_heater_year,
+    fire_hydrant_distance: propData.fire_hydrant_distance,
+    fire_station_distance: propData.fire_station_distance,
+    protection_class: propData.protection_class,
+    // Valuation
+    replacement_cost: replacementCost,
+    market_value: marketValue,
+    // Mortgagee info
+    mortgagee_name: mortgagee.name,
+    mortgagee_address: mortgageeAddr.street,
+    mortgagee_city: mortgageeAddr.city,
+    mortgagee_state: mortgageeAddr.state,
+    mortgagee_zip: mortgageeAddr.zip,
+    mortgagee_loan_number: mortgagee.loan_number,
+    // Coverages
     dwelling_coverage: dwelling.coverages?.dwelling,
     other_structures: dwelling.coverages?.other_structures,
     personal_property: dwelling.coverages?.personal_property,
@@ -1618,14 +1932,17 @@ async function upsertDwelling(supabase: ReturnType<typeof createClient>, policyI
     hurricane_deductible: dwelling.coverages?.hurricane_deductible,
     flood_coverage: dwelling.coverages?.flood || false,
     earthquake_coverage: dwelling.coverages?.earthquake || false,
-    swimming_pool: dwelling.features?.swimming_pool || false,
-    trampoline: dwelling.features?.trampoline || false,
-    dog_breed: dwelling.features?.dog_breed,
-    security_system: dwelling.features?.security_system || false,
-    fire_alarm: dwelling.features?.fire_alarm || false,
-    sprinkler_system: dwelling.features?.sprinkler_system || false,
-    deadbolt_locks: dwelling.features?.deadbolt_locks || false,
-    gated_community: dwelling.features?.gated_community || false,
+    // Features/risks
+    swimming_pool: dwelling.features?.swimming_pool || propData.swimming_pool || false,
+    trampoline: dwelling.features?.trampoline || propData.trampoline || false,
+    dog_breed: dwelling.features?.dog_breed || propData.dog_breed,
+    security_system: dwelling.features?.security_system || propData.security_system || false,
+    fire_alarm: dwelling.features?.fire_alarm || propData.fire_alarm || false,
+    sprinkler_system: dwelling.features?.sprinkler_system || propData.sprinkler_system || false,
+    deadbolt_locks: dwelling.features?.deadbolt_locks || propData.deadbolt_locks || false,
+    gated_community: dwelling.features?.gated_community || propData.gated_community || false,
+    // Store raw property_data
+    property_data: propData,
   };
 
   if (existingId) {
@@ -1638,6 +1955,7 @@ async function upsertDwelling(supabase: ReturnType<typeof createClient>, policyI
 // Upsert claim with deduplication
 async function upsertClaim(supabase: ReturnType<typeof createClient>, policyId: string, claim: any) {
   let existingId: string | null = null;
+  const canopyClaimId = claim.claim_id || claim.id;
 
   if (claim.claim_number) {
     const { data: existing } = await supabase
@@ -1649,21 +1967,50 @@ async function upsertClaim(supabase: ReturnType<typeof createClient>, policyId: 
     existingId = existing?.id;
   }
 
+  // Parse amounts from cents
+  const amountPaid = claim.amount_paid_cents
+    ? claim.amount_paid_cents / 100
+    : claim.amount_paid;
+  const amountReserved = claim.amount_reserved_cents
+    ? claim.amount_reserved_cents / 100
+    : claim.amount_reserved;
+  const deductibleApplied = claim.deductible_applied_cents
+    ? claim.deductible_applied_cents / 100
+    : claim.deductible_applied;
+  const totalIncurred = claim.total_incurred_cents
+    ? claim.total_incurred_cents / 100
+    : claim.total_incurred;
+
+  // Get representative info
+  const rep = claim.representative || claim.adjuster || {};
+
   const claimData = {
     policy_id: policyId,
+    canopy_claim_id: canopyClaimId,
+    carrier_claim_identifier: claim.carrier_claim_identifier || claim.carrier_claim_id,
     claim_number: claim.claim_number,
-    claim_date: claim.claim_date,
-    close_date: claim.close_date,
-    claim_type: claim.claim_type,
-    claim_category: claim.claim_category,
+    claim_date: claim.claim_date || claim.date_of_loss,
+    close_date: claim.close_date || claim.closed_date,
+    claim_type: claim.claim_type || claim.type,
+    claim_category: claim.claim_category || claim.category,
     status: mapClaimStatus(claim.status),
-    amount_paid: claim.amount_paid,
-    amount_reserved: claim.amount_reserved,
-    deductible_applied: claim.deductible_applied,
+    amount_paid: amountPaid,
+    amount_reserved: amountReserved,
+    deductible_applied: deductibleApplied,
+    total_incurred: totalIncurred,
     description: claim.description,
     at_fault: claim.at_fault,
     subrogation: claim.subrogation || false,
-    claimant_name: claim.claimant_name,
+    claimant_name: claim.claimant_name || claim.claimant,
+    // Representative info
+    representative_name: rep.name || `${rep.first_name || ''} ${rep.last_name || ''}`.trim() || null,
+    representative_phone: rep.phone || rep.phone_number,
+    representative_email: rep.email,
+    // Entity linking
+    vehicle_id: claim.vehicle_id,
+    driver_id: claim.driver_id,
+    dwelling_id: claim.dwelling_id,
+    raw_data: claim,
   };
 
   if (existingId) {

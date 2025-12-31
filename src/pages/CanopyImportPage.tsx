@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CanopyDataDisplay } from '@/components/canopy/CanopyDataDisplay';
+import { CanopyDataDisplayRedesign } from '@/components/canopy/CanopyDataDisplayRedesign';
 import {
   Shield,
   Copy,
