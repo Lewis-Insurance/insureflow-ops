@@ -42,12 +42,13 @@ export function UpcomingTasksCard() {
       const weekStart = startOfWeek(now);
       const weekEnd = endOfWeek(now);
 
-      // Fetch all tasks due this week that are not completed
+      // Fetch tasks due this week that are assigned to current user OR unassigned
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .lte('due_at', weekEnd.toISOString())
         .in('status', ['pending', 'in_progress'])
+        .or(`assignee_id.eq.${user.id},assignee_id.is.null`)
         .order('due_at', { ascending: true });
 
       if (error) throw error;
