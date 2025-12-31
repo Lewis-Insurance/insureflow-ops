@@ -193,7 +193,7 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
     }
   };
 
-  const handleViewDocument = async (doc: { id: string; file_url?: string | null; canopy_document_id?: string | null }) => {
+  const handleViewDocument = async (doc: { id: string; file_url?: string | null; canopy_document_id?: string | null; file_name?: string | null }) => {
     setLoadingDocId(doc.id);
     try {
       let documentId = doc.canopy_document_id;
@@ -207,11 +207,57 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
         return;
       }
 
-      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canopy-document-proxy?documentId=${documentId}`;
-      window.open(proxyUrl, '_blank');
+      // Call the proxy function via Supabase client (includes auth)
+      const { data, error } = await supabase.functions.invoke('canopy-document-proxy', {
+        body: { documentId, id: doc.id },
+      });
+
+      if (error) {
+        // Check if it's a configuration error
+        if (error.message?.includes('not configured')) {
+          toast({
+            title: 'Canopy API not configured',
+            description: 'Please configure CANOPY_CLIENT_ID, CANOPY_CLIENT_SECRET, and CANOPY_TEAM_ID in Edge Function secrets',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw error;
+      }
+
+      // If we got a blob back, open it
+      if (data instanceof Blob || data instanceof ArrayBuffer) {
+        const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Clean up after a delay
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else if (data?.error) {
+        // Handle JSON error response
+        toast({
+          title: 'Failed to load document',
+          description: data.error || 'Document not found',
+          variant: 'destructive',
+        });
+      } else {
+        // Fallback - try direct URL if we have one
+        if (doc.file_url) {
+          window.open(doc.file_url, '_blank');
+        } else {
+          toast({
+            title: 'Unable to view document',
+            description: 'Try refreshing the data or contact support',
+            variant: 'destructive',
+          });
+        }
+      }
     } catch (err) {
       logger.error('Failed to view document:', err);
-      toast({ title: 'Failed to load document', variant: 'destructive' });
+      toast({
+        title: 'Failed to load document',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
     } finally {
       setLoadingDocId(null);
     }
@@ -305,11 +351,40 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
     ? `${pullData.consumer_first_name || ''} ${pullData.consumer_middle_name || ''} ${pullData.consumer_last_name || ''}`.trim()
     : 'Unknown';
 
+  // Get all addresses (show all types)
   const mailingAddress = getAddressByType('MAILING');
   const physicalAddress = getAddressByType('PHYSICAL');
 
-  // All drivers across all policies (deduplicated by name)
+  // Get first address if specific types not found
+  const primaryAddress = mailingAddress || physicalAddress || (addresses && addresses.length > 0 ? addresses[0] : null);
+  const secondaryAddress = physicalAddress && physicalAddress.canopy_address_id !== mailingAddress?.canopy_address_id
+    ? physicalAddress
+    : (addresses && addresses.length > 1 ? addresses[1] : null);
+
+  // All drivers across all policies
   const allDrivers = drivers || [];
+
+  // Calculate age from DOB
+  const calculateAge = (dob: string | null | undefined) => {
+    if (!dob) return null;
+    try {
+      const birth = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      return age;
+    } catch { return null; }
+  };
+
+  // Get total premium and earliest expiration across all policies
+  const totalPremium = policies?.reduce((sum, p) => sum + (p.premium_amount || 0), 0) || 0;
+  const carriers = [...new Set(policies?.map(p => p.carrier_name).filter(Boolean))];
+  const earliestExpiration = policies?.reduce((earliest, p) => {
+    if (!p.expiration_date) return earliest;
+    if (!earliest) return p.expiration_date;
+    return new Date(p.expiration_date) < new Date(earliest) ? p.expiration_date : earliest;
+  }, null as string | null);
 
   return (
     <div className="space-y-8">
@@ -324,23 +399,38 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
               {pullData?.consumer_email && <span>{pullData.consumer_email}</span>}
               {(pullData?.phone || pullData?.mobile_phone) && <span>{pullData.mobile_phone || pullData.phone}</span>}
             </div>
+            {/* Key policy summary */}
+            {policies && policies.length > 0 && (
+              <div className="flex gap-4 mt-2 text-sm">
+                <span><strong>Carriers:</strong> {carriers.join(', ') || '-'}</span>
+                <span><strong>Premium:</strong> {formatCurrencyDollars(totalPremium)}</span>
+                {earliestExpiration && <span><strong>Expiration:</strong> {formatDate(earliestExpiration)}</span>}
+              </div>
+            )}
           </div>
 
           {/* Addresses in a clean row */}
           <div className="flex gap-8 text-sm">
-            {mailingAddress && (
+            {primaryAddress && (
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Mailing Address</p>
-                <p>{mailingAddress.full_address || `${mailingAddress.number || ''} ${mailingAddress.street || ''}`}</p>
-                <p className="text-muted-foreground">{[mailingAddress.city, mailingAddress.state, mailingAddress.zip].filter(Boolean).join(', ')}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                  {primaryAddress.address_nature || 'Mailing'} Address
+                </p>
+                <p>{primaryAddress.full_address || `${primaryAddress.number || ''} ${primaryAddress.street || ''} ${primaryAddress.type || ''}`.trim()}</p>
+                <p className="text-muted-foreground">{[primaryAddress.city, primaryAddress.state, primaryAddress.zip].filter(Boolean).join(', ')}</p>
               </div>
             )}
-            {physicalAddress && physicalAddress.canopy_address_id !== mailingAddress?.canopy_address_id && (
+            {secondaryAddress && secondaryAddress.canopy_address_id !== primaryAddress?.canopy_address_id && (
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Physical Address</p>
-                <p>{physicalAddress.full_address || `${physicalAddress.number || ''} ${physicalAddress.street || ''}`}</p>
-                <p className="text-muted-foreground">{[physicalAddress.city, physicalAddress.state, physicalAddress.zip].filter(Boolean).join(', ')}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                  {secondaryAddress.address_nature || 'Physical'} Address
+                </p>
+                <p>{secondaryAddress.full_address || `${secondaryAddress.number || ''} ${secondaryAddress.street || ''} ${secondaryAddress.type || ''}`.trim()}</p>
+                <p className="text-muted-foreground">{[secondaryAddress.city, secondaryAddress.state, secondaryAddress.zip].filter(Boolean).join(', ')}</p>
               </div>
+            )}
+            {!primaryAddress && !secondaryAddress && (
+              <p className="text-muted-foreground italic">No address data available</p>
             )}
           </div>
         </div>
@@ -647,10 +737,11 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
       {allDrivers.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold mb-4">Drivers</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             {allDrivers.map(driver => {
-              const hasViolations = (driver.violations as unknown[])?.length > 0;
-              const hasAccidents = (driver.accidents as unknown[])?.length > 0;
+              const violations = (driver.violations as Array<{ date?: string; type?: string; description?: string; points?: number }>) || [];
+              const accidents = (driver.accidents as Array<{ date?: string; type?: string; description?: string; at_fault?: boolean }>) || [];
+              const age = calculateAge(driver.date_of_birth);
 
               return (
                 <div key={driver.id} className="border rounded-lg p-4 bg-card">
@@ -668,7 +759,15 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Age</p>
+                      <p>{age || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">DOB</p>
+                      <p>{driver.date_of_birth ? formatDate(driver.date_of_birth) : '-'}</p>
+                    </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Gender</p>
                       <p className="capitalize">{driver.gender || '-'}</p>
@@ -678,19 +777,72 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
                       <p className="capitalize">{driver.marital_status || '-'}</p>
                     </div>
                     <div>
+                      <p className="text-xs text-muted-foreground">License #</p>
+                      <p className="font-mono text-xs">{driver.license_number || '-'}</p>
+                    </div>
+                    <div>
                       <p className="text-xs text-muted-foreground">License State</p>
                       <p>{driver.license_state || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Years Licensed</p>
+                      <p>{driver.years_licensed || '-'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Relationship</p>
                       <p className="capitalize">{driver.relationship || '-'}</p>
                     </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Education</p>
+                      <p className="capitalize">{driver.education || '-'}</p>
+                    </div>
                   </div>
-                  {(hasViolations || hasAccidents) && (
-                    <div className="mt-3 pt-3 border-t flex items-center gap-2 text-sm text-amber-600 dark:text-amber-500">
-                      <AlertTriangle className="w-4 h-4" />
-                      {hasViolations && <span>{(driver.violations as unknown[]).length} violation(s)</span>}
-                      {hasAccidents && <span>{(driver.accidents as unknown[]).length} accident(s)</span>}
+
+                  {/* MVR - Violations */}
+                  {violations.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs font-semibold text-amber-600 dark:text-amber-500 mb-2 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Violations ({violations.length})
+                      </p>
+                      <div className="space-y-1">
+                        {violations.map((v, idx) => (
+                          <div key={idx} className="text-xs bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                            <span className="font-medium">{v.type || v.description || 'Violation'}</span>
+                            {v.date && <span className="text-muted-foreground"> - {formatDate(v.date)}</span>}
+                            {v.points && <span className="text-muted-foreground"> ({v.points} pts)</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MVR - Accidents */}
+                  {accidents.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs font-semibold text-red-600 dark:text-red-500 mb-2 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Accidents ({accidents.length})
+                      </p>
+                      <div className="space-y-1">
+                        {accidents.map((a, idx) => (
+                          <div key={idx} className="text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                            <span className="font-medium">{a.type || a.description || 'Accident'}</span>
+                            {a.date && <span className="text-muted-foreground"> - {formatDate(a.date)}</span>}
+                            {a.at_fault && <Badge variant="destructive" className="ml-2 text-xs">At Fault</Badge>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No MVR data message */}
+                  {violations.length === 0 && accidents.length === 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Clean driving record
+                      </p>
                     </div>
                   )}
                 </div>
