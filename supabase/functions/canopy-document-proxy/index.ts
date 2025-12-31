@@ -2,7 +2,7 @@
 // CANOPY DOCUMENT PROXY
 // ============================================================================
 // Proxies document downloads from Canopy API with proper authentication
-// This is needed because Canopy document URLs require API auth headers
+// Uses the file_url stored from Canopy's API response
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -33,11 +33,11 @@ serve(async (req) => {
     let documentDbId = url.searchParams.get('id'); // Our internal document ID
 
     // Also support POST body
-    if (!documentId && req.method === 'POST') {
+    if (req.method === 'POST') {
       try {
         const body = await req.json();
-        documentId = body.documentId;
-        documentDbId = body.id;
+        documentId = body.documentId || documentId;
+        documentDbId = body.id || documentDbId;
       } catch {
         // Ignore JSON parse errors
       }
@@ -69,52 +69,71 @@ serve(async (req) => {
 
     console.log(`[Canopy Document Proxy] Credentials configured - teamId: ${canopyTeamId}`);
 
-    // If we have a database document ID, fetch the document URL from our database
-    if (documentDbId && !documentId) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-      if (supabaseUrl && supabaseServiceKey) {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const { data: doc } = await supabase
-          .from('canopy_documents')
-          .select('file_url')
-          .eq('id', documentDbId)
-          .single();
-
-        if (doc?.file_url) {
-          // Extract document ID from URL if it's a Canopy URL
-          const match = doc.file_url.match(/documents\/([a-f0-9-]+)\/download/);
-          if (match) {
-            documentId = match[1];
-          }
-        }
-      }
-    }
-
-    if (!documentId) {
-      return new Response(JSON.stringify({ error: 'Document ID required' }), {
-        status: 400,
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(JSON.stringify({ error: 'Supabase not configured' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`[Canopy Document Proxy] Fetching document: ${documentId}`);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Try multiple URL patterns - Canopy API might use different formats
-    const urlPatterns = [
-      // Pattern 1: teams/{teamId}/documents/{docId}/download
-      `https://app.usecanopy.com/api/v1.0.0/teams/${canopyTeamId}/documents/${documentId}/download`,
-      // Pattern 2: documents/{docId}/download (no team)
-      `https://app.usecanopy.com/api/v1.0.0/documents/${documentId}/download`,
-      // Pattern 3: teams/{teamId}/documents/{docId} (no /download suffix)
-      `https://app.usecanopy.com/api/v1.0.0/teams/${canopyTeamId}/documents/${documentId}`,
-    ];
+    // Look up the document from our database to get the Canopy URL
+    let storedFileUrl: string | null = null;
+    let canopyDocId: string | null = documentId;
+
+    if (documentDbId) {
+      console.log(`[Canopy Document Proxy] Looking up document by DB ID: ${documentDbId}`);
+      const { data: doc, error } = await supabase
+        .from('canopy_documents')
+        .select('file_url, canopy_document_id')
+        .eq('id', documentDbId)
+        .single();
+
+      if (error) {
+        console.error('[Canopy Document Proxy] DB lookup error:', error);
+      } else if (doc) {
+        storedFileUrl = doc.file_url;
+        canopyDocId = doc.canopy_document_id || canopyDocId;
+        console.log(`[Canopy Document Proxy] Found doc - URL: ${storedFileUrl}, Canopy ID: ${canopyDocId}`);
+      }
+    }
+
+    if (!storedFileUrl && !canopyDocId) {
+      return new Response(JSON.stringify({ error: 'Document not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`[Canopy Document Proxy] Fetching document: ${canopyDocId || 'via stored URL'}`);
+
+    // Build list of URLs to try
+    const urlsToTry: string[] = [];
+
+    // First priority: Use the stored URL from Canopy (most reliable)
+    if (storedFileUrl) {
+      urlsToTry.push(storedFileUrl);
+    }
+
+    // Fallback patterns using document ID
+    if (canopyDocId) {
+      urlsToTry.push(
+        `https://app.usecanopy.com/api/v1.0.0/teams/${canopyTeamId}/documents/${canopyDocId}/download`,
+        `https://app.usecanopy.com/api/v1.0.0/documents/${canopyDocId}/download`,
+        `https://app.usecanopy.com/api/v1.0.0/teams/${canopyTeamId}/documents/${canopyDocId}`,
+      );
+    }
 
     let canopyResponse: Response | null = null;
     let lastError = '';
+    let successUrl = '';
 
-    for (const canopyUrl of urlPatterns) {
+    for (const canopyUrl of urlsToTry) {
       console.log(`[Canopy Document Proxy] Trying URL: ${canopyUrl}`);
 
       try {
@@ -127,15 +146,31 @@ serve(async (req) => {
           },
         });
 
-        console.log(`[Canopy Document Proxy] Response status: ${response.status}, content-type: ${response.headers.get('Content-Type')}`);
+        const contentType = response.headers.get('Content-Type') || '';
+        console.log(`[Canopy Document Proxy] Response status: ${response.status}, content-type: ${contentType}`);
+
+        // Check if we got HTML instead of a document (Canopy login page redirect)
+        if (contentType.includes('text/html')) {
+          lastError = 'Received HTML instead of document - authentication may have failed';
+          console.log(`[Canopy Document Proxy] Got HTML response, skipping this URL`);
+          continue;
+        }
 
         if (response.ok) {
           canopyResponse = response;
+          successUrl = canopyUrl;
           console.log(`[Canopy Document Proxy] Success with URL: ${canopyUrl}`);
           break;
         } else {
-          lastError = await response.text();
-          console.log(`[Canopy Document Proxy] Failed (${response.status}): ${lastError.substring(0, 200)}`);
+          const responseText = await response.text();
+          // Check if error is JSON
+          try {
+            const errorJson = JSON.parse(responseText);
+            lastError = JSON.stringify(errorJson);
+          } catch {
+            lastError = responseText.substring(0, 200);
+          }
+          console.log(`[Canopy Document Proxy] Failed (${response.status}): ${lastError}`);
         }
       } catch (fetchError) {
         lastError = fetchError instanceof Error ? fetchError.message : 'Fetch failed';
@@ -147,9 +182,10 @@ serve(async (req) => {
       console.error(`[Canopy Document Proxy] All URL patterns failed. Last error: ${lastError}`);
       return new Response(JSON.stringify({
         error: 'Failed to fetch document from Canopy',
-        details: lastError.substring(0, 500),
-        documentId: documentId,
+        details: lastError,
+        documentId: canopyDocId,
         teamId: canopyTeamId,
+        triedUrls: urlsToTry.length,
       }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -160,7 +196,7 @@ serve(async (req) => {
     const contentType = canopyResponse.headers.get('Content-Type') || 'application/pdf';
     const contentDisposition = canopyResponse.headers.get('Content-Disposition');
 
-    console.log(`[Canopy Document Proxy] Success - Content-Type: ${contentType}`);
+    console.log(`[Canopy Document Proxy] Success - Content-Type: ${contentType}, URL: ${successUrl}`);
 
     // Stream the document back to the client
     const documentBody = await canopyResponse.arrayBuffer();
