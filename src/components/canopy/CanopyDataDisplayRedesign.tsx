@@ -347,16 +347,30 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
     );
   }
 
+  // Get customer name - fall back to primary driver if consumer info is missing
+  const primaryDriver = drivers?.find(d => d.is_primary) || drivers?.[0];
   const customerName = pullData
-    ? `${pullData.consumer_first_name || ''} ${pullData.consumer_middle_name || ''} ${pullData.consumer_last_name || ''}`.trim()
-    : 'Unknown';
+    ? `${pullData.consumer_first_name || primaryDriver?.first_name || ''} ${pullData.consumer_middle_name || ''} ${pullData.consumer_last_name || primaryDriver?.last_name || ''}`.trim() || 'Unknown'
+    : primaryDriver
+      ? `${primaryDriver.first_name || ''} ${primaryDriver.last_name || ''}`.trim() || 'Unknown'
+      : 'Unknown';
 
-  // Get all addresses (show all types)
+  // Get all addresses (show all types) - fall back to vehicle garaging address
   const mailingAddress = getAddressByType('MAILING');
   const physicalAddress = getAddressByType('PHYSICAL');
 
+  // Get first vehicle with garaging address as fallback
+  const vehicleWithAddress = vehicles?.find(v => v.garage_address || v.garage_city);
+  const vehicleAddressAsFallback = vehicleWithAddress ? {
+    full_address: vehicleWithAddress.garage_address,
+    city: vehicleWithAddress.garage_city,
+    state: vehicleWithAddress.garage_state,
+    zip: vehicleWithAddress.garage_zip,
+    address_nature: 'GARAGING',
+  } : null;
+
   // Get first address if specific types not found
-  const primaryAddress = mailingAddress || physicalAddress || (addresses && addresses.length > 0 ? addresses[0] : null);
+  const primaryAddress = mailingAddress || physicalAddress || (addresses && addresses.length > 0 ? addresses[0] : null) || vehicleAddressAsFallback;
   const secondaryAddress = physicalAddress && physicalAddress.canopy_address_id !== mailingAddress?.canopy_address_id
     ? physicalAddress
     : (addresses && addresses.length > 1 ? addresses[1] : null);
