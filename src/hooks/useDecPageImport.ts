@@ -395,7 +395,7 @@ export function useDecPageImport() {
           last_name: parseResult.insured.last_name,
           email: parseResult.insured.email || null,
           phone: parseResult.insured.phone || null,
-          address: parseResult.insured.address?.street || null,
+          address_line1: parseResult.insured.address?.street || null,
           city: parseResult.insured.address?.city || null,
           state: parseResult.insured.address?.state || null,
           zip_code: parseResult.insured.address?.zip || null,
