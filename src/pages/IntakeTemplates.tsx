@@ -55,6 +55,7 @@ import {
   Clock,
   CheckCircle,
 } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 // ============================================
 // CONSTANTS
@@ -167,9 +168,10 @@ export function IntakeTemplates() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <AppLayout>
+      <div className="container mx-auto py-8 px-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold">Intake Templates</h1>
           <p className="text-muted-foreground mt-1">
@@ -402,7 +404,8 @@ export function IntakeTemplates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 
