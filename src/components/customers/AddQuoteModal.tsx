@@ -179,13 +179,28 @@ export function AddQuoteModal({ open, onOpenChange, accountId, onSuccess }: AddQ
 
           <div>
             <Label htmlFor="line_of_business">Line of Business *</Label>
-            <Input
-              id="line_of_business"
+            <Select
               value={formData.line_of_business}
-              onChange={(e) => handleInputChange('line_of_business', e.target.value)}
-              placeholder="Auto Insurance"
-              className={errors.line_of_business ? 'border-destructive' : ''}
-            />
+              onValueChange={(value) => handleInputChange('line_of_business', value)}
+            >
+              <SelectTrigger className={errors.line_of_business ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Select line of business" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto</SelectItem>
+                <SelectItem value="home">Home</SelectItem>
+                <SelectItem value="renters">Renters</SelectItem>
+                <SelectItem value="umbrella">Umbrella</SelectItem>
+                <SelectItem value="life">Life</SelectItem>
+                <SelectItem value="health">Health</SelectItem>
+                <SelectItem value="commercial_auto">Commercial Auto</SelectItem>
+                <SelectItem value="bop">Business Owner's Policy (BOP)</SelectItem>
+                <SelectItem value="gl">General Liability</SelectItem>
+                <SelectItem value="workers_comp">Workers Compensation</SelectItem>
+                <SelectItem value="property">Property</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
             {errors.line_of_business && (
               <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
             )}

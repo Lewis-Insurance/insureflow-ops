@@ -69,6 +69,7 @@ import {
   type AORenewal,
 } from "@/hooks/useAORenewals";
 import { useMyAORenewalsCount } from "@/hooks/useMyAORenewals";
+import { useProfiles } from "@/hooks/useProfiles";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
@@ -123,6 +124,7 @@ export default function AORenewalsPage() {
   const { data: renewals = [], isLoading } = useAORenewals(filters);
   const { data: stats } = useAORenewalsStats();
   const { data: myStats } = useMyAORenewalsCount();
+  const { profiles } = useProfiles();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
@@ -467,23 +469,25 @@ export default function AORenewalsPage() {
               </Select>
 
               <Select
-                value={filters.priority?.[0] || "all"}
+                value={filters.assigned_to || "all"}
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
-                    priority: value === "all" ? undefined : [value as AORenewalPriority],
+                    assigned_to: value === "all" ? undefined : value,
                   })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Priority" />
+                  <SelectValue placeholder="Agent" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="all">All Agents</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {profiles?.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.full_name || 'Unknown User'}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
