@@ -95,7 +95,11 @@ export const useAORenewals = (filters?: AORenewalFilters) => {
       }
 
       if (filters?.assigned_to) {
-        query = query.eq("assigned_to", filters.assigned_to);
+        if (filters.assigned_to === "unassigned") {
+          query = query.is("assigned_to", null);
+        } else {
+          query = query.eq("assigned_to", filters.assigned_to);
+        }
       }
 
       if (filters?.policy_type) {
