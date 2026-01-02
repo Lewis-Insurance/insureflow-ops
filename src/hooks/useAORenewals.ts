@@ -284,7 +284,11 @@ export const useUpdateAORenewal = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", data.id] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
+
+      // Invalidate my-ao-renewals for dashboard refresh
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
+
       // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
@@ -292,7 +296,7 @@ export const useUpdateAORenewal = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-      
+
       toast.success("Renewal updated successfully");
     },
     onError: (error) => {
@@ -345,7 +349,11 @@ export const useUpdateAORenewalStatus = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
+
+      // Invalidate my-ao-renewals for dashboard refresh
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
+
       // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
@@ -380,6 +388,8 @@ export const useBulkUpdateAORenewals = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
       toast.success(`${data.length} renewals updated successfully`);
     },
     onError: (error) => {
@@ -406,6 +416,8 @@ export const useBulkDeleteAllAORenewals = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
@@ -537,7 +549,9 @@ export const useImportAORenewals = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
-      
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
+
       if (result.failed === 0) {
         toast.success(`Successfully imported ${result.successful} renewals!`);
       } else {

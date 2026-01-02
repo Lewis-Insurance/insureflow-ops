@@ -104,14 +104,17 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
         .insert([{
           account_id: accountId,
           name: file.name,
+          filename: file.name,
+          storage_path: fileName,
+          storage_bucket: 'documents',
           file_path: fileName,
-          file_url: urlData.publicUrl,
-          file_type: file.type,
+          mime_type: file.type,
           file_size: file.size,
           document_type: documentType,
-          description: description.trim() || null,
-          status: 'uploaded',
+          kind: 'customer_document',
           uploaded_by: user.id,
+          file_missing: false,
+          tags: description.trim() ? [description.trim()] : null,
         }]);
 
       if (dbError) throw dbError;

@@ -8,6 +8,7 @@ export interface MyAORenewalsStats {
   totalPremium: number;
   upcomingWithin7Days: number;
   upcomingWithin30Days: number;
+  totalIncludingCompleted?: number; // Total count including completed statuses
 }
 
 export interface MyAORenewalsData {
@@ -37,6 +38,7 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
             totalPremium: 0,
             upcomingWithin7Days: 0,
             upcomingWithin30Days: 0,
+            totalIncludingCompleted: 0,
           },
         };
       }
@@ -65,6 +67,19 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
         throw error;
       }
 
+      // If excluding completed, also fetch total count to show in stats
+      let totalIncludingCompleted = 0;
+      if (excludeCompleted) {
+        const { count, error: countError } = await supabase
+          .from("ao_renewals")
+          .select("id", { count: "exact", head: true })
+          .eq("assigned_to", user.id);
+
+        if (!countError && count !== null) {
+          totalIncludingCompleted = count;
+        }
+      }
+
       const renewals = (data || []) as AORenewal[];
       const now = new Date();
 
@@ -74,6 +89,7 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
         totalPremium: renewals.reduce((sum, r) => sum + (r.current_premium || 0), 0),
         upcomingWithin7Days: 0,
         upcomingWithin30Days: 0,
+        totalIncludingCompleted: excludeCompleted ? totalIncludingCompleted : renewals.length,
       };
 
       // Count upcoming renewals

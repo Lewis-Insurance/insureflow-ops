@@ -115,9 +115,20 @@ export function MyAORenewalsCard() {
         {renewals.length === 0 ? (
           <div className="text-center py-6">
             <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              No renewals assigned to you
-            </p>
+            {stats?.totalIncludingCompleted && stats.totalIncludingCompleted > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  No active renewals
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.totalIncludingCompleted} completed renewal{stats.totalIncludingCompleted !== 1 ? 's' : ''} on file
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No renewals assigned to you
+              </p>
+            )}
             <Button
               variant="link"
               size="sm"

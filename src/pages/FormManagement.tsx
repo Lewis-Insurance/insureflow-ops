@@ -3,7 +3,7 @@
 // Create, edit, and manage ACORD forms for accounts
 // ============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +30,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
 import {
   Table,
   TableBody,
@@ -67,6 +77,10 @@ import {
   ArrowUpDown,
   GitCompare,
   FileSignature,
+  ChevronsUpDown,
+  Check,
+  UserPlus,
+  Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,18 +120,56 @@ export default function FormManagement() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedAccountName, setSelectedAccountName] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [templates, setTemplates] = useState<{ id: string; form_number: string; form_name: string }[]>([]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureForm, setSignatureForm] = useState<FormWithDetails | null>(null);
 
+  // Account search state
+  const [accountSearchOpen, setAccountSearchOpen] = useState(false);
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [accountSearchResults, setAccountSearchResults] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [isSearchingAccounts, setIsSearchingAccounts] = useState(false);
+  const [isProspectMode, setIsProspectMode] = useState(false);
+  const [prospectName, setProspectName] = useState('');
+
   // Load forms
   useEffect(() => {
     loadForms();
-    loadAccounts();
     loadTemplates();
   }, []);
+
+  // Debounced account search
+  useEffect(() => {
+    const searchAccounts = async () => {
+      if (accountSearchQuery.length < 2) {
+        setAccountSearchResults([]);
+        return;
+      }
+
+      setIsSearchingAccounts(true);
+      try {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('id, name, type')
+          .ilike('name', `%${accountSearchQuery}%`)
+          .order('name')
+          .limit(20);
+
+        if (error) throw error;
+        setAccountSearchResults(data || []);
+      } catch (err) {
+        console.error('Error searching accounts:', err);
+        setAccountSearchResults([]);
+      } finally {
+        setIsSearchingAccounts(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchAccounts, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [accountSearchQuery]);
 
   const loadForms = async () => {
     setIsLoading(true);
@@ -164,14 +216,6 @@ export default function FormManagement() {
     }
   };
 
-  const loadAccounts = async () => {
-    const { data } = await supabase
-      .from('accounts')
-      .select('id, name')
-      .order('name');
-    setAccounts(data || []);
-  };
-
   const loadTemplates = async () => {
     const { data } = await supabase
       .from('acord_templates')
@@ -202,23 +246,63 @@ export default function FormManagement() {
 
   // Create new form
   const handleCreateForm = async () => {
-    if (!selectedAccountId || !selectedTemplateId) {
-      toast({
-        title: 'Missing information',
-        description: 'Please select an account and template',
-        variant: 'destructive',
-      });
-      return;
+    // Validate inputs
+    if (isProspectMode) {
+      if (!prospectName.trim() || !selectedTemplateId) {
+        toast({
+          title: 'Missing information',
+          description: 'Please enter prospect name and select a template',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      if (!selectedAccountId || !selectedTemplateId) {
+        toast({
+          title: 'Missing information',
+          description: 'Please select a client and template',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      let accountId = selectedAccountId;
+
+      // If prospect mode, create prospect account first
+      if (isProspectMode) {
+        // Get user's workspace
+        const { data: membership, error: membershipError } = await supabase
+          .from('agency_workspace_memberships')
+          .select('agency_workspace_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (membershipError) throw new Error('Could not find workspace');
+
+        const { data: newAccount, error: accountError } = await supabase
+          .from('accounts')
+          .insert({
+            agency_workspace_id: membership.agency_workspace_id,
+            name: prospectName.trim(),
+            type: 'prospect',
+            account_status: 'active',
+          })
+          .select()
+          .single();
+
+        if (accountError) throw accountError;
+        accountId = newAccount.id;
+      }
+
       const { data, error } = await supabase
         .from('acord_forms')
         .insert({
-          account_id: selectedAccountId,
+          account_id: accountId,
           template_id: selectedTemplateId,
           field_values: {},
           has_addendum: false,
@@ -234,12 +318,20 @@ export default function FormManagement() {
 
       toast({
         title: 'Form created',
-        description: 'New ACORD form has been created',
+        description: isProspectMode
+          ? `New ACORD form created for prospect "${prospectName.trim()}"`
+          : 'New ACORD form has been created',
       });
 
+      // Reset dialog state
       setCreateDialogOpen(false);
       setSelectedAccountId('');
+      setSelectedAccountName('');
       setSelectedTemplateId('');
+      setIsProspectMode(false);
+      setProspectName('');
+      setAccountSearchQuery('');
+      setAccountSearchResults([]);
       loadForms();
 
       // Navigate to edit
@@ -386,30 +478,128 @@ export default function FormManagement() {
                 New Form
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New ACORD Form</DialogTitle>
                 <DialogDescription>
-                  Select an account and form type to create a new ACORD form.
+                  Search for an existing client or create a form for a new prospect.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Account *</Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(account => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {/* Toggle between existing client and new prospect */}
+                <div className="flex gap-2">
+                  <Button
+                    variant={isProspectMode ? "outline" : "default"}
+                    size="sm"
+                    onClick={() => {
+                      setIsProspectMode(false);
+                      setProspectName('');
+                    }}
+                    className="flex-1"
+                  >
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Existing Client
+                  </Button>
+                  <Button
+                    variant={isProspectMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setIsProspectMode(true);
+                      setSelectedAccountId('');
+                      setSelectedAccountName('');
+                      setAccountSearchQuery('');
+                    }}
+                    className="flex-1"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    New Prospect
+                  </Button>
                 </div>
+
+                {isProspectMode ? (
+                  /* Prospect Name Input */
+                  <div className="space-y-2">
+                    <Label>Prospect Name *</Label>
+                    <Input
+                      placeholder="Enter prospect or business name..."
+                      value={prospectName}
+                      onChange={(e) => setProspectName(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      A new prospect account will be created for this form.
+                    </p>
+                  </div>
+                ) : (
+                  /* Searchable Client Selector */
+                  <div className="space-y-2">
+                    <Label>Client *</Label>
+                    <Popover open={accountSearchOpen} onOpenChange={setAccountSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={accountSearchOpen}
+                          className="w-full justify-between font-normal"
+                        >
+                          {selectedAccountName || "Search for a client..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[380px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Type to search clients..."
+                            value={accountSearchQuery}
+                            onValueChange={setAccountSearchQuery}
+                          />
+                          <CommandList>
+                            {isSearchingAccounts ? (
+                              <div className="py-6 text-center text-sm">
+                                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                                Searching...
+                              </div>
+                            ) : accountSearchQuery.length < 2 ? (
+                              <CommandEmpty>
+                                Type at least 2 characters to search...
+                              </CommandEmpty>
+                            ) : accountSearchResults.length === 0 ? (
+                              <CommandEmpty>
+                                No clients found. Try a different search or create a new prospect.
+                              </CommandEmpty>
+                            ) : (
+                              <CommandGroup heading="Clients">
+                                {accountSearchResults.map((account) => (
+                                  <CommandItem
+                                    key={account.id}
+                                    value={account.id}
+                                    onSelect={() => {
+                                      setSelectedAccountId(account.id);
+                                      setSelectedAccountName(account.name);
+                                      setAccountSearchOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        selectedAccountId === account.id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span>{account.name}</span>
+                                      <span className="text-xs text-muted-foreground capitalize">
+                                        {account.type || 'client'}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Form Template *</Label>
@@ -429,7 +619,14 @@ export default function FormManagement() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                <Button variant="outline" onClick={() => {
+                  setCreateDialogOpen(false);
+                  setIsProspectMode(false);
+                  setProspectName('');
+                  setSelectedAccountId('');
+                  setSelectedAccountName('');
+                  setAccountSearchQuery('');
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={handleCreateForm}>Create Form</Button>
