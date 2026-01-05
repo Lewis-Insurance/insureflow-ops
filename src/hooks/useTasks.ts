@@ -83,8 +83,7 @@ export function useTasks(accountId?: string) {
         .select(`
           *,
           account:accounts(id, name),
-          policy:policies(id, policy_number, carrier, line_of_business),
-          assignee:profiles!tasks_assignee_id_fkey(id, full_name)
+          policy:policies(id, policy_number, carrier, line_of_business)
         `)
         .order('created_at', { ascending: false });
 
