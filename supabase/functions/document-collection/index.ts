@@ -583,7 +583,7 @@ async function portalUpload(
   const filePath = `collection/${workspaceId}/${requirement_id}/${timestamp}-${safeName}`;
 
   const { error: uploadError } = await supabase.storage
-    .from('customer-docs')
+    .from('documents')
     .upload(filePath, fileData, {
       contentType: mime_type,
       upsert: false,

@@ -243,7 +243,7 @@ export function useUploadExploreDocument() {
       const storagePath = `explore/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(storagePath, file);
 
       if (uploadError) throw uploadError;

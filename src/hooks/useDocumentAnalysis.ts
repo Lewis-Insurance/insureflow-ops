@@ -205,7 +205,7 @@ export const useDocumentUploadAndAnalysis = () => {
       const filePath = accountId ? `${accountId}/${fileName}` : `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -219,7 +219,7 @@ export const useDocumentUploadAndAnalysis = () => {
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .getPublicUrl(filePath);
 
       setUploadProgress(60);
@@ -234,7 +234,7 @@ export const useDocumentUploadAndAnalysis = () => {
           name: file.name,
           category: 'other',
           storage_path: filePath,
-          storage_bucket: 'customer-docs',
+          storage_bucket: 'documents',
           file_missing: false,
           mime_type: file.type,
           size_bytes: file.size,
@@ -347,7 +347,7 @@ export const useDocumentComparison = () => {
         const filePath = accountId ? `${accountId}/${fileName}` : `${user.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('customer-docs')
+          .from('documents')
           .upload(filePath, doc.file);
 
         if (uploadError) {
@@ -356,7 +356,7 @@ export const useDocumentComparison = () => {
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
-          .from('customer-docs')
+          .from('documents')
           .getPublicUrl(filePath);
 
         // Create document record
@@ -369,7 +369,7 @@ export const useDocumentComparison = () => {
             name: doc.file.name,
             category: 'other',
             storage_path: filePath,
-            storage_bucket: 'customer-docs',
+            storage_bucket: 'documents',
             file_missing: false,
             mime_type: doc.file.type,
             size_bytes: doc.file.size,

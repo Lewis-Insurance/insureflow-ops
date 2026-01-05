@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
+  spouse_name: z.string().max(200, 'Spouse name too long').optional().or(z.literal('')),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
   address_line1: z.string().optional(),
@@ -27,6 +28,7 @@ const accountSchema = z.object({
 interface Account {
   id: string;
   name: string;
+  spouse_name?: string;
   type: string;
   account_type?: string;
   account_status?: string;
@@ -53,6 +55,7 @@ interface EditContactInfoModalProps {
 export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }: EditContactInfoModalProps) {
   const [formData, setFormData] = useState({
     name: '',
+    spouse_name: '',
     email: '',
     phone: '',
     address_line1: '',
@@ -73,6 +76,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     if (account && open) {
       setFormData({
         name: account.name || '',
+        spouse_name: account.spouse_name || '',
         email: account.email || '',
         phone: account.phone || '',
         address_line1: account.address_line1 || '',
@@ -115,6 +119,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     try {
       const updateData = {
         name: formData.name.trim(),
+        spouse_name: account.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
         address_line1: formData.address_line1.trim() || null,
@@ -174,17 +179,30 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
           <DialogTitle>Edit Customer Information</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-          <div>
-            <Label htmlFor="name">Customer Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="John Doe"
-              className={errors.name ? 'border-destructive' : ''}
-            />
-            {errors.name && (
-              <p className="text-sm text-destructive mt-1">{errors.name}</p>
+          <div className={account.type === 'household' ? 'grid grid-cols-2 gap-4' : ''}>
+            <div>
+              <Label htmlFor="name">Customer Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                placeholder={account.type === 'household' ? "Primary Insured" : "Business Name"}
+                className={errors.name ? 'border-destructive' : ''}
+              />
+              {errors.name && (
+                <p className="text-sm text-destructive mt-1">{errors.name}</p>
+              )}
+            </div>
+            {account.type === 'household' && (
+              <div>
+                <Label htmlFor="spouse_name">Spouse / Co-Insured</Label>
+                <Input
+                  id="spouse_name"
+                  value={formData.spouse_name}
+                  onChange={(e) => handleInputChange('spouse_name', e.target.value)}
+                  placeholder="Second Named Insured"
+                />
+              </div>
             )}
           </div>
 

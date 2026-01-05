@@ -260,7 +260,7 @@ export function useDocumentIntelligence() {
         const filePath = `${membership.account_id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('customer-docs')
+          .from('documents')
           .upload(filePath, file, {
             cacheControl: '3600',
             upsert: false

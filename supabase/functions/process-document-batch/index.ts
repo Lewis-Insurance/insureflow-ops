@@ -80,7 +80,7 @@ serve(async (req) => {
             try {
               // Download file from storage
               const { data: fileData, error: downloadError } = await supabase.storage
-                .from('customer-docs')
+                .from('documents')
                 .download(item.storage_path);
 
               if (downloadError) throw downloadError;
@@ -145,7 +145,7 @@ serve(async (req) => {
               kind: 'document',
               category: docCategory,
               storage_path: item.storage_path,
-              storage_bucket: 'customer-docs',
+              storage_bucket: 'documents',
               file_missing: false,
               mime_type: item.metadata?.mime_type || 'application/octet-stream',
               size_bytes: item.file_size,
