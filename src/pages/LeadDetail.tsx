@@ -49,6 +49,7 @@ import {
   Plus,
   TrendingUp,
   ArrowLeft,
+  UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -64,6 +65,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { ConvertLeadModal } from "@/components/leads/ConvertLeadModal";
 
 const INSURANCE_TYPES = [
   { value: 'auto', label: 'Auto' },
@@ -96,6 +98,7 @@ export default function LeadDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
 
   const { data: lead, isLoading } = useLead(leadId || undefined);
   const { data: sources } = useLeadSources();
@@ -303,6 +306,13 @@ export default function LeadDetail() {
         <div className="flex gap-2">
           {!isEditing ? (
             <>
+              <Button
+                onClick={() => setConvertModalOpen(true)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <UserCheck className="h-4 w-4 mr-2" />
+                Convert to Customer
+              </Button>
               <CanopyConnectButton
                 leadId={leadId}
                 variant="outline"
@@ -612,6 +622,15 @@ export default function LeadDetail() {
           onOpenChange={setAddQuoteOpen}
           accountId={lead.account_id || leadId || ''}
           accountName={displayName.fullName}
+        />
+      )}
+
+      {/* Convert to Customer Modal */}
+      {lead && (
+        <ConvertLeadModal
+          open={convertModalOpen}
+          onOpenChange={setConvertModalOpen}
+          lead={lead}
         />
       )}
       </div>

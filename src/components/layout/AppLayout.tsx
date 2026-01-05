@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug, FilePlus2, ClipboardList, ScrollText, Award, Workflow, FileType, FileStack, Eye, Activity, Receipt, Landmark, FileSpreadsheet, GraduationCap, FileInput } from 'lucide-react';
+import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug, FilePlus2, ClipboardList, ScrollText, Award, Workflow, FileType, FileStack, Eye, Activity, Receipt, Landmark, FileSpreadsheet, GraduationCap, FileInput, GitMerge } from 'lucide-react';
 import { NewLeadBanner } from '@/components/leads/NewLeadBanner';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
@@ -16,6 +16,7 @@ import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
 import { AIAssistantProvider, useAIAssistantContext } from '@/contexts/AIAssistantContext';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { FloatingMessenger } from '@/components/messaging/FloatingMessenger';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -238,6 +239,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               {/* Team Group */}
               <NavGroup label="Team" defaultOpen={false}>
                 <NavItem
+                  icon={MessageSquare}
+                  label="Messages"
+                  to="/team-messaging"
+                  badge="NEW"
+                />
+                <NavItem
                   icon={GraduationCap}
                   label="Training"
                   to="/training"
@@ -330,6 +337,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={Radio}
                   label="Command Center"
                   to="/command-center"
+                />
+                <NavItem
+                  icon={GitMerge}
+                  label="Merge Customers"
+                  to="/merge-customers"
                 />
               </NavGroup>
 
@@ -434,6 +446,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
         onOpenChange={(open) => open ? openSidebar() : closeSidebar()}
         context={context}
       />
+
+      {/* Floating Team Messenger */}
+      <FloatingMessenger />
     </SidebarProvider>
   );
 }
