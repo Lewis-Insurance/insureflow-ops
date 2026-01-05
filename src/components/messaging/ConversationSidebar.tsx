@@ -169,8 +169,11 @@ export function ConversationSidebar({
   onNewConversation,
 }: ConversationSidebarProps) {
   const { user } = useAuth();
-  const { data: conversations, isLoading } = useConversations();
+  const { data: conversations, isLoading, error } = useConversations();
   const [search, setSearch] = useState('');
+
+  // Debug: log query state
+  console.log('[ConversationSidebar] isLoading:', isLoading, 'error:', error, 'conversations:', conversations?.length);
 
   // Filter conversations by search
   const filteredConversations = conversations?.filter((conv) => {
@@ -218,7 +221,12 @@ export function ConversationSidebar({
 
       {/* Conversation List */}
       <ScrollArea className="flex-1">
-        {isLoading ? (
+        {error ? (
+          <div className="p-6 text-center text-destructive">
+            <p className="font-medium">Error loading conversations</p>
+            <p className="text-sm mt-1">{(error as Error).message}</p>
+          </div>
+        ) : isLoading ? (
           <div className="p-2">
             {[1, 2, 3, 4, 5].map((i) => (
               <ConversationSkeleton key={i} />
