@@ -14,6 +14,7 @@ import {
   Conversation,
   Message,
 } from '@/hooks/useTeamMessaging';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FloatingMessengerProps {
@@ -29,8 +30,9 @@ export function FloatingMessenger({ className }: FloatingMessengerProps) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
-  const { data: conversations } = useConversations();
+  const { data: conversations, refetch: refetchConversations } = useConversations();
   const editMessage = useEditMessage();
+  const queryClient = useQueryClient();
 
   // Get agency workspace ID from profile
   const agencyWorkspaceId = profile?.default_agency_workspace_id || null;
@@ -52,13 +54,15 @@ export function FloatingMessenger({ className }: FloatingMessengerProps) {
   }, []);
 
   const handleConversationCreated = useCallback(
-    (conversationId: string) => {
-      const newConvo = conversations?.find((c) => c.id === conversationId);
+    async (conversationId: string) => {
+      // Refetch conversations to get the new one
+      const result = await refetchConversations();
+      const newConvo = result.data?.find((c) => c.id === conversationId);
       if (newConvo) {
         setSelectedConversation(newConvo);
       }
     },
-    [conversations]
+    [refetchConversations]
   );
 
   const handleReply = useCallback((message: Message) => {
