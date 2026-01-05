@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Building2, Home, Users, FileText, Calendar, Phone, MessageSquare, CheckSquare, BarChart3, Settings, LogOut, Radio, Target, TrendingUp, Heart, Shield, DollarSign, Brain, Bot, Database, BookMarked, Scale, Briefcase, LayoutDashboard, UserPlus, Sliders, Mail, RefreshCw, FileQuestion, FileSearch, Sparkles, FolderKanban, Bug, FilePlus2, ClipboardList, ScrollText, Award, Workflow, FileType, FileStack, Eye, Activity, Receipt, Landmark, FileSpreadsheet, GraduationCap, FileInput } from 'lucide-react';
+import { NewLeadBanner } from '@/components/leads/NewLeadBanner';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
@@ -412,6 +413,8 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               </div>
             </div>
           </header>
+          {/* New Lead Banner - shows when there are unacknowledged Canopy leads */}
+          <NewLeadBanner />
           <main className="flex-1 overflow-auto">
             {children}
           </main>
