@@ -594,23 +594,45 @@ export function useTeamMembers(agencyWorkspaceId: string | null) {
     queryFn: async () => {
       if (!agencyWorkspaceId) return [];
 
-      const { data, error } = await supabase
+      // First, get all memberships for the workspace
+      const { data: memberships, error: membershipError } = await supabase
         .from('agency_workspace_memberships')
-        .select(`
-          user_id,
-          role,
-          profile:profiles(id, full_name, email, avatar_url)
-        `)
+        .select('user_id, role')
         .eq('agency_workspace_id', agencyWorkspaceId)
         .eq('status', 'active');
 
-      if (error) throw error;
+      if (membershipError) {
+        logger.error('[useTeamMembers] Error fetching memberships:', membershipError);
+        throw membershipError;
+      }
 
-      return (data || []).map((m) => ({
-        id: m.user_id,
-        role: m.role,
-        ...m.profile,
-      }));
+      if (!memberships || memberships.length === 0) {
+        return [];
+      }
+
+      // Then, get profiles for those users
+      const userIds = memberships.map((m) => m.user_id);
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', userIds);
+
+      if (profileError) {
+        logger.error('[useTeamMembers] Error fetching profiles:', profileError);
+        throw profileError;
+      }
+
+      // Merge memberships with profiles
+      return memberships.map((m) => {
+        const profile = profiles?.find((p) => p.id === m.user_id);
+        return {
+          id: m.user_id,
+          role: m.role,
+          full_name: profile?.full_name || null,
+          email: profile?.email || null,
+          avatar_url: profile?.avatar_url || null,
+        };
+      });
     },
     enabled: !!agencyWorkspaceId,
     staleTime: 60000,
