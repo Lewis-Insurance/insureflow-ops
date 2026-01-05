@@ -83,7 +83,9 @@ export function useCurrentDaySheet() {
   return useQuery({
     queryKey: daySheetKeys.current(),
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
+      // Use local date (not UTC) to avoid timezone issues
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       const { data, error } = await supabase
         .from('day_sheets')

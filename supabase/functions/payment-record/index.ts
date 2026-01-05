@@ -145,9 +145,13 @@ serve(async (req) => {
       }
     }
 
-    // Get or create today's day sheet
+    // Get or create day sheet for the received date (not server UTC date)
+    // This fixes timezone issues where evening payments were assigned to wrong day
     const { data: daySheetId, error: daySheetError } = await supabase
-      .rpc('get_or_create_day_sheet', { p_org_id: orgId });
+      .rpc('get_or_create_day_sheet', {
+        p_org_id: orgId,
+        p_date: body.received_date  // Use client-provided date to avoid UTC issues
+      });
 
     if (daySheetError) {
       logger.error('Failed to get/create day sheet', { error: daySheetError });
