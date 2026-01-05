@@ -111,15 +111,12 @@ export function useConversations() {
 
       const conversationIds = participations.map(p => p.conversation_id);
 
-      // Fetch conversations with participants and last message
+      // Fetch conversations (without nested profile join - that FK doesn't exist)
       const { data: conversations, error: convError } = await supabase
         .from('team_conversations')
         .select(`
           *,
-          participants:team_conversation_participants(
-            *,
-            profile:profiles(id, full_name, email, avatar_url)
-          )
+          participants:team_conversation_participants(*)
         `)
         .in('id', conversationIds)
         .eq('is_archived', false)
@@ -130,9 +127,41 @@ export function useConversations() {
         throw convError;
       }
 
-      // Fetch last message for each conversation
-      const conversationsWithLastMessage = await Promise.all(
-        (conversations || []).map(async (conv) => {
+      if (!conversations || conversations.length === 0) {
+        return [];
+      }
+
+      // Collect all unique user IDs from participants
+      const allUserIds = new Set<string>();
+      conversations.forEach((conv) => {
+        conv.participants?.forEach((p: { user_id: string }) => {
+          allUserIds.add(p.user_id);
+        });
+      });
+
+      // Fetch all profiles in one query
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', Array.from(allUserIds));
+
+      if (profileError) {
+        logger.error('[useConversations] Error fetching profiles:', profileError);
+        // Don't throw - continue with partial data
+      }
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Attach profiles to participants and fetch last message
+      const conversationsWithData = await Promise.all(
+        conversations.map(async (conv) => {
+          // Attach profile data to each participant
+          const participantsWithProfiles = conv.participants?.map((p: ConversationParticipant) => ({
+            ...p,
+            profile: profileMap.get(p.user_id) || null,
+          })) || [];
+
+          // Fetch last message
           const { data: messages } = await supabase
             .from('team_messages')
             .select('*')
@@ -142,7 +171,7 @@ export function useConversations() {
             .limit(1);
 
           // Get unread count
-          const myParticipation = conv.participants?.find(
+          const myParticipation = participantsWithProfiles.find(
             (p: ConversationParticipant) => p.user_id === user.id
           );
           const lastReadAt = myParticipation?.last_read_at;
@@ -161,13 +190,14 @@ export function useConversations() {
 
           return {
             ...conv,
+            participants: participantsWithProfiles,
             last_message: messages?.[0] || null,
             unread_count: unreadCount,
           };
         })
       );
 
-      return conversationsWithLastMessage as Conversation[];
+      return conversationsWithData as Conversation[];
     },
     enabled: !!user?.id,
     staleTime: 30000,
@@ -183,11 +213,11 @@ export function useMessages(conversationId: string | null) {
     queryFn: async () => {
       if (!conversationId) return [];
 
-      const { data, error } = await supabase
+      // Fetch messages with reactions (no profile join - FK doesn't exist)
+      const { data: messages, error } = await supabase
         .from('team_messages')
         .select(`
           *,
-          sender:profiles!team_messages_sender_id_fkey(id, full_name, email, avatar_url),
           reactions:team_message_reactions(*)
         `)
         .eq('conversation_id', conversationId)
@@ -199,7 +229,33 @@ export function useMessages(conversationId: string | null) {
         throw error;
       }
 
-      return (data || []) as Message[];
+      if (!messages || messages.length === 0) {
+        return [];
+      }
+
+      // Collect unique sender IDs
+      const senderIds = [...new Set(messages.map(m => m.sender_id))];
+
+      // Fetch sender profiles
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', senderIds);
+
+      if (profileError) {
+        logger.error('[useMessages] Error fetching profiles:', profileError);
+        // Continue with partial data
+      }
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Attach sender profiles to messages
+      const messagesWithSenders = messages.map(m => ({
+        ...m,
+        sender: profileMap.get(m.sender_id) || null,
+      }));
+
+      return messagesWithSenders as Message[];
     },
     enabled: !!conversationId && !!user?.id,
     staleTime: 10000,
@@ -227,20 +283,33 @@ export function useMessageSubscription(
           filter: `conversation_id=eq.${conversationId}`,
         },
         async (payload) => {
-          // Fetch full message with sender info
-          const { data } = await supabase
+          const newMsg = payload.new as { id: string; sender_id: string };
+
+          // Fetch the full message with reactions
+          const { data: message } = await supabase
             .from('team_messages')
             .select(`
               *,
-              sender:profiles!team_messages_sender_id_fkey(id, full_name, email, avatar_url),
               reactions:team_message_reactions(*)
             `)
-            .eq('id', payload.new.id)
+            .eq('id', newMsg.id)
             .single();
 
-          if (data) {
-            onNewMessage(data as Message);
-          }
+          if (!message) return;
+
+          // Fetch sender profile separately
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .eq('id', newMsg.sender_id)
+            .single();
+
+          const messageWithSender = {
+            ...message,
+            sender: senderProfile || null,
+          };
+
+          onNewMessage(messageWithSender as Message);
         }
       )
       .subscribe();
