@@ -119,7 +119,7 @@ export default function TeamMessagingPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
-  const { data: conversations } = useConversations();
+  const { data: conversations, refetch: refetchConversations } = useConversations();
   const editMessage = useEditMessage();
 
   // Get agency workspace ID from profile
@@ -139,14 +139,15 @@ export default function TeamMessagingPage() {
   }, []);
 
   const handleConversationCreated = useCallback(
-    (conversationId: string) => {
-      // Find and select the new conversation
-      const newConvo = conversations?.find((c) => c.id === conversationId);
+    async (conversationId: string) => {
+      // Refetch conversations to get the new one
+      const result = await refetchConversations();
+      const newConvo = result.data?.find((c) => c.id === conversationId);
       if (newConvo) {
         setSelectedConversation(newConvo);
       }
     },
-    [conversations]
+    [refetchConversations]
   );
 
   const handleReply = useCallback((message: Message) => {
