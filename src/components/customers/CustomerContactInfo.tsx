@@ -9,6 +9,7 @@ import { SMSComposerModal } from '@/components/communications/SMSComposerModal';
 interface CustomerAccount {
   id: string;
   name: string;
+  spouse_name?: string;
   type: string;
   account_type?: string;
   account_status?: string;
@@ -62,8 +63,15 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Customer Name</label>
-            <p className="text-sm font-semibold">{account.name}</p>
+            <label className="text-sm font-medium text-muted-foreground">
+              {account.type === 'household' && account.spouse_name ? 'Named Insureds' : 'Customer Name'}
+            </label>
+            <p className="text-sm font-semibold">
+              {account.name}
+              {account.type === 'household' && account.spouse_name && (
+                <span className="text-muted-foreground font-normal"> & {account.spouse_name}</span>
+              )}
+            </p>
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Account Type</label>

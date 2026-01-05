@@ -90,7 +90,7 @@ export function useDocumentManager(accountId?: string) {
 
       // Upload file to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -107,7 +107,7 @@ export function useDocumentManager(accountId?: string) {
         name: file.name,
         category: category || 'other',
         storage_path: filePath,
-        storage_bucket: 'customer-docs',
+        storage_bucket: 'documents',
         file_missing: false,
         mime_type: file.type,
         size_bytes: file.size,
@@ -149,8 +149,8 @@ export function useDocumentManager(accountId?: string) {
     const path = doc.storage_path;
     // Try buckets in order of likelihood
     const bucketsToTry = doc.storage_bucket
-      ? [doc.storage_bucket, 'documents', 'customer-docs']
-      : ['documents', 'customer-docs']; // New uploads go to 'documents'
+      ? [doc.storage_bucket, 'documents', 'documents']
+      : ['documents', 'documents']; // New uploads go to 'documents'
 
     for (const bucket of bucketsToTry) {
       try {
@@ -261,7 +261,7 @@ export function useDocumentManager(accountId?: string) {
       const newPath = `${document.account_id}/${newName}`;
 
       const { error: uploadErr } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(newPath, file, { cacheControl: '3600', upsert: false });
       if (uploadErr) throw uploadErr;
 
@@ -269,7 +269,7 @@ export function useDocumentManager(accountId?: string) {
         .from('documents')
         .update({
           storage_path: newPath,
-          storage_bucket: 'customer-docs',
+          storage_bucket: 'documents',
           file_missing: false,
           filename: file.name,
           mime_type: file.type,

@@ -126,7 +126,7 @@ export function RequirementDetailModal({
   const handleViewDocument = async (upload: CollectionUpload) => {
     try {
       const { data, error } = await supabase.storage
-        .from(upload.storage_bucket || 'customer-docs')
+        .from(upload.storage_bucket || 'documents')
         .createSignedUrl(upload.file_path, 3600);
 
       if (error) throw error;
@@ -143,7 +143,7 @@ export function RequirementDetailModal({
   const handleDownload = async (upload: CollectionUpload) => {
     try {
       const { data, error } = await supabase.storage
-        .from(upload.storage_bucket || 'customer-docs')
+        .from(upload.storage_bucket || 'documents')
         .download(upload.file_path);
 
       if (error) throw error;

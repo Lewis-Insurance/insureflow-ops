@@ -16,6 +16,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-r
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Customer name is required').max(200, 'Name too long'),
+  spouse_name: z.string().max(200, 'Spouse name too long').optional().or(z.literal('')),
   type: z.enum(['household', 'commercial_business'], { required_error: 'Account type is required' }),
   account_status: z.enum(['lead', 'active', 'churned']).optional(),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
@@ -147,6 +148,7 @@ const initialPolicyData: PolicyData = {
 export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerModalProps) {
   const [formData, setFormData] = useState({
     name: '',
+    spouse_name: '',
     type: 'household' as 'household' | 'commercial_business',
     account_status: 'active' as 'lead' | 'active' | 'churned',
     email: '',
@@ -436,6 +438,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       // Create customer
       const customerData = {
         name: formData.name.trim(),
+        spouse_name: formData.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         type: formData.type,
         account_status: formData.account_status,
         email: formData.email.trim() || null,
@@ -556,6 +559,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       // Reset form
       setFormData({
         name: '',
+        spouse_name: '',
         type: 'household',
         account_status: 'active',
         email: '',
@@ -688,19 +692,30 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+            <div className={formData.type === 'household' ? '' : 'col-span-2'}>
               <Label htmlFor="name">Customer Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="John Doe or Acme Corp"
+                placeholder={formData.type === 'household' ? "Primary Insured Name" : "Business Name"}
                 className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && (
                 <p className="text-sm text-destructive mt-1">{errors.name}</p>
               )}
             </div>
+            {formData.type === 'household' && (
+              <div>
+                <Label htmlFor="spouse_name">Spouse / Co-Insured</Label>
+                <Input
+                  id="spouse_name"
+                  value={formData.spouse_name}
+                  onChange={(e) => handleInputChange('spouse_name', e.target.value)}
+                  placeholder="Second Named Insured"
+                />
+              </div>
+            )}
             <div>
               <Label htmlFor="type">Account Type *</Label>
               <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>

@@ -121,7 +121,7 @@ serve(async (req) => {
     const {
       document_id,
       storage_path,
-      storage_bucket = 'customer-docs', // Default to customer-docs bucket
+      storage_bucket = 'documents', // Default to documents bucket
       filename,
       question,
       context // Optional: account name, policy info, etc.

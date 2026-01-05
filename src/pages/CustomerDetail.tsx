@@ -29,6 +29,7 @@ import { logger } from '@/lib/logger';
 interface Account {
   id: string;
   name: string;
+  spouse_name?: string;
   type: string;
   account_type?: string;
   account_status?: string;

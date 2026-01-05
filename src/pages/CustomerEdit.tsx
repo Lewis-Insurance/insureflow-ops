@@ -12,6 +12,7 @@ import { ArrowLeft } from 'lucide-react';
 
 interface AccountData {
   name: string;
+  spouse_name?: string;
   type: string;
   email?: string;
   phone?: string;
@@ -23,6 +24,7 @@ export default function CustomerEdit() {
   const { toast } = useToast();
   const [data, setData] = useState<AccountData>({
     name: '',
+    spouse_name: '',
     type: 'household',
   });
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ export default function CustomerEdit() {
 
         setData({
           name: account.name || '',
+          spouse_name: account.spouse_name || '',
           type: account.type === 'commercial_business' ? 'business' : (account.type || 'household'),
           email: account.email || '',
           phone: account.phone || '',
@@ -79,6 +82,7 @@ export default function CustomerEdit() {
           .from('accounts')
           .update({
             name: data.name.trim(),
+            spouse_name: data.type === 'household' && data.spouse_name?.trim() ? data.spouse_name.trim() : null,
             type: data.type === 'business' ? 'commercial_business' : data.type,
             email: data.email?.trim() || null,
             phone: data.phone?.trim() || null,
@@ -139,14 +143,27 @@ export default function CustomerEdit() {
             <CardTitle>Customer Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={data.name}
-                onChange={(e) => setData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Customer name"
-              />
+            <div className={data.type === 'household' ? 'grid grid-cols-2 gap-4' : ''}>
+              <div>
+                <Label htmlFor="name">Name *</Label>
+                <Input
+                  id="name"
+                  value={data.name}
+                  onChange={(e) => setData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder={data.type === 'household' ? "Primary Insured" : "Business Name"}
+                />
+              </div>
+              {data.type === 'household' && (
+                <div>
+                  <Label htmlFor="spouse_name">Spouse / Co-Insured</Label>
+                  <Input
+                    id="spouse_name"
+                    value={data.spouse_name || ''}
+                    onChange={(e) => setData(prev => ({ ...prev, spouse_name: e.target.value }))}
+                    placeholder="Second Named Insured"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

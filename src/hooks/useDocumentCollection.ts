@@ -564,7 +564,7 @@ export function useAgentUpload() {
       const filePath = `collection/${requirement.workspace_id}/${requirement_id}/${timestamp}-${safeName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(filePath, file);
 
       if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);

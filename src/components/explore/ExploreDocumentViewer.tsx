@@ -61,7 +61,7 @@ interface Props {
 export function ExploreDocumentViewer({
   documentId,
   storagePath,
-  storageBucket = 'customer-docs',
+  storageBucket = 'documents',
   pageCount = 1,
   evidenceCatalog = [],
   activeHighlight,

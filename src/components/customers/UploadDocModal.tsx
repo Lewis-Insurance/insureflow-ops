@@ -77,7 +77,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
 
       // Upload file to storage
       const { error: uploadError } = await supabase.storage
-        .from('customer-docs')
+        .from('documents')
         .upload(filePath, file);
 
       if (uploadError) {
@@ -94,7 +94,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
         account_id: accountId,
         uploaded_by: user.id,
         storage_path: filePath,
-        storage_bucket: 'customer-docs',
+        storage_bucket: 'documents',
         file_missing: false,
         filename: file.name,
         name: documentName || file.name,
@@ -112,7 +112,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
 
       if (dbError) {
         // Clean up uploaded file if DB insert fails
-        await supabase.storage.from('customer-docs').remove([filePath]);
+        await supabase.storage.from('documents').remove([filePath]);
         toast({
           title: 'Database Error',
           description: dbError.message,
