@@ -46,6 +46,7 @@ import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
 import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import { downloadDaySheetPDF, printDaySheetPDF } from '@/components/payments/DaySheetPDF';
 import { DailyCashDialog } from '@/components/payments/DailyCashDialog';
+import { useToast } from '@/hooks/use-toast';
 import type { PremiumPayment } from '@/types/payments';
 
 const statusColors = {
@@ -58,6 +59,7 @@ export default function DaySheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { toast } = useToast();
 
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
@@ -106,14 +108,23 @@ export default function DaySheetDetail() {
 
     try {
       await closeDaySheet.mutateAsync({
-        daySheetId: id,
+        day_sheet_id: id,
         notes: closeNotes || undefined,
-        createDeposit,
-        bankAccountId: createDeposit ? selectedBankAccount : undefined,
+        create_deposit: createDeposit,
+        bank_account_id: createDeposit ? selectedBankAccount : undefined,
       });
       setShowCloseDialog(false);
+      toast({
+        title: 'Day Sheet Closed',
+        description: `Successfully closed with ${daySheet?.payment_count || 0} payments totaling ${formatCurrency(daySheet?.grand_total || 0)}`,
+      });
     } catch (error) {
       console.error('Failed to close day sheet:', error);
+      toast({
+        title: 'Failed to Close',
+        description: error instanceof Error ? error.message : 'An error occurred while closing the day sheet',
+        variant: 'destructive',
+      });
     }
   };
 
