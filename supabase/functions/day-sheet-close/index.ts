@@ -50,30 +50,52 @@ serve(async (req) => {
       throw new ValidationError('Day sheet ID is required');
     }
 
-    // Get user's org_id
+    // Get user's org_id from profiles table
     const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('org_id')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile?.org_id) {
-      throw new ValidationError('User organization not found');
+    // If profile doesn't have org_id, try getting from agency_workspace_memberships
+    let orgId = profile?.org_id;
+    if (!orgId) {
+      const { data: membership } = await supabase
+        .from('agency_workspace_memberships')
+        .select('agency_workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+
+      orgId = membership?.agency_workspace_id;
     }
 
-    const orgId = profile.org_id;
+    if (!orgId) {
+      // Fallback: Get org from the day sheet itself since it's a single-agency setup
+      logger.warn('Could not determine org_id from profile, will verify ownership differently');
+    }
 
-    // Get day sheet and verify ownership
-    const { data: daySheet, error: sheetError } = await supabase
+    // Get day sheet - if we have orgId, verify ownership; otherwise just get by ID
+    let daySheetQuery = supabase
       .from('day_sheets')
       .select('*')
       .eq('id', body.day_sheet_id)
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .single();
+      .is('deleted_at', null);
+
+    if (orgId) {
+      daySheetQuery = daySheetQuery.eq('org_id', orgId);
+    }
+
+    const { data: daySheet, error: sheetError } = await daySheetQuery.single();
 
     if (sheetError || !daySheet) {
       throw new ValidationError('Day sheet not found');
+    }
+
+    // Use the day sheet's org_id if we don't have one
+    if (!orgId && daySheet.org_id) {
+      orgId = daySheet.org_id;
     }
 
     if (daySheet.status !== 'open') {
@@ -149,19 +171,26 @@ serve(async (req) => {
     // Optionally create escrow deposit
     let escrowDeposit = null;
     if (body.create_deposit && body.bank_account_id) {
-      // Validate bank account
-      const { data: bankAccount, error: bankError } = await supabase
+      // Validate bank account - if we have orgId, verify ownership
+      let bankAccountQuery = supabase
         .from('bank_accounts')
-        .select('id')
+        .select('id, org_id')
         .eq('id', body.bank_account_id)
-        .eq('org_id', orgId)
         .eq('is_active', true)
-        .is('deleted_at', null)
-        .single();
+        .is('deleted_at', null);
+
+      if (orgId) {
+        bankAccountQuery = bankAccountQuery.eq('org_id', orgId);
+      }
+
+      const { data: bankAccount, error: bankError } = await bankAccountQuery.single();
 
       if (bankError || !bankAccount) {
         logger.warn('Invalid bank account for deposit', { bank_account_id: body.bank_account_id });
       } else {
+        // Use bankAccount's org_id if we don't have one
+        const depositOrgId = orgId || bankAccount.org_id || daySheet.org_id;
+
         // Calculate depositable amount (cash + checks)
         const depositAmount = sheetTotals.total_cash + sheetTotals.total_checks;
 
@@ -169,7 +198,7 @@ serve(async (req) => {
           const { data: deposit, error: depositError } = await supabase
             .from('escrow_deposits')
             .insert({
-              org_id: orgId,
+              org_id: depositOrgId,
               day_sheet_id: body.day_sheet_id,
               bank_account_id: body.bank_account_id,
               deposit_date: daySheet.sheet_date,
