@@ -205,9 +205,9 @@ export default function RateWatchDetail() {
               {error?.message || 'Job not found'}
             </AlertDescription>
           </Alert>
-          <Button variant="ghost" className="mt-4" onClick={() => navigate('/ao-renewals')}>
+          <Button variant="ghost" className="mt-4" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to AO Renewals
+            Back
           </Button>
         </div>
       </AppLayout>
@@ -224,7 +224,7 @@ export default function RateWatchDetail() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>

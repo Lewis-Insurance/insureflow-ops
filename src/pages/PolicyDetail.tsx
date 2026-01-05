@@ -179,9 +179,9 @@ export default function PolicyDetail() {
               <p className="text-muted-foreground mb-4">
                 The requested policy could not be found.
               </p>
-              <Button onClick={() => navigate('/policies')}>
+              <Button onClick={() => navigate(-1)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Policies
+                Back
               </Button>
             </CardContent>
           </Card>

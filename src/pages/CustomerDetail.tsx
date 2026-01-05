@@ -210,9 +210,9 @@ export default function CustomerDetail() {
     return (
       <AppLayout>
         <div className="space-y-4">
-          <Button variant="ghost" onClick={() => navigate('/customers')}>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Customers
+            Back
           </Button>
           <div className="text-center py-8">
             <h2 className="text-lg font-semibold">Customer not found</h2>
@@ -228,7 +228,7 @@ export default function CustomerDetail() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => navigate('/customers')}>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
