@@ -94,30 +94,35 @@ export function useConversations() {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Get conversations where user is a participant
-      const { data: participations, error: partError } = await supabase
-        .from('team_conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
+      // Use SECURITY DEFINER function to get ALL participants for user's conversations
+      // This bypasses RLS which would only return the user's own participant records
+      const { data: allParticipants, error: partError } = await supabase
+        .rpc('get_conversation_participants_for_user', { p_user_id: user.id });
 
       if (partError) {
-        logger.error('[useConversations] Error fetching participations:', partError);
+        logger.error('[useConversations] Error fetching participants:', partError);
         throw partError;
       }
 
-      if (!participations || participations.length === 0) {
+      if (!allParticipants || allParticipants.length === 0) {
         return [];
       }
 
-      const conversationIds = participations.map(p => p.conversation_id);
+      // Get unique conversation IDs
+      const conversationIds = [...new Set(allParticipants.map((p: { conversation_id: string }) => p.conversation_id))];
 
-      // Fetch conversations (without nested profile join - that FK doesn't exist)
+      // Group participants by conversation
+      const participantsByConversation = new Map<string, typeof allParticipants>();
+      allParticipants.forEach((p: { conversation_id: string }) => {
+        const existing = participantsByConversation.get(p.conversation_id) || [];
+        existing.push(p);
+        participantsByConversation.set(p.conversation_id, existing);
+      });
+
+      // Fetch conversations (without nested participant select - we already have them)
       const { data: conversations, error: convError } = await supabase
         .from('team_conversations')
-        .select(`
-          *,
-          participants:team_conversation_participants(*)
-        `)
+        .select('*')
         .in('id', conversationIds)
         .eq('is_archived', false)
         .order('updated_at', { ascending: false });
@@ -133,10 +138,8 @@ export function useConversations() {
 
       // Collect all unique user IDs from participants
       const allUserIds = new Set<string>();
-      conversations.forEach((conv) => {
-        conv.participants?.forEach((p: { user_id: string }) => {
-          allUserIds.add(p.user_id);
-        });
+      allParticipants.forEach((p: { user_id: string }) => {
+        allUserIds.add(p.user_id);
       });
 
       // Fetch all profiles in one query
@@ -155,11 +158,12 @@ export function useConversations() {
       // Attach profiles to participants and fetch last message
       const conversationsWithData = await Promise.all(
         conversations.map(async (conv) => {
-          // Attach profile data to each participant
-          const participantsWithProfiles = conv.participants?.map((p: ConversationParticipant) => ({
+          // Get participants for this conversation and attach profiles
+          const convParticipants = participantsByConversation.get(conv.id) || [];
+          const participantsWithProfiles = convParticipants.map((p: ConversationParticipant) => ({
             ...p,
             profile: profileMap.get(p.user_id) || null,
-          })) || [];
+          }));
 
           // Fetch last message
           const { data: messages } = await supabase
