@@ -41,6 +41,8 @@ const AdminPage = React.lazy(() => import("./pages/AdminPage"));
 const TelephonyDashboard = React.lazy(() => import("./pages/TelephonyDashboard"));
 const ReportsPage = React.lazy(() => import("./pages/ReportsPage"));
 const CommandCenterPage = React.lazy(() => import("./pages/CommandCenterPage"));
+const MergeCustomersPage = React.lazy(() => import("./pages/MergeCustomersPage"));
+const TeamMessagingPage = React.lazy(() => import("./pages/TeamMessagingPage"));
 const ExecutivePage = React.lazy(() => import("./pages/ExecutivePage"));
 const AnalyticsPage = React.lazy(() => import("./pages/AnalyticsPage"));
 const CarriersPage = React.lazy(() => import("./pages/CarriersPage"));
@@ -480,6 +482,22 @@ const App = () => (
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <CommandCenterPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/merge-customers"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <MergeCustomersPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/team-messaging"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <TeamMessagingPage />
                     </ErrorBoundary>
                   }
                 />

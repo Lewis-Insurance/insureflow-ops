@@ -47,9 +47,11 @@ import {
   Trash2,
   Edit2,
   Save,
+  UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { LeadScoreBreakdown } from "./LeadScoreBreakdown";
+import { ConvertLeadModal } from "@/components/leads/ConvertLeadModal";
 
 interface LeadDetailViewProps {
   lead: Lead | null;
@@ -64,6 +66,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   const [newNote, setNewNote] = useState("");
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
 
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
@@ -314,6 +317,14 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                 </>
               ) : (
                 <>
+                  <Button
+                    onClick={() => setConvertModalOpen(true)}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <UserCheck className="h-4 w-4 mr-1" />
+                    Convert
+                  </Button>
                   <Button onClick={() => setIsEditing(true)} size="sm" variant="outline">
                     <Edit2 className="h-4 w-4 mr-1" />
                     Edit
@@ -844,6 +855,15 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Convert to Customer Modal */}
+      {lead && (
+        <ConvertLeadModal
+          open={convertModalOpen}
+          onOpenChange={setConvertModalOpen}
+          lead={lead}
+        />
+      )}
     </Sheet>
   );
 }
