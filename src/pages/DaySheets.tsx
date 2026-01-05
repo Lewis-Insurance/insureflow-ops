@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -32,10 +32,12 @@ import {
   Receipt,
   Filter,
   Printer,
+  CalendarSearch,
 } from 'lucide-react';
 import { useDaySheets, useCurrentDaySheet } from '@/hooks/useDaySheets';
 import { DaySheetSummary } from '@/components/payments/DaySheetSummary';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type DateRange = {
   from: Date;
@@ -56,11 +58,15 @@ const statusColors = {
 
 export default function DaySheets() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [goToDateOpen, setGoToDateOpen] = useState(false);
+  const [selectedGoToDate, setSelectedGoToDate] = useState<Date | undefined>(undefined);
+  const [searchingForDate, setSearchingForDate] = useState<string | null>(null);
 
   const { data: daySheets = [], isLoading } = useDaySheets({
     startDate: format(dateRange.from, 'yyyy-MM-dd'),
@@ -69,6 +75,51 @@ export default function DaySheets() {
   });
 
   const { data: currentDaySheet } = useCurrentDaySheet();
+
+  // Handler for "Go to Date" - finds and navigates to a day sheet by date
+  const handleGoToDate = (date: Date | undefined) => {
+    if (!date) return;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    // Find the day sheet for this date in our existing data or query
+    const existingSheet = daySheets.find(ds => ds.sheet_date === dateStr);
+
+    if (existingSheet) {
+      setGoToDateOpen(false);
+      setSelectedGoToDate(undefined);
+      setSearchingForDate(null);
+      navigate(`/day-sheets/${existingSheet.id}`);
+    } else {
+      // Sheet might exist but not be in the current date range filter
+      // Set the date range to this specific date to search for it
+      setGoToDateOpen(false);
+      setSelectedGoToDate(undefined);
+      setSearchingForDate(dateStr);
+      setDateRange({
+        from: date,
+        to: date,
+      });
+    }
+  };
+
+  // Auto-navigate when searching for a specific date and data loads
+  useEffect(() => {
+    if (searchingForDate && !isLoading && daySheets.length > 0) {
+      const targetSheet = daySheets.find(ds => ds.sheet_date === searchingForDate);
+      if (targetSheet) {
+        setSearchingForDate(null);
+        navigate(`/day-sheets/${targetSheet.id}`);
+      }
+    }
+    // If no sheet found after loading, clear the search state
+    if (searchingForDate && !isLoading && daySheets.length === 0) {
+      toast({
+        title: 'No Day Sheet Found',
+        description: `No day sheet exists for ${format(parseISO(searchingForDate), 'MMMM d, yyyy')}. This day may have had no payments recorded.`,
+      });
+      setSearchingForDate(null);
+    }
+  }, [searchingForDate, isLoading, daySheets, navigate, toast]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -108,10 +159,37 @@ export default function DaySheets() {
             Daily payment batches and deposit preparation
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/payments')}>
-          <Receipt className="h-4 w-4 mr-2" />
-          View Payments
-        </Button>
+        <div className="flex gap-2">
+          {/* Go to Date - Select a specific date to view/print that day's sheet */}
+          <Popover open={goToDateOpen} onOpenChange={setGoToDateOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline">
+                <CalendarSearch className="h-4 w-4 mr-2" />
+                Go to Date
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 border-b">
+                <p className="text-sm font-medium">View Day Sheet by Date</p>
+                <p className="text-xs text-muted-foreground">Select a date to view or print that day's sheet</p>
+              </div>
+              <Calendar
+                mode="single"
+                selected={selectedGoToDate}
+                onSelect={(date) => {
+                  setSelectedGoToDate(date);
+                  handleGoToDate(date);
+                }}
+                disabled={(date) => date > new Date()}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" onClick={() => navigate('/payments')}>
+            <Receipt className="h-4 w-4 mr-2" />
+            View Payments
+          </Button>
+        </div>
       </div>
 
       {/* Current Day Sheet */}
