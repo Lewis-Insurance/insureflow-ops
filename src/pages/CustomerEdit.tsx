@@ -130,7 +130,7 @@ export default function CustomerEdit() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => navigate(`/customers/${id}`)}>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -202,7 +202,7 @@ export default function CustomerEdit() {
             </div>
 
             <div className="flex gap-2 pt-4">
-              <Button variant="ghost" onClick={() => navigate(`/customers/${id}`)}>
+              <Button variant="ghost" onClick={() => navigate(-1)}>
                 Cancel
               </Button>
               <Button onClick={handleSave} disabled={saving || !data.name.trim()}>

@@ -327,8 +327,8 @@ export default function RenewalRateWatchPage() {
                 {(workspaceError as any)?.message || 'Unknown error'}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => navigate('/ao-renewals')}>
-                  Back to AO Renewals
+                <Button variant="outline" onClick={() => navigate(-1)}>
+                  Back
                 </Button>
                 <Button onClick={() => navigate('/ao-renewals/rate-watch')}>
                   Start New Rate Watch
@@ -347,7 +347,7 @@ export default function RenewalRateWatchPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>

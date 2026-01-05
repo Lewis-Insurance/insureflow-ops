@@ -171,10 +171,10 @@ export default function AORenewalEdit() {
               <p className="text-muted-foreground">Renewal not found</p>
               <Button
                 variant="outline"
-                onClick={() => navigate('/ao-renewals')}
+                onClick={() => navigate(-1)}
                 className="mt-4"
               >
-                Back to Renewals
+                Back
               </Button>
             </CardContent>
           </Card>
@@ -188,7 +188,7 @@ export default function AORenewalEdit() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => navigate('/ao-renewals')}>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -417,7 +417,7 @@ export default function AORenewalEdit() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/ao-renewals')}
+                  onClick={() => navigate(-1)}
                 >
                   Cancel
                 </Button>
