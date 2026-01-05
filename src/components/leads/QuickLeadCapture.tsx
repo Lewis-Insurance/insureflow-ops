@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/dialog";
 import { useCreateLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
-import { Plus, Building2, User } from "lucide-react";
+import { useProfiles } from "@/hooks/useProfiles";
+import { Plus, Building2, User, MapPin } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InsuranceDetailsModal } from "./InsuranceDetailsModal";
 import type { InsuranceType } from "@/integrations/supabase/hooks/useLeadInsuranceDetails";
@@ -45,6 +46,12 @@ const personalLeadSchema = z.object({
   company_name: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
+  address_line1: z.string().optional(),
+  address_line2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip_code: z.string().optional(),
+  assigned_to: z.string().optional(),
   source_id: z.string().optional(),
   insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
@@ -60,6 +67,12 @@ const businessLeadSchema = z.object({
   last_name: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
+  address_line1: z.string().optional(),
+  address_line2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip_code: z.string().optional(),
+  assigned_to: z.string().optional(),
   source_id: z.string().optional(),
   insurance_types: z.array(z.string()).optional(),
   current_carrier: z.string().optional(),
@@ -92,6 +105,10 @@ export const QuickLeadCapture = () => {
   const [leadType, setLeadType] = useState<LeadType>("personal");
   const createLead = useCreateLead();
   const { data: sources } = useLeadSources();
+  const { profiles } = useProfiles();
+
+  // Filter to only show staff members who can be assigned leads
+  const staffMembers = profiles.filter(p => p.is_staff);
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -102,6 +119,12 @@ export const QuickLeadCapture = () => {
       company_name: "",
       email: "",
       phone: "",
+      address_line1: "",
+      address_line2: "",
+      city: "",
+      state: "",
+      zip_code: "",
+      assigned_to: "",
       insurance_types: [],
       notes: "",
     },
@@ -131,6 +154,12 @@ export const QuickLeadCapture = () => {
       company_name: data.lead_type === "business" ? data.company_name : (data.company_name || null),
       email: data.email || null,
       phone: data.phone || null,
+      address_line1: data.address_line1 || null,
+      address_line2: data.address_line2 || null,
+      city: data.city || null,
+      state: data.state || null,
+      zip_code: data.zip_code || null,
+      assigned_to: data.assigned_to || null,
       source_id: data.source_id || null,
       insurance_types: data.insurance_types || [],
       current_carrier: data.current_carrier || null,
@@ -329,6 +358,102 @@ export const QuickLeadCapture = () => {
                 )}
               />
             </div>
+
+            {/* Address Section */}
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <MapPin className="h-4 w-4" />
+                Address
+              </div>
+              <FormField
+                control={form.control}
+                name="address_line1"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input placeholder="Street Address" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_line2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input placeholder="Apt, Suite, Unit (optional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-6 gap-2">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem className="col-span-3">
+                      <FormControl>
+                        <Input placeholder="City" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1">
+                      <FormControl>
+                        <Input placeholder="State" maxLength={2} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zip_code"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormControl>
+                        <Input placeholder="ZIP" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Assign To Field */}
+            <FormField
+              control={form.control}
+              name="assigned_to"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assign To</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Leave unassigned (shows in banner)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {staffMembers.map((staff) => (
+                        <SelectItem key={staff.id} value={staff.id}>
+                          {staff.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
