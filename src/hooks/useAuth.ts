@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 interface UserProfile {
   id: string;
   full_name: string | null;
+  email?: string | null;
   role: 'customer' | 'staff' | 'admin' | 'producer' | 'csr' | 'accounting' | 'owner';
   phone: string | null;
   is_staff: boolean;
@@ -19,6 +20,7 @@ interface UserProfile {
   timezone?: string;
   locale?: string;
   avatar_url?: string | null;
+  default_agency_workspace_id?: string | null;
 }
 
 export function useAuth() {
@@ -66,10 +68,11 @@ export function useAuth() {
           ...profileData,
           role: (profileData.role as UserProfile['role']) || 'customer',
           is_staff: profileData.is_staff ?? isStaffByRole,
-          notification_email: typeof profileData.notification_email === 'string' 
-            ? profileData.notification_email === 'true' 
+          notification_email: typeof profileData.notification_email === 'string'
+            ? profileData.notification_email === 'true'
             : Boolean(profileData.notification_email),
-          notification_sms: false // Default since field doesn't exist in database yet
+          notification_sms: false, // Default since field doesn't exist in database yet
+          default_agency_workspace_id: profileData.default_agency_workspace_id || null,
         });
       }
     } catch (error) {
