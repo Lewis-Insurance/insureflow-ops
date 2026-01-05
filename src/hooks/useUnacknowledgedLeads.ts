@@ -27,12 +27,17 @@ export function useUnacknowledgedLeads() {
     }
 
     try {
-      // Fetch leads from Canopy that haven't been acknowledged yet
+      // Fetch leads that are:
+      // 1. Not yet acknowledged (acknowledged_at IS NULL)
+      // 2. Not deleted (deleted_at IS NULL)
+      // 3. Not assigned to anyone (assigned_to IS NULL)
+      // This ensures only truly "new" unhandled leads show in the banner
       const { data, error } = await supabase
         .from('leads')
-        .select('id, first_name, last_name, email, phone, created_at, insurance_types, account_id')
+        .select('id, first_name, last_name, email, phone, created_at, insurance_types, account_id, source_details')
         .is('acknowledged_at', null)
-        .contains('source_details', { source: 'canopy_import' })
+        .is('deleted_at', null)
+        .is('assigned_to', null) // Only show unassigned leads
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -112,9 +117,9 @@ export function useUnacknowledgedLeads() {
   useEffect(() => {
     fetchUnacknowledgedLeads();
 
-    // Set up real-time subscription for new leads
+    // Set up real-time subscription for leads
     const channel = supabase
-      .channel('new-canopy-leads')
+      .channel('new-leads-notification')
       .on(
         'postgres_changes',
         {
@@ -123,9 +128,9 @@ export function useUnacknowledgedLeads() {
           table: 'leads',
         },
         (payload) => {
-          // Check if it's a Canopy lead
+          // Add new lead only if unacknowledged, not deleted, AND not assigned
           const newLead = payload.new as any;
-          if (newLead.source_details?.source === 'canopy_import' && !newLead.acknowledged_at) {
+          if (!newLead.acknowledged_at && !newLead.deleted_at && !newLead.assigned_to) {
             setLeads((prev) => [
               {
                 id: newLead.id,
@@ -139,6 +144,21 @@ export function useUnacknowledgedLeads() {
               },
               ...prev,
             ]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads',
+        },
+        (payload) => {
+          // Remove lead from banner if it was assigned, acknowledged, or deleted
+          const updatedLead = payload.new as any;
+          if (updatedLead.assigned_to || updatedLead.acknowledged_at || updatedLead.deleted_at) {
+            setLeads((prev) => prev.filter((lead) => lead.id !== updatedLead.id));
           }
         }
       )
