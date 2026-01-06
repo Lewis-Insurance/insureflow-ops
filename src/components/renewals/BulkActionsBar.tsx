@@ -25,7 +25,7 @@ import {
   RenewalStatus,
   getStatusConfig,
 } from '@/hooks/useRenewalWorkflow';
-import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
+import { useAgencyMembers } from '@/hooks/useAgencyWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -50,7 +50,7 @@ export function BulkActionsBar({
   totalCount,
 }: BulkActionsBarProps) {
   const { profile } = useAuth();
-  const { data: members } = useWorkspaceMembers(profile?.default_agency_workspace_id);
+  const { members } = useAgencyMembers(profile?.default_agency_workspace_id);
   const bulkUpdateStatus = useBulkUpdateRenewalStatus();
   const bulkAssign = useBulkAssignRenewals();
 
@@ -119,9 +119,9 @@ export function BulkActionsBar({
     return null;
   }
 
-  const assigneeName = members?.find(
+  const assigneeName = members?.data?.find(
     (m) => m.user_id === pendingAssignee
-  )?.profile?.full_name;
+  )?.user?.full_name;
 
   return (
     <>
@@ -167,9 +167,9 @@ export function BulkActionsBar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {members?.map((member) => (
+              {members?.data?.map((member) => (
                 <SelectItem key={member.user_id} value={member.user_id}>
-                  {member.profile?.full_name || member.profile?.email || 'Unknown'}
+                  {member.user?.full_name || member.user?.email || 'Unknown'}
                 </SelectItem>
               ))}
             </SelectContent>
