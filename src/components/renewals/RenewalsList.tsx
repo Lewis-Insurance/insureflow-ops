@@ -192,9 +192,10 @@ export function RenewalsList({ policies, type, loading, onPolicySelect }: Renewa
                   >
                     View Policy
                   </Button>
-                  <Button 
+                  <Button
                     size="sm"
                     className="bg-primary hover:bg-primary/90"
+                    onClick={() => navigate(`/renewals/${policy.id}/edit`)}
                   >
                     {type === 'expired' ? 'Renew Now' : 'Start Renewal'}
                   </Button>

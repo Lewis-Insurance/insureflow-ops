@@ -16,6 +16,7 @@ import { AddDocumentModal } from '@/components/customers/AddDocumentModal';
 import { AddCallLogModal } from '@/components/customers/AddCallLogModal';
 import { QuickActionsBar } from '@/components/customers/QuickActionsBar';
 import { InviteToPortalButton } from '@/components/customers/InviteToPortalButton';
+import { ReviewRequestModal } from '@/components/customers/ReviewRequestModal';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
@@ -121,6 +122,7 @@ export default function CustomerDetail() {
   const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [emailComposerOpen, setEmailComposerOpen] = useState(false);
+  const [reviewRequestOpen, setReviewRequestOpen] = useState(false);
 
   const refetchTasks = async () => {
     if (!id) return;
@@ -262,6 +264,7 @@ export default function CustomerDetail() {
           onAddPolicy={() => setAddPolicyOpen(true)}
           onAddDocument={() => setAddDocumentOpen(true)}
           onAddCallLog={() => setAddCallLogOpen(true)}
+          onRequestReview={() => setReviewRequestOpen(true)}
         />
 
         {/* Customer Information Grid */}
@@ -404,6 +407,16 @@ export default function CustomerDetail() {
         onOpenChange={setEmailComposerOpen}
         accountId={account.id}
         accountName={account.name}
+      />
+      <ReviewRequestModal
+        open={reviewRequestOpen}
+        onOpenChange={setReviewRequestOpen}
+        customer={{
+          id: account.id,
+          name: account.name,
+          email: account.email,
+          phone: account.phone,
+        }}
       />
     </AppLayout>
   );

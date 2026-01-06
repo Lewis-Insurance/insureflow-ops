@@ -25,6 +25,7 @@ const CustomerEdit = React.lazy(() => import("./pages/CustomerEdit"));
 const PoliciesPage = React.lazy(() => import("./pages/PoliciesPage"));
 const RenewalsPage = React.lazy(() => import("./pages/RenewalsPage"));
 const RenewalIntelligencePage = React.lazy(() => import("./pages/RenewalIntelligencePage"));
+const RenewalEditPage = React.lazy(() => import("./pages/RenewalEditPage"));
 const AOImportPage = React.lazy(() => import("./pages/AOImportPage"));
 const AORenewalsPage = React.lazy(() => import("./pages/AORenewalsPage"));
 const AORenewalEdit = React.lazy(() => import("./pages/AORenewalEdit"));
@@ -104,6 +105,7 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const CanopyImportPage = React.lazy(() => import("./pages/CanopyImportPage"));
 const CEODigestSettings = React.lazy(() => import("./pages/CEODigestSettings"));
 const CEODigestHistory = React.lazy(() => import("./pages/CEODigestHistory"));
+const ReputationSettings = React.lazy(() => import("./pages/ReputationSettings"));
 
 // Payment Tracking Module
 const PaymentList = React.lazy(() => import("./pages/PaymentList"));
@@ -296,6 +298,16 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/renewals/:id/edit"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <RenewalEditPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/ao-renewals"
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
@@ -433,6 +445,16 @@ const App = () => (
                     <ProtectedRoute requireAdmin>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <CEODigestHistory />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings/reputation"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ReputationSettings />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

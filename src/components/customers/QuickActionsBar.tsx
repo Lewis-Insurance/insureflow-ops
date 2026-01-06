@@ -7,6 +7,7 @@ import {
   FileUp,
   Phone,
   Shield,
+  Star,
 } from 'lucide-react';
 
 interface QuickActionsBarProps {
@@ -16,6 +17,7 @@ interface QuickActionsBarProps {
   onAddPolicy: () => void;
   onAddDocument: () => void;
   onAddCallLog: () => void;
+  onRequestReview?: () => void;
 }
 
 export function QuickActionsBar({
@@ -25,6 +27,7 @@ export function QuickActionsBar({
   onAddPolicy,
   onAddDocument,
   onAddCallLog,
+  onRequestReview,
 }: QuickActionsBarProps) {
   const actions = [
     {
@@ -69,6 +72,17 @@ export function QuickActionsBar({
       bgColor: 'bg-purple-600 hover:bg-purple-700',
       iconBg: 'bg-purple-500',
     },
+    ...(onRequestReview
+      ? [
+          {
+            label: 'Request Review',
+            icon: Star,
+            onClick: onRequestReview,
+            bgColor: 'bg-yellow-600 hover:bg-yellow-700',
+            iconBg: 'bg-yellow-500',
+          },
+        ]
+      : []),
   ];
 
   return (
