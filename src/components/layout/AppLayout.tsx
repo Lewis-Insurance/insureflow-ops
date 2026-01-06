@@ -17,6 +17,8 @@ import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
 import { AIAssistantProvider, useAIAssistantContext } from '@/contexts/AIAssistantContext';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { FloatingMessenger } from '@/components/messaging/FloatingMessenger';
+import { MessengerProvider } from '@/contexts/MessengerContext';
+import { useGlobalMessageNotifications } from '@/hooks/useGlobalMessageNotifications';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -33,6 +35,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     closeSidebar,
     context
   } = useAIAssistantContext();
+
+  // Initialize global message notifications (shows toast for new messages)
+  useGlobalMessageNotifications();
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -456,7 +461,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 export function AppLayout({ children }: AppLayoutProps) {
   return (
     <AIAssistantProvider>
-      <AppLayoutContent>{children}</AppLayoutContent>
+      <MessengerProvider>
+        <AppLayoutContent>{children}</AppLayoutContent>
+      </MessengerProvider>
     </AIAssistantProvider>
   );
 }

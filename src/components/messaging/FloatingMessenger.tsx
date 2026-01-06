@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { MessageSquare, X, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useTeamMessaging';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { useMessengerOptional } from '@/contexts/MessengerContext';
 
 interface FloatingMessengerProps {
   className?: string;
@@ -23,12 +24,19 @@ interface FloatingMessengerProps {
 
 export function FloatingMessenger({ className }: FloatingMessengerProps) {
   const { user, profile } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const messengerContext = useMessengerOptional();
+
+  // Use context state if available, otherwise fall back to local state
+  const [localIsOpen, setLocalIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+
+  // Use context if available, otherwise use local state
+  const isOpen = messengerContext?.isOpen ?? localIsOpen;
+  const setIsOpen = messengerContext?.setIsOpen ?? setLocalIsOpen;
 
   const { data: conversations, refetch: refetchConversations } = useConversations();
   const editMessage = useEditMessage();
@@ -39,6 +47,33 @@ export function FloatingMessenger({ className }: FloatingMessengerProps) {
 
   // Track presence when messenger is open
   usePresence(isOpen ? agencyWorkspaceId : null);
+
+  // Sync selected conversation with context for focus detection
+  useEffect(() => {
+    if (messengerContext) {
+      messengerContext.setActiveViewingConversationId(selectedConversation?.id || null);
+    }
+  }, [selectedConversation?.id, messengerContext]);
+
+  // Handle external navigation to a conversation (from toast notification)
+  useEffect(() => {
+    if (
+      messengerContext?.selectedConversationId &&
+      conversations &&
+      messengerContext.selectedConversationId !== selectedConversation?.id
+    ) {
+      const targetConversation = conversations.find(
+        (c) => c.id === messengerContext.selectedConversationId
+      );
+      if (targetConversation) {
+        setSelectedConversation(targetConversation);
+        setReplyTo(null);
+        setEditingMessage(null);
+        // Clear the context's selectedConversationId after navigating
+        messengerContext.setSelectedConversationId(null);
+      }
+    }
+  }, [messengerContext?.selectedConversationId, conversations, selectedConversation?.id, messengerContext]);
 
   // Calculate total unread count
   const totalUnread = conversations?.reduce((sum, conv) => sum + (conv.unread_count || 0), 0) || 0;
