@@ -172,9 +172,6 @@ export function ConversationSidebar({
   const { data: conversations, isLoading, error } = useConversations();
   const [search, setSearch] = useState('');
 
-  // Debug: log query state
-  console.log('[ConversationSidebar] isLoading:', isLoading, 'error:', error, 'conversations:', conversations?.length);
-
   // Filter conversations by search
   const filteredConversations = conversations?.filter((conv) => {
     if (!search.trim()) return true;
