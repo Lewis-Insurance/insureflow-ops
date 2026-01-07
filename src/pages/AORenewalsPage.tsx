@@ -74,6 +74,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 
+// Status view types
+type StatusView = 'in_progress' | 'moved' | 'lost' | 'cancelled';
+
+// Statuses shown in "In Progress" view (excludes terminal statuses)
+const IN_PROGRESS_STATUSES: AORenewalStatus[] = ['pending', 'contacted', 'quoted', 'renewed'];
+
 export default function AORenewalsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -86,6 +92,7 @@ export default function AORenewalsPage() {
   const [showMyAssignments, setShowMyAssignments] = useState(false);
   const [showNext30Days, setShowNext30Days] = useState(false);
   const [showHighPriority, setShowHighPriority] = useState(false);
+  const [statusView, setStatusView] = useState<StatusView>('in_progress');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get current user ID
@@ -185,8 +192,16 @@ export default function AORenewalsPage() {
     }
   };
 
+  // Build filters based on statusView
+  const viewFilters: AORenewalFilters = {
+    ...filters,
+    status: statusView === 'in_progress'
+      ? IN_PROGRESS_STATUSES
+      : [statusView],
+  };
+
   // Queries
-  const { data: renewals = [], isLoading } = useAORenewals(filters);
+  const { data: renewals = [], isLoading } = useAORenewals(viewFilters);
   const { data: stats } = useAORenewalsStats();
   const { data: myStats } = useMyAORenewalsCount();
   const { profiles } = useProfiles();
@@ -511,6 +526,42 @@ export default function AORenewalsPage() {
           </div>
         )}
 
+        {/* Status View Toggle */}
+        <div className="flex gap-2">
+          <Button
+            variant={statusView === 'in_progress' ? 'default' : 'outline'}
+            onClick={() => setStatusView('in_progress')}
+            className="gap-2"
+          >
+            <Clock className="h-4 w-4" />
+            In Progress
+          </Button>
+          <Button
+            variant={statusView === 'moved' ? 'default' : 'outline'}
+            onClick={() => setStatusView('moved')}
+            className={`gap-2 ${statusView === 'moved' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Moved
+          </Button>
+          <Button
+            variant={statusView === 'lost' ? 'default' : 'outline'}
+            onClick={() => setStatusView('lost')}
+            className={`gap-2 ${statusView === 'lost' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+          >
+            <XCircle className="h-4 w-4" />
+            Lost
+          </Button>
+          <Button
+            variant={statusView === 'cancelled' ? 'default' : 'outline'}
+            onClick={() => setStatusView('cancelled')}
+            className={`gap-2 ${statusView === 'cancelled' ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+          >
+            <XCircle className="h-4 w-4" />
+            Cancelled
+          </Button>
+        </div>
+
         {/* Filters */}
         <Card>
           <CardHeader>
@@ -586,6 +637,9 @@ export default function AORenewalsPage() {
                   setFilters({});
                   setSearchQuery("");
                   setShowMyAssignments(false);
+                  setShowNext30Days(false);
+                  setShowHighPriority(false);
+                  setStatusView('in_progress');
                   setSearchParams({});
                 }}
               >
