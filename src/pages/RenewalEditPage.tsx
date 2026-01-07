@@ -41,13 +41,13 @@ import {
   useRenewal,
   useUpdateRenewalStatus,
   useUpdateRenewal,
-  useAssignRenewal,
+  useCompleteRenewal,
+  useTerminateRenewal,
   RenewalStatus,
   RenewalPriority,
   getStatusConfig,
   getPriorityConfig,
 } from '@/hooks/useRenewalWorkflow';
-import { useAgencyMembers } from '@/hooks/useAgencyWorkspace';
 import { useAuth } from '@/hooks/useAuth';
 
 // Tab Components
@@ -56,8 +56,8 @@ import { RenewalContactLog } from '@/components/renewals/RenewalContactLog';
 import { RenewalQuotes } from '@/components/renewals/RenewalQuotes';
 import { RenewalDocuments } from '@/components/renewals/RenewalDocuments';
 import { RenewalNotes } from '@/components/renewals/RenewalNotes';
-import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
-import { LostReasonModal } from '@/components/renewals/LostReasonModal';
+import { RenewalCompletionModal, RenewalCompletionData } from '@/components/renewals/RenewalCompletionModal';
+import { TerminalStatusModal, TerminalStatusType, TerminalStatusData } from '@/components/renewals/TerminalStatusModal';
 
 // Status options for dropdown
 const STATUS_OPTIONS: { value: RenewalStatus; label: string }[] = [
@@ -67,9 +67,13 @@ const STATUS_OPTIONS: { value: RenewalStatus; label: string }[] = [
   { value: 'renewed', label: 'Renewed' },
   { value: 'lost', label: 'Lost' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'lapsed', label: 'Lapsed' },
   { value: 'moved', label: 'Moved to Another Carrier' },
   { value: 'non_renewed', label: 'Non-Renewed by Carrier' },
 ];
+
+// Terminal statuses that require the terminal modal
+const TERMINAL_STATUSES: RenewalStatus[] = ['cancelled', 'lapsed', 'non_renewed', 'lost', 'moved'];
 
 const PRIORITY_OPTIONS: { value: RenewalPriority; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -144,70 +148,77 @@ export default function RenewalEditPage() {
   const { profile } = useAuth();
 
   const { data: renewal, isLoading, error } = useRenewal(id);
-  const { members } = useAgencyMembers(profile?.default_agency_workspace_id);
 
   const updateStatus = useUpdateRenewalStatus();
   const updateRenewal = useUpdateRenewal();
-  const assignRenewal = useAssignRenewal();
+  const completeRenewal = useCompleteRenewal();
+  const terminateRenewal = useTerminateRenewal();
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [showMovedModal, setShowMovedModal] = useState(false);
-  const [showLostModal, setShowLostModal] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<RenewalStatus | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
+  const [pendingTerminalStatus, setPendingTerminalStatus] = useState<TerminalStatusType | null>(null);
 
   // Handle status change
   const handleStatusChange = (newStatus: RenewalStatus) => {
     if (!renewal) return;
 
-    // If status requires additional info, show modal
-    if (newStatus === 'moved') {
-      setPendingStatus(newStatus);
-      setShowMovedModal(true);
+    // If selecting "renewed", show completion modal
+    if (newStatus === 'renewed') {
+      setShowCompletionModal(true);
       return;
     }
 
-    if (newStatus === 'lost') {
-      setPendingStatus(newStatus);
-      setShowLostModal(true);
+    // If selecting a terminal status, show terminal modal
+    if (TERMINAL_STATUSES.includes(newStatus)) {
+      setPendingTerminalStatus(newStatus as TerminalStatusType);
+      setShowTerminalModal(true);
       return;
     }
 
-    // Otherwise update directly
+    // Otherwise update directly (for pending, contacted, quoted)
     updateStatus.mutate({ renewalId: renewal.id, status: newStatus });
   };
 
-  // Handle moved status with carrier info
-  const handleMovedConfirm = (data: {
-    carrier: string;
-    term: '6_month' | 'annual';
-    premium: number;
-  }) => {
-    if (!renewal || !pendingStatus) return;
+  // Handle renewal completion with policy updates
+  const handleCompletionConfirm = (data: RenewalCompletionData) => {
+    if (!renewal || !renewal.policy_id) return;
 
-    updateStatus.mutate({
+    completeRenewal.mutate({
       renewalId: renewal.id,
-      status: 'moved',
-      moved_carrier: data.carrier,
-      moved_term: data.term,
-      moved_premium: data.premium,
+      policyId: renewal.policy_id,
+      policyUpdates: {
+        policy_number: data.policyNumber,
+        premium: data.premium,
+        effective_date: data.effectiveDate,
+        expiration_date: data.expirationDate,
+      },
+      notes: data.notes,
+    }, {
+      onSuccess: () => {
+        setShowCompletionModal(false);
+      },
     });
-
-    setShowMovedModal(false);
-    setPendingStatus(null);
   };
 
-  // Handle lost status with reason
-  const handleLostConfirm = (reason: string) => {
-    if (!renewal || !pendingStatus) return;
+  // Handle terminal status (cancelled, lapsed, non_renewed, lost, moved)
+  const handleTerminalConfirm = (data: TerminalStatusData) => {
+    if (!renewal || !pendingTerminalStatus || !renewal.policy_id) return;
 
-    updateStatus.mutate({
+    terminateRenewal.mutate({
       renewalId: renewal.id,
-      status: 'lost',
-      lost_reason: reason,
+      policyId: renewal.policy_id,
+      status: pendingTerminalStatus,
+      reason: data.reason,
+      terminationDate: data.terminationDate,
+      notes: data.notes,
+      movedData: data.movedData,
+    }, {
+      onSuccess: () => {
+        setShowTerminalModal(false);
+        setPendingTerminalStatus(null);
+      },
     });
-
-    setShowLostModal(false);
-    setPendingStatus(null);
   };
 
   // Handle priority change
@@ -216,15 +227,6 @@ export default function RenewalEditPage() {
     updateRenewal.mutate({
       renewalId: renewal.id,
       updates: { priority },
-    });
-  };
-
-  // Handle assignment change
-  const handleAssignmentChange = (userId: string) => {
-    if (!renewal) return;
-    assignRenewal.mutate({
-      renewalId: renewal.id,
-      assignedTo: userId === 'unassigned' ? null : userId,
     });
   };
 
@@ -338,7 +340,7 @@ export default function RenewalEditPage() {
         </div>
 
         {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Status Card */}
           <Card>
             <CardHeader className="pb-2">
@@ -386,39 +388,6 @@ export default function RenewalEditPage() {
             </CardContent>
           </Card>
 
-          {/* Assignment Card */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Assigned To
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select
-                value={renewal.assigned_to || 'unassigned'}
-                onValueChange={handleAssignmentChange}
-                disabled={assignRenewal.isPending}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {members?.data?.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>
-                      {member.user?.full_name || member.user?.email || 'Unknown'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {renewal.assigned_user && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  {renewal.assigned_user.email}
-                </p>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Premium Card */}
           <Card>
@@ -623,6 +592,70 @@ export default function RenewalEditPage() {
           </Card>
         )}
 
+        {renewal.status === 'cancelled' && renewal.cancelled_reason && (
+          <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <Badge variant="destructive">Cancelled</Badge>
+                <span className="text-sm">
+                  Reason: <strong>{renewal.cancelled_reason}</strong>
+                  {renewal.termination_effective_date && (
+                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                  )}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {renewal.status === 'lapsed' && renewal.lapsed_reason && (
+          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Lapsed</Badge>
+                <span className="text-sm">
+                  Reason: <strong>{renewal.lapsed_reason}</strong>
+                  {renewal.termination_effective_date && (
+                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                  )}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {renewal.status === 'non_renewed' && renewal.non_renewed_reason && (
+          <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Non-Renewed</Badge>
+                <span className="text-sm">
+                  Reason: <strong>{renewal.non_renewed_reason}</strong>
+                  {renewal.termination_effective_date && (
+                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                  )}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {renewal.status === 'renewed' && renewal.completed_at && (
+          <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Renewed</Badge>
+                <span className="text-sm">
+                  Completed: <strong>{format(new Date(renewal.completed_at), 'MMM d, yyyy')}</strong>
+                  {renewal.renewal_premium && (
+                    <> • New Premium: <strong>{formatCurrency(renewal.renewal_premium)}</strong></>
+                  )}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-5">
@@ -670,17 +703,30 @@ export default function RenewalEditPage() {
         </Tabs>
 
         {/* Modals */}
-        <MovedStatusModal
-          open={showMovedModal}
-          onOpenChange={setShowMovedModal}
-          onConfirm={handleMovedConfirm}
+        <RenewalCompletionModal
+          open={showCompletionModal}
+          onOpenChange={setShowCompletionModal}
+          onConfirm={handleCompletionConfirm}
+          isLoading={completeRenewal.isPending}
+          currentPolicyNumber={renewal.policy_number || ''}
+          currentPremium={renewal.current_premium || 0}
+          currentExpirationDate={renewal.expiration_date}
+          policyTerm={renewal.policy_term}
         />
 
-        <LostReasonModal
-          open={showLostModal}
-          onOpenChange={setShowLostModal}
-          onConfirm={handleLostConfirm}
-        />
+        {pendingTerminalStatus && (
+          <TerminalStatusModal
+            open={showTerminalModal}
+            onOpenChange={(open) => {
+              setShowTerminalModal(open);
+              if (!open) setPendingTerminalStatus(null);
+            }}
+            onConfirm={handleTerminalConfirm}
+            isLoading={terminateRenewal.isPending}
+            statusType={pendingTerminalStatus}
+            currentExpirationDate={renewal.expiration_date}
+          />
+        )}
       </div>
     </AppLayout>
   );

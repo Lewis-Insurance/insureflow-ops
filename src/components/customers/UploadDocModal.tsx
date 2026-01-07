@@ -16,14 +16,15 @@ interface UploadDocModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string;
+  policyId?: string;
   onSuccess?: () => void;
 }
 
-export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: UploadDocModalProps) {
+export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSuccess }: UploadDocModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [documentName, setDocumentName] = useState('');
-  const [associationType, setAssociationType] = useState<'none' | 'policy' | 'quote'>('none');
-  const [selectedPolicyId, setSelectedPolicyId] = useState<string>('');
+  const [associationType, setAssociationType] = useState<'none' | 'policy' | 'quote'>(policyId ? 'policy' : 'none');
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string>(policyId || '');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>('');
   const [noteContent, setNoteContent] = useState('');
   const [createTask, setCreateTask] = useState(false);
@@ -44,8 +45,8 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
     if (!open) {
       setFile(null);
       setDocumentName('');
-      setAssociationType('none');
-      setSelectedPolicyId('');
+      setAssociationType(policyId ? 'policy' : 'none');
+      setSelectedPolicyId(policyId || '');
       setSelectedQuoteId('');
       setNoteContent('');
       setCreateTask(false);
@@ -53,7 +54,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
       setTaskDescription('');
       setTaskDueDate('');
     }
-  }, [open]);
+  }, [open, policyId]);
 
   async function handleUpload() {
     if (!file) return;
@@ -177,7 +178,8 @@ export function UploadDocModal({ open, onOpenChange, accountId, onSuccess }: Upl
         description: 'Document uploaded successfully',
       });
 
-      onSuccess?.();
+      // Call onSuccess and wait for it to complete (it may be async for refetching)
+      await onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       toast({

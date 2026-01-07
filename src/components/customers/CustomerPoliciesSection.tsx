@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePolicies } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
-import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
@@ -14,6 +14,7 @@ import { UploadDocModal } from './UploadDocModal';
 import { EditPolicyModal } from './EditPolicyModal';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CustomerPoliciesSectionProps {
   accountId: string;
@@ -35,11 +36,42 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
 
+  // Split policies into active and inactive
+  const activePolicies = policies.filter(policy =>
+    ['active', 'bound', 'pending'].includes(policy.status?.toLowerCase() || 'active')
+  );
+  const inactivePolicies = policies.filter(policy =>
+    ['cancelled', 'lapsed', 'expired', 'inactive'].includes(policy.status?.toLowerCase() || '')
+  );
+
   const isLoading = policiesLoading || quotesLoading;
 
   const refetch = () => {
     refetchPolicies();
     refetchQuotes();
+  };
+
+  const updatePolicyStatus = async (policyId: string, newStatus: 'active' | 'inactive') => {
+    try {
+      const { error } = await supabase
+        .from('policies')
+        .update({ status: newStatus === 'active' ? 'active' : 'cancelled' })
+        .eq('id', policyId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Policy Updated',
+        description: `Policy status changed to ${newStatus === 'active' ? 'Active' : 'Inactive'}.`,
+      });
+      refetchPolicies();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update policy status.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const formatCurrency = (amount: number | null) => {
@@ -145,124 +177,294 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {policies.map((policy) => (
-                  <div
-                    key={policy.id}
-                    className="border rounded-lg p-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {/* Policy Basic Info */}
-                      <div className="md:col-span-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{policy.line_of_business || 'General Policy'}</h4>
-                          <Badge variant={getStatusColor(policy.status || 'active')}>
-                            {policy.status || 'Active'}
-                          </Badge>
-                        </div>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          {policy.policy_number && (
-                            <div className="flex items-center gap-2">
-                              <span>Policy #:</span>
-                              <span className="font-mono">{policy.policy_number}</span>
-                            </div>
-                          )}
-                          {policy.carrier && (
-                            <div className="flex items-center gap-2">
-                              <Building className="h-3 w-3" />
-                              <span>{policy.carrier}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dates */}
-                      <div>
-                        <div className="space-y-1 text-sm">
-                          {policy.effective_date && (
-                            <div>
-                              <label className="text-muted-foreground">Effective:</label>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{new Date(policy.effective_date).toLocaleDateString()}</span>
+              <div className="space-y-6">
+                {/* Active Policies Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Active Policies ({activePolicies.length})
+                  </h3>
+                  {activePolicies.length === 0 ? (
+                    <div className="text-center py-4 border rounded-lg bg-muted/20">
+                      <p className="text-muted-foreground">No active policies</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activePolicies.map((policy) => (
+                        <div
+                          key={policy.id}
+                          className="border rounded-lg p-4 hover:bg-muted/30 transition-colors border-green-200 bg-green-50/30"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {/* Policy Basic Info */}
+                            <div className="md:col-span-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-semibold">{policy.line_of_business || 'General Policy'}</h4>
+                                <Badge variant={getStatusColor(policy.status || 'active')}>
+                                  {policy.status || 'Active'}
+                                </Badge>
+                              </div>
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                {policy.policy_number && (
+                                  <div className="flex items-center gap-2">
+                                    <span>Policy #:</span>
+                                    <span className="font-mono">{policy.policy_number}</span>
+                                  </div>
+                                )}
+                                {policy.carrier && (
+                                  <div className="flex items-center gap-2">
+                                    <Building className="h-3 w-3" />
+                                    <span>{policy.carrier}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          )}
-                          {policy.expiration_date && (
+
+                            {/* Dates */}
                             <div>
-                              <label className="text-muted-foreground">Expires:</label>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{new Date(policy.expiration_date).toLocaleDateString()}</span>
+                              <div className="space-y-1 text-sm">
+                                {policy.effective_date && (
+                                  <div>
+                                    <label className="text-muted-foreground">Effective:</label>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      <span>{new Date(policy.effective_date).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {policy.expiration_date && (
+                                  <div>
+                                    <label className="text-muted-foreground">Expires:</label>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      <span>{new Date(policy.expiration_date).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Premium */}
-                      <div>
-                        <div className="text-sm">
-                          <label className="text-muted-foreground">Premium:</label>
-                          <div className="flex items-center gap-1 font-semibold">
-                            <DollarSign className="h-3 w-3" />
-                            <span>{formatCurrency(policy.premium)}</span>
+                            {/* Premium */}
+                            <div>
+                              <div className="text-sm">
+                                <label className="text-muted-foreground">Premium:</label>
+                                <div className="flex items-center gap-1 font-semibold">
+                                  <DollarSign className="h-3 w-3" />
+                                  <span>{formatCurrency(policy.premium)}</span>
+                                </div>
+                                {policy.premium && (
+                                  <span className="text-muted-foreground text-xs">
+                                    / {policy.billing_frequency || 'annual'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {policy.premium && (
-                            <span className="text-muted-foreground text-xs">
-                              / {policy.billing_frequency || 'annual'}
-                            </span>
+
+                          {/* Actions - Colorful Buttons */}
+                          <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
+                              <Link to={`/policies/${policy.id}`}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                View Policy
+                              </Link>
+                            </Button>
+                            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
+                              setSelectedPolicy(policy);
+                              setEditPolicyOpen(true);
+                            }}>
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit Policy
+                            </Button>
+                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setAddNoteOpen(true);
+                            }}>
+                              <FileText className="h-4 w-4 mr-1" />
+                              Add Note
+                            </Button>
+                            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setAddTaskOpen(true);
+                            }}>
+                              <CheckSquare className="h-4 w-4 mr-1" />
+                              Add Task
+                            </Button>
+                            <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setUploadDocOpen(true);
+                            }}>
+                              <FolderOpen className="h-4 w-4 mr-1" />
+                              Documents
+                            </Button>
+                            {/* Status Toggle Buttons */}
+                            <div className="ml-auto flex gap-2">
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled>
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Active
+                              </Button>
+                              <Button size="sm" className="bg-gray-600 hover:bg-gray-700 text-white" onClick={() => updatePolicyStatus(policy.id, 'inactive')}>
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Inactive
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Additional Info */}
+                          {policy.coverage && (
+                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+                              <span>Coverage: {JSON.stringify(policy.coverage)}</span>
+                            </div>
                           )}
                         </div>
-                      </div>
+                      ))}
                     </div>
+                  )}
+                </div>
 
-                    {/* Actions - Colorful Buttons */}
-                    <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
-                        <Link to={`/policies/${policy.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Policy
-                        </Link>
-                      </Button>
-                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
-                        setSelectedPolicy(policy);
-                        setEditPolicyOpen(true);
-                      }}>
-                        <Pencil className="h-4 w-4 mr-1" />
-                        Edit Policy
-                      </Button>
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
-                        setSelectedPolicyId(policy.id);
-                        setAddNoteOpen(true);
-                      }}>
-                        <FileText className="h-4 w-4 mr-1" />
-                        Add Note
-                      </Button>
-                      <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
-                        setSelectedPolicyId(policy.id);
-                        setAddTaskOpen(true);
-                      }}>
-                        <CheckSquare className="h-4 w-4 mr-1" />
-                        Add Task
-                      </Button>
-                      <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
-                        setSelectedPolicyId(policy.id);
-                        setUploadDocOpen(true);
-                      }}>
-                        <FolderOpen className="h-4 w-4 mr-1" />
-                        Documents
-                      </Button>
+                {/* Inactive Policies Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-gray-500" />
+                    Inactive Policies ({inactivePolicies.length})
+                  </h3>
+                  {inactivePolicies.length === 0 ? (
+                    <div className="text-center py-4 border rounded-lg bg-muted/20">
+                      <p className="text-muted-foreground">No inactive policies</p>
                     </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {inactivePolicies.map((policy) => (
+                        <div
+                          key={policy.id}
+                          className="border rounded-lg p-4 hover:bg-muted/30 transition-colors border-gray-200 bg-gray-50/50"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {/* Policy Basic Info */}
+                            <div className="md:col-span-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-semibold text-muted-foreground">{policy.line_of_business || 'General Policy'}</h4>
+                                <Badge variant={getStatusColor(policy.status || 'cancelled')}>
+                                  {policy.status || 'Cancelled'}
+                                </Badge>
+                              </div>
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                {policy.policy_number && (
+                                  <div className="flex items-center gap-2">
+                                    <span>Policy #:</span>
+                                    <span className="font-mono">{policy.policy_number}</span>
+                                  </div>
+                                )}
+                                {policy.carrier && (
+                                  <div className="flex items-center gap-2">
+                                    <Building className="h-3 w-3" />
+                                    <span>{policy.carrier}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
 
-                    {/* Additional Info */}
-                    {policy.coverage && (
-                      <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                        <span>Coverage: {JSON.stringify(policy.coverage)}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                            {/* Dates */}
+                            <div>
+                              <div className="space-y-1 text-sm">
+                                {policy.effective_date && (
+                                  <div>
+                                    <label className="text-muted-foreground">Effective:</label>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      <span>{new Date(policy.effective_date).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {policy.expiration_date && (
+                                  <div>
+                                    <label className="text-muted-foreground">Expires:</label>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      <span>{new Date(policy.expiration_date).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Premium */}
+                            <div>
+                              <div className="text-sm">
+                                <label className="text-muted-foreground">Premium:</label>
+                                <div className="flex items-center gap-1 font-semibold text-muted-foreground">
+                                  <DollarSign className="h-3 w-3" />
+                                  <span>{formatCurrency(policy.premium)}</span>
+                                </div>
+                                {policy.premium && (
+                                  <span className="text-muted-foreground text-xs">
+                                    / {policy.billing_frequency || 'annual'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions - Colorful Buttons */}
+                          <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
+                              <Link to={`/policies/${policy.id}`}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                View Policy
+                              </Link>
+                            </Button>
+                            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
+                              setSelectedPolicy(policy);
+                              setEditPolicyOpen(true);
+                            }}>
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit Policy
+                            </Button>
+                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setAddNoteOpen(true);
+                            }}>
+                              <FileText className="h-4 w-4 mr-1" />
+                              Add Note
+                            </Button>
+                            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setAddTaskOpen(true);
+                            }}>
+                              <CheckSquare className="h-4 w-4 mr-1" />
+                              Add Task
+                            </Button>
+                            <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
+                              setSelectedPolicyId(policy.id);
+                              setUploadDocOpen(true);
+                            }}>
+                              <FolderOpen className="h-4 w-4 mr-1" />
+                              Documents
+                            </Button>
+                            {/* Status Toggle Buttons */}
+                            <div className="ml-auto flex gap-2">
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updatePolicyStatus(policy.id, 'active')}>
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Active
+                              </Button>
+                              <Button size="sm" className="bg-gray-600 hover:bg-gray-700 text-white" disabled>
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Inactive
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Additional Info */}
+                          {policy.coverage && (
+                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+                              <span>Coverage: {JSON.stringify(policy.coverage)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </TabsContent>
