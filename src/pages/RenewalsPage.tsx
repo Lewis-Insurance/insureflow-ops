@@ -61,6 +61,7 @@ import {
   getPriorityConfig,
 } from '@/hooks/useRenewalWorkflow';
 import { useToast } from '@/hooks/use-toast';
+import { useCarriers } from '@/hooks/useLookupData';
 import { formatCurrency } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
 
@@ -116,6 +117,7 @@ export default function RenewalsPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<RenewalStatus[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<RenewalPriority[]>([]);
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([]);
+  const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>('renewal_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -137,6 +139,9 @@ export default function RenewalsPage() {
 
   const { data: stats, isLoading: statsLoading } = useRenewalsStats();
 
+  // Fetch carriers for filter dropdown
+  const { data: carriers = [] } = useCarriers();
+
   // Data fetching - Workflow-based view
   const { data: workflowRenewals = [], isLoading: loadingWorkflow, refetch: refetchWorkflow } =
     useRenewals({
@@ -147,6 +152,7 @@ export default function RenewalsPage() {
           ? (selectedRiskLevels as ('low' | 'medium' | 'high' | 'critical')[])
           : undefined,
       search: searchQuery || undefined,
+      carrier: selectedCarriers.length > 0 ? selectedCarriers[0] : undefined,
     });
 
   // Filter and sort renewals
@@ -261,6 +267,7 @@ export default function RenewalsPage() {
     setSelectedStatuses([]);
     setSelectedPriorities([]);
     setSelectedRiskLevels([]);
+    setSelectedCarriers([]);
   };
 
   // Selection handlers for bulk operations
@@ -284,7 +291,8 @@ export default function RenewalsPage() {
     searchQuery ||
     selectedStatuses.length > 0 ||
     selectedPriorities.length > 0 ||
-    selectedRiskLevels.length > 0;
+    selectedRiskLevels.length > 0 ||
+    selectedCarriers.length > 0;
 
   const isLoading =
     viewMode === 'policies' ? loadingUpcoming || loadingExpired : loadingWorkflow;
@@ -552,6 +560,41 @@ export default function RenewalsPage() {
                       }}
                     >
                       {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Carrier Filter */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Carrier
+                    {selectedCarriers.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">
+                        {selectedCarriers.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56 max-h-64 overflow-y-auto">
+                  <DropdownMenuLabel>Filter by Carrier</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {carriers.map((carrier) => (
+                    <DropdownMenuCheckboxItem
+                      key={carrier.id}
+                      checked={selectedCarriers.includes(carrier.name)}
+                      onCheckedChange={(checked) => {
+                        setSelectedCarriers((prev) =>
+                          checked
+                            ? [...prev, carrier.name]
+                            : prev.filter((c) => c !== carrier.name)
+                        );
+                      }}
+                    >
+                      {carrier.name}
                     </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
