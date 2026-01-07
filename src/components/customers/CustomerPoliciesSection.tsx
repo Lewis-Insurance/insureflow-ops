@@ -211,10 +211,10 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <span className="font-mono">{policy.policy_number}</span>
                                   </div>
                                 )}
-                                {policy.carrier && (
+                                {policy.carrier_info?.name && (
                                   <div className="flex items-center gap-2">
                                     <Building className="h-3 w-3" />
-                                    <span>{policy.carrier}</span>
+                                    <span>{policy.carrier_info.name}</span>
                                   </div>
                                 )}
                               </div>
@@ -355,10 +355,10 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <span className="font-mono">{policy.policy_number}</span>
                                   </div>
                                 )}
-                                {policy.carrier && (
+                                {policy.carrier_info?.name && (
                                   <div className="flex items-center gap-2">
                                     <Building className="h-3 w-3" />
-                                    <span>{policy.carrier}</span>
+                                    <span>{policy.carrier_info.name}</span>
                                   </div>
                                 )}
                               </div>

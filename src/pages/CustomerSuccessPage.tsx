@@ -52,17 +52,34 @@ export default function CustomerSuccessPage() {
   const { data: policies } = usePolicies({});
   const { data: renewalsStats } = useRenewalsStats();
 
-  // Fetch account status distribution
+  // Fetch account status distribution with pagination to handle >1000 accounts
   const { data: accountsData } = useQuery({
     queryKey: ['accounts-status-distribution'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('account_status, id')
-        .is('deleted_at', null);
-      
-      if (error) throw error;
-      return data || [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
+      const allAccounts: { account_status: string | null; id: string }[] = [];
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('account_status, id')
+          .is('deleted_at', null)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allAccounts.push(...data);
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      return allAccounts;
     },
   });
 

@@ -90,8 +90,9 @@ const PRIORITY_OPTIONS: { value: RenewalPriority; label: string }[] = [
 const RISK_LEVELS = ['critical', 'high', 'medium', 'low'] as const;
 
 // Statuses that represent active work vs completed
-const TO_WORK_STATUSES: RenewalStatus[] = ['pending', 'contacted', 'quoted'];
-const COMPLETED_STATUSES: RenewalStatus[] = ['renewed', 'lost', 'cancelled', 'moved', 'non_renewed', 'lapsed'];
+// Include legacy values: 'upcoming' and 'in_progress' map to "To Work", 'completed' maps to "Completed"
+const TO_WORK_STATUSES: RenewalStatus[] = ['pending', 'contacted', 'quoted', 'upcoming', 'in_progress'];
+const COMPLETED_STATUSES: RenewalStatus[] = ['renewed', 'lost', 'cancelled', 'moved', 'non_renewed', 'lapsed', 'completed'];
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'renewal_date', label: 'Expiration Date' },
@@ -211,12 +212,19 @@ export default function RenewalsPage() {
       byPriority,
       totalPremium,
       activeCount:
-        (byStatus['pending'] || 0) + (byStatus['contacted'] || 0) + (byStatus['quoted'] || 0),
+        (byStatus['pending'] || 0) +
+        (byStatus['contacted'] || 0) +
+        (byStatus['quoted'] || 0) +
+        (byStatus['upcoming'] || 0) +
+        (byStatus['in_progress'] || 0),
       completedCount:
         (byStatus['renewed'] || 0) +
         (byStatus['lost'] || 0) +
         (byStatus['cancelled'] || 0) +
-        (byStatus['moved'] || 0),
+        (byStatus['moved'] || 0) +
+        (byStatus['non_renewed'] || 0) +
+        (byStatus['lapsed'] || 0) +
+        (byStatus['completed'] || 0),
     };
   }, [workflowRenewals]);
 
