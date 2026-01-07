@@ -74,7 +74,9 @@ export function usePolicies(filters: PolicyFilters = {}) {
 
         // Apply filters
         if (filters.search) {
-          const searchCondition = sanitizeMultiFieldSearch(filters.search, ['policy_number', 'carrier', 'line_of_business']);
+          // Note: carrier is a FK (carrier_id), not a text field - search by policy_number and line_of_business only
+          // Carrier name search is handled client-side after the JOIN
+          const searchCondition = sanitizeMultiFieldSearch(filters.search, ['policy_number', 'line_of_business', 'named_insured']);
           query = query.or(searchCondition);
         }
 
@@ -99,10 +101,8 @@ export function usePolicies(filters: PolicyFilters = {}) {
           query = query.lte('expiration_date', filters.expirationDateTo);
         }
 
-        if (filters.carrier) {
-          const sanitized = sanitizeForILike(filters.carrier);
-          query = query.ilike('carrier', `%${sanitized}%`);
-        }
+        // Note: Carrier filter is handled client-side since carrier is a FK
+        // The carrier_info join provides the carrier name for filtering
 
         if (filters.mga) {
           query = query.eq('mga_id', filters.mga);
@@ -147,6 +147,14 @@ export function usePolicies(filters: PolicyFilters = {}) {
         );
       }
 
+      // Client-side carrier filter using the joined carrier_info
+      if (filters.carrier) {
+        const carrierSearch = filters.carrier.toLowerCase();
+        filteredData = filteredData.filter(policy =>
+          policy.carrier_info?.name?.toLowerCase().includes(carrierSearch)
+        );
+      }
+
       return filteredData;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -168,10 +176,13 @@ export function usePolicyStats() {
           .from('policies')
           .select(`
             status,
-            carrier,
             line_of_business,
             effective_date,
             expiration_date,
+            carrier_info:carriers!policies_carrier_id_fkey(
+              id,
+              name
+            ),
             mga_info:mgas!policies_mga_id_fkey(
               id,
               name
@@ -205,7 +216,8 @@ export function usePolicyStats() {
           return expDate > now && expDate <= thirtyDaysFromNow;
         }).length,
         byCarrier: data.reduce((acc, p) => {
-          acc[p.carrier] = (acc[p.carrier] || 0) + 1;
+          const carrierName = p.carrier_info?.name || 'Unknown';
+          acc[carrierName] = (acc[carrierName] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
         byMGA: data.reduce((acc, p) => {
