@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,9 @@ export default function AORenewalEdit() {
   const [showMovedModal, setShowMovedModal] = useState(false);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
 
+  // Track if we've loaded initial data to prevent form reset after save
+  const initialDataLoaded = useRef(false);
+
   const [formData, setFormData] = useState({
     customer_name: '',
     policy_number: '',
@@ -51,8 +54,10 @@ export default function AORenewalEdit() {
     moved_premium: '' as string,
   });
 
+  // Only populate form data on initial load to prevent reset after save
   useEffect(() => {
-    if (renewal) {
+    if (renewal && !initialDataLoaded.current) {
+      initialDataLoaded.current = true;
       setFormData({
         customer_name: renewal.customer_name || '',
         policy_number: renewal.policy_number || '',

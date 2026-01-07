@@ -84,6 +84,8 @@ export default function AORenewalsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
   const [showMyAssignments, setShowMyAssignments] = useState(false);
+  const [showNext30Days, setShowNext30Days] = useState(false);
+  const [showHighPriority, setShowHighPriority] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get current user ID
@@ -108,12 +110,75 @@ export default function AORenewalsPage() {
   const handleToggleMyAssignments = () => {
     const newValue = !showMyAssignments;
     setShowMyAssignments(newValue);
+    // Clear other metric filters when activating this one
+    if (newValue) {
+      setShowNext30Days(false);
+      setShowHighPriority(false);
+    }
     if (newValue && currentUserId) {
-      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
+      setFilters((prev) => {
+        const { renewal_date_from, renewal_date_to, priority, ...rest } = prev;
+        return { ...rest, assigned_to: currentUserId };
+      });
       setSearchParams({ assigned: "me" });
     } else {
       setFilters((prev) => {
         const { assigned_to, ...rest } = prev;
+        return rest;
+      });
+      setSearchParams({});
+    }
+  };
+
+  // Toggle next 30 days filter
+  const handleToggleNext30Days = () => {
+    const newValue = !showNext30Days;
+    setShowNext30Days(newValue);
+    // Clear other metric filters when activating this one
+    if (newValue) {
+      setShowMyAssignments(false);
+      setShowHighPriority(false);
+    }
+    if (newValue) {
+      const today = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      setFilters((prev) => {
+        const { assigned_to, priority, ...rest } = prev;
+        return {
+          ...rest,
+          renewal_date_from: today.toISOString().split('T')[0],
+          renewal_date_to: thirtyDaysFromNow.toISOString().split('T')[0],
+        };
+      });
+      setSearchParams({ filter: "30days" });
+    } else {
+      setFilters((prev) => {
+        const { renewal_date_from, renewal_date_to, ...rest } = prev;
+        return rest;
+      });
+      setSearchParams({});
+    }
+  };
+
+  // Toggle high priority filter
+  const handleToggleHighPriority = () => {
+    const newValue = !showHighPriority;
+    setShowHighPriority(newValue);
+    // Clear other metric filters when activating this one
+    if (newValue) {
+      setShowMyAssignments(false);
+      setShowNext30Days(false);
+    }
+    if (newValue) {
+      setFilters((prev) => {
+        const { assigned_to, renewal_date_from, renewal_date_to, ...rest } = prev;
+        return { ...rest, priority: ['urgent', 'high'] };
+      });
+      setSearchParams({ filter: "high-priority" });
+    } else {
+      setFilters((prev) => {
+        const { priority, ...rest } = prev;
         return rest;
       });
       setSearchParams({});
@@ -360,11 +425,23 @@ export default function AORenewalsPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                showNext30Days
+                  ? "ring-2 ring-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+              }`}
+              onClick={handleToggleNext30Days}
+            >
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Next 30 Days
+                  {showNext30Days && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      Active
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -375,11 +452,23 @@ export default function AORenewalsPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                showHighPriority
+                  ? "ring-2 ring-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+              }`}
+              onClick={handleToggleHighPriority}
+            >
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
                   High Priority
+                  {showHighPriority && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      Active
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>

@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { z } from 'zod';
 import { AlertTriangle, Calendar, Building2, DollarSign, XCircle, Clock, Ban, TrendingDown, ArrowRightLeft } from 'lucide-react';
+import { useCarriers } from '@/hooks/useLookupData';
 
 export type TerminalStatusType = 'cancelled' | 'lapsed' | 'non_renewed' | 'lost' | 'moved';
 
@@ -160,6 +161,9 @@ export function TerminalStatusModal({
   const StatusIcon = config.icon;
   const reasons = REASON_OPTIONS[statusType];
 
+  // Fetch carriers for dropdown
+  const { data: carriers = [] } = useCarriers();
+
   // Initialize form when modal opens
   useEffect(() => {
     if (open) {
@@ -310,13 +314,21 @@ export function TerminalStatusModal({
                 {/* New Carrier */}
                 <div className="mb-3">
                   <Label htmlFor="new_carrier">New Carrier *</Label>
-                  <Input
-                    id="new_carrier"
+                  <Select
                     value={formData.new_carrier}
-                    onChange={(e) => handleInputChange('new_carrier', e.target.value)}
-                    placeholder="e.g., Progressive, State Farm..."
-                    className={errors.new_carrier ? 'border-destructive' : ''}
-                  />
+                    onValueChange={(v) => handleInputChange('new_carrier', v)}
+                  >
+                    <SelectTrigger className={errors.new_carrier ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select carrier..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {carriers.map((carrier) => (
+                        <SelectItem key={carrier.id} value={carrier.name}>
+                          {carrier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.new_carrier && (
                     <p className="text-sm text-destructive mt-1">{errors.new_carrier}</p>
                   )}
