@@ -6,7 +6,7 @@ import { UploadDocModal } from './UploadDocModal';
 import { EditDocumentModal } from './EditDocumentModal';
 import { FileText, Download, Trash2, Upload, Calendar, FileType, Brain, Pencil } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
 
 interface CustomerDocumentsSectionProps {
@@ -28,16 +28,16 @@ export function CustomerDocumentsSection({ accountId }: CustomerDocumentsSection
     checkIntegrity,
     getDocumentUrl
   } = useDocumentManager(accountId);
-  
+
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [repairDocId, setRepairDocId] = useState<string | null>(null);
   const [editingDocument, setEditingDocument] = useState<any>(null);
-  
-  const handleUploadSuccess = () => {
+
+  const handleUploadSuccess = useCallback(async () => {
     // Refresh the documents list after successful upload
-    fetchDocuments();
-    setUploadModalOpen(false);
-  };
+    // Don't close modal here - let the modal handle its own closing
+    await fetchDocuments();
+  }, [fetchDocuments]);
 
   const handleReplace = async (doc: any) => {
     const input = document.createElement('input');

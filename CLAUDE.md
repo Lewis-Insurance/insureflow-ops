@@ -1225,7 +1225,11 @@ insureflow-ops/
 - ✅ Created comprehensive documentation (CLAUDE_CONTEXT.md)
 
 ---
+Claude code is to deploy all edge functions automatically on behalf of the user 
+
 
 **Last Updated:** December 28, 2025
 **Status:** ✅ Production Deployed
 **Version:** 2.3.0
+
+

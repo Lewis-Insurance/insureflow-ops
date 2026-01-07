@@ -982,6 +982,197 @@ export function useBulkAssignRenewals() {
   });
 }
 
+/**
+ * Complete a renewal (mark as renewed and update policy)
+ * This updates the existing policy with new term details
+ */
+export function useCompleteRenewal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      renewalId: string;
+      policyId: string;
+      policyUpdates: {
+        policy_number?: string;
+        premium: number;
+        effective_date: string;
+        expiration_date: string;
+      };
+      notes?: string;
+    }) => {
+      const { renewalId, policyId, policyUpdates, notes } = params;
+
+      // 1. Update the policy record with new term details
+      const { error: policyError } = await supabase
+        .from('policies')
+        .update({
+          policy_number: policyUpdates.policy_number,
+          premium: policyUpdates.premium,
+          effective_date: policyUpdates.effective_date,
+          expiration_date: policyUpdates.expiration_date,
+          status: 'active',
+        })
+        .eq('id', policyId);
+
+      if (policyError) throw policyError;
+
+      // 2. Update renewal status to 'renewed' (trigger auto-sets completed_at)
+      const { error: renewalError } = await supabase
+        .from('renewals')
+        .update({
+          status: 'renewed',
+          renewal_premium: policyUpdates.premium,
+        })
+        .eq('id', renewalId);
+
+      if (renewalError) throw renewalError;
+
+      // 3. Add note if provided
+      if (notes) {
+        await supabase.from('renewal_notes').insert({
+          renewal_id: renewalId,
+          content: `Renewal completed: ${notes}`,
+        });
+      }
+
+      // 4. Trigger retention analytics recalculation (best effort)
+      try {
+        await supabase.functions.invoke('run-retention-scoring', {
+          body: { policy_id: policyId, immediate: true },
+        });
+      } catch (analyticsError) {
+        logger.warn('[useCompleteRenewal] Analytics trigger failed:', analyticsError);
+        // Don't fail the whole operation for analytics
+      }
+
+      return { renewalId, policyId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['policy', data.policyId] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
+      toast.success('Renewal completed successfully');
+    },
+    onError: (error) => {
+      logger.error('[useCompleteRenewal] Error:', error);
+      toast.error('Failed to complete renewal');
+    },
+  });
+}
+
+/**
+ * Terminate a renewal (cancelled, lapsed, non_renewed, lost, moved)
+ * Updates both renewal and policy status with full details
+ */
+export function useTerminateRenewal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      renewalId: string;
+      policyId: string;
+      status: 'cancelled' | 'lapsed' | 'non_renewed' | 'lost' | 'moved';
+      reason: string;
+      terminationDate: string;
+      notes?: string;
+      movedData?: {
+        carrier: string;
+        premium: number;
+        term: '6_month' | 'annual';
+      };
+    }) => {
+      const { renewalId, policyId, status, reason, terminationDate, notes, movedData } = params;
+
+      // Build renewal update object
+      const renewalUpdate: Record<string, any> = {
+        status,
+        termination_effective_date: terminationDate,
+      };
+
+      // Set reason field based on status
+      switch (status) {
+        case 'cancelled':
+          renewalUpdate.cancelled_reason = reason;
+          break;
+        case 'lapsed':
+          renewalUpdate.lapsed_reason = reason;
+          break;
+        case 'non_renewed':
+          renewalUpdate.non_renewal_reason = reason;
+          break;
+        case 'lost':
+          renewalUpdate.lost_reason = reason;
+          break;
+        case 'moved':
+          if (movedData) {
+            renewalUpdate.moved_carrier = movedData.carrier;
+            renewalUpdate.moved_premium = movedData.premium;
+            renewalUpdate.moved_term = movedData.term;
+          }
+          break;
+      }
+
+      // 1. Update renewal (trigger auto-sets completed_at)
+      const { error: renewalError } = await supabase
+        .from('renewals')
+        .update(renewalUpdate)
+        .eq('id', renewalId);
+
+      if (renewalError) throw renewalError;
+
+      // 2. Update policy status
+      // For 'moved', we mark the policy as cancelled since customer moved elsewhere
+      const policyStatus = status === 'moved' ? 'cancelled' : status;
+      const { error: policyError } = await supabase
+        .from('policies')
+        .update({
+          status: policyStatus,
+        })
+        .eq('id', policyId);
+
+      if (policyError) throw policyError;
+
+      // 3. Add note with status change details
+      const noteContent = notes
+        ? `Status changed to ${status}: ${reason}. ${notes}`
+        : `Status changed to ${status}: ${reason}`;
+
+      await supabase.from('renewal_notes').insert({
+        renewal_id: renewalId,
+        content: noteContent,
+      });
+
+      // 4. Trigger retention analytics recalculation (best effort)
+      try {
+        await supabase.functions.invoke('run-retention-scoring', {
+          body: { policy_id: policyId, immediate: true },
+        });
+      } catch (analyticsError) {
+        logger.warn('[useTerminateRenewal] Analytics trigger failed:', analyticsError);
+      }
+
+      return { renewalId, policyId, status };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['policy', data.policyId] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
+      toast.success(`Renewal marked as ${data.status}`);
+    },
+    onError: (error) => {
+      logger.error('[useTerminateRenewal] Error:', error);
+      toast.error('Failed to update renewal status');
+    },
+  });
+}
+
 // ============================================================================
 // UTILITY HOOKS
 // ============================================================================

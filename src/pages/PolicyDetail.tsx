@@ -818,6 +818,7 @@ export default function PolicyDetail() {
             open={uploadDocOpen}
             onOpenChange={setUploadDocOpen}
             accountId={policy.account.id}
+            policyId={policy.id}
             onSuccess={() => {
               toast({
                 title: "Document Uploaded",
