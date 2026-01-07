@@ -75,6 +75,7 @@ const STATUS_OPTIONS: { value: RenewalStatus; label: string }[] = [
   { value: 'renewed', label: 'Renewed' },
   { value: 'lost', label: 'Lost' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'lapsed', label: 'Lapsed' },
   { value: 'moved', label: 'Moved' },
   { value: 'non_renewed', label: 'Non-Renewed' },
 ];
@@ -87,6 +88,10 @@ const PRIORITY_OPTIONS: { value: RenewalPriority; label: string }[] = [
 ];
 
 const RISK_LEVELS = ['critical', 'high', 'medium', 'low'] as const;
+
+// Statuses that represent active work vs completed
+const TO_WORK_STATUSES: RenewalStatus[] = ['pending', 'contacted', 'quoted'];
+const COMPLETED_STATUSES: RenewalStatus[] = ['renewed', 'lost', 'cancelled', 'moved', 'non_renewed', 'lapsed'];
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'renewal_date', label: 'Expiration Date' },
@@ -103,6 +108,7 @@ export default function RenewalsPage() {
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('workflow');
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [workflowTab, setWorkflowTab] = useState<'to_work' | 'completed'>('to_work');
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,6 +152,10 @@ export default function RenewalsPage() {
   const filteredRenewals = useMemo(() => {
     let renewals = [...workflowRenewals];
 
+    // Filter by workflow tab (to work vs completed)
+    const tabStatuses = workflowTab === 'to_work' ? TO_WORK_STATUSES : COMPLETED_STATUSES;
+    renewals = renewals.filter(r => tabStatuses.includes(r.status as RenewalStatus));
+
     // Sort
     renewals.sort((a, b) => {
       let comparison = 0;
@@ -179,7 +189,7 @@ export default function RenewalsPage() {
     });
 
     return renewals;
-  }, [workflowRenewals, sortField, sortDirection]);
+  }, [workflowRenewals, sortField, sortDirection, workflowTab]);
 
   // Calculate workflow stats
   const workflowStats = useMemo(() => {
@@ -397,6 +407,26 @@ export default function RenewalsPage() {
         {/* Workflow View Content */}
         {viewMode === 'workflow' && (
           <>
+            {/* Workflow Tabs - To Work vs Completed */}
+            <Tabs value={workflowTab} onValueChange={(v) => setWorkflowTab(v as 'to_work' | 'completed')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 max-w-md">
+                <TabsTrigger value="to_work" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  To Work
+                  <Badge variant="secondary" className="ml-1">
+                    {workflowStats.activeCount}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Completed
+                  <Badge variant="secondary" className="ml-1">
+                    {workflowStats.completedCount}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             {/* Filters Bar */}
             <div className="flex flex-wrap items-center gap-3">
               {/* Search */}
