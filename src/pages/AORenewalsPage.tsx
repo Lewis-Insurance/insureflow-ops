@@ -529,33 +529,33 @@ export default function AORenewalsPage() {
         {/* Status View Toggle */}
         <div className="flex gap-2">
           <Button
-            variant={statusView === 'in_progress' ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => setStatusView('in_progress')}
-            className="gap-2"
+            className={`gap-2 ${statusView === 'in_progress' ? 'bg-green-600/20 border-green-500 text-green-400 hover:bg-green-600/30' : 'hover:bg-green-600/10 hover:border-green-500/50'}`}
           >
             <Clock className="h-4 w-4" />
             In Progress
           </Button>
           <Button
-            variant={statusView === 'moved' ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => setStatusView('moved')}
-            className={`gap-2 ${statusView === 'moved' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+            className={`gap-2 ${statusView === 'moved' ? 'bg-blue-600/20 border-blue-500 text-blue-400 hover:bg-blue-600/30' : 'hover:bg-blue-600/10 hover:border-blue-500/50'}`}
           >
             <ArrowRightLeft className="h-4 w-4" />
             Moved
           </Button>
           <Button
-            variant={statusView === 'lost' ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => setStatusView('lost')}
-            className={`gap-2 ${statusView === 'lost' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+            className={`gap-2 ${statusView === 'lost' ? 'bg-red-600/20 border-red-500 text-red-400 hover:bg-red-600/30' : 'hover:bg-red-600/10 hover:border-red-500/50'}`}
           >
             <XCircle className="h-4 w-4" />
             Lost
           </Button>
           <Button
-            variant={statusView === 'cancelled' ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => setStatusView('cancelled')}
-            className={`gap-2 ${statusView === 'cancelled' ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+            className={`gap-2 ${statusView === 'cancelled' ? 'bg-yellow-600/20 border-yellow-500 text-yellow-400 hover:bg-yellow-600/30' : 'hover:bg-yellow-600/10 hover:border-yellow-500/50'}`}
           >
             <XCircle className="h-4 w-4" />
             Cancelled
