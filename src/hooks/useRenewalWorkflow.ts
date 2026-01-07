@@ -1015,7 +1015,10 @@ export function useCompleteRenewal() {
         })
         .eq('id', policyId);
 
-      if (policyError) throw policyError;
+      if (policyError) {
+        logger.error('[useCompleteRenewal] Policy update failed:', policyError);
+        throw new Error(`Policy update failed: ${policyError.message}`);
+      }
 
       // 2. Update renewal status to 'renewed' (trigger auto-sets completed_at)
       const { error: renewalError } = await supabase
@@ -1026,14 +1029,21 @@ export function useCompleteRenewal() {
         })
         .eq('id', renewalId);
 
-      if (renewalError) throw renewalError;
+      if (renewalError) {
+        logger.error('[useCompleteRenewal] Renewal update failed:', renewalError);
+        throw new Error(`Renewal update failed: ${renewalError.message}`);
+      }
 
       // 3. Add note if provided
       if (notes) {
-        await supabase.from('renewal_notes').insert({
+        const { error: noteError } = await supabase.from('renewal_notes').insert({
           renewal_id: renewalId,
           content: `Renewal completed: ${notes}`,
         });
+        if (noteError) {
+          logger.warn('[useCompleteRenewal] Note insert failed:', noteError);
+          // Don't fail the whole operation for notes
+        }
       }
 
       // 4. Trigger retention analytics recalculation (best effort)
@@ -1057,9 +1067,9 @@ export function useCompleteRenewal() {
       queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
       toast.success('Renewal completed successfully');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       logger.error('[useCompleteRenewal] Error:', error);
-      toast.error('Failed to complete renewal');
+      toast.error(error.message || 'Failed to complete renewal');
     },
   });
 }
