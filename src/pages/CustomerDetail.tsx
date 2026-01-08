@@ -169,12 +169,19 @@ export default function CustomerDetail() {
 
       // Fetch notes
       const { data: notesData } = await supabase
-        .from('notes')
+        .from('customer_notes')
         .select('*')
-        .eq('account_id', id)
+        .eq('customer_id', id)
         .order('created_at', { ascending: false });
 
-      setNotes(notesData || []);
+      // Map to expected format
+      const mappedNotes = (notesData || []).map(n => ({
+        id: n.id,
+        body: n.note_text,
+        created_at: n.created_at,
+        author_id: n.created_by
+      }));
+      setNotes(mappedNotes);
 
       // Fetch tasks
       const { data: tasksData } = await supabase

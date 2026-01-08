@@ -34,11 +34,10 @@ export function AddNoteModal({ open, onOpenChange, accountId, policyId }: AddNot
         return;
       }
 
-      const { error } = await supabase.from('notes').insert({
-        account_id: accountId,
-        policy_id: policyId || null,
-        author_id: user.id,
-        body: body.trim()
+      const { error } = await supabase.from('customer_notes').insert({
+        customer_id: accountId,
+        note_text: body.trim(),
+        created_by: user.id
       });
 
       if (error) {
