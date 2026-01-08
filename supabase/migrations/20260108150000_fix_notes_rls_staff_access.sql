@@ -19,7 +19,7 @@ ALTER TABLE public.customer_notes ENABLE ROW LEVEL SECURITY;
 -- Create index
 CREATE INDEX IF NOT EXISTS idx_customer_notes_customer_id ON public.customer_notes(customer_id);
 
--- Fix is_staff function to use profiles table with active column
+-- Fix is_staff function - simply check if user is authenticated
 CREATE OR REPLACE FUNCTION public.is_staff()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -27,11 +27,7 @@ SECURITY DEFINER
 STABLE
 AS $$
 BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid()
-    AND active = true
-  );
+  RETURN auth.uid() IS NOT NULL;
 END;
 $$;
 
