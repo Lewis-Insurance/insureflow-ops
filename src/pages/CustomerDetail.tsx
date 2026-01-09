@@ -134,6 +134,23 @@ export default function CustomerDetail() {
     setTasks(tasksData || []);
   };
 
+  const refetchNotes = async () => {
+    if (!id) return;
+    const { data: notesData } = await supabase
+      .from('customer_notes')
+      .select('*')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false });
+
+    const mappedNotes = (notesData || []).map(n => ({
+      id: n.id,
+      body: n.note_text,
+      created_at: n.created_at,
+      author_id: n.created_by
+    }));
+    setNotes(mappedNotes);
+  };
+
   useEffect(() => {
     if (!id) return;
     
@@ -372,6 +389,7 @@ export default function CustomerDetail() {
         open={addNoteOpen}
         onOpenChange={setAddNoteOpen}
         accountId={account.id}
+        onSuccess={refetchNotes}
       />
       <AddTaskModal
         open={addTaskOpen}

@@ -11,9 +11,10 @@ interface AddNoteModalProps {
   onOpenChange: (open: boolean) => void;
   accountId: string;
   policyId?: string;
+  onSuccess?: () => void;
 }
 
-export function AddNoteModal({ open, onOpenChange, accountId, policyId }: AddNoteModalProps) {
+export function AddNoteModal({ open, onOpenChange, accountId, policyId, onSuccess }: AddNoteModalProps) {
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -62,7 +63,12 @@ export function AddNoteModal({ open, onOpenChange, accountId, policyId }: AddNot
         queryClient.invalidateQueries({ queryKey: ['policy-notes', policyId] });
         queryClient.invalidateQueries({ queryKey: ['policy', policyId] });
       }
-      
+
+      // Call onSuccess callback to refresh parent state
+      if (onSuccess) {
+        onSuccess();
+      }
+
       setBody('');
       onOpenChange(false);
     } catch (error) {

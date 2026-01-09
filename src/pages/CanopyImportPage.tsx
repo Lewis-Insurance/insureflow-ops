@@ -129,6 +129,88 @@ export default function CanopyImportPage() {
     navigate(`/leads/${leadId}`);
   };
 
+  const handleCreateLeadFromPull = async (pullId: string) => {
+    try {
+      // Get the pull metadata for consumer info
+      const { data: pull } = await supabase
+        .from('canopy_pulls')
+        .select('metadata')
+        .eq('id', pullId)
+        .single();
+
+      const metadata = pull?.metadata as any;
+
+      // Get policies for this pull to determine insurance types
+      const { data: policies } = await supabase
+        .from('canopy_policies')
+        .select('policy_type, carrier_name, premium_amount')
+        .eq('pull_id', pullId);
+
+      const insuranceTypes = [...new Set(policies?.map(p => p.policy_type).filter(Boolean) || ['auto'])];
+      const carriers = policies?.map(p => p.carrier_name).filter(Boolean) || [];
+      const totalPremium = policies?.reduce((sum, p) => sum + (p.premium_amount || 0), 0) || 0;
+
+      // Get primary driver as fallback for name
+      const { data: drivers } = await supabase
+        .from('canopy_drivers')
+        .select('first_name, last_name, canopy_policies!inner(pull_id)')
+        .eq('canopy_policies.pull_id', pullId)
+        .limit(1);
+
+      const driver = drivers?.[0];
+
+      const firstName = metadata?.consumer_first_name || driver?.first_name || 'Unknown';
+      const lastName = metadata?.consumer_last_name || driver?.last_name || 'Customer';
+
+      // Create the lead
+      const { data: newLead, error: leadError } = await supabase
+        .from('leads')
+        .insert({
+          first_name: firstName,
+          last_name: lastName,
+          email: metadata?.consumer_email || null,
+          phone: metadata?.consumer_phone || null,
+          insurance_types: insuranceTypes,
+          lead_score: 75,
+          status: 'qualified',
+          source_details: { source: 'canopy_import', provider: 'canopy_connect' },
+          notes: `Manually created from Canopy import. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium}`
+        })
+        .select('id')
+        .single();
+
+      if (leadError) {
+        toast({
+          title: 'Failed to create lead',
+          description: leadError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Link the lead to the pull
+      await supabase
+        .from('canopy_pulls')
+        .update({ lead_id: newLead.id })
+        .eq('id', pullId);
+
+      toast({
+        title: 'Lead created!',
+        description: `Created lead for ${firstName} ${lastName}`,
+      });
+
+      // Refresh the data
+      refetchPulls();
+      navigate(`/leads/${newLead.id}`);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create lead from import',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'complete':
@@ -232,15 +314,30 @@ export default function CanopyImportPage() {
                             </p>
                           </div>
                         </div>
-                        {pull.lead_id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewLead(pull.lead_id!)}
-                          >
-                            View Lead <ArrowRight className="w-4 h-4 ml-1" />
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {pull.lead_id ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewLead(pull.lead_id!)}
+                            >
+                              View Lead <ArrowRight className="w-4 h-4 ml-1" />
+                            </Button>
+                          ) : pull.status === 'complete' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCreateLeadFromPull(pull.id)}
+                            >
+                              Create Lead
+                            </Button>
+                          ) : null}
+                          {pull.error_message && (
+                            <span className="text-xs text-destructive" title={pull.error_message}>
+                              <AlertCircle className="w-4 h-4" />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
