@@ -140,27 +140,67 @@ export default function CanopyImportPage() {
 
       const metadata = pull?.metadata as any;
 
-      // Get policies for this pull to determine insurance types
+      // Get policies for this pull to determine insurance types AND named_insureds
       const { data: policies } = await supabase
         .from('canopy_policies')
-        .select('policy_type, carrier_name, premium_amount')
+        .select('id, policy_type, carrier_name, premium_amount, named_insureds')
         .eq('pull_id', pullId);
 
       const insuranceTypes = [...new Set(policies?.map(p => p.policy_type).filter(Boolean) || ['auto'])];
       const carriers = policies?.map(p => p.carrier_name).filter(Boolean) || [];
       const totalPremium = policies?.reduce((sum, p) => sum + (p.premium_amount || 0), 0) || 0;
 
-      // Get primary driver as fallback for name
-      const { data: drivers } = await supabase
-        .from('canopy_drivers')
-        .select('first_name, last_name, canopy_policies!inner(pull_id)')
-        .eq('canopy_policies.pull_id', pullId)
-        .limit(1);
+      // Try to get name from named_insureds first
+      let firstName = metadata?.consumer_first_name;
+      let lastName = metadata?.consumer_last_name;
 
-      const driver = drivers?.[0];
+      // Check named_insureds from policies if no name yet
+      if (!firstName || !lastName) {
+        for (const policy of policies || []) {
+          const insureds = policy.named_insureds as any[];
+          if (insureds && insureds.length > 0) {
+            const primary = insureds[0];
+            if (primary.first_name) firstName = firstName || primary.first_name;
+            if (primary.last_name) lastName = lastName || primary.last_name;
+            if (firstName && lastName) break;
+          }
+        }
+      }
 
-      const firstName = metadata?.consumer_first_name || driver?.first_name || 'Unknown';
-      const lastName = metadata?.consumer_last_name || driver?.last_name || 'Customer';
+      // Get drivers via policy IDs as another fallback
+      if (!firstName || !lastName) {
+        const policyIds = policies?.map(p => p.id) || [];
+        if (policyIds.length > 0) {
+          const { data: drivers } = await supabase
+            .from('canopy_drivers')
+            .select('first_name, last_name')
+            .in('policy_id', policyIds)
+            .limit(1);
+
+          const driver = drivers?.[0];
+          if (driver) {
+            firstName = firstName || driver.first_name;
+            lastName = lastName || driver.last_name;
+          }
+        }
+      }
+
+      // Last resort: try to extract name from email
+      if ((!firstName || firstName === 'Unknown') && metadata?.consumer_email) {
+        const emailName = metadata.consumer_email.split('@')[0];
+        // Try to split on common separators
+        const parts = emailName.split(/[._-]/);
+        if (parts.length >= 2) {
+          firstName = firstName || parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+          lastName = lastName || parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
+        } else if (parts.length === 1 && parts[0].length > 2) {
+          firstName = firstName || parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+        }
+      }
+
+      // Final defaults
+      firstName = firstName || 'Unknown';
+      lastName = lastName || 'Customer';
 
       // Create the lead
       const { data: newLead, error: leadError } = await supabase
