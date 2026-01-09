@@ -121,6 +121,43 @@ export function PaymentEntryForm({
     return amountTendered - amount;
   }, [showCashFields, amountTendered, amount]);
 
+  // Auto-populate selectedPolicy when defaultPolicyId is provided
+  useEffect(() => {
+    if (!defaultPolicyId) return;
+
+    const fetchDefaultPolicy = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('policies')
+          .select(`
+            id,
+            policy_number,
+            line_of_business,
+            account_id,
+            account:accounts!policies_account_id_fkey(name)
+          `)
+          .eq('id', defaultPolicyId)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setSelectedPolicy({
+            id: data.id,
+            policy_number: data.policy_number,
+            line_of_business: data.line_of_business,
+            account_id: data.account_id,
+            account_name: (data.account as any)?.name || 'Unknown',
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching default policy:', error);
+      }
+    };
+
+    fetchDefaultPolicy();
+  }, [defaultPolicyId]);
+
   // Search for policies
   useEffect(() => {
     if (policySearch.length < 2) {
@@ -139,27 +176,37 @@ export function PaymentEntryForm({
             policy_number,
             line_of_business,
             account_id,
-            account:accounts!inner(name)
+            account:accounts!policies_account_id_fkey(name)
           `)
           .or(`policy_number.ilike.%${policySearch}%,carrier.ilike.%${policySearch}%`)
           .limit(20);
 
         // If no results, try searching by account name
         if (!error && (!data || data.length === 0)) {
-          const accountResult = await supabase
-            .from('policies')
-            .select(`
-              id,
-              policy_number,
-              line_of_business,
-              account_id,
-              account:accounts!inner(name)
-            `)
-            .ilike('account.name', `%${policySearch}%`)
-            .limit(20);
+          // First find accounts matching the search term
+          const { data: matchingAccounts } = await supabase
+            .from('accounts')
+            .select('id')
+            .ilike('name', `%${policySearch}%`)
+            .limit(50);
 
-          if (!accountResult.error) {
-            data = accountResult.data;
+          if (matchingAccounts && matchingAccounts.length > 0) {
+            const accountIds = matchingAccounts.map((a) => a.id);
+            const { data: policiesForAccounts, error: policiesError } = await supabase
+              .from('policies')
+              .select(`
+                id,
+                policy_number,
+                line_of_business,
+                account_id,
+                account:accounts!policies_account_id_fkey(name)
+              `)
+              .in('account_id', accountIds)
+              .limit(20);
+
+            if (!policiesError) {
+              data = policiesForAccounts;
+            }
           }
         }
 
