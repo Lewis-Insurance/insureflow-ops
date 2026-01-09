@@ -2432,8 +2432,8 @@ async function createLeadFromCanopyPull(
     return null;
   }
 
-  // Copy driver info to lead_auto_drivers if we have a driver and auto insurance
-  if (driver && insuranceTypes.includes('auto') && newLead?.id) {
+  // Copy driver info to lead_auto_drivers if we have auto insurance
+  if (insuranceTypes.includes('auto') && newLead?.id) {
     const { data: allDrivers } = await supabase.from('canopy_drivers')
       .select(`
         *,
