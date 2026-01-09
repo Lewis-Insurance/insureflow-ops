@@ -434,14 +434,13 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                         </div>
                       </div>
                       <Button
-                        variant="outline"
-                        className="w-full"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
                         onClick={() => {
                           onOpenChange(false);
                           navigate(`/leads/${leadId}`);
                         }}
                       >
-                        <ExternalLink className="w-4 h-4 mr-2" />
+                        <ExternalLink className="w-5 h-5 mr-2" />
                         View Full Insurance Details
                       </Button>
                     </div>
