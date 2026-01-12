@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTasks, Task } from '@/hooks/useTasks';
@@ -19,7 +20,7 @@ interface MyTasksDashboardProps {
 }
 
 export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) {
-  const { tasks, loading, fetchTasks, backfillAssignmentsForUser, backfillDueDatesForUser } = useTasks();
+  const { tasks, loading, fetchTasks, updateTask, backfillAssignmentsForUser, backfillDueDatesForUser } = useTasks();
   const [activeTab, setActiveTab] = useState(defaultFilter || 'all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -180,6 +181,18 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
     setEditModalOpen(true);
   };
 
+  const handleQuickComplete = async (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    await updateTask(taskId, {
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    });
+    // Refetch tasks to update the list
+    if (currentUserId) {
+      fetchTasks({ assignedTo: currentUserId });
+    }
+  };
+
   const renderTaskCard = (task: Task) => (
     <Card
       key={task.id}
@@ -196,9 +209,22 @@ export function MyTasksDashboard({ defaultFilter }: MyTasksDashboardProps = {}) 
               />
               <h4 className="font-medium">{task.title}</h4>
             </div>
-            <Badge variant={getPriorityColor(task.priority)}>
-              {task.priority}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={getPriorityColor(task.priority)}>
+                {task.priority}
+              </Badge>
+              {task.status !== 'completed' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
+                  onClick={(e) => handleQuickComplete(e, task.id)}
+                  title="Mark Complete"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {task.description && (
