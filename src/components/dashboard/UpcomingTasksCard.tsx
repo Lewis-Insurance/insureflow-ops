@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfDay, endOfDay, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useTasks } from '@/hooks/useTasks';
 import type { Task } from '@/hooks/useTasks';
+import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 
 interface TasksByDate {
   today: Task[];
@@ -18,7 +20,10 @@ interface TasksByDate {
 export function UpcomingTasksCard() {
   const [tasks, setTasks] = useState<TasksByDate>({ today: [], tomorrow: [], thisWeek: [] });
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { updateTask } = useTasks();
 
   useEffect(() => {
     fetchUpcomingTasks();
@@ -104,6 +109,26 @@ export function UpcomingTasksCard() {
     );
   };
 
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setModalOpen(true);
+  };
+
+  const handleQuickComplete = async (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    await updateTask(taskId, {
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    });
+    // Refetch tasks to update the list
+    fetchUpcomingTasks();
+  };
+
+  const handleTaskUpdate = () => {
+    fetchUpcomingTasks();
+    setModalOpen(false);
+  };
+
   const renderTaskList = (taskList: Task[], emptyMessage: string, filterParam: string) => {
     if (loading) {
       return (
@@ -129,7 +154,7 @@ export function UpcomingTasksCard() {
           <div
             key={task.id}
             className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-            onClick={() => navigate(`/tasks?filter=${filterParam}`)}
+            onClick={() => handleTaskClick(task)}
           >
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2">
@@ -175,8 +200,14 @@ export function UpcomingTasksCard() {
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="sm" className="ml-2">
-              <ExternalLink className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 hover:bg-green-100 hover:text-green-700"
+              onClick={(e) => handleQuickComplete(e, task.id)}
+              title="Mark Complete"
+            >
+              <CheckCircle2 className="h-5 w-5" />
             </Button>
           </div>
         ))}
@@ -247,6 +278,14 @@ export function UpcomingTasksCard() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* Task Edit Modal */}
+      <TaskEditModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        task={selectedTask}
+        onTaskUpdate={handleTaskUpdate}
+      />
     </Card>
   );
 }
