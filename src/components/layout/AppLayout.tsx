@@ -96,6 +96,35 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 />
               </SidebarMenu>
 
+              {/* CRM Group - Primary navigation for daily use */}
+              <NavGroup label="CRM" defaultOpen={true}>
+                <NavItem
+                  icon={Users}
+                  label="Customers"
+                  to="/customers"
+                />
+                <NavItem
+                  icon={FileText}
+                  label="Policies"
+                  to="/policies"
+                />
+                <NavItem
+                  icon={Calendar}
+                  label="Renewals"
+                  to="/renewals"
+                />
+                <NavItem
+                  icon={Phone}
+                  label="Calls"
+                  to="/calls"
+                />
+                <NavItem
+                  icon={MessageSquare}
+                  label="SMS"
+                  to="/sms"
+                />
+              </NavGroup>
+
               {/* Lewi AI Group */}
               <NavGroup label="Lewi AI" defaultOpen={true}>
                 <NavItem
@@ -190,35 +219,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   icon={FileType}
                   label="Templates"
                   to="/marketing/templates"
-                />
-              </NavGroup>
-
-              {/* CRM Group */}
-              <NavGroup label="CRM" defaultOpen={true}>
-                <NavItem
-                  icon={Users}
-                  label="Customers"
-                  to="/customers"
-                />
-                <NavItem
-                  icon={FileText}
-                  label="Policies"
-                  to="/policies"
-                />
-                <NavItem
-                  icon={Calendar}
-                  label="Renewals"
-                  to="/renewals"
-                />
-                <NavItem
-                  icon={Phone}
-                  label="Calls"
-                  to="/calls"
-                />
-                <NavItem
-                  icon={MessageSquare}
-                  label="SMS"
-                  to="/sms"
                 />
               </NavGroup>
 

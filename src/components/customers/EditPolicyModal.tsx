@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
+import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
+import { format, parse } from 'date-fns';
 import { z } from 'zod';
+import { CalendarIcon } from 'lucide-react';
 
 // Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
 const formatDateForDisplay = (dateStr: string): string => {
@@ -55,6 +59,8 @@ interface Policy {
   policy_term: string | null;
   status: string;
   payment_type: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
 }
 
 interface EditPolicyModalProps {
@@ -77,9 +83,13 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
     policy_term: '',
     status: 'active',
     payment_type: 'direct',
+    cancelled_at: '',
+    cancellation_reason: '',
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Fetch carriers and lines of business
@@ -100,6 +110,8 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         policy_term: policy.policy_term || '',
         status: policy.status || 'active',
         payment_type: policy.payment_type || 'direct',
+        cancelled_at: policy.cancelled_at ? formatDateForDisplay(policy.cancelled_at) : '',
+        cancellation_reason: policy.cancellation_reason || '',
       });
     }
   }, [policy]);
@@ -125,9 +137,28 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
 
   async function handleSave() {
     if (!policy || !validateForm()) return;
-    
+
     setLoading(true);
     try {
+      // Determine actual status based on cancellation date
+      let actualStatus = formData.status;
+      const cancelledAtDate = formData.cancelled_at ? formatDateForStorage(formData.cancelled_at) : null;
+
+      // If there's a cancellation date, check if it's in the future
+      if (cancelledAtDate) {
+        const cancelDate = new Date(cancelledAtDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (cancelDate > today) {
+          // Future cancellation - keep policy active
+          actualStatus = 'active';
+        } else {
+          // Past/today - mark as cancelled
+          actualStatus = 'cancelled';
+        }
+      }
+
       const policyData = {
         policy_number: formData.policy_number.trim(),
         carrier: formData.carrier.trim(),
@@ -138,8 +169,10 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
         billing_method: formData.billing_method ? formData.billing_method as 'direct_bill' | 'agency_bill' : null,
         policy_term: formData.policy_term || null,
-        status: formData.status,
+        status: actualStatus,
         payment_type: formData.payment_type as 'direct' | 'agency',
+        cancelled_at: cancelledAtDate,
+        cancellation_reason: formData.cancellation_reason || null,
       };
 
       const { error } = await supabase
@@ -160,7 +193,7 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         title: 'Success',
         description: 'Policy updated successfully',
       });
-      
+
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -175,35 +208,84 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
   }
 
   const handleInputChange = (field: string, value: string) => {
+    // Handle status change - show cancellation modal if changing to cancelled
+    if (field === 'status' && value === 'cancelled') {
+      setPendingStatus(value);
+      setShowCancellationModal(true);
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-    
+
     // Auto-calculate expiration date when effective date or policy term changes
     if (field === 'effective_date' || field === 'policy_term') {
       const effectiveDate = field === 'effective_date' ? value : formData.effective_date;
       const policyTerm = field === 'policy_term' ? value : formData.policy_term;
-      
+
       if (effectiveDate && policyTerm) {
-        const startDate = new Date(effectiveDate);
-        let expirationDate: Date;
-        
-        if (policyTerm === 'semiannual') {
-          expirationDate = new Date(startDate);
-          expirationDate.setMonth(startDate.getMonth() + 6);
-        } else if (policyTerm === 'annual') {
-          expirationDate = new Date(startDate);
-          expirationDate.setFullYear(startDate.getFullYear() + 1);
-        } else {
-          return; // Unknown term, don't auto-calculate
+        // Parse MM/DD/YYYY format
+        const dateParts = effectiveDate.split('/');
+        if (dateParts.length === 3 && dateParts[2].length === 4) {
+          const startDate = new Date(
+            parseInt(dateParts[2]),
+            parseInt(dateParts[0]) - 1,
+            parseInt(dateParts[1])
+          );
+          const term = parsePolicyTerm(policyTerm);
+          const expirationDate = calcExpirationDate(startDate, term);
+          const formattedDate = format(expirationDate, 'MM/dd/yyyy');
+          setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
         }
-        
-        // Format as YYYY-MM-DD for date input
-        const formattedDate = expirationDate.toISOString().split('T')[0];
-        setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
       }
     }
+  };
+
+  const handleCancellationConfirm = () => {
+    const cancelDate = formData.cancelled_at;
+    if (!cancelDate) {
+      toast({
+        title: 'Error',
+        description: 'Please select a cancellation date',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Parse the date to check if it's in the future
+    const dateParts = cancelDate.split('/');
+    if (dateParts.length === 3) {
+      const cancelDateObj = new Date(
+        parseInt(dateParts[2]),
+        parseInt(dateParts[0]) - 1,
+        parseInt(dateParts[1])
+      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (cancelDateObj > today) {
+        // Future date - keep active, just set the scheduled cancellation
+        setFormData(prev => ({ ...prev, status: 'active' }));
+        toast({
+          title: 'Scheduled Cancellation',
+          description: `Policy will be cancelled on ${cancelDate}`,
+        });
+      } else {
+        // Today or past - mark as cancelled
+        setFormData(prev => ({ ...prev, status: 'cancelled' }));
+      }
+    }
+
+    setShowCancellationModal(false);
+    setPendingStatus(null);
+  };
+
+  const handleCancellationCancel = () => {
+    setShowCancellationModal(false);
+    setPendingStatus(null);
+    setFormData(prev => ({ ...prev, cancelled_at: '', cancellation_reason: '' }));
   };
 
   return (
@@ -368,24 +450,14 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
                   if (value.length === 10 && formData.policy_term) {
                     const parts = value.split('/');
                     if (parts.length === 3) {
-                      const startDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                      let expirationDate: Date;
-                      
-                      if (formData.policy_term === 'semiannual') {
-                        expirationDate = new Date(startDate);
-                        expirationDate.setMonth(startDate.getMonth() + 6);
-                      } else if (formData.policy_term === 'annual') {
-                        expirationDate = new Date(startDate);
-                        expirationDate.setFullYear(startDate.getFullYear() + 1);
-                      } else {
-                        return;
-                      }
-                      
-                      const expMonth = (expirationDate.getMonth() + 1).toString().padStart(2, '0');
-                      const expDay = expirationDate.getDate().toString().padStart(2, '0');
-                      const expYear = expirationDate.getFullYear();
-                      const formattedExpDate = `${expMonth}/${expDay}/${expYear}`;
-                      
+                      const startDate = new Date(
+                        parseInt(parts[2]),
+                        parseInt(parts[0]) - 1,
+                        parseInt(parts[1])
+                      );
+                      const term = parsePolicyTerm(formData.policy_term);
+                      const expirationDate = calcExpirationDate(startDate, term);
+                      const formattedExpDate = format(expirationDate, 'MM/dd/yyyy');
                       setFormData(prev => ({ ...prev, effective_date: value, expiration_date: formattedExpDate }));
                     }
                   }
@@ -457,6 +529,54 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
             </div>
           </div>
 
+          {/* Cancellation Info - Show if there's a scheduled cancellation */}
+          {formData.cancelled_at && (
+            <div className="border border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 rounded-md p-4 space-y-3">
+              <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                <CalendarIcon className="h-4 w-4" />
+                <span className="font-medium">Scheduled Cancellation</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="cancelled_at">Cancellation Date</Label>
+                  <Input
+                    id="cancelled_at"
+                    type="text"
+                    placeholder="MM/DD/YYYY"
+                    value={formData.cancelled_at}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      value = value.replace(/\D/g, '');
+                      if (value.length >= 3) {
+                        value = value.substring(0, 2) + '/' + value.substring(2);
+                      }
+                      if (value.length >= 6) {
+                        value = value.substring(0, 5) + '/' + value.substring(5, 9);
+                      }
+                      setFormData(prev => ({ ...prev, cancelled_at: value }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cancellation_reason">Reason</Label>
+                  <Input
+                    id="cancellation_reason"
+                    value={formData.cancellation_reason}
+                    onChange={(e) => setFormData(prev => ({ ...prev, cancellation_reason: e.target.value }))}
+                    placeholder="Optional reason for cancellation"
+                  />
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFormData(prev => ({ ...prev, cancelled_at: '', cancellation_reason: '', status: 'active' }))}
+              >
+                Remove Scheduled Cancellation
+              </Button>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
@@ -467,6 +587,60 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
           </div>
         </div>
       </DialogContent>
+
+      {/* Cancellation Date Modal */}
+      <AlertDialog open={showCancellationModal} onOpenChange={setShowCancellationModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Schedule Policy Cancellation</AlertDialogTitle>
+            <AlertDialogDescription>
+              When should this policy be cancelled? If you select a future date, the policy will remain active until that date.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="cancel_date_modal">Cancellation Date *</Label>
+              <Input
+                id="cancel_date_modal"
+                type="text"
+                placeholder="MM/DD/YYYY"
+                value={formData.cancelled_at}
+                onChange={(e) => {
+                  let value = e.target.value;
+                  value = value.replace(/\D/g, '');
+                  if (value.length >= 3) {
+                    value = value.substring(0, 2) + '/' + value.substring(2);
+                  }
+                  if (value.length >= 6) {
+                    value = value.substring(0, 5) + '/' + value.substring(5, 9);
+                  }
+                  setFormData(prev => ({ ...prev, cancelled_at: value }));
+                }}
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Select today for immediate cancellation, or a future date to schedule.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="cancel_reason_modal">Reason (optional)</Label>
+              <Input
+                id="cancel_reason_modal"
+                value={formData.cancellation_reason}
+                onChange={(e) => setFormData(prev => ({ ...prev, cancellation_reason: e.target.value }))}
+                placeholder="e.g., Non-payment, Moved out of state"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancellationCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancellationConfirm}>
+              Confirm Cancellation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

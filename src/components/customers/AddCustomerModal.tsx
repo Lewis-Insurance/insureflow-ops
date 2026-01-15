@@ -11,8 +11,31 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
+import { normalizePolicyType, getPolicyTypeLabel } from '@/lib/policyTypes';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
+
+/**
+ * Parse an insured name that may contain multiple people (e.g., "John Smith & Jane Smith")
+ * Returns the primary insured name and spouse name if detected
+ */
+function parseInsuredNames(fullName: string): { primary: string; spouse: string | null } {
+  if (!fullName) return { primary: '', spouse: null };
+
+  // Common separators for joint insureds
+  const separators = [' & ', ' and ', ' / ', ' AND ', ' And '];
+
+  for (const sep of separators) {
+    if (fullName.includes(sep)) {
+      const [first, second] = fullName.split(sep).map(n => n.trim());
+      if (first && second) {
+        return { primary: first, spouse: second };
+      }
+    }
+  }
+
+  return { primary: fullName.trim(), spouse: null };
+}
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Customer name is required').max(200, 'Name too long'),
@@ -289,7 +312,16 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
       // Auto-fill customer form
       const newFormData = { ...formData };
-      if (extracted.insured_name) newFormData.name = extracted.insured_name;
+      // Parse insured name - detect joint insureds (e.g., "John & Jane Smith")
+      if (extracted.insured_name) {
+        const names = parseInsuredNames(extracted.insured_name);
+        newFormData.name = names.primary;
+        if (names.spouse) {
+          newFormData.spouse_name = names.spouse;
+          // Auto-set to household if we detected a spouse
+          newFormData.type = 'household';
+        }
+      }
 
       // Try to get address from property object or direct fields
       const fullAddress = extracted.property?.address || extracted.insured_address || '';
@@ -334,24 +366,16 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       // AI returns 'carrier' not 'carrier_name'
       if (extracted.carrier) newPolicyData.carrier = extracted.carrier;
 
-      // Map line_of_business - check both line_of_business and document_type
+      // Map line_of_business - use centralized normalizePolicyType helper
       if (extracted.line_of_business) {
-        newPolicyData.line_of_business = extracted.line_of_business;
-      } else if (extracted.document_type) {
-        // Map document_type values to friendly line of business names
-        const docTypeMap: Record<string, string> = {
-          'auto_policy': 'Auto',
-          'auto': 'Auto',
-          'home_policy': 'Home',
-          'home': 'Home',
-          'homeowners': 'Home',
-          'commercial_policy': 'Commercial',
-          'commercial': 'Commercial',
-          'application': '', // Don't set LOB for generic applications
-        };
-        const mappedLob = docTypeMap[extracted.document_type.toLowerCase()];
-        if (mappedLob) {
-          newPolicyData.line_of_business = mappedLob;
+        const normalizedType = normalizePolicyType(extracted.line_of_business);
+        newPolicyData.line_of_business = normalizedType
+          ? getPolicyTypeLabel(normalizedType)
+          : extracted.line_of_business;
+      } else if (extracted.document_type && extracted.document_type.toLowerCase() !== 'application') {
+        const normalizedType = normalizePolicyType(extracted.document_type);
+        if (normalizedType) {
+          newPolicyData.line_of_business = getPolicyTypeLabel(normalizedType);
         }
       }
       if (extracted.effective_date) {
@@ -380,8 +404,9 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       }
       setPolicyData(newPolicyData);
 
-      // Enable policy creation if we extracted policy data
-      if (extracted.policy_number || extracted.carrier) {
+      // Enable policy creation only if we have BOTH required fields
+      // (matches save logic which requires both policy_number AND carrier)
+      if (extracted.policy_number && extracted.carrier) {
         setIncludePolicy(true);
       }
 
