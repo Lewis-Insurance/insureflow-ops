@@ -213,18 +213,30 @@ serve(async (req) => {
       throw new ValidationError('Invalid or expired token');
     }
 
-    // Get user's org_id
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+    // Get user's org_id from profiles table
+    const { data: profile } = await supabase
+      .from('profiles')
       .select('org_id')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile?.org_id) {
-      throw new ValidationError('User organization not found');
+    // If profile doesn't have org_id, try getting from agency_workspace_memberships
+    let orgId = profile?.org_id;
+    if (!orgId) {
+      const { data: membership } = await supabase
+        .from('agency_workspace_memberships')
+        .select('agency_workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+
+      orgId = membership?.agency_workspace_id;
     }
 
-    const orgId = profile.org_id;
+    if (!orgId) {
+      throw new ValidationError('User organization not found');
+    }
 
     // Check content type for CSV upload
     const contentType = req.headers.get('Content-Type') || '';

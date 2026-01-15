@@ -88,7 +88,7 @@ export default function BankReconciliation() {
 
   const handleMatch = async (lineId: string, depositId: string) => {
     try {
-      await matchDeposit.mutateAsync({ lineId, depositId });
+      await matchDeposit.mutateAsync({ line_id: lineId, deposit_id: depositId });
       setShowMatchDialog(false);
       setSelectedLine(null);
     } catch (error) {
@@ -98,7 +98,7 @@ export default function BankReconciliation() {
 
   const handleUnmatch = async (lineId: string) => {
     try {
-      await unmatchDeposit.mutateAsync({ lineId });
+      await unmatchDeposit.mutateAsync({ line_id: lineId });
     } catch (error) {
       console.error('Failed to unmatch:', error);
     }
@@ -106,7 +106,7 @@ export default function BankReconciliation() {
 
   const handleExclude = async (lineId: string, reason: string) => {
     try {
-      await excludeLine.mutateAsync({ lineId, reason });
+      await excludeLine.mutateAsync({ line_id: lineId, exclude_reason: reason });
     } catch (error) {
       console.error('Failed to exclude:', error);
     }
