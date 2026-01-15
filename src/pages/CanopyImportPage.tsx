@@ -202,6 +202,43 @@ export default function CanopyImportPage() {
       firstName = firstName || 'Unknown';
       lastName = lastName || 'Customer';
 
+      // Get phone number with fallbacks
+      let phone = metadata?.consumer_phone || null;
+
+      // If no phone in metadata, check canopy_named_insureds
+      if (!phone) {
+        const policyIds = policies?.map(p => p.id) || [];
+        if (policyIds.length > 0) {
+          const { data: namedInsureds } = await supabase
+            .from('canopy_named_insureds')
+            .select('contact_phone')
+            .in('policy_id', policyIds)
+            .eq('is_primary', true)
+            .not('contact_phone', 'is', null)
+            .limit(1);
+
+          if (namedInsureds?.[0]?.contact_phone) {
+            phone = namedInsureds[0].contact_phone;
+          }
+        }
+      }
+
+      // Also check raw_data in policies for phone fields
+      if (!phone) {
+        for (const policy of policies || []) {
+          const rawData = policy.named_insureds as any[];
+          if (rawData && rawData.length > 0) {
+            for (const insured of rawData) {
+              if (insured.phone || insured.contact_phone || insured.mobile_phone) {
+                phone = insured.phone || insured.contact_phone || insured.mobile_phone;
+                break;
+              }
+            }
+            if (phone) break;
+          }
+        }
+      }
+
       // Create the lead
       const { data: newLead, error: leadError } = await supabase
         .from('leads')
@@ -209,7 +246,7 @@ export default function CanopyImportPage() {
           first_name: firstName,
           last_name: lastName,
           email: metadata?.consumer_email || null,
-          phone: metadata?.consumer_phone || null,
+          phone: phone,
           insurance_types: insuranceTypes,
           lead_score: 75,
           status: 'qualified',

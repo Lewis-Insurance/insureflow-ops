@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, Users, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,14 +20,27 @@ export default function CustomersPage() {
   const { customers, loading, fetchCustomers } = useUnifiedCustomers();
   const { tags, seedDefaultTags } = useTags();  // Remove mock account ID for now
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleCustomerAdded = () => {
     fetchCustomers(searchQuery); // Refresh the customer list
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    fetchCustomers(query);
-  };
+  // Debounced search - waits 300ms after user stops typing
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchCustomers(searchQuery);
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   if (loading) {
     return (
@@ -90,7 +103,7 @@ export default function CustomersPage() {
             <Input
               placeholder="Search customers..."
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8"
             />
           </div>

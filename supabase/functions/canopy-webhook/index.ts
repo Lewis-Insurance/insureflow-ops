@@ -2238,10 +2238,15 @@ async function upsertNamedInsured(
     city: insured.address?.city,
     state: insured.address?.state,
     zip: insured.address?.zip,
+    // Contact info - check multiple possible field names
+    contact_phone: insured.phone || insured.contact_phone || insured.mobile_phone || insured.home_phone || null,
+    contact_email: insured.email || insured.contact_email || null,
+    contact_name: insured.contact_name || insured.contact || null,
     interest_type: insured.interest_type,
     is_mortgagee: insured.is_mortgagee || false,
     is_loss_payee: insured.is_loss_payee || false,
     is_additional_insured: insured.is_additional || insured.is_additional_insured || false,
+    is_primary: insured.is_primary || insured.is_named_insured || (!insured.is_additional && !insured.is_additional_insured) || false,
     endorsement_number: insured.endorsement_number,
     raw_data: insured,
   };
@@ -2385,6 +2390,23 @@ async function createLeadFromCanopyPull(
     if (driver) {
       firstName = firstName || driver.first_name;
       lastName = lastName || driver.last_name;
+    }
+  }
+
+  // Fallback: Get phone from canopy_named_insureds if still missing
+  if (!phone) {
+    const { data: namedInsureds } = await supabase.from('canopy_named_insureds')
+      .select(`
+        contact_phone,
+        canopy_policies!inner (pull_id)
+      `)
+      .eq('canopy_policies.pull_id', pullId)
+      .eq('is_primary', true)
+      .not('contact_phone', 'is', null)
+      .limit(1);
+
+    if (namedInsureds?.[0]?.contact_phone) {
+      phone = namedInsureds[0].contact_phone;
     }
   }
 
