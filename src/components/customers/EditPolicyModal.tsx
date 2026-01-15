@@ -16,11 +16,19 @@ import { CalendarIcon } from 'lucide-react';
 // Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
 const formatDateForDisplay = (dateStr: string): string => {
   if (!dateStr) return '';
+  // Parse YYYY-MM-DD manually to avoid timezone issues
+  // new Date('2026-01-15') interprets as UTC midnight, which shifts in local timezone
+  const parts = dateStr.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${month}/${day}/${year}`;
+  }
+  // Fallback for other formats (shouldn't happen but just in case)
   const date = new Date(dateStr);
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  const year = date.getFullYear();
-  return `${month}/${day}/${year}`;
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const d = date.getDate().toString().padStart(2, '0');
+  const y = date.getFullYear();
+  return `${m}/${d}/${y}`;
 };
 
 // Helper function to convert MM/DD/YYYY to YYYY-MM-DD for storage
