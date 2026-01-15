@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
+import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
+import { format } from 'date-fns';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 
@@ -417,19 +419,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
 
       if (effectiveDate && policyTerm) {
         const startDate = new Date(effectiveDate);
-        let expirationDate: Date;
-
-        if (policyTerm === 'semiannual') {
-          expirationDate = new Date(startDate);
-          expirationDate.setMonth(startDate.getMonth() + 6);
-        } else if (policyTerm === 'annual') {
-          expirationDate = new Date(startDate);
-          expirationDate.setFullYear(startDate.getFullYear() + 1);
-        } else {
-          return;
-        }
-
-        const formattedDate = expirationDate.toISOString().split('T')[0];
+        const term = parsePolicyTerm(policyTerm);
+        const expirationDate = calcExpirationDate(startDate, term);
+        const formattedDate = format(expirationDate, 'yyyy-MM-dd');
         setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
       }
     }

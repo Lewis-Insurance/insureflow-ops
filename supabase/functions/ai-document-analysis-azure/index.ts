@@ -266,7 +266,14 @@ Return ONLY valid JSON:
   "key_details": []
 }
 
-IMPORTANT: Look carefully for phone numbers, email addresses, and the insured's mailing address. These are often at the top of applications or dec pages. Phone numbers may be formatted as (XXX) XXX-XXXX or XXX-XXX-XXXX.`;
+IMPORTANT INSTRUCTIONS:
+- "insured_phone" must be the CUSTOMER's personal phone number, NOT the insurance agency or producer phone
+- Agency/Producer phone numbers are typically at the top of the document near the agency name, logo, or "Agency" label
+- Customer phone is usually in the "Named Insured", "Applicant", or "Insured Information" section
+- If you cannot clearly distinguish between agency and customer phone, leave "insured_phone" EMPTY
+- Similarly for email: only use customer email, not agency email addresses
+- Phone numbers may be formatted as (XXX) XXX-XXXX, XXX-XXX-XXXX, or XXX.XXX.XXXX
+- Look for the insured's mailing address in the Named Insured or Applicant section, not the agency address`;
 
       const aiResponse = await fetch(
         `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,

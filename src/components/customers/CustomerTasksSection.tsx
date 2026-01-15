@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, CheckSquare, Calendar, User } from 'lucide-react';
+import { Plus, CheckSquare, Calendar, User, CheckCircle2 } from 'lucide-react';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { TaskDetail } from '@/components/tasks/TaskDetail';
@@ -45,6 +45,14 @@ export function CustomerTasksSection({ accountId }: CustomerTasksSectionProps) {
     setEditingTask(selectedTask);
     setTaskDetailOpen(false);
     setTaskFormOpen(true);
+  };
+
+  const handleQuickComplete = async (e: React.MouseEvent, task: Task) => {
+    e.stopPropagation(); // Prevent opening task detail
+    await updateTask(task.id, {
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -128,6 +136,18 @@ export function CustomerTasksSection({ accountId }: CustomerTasksSectionProps) {
                       )}
                     </div>
                   </div>
+                  {/* Quick Complete Button */}
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-2 shrink-0 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400"
+                      onClick={(e) => handleQuickComplete(e, task)}
+                      title="Mark Complete"
+                    >
+                      <CheckCircle2 className="h-5 w-5" />
+                    </Button>
+                  )}
                 </div>
               ))}
 
