@@ -418,7 +418,10 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
       const policyTerm = field === 'policy_term' ? value : formData.policy_term;
 
       if (effectiveDate && policyTerm) {
-        const startDate = new Date(effectiveDate);
+        // Parse date parts manually to avoid timezone issues
+        // new Date('2026-01-15') interprets as UTC midnight, which shifts in local timezone
+        const [year, month, day] = effectiveDate.split('-').map(Number);
+        const startDate = new Date(year, month - 1, day); // month is 0-indexed
         const term = parsePolicyTerm(policyTerm);
         const expirationDate = calcExpirationDate(startDate, term);
         const formattedDate = format(expirationDate, 'yyyy-MM-dd');
