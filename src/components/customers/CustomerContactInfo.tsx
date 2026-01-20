@@ -5,6 +5,7 @@ import { Mail, Phone, MapPin, Building, Calendar, FileText, User, Edit, MessageS
 import { EditContactInfoModal } from './EditContactInfoModal';
 import { useState } from 'react';
 import { SMSComposerModal } from '@/components/communications/SMSComposerModal';
+import { formatInsuredDisplay } from '@/lib/insuredNames';
 
 interface CustomerAccount {
   id: string;
@@ -26,6 +27,13 @@ interface CustomerAccount {
   notes?: string;
   created_at: string;
   updated_at: string;
+  // Trust/Estate fields
+  primary_entity_type?: 'trust' | 'estate' | null;
+  primary_entity_name?: string;
+  trustee_name?: string;
+  trust_date?: string;
+  secondary_entity_type?: 'trust' | 'estate' | null;
+  secondary_entity_name?: string;
 }
 
 interface CustomerContactInfoProps {
@@ -36,6 +44,25 @@ interface CustomerContactInfoProps {
 export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInfoProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [smsModalOpen, setSmsModalOpen] = useState(false);
+
+  // Format primary insured display (may include trust/estate)
+  const primaryInsuredDisplay = formatInsuredDisplay({
+    personName: account.name || null,
+    entityType: account.primary_entity_type || null,
+    entityName: account.primary_entity_name || null,
+    trusteeName: account.trustee_name || null,
+  });
+
+  // Format secondary insured display (may include trust/estate)
+  const secondaryInsuredDisplay = (account.spouse_name || account.secondary_entity_name)
+    ? formatInsuredDisplay({
+        personName: account.spouse_name || null,
+        entityType: account.secondary_entity_type || null,
+        entityName: account.secondary_entity_name || null,
+        trusteeName: null,
+      })
+    : null;
+
   const formatAddress = () => {
     const parts = [
       account.address_line1,
@@ -64,12 +91,12 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              {account.type === 'household' && account.spouse_name ? 'Named Insureds' : 'Customer Name'}
+              {account.type === 'household' && secondaryInsuredDisplay ? 'Named Insureds' : 'Customer Name'}
             </label>
             <p className="text-sm font-semibold">
-              {account.name}
-              {account.type === 'household' && account.spouse_name && (
-                <span className="text-muted-foreground font-normal"> & {account.spouse_name}</span>
+              {primaryInsuredDisplay}
+              {account.type === 'household' && secondaryInsuredDisplay && (
+                <span className="text-muted-foreground font-normal"> & {secondaryInsuredDisplay}</span>
               )}
             </p>
           </div>

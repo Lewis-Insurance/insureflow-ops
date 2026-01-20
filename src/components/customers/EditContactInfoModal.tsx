@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { type EntityType } from '@/lib/insuredNames';
 import { z } from 'zod';
 
 const accountSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
+  name: z.string().max(200, 'Name too long').optional().or(z.literal('')),
   spouse_name: z.string().max(200, 'Spouse name too long').optional().or(z.literal('')),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
@@ -23,6 +25,15 @@ const accountSchema = z.object({
   source: z.string().optional(),
   lead_source_detail: z.string().optional(),
   notes: z.string().optional(),
+  // Trust/Estate fields
+  hasPrimaryEntity: z.boolean().optional(),
+  primary_entity_type: z.enum(['trust', 'estate']).nullable().optional(),
+  primary_entity_name: z.string().max(200).optional().or(z.literal('')),
+  trustee_name: z.string().max(200).optional().or(z.literal('')),
+  trust_date: z.string().optional().or(z.literal('')),
+  hasSecondaryEntity: z.boolean().optional(),
+  secondary_entity_type: z.enum(['trust', 'estate']).nullable().optional(),
+  secondary_entity_name: z.string().max(200).optional().or(z.literal('')),
 });
 
 interface Account {
@@ -43,6 +54,13 @@ interface Account {
   source?: string;
   lead_source_detail?: string;
   notes?: string;
+  // Trust/Estate fields
+  primary_entity_type?: 'trust' | 'estate' | null;
+  primary_entity_name?: string;
+  trustee_name?: string;
+  trust_date?: string;
+  secondary_entity_type?: 'trust' | 'estate' | null;
+  secondary_entity_name?: string;
 }
 
 interface EditContactInfoModalProps {
@@ -67,6 +85,15 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     source: '',
     lead_source_detail: '',
     notes: '',
+    // Trust/Estate fields
+    hasPrimaryEntity: false,
+    primary_entity_type: null as EntityType,
+    primary_entity_name: '',
+    trustee_name: '',
+    trust_date: '',
+    hasSecondaryEntity: false,
+    secondary_entity_type: null as EntityType,
+    secondary_entity_name: '',
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -74,6 +101,9 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
   useEffect(() => {
     if (account && open) {
+      const hasPrimaryEntity = !!(account.primary_entity_type && account.primary_entity_name);
+      const hasSecondaryEntity = !!(account.secondary_entity_type && account.secondary_entity_name);
+
       setFormData({
         name: account.name || '',
         spouse_name: account.spouse_name || '',
@@ -88,6 +118,15 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         source: account.source || '',
         lead_source_detail: account.lead_source_detail || '',
         notes: account.notes || '',
+        // Trust/Estate fields
+        hasPrimaryEntity,
+        primary_entity_type: account.primary_entity_type || null,
+        primary_entity_name: account.primary_entity_name || '',
+        trustee_name: account.trustee_name || '',
+        trust_date: account.trust_date || '',
+        hasSecondaryEntity,
+        secondary_entity_type: account.secondary_entity_type || null,
+        secondary_entity_name: account.secondary_entity_name || '',
       });
       setErrors({});
     }
@@ -96,6 +135,31 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
   const validateForm = () => {
     try {
       accountSchema.parse(formData);
+      const newErrors: Record<string, string> = {};
+
+      // Custom validation: require either name OR entity name
+      const hasName = formData.name.trim().length > 0;
+      const hasEntity = formData.hasPrimaryEntity && formData.primary_entity_name.trim().length > 0;
+
+      if (!hasName && !hasEntity) {
+        newErrors.name = 'Either customer name or trust/estate name is required';
+      }
+
+      // If entity toggle is on, require entity name
+      if (formData.hasPrimaryEntity && !formData.primary_entity_name.trim()) {
+        newErrors.primary_entity_name = 'Trust/Estate name is required';
+      }
+
+      // If secondary entity toggle is on, require secondary entity name
+      if (formData.hasSecondaryEntity && !formData.secondary_entity_name.trim()) {
+        newErrors.secondary_entity_name = 'Trust/Estate name is required';
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return false;
+      }
+
       setErrors({});
       return true;
     } catch (error) {
@@ -114,11 +178,11 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
   async function handleSave() {
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       const updateData = {
-        name: formData.name.trim(),
+        name: formData.name.trim() || null,
         spouse_name: account.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
@@ -131,6 +195,14 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         source: formData.source.trim() || null,
         lead_source_detail: formData.lead_source_detail.trim() || null,
         notes: formData.notes.trim() || null,
+        // Trust/Estate fields for primary insured
+        primary_entity_type: formData.hasPrimaryEntity ? formData.primary_entity_type : null,
+        primary_entity_name: formData.hasPrimaryEntity && formData.primary_entity_name.trim() ? formData.primary_entity_name.trim() : null,
+        trustee_name: formData.hasPrimaryEntity && formData.primary_entity_type === 'trust' && formData.trustee_name.trim() ? formData.trustee_name.trim() : null,
+        trust_date: formData.hasPrimaryEntity && formData.primary_entity_type === 'trust' && formData.trust_date ? formData.trust_date : null,
+        // Trust/Estate fields for secondary insured
+        secondary_entity_type: account.type === 'household' && formData.hasSecondaryEntity ? formData.secondary_entity_type : null,
+        secondary_entity_name: account.type === 'household' && formData.hasSecondaryEntity && formData.secondary_entity_name.trim() ? formData.secondary_entity_name.trim() : null,
       };
 
       const { error } = await supabase
@@ -181,7 +253,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div className={account.type === 'household' ? 'grid grid-cols-2 gap-4' : ''}>
             <div>
-              <Label htmlFor="name">Customer Name *</Label>
+              <Label htmlFor="name">{formData.hasPrimaryEntity ? 'Individual Name (optional)' : 'Customer Name *'}</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -192,16 +264,151 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
               {errors.name && (
                 <p className="text-sm text-destructive mt-1">{errors.name}</p>
               )}
+
+              {/* Trust/Estate Toggle for Primary Insured */}
+              <div className="flex items-center gap-2 mt-3">
+                <Switch
+                  id="edit-primary-entity-toggle"
+                  checked={formData.hasPrimaryEntity}
+                  onCheckedChange={(checked) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      hasPrimaryEntity: checked,
+                      primary_entity_type: checked ? (prev.primary_entity_type || 'trust') : null,
+                      primary_entity_name: checked ? prev.primary_entity_name : '',
+                      trustee_name: checked ? prev.trustee_name : '',
+                      trust_date: checked ? prev.trust_date : '',
+                    }));
+                  }}
+                />
+                <Label htmlFor="edit-primary-entity-toggle" className="text-sm font-normal">Add Trust or Estate</Label>
+              </div>
+
+              {formData.hasPrimaryEntity && (
+                <div className="space-y-3 pl-4 border-l-2 border-muted mt-3">
+                  <div>
+                    <Label htmlFor="edit_primary_entity_type">Entity Type *</Label>
+                    <Select
+                      value={formData.primary_entity_type || 'trust'}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, primary_entity_type: value as EntityType }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="trust">Trust</SelectItem>
+                        <SelectItem value="estate">Estate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_primary_entity_name">
+                      {formData.primary_entity_type === 'estate' ? 'Estate Name *' : 'Trust Name *'}
+                    </Label>
+                    <Input
+                      id="edit_primary_entity_name"
+                      value={formData.primary_entity_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, primary_entity_name: e.target.value }))}
+                      placeholder={formData.primary_entity_type === 'estate'
+                        ? 'Estate of John Smith'
+                        : 'The Smith Family Trust'}
+                      className={errors.primary_entity_name ? 'border-destructive' : ''}
+                    />
+                    {errors.primary_entity_name && (
+                      <p className="text-sm text-destructive mt-1">{errors.primary_entity_name}</p>
+                    )}
+                  </div>
+
+                  {formData.primary_entity_type === 'trust' && (
+                    <>
+                      <div>
+                        <Label htmlFor="edit_trustee_name">Trustee Name</Label>
+                        <Input
+                          id="edit_trustee_name"
+                          value={formData.trustee_name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, trustee_name: e.target.value }))}
+                          placeholder="Brian Lewis, Trustee"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_trust_date">Trust Date</Label>
+                        <Input
+                          id="edit_trust_date"
+                          type="date"
+                          value={formData.trust_date}
+                          onChange={(e) => setFormData(prev => ({ ...prev, trust_date: e.target.value }))}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {account.type === 'household' && (
               <div>
-                <Label htmlFor="spouse_name">Spouse / Co-Insured</Label>
+                <Label htmlFor="spouse_name">{formData.hasSecondaryEntity ? 'Spouse Name (optional)' : 'Spouse / Co-Insured'}</Label>
                 <Input
                   id="spouse_name"
                   value={formData.spouse_name}
                   onChange={(e) => handleInputChange('spouse_name', e.target.value)}
                   placeholder="Second Named Insured"
                 />
+
+                {/* Trust/Estate Toggle for Secondary Insured */}
+                <div className="flex items-center gap-2 mt-3">
+                  <Switch
+                    id="edit-secondary-entity-toggle"
+                    checked={formData.hasSecondaryEntity}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        hasSecondaryEntity: checked,
+                        secondary_entity_type: checked ? (prev.secondary_entity_type || 'trust') : null,
+                        secondary_entity_name: checked ? prev.secondary_entity_name : '',
+                      }));
+                    }}
+                  />
+                  <Label htmlFor="edit-secondary-entity-toggle" className="text-sm font-normal">Add Trust or Estate</Label>
+                </div>
+
+                {formData.hasSecondaryEntity && (
+                  <div className="space-y-3 pl-4 border-l-2 border-muted mt-3">
+                    <div>
+                      <Label htmlFor="edit_secondary_entity_type">Entity Type *</Label>
+                      <Select
+                        value={formData.secondary_entity_type || 'trust'}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, secondary_entity_type: value as EntityType }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="trust">Trust</SelectItem>
+                          <SelectItem value="estate">Estate</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit_secondary_entity_name">
+                        {formData.secondary_entity_type === 'estate' ? 'Estate Name *' : 'Trust Name *'}
+                      </Label>
+                      <Input
+                        id="edit_secondary_entity_name"
+                        value={formData.secondary_entity_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, secondary_entity_name: e.target.value }))}
+                        placeholder={formData.secondary_entity_type === 'estate'
+                          ? 'Estate of Jane Smith'
+                          : 'The Smith Family Trust'}
+                        className={errors.secondary_entity_name ? 'border-destructive' : ''}
+                      />
+                      {errors.secondary_entity_name && (
+                        <p className="text-sm text-destructive mt-1">{errors.secondary_entity_name}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
