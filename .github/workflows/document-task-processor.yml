@@ -20,6 +20,11 @@ on:
 env:
   SUPABASE_URL: https://lrqajzwcmdwahnjyidgv.supabase.co
 
+# Prevent multiple runs from overlapping
+concurrency:
+  group: document-processing
+  cancel-in-progress: false
+
 jobs:
   process-documents:
     name: Process Document Queue
