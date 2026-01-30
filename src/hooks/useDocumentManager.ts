@@ -307,12 +307,16 @@ export function useDocumentManager(accountId?: string) {
     }
 
     try {
-      const { error } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', documentId);
+      // Use soft delete RPC instead of hard delete
+      // This sets deleted_at timestamp and logs to deletion_audit_log
+      const { data, error } = await supabase.rpc('perform_soft_delete', {
+        p_table_name: 'documents',
+        p_record_id: documentId,
+        p_reason: 'User deleted document'
+      });
 
       if (error) throw error;
+      if (!data) throw new Error('Document not found or already deleted');
 
       toast({
         title: "Success",
