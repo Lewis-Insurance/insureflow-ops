@@ -96,39 +96,50 @@ export function useDeleteDocument() {
 
   return useMutation({
     mutationFn: async (documentId: string) => {
-      // First get the document to find the storage path
-      const { data: doc, error: fetchError } = await supabase
-        .from('documents')
-        .select('storage_path')
-        .eq('id', documentId)
-        .single();
-
-      if (fetchError) throw new Error(`Failed to find document: ${fetchError.message}`);
-
-      // Delete from storage if path exists
-      if (doc?.storage_path) {
-        const { error: storageError } = await supabase.storage
-          .from('documents')
-          .remove([doc.storage_path]);
-
-        if (storageError) {
-          logger.warn('Failed to delete from storage:', storageError);
-          // Continue with database deletion even if storage fails
-        }
-      }
-
-      // Delete from database
-      const { error } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', documentId);
+      // Use soft delete RPC instead of hard delete
+      // This sets deleted_at timestamp and logs to deletion_audit_log
+      const { data, error } = await supabase.rpc('perform_soft_delete', {
+        p_table_name: 'documents',
+        p_record_id: documentId,
+        p_reason: 'User deleted document'
+      });
 
       if (error) throw new Error(`Failed to delete document: ${error.message}`);
+      if (!data) throw new Error('Document not found or already deleted');
     },
     onSuccess: () => {
       // Invalidate all document queries regardless of filters
       queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
       toast({ title: 'Document deleted', description: 'The document has been removed.' });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useRestoreDocument() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (documentId: string) => {
+      // Restore soft-deleted document (admin only)
+      const { data, error } = await supabase.rpc('restore_soft_deleted', {
+        p_table_name: 'documents',
+        p_record_id: documentId
+      });
+
+      if (error) throw new Error(`Failed to restore document: ${error.message}`);
+      if (!data) throw new Error('Document not found or not deleted');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'], refetchType: 'all' });
+      toast({ title: 'Document restored', description: 'The document has been restored.' });
     },
     onError: (error) => {
       toast({
