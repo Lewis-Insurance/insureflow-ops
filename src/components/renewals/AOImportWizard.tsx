@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { useImportAORenewals, type AORenewal } from "@/hooks/useAORenewals";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { readWorkbookFromBuffer, worksheetToJson, parseExcelDate } from "@/lib/excel-utils";
 
 type ImportStep = "upload" | "preview" | "import" | "complete";
 
@@ -80,19 +80,14 @@ export const AOImportWizard = () => {
 
     // Parse the file
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: "binary", cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        const workbook = await readWorkbookFromBuffer(new Uint8Array(data as ArrayBuffer));
+        const worksheet = workbook.worksheets[0];
         
         // Convert to JSON - this gets all rows
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 1,
-          raw: false,
-          dateNF: 'yyyy-mm-dd'
-        });
+        const jsonData = worksheetToJson(worksheet, { header: 1 });
 
         if (jsonData.length === 0) {
           toast.error("The file appears to be empty");
@@ -173,7 +168,7 @@ export const AOImportWizard = () => {
                 }
               } else if (typeof value === 'number') {
                 // Excel date serial number
-                const date = XLSX.SSF.parse_date_code(value);
+                const date = parseExcelDate(value);
                 renewal.renewal_date = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
               }
             } else if (headerUpper === 'EXP PREM' || headerUpper === 'PREMIUM') {
