@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
 
 export interface AtRiskRenewal {
   id: string;
@@ -63,12 +62,12 @@ export const useAtRiskRenewals = () => {
           .order('risk_score', { ascending: false });
 
         if (error) {
-          logger.warn('Error fetching at-risk renewals:', error.message);
+          console.warn('Error fetching at-risk renewals:', error.message);
           return [] as AtRiskRenewal[];
         }
         return (data || []) as AtRiskRenewal[];
       } catch (err) {
-        logger.error('Error in at-risk renewals:', err);
+        console.error('Error in at-risk renewals:', err);
         return [] as AtRiskRenewal[];
       }
     },
@@ -89,7 +88,7 @@ export const useRenewalIntelligenceSummary = () => {
 
         // If table doesn't exist or error, return empty summary
         if (error) {
-          logger.warn('Error fetching renewals for intelligence:', error.message);
+          console.warn('Error fetching renewals for intelligence:', error.message);
           return {
             total_renewals: 0,
             renewals_next_30_days: 0,
@@ -123,7 +122,7 @@ export const useRenewalIntelligenceSummary = () => {
           activeCampaigns = campaigns?.length || 0;
         } catch {
           // renewal_campaigns table may not exist
-          logger.warn('renewal_campaigns table not found');
+          console.warn('renewal_campaigns table not found');
         }
 
         const summary: RenewalIntelligenceSummary = {
@@ -141,7 +140,7 @@ export const useRenewalIntelligenceSummary = () => {
 
         return summary;
       } catch (err) {
-        logger.error('Error in renewal intelligence summary:', err);
+        console.error('Error in renewal intelligence summary:', err);
         // Return empty summary on error
         return {
           total_renewals: 0,
@@ -158,21 +157,33 @@ export const useRenewalIntelligenceSummary = () => {
   });
 };
 
-// Bulk calculate risk scores
+// Bulk calculate risk scores - calls the database function directly
 export const useBulkCalculateRisk = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('calculate-renewal-risk', {
-        body: { bulk: true },
+      // Call the database function that syncs policies, aggregates indicators, and calculates risk
+      const { data, error } = await supabase.rpc('refresh_renewal_intelligence', {
+        days_ahead: 90 // Sync policies expiring in next 90 days
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error refreshing renewal intelligence:', error);
+        throw error;
+      }
+
       return data;
     },
-    onSuccess: () => {
-      toast.success('Risk scores recalculated for all renewals');
+    onSuccess: (data) => {
+      const result = data?.[0];
+      if (result) {
+        toast.success(
+          `Refreshed ${result.policies_synced} renewals: ${result.critical_risk} critical, ${result.high_risk} high, ${result.medium_risk} medium, ${result.low_risk} low`
+        );
+      } else {
+        toast.success('Risk scores recalculated for all renewals');
+      }
       queryClient.invalidateQueries({ queryKey: ['renewals'] });
       queryClient.invalidateQueries({ queryKey: ['at-risk-renewals'] });
       queryClient.invalidateQueries({ queryKey: ['renewal-intelligence-summary'] });
@@ -189,6 +200,8 @@ export const useCalculateRenewalRisk = () => {
 
   return useMutation({
     mutationFn: async (renewalId: string) => {
+      // For single renewal, we can still use the edge function if available
+      // or just trigger a full refresh (simpler approach)
       const { data, error } = await supabase.functions.invoke('calculate-renewal-risk', {
         body: { renewal_id: renewalId },
       });
@@ -204,6 +217,37 @@ export const useCalculateRenewalRisk = () => {
     },
     onError: (error: Error) => {
       toast.error(`Failed to calculate risk: ${error.message}`);
+    },
+  });
+};
+
+// Sync policies to renewals table without calculating risk
+export const useSyncPoliciesToRenewals = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (daysAhead: number = 90) => {
+      const { data, error } = await supabase.rpc('sync_policies_to_renewals', {
+        days_ahead: daysAhead
+      });
+
+      if (error) {
+        console.error('Error syncing policies to renewals:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      const result = data?.[0];
+      if (result) {
+        toast.success(`Synced ${result.synced_count} policies (${result.new_count} new, ${result.updated_count} updated)`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['renewal-intelligence-summary'] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to sync policies: ${error.message}`);
     },
   });
 };

@@ -69,16 +69,9 @@ import {
   type AORenewal,
 } from "@/hooks/useAORenewals";
 import { useMyAORenewalsCount } from "@/hooks/useMyAORenewals";
-import { useProfiles } from "@/hooks/useProfiles";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
-
-// Status view types
-type StatusView = 'in_progress' | 'moved' | 'lost' | 'cancelled';
-
-// Statuses shown in "In Progress" view (excludes terminal statuses)
-const IN_PROGRESS_STATUSES: AORenewalStatus[] = ['pending', 'contacted', 'quoted', 'renewed'];
 
 export default function AORenewalsPage() {
   const navigate = useNavigate();
@@ -90,9 +83,6 @@ export default function AORenewalsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
   const [showMyAssignments, setShowMyAssignments] = useState(false);
-  const [showNext30Days, setShowNext30Days] = useState(false);
-  const [showHighPriority, setShowHighPriority] = useState(false);
-  const [statusView, setStatusView] = useState<StatusView>('in_progress');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get current user ID
@@ -117,16 +107,8 @@ export default function AORenewalsPage() {
   const handleToggleMyAssignments = () => {
     const newValue = !showMyAssignments;
     setShowMyAssignments(newValue);
-    // Clear other metric filters when activating this one
-    if (newValue) {
-      setShowNext30Days(false);
-      setShowHighPriority(false);
-    }
     if (newValue && currentUserId) {
-      setFilters((prev) => {
-        const { renewal_date_from, renewal_date_to, priority, ...rest } = prev;
-        return { ...rest, assigned_to: currentUserId };
-      });
+      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
       setSearchParams({ assigned: "me" });
     } else {
       setFilters((prev) => {
@@ -137,74 +119,10 @@ export default function AORenewalsPage() {
     }
   };
 
-  // Toggle next 30 days filter
-  const handleToggleNext30Days = () => {
-    const newValue = !showNext30Days;
-    setShowNext30Days(newValue);
-    // Clear other metric filters when activating this one
-    if (newValue) {
-      setShowMyAssignments(false);
-      setShowHighPriority(false);
-    }
-    if (newValue) {
-      const today = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(today.getDate() + 30);
-      setFilters((prev) => {
-        const { assigned_to, priority, ...rest } = prev;
-        return {
-          ...rest,
-          renewal_date_from: today.toISOString().split('T')[0],
-          renewal_date_to: thirtyDaysFromNow.toISOString().split('T')[0],
-        };
-      });
-      setSearchParams({ filter: "30days" });
-    } else {
-      setFilters((prev) => {
-        const { renewal_date_from, renewal_date_to, ...rest } = prev;
-        return rest;
-      });
-      setSearchParams({});
-    }
-  };
-
-  // Toggle high priority filter
-  const handleToggleHighPriority = () => {
-    const newValue = !showHighPriority;
-    setShowHighPriority(newValue);
-    // Clear other metric filters when activating this one
-    if (newValue) {
-      setShowMyAssignments(false);
-      setShowNext30Days(false);
-    }
-    if (newValue) {
-      setFilters((prev) => {
-        const { assigned_to, renewal_date_from, renewal_date_to, ...rest } = prev;
-        return { ...rest, priority: ['urgent', 'high'] };
-      });
-      setSearchParams({ filter: "high-priority" });
-    } else {
-      setFilters((prev) => {
-        const { priority, ...rest } = prev;
-        return rest;
-      });
-      setSearchParams({});
-    }
-  };
-
-  // Build filters based on statusView
-  const viewFilters: AORenewalFilters = {
-    ...filters,
-    status: statusView === 'in_progress'
-      ? IN_PROGRESS_STATUSES
-      : [statusView],
-  };
-
   // Queries
-  const { data: renewals = [], isLoading } = useAORenewals(viewFilters);
+  const { data: renewals = [], isLoading } = useAORenewals(filters);
   const { data: stats } = useAORenewalsStats();
   const { data: myStats } = useMyAORenewalsCount();
-  const { profiles } = useProfiles();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
@@ -440,23 +358,11 @@ export default function AORenewalsPage() {
               </CardContent>
             </Card>
 
-            <Card
-              className={`cursor-pointer transition-all ${
-                showNext30Days
-                  ? "ring-2 ring-primary bg-primary/5"
-                  : "hover:bg-muted/50"
-              }`}
-              onClick={handleToggleNext30Days}
-            >
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Next 30 Days
-                  {showNext30Days && (
-                    <Badge variant="secondary" className="ml-auto text-xs">
-                      Active
-                    </Badge>
-                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -467,31 +373,19 @@ export default function AORenewalsPage() {
               </CardContent>
             </Card>
 
-            <Card
-              className={`cursor-pointer transition-all ${
-                showHighPriority
-                  ? "ring-2 ring-primary bg-primary/5"
-                  : "hover:bg-muted/50"
-              }`}
-              onClick={handleToggleHighPriority}
-            >
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
-                  High Priority
-                  {showHighPriority && (
-                    <Badge variant="secondary" className="ml-auto text-xs">
-                      Active
-                    </Badge>
-                  )}
+                  Urgent
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {stats.by_priority.urgent + stats.by_priority.high}
+                  {stats.upcoming_5_days}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Require attention
+                  Due within 5 days
                 </p>
               </CardContent>
             </Card>
@@ -525,42 +419,6 @@ export default function AORenewalsPage() {
             </Card>
           </div>
         )}
-
-        {/* Status View Toggle */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setStatusView('in_progress')}
-            className={`gap-2 ${statusView === 'in_progress' ? 'bg-green-600/20 border-green-500 text-green-400 hover:bg-green-600/30' : 'hover:bg-green-600/10 hover:border-green-500/50'}`}
-          >
-            <Clock className="h-4 w-4" />
-            In Progress
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setStatusView('moved')}
-            className={`gap-2 ${statusView === 'moved' ? 'bg-blue-600/20 border-blue-500 text-blue-400 hover:bg-blue-600/30' : 'hover:bg-blue-600/10 hover:border-blue-500/50'}`}
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-            Moved
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setStatusView('lost')}
-            className={`gap-2 ${statusView === 'lost' ? 'bg-red-600/20 border-red-500 text-red-400 hover:bg-red-600/30' : 'hover:bg-red-600/10 hover:border-red-500/50'}`}
-          >
-            <XCircle className="h-4 w-4" />
-            Lost
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setStatusView('cancelled')}
-            className={`gap-2 ${statusView === 'cancelled' ? 'bg-yellow-600/20 border-yellow-500 text-yellow-400 hover:bg-yellow-600/30' : 'hover:bg-yellow-600/10 hover:border-yellow-500/50'}`}
-          >
-            <XCircle className="h-4 w-4" />
-            Cancelled
-          </Button>
-        </div>
 
         {/* Filters */}
         <Card>
@@ -609,25 +467,23 @@ export default function AORenewalsPage() {
               </Select>
 
               <Select
-                value={filters.assigned_to || "all"}
+                value={filters.priority?.[0] || "all"}
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
-                    assigned_to: value === "all" ? undefined : value,
+                    priority: value === "all" ? undefined : [value as AORenewalPriority],
                   })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Agent" />
+                  <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Agents</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {profiles?.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.full_name || 'Unknown User'}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -637,9 +493,6 @@ export default function AORenewalsPage() {
                   setFilters({});
                   setSearchQuery("");
                   setShowMyAssignments(false);
-                  setShowNext30Days(false);
-                  setShowHighPriority(false);
-                  setStatusView('in_progress');
                   setSearchParams({});
                 }}
               >
