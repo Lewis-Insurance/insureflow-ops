@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { logger } from '@/lib/logger';
 
 // Types
 export type AORenewalStatus = "pending" | "contacted" | "quoted" | "renewed" | "lost" | "cancelled" | "moved";
@@ -61,6 +60,7 @@ export interface AORenewalStats {
   by_status: Record<AORenewalStatus, number>;
   by_priority: Record<AORenewalPriority, number>;
   avg_premium: number;
+  upcoming_5_days: number;
   upcoming_30_days: number;
   upcoming_60_days: number;
   upcoming_90_days: number;
@@ -95,11 +95,7 @@ export const useAORenewals = (filters?: AORenewalFilters) => {
       }
 
       if (filters?.assigned_to) {
-        if (filters.assigned_to === "unassigned") {
-          query = query.is("assigned_to", null);
-        } else {
-          query = query.eq("assigned_to", filters.assigned_to);
-        }
+        query = query.eq("assigned_to", filters.assigned_to);
       }
 
       if (filters?.policy_type) {
@@ -187,6 +183,7 @@ export const useAORenewalsStats = () => {
           urgent: 0,
         },
         avg_premium: 0,
+        upcoming_5_days: 0,
         upcoming_30_days: 0,
         upcoming_60_days: 0,
         upcoming_90_days: 0,
@@ -201,6 +198,7 @@ export const useAORenewalsStats = () => {
           (renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
 
+        if (daysUntil <= 5 && daysUntil >= 0) stats.upcoming_5_days++;
         if (daysUntil <= 30 && daysUntil >= 0) stats.upcoming_30_days++;
         if (daysUntil <= 60 && daysUntil >= 0) stats.upcoming_60_days++;
         if (daysUntil <= 90 && daysUntil >= 0) stats.upcoming_90_days++;
@@ -256,7 +254,7 @@ export const useCreateAORenewal = () => {
       toast.success("Renewal created successfully");
     },
     onError: (error) => {
-      logger.error("Error creating renewal:", error);
+      console.error("Error creating renewal:", error);
       toast.error("Failed to create renewal");
     },
   });
@@ -284,11 +282,7 @@ export const useUpdateAORenewal = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", data.id] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-
-      // Invalidate my-ao-renewals for dashboard refresh
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
-
+      
       // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
@@ -296,11 +290,11 @@ export const useUpdateAORenewal = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-
+      
       toast.success("Renewal updated successfully");
     },
     onError: (error) => {
-      logger.error("Error updating renewal:", error);
+      console.error("Error updating renewal:", error);
       toast.error("Failed to update renewal");
     },
   });
@@ -322,7 +316,7 @@ export const useDeleteAORenewal = () => {
       toast.success("Renewal deleted successfully");
     },
     onError: (error) => {
-      logger.error("Error deleting renewal:", error);
+      console.error("Error deleting renewal:", error);
       toast.error("Failed to delete renewal");
     },
   });
@@ -349,11 +343,7 @@ export const useUpdateAORenewalStatus = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-
-      // Invalidate my-ao-renewals for dashboard refresh
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
-
+      
       // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
@@ -364,7 +354,7 @@ export const useUpdateAORenewalStatus = () => {
       toast.success("Status updated successfully");
     },
     onError: (error) => {
-      logger.error("Error updating status:", error);
+      console.error("Error updating status:", error);
       toast.error("Failed to update status");
     },
   });
@@ -388,12 +378,10 @@ export const useBulkUpdateAORenewals = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
       toast.success(`${data.length} renewals updated successfully`);
     },
     onError: (error) => {
-      logger.error("Error bulk updating renewals:", error);
+      console.error("Error bulk updating renewals:", error);
       toast.error("Failed to update renewals");
     },
   });
@@ -416,8 +404,6 @@ export const useBulkDeleteAllAORenewals = () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
@@ -427,7 +413,7 @@ export const useBulkDeleteAllAORenewals = () => {
       toast.success("All renewal data cleared successfully");
     },
     onError: (error) => {
-      logger.error("Error deleting all renewals:", error);
+      console.error("Error deleting all renewals:", error);
       toast.error("Failed to clear renewal data");
     },
   });
@@ -471,7 +457,7 @@ export const useImportAORenewals = () => {
             .maybeSingle();
 
           if (checkError) {
-            logger.error("Error checking for duplicates:", checkError);
+            console.error("Error checking for duplicates:", checkError);
             result.errors.push(
               `Error checking duplicate for ${renewal.policy_number}: ${checkError.message}`
             );
@@ -487,7 +473,7 @@ export const useImportAORenewals = () => {
                 .eq("id", existing.id);
 
               if (updateError) {
-                logger.error("Error updating renewal:", updateError);
+                console.error("Error updating renewal:", updateError);
                 result.errors.push(
                   `Error updating ${renewal.policy_number}: ${updateError.message}`
                 );
@@ -525,7 +511,7 @@ export const useImportAORenewals = () => {
             .insert([insertData]);
 
           if (insertError) {
-            logger.error("Error inserting renewal:", insertError);
+            console.error("Error inserting renewal:", insertError);
             result.errors.push(
               `Error inserting ${renewal.policy_number}: ${insertError.message}`
             );
@@ -534,7 +520,7 @@ export const useImportAORenewals = () => {
             result.successful++;
           }
         } catch (error) {
-          logger.error("Unexpected error processing renewal:", error);
+          console.error("Unexpected error processing renewal:", error);
           result.errors.push(
             `Unexpected error for ${renewal.policy_number}: ${
               error instanceof Error ? error.message : "Unknown error"
@@ -549,9 +535,7 @@ export const useImportAORenewals = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals"] });
-      queryClient.invalidateQueries({ queryKey: ["my-ao-renewals-count"] });
-
+      
       if (result.failed === 0) {
         toast.success(`Successfully imported ${result.successful} renewals!`);
       } else {
@@ -561,7 +545,7 @@ export const useImportAORenewals = () => {
       }
     },
     onError: (error) => {
-      logger.error("Import failed:", error);
+      console.error("Import failed:", error);
       toast.error("Failed to import renewals. Please try again.");
     },
   });
