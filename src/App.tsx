@@ -921,9 +921,11 @@ const App = () => (
                 <Route
                   path="/coverage-gap-analysis"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <CoverageGapAnalysis />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CoverageGapAnalysis />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
@@ -1067,9 +1069,11 @@ const App = () => (
                 <Route
                   path="/extraction-analytics"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <ExtractionAnalyticsPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <ExtractionAnalyticsPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

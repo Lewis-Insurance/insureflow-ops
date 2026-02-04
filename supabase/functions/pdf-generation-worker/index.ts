@@ -53,6 +53,24 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin);
 
   try {
+    // Require cron secret for scheduled/worker execution
+    const cronSecret = req.headers.get('x-cron-secret');
+    const expectedSecret = Deno.env.get('CRON_SECRET');
+    if (!expectedSecret) {
+      console.error('CRON_SECRET not configured - rejecting request');
+      return new Response(
+        JSON.stringify({ error: 'Cron authentication not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!cronSecret || cronSecret !== expectedSecret) {
+      console.error('Unauthorized: Invalid or missing CRON_SECRET');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
