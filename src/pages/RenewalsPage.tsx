@@ -203,6 +203,9 @@ export default function RenewalsPage() {
     const byStatus: Record<string, number> = {};
     const byPriority: Record<string, number> = {};
     let totalPremium = 0;
+    let urgentCount = 0;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Normalize to start of day
 
     workflowRenewals.forEach((r) => {
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
@@ -210,6 +213,16 @@ export default function RenewalsPage() {
         byPriority[r.priority] = (byPriority[r.priority] || 0) + 1;
       }
       totalPremium += r.current_premium || 0;
+
+      // Calculate urgent: renewals within next 5 days only (not past due)
+      if (r.renewal_date) {
+        const renewalDate = new Date(r.renewal_date);
+        renewalDate.setHours(0, 0, 0, 0);
+        const daysUntil = Math.floor((renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil >= 0 && daysUntil <= 5) {
+          urgentCount++;
+        }
+      }
     });
 
     return {
@@ -217,6 +230,7 @@ export default function RenewalsPage() {
       byStatus,
       byPriority,
       totalPremium,
+      urgentCount,
       activeCount:
         (byStatus['pending'] || 0) +
         (byStatus['contacted'] || 0) +
@@ -412,7 +426,7 @@ export default function RenewalsPage() {
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Urgent</p>
                   <p className="text-3xl font-bold mt-1 text-red-600">
-                    {workflowStats.byPriority['urgent'] || 0}
+                    {workflowStats.urgentCount}
                   </p>
                 </div>
               </CardContent>
