@@ -10,7 +10,9 @@ import { formatInsuredDisplay } from '@/lib/insuredNames';
 interface CustomerAccount {
   id: string;
   name: string;
+  date_of_birth?: string;
   spouse_name?: string;
+  spouse_date_of_birth?: string;
   type: string;
   account_type?: string;
   account_status?: string;
@@ -63,6 +65,12 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
       })
     : null;
 
+  const formatDateOfBirth = (dob: string | undefined) => {
+    if (!dob) return null;
+    const date = new Date(dob + 'T00:00:00'); // Avoid timezone issues
+    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  };
+
   const formatAddress = () => {
     const parts = [
       account.address_line1,
@@ -95,8 +103,20 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
             </label>
             <p className="text-sm font-semibold">
               {primaryInsuredDisplay}
+              {account.date_of_birth && (
+                <span className="text-muted-foreground font-normal text-xs ml-2">
+                  (DOB: {formatDateOfBirth(account.date_of_birth)})
+                </span>
+              )}
               {account.type === 'household' && secondaryInsuredDisplay && (
-                <span className="text-muted-foreground font-normal"> & {secondaryInsuredDisplay}</span>
+                <>
+                  <span className="text-muted-foreground font-normal"> & {secondaryInsuredDisplay}</span>
+                  {account.spouse_date_of_birth && (
+                    <span className="text-muted-foreground font-normal text-xs ml-1">
+                      (DOB: {formatDateOfBirth(account.spouse_date_of_birth)})
+                    </span>
+                  )}
+                </>
               )}
             </p>
           </div>

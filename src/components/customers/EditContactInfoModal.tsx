@@ -13,7 +13,9 @@ import { z } from 'zod';
 
 const accountSchema = z.object({
   name: z.string().max(200, 'Name too long').optional().or(z.literal('')),
+  date_of_birth: z.string().optional().or(z.literal('')),
   spouse_name: z.string().max(200, 'Spouse name too long').optional().or(z.literal('')),
+  spouse_date_of_birth: z.string().optional().or(z.literal('')),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
   address_line1: z.string().optional(),
@@ -39,7 +41,9 @@ const accountSchema = z.object({
 interface Account {
   id: string;
   name: string;
+  date_of_birth?: string;
   spouse_name?: string;
+  spouse_date_of_birth?: string;
   type: string;
   account_type?: string;
   account_status?: string;
@@ -73,7 +77,9 @@ interface EditContactInfoModalProps {
 export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }: EditContactInfoModalProps) {
   const [formData, setFormData] = useState({
     name: '',
+    date_of_birth: '',
     spouse_name: '',
+    spouse_date_of_birth: '',
     email: '',
     phone: '',
     address_line1: '',
@@ -106,7 +112,9 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
       setFormData({
         name: account.name || '',
+        date_of_birth: account.date_of_birth || '',
         spouse_name: account.spouse_name || '',
+        spouse_date_of_birth: account.spouse_date_of_birth || '',
         email: account.email || '',
         phone: account.phone || '',
         address_line1: account.address_line1 || '',
@@ -183,7 +191,9 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     try {
       const updateData = {
         name: formData.name.trim() || null,
+        date_of_birth: formData.date_of_birth || null,
         spouse_name: account.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
+        spouse_date_of_birth: account.type === 'household' && formData.spouse_date_of_birth ? formData.spouse_date_of_birth : null,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
         address_line1: formData.address_line1.trim() || null,
@@ -264,6 +274,17 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
               {errors.name && (
                 <p className="text-sm text-destructive mt-1">{errors.name}</p>
               )}
+
+              {/* Date of Birth for Primary Insured */}
+              <div className="mt-3">
+                <Label htmlFor="date_of_birth">Date of Birth</Label>
+                <Input
+                  id="date_of_birth"
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
+                />
+              </div>
 
               {/* Trust/Estate Toggle for Primary Insured */}
               <div className="flex items-center gap-2 mt-3">
@@ -354,6 +375,17 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
                   onChange={(e) => handleInputChange('spouse_name', e.target.value)}
                   placeholder="Second Named Insured"
                 />
+
+                {/* Date of Birth for Secondary Insured */}
+                <div className="mt-3">
+                  <Label htmlFor="spouse_date_of_birth">Date of Birth</Label>
+                  <Input
+                    id="spouse_date_of_birth"
+                    type="date"
+                    value={formData.spouse_date_of_birth}
+                    onChange={(e) => handleInputChange('spouse_date_of_birth', e.target.value)}
+                  />
+                </div>
 
                 {/* Trust/Estate Toggle for Secondary Insured */}
                 <div className="flex items-center gap-2 mt-3">
