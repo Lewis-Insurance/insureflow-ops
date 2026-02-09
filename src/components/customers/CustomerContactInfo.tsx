@@ -18,6 +18,7 @@ interface CustomerAccount {
   account_status?: string;
   email?: string;
   phone?: string;
+  phone_secondary?: string;
   address_line1?: string;
   address_line2?: string;
   city?: string;
@@ -176,11 +177,16 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Phone</label>
                   {account.phone ? (
-                    <a href={`tel:${account.phone}`} className="text-sm font-semibold hover:underline">
+                    <a href={`tel:${account.phone}`} className="text-sm font-semibold hover:underline block">
                       {account.phone}
                     </a>
                   ) : (
                     <p className="text-sm text-muted-foreground italic">No phone on file</p>
+                  )}
+                  {account.phone_secondary && (
+                    <a href={`tel:${account.phone_secondary}`} className="text-xs text-muted-foreground hover:underline block">
+                      {account.phone_secondary} (secondary)
+                    </a>
                   )}
                 </div>
               </div>
