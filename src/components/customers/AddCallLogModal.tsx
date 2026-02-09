@@ -54,19 +54,16 @@ export function AddCallLogModal({ open, onOpenChange, accountId, onSuccess }: Ad
         .from('communications')
         .insert([{
           account_id: accountId,
-          entity_type: 'account',
-          entity_id: accountId,
           type: 'call',
           direction: formData.direction,
           subject: formData.subject.trim(),
-          content: formData.content.trim() || null,
-          status: 'completed',
-          metadata: {
+          body: formData.content.trim() || null,
+          meta: {
             duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
             contact_name: formData.contact_name.trim() || null,
             phone_number: formData.phone_number.trim() || null,
           },
-          created_by: user.id,
+          agent_id: user.id,
         }]);
 
       if (error) throw error;
