@@ -18,6 +18,7 @@ const accountSchema = z.object({
   spouse_date_of_birth: z.string().optional().or(z.literal('')),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
+  phone_secondary: z.string().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),
   city: z.string().optional(),
@@ -49,6 +50,7 @@ interface Account {
   account_status?: string;
   email?: string;
   phone?: string;
+  phone_secondary?: string;
   address_line1?: string;
   address_line2?: string;
   city?: string;
@@ -82,6 +84,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     spouse_date_of_birth: '',
     email: '',
     phone: '',
+    phone_secondary: '',
     address_line1: '',
     address_line2: '',
     city: '',
@@ -117,6 +120,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         spouse_date_of_birth: account.spouse_date_of_birth || '',
         email: account.email || '',
         phone: account.phone || '',
+        phone_secondary: account.phone_secondary || '',
         address_line1: account.address_line1 || '',
         address_line2: account.address_line2 || '',
         city: account.city || '',
@@ -196,6 +200,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         spouse_date_of_birth: account.type === 'household' && formData.spouse_date_of_birth ? formData.spouse_date_of_birth : null,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
+        phone_secondary: formData.phone_secondary.trim() || null,
         address_line1: formData.address_line1.trim() || null,
         address_line2: formData.address_line2.trim() || null,
         city: formData.city.trim() || null,
@@ -445,21 +450,22 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
             )}
           </div>
 
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              placeholder="john@example.com"
+              className={errors.email ? 'border-destructive' : ''}
+            />
+            {errors.email && (
+              <p className="text-sm text-destructive mt-1">{errors.email}</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="john@example.com"
-                className={errors.email ? 'border-destructive' : ''}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive mt-1">{errors.email}</p>
-              )}
-            </div>
             <div>
               <Label htmlFor="phone">Phone</Label>
               <Input
@@ -467,6 +473,15 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 placeholder="(555) 123-4567"
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone_secondary">Secondary Phone</Label>
+              <Input
+                id="phone_secondary"
+                value={formData.phone_secondary}
+                onChange={(e) => handleInputChange('phone_secondary', e.target.value)}
+                placeholder="(555) 987-6543"
               />
             </div>
           </div>

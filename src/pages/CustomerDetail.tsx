@@ -36,6 +36,7 @@ interface Account {
   account_status?: string;
   email?: string;
   phone?: string;
+  phone_secondary?: string;
   address_line1?: string;
   address_line2?: string;
   city?: string;
@@ -415,6 +416,8 @@ export default function CustomerDetail() {
         open={addCallLogOpen}
         onOpenChange={setAddCallLogOpen}
         accountId={account.id}
+        defaultPhone={account.phone}
+        defaultPhoneSecondary={account.phone_secondary}
       />
       {selectedTask && (
         <TaskEditModal

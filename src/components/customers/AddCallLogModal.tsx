@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,20 +13,32 @@ interface AddCallLogModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string;
+  defaultPhone?: string;
+  defaultPhoneSecondary?: string;
   onSuccess?: () => void;
 }
 
-export function AddCallLogModal({ open, onOpenChange, accountId, onSuccess }: AddCallLogModalProps) {
+export function AddCallLogModal({ open, onOpenChange, accountId, defaultPhone, defaultPhoneSecondary, onSuccess }: AddCallLogModalProps) {
   const [formData, setFormData] = useState({
     direction: 'outbound',
     subject: '',
     content: '',
     duration_minutes: '',
     contact_name: '',
-    phone_number: '',
+    phone_number: defaultPhone || '',
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Reset phone to default when modal opens
+  useEffect(() => {
+    if (open) {
+      setFormData(prev => ({
+        ...prev,
+        phone_number: defaultPhone || '',
+      }));
+    }
+  }, [open, defaultPhone]);
 
   async function handleSave() {
     if (!formData.subject.trim()) {
@@ -80,7 +92,7 @@ export function AddCallLogModal({ open, onOpenChange, accountId, onSuccess }: Ad
         content: '',
         duration_minutes: '',
         contact_name: '',
-        phone_number: '',
+        phone_number: defaultPhone || '',
       });
       onOpenChange(false);
       onSuccess?.();
@@ -141,12 +153,27 @@ export function AddCallLogModal({ open, onOpenChange, accountId, onSuccess }: Ad
             </div>
             <div>
               <Label htmlFor="phone_number">Phone Number</Label>
-              <Input
-                id="phone_number"
-                value={formData.phone_number}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
-                placeholder="(555) 123-4567"
-              />
+              {defaultPhone && defaultPhoneSecondary ? (
+                <Select
+                  value={formData.phone_number}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, phone_number: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select phone number" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={defaultPhone}>{defaultPhone} (primary)</SelectItem>
+                    <SelectItem value={defaultPhoneSecondary}>{defaultPhoneSecondary} (secondary)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="phone_number"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+                  placeholder="(555) 123-4567"
+                />
+              )}
             </div>
           </div>
 
