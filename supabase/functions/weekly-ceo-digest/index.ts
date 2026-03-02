@@ -249,7 +249,14 @@ function generateIdempotencyKey(periodStart: Date, recipients: string[]): string
 }
 
 /**
- * Call AI provider to generate summary
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Call AI provider to generate summary with retry logic
  */
 async function generateAISummary(
   facts: FactsPacket,
@@ -262,79 +269,127 @@ ${JSON.stringify(facts, null, 2)}
 
 Remember: Output ONLY valid JSON matching the schema. Do not include any text outside the JSON.`;
 
-  if (provider === 'anthropic') {
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) throw new AppError('ANTHROPIC_API_KEY not configured', 500);
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 4096,
-        system: AI_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (provider === 'anthropic') {
+        const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+        if (!apiKey) throw new AppError('ANTHROPIC_API_KEY not configured', 500);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Anthropic API error', new Error(errorText));
-      throw new ExternalServiceError('Anthropic', `API error: ${response.status}`);
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 4096,
+            system: AI_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: userPrompt }],
+          }),
+        });
+
+        // Handle rate limiting with retry
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+          logger.warn(`Rate limited by Anthropic, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
+
+          if (attempt < maxRetries) {
+            await sleep(waitTime);
+            continue;
+          }
+          throw new ExternalServiceError('Anthropic', `Rate limit exceeded after ${maxRetries} attempts`);
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error('Anthropic API error', new Error(errorText));
+          throw new ExternalServiceError('Anthropic', `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.content[0]?.text || '';
+
+        // Parse JSON from response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new ValidationError('AI did not return valid JSON');
+        }
+
+        const output = JSON.parse(jsonMatch[0]) as AIOutput;
+        const tokens = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
+
+        return { output, model: 'claude-3-5-sonnet-20241022', tokens };
+      } else {
+        // Default to OpenAI
+        const apiKey = Deno.env.get('OPENAI_API_KEY');
+        if (!apiKey) throw new AppError('OPENAI_API_KEY not configured', 500);
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { role: 'system', content: AI_SYSTEM_PROMPT },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 4096,
+          }),
+        });
+
+        // Handle rate limiting with retry
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+          logger.warn(`Rate limited by OpenAI, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
+
+          if (attempt < maxRetries) {
+            await sleep(waitTime);
+            continue;
+          }
+          throw new ExternalServiceError('OpenAI', `Rate limit exceeded after ${maxRetries} attempts`);
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error('OpenAI API error', new Error(errorText));
+          throw new ExternalServiceError('OpenAI', `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content || '';
+        const output = JSON.parse(content) as AIOutput;
+        const tokens = data.usage?.total_tokens || 0;
+
+        return { output, model: 'gpt-4o', tokens };
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // If it's not a rate limit error, throw immediately
+      if (!(error instanceof ExternalServiceError) || !error.message.includes('Rate limit')) {
+        throw error;
+      }
+
+      // If we've exhausted retries, throw the last error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
     }
-
-    const data = await response.json();
-    const content = data.content[0]?.text || '';
-
-    // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new ValidationError('AI did not return valid JSON');
-    }
-
-    const output = JSON.parse(jsonMatch[0]) as AIOutput;
-    const tokens = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
-
-    return { output, model: 'claude-3-5-sonnet-20241022', tokens };
-  } else {
-    // Default to OpenAI
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) throw new AppError('OPENAI_API_KEY not configured', 500);
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: AI_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 4096,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('OpenAI API error', new Error(errorText));
-      throw new ExternalServiceError('OpenAI', `API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '';
-    const output = JSON.parse(content) as AIOutput;
-    const tokens = data.usage?.total_tokens || 0;
-
-    return { output, model: 'gpt-4o', tokens };
   }
+
+  // Should never reach here, but TypeScript needs this
+  throw lastError || new AppError('Failed to generate AI summary', 500);
 }
 
 /**
