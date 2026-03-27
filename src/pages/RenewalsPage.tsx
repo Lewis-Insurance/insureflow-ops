@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -60,6 +60,7 @@ import {
   getStatusConfig,
   getPriorityConfig,
 } from '@/hooks/useRenewalWorkflow';
+import { useSyncPoliciesToRenewals } from '@/hooks/useRenewalIntelligence';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers } from '@/hooks/useLookupData';
 import { formatCurrency } from '@/lib/utils';
@@ -123,6 +124,16 @@ export default function RenewalsPage() {
 
   // Selection state for bulk operations
   const [selectedRenewalIds, setSelectedRenewalIds] = useState<string[]>([]);
+
+  // Sync policies to renewals on mount
+  const syncMutation = useSyncPoliciesToRenewals();
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (!hasSynced.current) {
+      hasSynced.current = true;
+      syncMutation.mutate(90);
+    }
+  }, []);
 
   // Data fetching - Policy-based view
   const {
@@ -249,15 +260,20 @@ export default function RenewalsPage() {
   }, [workflowRenewals]);
 
   const handleRefresh = () => {
-    if (viewMode === 'policies') {
-      refetchUpcoming();
-      refetchExpired();
-    } else {
-      refetchWorkflow();
-    }
+    // Sync policies to renewals table first, then refetch
+    syncMutation.mutate(90, {
+      onSettled: () => {
+        if (viewMode === 'policies') {
+          refetchUpcoming();
+          refetchExpired();
+        } else {
+          refetchWorkflow();
+        }
+      },
+    });
     toast({
-      title: 'Refreshed',
-      description: 'Renewals data has been refreshed',
+      title: 'Syncing & Refreshing',
+      description: 'Syncing policies to renewals and refreshing data',
     });
   };
 

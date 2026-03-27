@@ -160,6 +160,9 @@ export function UpcomingRenewalsWidget() {
     try {
       const now = new Date();
       const thirtyDaysOut = addDays(now, 30);
+      // Use local date strings (YYYY-MM-DD) to avoid timezone shift
+      const todayStr = format(now, 'yyyy-MM-dd');
+      const futureStr = format(thirtyDaysOut, 'yyyy-MM-dd');
 
       const { data, error } = await supabase
         .from('policies')
@@ -172,8 +175,8 @@ export function UpcomingRenewalsWidget() {
           accounts!inner(id, name),
           carriers(name)
         `)
-        .gte('expiration_date', startOfDay(now).toISOString())
-        .lte('expiration_date', endOfDay(thirtyDaysOut).toISOString())
+        .gte('expiration_date', todayStr)
+        .lte('expiration_date', futureStr)
         .order('expiration_date', { ascending: true })
         .limit(5);
 
