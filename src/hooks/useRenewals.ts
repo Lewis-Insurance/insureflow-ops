@@ -16,9 +16,11 @@ export function useRenewals(type: RenewalType) {
   return useQuery({
     queryKey: ['renewals', type],
     queryFn: async () => {
-      const today = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      // Use local date strings to avoid timezone shift from toISOString()
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const future = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+      const futureStr = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
 
       let query = supabase
         .from('policies')
@@ -39,13 +41,13 @@ export function useRenewals(type: RenewalType) {
       if (type === 'upcoming') {
         // Policies expiring within 30 days
         query = query
-          .gte('expiration_date', today.toISOString().split('T')[0])
-          .lte('expiration_date', thirtyDaysFromNow.toISOString().split('T')[0])
+          .gte('expiration_date', todayStr)
+          .lte('expiration_date', futureStr)
           .in('status', ['active', 'pending']);
       } else if (type === 'expired') {
         // Policies that have already expired
         query = query
-          .lt('expiration_date', today.toISOString().split('T')[0])
+          .lt('expiration_date', todayStr)
           .in('status', ['active', 'expired']);
       }
 
@@ -67,23 +69,25 @@ export function useRenewalsStats() {
   return useQuery({
     queryKey: ['renewals', 'stats'],
     queryFn: async () => {
-      const today = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      // Use local date strings to avoid timezone shift from toISOString()
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const future = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+      const futureStr = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
 
       // Get upcoming renewals count
       const { count: upcomingCount } = await supabase
         .from('policies')
         .select('*', { count: 'exact', head: true })
-        .gte('expiration_date', today.toISOString().split('T')[0])
-        .lte('expiration_date', thirtyDaysFromNow.toISOString().split('T')[0])
+        .gte('expiration_date', todayStr)
+        .lte('expiration_date', futureStr)
         .in('status', ['active', 'pending']);
 
       // Get expired policies count
       const { count: expiredCount } = await supabase
         .from('policies')
         .select('*', { count: 'exact', head: true })
-        .lt('expiration_date', today.toISOString().split('T')[0])
+        .lt('expiration_date', todayStr)
         .in('status', ['active', 'expired']);
 
       // Get breakdown by carrier for upcoming renewals
@@ -93,16 +97,16 @@ export function useRenewalsStats() {
           carrier,
           carrier_info:carriers!policies_carrier_id_fkey(name)
         `)
-        .gte('expiration_date', today.toISOString().split('T')[0])
-        .lte('expiration_date', thirtyDaysFromNow.toISOString().split('T')[0])
+        .gte('expiration_date', todayStr)
+        .lte('expiration_date', futureStr)
         .in('status', ['active', 'pending']);
 
       // Get breakdown by line of business for upcoming renewals
       const { data: lineData } = await supabase
         .from('policies')
         .select('line_of_business')
-        .gte('expiration_date', today.toISOString().split('T')[0])
-        .lte('expiration_date', thirtyDaysFromNow.toISOString().split('T')[0])
+        .gte('expiration_date', todayStr)
+        .lte('expiration_date', futureStr)
         .in('status', ['active', 'pending']);
 
       // Process carrier breakdown
