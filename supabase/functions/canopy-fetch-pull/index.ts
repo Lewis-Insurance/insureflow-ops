@@ -21,6 +21,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth } from '../_shared/auth.ts';
 
 // ============================================================================
 // TYPE DEFINITIONS - Matching Canopy's actual API response structure
@@ -2004,6 +2005,21 @@ serve(async (req) => {
 
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
+  }
+
+  // SECURITY: Require authenticated user before any processing
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'content-type, authorization',
+    'Content-Type': 'application/json',
+  };
+  const supabaseForAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+  const authResult = await requireAuth(req, supabaseForAuth, corsHeaders);
+  if (authResult instanceof Response) {
+    return authResult; // 401 Unauthorized
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
