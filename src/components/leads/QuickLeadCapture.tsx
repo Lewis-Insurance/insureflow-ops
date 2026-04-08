@@ -31,6 +31,7 @@ import {
 import { useCreateLead } from "@/hooks/useLeads";
 import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { useProfiles } from "@/hooks/useProfiles";
+import { useActiveAgency } from "@/hooks/useAgencyWorkspace";
 import { Plus, Building2, User, MapPin } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InsuranceDetailsModal } from "./InsuranceDetailsModal";
@@ -106,6 +107,7 @@ export const QuickLeadCapture = () => {
   const createLead = useCreateLead();
   const { data: sources } = useLeadSources();
   const { profiles } = useProfiles();
+  const { activeAgency } = useActiveAgency();
 
   // Filter to only show staff members who can be assigned leads
   const staffMembers = profiles.filter(p => p.is_staff);
@@ -168,6 +170,7 @@ export const QuickLeadCapture = () => {
       notes: data.notes || null,
       status: 'new' as const,
       lead_score: 50,
+      agency_workspace_id: activeAgency?.agency_workspace_id,
     };
 
     createLead.mutate(leadData, {

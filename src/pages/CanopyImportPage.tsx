@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
 import { CanopyDataDisplayRedesign } from '@/components/canopy/CanopyDataDisplayRedesign';
 import {
   Shield,
@@ -37,6 +38,7 @@ import {
 export default function CanopyImportPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeAgency } = useActiveAgency();
   const [copied, setCopied] = useState(false);
 
   // The shareable Canopy link
@@ -251,7 +253,8 @@ export default function CanopyImportPage() {
           lead_score: 75,
           status: 'qualified',
           source_details: { source: 'canopy_import', provider: 'canopy_connect' },
-          notes: `Manually created from Canopy import. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium}`
+          notes: `Manually created from Canopy import. Carriers: ${carriers.join(', ') || 'N/A'}. Premium: $${totalPremium}`,
+          agency_workspace_id: activeAgency?.agency_workspace_id
         })
         .select('id')
         .single();

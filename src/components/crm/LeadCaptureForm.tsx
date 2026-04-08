@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCreateLead } from '@/hooks/useLeads';
 import { useLeadSources } from '@/integrations/supabase/hooks/useLeadSources';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -64,6 +65,7 @@ interface LeadCaptureFormProps {
 export function LeadCaptureForm({ onSuccess }: LeadCaptureFormProps) {
   const { data: sources } = useLeadSources();
   const createLead = useCreateLead();
+  const { activeAgency } = useActiveAgency();
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -101,6 +103,7 @@ export function LeadCaptureForm({ onSuccess }: LeadCaptureFormProps) {
       current_premium: values.current_premium ? parseFloat(values.current_premium) : null,
       notes: values.notes || null,
       status: 'new',
+      agency_workspace_id: activeAgency?.agency_workspace_id,
     });
     form.reset();
     onSuccess?.();
