@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
 
 // Types for parsed dec page data
 export interface ParsedInsured {
@@ -113,6 +114,7 @@ export function useDecPageImport() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeAgency } = useActiveAgency();
 
   // Upload and parse dec page
   const uploadAndParse = async (file: File): Promise<DecPageParseResult> => {
@@ -405,6 +407,7 @@ export function useDecPageImport() {
           notes: policyNotes,
           assigned_to: assignedTo || null,
           account_id: membership?.account_id || null,
+          agency_workspace_id: activeAgency?.agency_workspace_id,
         })
         .select()
         .single();
