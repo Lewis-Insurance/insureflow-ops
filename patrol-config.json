@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "metadata": {
+    "project_name": "LEWIS INSURANCE",
+    "client": "Lewis Insurance Agency",
+    "paperclip_project_id": "9f3556f0-71b8-4097-8475-5158005f851c",
+    "github_repository": "https://github.com/Lewis-Insurance/insureflow-ops"
+  },
+  "supabase": {
+    "project_ref": "lrqajzwcmdwahnjyidgv",
+    "url": "https://lrqajzwcmdwahnjyidgv.supabase.co"
+  },
+  "production": {
+    "url": "https://lewisinsurance.netlify.app"
+  },
+  "netlify": {
+    "site_slug": "insureflow-ops",
+    "site_id": "42494172-3d10-4c48-9b17-dd20d23b192e"
+  },
+  "checks": {
+    "SUP-001": { "enabled": true },
+    "SUP-002": { "enabled": true },
+    "SUP-003": { "enabled": true },
+    "SUP-004": { "enabled": true },
+    "SUP-005": { "enabled": true },
+    "SUP-006": { "enabled": true },
+    "SUP-007": { "enabled": true },
+    "REP-001": { "enabled": true },
+    "REP-002": { "enabled": true },
+    "REP-003": { "enabled": true },
+    "REP-004": { "enabled": true },
+    "REP-005": { "enabled": true },
+    "INF-001": { "enabled": true },
+    "INF-002": { "enabled": true },
+    "INF-003": { "enabled": true },
+    "INF-004": { "enabled": true },
+    "INF-005": {
+      "enabled": false,
+      "reason": "No Cloudflare Workers on this project"
+    },
+    "INF-006": { "enabled": true },
+    "INF-007": { "enabled": true },
+    "SEC-001": { "enabled": true },
+    "SEC-002": {
+      "enabled": true,
+      "severity": "critical"
+    },
+    "SEC-003": { "enabled": true },
+    "SEC-004": { "enabled": true },
+    "E2E-001": {
+      "enabled": false,
+      "reason": "No Playwright suite configured yet - defer to future E2E implementation"
+    }
+  },
+  "sec002_expectations": {
+    "phase_a": {
+      "expect_disable_signup": false,
+      "rules": [
+        { "key": "mailer_autoconfirm", "expect": false },
+        { "key": "phone_autoconfirm", "expect": false }
+      ]
+    },
+    "phase_b": {
+      "min_jwt_exp_seconds": 3600,
+      "min_password_min_length": 8,
+      "require_non_empty_site_url": true,
+      "require_redirect_allowlist_configured": true
+    }
+  },
+  "known_drift": [],
+  "integrity_queries": []
+}
