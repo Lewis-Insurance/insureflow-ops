@@ -6,6 +6,10 @@
 --
 -- Fix: drop and recreate each hide_soft_deleted_* policy with TO authenticated.
 -- Service role bypasses RLS by default — no separate service_role policy needed.
+--
+-- Rollback:
+--   Recreate each policy without a TO clause. That would restore the prior
+--   behavior, including the anon-key exposure this migration is fixing.
 
 -- ============================================================
 -- 1. documents (confirmed anon-leaking table)
@@ -46,3 +50,30 @@ CREATE POLICY "hide_soft_deleted_contacts"
   FOR SELECT
   TO authenticated
   USING (deleted_at IS NULL);
+
+/*
+-- To rollback this migration:
+DROP POLICY IF EXISTS "hide_soft_deleted_documents" ON public.documents;
+CREATE POLICY "hide_soft_deleted_documents"
+  ON public.documents
+  FOR SELECT
+  USING (deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "hide_soft_deleted_accounts" ON public.accounts;
+CREATE POLICY "hide_soft_deleted_accounts"
+  ON public.accounts
+  FOR SELECT
+  USING (deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "hide_soft_deleted_tasks" ON public.tasks;
+CREATE POLICY "hide_soft_deleted_tasks"
+  ON public.tasks
+  FOR SELECT
+  USING (deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "hide_soft_deleted_contacts" ON public.contacts;
+CREATE POLICY "hide_soft_deleted_contacts"
+  ON public.contacts
+  FOR SELECT
+  USING (deleted_at IS NULL);
+*/
