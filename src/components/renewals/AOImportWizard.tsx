@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { useImportAORenewals, type AORenewal } from "@/hooks/useAORenewals";
 import { toast } from "sonner";
-import { readWorkbookFromBuffer, worksheetToJson, parseExcelDate } from "@/lib/excel-utils";
+import { readSpreadsheetRowsMatrix, parseExcelDate } from "@/lib/excel-utils";
 
 type ImportStep = "upload" | "preview" | "import" | "complete";
 
@@ -78,16 +78,9 @@ export const AOImportWizard = () => {
 
     setFile(selectedFile);
 
-    // Parse the file
-    const reader = new FileReader();
-    reader.onload = async (event) => {
+    void (async () => {
       try {
-        const data = event.target?.result;
-        const workbook = await readWorkbookFromBuffer(new Uint8Array(data as ArrayBuffer));
-        const worksheet = workbook.worksheets[0];
-        
-        // Convert to JSON - this gets all rows
-        const jsonData = worksheetToJson(worksheet, { header: 1 });
+        const jsonData = await readSpreadsheetRowsMatrix(selectedFile);
 
         if (jsonData.length === 0) {
           toast.error("The file appears to be empty");
@@ -167,9 +160,12 @@ export const AOImportWizard = () => {
                   renewal.renewal_date = date.toISOString().split('T')[0];
                 }
               } else if (typeof value === 'number') {
-                // Excel date serial number
+                // Excel date serial number (calendar date in local time)
                 const date = parseExcelDate(value);
-                renewal.renewal_date = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                renewal.renewal_date = `${y}-${m}-${d}`;
               }
             } else if (headerUpper === 'EXP PREM' || headerUpper === 'PREMIUM') {
               const premium = parseFloat(String(value).replace(/[$,]/g, ''));
@@ -241,9 +237,7 @@ export const AOImportWizard = () => {
         console.error("Error parsing file:", error);
         toast.error("Failed to parse the file. Please check the format.");
       }
-    };
-
-    reader.readAsBinaryString(selectedFile);
+    })();
   }, []);
 
   // Step 2: Start Import
