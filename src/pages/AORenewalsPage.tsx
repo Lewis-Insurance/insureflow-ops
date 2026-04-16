@@ -483,7 +483,6 @@ export default function AORenewalsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Insured</TableHead>
-                      <TableHead>Insured</TableHead>
                       <TableHead>{renderSortButton("Renewal", "renewal_date")}</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>{renderSortButton("Premium", "current_premium")}</TableHead>
