@@ -358,16 +358,6 @@ export default function AORenewalEdit() {
                 </div>
 
                 <div>
-                  <Label htmlFor="follow_up_date">Follow-Up Date</Label>
-                  <Input
-                    id="follow_up_date"
-                    type="date"
-                    value={formData.follow_up_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_date: e.target.value }))}
-                  />
-                </div>
-
-                <div>
                   <Label htmlFor="losses_3yr">3 Year # of Losses</Label>
                   <Input
                     id="losses_3yr"
@@ -472,9 +462,10 @@ export default function AORenewalEdit() {
                   Set the next committed callback date here so the file never drifts.
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                 <span>Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
                 <span>Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
+                <span>Need a set callback here whenever the file is quoted or waiting on insured.</span>
               </div>
             </CardContent>
           </Card>

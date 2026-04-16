@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   AlertTriangle,
-  ArrowRightLeft,
   Calendar,
   CheckCircle,
   Clock,
@@ -17,6 +16,7 @@ import {
   TrendingUp,
   Upload,
   XCircle,
+  ArrowUpDown,
 } from "lucide-react";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -49,23 +49,11 @@ import {
   getAORenewalWorkQueueSummary,
   useAORenewals,
   useAORenewalsStats,
-  type AORenewal,
   type AORenewalFilters,
   type AORenewalPriority,
   type AORenewalQueue,
   type AORenewalStatus,
 } from "@/hooks/useAORenewals";
-
-const STATUS_OPTIONS: { value: AORenewalStatus; label: string }[] = [
-  { value: "pending", label: "Pending" },
-  { value: "contacted", label: "Contacted" },
-  { value: "quoted", label: "Quoted" },
-  { value: "waiting_on_insured", label: "Waiting on insured" },
-  { value: "renewed", label: "Retained" },
-  { value: "moved", label: "Moved" },
-  { value: "lost", label: "Lost" },
-  { value: "cancelled", label: "Cancelled" },
-];
 
 const QUEUE_OPTIONS: { value: AORenewalQueue; label: string; description: string }[] = [
   { value: "active", label: "Active work", description: "Everything still being worked" },
@@ -142,7 +130,7 @@ export default function AORenewalsPage() {
     }));
   }, [debouncedSearch, showClosedStatuses]);
 
-  const { data: renewals = [], isLoading, refetch, isFetching } = useAORenewals(filters);
+  const { data: renewals = [], isLoading } = useAORenewals(filters);
   const { data: stats } = useAORenewalsStats();
 
   const visibleRenewals = useMemo(() => {
@@ -176,6 +164,32 @@ export default function AORenewalsPage() {
   }, [renewals, selectedQueue, showClosedStatuses, sortDirection, sortField]);
 
   const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
+
+  const toggleSort = (
+    field: "renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date",
+  ) => {
+    if (sortField === field) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortField(field);
+    setSortDirection(field === "renewal_date" ? "asc" : "desc");
+  };
+
+  const renderSortButton = (
+    label: string,
+    field: "renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date",
+  ) => (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+      onClick={() => toggleSort(field)}
+    >
+      {label}
+      <ArrowUpDown className="h-3.5 w-3.5" />
+    </button>
+  );
 
   const exportVisibleRows = () => {
     const headers = [
@@ -470,11 +484,11 @@ export default function AORenewalsPage() {
                     <TableRow>
                       <TableHead>Insured</TableHead>
                       <TableHead>Insured</TableHead>
-                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("renewal_date"); setSortDirection(sortField === "renewal_date" && sortDirection === "asc" ? "desc" : "asc"); }}>Renewal</button></TableHead>
+                      <TableHead>{renderSortButton("Renewal", "renewal_date")}</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("current_premium"); setSortDirection(sortField === "current_premium" && sortDirection === "asc" ? "desc" : "asc"); }}>Premium</button></TableHead>
-                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("days_since_contact"); setSortDirection(sortField === "days_since_contact" && sortDirection === "asc" ? "desc" : "asc"); }}>Days Since Contact</button></TableHead>
-                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("follow_up_date"); setSortDirection(sortField === "follow_up_date" && sortDirection === "asc" ? "desc" : "asc"); }}>Follow-Up Due</button></TableHead>
+                      <TableHead>{renderSortButton("Premium", "current_premium")}</TableHead>
+                      <TableHead>{renderSortButton("Days Since Contact", "days_since_contact")}</TableHead>
+                      <TableHead>{renderSortButton("Follow-Up Due", "follow_up_date")}</TableHead>
                       <TableHead>Attention</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -527,7 +541,7 @@ export default function AORenewalsPage() {
                               {metrics.daysUntilFollowUp === null
                                 ? renewal.status === "quoted" || renewal.status === "waiting_on_insured"
                                   ? "Required"
-                                  : "Optional"
+                                  : "No follow-up set"
                                 : metrics.daysUntilFollowUp < 0
                                   ? `${Math.abs(metrics.daysUntilFollowUp)} day${Math.abs(metrics.daysUntilFollowUp) === 1 ? "" : "s"} overdue`
                                   : metrics.daysUntilFollowUp === 0
