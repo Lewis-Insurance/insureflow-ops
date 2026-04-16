@@ -451,6 +451,35 @@ export default function AORenewalEdit() {
           </Card>
         </form>
 
+
+        {renewal && (
+          <Card className="max-w-4xl">
+            <CardHeader>
+              <CardTitle>Follow-Up</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="follow_up_panel_date">Follow-Up Date</Label>
+                  <Input
+                    id="follow_up_panel_date"
+                    type="date"
+                    value={formData.follow_up_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_date: e.target.value }))}
+                  />
+                </div>
+                <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                  Set the next committed callback date here so the file never drifts.
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span>Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
+                <span>Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Documents Section */}
         {renewal && (
           <AORenewalDocuments

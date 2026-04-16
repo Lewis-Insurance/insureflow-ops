@@ -72,11 +72,7 @@ const QUEUE_OPTIONS: { value: AORenewalQueue; label: string; description: string
   { value: "needs_first_contact", label: "Needs first contact", description: "Pending files only" },
   { value: "needs_quote", label: "Needs quote", description: "Contacted but not quoted" },
   { value: "waiting_on_insured", label: "Waiting on insured", description: "Insured owes the next answer" },
-  { value: "stale_follow_up", label: "Stale follow-up", description: "Drift that needs attention now" },
-  { value: "follow_up_due", label: "Follow-up due", description: "Due or overdue callbacks" },
-  { value: "expiring_30", label: "Expiring in 30 days", description: "Files inside your one-month window" },
-  { value: "critical_window", label: "Critical window", description: "Inside 5 days with work still open" },
-  { value: "all", label: "All visible", description: "Everything currently included by filters" },
+  { value: "follow_up_due", label: "Follow-up issues", description: "Due, overdue, or drifting follow-up files" },
 ];
 
 const formatCurrency = (value: number | null) => {
@@ -132,6 +128,8 @@ export default function AORenewalsPage() {
   const [filters, setFilters] = useState<AORenewalFilters>({});
   const [searchInput, setSearchInput] = useState("");
   const [selectedQueue, setSelectedQueue] = useState<AORenewalQueue>("active");
+  const [sortField, setSortField] = useState<"renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date">("renewal_date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [showClosedStatuses, setShowClosedStatuses] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 250);
@@ -155,12 +153,27 @@ export default function AORenewalsPage() {
     return filterAORenewalsByQueue(base, selectedQueue)
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
       .sort((a, b) => {
-        if (b.metrics.urgencyRank !== a.metrics.urgencyRank) {
-          return b.metrics.urgencyRank - a.metrics.urgencyRank;
+        const dir = sortDirection === "asc" ? 1 : -1;
+        const getTime = (value?: string | null) => (value ? new Date(value).getTime() : Number.POSITIVE_INFINITY);
+
+        let comparison = 0;
+        if (sortField === "renewal_date") {
+          comparison = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
+        } else if (sortField === "current_premium") {
+          comparison = (a.renewal.current_premium || 0) - (b.renewal.current_premium || 0);
+        } else if (sortField === "days_since_contact") {
+          comparison = (a.metrics.daysSinceContact ?? Number.POSITIVE_INFINITY) - (b.metrics.daysSinceContact ?? Number.POSITIVE_INFINITY);
+        } else if (sortField === "follow_up_date") {
+          comparison = getTime(a.renewal.follow_up_date) - getTime(b.renewal.follow_up_date);
         }
-        return a.metrics.daysUntilRenewal - b.metrics.daysUntilRenewal;
+
+        if (comparison === 0) {
+          comparison = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
+        }
+
+        return comparison * dir;
       });
-  }, [renewals, selectedQueue, showClosedStatuses]);
+  }, [renewals, selectedQueue, showClosedStatuses, sortDirection, sortField]);
 
   const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
 
@@ -413,6 +426,8 @@ export default function AORenewalsPage() {
                 setSearchInput("");
                 setSelectedQueue("active");
                 setShowClosedStatuses(false);
+                setSortField("renewal_date");
+                setSortDirection("asc");
                 setFilters({});
               }}>
                 <RefreshCcw className="mr-2 h-4 w-4" />
@@ -454,12 +469,13 @@ export default function AORenewalsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Insured</TableHead>
-                      <TableHead>Renewal</TableHead>
+                      <TableHead>Insured</TableHead>
+                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("renewal_date"); setSortDirection(sortField === "renewal_date" && sortDirection === "asc" ? "desc" : "asc"); }}>Renewal</button></TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Premium</TableHead>
-                      <TableHead>Days Since Contact</TableHead>
-                      <TableHead>Follow-Up Due</TableHead>
-                      <TableHead>Urgency</TableHead>
+                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("current_premium"); setSortDirection(sortField === "current_premium" && sortDirection === "asc" ? "desc" : "asc"); }}>Premium</button></TableHead>
+                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("days_since_contact"); setSortDirection(sortField === "days_since_contact" && sortDirection === "asc" ? "desc" : "asc"); }}>Days Since Contact</button></TableHead>
+                      <TableHead><button className="font-medium hover:text-foreground" onClick={() => { setSortField("follow_up_date"); setSortDirection(sortField === "follow_up_date" && sortDirection === "asc" ? "desc" : "asc"); }}>Follow-Up Due</button></TableHead>
+                      <TableHead>Attention</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -522,16 +538,16 @@ export default function AORenewalsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="space-y-2">
-                            {metrics.staleReason ? (
-                              <Badge variant="destructive">{metrics.staleReason}</Badge>
-                            ) : metrics.isFollowUpOverdue ? (
-                              <Badge variant="destructive">Follow-up overdue</Badge>
+                            {renewal.status === "pending" ? (
+                              <Badge className="bg-slate-700 hover:bg-slate-700">No contact yet</Badge>
+                            ) : renewal.status === "contacted" ? (
+                              <Badge className="bg-blue-600 hover:bg-blue-600">Quote needed</Badge>
+                            ) : metrics.isFollowUpOverdue || metrics.staleReason ? (
+                              <Badge variant="destructive">Follow up overdue</Badge>
+                            ) : renewal.status === "waiting_on_insured" ? (
+                              <Badge className="bg-violet-600 hover:bg-violet-600">Waiting on insured</Badge>
                             ) : metrics.isCriticalWindow ? (
                               <Badge className="bg-orange-600 hover:bg-orange-600">Inside 5 days</Badge>
-                            ) : metrics.isPendingInside30Days ? (
-                              <Badge className="bg-amber-600 hover:bg-amber-600">Pending inside 30 days</Badge>
-                            ) : renewal.status === "waiting_on_insured" ? (
-                              <Badge className="bg-violet-600 hover:bg-violet-600">Need insured decision</Badge>
                             ) : (
                               <Badge variant="outline">On track</Badge>
                             )}
