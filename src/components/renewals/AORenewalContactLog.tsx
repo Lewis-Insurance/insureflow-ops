@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +56,14 @@ export function AORenewalContactLog({
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>(currentStatus || "");
   const [followUpDate, setFollowUpDate] = useState(currentFollowUpDate || "");
+
+  useEffect(() => {
+    setStatus(currentStatus || "");
+  }, [currentStatus]);
+
+  useEffect(() => {
+    setFollowUpDate(currentFollowUpDate || "");
+  }, [currentFollowUpDate]);
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -170,7 +178,7 @@ export function AORenewalContactLog({
       setContactDate(new Date().toISOString().split("T")[0]);
       setContactMethod("phone");
       setStatus(currentStatus || "");
-      setFollowUpDate("");
+      setFollowUpDate(currentFollowUpDate || "");
       toast({
         title: "Success",
         description: "Contact logged successfully",
