@@ -47,6 +47,7 @@ export default function AORenewalEdit() {
     priority: 'normal' as AORenewalPriority,
     assigned_to: '',
     last_contact_date: '',
+    follow_up_date: '',
     losses_3yr: '',
     oldest_in_household: '',
     moved_carrier: '' as string,
@@ -69,6 +70,7 @@ export default function AORenewalEdit() {
         priority: renewal.priority || 'normal',
         assigned_to: renewal.assigned_to || '',
         last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
+        follow_up_date: renewal.follow_up_date ? renewal.follow_up_date.split('T')[0] : '',
         losses_3yr: renewal.losses_3yr?.toString() || '',
         oldest_in_household: renewal.oldest_in_household?.toString() || '',
         moved_carrier: renewal.moved_carrier || '',
@@ -126,6 +128,7 @@ export default function AORenewalEdit() {
           priority: formData.priority,
           assigned_to: formData.assigned_to.trim() || null,
           last_contact_date: formData.last_contact_date || null,
+          follow_up_date: formData.follow_up_date || null,
           losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
           oldest_in_household: formData.oldest_in_household ? parseInt(formData.oldest_in_household) : null,
           moved_carrier: formData.moved_carrier || null,
@@ -317,7 +320,8 @@ export default function AORenewalEdit() {
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="contacted">Contacted</SelectItem>
                       <SelectItem value="quoted">Quoted</SelectItem>
-                      <SelectItem value="renewed">Renewed</SelectItem>
+                      <SelectItem value="waiting_on_insured">Waiting on Insured</SelectItem>
+                      <SelectItem value="renewed">Retained</SelectItem>
                       <SelectItem value="moved">Moved</SelectItem>
                       <SelectItem value="lost">Lost</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -350,6 +354,16 @@ export default function AORenewalEdit() {
                     type="date"
                     value={formData.last_contact_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, last_contact_date: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="follow_up_date">Follow-Up Date</Label>
+                  <Input
+                    id="follow_up_date"
+                    type="date"
+                    value={formData.follow_up_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_date: e.target.value }))}
                   />
                 </div>
 
@@ -456,7 +470,13 @@ export default function AORenewalEdit() {
         )}
 
         {/* Contact Log Section */}
-        {renewal && <AORenewalContactLog renewalId={renewal.id} />}
+        {renewal && (
+          <AORenewalContactLog
+            renewalId={renewal.id}
+            currentStatus={renewal.status}
+            currentFollowUpDate={renewal.follow_up_date}
+          />
+        )}
 
         {/* Notes Section */}
         {renewal && <AORenewalNotes renewalId={renewal.id} />}
