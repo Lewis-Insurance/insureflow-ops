@@ -56,6 +56,10 @@ export interface AORenewal {
   updated_at: string;
   last_contact_date: string | null;
   follow_up_date: string | null;
+  follow_up_reason: string | null;
+  follow_up_note: string | null;
+  follow_up_completed_at: string | null;
+  follow_up_cleared_at: string | null;
   quoted_at: string | null;
   waiting_on_insured_since: string | null;
   moved_carrier: string | null;

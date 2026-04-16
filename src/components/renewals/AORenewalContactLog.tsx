@@ -29,6 +29,8 @@ interface AORenewalContactLogProps {
   renewalId: string;
   currentStatus?: string;
   currentFollowUpDate?: string | null;
+  currentFollowUpReason?: string | null;
+  currentFollowUpNote?: string | null;
 }
 
 const methodIcons = {
@@ -51,11 +53,15 @@ export function AORenewalContactLog({
   renewalId,
   currentStatus,
   currentFollowUpDate,
+  currentFollowUpReason,
+  currentFollowUpNote,
 }: AORenewalContactLogProps) {
   const [contactDate, setContactDate] = useState(new Date().toISOString().split("T")[0]);
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>(currentStatus || "");
   const [followUpDate, setFollowUpDate] = useState(currentFollowUpDate || "");
+  const [followUpReason, setFollowUpReason] = useState(currentFollowUpReason || "");
+  const [followUpNote, setFollowUpNote] = useState(currentFollowUpNote || "");
 
   useEffect(() => {
     setStatus(currentStatus || "");
@@ -64,6 +70,14 @@ export function AORenewalContactLog({
   useEffect(() => {
     setFollowUpDate(currentFollowUpDate || "");
   }, [currentFollowUpDate]);
+
+  useEffect(() => {
+    setFollowUpReason(currentFollowUpReason || "");
+  }, [currentFollowUpReason]);
+
+  useEffect(() => {
+    setFollowUpNote(currentFollowUpNote || "");
+  }, [currentFollowUpNote]);
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -105,6 +119,8 @@ export function AORenewalContactLog({
       contact_method: string;
       status: string;
       follow_up_date: string;
+      follow_up_reason: string;
+      follow_up_note: string;
       notes: string;
     }) => {
       const {
@@ -149,6 +165,9 @@ export function AORenewalContactLog({
         updates.follow_up_date = data.follow_up_date;
       }
 
+      updates.follow_up_reason = data.follow_up_reason.trim() || null;
+      updates.follow_up_note = data.follow_up_note.trim() || null;
+
       if (["renewed", "lost", "cancelled", "moved"].includes(effectiveStatus || "")) {
         updates.follow_up_date = null;
         updates.waiting_on_insured_since = null;
@@ -179,6 +198,8 @@ export function AORenewalContactLog({
       setContactMethod("phone");
       setStatus(currentStatus || "");
       setFollowUpDate(currentFollowUpDate || "");
+      setFollowUpReason(currentFollowUpReason || "");
+      setFollowUpNote(currentFollowUpNote || "");
       toast({
         title: "Success",
         description: "Contact logged successfully",
@@ -204,6 +225,8 @@ export function AORenewalContactLog({
       contact_method: contactMethod,
       status,
       follow_up_date: followUpDate,
+      follow_up_reason: followUpReason,
+      follow_up_note: followUpNote,
       notes,
     });
   };
@@ -290,9 +313,48 @@ export function AORenewalContactLog({
                 onChange={(e) => setFollowUpDate(e.target.value)}
                 min={contactDate}
               />
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 1);
+                  setFollowUpDate(d.toISOString().split('T')[0]);
+                }}>Tomorrow</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 3);
+                  setFollowUpDate(d.toISOString().split('T')[0]);
+                }}>+3 days</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 7);
+                  setFollowUpDate(d.toISOString().split('T')[0]);
+                }}>+7 days</Button>
+              </div>
             </div>
-            <div className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
-              Required whenever the file is quoted or waiting on insured.
+            <div className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground space-y-2">
+              <div>Required whenever the file is quoted or waiting on insured.</div>
+              <div><strong>Recommended:</strong> {status === 'quoted' ? '1 to 3 days so the quote gets presented.' : status === 'waiting_on_insured' ? '3 to 7 days depending on urgency.' : 'Use this when the next touch is committed.'}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
+              <Input
+                id="follow_up_reason"
+                value={followUpReason}
+                onChange={(e) => setFollowUpReason(e.target.value)}
+                maxLength={120}
+                placeholder="e.g. waiting on insured decision"
+              />
+            </div>
+            <div>
+              <Label htmlFor="follow_up_note">Follow-Up Note</Label>
+              <Textarea
+                id="follow_up_note"
+                value={followUpNote}
+                onChange={(e) => setFollowUpNote(e.target.value)}
+                maxLength={240}
+                placeholder="Short context for the next touch"
+                rows={2}
+              />
             </div>
           </div>
 

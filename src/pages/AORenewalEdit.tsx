@@ -48,6 +48,8 @@ export default function AORenewalEdit() {
     assigned_to: '',
     last_contact_date: '',
     follow_up_date: '',
+    follow_up_reason: '',
+    follow_up_note: '',
     losses_3yr: '',
     oldest_in_household: '',
     moved_carrier: '' as string,
@@ -71,6 +73,8 @@ export default function AORenewalEdit() {
         assigned_to: renewal.assigned_to || '',
         last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
         follow_up_date: renewal.follow_up_date ? renewal.follow_up_date.split('T')[0] : '',
+        follow_up_reason: renewal.follow_up_reason || '',
+        follow_up_note: renewal.follow_up_note || '',
         losses_3yr: renewal.losses_3yr?.toString() || '',
         oldest_in_household: renewal.oldest_in_household?.toString() || '',
         moved_carrier: renewal.moved_carrier || '',
@@ -129,6 +133,8 @@ export default function AORenewalEdit() {
           assigned_to: formData.assigned_to.trim() || null,
           last_contact_date: formData.last_contact_date || null,
           follow_up_date: formData.follow_up_date || null,
+          follow_up_reason: formData.follow_up_reason.trim() || null,
+          follow_up_note: formData.follow_up_note.trim() || null,
           losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
           oldest_in_household: formData.oldest_in_household ? parseInt(formData.oldest_in_household) : null,
           moved_carrier: formData.moved_carrier || null,
@@ -448,6 +454,31 @@ export default function AORenewalEdit() {
               <CardTitle>Follow-Up</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                {(() => {
+                  const today = new Date();
+                  const followUpDate = formData.follow_up_date ? new Date(formData.follow_up_date + 'T00:00:00') : null;
+                  let label = 'Not set';
+                  let tone = 'outline';
+                  if (followUpDate) {
+                    const msPerDay = 1000 * 60 * 60 * 24;
+                    const diff = Math.floor((followUpDate.setHours(0,0,0,0) - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / msPerDay);
+                    if (diff < 0) {
+                      label = `Overdue by ${Math.abs(diff)} day${Math.abs(diff) === 1 ? '' : 's'}`;
+                      tone = 'destructive';
+                    } else if (diff === 0) {
+                      label = 'Due today';
+                      tone = 'default';
+                    } else {
+                      label = `Due in ${diff} day${diff === 1 ? '' : 's'}`;
+                    }
+                  }
+                  return <Badge variant={tone as any}>{label}</Badge>;
+                })()}
+                <span className="text-sm text-muted-foreground">Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
+                <span className="text-sm text-muted-foreground">Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="follow_up_panel_date">Follow-Up Date</Label>
@@ -457,15 +488,61 @@ export default function AORenewalEdit() {
                     value={formData.follow_up_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, follow_up_date: e.target.value }))}
                   />
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 1);
+                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                    }}>Tomorrow</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 3);
+                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                    }}>+3 days</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 7);
+                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                    }}>+7 days</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      const d = new Date();
+                      const day = d.getDay();
+                      const add = day === 0 ? 1 : 8 - day;
+                      d.setDate(d.getDate() + add);
+                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                    }}>Next week</Button>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                  Set the next committed callback date here so the file never drifts.
+                <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground space-y-2">
+                  <div>Set the next committed callback date here so the file never drifts.</div>
+                  <div><strong>Recommended:</strong> {formData.status === 'waiting_on_insured' ? '3 to 7 days depending on renewal pressure.' : formData.status === 'quoted' ? '1 to 3 days so quotes do not sit quietly.' : 'Use a real follow-up date whenever the next touch is committed.'}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                <span>Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
-                <span>Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
-                <span>Need a set callback here whenever the file is quoted or waiting on insured.</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
+                  <Input
+                    id="follow_up_reason"
+                    value={formData.follow_up_reason}
+                    maxLength={120}
+                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_reason: e.target.value }))}
+                    placeholder="e.g. waiting on insured, quote review"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="follow_up_note">Follow-Up Note</Label>
+                  <Textarea
+                    id="follow_up_note"
+                    value={formData.follow_up_note}
+                    maxLength={240}
+                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_note: e.target.value }))}
+                    placeholder="Short context for the next call"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button type="button" variant="outline" onClick={() => setFormData(prev => ({ ...prev, follow_up_date: '', follow_up_reason: '', follow_up_note: '' }))}>Clear follow-up</Button>
+                <Button type="button" variant="outline" onClick={() => setFormData(prev => ({ ...prev, follow_up_date: '', }))}>Mark handled</Button>
               </div>
             </CardContent>
           </Card>
@@ -495,6 +572,8 @@ export default function AORenewalEdit() {
             renewalId={renewal.id}
             currentStatus={renewal.status}
             currentFollowUpDate={renewal.follow_up_date}
+            currentFollowUpReason={renewal.follow_up_reason}
+            currentFollowUpNote={renewal.follow_up_note}
           />
         )}
 
