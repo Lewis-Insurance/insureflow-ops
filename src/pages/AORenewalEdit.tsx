@@ -324,64 +324,50 @@ export default function AORenewalEdit() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+            <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.95fr_0.9fr]">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Renewal Window</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{renewalWindowLabel}</div>
-                    <p className="mt-2 text-sm text-slate-400">Renewal date {formData.renewal_date ? formatLocalDateDisplay(formData.renewal_date) : "not set"}</p>
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happens next</div>
+                <div className="mt-3 text-2xl font-semibold text-white">{commandStateLabel}</div>
+                <p className="mt-2 text-sm text-slate-300">{followUpDraft.date ? `Follow up ${formatLocalDateDisplay(followUpDraft.date)}` : "No follow-up date committed yet."}</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Reason</div>
+                    <div className="mt-2 text-base font-semibold text-white">{followUpDraft.reason || formData.follow_up_reason || "No reason set"}</div>
                   </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Current Follow-Up</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{commandStateLabel}</div>
-                    <p className="mt-2 text-sm text-slate-400">{followUpDraft.date ? formatLocalDateDisplay(followUpDraft.date) : "No date committed"}</p>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Premium</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{formatCurrency(formData.current_premium)}</div>
-                    <p className="mt-2 text-sm text-slate-400">{formData.term_months ? `${formData.term_months}-month term` : "Term not set"}</p>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Last Contact</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{formData.last_contact_date ? formatLocalDateDisplay(formData.last_contact_date) : "Not logged"}</div>
-                    <p className="mt-2 text-sm text-slate-400">{formData.follow_up_reason || formData.follow_up_note || "No follow-up context saved."}</p>
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
+                    <div className="mt-2 text-base font-semibold capitalize text-white">{formData.status.replaceAll("_", " ")}</div>
                   </div>
                 </div>
               </div>
-              <div className="rounded-3xl border border-lime-300/20 bg-lime-300/8 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-lime-200/70">Quote</div>
-                {bestQuote ? (
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <div className="text-2xl font-semibold text-white">{bestQuote.carrier}</div>
-                      <p className="mt-1 text-sm text-slate-300">Most useful quote currently on file</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className={heroTile}>
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Carrier</div>
-                        <div className="mt-2 text-lg font-semibold text-white">{bestQuote.carrier}</div>
-                      </div>
-                      <div className={heroTile}>
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Premium</div>
-                        <div className="mt-2 text-lg font-semibold text-white">{formatAppCurrency(bestQuote.premium)}</div>
-                      </div>
-                      <div className={heroTile}>
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Term</div>
-                        <div className="mt-2 text-lg font-semibold text-white">{bestQuote.term_months} months</div>
-                      </div>
-                      <div className={heroTile}>
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Savings</div>
-                        <div className="mt-2 text-lg font-semibold text-white">{savingsAmount === null ? "—" : savingsAmount >= 0 ? formatAppCurrency(savingsAmount) : `+${formatAppCurrency(Math.abs(savingsAmount))}`}</div>
-                      </div>
-                    </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happened last</div>
+                <div className="mt-3 text-2xl font-semibold text-white">{formData.last_contact_date ? formatLocalDateDisplay(formData.last_contact_date) : "Not logged"}</div>
+                <p className="mt-2 text-sm text-slate-300">{formData.follow_up_note || formData.follow_up_reason || "No recent contact context saved."}</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Renewal Window</div>
+                    <div className="mt-2 text-base font-semibold text-white">{renewalWindowLabel}</div>
                   </div>
-                ) : (
-                  <div className="mt-3">
-                    <div className="text-2xl font-semibold text-white">No quote yet</div>
-                    <p className="mt-2 text-sm text-slate-300">Once a quote is added, the key carrier, premium, term, and savings will live here.</p>
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Premium</div>
+                    <div className="mt-2 text-base font-semibold text-white">{formatCurrency(formData.current_premium)}</div>
                   </div>
-                )}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">File snapshot</div>
+                <div className="mt-3 space-y-3">
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Policy</div>
+                    <div className="mt-2 text-base font-semibold text-white">{formData.policy_number || "No policy number"}</div>
+                    <div className="mt-1 text-sm text-slate-400">{formData.policy_type || "Policy type not set"}</div>
+                  </div>
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Term</div>
+                    <div className="mt-2 text-base font-semibold text-white">{formData.term_months ? `${formData.term_months} month term` : "Term not set"}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
