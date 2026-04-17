@@ -110,12 +110,15 @@ export function AORenewalContactLog({
     },
   });
 
+  const hasActiveFollowUp = Boolean(currentFollowUpDateValue || currentFollowUpReason || currentFollowUpNote);
+
   const addLogMutation = useMutation({
     mutationFn: async (data: {
       contact_date: string;
       contact_method: string;
       status: string;
       notes: string;
+      clearFollowUp?: boolean;
     }) => {
       const {
         data: { user },
@@ -165,6 +168,12 @@ export function AORenewalContactLog({
         updates.waiting_on_insured_since = null;
       }
 
+      if (data.clearFollowUp) {
+        updates.follow_up_date = null;
+        updates.follow_up_reason = null;
+        updates.follow_up_note = null;
+      }
+
       const { error: renewalError } = await supabase
         .from("ao_renewals")
         .update(updates)
@@ -203,7 +212,7 @@ export function AORenewalContactLog({
     },
   });
 
-  const handleAddLog = () => {
+  const handleAddLog = (clearFollowUp = false) => {
     if (!notes.trim() || !contactDate) return;
 
     addLogMutation.mutate({
@@ -211,6 +220,7 @@ export function AORenewalContactLog({
       contact_method: contactMethod,
       status,
       notes,
+      clearFollowUp,
     });
   };
 
@@ -304,22 +314,45 @@ export function AORenewalContactLog({
           </div>
 
 
-          <Button
-            onClick={handleAddLog}
-            disabled={
-              !notes.trim() ||
-              !contactDate ||
-              addLogMutation.isPending
-            }
-            size="sm"
-          >
-            {addLogMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Calendar className="h-4 w-4 mr-2" />
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => handleAddLog(false)}
+              disabled={
+                !notes.trim() ||
+                !contactDate ||
+                addLogMutation.isPending
+              }
+              size="sm"
+            >
+              {addLogMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Calendar className="h-4 w-4 mr-2" />
+              )}
+              Save Contact
+            </Button>
+
+            {hasActiveFollowUp && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAddLog(true)}
+                disabled={
+                  !notes.trim() ||
+                  !contactDate ||
+                  addLogMutation.isPending
+                }
+                size="sm"
+              >
+                {addLogMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
+                Save and Clear Follow-Up
+              </Button>
             )}
-            Save Contact
-          </Button>
+          </div>
         </div>
 
         <Separator />
