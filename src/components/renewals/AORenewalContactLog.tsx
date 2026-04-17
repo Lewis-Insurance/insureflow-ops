@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Mail, User, MessageSquare, Calendar, Loader2, ArrowRight } from "lucide-react";
+import { Phone, Mail, User, MessageSquare, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addDaysLocalDate, extractLocalDate, formatLocalDateDisplay, todayLocalDate } from "@/lib/date/localDate";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,14 +50,6 @@ const methodLabels = {
   other: "Other",
 };
 
-const FOLLOW_UP_REASON_PRESETS = [
-  "Waiting on insured decision",
-  "Quote review",
-  "Documents needed",
-  "Call back requested",
-  "No answer, retry",
-];
-
 export function AORenewalContactLog({
   renewalId,
   currentStatus,
@@ -68,9 +60,6 @@ export function AORenewalContactLog({
   const [contactDate, setContactDate] = useState(todayLocalDate());
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>(currentStatus || "");
-  const [followUpDate, setFollowUpDate] = useState(currentFollowUpDate || "");
-  const [followUpReason, setFollowUpReason] = useState(currentFollowUpReason || "");
-  const [followUpNote, setFollowUpNote] = useState(currentFollowUpNote || "");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,32 +68,16 @@ export function AORenewalContactLog({
     setStatus(currentStatus || "");
   }, [currentStatus]);
 
-  useEffect(() => {
-    setFollowUpDate(extractLocalDate(currentFollowUpDate));
-  }, [currentFollowUpDate]);
-
-  useEffect(() => {
-    setFollowUpReason(currentFollowUpReason || "");
-  }, [currentFollowUpReason]);
-
-  useEffect(() => {
-    setFollowUpNote(currentFollowUpNote || "");
-  }, [currentFollowUpNote]);
-
-  const requiresFollowUp = status === "quoted" || status === "waiting_on_insured";
+  const currentFollowUpDateValue = extractLocalDate(currentFollowUpDate);
   const followUpSummary = useMemo(() => {
-    if (!followUpDate && !followUpReason && !followUpNote) {
-      return "No follow-up set yet";
-    }
-
     const parts = [
-      followUpDate ? `Next follow-up ${formatLocalDateDisplay(followUpDate)}` : null,
-      followUpReason || null,
-      followUpNote || null,
+      currentFollowUpDateValue ? `Next follow-up ${formatLocalDateDisplay(currentFollowUpDateValue)}` : null,
+      currentFollowUpReason || null,
+      currentFollowUpNote || null,
     ].filter(Boolean);
 
-    return parts.join(" • ");
-  }, [followUpDate, followUpReason, followUpNote]);
+    return parts.length ? parts.join(" • ") : "No follow-up set yet";
+  }, [currentFollowUpDateValue, currentFollowUpReason, currentFollowUpNote]);
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["ao-renewal-contact-log", renewalId],
@@ -142,9 +115,6 @@ export function AORenewalContactLog({
       contact_date: string;
       contact_method: string;
       status: string;
-      follow_up_date: string;
-      follow_up_reason: string;
-      follow_up_note: string;
       notes: string;
     }) => {
       const {
@@ -156,9 +126,9 @@ export function AORenewalContactLog({
       const effectiveStatus = normalizedStatus || currentStatus || null;
 
       const followUpContext = [
-        data.follow_up_date ? `Next follow-up: ${data.follow_up_date}` : null,
-        data.follow_up_reason ? `Reason: ${data.follow_up_reason}` : null,
-        data.follow_up_note ? `Follow-up note: ${data.follow_up_note}` : null,
+        currentFollowUpDateValue ? `Next follow-up: ${currentFollowUpDateValue}` : null,
+        currentFollowUpReason ? `Reason: ${currentFollowUpReason}` : null,
+        currentFollowUpNote ? `Follow-up note: ${currentFollowUpNote}` : null,
       ].filter(Boolean);
 
       const logNotes = [data.notes.trim(), ...followUpContext].filter(Boolean).join("\n");
@@ -176,9 +146,6 @@ export function AORenewalContactLog({
 
       const updates: Record<string, string | null> = {
         last_contact_date: data.contact_date,
-        follow_up_date: data.follow_up_date || null,
-        follow_up_reason: data.follow_up_reason.trim() || null,
-        follow_up_note: data.follow_up_note.trim() || null,
       };
 
       if (normalizedStatus) {
@@ -195,9 +162,6 @@ export function AORenewalContactLog({
       }
 
       if (["renewed", "lost", "cancelled", "moved"].includes(effectiveStatus || "")) {
-        updates.follow_up_date = null;
-        updates.follow_up_reason = null;
-        updates.follow_up_note = null;
         updates.waiting_on_insured_since = null;
       }
 
@@ -224,9 +188,10 @@ export function AORenewalContactLog({
       setNotes("");
       setContactDate(todayLocalDate());
       setContactMethod("phone");
+      setStatus(currentStatus || "");
       toast({
         title: "Success",
-        description: "Contact and follow-up saved",
+        description: "Contact saved",
       });
     },
     onError: () => {
@@ -240,15 +205,11 @@ export function AORenewalContactLog({
 
   const handleAddLog = () => {
     if (!notes.trim() || !contactDate) return;
-    if (requiresFollowUp && !followUpDate) return;
 
     addLogMutation.mutate({
       contact_date: contactDate,
       contact_method: contactMethod,
       status,
-      follow_up_date: followUpDate,
-      follow_up_reason: followUpReason,
-      follow_up_note: followUpNote,
       notes,
     });
   };
@@ -280,9 +241,7 @@ export function AORenewalContactLog({
         <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
           <div className="text-sm font-medium">Current follow-up commitment</div>
           <div className="text-sm text-muted-foreground">{followUpSummary}</div>
-          {requiresFollowUp && !followUpDate && (
-            <Badge variant="destructive">Follow-up required before saving this contact</Badge>
-          )}
+          
         </div>
 
         <div className="space-y-3">
@@ -344,76 +303,10 @@ export function AORenewalContactLog({
             />
           </div>
 
-          <div className="rounded-lg border border-dashed p-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <ArrowRight className="h-4 w-4" />
-              Set the next move
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <Label htmlFor="follow_up_date">Next Follow-Up</Label>
-                <Input
-                  id="follow_up_date"
-                  type="date"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  min={contactDate}
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => {
-                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 1));
-                  }}>Tomorrow</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => {
-                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 3));
-                  }}>+3 days</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => {
-                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 7));
-                  }}>+7 days</Button>
-                </div>
-              </div>
-              <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground space-y-2">
-                <div>Quoted and waiting-on-insured files must leave here with a real next follow-up.</div>
-                <div><strong>Recommended:</strong> {status === 'quoted' ? '1 to 3 days so the quote gets presented.' : status === 'waiting_on_insured' ? '3 to 7 days depending on urgency.' : 'Use a next touch whenever the file is still moving.'}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <Label htmlFor="follow_up_reason">Reason</Label>
-                <Input
-                  id="follow_up_reason"
-                  value={followUpReason}
-                  onChange={(e) => setFollowUpReason(e.target.value)}
-                  maxLength={120}
-                  placeholder="Why is the next touch needed?"
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {FOLLOW_UP_REASON_PRESETS.map((preset) => (
-                    <Button
-                      key={preset}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setFollowUpReason(preset)}
-                    >
-                      {preset}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="follow_up_note">Follow-Up Note</Label>
-                <Textarea
-                  id="follow_up_note"
-                  value={followUpNote}
-                  onChange={(e) => setFollowUpNote(e.target.value)}
-                  maxLength={240}
-                  placeholder="Short context for the next touch"
-                  rows={2}
-                />
-              </div>
-            </div>
+          <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
+            <div className="font-medium text-foreground">Current next move</div>
+            <div>{followUpSummary}</div>
+            <div>Use the Follow-Up panel above to change the commitment. Use this log only for what just happened.</div>
           </div>
 
           <Button
@@ -421,7 +314,6 @@ export function AORenewalContactLog({
             disabled={
               !notes.trim() ||
               !contactDate ||
-              (requiresFollowUp && !followUpDate) ||
               addLogMutation.isPending
             }
             size="sm"
@@ -431,7 +323,7 @@ export function AORenewalContactLog({
             ) : (
               <Calendar className="h-4 w-4 mr-2" />
             )}
-            Save Contact + Follow-Up
+            Save Contact
           </Button>
         </div>
 
