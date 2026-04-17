@@ -19,7 +19,7 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
-import { addDaysLocalDate, todayLocalDate } from '@/lib/date/localDate';
+import { addDaysLocalDate, differenceFromTodayInLocalDays, extractLocalDate, formatLocalDateDisplay, todayLocalDate } from '@/lib/date/localDate';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -68,14 +68,14 @@ export default function AORenewalEdit() {
         customer_name: renewal.customer_name || '',
         policy_number: renewal.policy_number || '',
         policy_type: renewal.policy_type || '',
-        renewal_date: renewal.renewal_date ? renewal.renewal_date.split('T')[0] : '',
+        renewal_date: extractLocalDate(renewal.renewal_date),
         current_premium: renewal.current_premium?.toString() || '',
         term_months: renewal.term_months ? renewal.term_months.toString() as '6' | '12' : '',
         status: renewal.status || 'pending',
         priority: renewal.priority || 'normal',
         assigned_to: renewal.assigned_to || '',
-        last_contact_date: renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : '',
-        follow_up_date: renewal.follow_up_date ? renewal.follow_up_date.split('T')[0] : '',
+        last_contact_date: extractLocalDate(renewal.last_contact_date),
+        follow_up_date: extractLocalDate(renewal.follow_up_date),
         follow_up_reason: renewal.follow_up_reason || '',
         follow_up_note: renewal.follow_up_note || '',
         losses_3yr: renewal.losses_3yr?.toString() || '',
@@ -165,7 +165,7 @@ export default function AORenewalEdit() {
   };
 
   const followUpSummary = [
-    formData.follow_up_date ? `Next follow-up ${new Date(formData.follow_up_date + 'T00:00:00').toLocaleDateString()}` : null,
+    formData.follow_up_date ? `Next follow-up ${formatLocalDateDisplay(formData.follow_up_date)}` : null,
     formData.follow_up_reason || null,
     formData.follow_up_note || null,
   ].filter(Boolean).join(' • ') || 'No follow-up committed yet';
@@ -521,13 +521,10 @@ export default function AORenewalEdit() {
 
               <div className="flex items-center gap-3 flex-wrap">
                 {(() => {
-                  const today = new Date();
-                  const followUpDate = followUpDraft.date ? new Date(followUpDraft.date + 'T00:00:00') : null;
+                  const diff = differenceFromTodayInLocalDays(followUpDraft.date);
                   let label = 'Not set';
                   let tone = 'outline';
-                  if (followUpDate) {
-                    const msPerDay = 1000 * 60 * 60 * 24;
-                    const diff = Math.floor((followUpDate.setHours(0,0,0,0) - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / msPerDay);
+                  if (diff !== null) {
                     if (diff < 0) {
                       label = `Overdue by ${Math.abs(diff)} day${Math.abs(diff) === 1 ? '' : 's'}`;
                       tone = 'destructive';
@@ -542,7 +539,7 @@ export default function AORenewalEdit() {
                   return <Badge variant={badgeVariant}>{label}</Badge>;
                 })()}
                 <span className="text-sm text-muted-foreground">Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
-                <span className="text-sm text-muted-foreground">Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
+                <span className="text-sm text-muted-foreground">Last contact: <strong className="text-foreground">{renewal.last_contact_date ? extractLocalDate(renewal.last_contact_date) : 'None logged'}</strong></span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
