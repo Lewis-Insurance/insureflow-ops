@@ -182,6 +182,32 @@ export function AORenewalContactLog({
         .eq("id", renewalId);
 
       if (renewalError) throw renewalError;
+
+      if (data.clearFollowUp) {
+        const { data: linkedTasks, error: taskFetchError } = await supabase
+          .from('tasks')
+          .select('id, metadata')
+          .eq('entity_type', 'ao_renewal')
+          .eq('entity_id', renewalId)
+          .eq('category', 'renewal')
+          .contains('metadata', { task_origin: 'ao_follow_up' })
+          .in('status', ['pending', 'in_progress']);
+
+        if (taskFetchError) throw taskFetchError;
+
+        if (linkedTasks && linkedTasks.length > 0) {
+          const taskIds = linkedTasks.map((task) => task.id);
+          const { error: taskUpdateError } = await supabase
+            .from('tasks')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            })
+            .in('id', taskIds);
+
+          if (taskUpdateError) throw taskUpdateError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
@@ -195,6 +221,10 @@ export function AORenewalContactLog({
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tasks:updated'));
+      }
 
       setNotes("");
       setContactDate(todayLocalDate());

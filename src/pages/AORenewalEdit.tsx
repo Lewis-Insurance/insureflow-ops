@@ -211,18 +211,22 @@ export default function AORenewalEdit() {
 
     setFollowUpSaving(true);
     try {
-      let taskAlreadyExists = false;
+      const trimmedReason = followUpDraft.reason.trim();
+      const hasFollowUp = Boolean(followUpDraft.date && trimmedReason);
 
       const { data: existingTasks, error: existingTasksError } = await supabase
         .from("tasks")
-        .select("id")
+        .select("id, status, due_at, title, description, metadata")
         .eq("entity_type", "ao_renewal")
         .eq("entity_id", id)
-        .eq("status", "pending")
+        .eq("category", "renewal")
+        .contains("metadata", { task_origin: "ao_follow_up" })
+        .in("status", ["pending", "in_progress"])
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (existingTasksError) throw existingTasksError;
-      taskAlreadyExists = Boolean(existingTasks && existingTasks.length > 0);
+      const existingTask = existingTasks?.[0] ?? null;
 
       await updateMutation.mutateAsync({
         id,
@@ -233,7 +237,7 @@ export default function AORenewalEdit() {
         },
       });
 
-      if (followUpDraft.date && followUpDraft.reason.trim() && !taskAlreadyExists) {
+      if (hasFollowUp) {
         const { data: authData } = await supabase.auth.getUser();
         const user = authData.user;
         if (!user) throw new Error("Not authenticated");
@@ -242,29 +246,63 @@ export default function AORenewalEdit() {
         const descriptionParts = [
           formData.policy_number ? `Policy: ${formData.policy_number}` : null,
           `Status: ${formData.status.replaceAll("_", " ")}`,
-          `Follow-up reason: ${followUpDraft.reason.trim()}`,
+          `Follow-up reason: ${trimmedReason}`,
           formData.last_contact_date ? `Last contact: ${formData.last_contact_date}` : null,
         ].filter(Boolean);
 
-        const { error: taskError } = await supabase.from("tasks").insert({
+        const taskPayload = {
           account_id: renewal?.account_id || null,
-          title: `Follow up with ${formData.customer_name} (${followUpDraft.reason.trim()})`,
+          title: `Follow up with ${formData.customer_name} (${trimmedReason})`,
           description: descriptionParts.join("\n"),
           due_at: dueAt,
           priority: formData.status === "waiting_on_insured" ? "high" : "medium",
-          category: "renewal",
+          category: "renewal" as const,
           entity_type: "ao_renewal",
           entity_id: id,
-          status: "pending",
-          created_by: user.id,
+          assignee_id: user.id,
           metadata: {
+            task_origin: "ao_follow_up",
             renewal_customer_name: formData.customer_name,
             renewal_policy_number: formData.policy_number,
             renewal_date: formData.renewal_date,
             renewal_follow_up_date: followUpDraft.date,
-            renewal_follow_up_reason: followUpDraft.reason.trim(),
+            renewal_follow_up_reason: trimmedReason,
           },
-        });
+        };
+
+        if (existingTask) {
+          const { error: taskError } = await supabase
+            .from("tasks")
+            .update({
+              ...taskPayload,
+              status: existingTask.status === "completed" || existingTask.status === "cancelled" ? "pending" : existingTask.status,
+              completed_at: null,
+            })
+            .eq("id", existingTask.id);
+
+          if (taskError) throw taskError;
+        } else {
+          const { error: taskError } = await supabase.from("tasks").insert({
+            ...taskPayload,
+            status: "pending",
+            created_by: user.id,
+          });
+
+          if (taskError) throw taskError;
+        }
+      } else if (existingTask) {
+        const { error: taskError } = await supabase
+          .from("tasks")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            metadata: {
+              ...(existingTask.metadata || {}),
+              task_origin: "ao_follow_up",
+              cleared_from_ao_follow_up: true,
+            },
+          })
+          .eq("id", existingTask.id);
 
         if (taskError) throw taskError;
       }
@@ -275,6 +313,10 @@ export default function AORenewalEdit() {
         follow_up_reason: followUpDraft.reason,
         follow_up_note: followUpDraft.note,
       }));
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("tasks:updated"));
+      }
 
       forceDirtyRegistryRender((value) => value + 1);
       toast({ title: "Success", description: "Follow-up updated" });
