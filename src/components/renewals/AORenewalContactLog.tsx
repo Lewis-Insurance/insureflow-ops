@@ -149,39 +149,35 @@ export function AORenewalContactLog({
 
       if (error) throw error;
 
-      const updates: Record<string, string | null> = {
-        last_contact_date: data.contact_date,
-      };
-
-      if (normalizedStatus) {
-        updates.status = normalizedStatus;
-      }
+      const renewalUpdates: Record<string, string | null> = {};
 
       if (effectiveStatus === "quoted") {
-        updates.quoted_at = new Date().toISOString();
-        updates.waiting_on_insured_since = null;
+        renewalUpdates.quoted_at = new Date().toISOString();
+        renewalUpdates.waiting_on_insured_since = null;
       }
 
       if (effectiveStatus === "waiting_on_insured") {
-        updates.waiting_on_insured_since = new Date().toISOString();
+        renewalUpdates.waiting_on_insured_since = new Date().toISOString();
       }
 
       if (["renewed", "lost", "cancelled", "moved"].includes(effectiveStatus || "")) {
-        updates.waiting_on_insured_since = null;
+        renewalUpdates.waiting_on_insured_since = null;
       }
 
       if (data.clearFollowUp) {
-        updates.follow_up_date = null;
-        updates.follow_up_reason = null;
-        updates.follow_up_note = null;
+        renewalUpdates.follow_up_date = null;
+        renewalUpdates.follow_up_reason = null;
+        renewalUpdates.follow_up_note = null;
       }
 
-      const { error: renewalError } = await supabase
-        .from("ao_renewals")
-        .update(updates)
-        .eq("id", renewalId);
+      if (Object.keys(renewalUpdates).length > 0) {
+        const { error: renewalError } = await supabase
+          .from("ao_renewals")
+          .update(renewalUpdates)
+          .eq("id", renewalId);
 
-      if (renewalError) throw renewalError;
+        if (renewalError) throw renewalError;
+      }
 
       if (data.clearFollowUp) {
         const { data: linkedTasks, error: taskFetchError } = await supabase
@@ -192,7 +188,10 @@ export function AORenewalContactLog({
           .eq('category', 'renewal')
           .in('status', ['pending', 'in_progress']);
 
-        if (taskFetchError) throw taskFetchError;
+        if (taskFetchError) {
+          console.error('Failed to fetch AO follow-up tasks after contact save', taskFetchError);
+          return;
+        }
 
         const aoFollowUpTaskIds = (linkedTasks || [])
           .filter((task) => task.metadata && (task.metadata as Record<string, unknown>).task_origin === 'ao_follow_up')
@@ -207,7 +206,9 @@ export function AORenewalContactLog({
             })
             .in('id', aoFollowUpTaskIds);
 
-          if (taskUpdateError) throw taskUpdateError;
+          if (taskUpdateError) {
+            console.error('Failed to complete AO follow-up tasks after contact save', taskUpdateError);
+          }
         }
       }
     },
