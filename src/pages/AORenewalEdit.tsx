@@ -537,7 +537,8 @@ export default function AORenewalEdit() {
                       label = `Due in ${diff} day${diff === 1 ? '' : 's'}`;
                     }
                   }
-                  return <Badge variant={tone as any}>{label}</Badge>;
+                  const badgeVariant = tone === 'destructive' ? 'destructive' : tone === 'default' ? 'default' : 'outline';
+                  return <Badge variant={badgeVariant}>{label}</Badge>;
                 })()}
                 <span className="text-sm text-muted-foreground">Current status: <strong className="text-foreground">{renewal.status.replaceAll('_', ' ')}</strong></span>
                 <span className="text-sm text-muted-foreground">Last contact: <strong className="text-foreground">{renewal.last_contact_date ? renewal.last_contact_date.split('T')[0] : 'None logged'}</strong></span>
