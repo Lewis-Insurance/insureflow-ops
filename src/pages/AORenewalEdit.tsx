@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayoutWithNavigationGuard } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalTerm } from "@/hooks/useAORenewals";
+import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
 import { AORenewalNotes } from "@/components/renewals/AORenewalNotes";
 import { AORenewalContactLog } from "@/components/renewals/AORenewalContactLog";
 import { AORenewalQuotes } from "@/components/renewals/AORenewalQuotes";
 import { AORenewalDocuments } from "@/components/renewals/AORenewalDocuments";
+import { AORenewalEditorContext, type AORenewalDirtyRegistration } from "@/components/renewals/aoRenewalEditor";
 import {
   addDaysLocalDate,
   differenceFromTodayInLocalDays,
@@ -84,12 +96,17 @@ export default function AORenewalEdit() {
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMovedModal, setShowMovedModal] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | number | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: "", reason: "", note: "" });
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [panelPrefs, setPanelPrefs] = useState(loadPanelPrefs);
 
   const initialDataLoaded = useRef(false);
+  const skipNavigationGuardRef = useRef(false);
+  const dirtySourcesRef = useRef<Map<string, AORenewalDirtyRegistration>>(new Map());
+  const [, forceDirtyRegistryRender] = useState(0);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -187,8 +204,26 @@ export default function AORenewalEdit() {
   const handleConfirmFollowUp = async () => {
     if (!id) return;
 
+    if (followUpDraft.date && !followUpDraft.reason.trim()) {
+      toast({ title: "Error", description: "Follow-up reason is required", variant: "destructive" });
+      return false;
+    }
+
     setFollowUpSaving(true);
     try {
+      let taskAlreadyExists = false;
+
+      const { data: existingTasks, error: existingTasksError } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("entity_type", "ao_renewal")
+        .eq("entity_id", id)
+        .eq("status", "pending")
+        .limit(1);
+
+      if (existingTasksError) throw existingTasksError;
+      taskAlreadyExists = Boolean(existingTasks && existingTasks.length > 0);
+
       await updateMutation.mutateAsync({
         id,
         updates: {
@@ -198,6 +233,42 @@ export default function AORenewalEdit() {
         },
       });
 
+      if (followUpDraft.date && followUpDraft.reason.trim() && !taskAlreadyExists) {
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData.user;
+        if (!user) throw new Error("Not authenticated");
+
+        const dueAt = new Date(`${followUpDraft.date}T12:00:00`).toISOString();
+        const descriptionParts = [
+          formData.policy_number ? `Policy: ${formData.policy_number}` : null,
+          `Status: ${formData.status.replaceAll("_", " ")}`,
+          `Follow-up reason: ${followUpDraft.reason.trim()}`,
+          formData.last_contact_date ? `Last contact: ${formData.last_contact_date}` : null,
+        ].filter(Boolean);
+
+        const { error: taskError } = await supabase.from("tasks").insert({
+          account_id: renewal?.account_id || null,
+          title: `Follow up with ${formData.customer_name} (${followUpDraft.reason.trim()})`,
+          description: descriptionParts.join("\n"),
+          due_at: dueAt,
+          priority: formData.status === "waiting_on_insured" ? "high" : "medium",
+          category: "renewal",
+          entity_type: "ao_renewal",
+          entity_id: id,
+          status: "pending",
+          created_by: user.id,
+          metadata: {
+            renewal_customer_name: formData.customer_name,
+            renewal_policy_number: formData.policy_number,
+            renewal_date: formData.renewal_date,
+            renewal_follow_up_date: followUpDraft.date,
+            renewal_follow_up_reason: followUpDraft.reason.trim(),
+          },
+        });
+
+        if (taskError) throw taskError;
+      }
+
       setFormData((prev) => ({
         ...prev,
         follow_up_date: followUpDraft.date,
@@ -205,9 +276,12 @@ export default function AORenewalEdit() {
         follow_up_note: followUpDraft.note,
       }));
 
+      forceDirtyRegistryRender((value) => value + 1);
       toast({ title: "Success", description: "Follow-up updated" });
+      return true;
     } catch {
       toast({ title: "Error", description: "Failed to update follow-up", variant: "destructive" });
+      return false;
     } finally {
       setFollowUpSaving(false);
     }
@@ -243,9 +317,132 @@ export default function AORenewalEdit() {
       });
 
       toast({ title: "Success", description: "Renewal updated successfully" });
+      forceDirtyRegistryRender((value) => value + 1);
+      return true;
     } catch {
       toast({ title: "Error", description: "Failed to update renewal", variant: "destructive" });
+      return false;
     }
+  };
+
+  const overviewDirty = useMemo(() => {
+    if (!renewal || !initialDataLoaded.current) return false;
+
+    const baseline = {
+      customer_name: renewal.customer_name || "",
+      policy_number: renewal.policy_number || "",
+      policy_type: renewal.policy_type || "",
+      renewal_date: extractLocalDate(renewal.renewal_date),
+      current_premium: renewal.current_premium?.toString() || "",
+      term_months: renewal.term_months ? renewal.term_months.toString() : "",
+      status: renewal.status || "pending",
+      priority: renewal.priority || "normal",
+      assigned_to: renewal.assigned_to || "",
+      last_contact_date: extractLocalDate(renewal.last_contact_date),
+      follow_up_date: extractLocalDate(renewal.follow_up_date),
+      follow_up_reason: renewal.follow_up_reason || "",
+      follow_up_note: renewal.follow_up_note || "",
+      losses_3yr: renewal.losses_3yr?.toString() ?? "0",
+      oldest_in_household: renewal.oldest_in_household?.toString() || "",
+      moved_carrier: renewal.moved_carrier || "",
+      moved_term: renewal.moved_term || "",
+      moved_premium: renewal.moved_premium?.toString() || "",
+    };
+
+    return JSON.stringify(formData) !== JSON.stringify(baseline);
+  }, [formData, renewal]);
+
+  const hasUnsavedChanges = overviewDirty || followUpDirty;
+
+  const registerDirtySource = (registration: AORenewalDirtyRegistration) => {
+    dirtySourcesRef.current.set(registration.id, registration);
+    forceDirtyRegistryRender((value) => value + 1);
+    return () => {
+      dirtySourcesRef.current.delete(registration.id);
+      forceDirtyRegistryRender((value) => value + 1);
+    };
+  };
+
+  const dirtyChildSources = Array.from(dirtySourcesRef.current.values()).filter((entry) => entry.isDirty());
+  const anyDirty = hasUnsavedChanges || dirtyChildSources.length > 0;
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!anyDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [anyDirty]);
+
+  const completeNavigation = (target: string | number | null) => {
+    if (target === null) return;
+    skipNavigationGuardRef.current = true;
+    if (typeof target === "number") {
+      navigate(target);
+    } else {
+      navigate(target);
+    }
+  };
+
+  const handleNavigationAttempt = (target: string) => {
+    if (skipNavigationGuardRef.current) {
+      skipNavigationGuardRef.current = false;
+      return true;
+    }
+
+    if (!anyDirty) return true;
+
+    setPendingNavigation(target);
+    setShowUnsavedDialog(true);
+    return false;
+  };
+
+  const handleBackNavigation = () => {
+    if (!anyDirty) {
+      skipNavigationGuardRef.current = true;
+      navigate(-1);
+      return;
+    }
+
+    setPendingNavigation(-1);
+    setShowUnsavedDialog(true);
+  };
+
+  const handleSaveAllPendingChanges = async () => {
+    let success = true;
+
+    if (overviewDirty) {
+      success = (await handleSubmit({ preventDefault: () => {} } as React.FormEvent)) && success;
+    }
+
+    if (success && followUpDirty) {
+      success = (await handleConfirmFollowUp()) && success;
+    }
+
+    if (success) {
+      for (const source of dirtySourcesRef.current.values()) {
+        if (!source.isDirty()) continue;
+        success = (await source.save()) && success;
+        if (!success) break;
+      }
+    }
+
+    return success;
+  };
+
+  const confirmNavigation = async (save: boolean) => {
+    if (save) {
+      const success = await handleSaveAllPendingChanges();
+      if (!success) return;
+    }
+
+    setShowUnsavedDialog(false);
+    const target = pendingNavigation;
+    setPendingNavigation(null);
+    completeNavigation(target);
   };
 
   const togglePanel = (panel: keyof typeof panelPrefs) => {
@@ -282,22 +479,23 @@ export default function AORenewalEdit() {
   const followUpHeadline = formData.follow_up_date ? formatLocalDateDisplay(formData.follow_up_date) : "No follow-up date";
 
   if (isLoading) {
-    return <AppLayout><div className="min-h-screen bg-[#060b16] p-6 md:p-8"><div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6"><Skeleton className="h-16 w-full rounded-3xl bg-white/5" /><div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]"><Skeleton className="h-[460px] rounded-3xl bg-white/5" /><Skeleton className="h-[460px] rounded-3xl bg-white/5" /></div><Skeleton className="h-[520px] rounded-3xl bg-white/5" /></div></div></AppLayout>;
+    return <AppLayoutWithNavigationGuard><div className="min-h-screen bg-[#060b16] p-6 md:p-8"><div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6"><Skeleton className="h-16 w-full rounded-3xl bg-white/5" /><div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]"><Skeleton className="h-[460px] rounded-3xl bg-white/5" /><Skeleton className="h-[460px] rounded-3xl bg-white/5" /></div><Skeleton className="h-[520px] rounded-3xl bg-white/5" /></div></div></AppLayoutWithNavigationGuard>;
   }
 
   if (!renewal) {
-    return <AppLayout><div className="min-h-screen bg-[#060b16] p-6 md:p-8"><Card className={cn(surfaceCard, "mx-auto max-w-2xl rounded-3xl")}><CardContent className="pt-6 text-center"><p className="text-slate-300">Renewal not found</p><Button variant="outline" onClick={() => navigate(-1)} className="mt-4">Back</Button></CardContent></Card></div></AppLayout>;
+    return <AppLayoutWithNavigationGuard><div className="min-h-screen bg-[#060b16] p-6 md:p-8"><Card className={cn(surfaceCard, "mx-auto max-w-2xl rounded-3xl")}><CardContent className="pt-6 text-center"><p className="text-slate-300">Renewal not found</p><Button variant="outline" onClick={() => navigate(-1)} className="mt-4">Back</Button></CardContent></Card></div></AppLayoutWithNavigationGuard>;
   }
 
   return (
-    <AppLayout>
+    <AORenewalEditorContext.Provider value={{ registerDirtySource }}>
+    <AppLayoutWithNavigationGuard onNavigateAttempt={handleNavigationAttempt}>
       <div className="min-h-screen bg-[#060b16] p-4 md:p-6 xl:p-8">
         <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
           <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(76,101,255,0.25),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(7,11,22,0.98))] p-5 shadow-[0_32px_120px_rgba(0,0,0,0.45)] md:p-7">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                  <Button variant="ghost" className="h-9 rounded-full border border-white/10 bg-white/5 px-4 text-slate-200 hover:bg-white/10" onClick={() => navigate(-1)}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
+                  <Button variant="ghost" className="h-9 rounded-full border border-white/10 bg-white/5 px-4 text-slate-200 hover:bg-white/10" onClick={handleBackNavigation}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.22em] text-slate-400">AO Renewal Command Center</span>
                 </div>
                 <div className="space-y-2">
@@ -409,8 +607,24 @@ export default function AORenewalEdit() {
 
           <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
           <MovedStatusModal open={showMovedModal} onOpenChange={handleMovedCancel} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
+          <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes on this renewal. Save them before leaving?
+                  {dirtyChildSources.length > 0 ? ` Pending: ${dirtyChildSources.map((source) => source.label).join(", ")}.` : ""}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => confirmNavigation(false)}>Leave Anyways</AlertDialogCancel>
+                <AlertDialogAction onClick={() => confirmNavigation(true)}>Save Changes</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
-    </AppLayout>
+    </AppLayoutWithNavigationGuard>
+    </AORenewalEditorContext.Provider>
   );
 }

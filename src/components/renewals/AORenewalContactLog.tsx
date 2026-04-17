@@ -15,6 +15,7 @@ import { addDaysLocalDate, extractLocalDate, formatLocalDateDisplay, todayLocalD
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAORenewalEditor } from "./aoRenewalEditor";
 
 interface ContactLog {
   id: string;
@@ -63,6 +64,7 @@ export function AORenewalContactLog({
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const editorContext = useAORenewalEditor();
 
   useEffect(() => {
     setStatus(currentStatus || "");
@@ -223,6 +225,32 @@ export function AORenewalContactLog({
       clearFollowUp,
     });
   };
+
+  const contactDraftDirty = useMemo(
+    () => Boolean(notes.trim() || status !== (currentStatus || "") || contactMethod !== "phone" || contactDate !== todayLocalDate()),
+    [notes, status, currentStatus, contactMethod, contactDate],
+  );
+
+  useEffect(() => {
+    if (!editorContext) return;
+
+    return editorContext.registerDirtySource({
+      id: `ao-renewal-contact-${renewalId}`,
+      label: 'Contact Log',
+      isDirty: () => Boolean(notes.trim() || status !== (currentStatus || "") || contactMethod !== "phone" || contactDate !== todayLocalDate()),
+      save: async () => {
+        if (!notes.trim() || !contactDate) return true;
+        await addLogMutation.mutateAsync({
+          contact_date: contactDate,
+          contact_method: contactMethod,
+          status,
+          notes,
+          clearFollowUp: false,
+        });
+        return true;
+      },
+    });
+  }, [editorContext, renewalId, notes, status, currentStatus, contactMethod, contactDate, addLogMutation]);
 
   const getInitials = (name: string) => {
     return name
