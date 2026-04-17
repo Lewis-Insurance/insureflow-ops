@@ -239,56 +239,60 @@ export default function AORenewalEdit() {
       if (hasFollowUp) {
         const { data: authData } = await supabase.auth.getUser();
         const user = authData.user;
-        if (!user) throw new Error("Not authenticated");
+        if (user) {
+          const dueAt = new Date(`${followUpDraft.date}T12:00:00`).toISOString();
+          const descriptionParts = [
+            formData.policy_number ? `Policy: ${formData.policy_number}` : null,
+            `Status: ${formData.status.replaceAll("_", " ")}`,
+            `Follow-up reason: ${trimmedReason}`,
+            formData.last_contact_date ? `Last contact: ${formData.last_contact_date}` : null,
+          ].filter(Boolean);
 
-        const dueAt = new Date(`${followUpDraft.date}T12:00:00`).toISOString();
-        const descriptionParts = [
-          formData.policy_number ? `Policy: ${formData.policy_number}` : null,
-          `Status: ${formData.status.replaceAll("_", " ")}`,
-          `Follow-up reason: ${trimmedReason}`,
-          formData.last_contact_date ? `Last contact: ${formData.last_contact_date}` : null,
-        ].filter(Boolean);
+          const taskPayload = {
+            account_id: null,
+            title: `Follow up with ${formData.customer_name} (${trimmedReason})`,
+            description: descriptionParts.join("\n"),
+            due_at: dueAt,
+            priority: formData.status === "waiting_on_insured" ? "high" : "medium",
+            category: "renewal" as const,
+            entity_type: "ao_renewal",
+            entity_id: id,
+            assignee_id: user.id,
+            metadata: {
+              task_origin: "ao_follow_up",
+              task_scope: "ao_renewals_only",
+              renewal_customer_name: formData.customer_name,
+              renewal_policy_number: formData.policy_number,
+              renewal_date: formData.renewal_date,
+              renewal_follow_up_date: followUpDraft.date,
+              renewal_follow_up_reason: trimmedReason,
+            },
+          };
 
-        const taskPayload = {
-          account_id: null,
-          title: `Follow up with ${formData.customer_name} (${trimmedReason})`,
-          description: descriptionParts.join("\n"),
-          due_at: dueAt,
-          priority: formData.status === "waiting_on_insured" ? "high" : "medium",
-          category: "renewal" as const,
-          entity_type: "ao_renewal",
-          entity_id: id,
-          assignee_id: user.id,
-          metadata: {
-            task_origin: "ao_follow_up",
-            task_scope: "ao_renewals_only",
-            renewal_customer_name: formData.customer_name,
-            renewal_policy_number: formData.policy_number,
-            renewal_date: formData.renewal_date,
-            renewal_follow_up_date: followUpDraft.date,
-            renewal_follow_up_reason: trimmedReason,
-          },
-        };
+          if (existingTask) {
+            const { error: taskError } = await supabase
+              .from("tasks")
+              .update({
+                ...taskPayload,
+                status: existingTask.status === "completed" || existingTask.status === "cancelled" ? "pending" : existingTask.status,
+                completed_at: null,
+              })
+              .eq("id", existingTask.id);
 
-        if (existingTask) {
-          const { error: taskError } = await supabase
-            .from("tasks")
-            .update({
+            if (taskError) {
+              console.error("Failed to sync AO follow-up task after renewal save", taskError);
+            }
+          } else {
+            const { error: taskError } = await supabase.from("tasks").insert({
               ...taskPayload,
-              status: existingTask.status === "completed" || existingTask.status === "cancelled" ? "pending" : existingTask.status,
-              completed_at: null,
-            })
-            .eq("id", existingTask.id);
+              status: "pending",
+              created_by: user.id,
+            });
 
-          if (taskError) throw taskError;
-        } else {
-          const { error: taskError } = await supabase.from("tasks").insert({
-            ...taskPayload,
-            status: "pending",
-            created_by: user.id,
-          });
-
-          if (taskError) throw taskError;
+            if (taskError) {
+              console.error("Failed to create AO follow-up task after renewal save", taskError);
+            }
+          }
         }
       } else if (existingTask) {
         const { error: taskError } = await supabase
@@ -305,7 +309,9 @@ export default function AORenewalEdit() {
           })
           .eq("id", existingTask.id);
 
-        if (taskError) throw taskError;
+        if (taskError) {
+          console.error("Failed to complete AO follow-up task after renewal save", taskError);
+        }
       }
 
       setFormData((prev) => ({
