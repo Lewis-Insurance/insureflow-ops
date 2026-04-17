@@ -233,7 +233,6 @@ export default function AORenewalEdit() {
         updates: {
           follow_up_date: normalizedFollowUpDate,
           follow_up_reason: trimmedReason || null,
-          follow_up_note: followUpDraft.note.trim() || null,
         },
       });
 
@@ -319,12 +318,12 @@ export default function AORenewalEdit() {
         ...prev,
         follow_up_date: normalizedFollowUpDate || "",
         follow_up_reason: trimmedReason,
-        follow_up_note: followUpDraft.note,
       }));
       setFollowUpDraft((prev) => ({
         ...prev,
         date: normalizedFollowUpDate || "",
         reason: trimmedReason,
+        note: "",
       }));
 
       if (typeof window !== "undefined") {
