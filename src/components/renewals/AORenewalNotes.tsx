@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAORenewalEditor } from "./aoRenewalEditor";
 
 interface Note {
   id: string;
@@ -27,6 +28,7 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
   const [newNote, setNewNote] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const editorContext = useAORenewalEditor();
 
   // Fetch notes
   const { data: notes = [], isLoading } = useQuery({
@@ -95,6 +97,23 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     addNoteMutation.mutate(newNote);
   };
 
+  const hasDraft = useMemo(() => newNote.trim().length > 0, [newNote]);
+
+  useEffect(() => {
+    if (!editorContext) return;
+
+    return editorContext.registerDirtySource({
+      id: `ao-renewal-notes-${renewalId}`,
+      label: 'Notes',
+      isDirty: () => newNote.trim().length > 0,
+      save: async () => {
+        if (!newNote.trim()) return true;
+        await addNoteMutation.mutateAsync(newNote);
+        return true;
+      },
+    });
+  }, [editorContext, renewalId, newNote, addNoteMutation]);
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -120,7 +139,7 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
           />
           <Button
             onClick={handleAddNote}
-            disabled={!newNote.trim() || addNoteMutation.isPending}
+            disabled={!hasDraft || addNoteMutation.isPending}
             size="sm"
           >
             {addNoteMutation.isPending ? (
