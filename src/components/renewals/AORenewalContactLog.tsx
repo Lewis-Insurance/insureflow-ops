@@ -303,11 +303,6 @@ export function AORenewalContactLog({
             />
           </div>
 
-          <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground space-y-2">
-            <div className="font-medium text-foreground">Current next move</div>
-            <div>{followUpSummary}</div>
-            <div>Use the Follow-Up panel above to change the commitment. Use this log only for what just happened.</div>
-          </div>
 
           <Button
             onClick={handleAddLog}
