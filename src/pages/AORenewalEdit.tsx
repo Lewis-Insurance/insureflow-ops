@@ -251,7 +251,7 @@ export default function AORenewalEdit() {
         ].filter(Boolean);
 
         const taskPayload = {
-          account_id: renewal?.account_id || null,
+          account_id: null,
           title: `Follow up with ${formData.customer_name} (${trimmedReason})`,
           description: descriptionParts.join("\n"),
           due_at: dueAt,
@@ -262,6 +262,7 @@ export default function AORenewalEdit() {
           assignee_id: user.id,
           metadata: {
             task_origin: "ao_follow_up",
+            task_scope: "ao_renewals_only",
             renewal_customer_name: formData.customer_name,
             renewal_policy_number: formData.policy_number,
             renewal_date: formData.renewal_date,
@@ -299,6 +300,7 @@ export default function AORenewalEdit() {
             metadata: {
               ...(existingTask.metadata || {}),
               task_origin: "ao_follow_up",
+              task_scope: "ao_renewals_only",
               cleared_from_ao_follow_up: true,
             },
           })
