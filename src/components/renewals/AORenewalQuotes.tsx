@@ -120,106 +120,108 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
               No quotes added yet. Click "Add Quote" to enter a competitive quote.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0b1020]">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/10 hover:bg-transparent">
-                    <TableHead className="text-slate-300">Carrier</TableHead>
-                    <TableHead className="text-slate-300">Premium</TableHead>
-                    <TableHead className="text-slate-300">Term</TableHead>
-                    <TableHead className="text-slate-300">Annual</TableHead>
-                    {currentPremium && currentTermMonths && <TableHead className="text-slate-300">Savings</TableHead>}
-                    <TableHead className="text-slate-300">Status</TableHead>
-                    <TableHead className="text-slate-300">Document</TableHead>
-                    <TableHead className="text-right text-slate-300">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quotes.map((quote) => {
-                    const annualPremium = calculateAnnualPremium(quote);
-                    const savings = calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
+            <>
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0b1020]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead className="text-slate-300">Carrier</TableHead>
+                      <TableHead className="text-slate-300">Premium</TableHead>
+                      <TableHead className="text-slate-300">Term</TableHead>
+                      <TableHead className="text-slate-300">Annual</TableHead>
+                      {currentPremium && currentTermMonths && <TableHead className="text-slate-300">Savings</TableHead>}
+                      <TableHead className="text-slate-300">Status</TableHead>
+                      <TableHead className="text-slate-300">Document</TableHead>
+                      <TableHead className="text-right text-slate-300">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quotes.map((quote) => {
+                      const annualPremium = calculateAnnualPremium(quote);
+                      const savings = calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
 
-                    return (
-                      <TableRow key={quote.id} className="border-white/10 hover:bg-white/5">
-                        <TableCell className="font-medium text-white">{quote.carrier}</TableCell>
-                        <TableCell className="text-slate-200">{formatCurrency(quote.premium)}</TableCell>
-                        <TableCell className="text-slate-300">{quote.term_months} months</TableCell>
-                        <TableCell className="text-slate-200">{formatCurrency(annualPremium)}</TableCell>
-                        {currentPremium && currentTermMonths && (
+                      return (
+                        <TableRow key={quote.id} className="border-white/10 hover:bg-white/5">
+                          <TableCell className="font-medium text-white">{quote.carrier}</TableCell>
+                          <TableCell className="text-slate-200">{formatCurrency(quote.premium)}</TableCell>
+                          <TableCell className="text-slate-300">{quote.term_months} months</TableCell>
+                          <TableCell className="text-slate-200">{formatCurrency(annualPremium)}</TableCell>
+                          {currentPremium && currentTermMonths && (
+                            <TableCell>
+                              {savings && (
+                                <div className="flex items-center gap-1.5">
+                                  {savings.amount > 0 ? (
+                                    <>
+                                      <TrendingDown className="h-4 w-4 text-emerald-300" />
+                                      <span className="font-medium text-emerald-300">
+                                        Save {formatCurrency(savings.amount)}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <TrendingUp className="h-4 w-4 text-rose-300" />
+                                      <span className="font-medium text-rose-300">
+                                        +{formatCurrency(Math.abs(savings.amount))}
+                                      </span>
+                                    </>
+                                  )}
+                                  <span className="text-xs text-slate-500">({savings.percentage.toFixed(1)}%)</span>
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
-                            {savings && (
-                              <div className="flex items-center gap-1.5">
-                                {savings.amount > 0 ? (
-                                  <>
-                                    <TrendingDown className="h-4 w-4 text-emerald-300" />
-                                    <span className="font-medium text-emerald-300">
-                                      Save {formatCurrency(savings.amount)}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <TrendingUp className="h-4 w-4 text-rose-300" />
-                                    <span className="font-medium text-rose-300">
-                                      +{formatCurrency(Math.abs(savings.amount))}
-                                    </span>
-                                  </>
-                                )}
-                                <span className="text-xs text-slate-500">({Math.abs(savings.percentage).toFixed(1)}%)</span>
-                              </div>
+                            <div className="space-y-1">
+                              {getStatusBadge(quote.status)}
+                              {quote.status === 'denied' && quote.denial_reason && (
+                                <div className="text-xs text-slate-500">
+                                  {quote.denial_reason}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {quote.document_url && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-slate-300 hover:bg-white/10 hover:text-white"
+                                asChild
+                              >
+                                <a href={quote.document_url} target="_blank" rel="noopener noreferrer">
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </Button>
                             )}
                           </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="space-y-1">
-                            {getStatusBadge(quote.status)}
-                            {quote.status === 'denied' && quote.denial_reason && (
-                              <div className="text-xs text-slate-500">
-                                {quote.denial_reason}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {quote.document_url && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-slate-300 hover:bg-white/10 hover:text-white"
-                              asChild
-                            >
-                              <a href={quote.document_url} target="_blank" rel="noopener noreferrer">
-                                <FileText className="h-4 w-4 mr-1" />
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            </Button>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-slate-300 hover:bg-white/10 hover:text-white"
-                              onClick={() => setEditQuote(quote)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-slate-300 hover:bg-white/10 hover:text-white"
-                              onClick={() => handleDelete(quote.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-slate-300 hover:bg-white/10 hover:text-white"
+                                onClick={() => setEditQuote(quote)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-slate-300 hover:bg-white/10 hover:text-white"
+                                onClick={() => handleDelete(quote.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
 
               {quotes.some(q => q.notes) && (
                 <div className="mt-4 space-y-2">
@@ -231,7 +233,7 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                   ))}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
