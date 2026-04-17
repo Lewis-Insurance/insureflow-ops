@@ -196,9 +196,8 @@ export default function AORenewalEdit() {
   const followUpDirty = useMemo(
     () =>
       followUpDraft.date !== formData.follow_up_date ||
-      followUpDraft.reason !== formData.follow_up_reason ||
-      followUpDraft.note !== formData.follow_up_note,
-    [followUpDraft, formData.follow_up_date, formData.follow_up_reason, formData.follow_up_note],
+      followUpDraft.reason !== formData.follow_up_reason,
+    [followUpDraft.date, followUpDraft.reason, formData.follow_up_date, formData.follow_up_reason],
   );
 
   const handleConfirmFollowUp = async () => {
@@ -228,13 +227,15 @@ export default function AORenewalEdit() {
       if (existingTasksError) throw existingTasksError;
       const existingTask = existingTasks?.find((task) => task.metadata && (task.metadata as Record<string, unknown>).task_origin === "ao_follow_up") ?? null;
 
-      await updateMutation.mutateAsync({
-        id,
-        updates: {
+      const { error: followUpUpdateError } = await supabase
+        .from("ao_renewals")
+        .update({
           follow_up_date: normalizedFollowUpDate,
           follow_up_reason: trimmedReason || null,
-        },
-      });
+        })
+        .eq("id", id);
+
+      if (followUpUpdateError) throw followUpUpdateError;
 
       if (hasFollowUp) {
         const { data: authData } = await supabase.auth.getUser();
