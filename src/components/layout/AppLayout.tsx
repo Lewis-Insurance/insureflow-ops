@@ -452,8 +452,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
         context={context}
       />
 
-      {/* Floating Team Messenger */}
-      <FloatingMessenger />
     </SidebarProvider>
   );
 }
