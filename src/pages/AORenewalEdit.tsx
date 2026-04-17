@@ -220,13 +220,12 @@ export default function AORenewalEdit() {
         .eq("entity_type", "ao_renewal")
         .eq("entity_id", id)
         .eq("category", "renewal")
-        .contains("metadata", { task_origin: "ao_follow_up" })
         .in("status", ["pending", "in_progress"])
         .order("created_at", { ascending: false })
-        .limit(1);
+        .limit(10);
 
       if (existingTasksError) throw existingTasksError;
-      const existingTask = existingTasks?.[0] ?? null;
+      const existingTask = existingTasks?.find((task) => task.metadata && (task.metadata as Record<string, unknown>).task_origin === "ao_follow_up") ?? null;
 
       await updateMutation.mutateAsync({
         id,
@@ -323,8 +322,13 @@ export default function AORenewalEdit() {
       forceDirtyRegistryRender((value) => value + 1);
       toast({ title: "Success", description: "Follow-up updated" });
       return true;
-    } catch {
-      toast({ title: "Error", description: "Failed to update follow-up", variant: "destructive" });
+    } catch (error) {
+      console.error("Failed to update AO follow-up", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update follow-up",
+        variant: "destructive",
+      });
       return false;
     } finally {
       setFollowUpSaving(false);

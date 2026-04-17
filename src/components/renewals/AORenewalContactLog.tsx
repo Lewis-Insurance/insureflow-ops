@@ -190,20 +190,22 @@ export function AORenewalContactLog({
           .eq('entity_type', 'ao_renewal')
           .eq('entity_id', renewalId)
           .eq('category', 'renewal')
-          .contains('metadata', { task_origin: 'ao_follow_up' })
           .in('status', ['pending', 'in_progress']);
 
         if (taskFetchError) throw taskFetchError;
 
-        if (linkedTasks && linkedTasks.length > 0) {
-          const taskIds = linkedTasks.map((task) => task.id);
+        const aoFollowUpTaskIds = (linkedTasks || [])
+          .filter((task) => task.metadata && (task.metadata as Record<string, unknown>).task_origin === 'ao_follow_up')
+          .map((task) => task.id);
+
+        if (aoFollowUpTaskIds.length > 0) {
           const { error: taskUpdateError } = await supabase
             .from('tasks')
             .update({
               status: 'completed',
               completed_at: new Date().toISOString(),
             })
-            .in('id', taskIds);
+            .in('id', aoFollowUpTaskIds);
 
           if (taskUpdateError) throw taskUpdateError;
         }
