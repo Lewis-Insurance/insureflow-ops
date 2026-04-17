@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, CheckSquare, ArrowRightLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckSquare, ArrowRightLeft, CalendarClock } from 'lucide-react';
 import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalPriority, type AORenewal, type AORenewalTerm } from '@/hooks/useAORenewals';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,8 @@ export default function AORenewalEdit() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMovedModal, setShowMovedModal] = useState(false);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
+  const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '', note: '' });
+  const [followUpSaving, setFollowUpSaving] = useState(false);
 
   // Track if we've loaded initial data to prevent form reset after save
   const initialDataLoaded = useRef(false);
@@ -61,7 +63,7 @@ export default function AORenewalEdit() {
   useEffect(() => {
     if (renewal && !initialDataLoaded.current) {
       initialDataLoaded.current = true;
-      setFormData({
+      const nextFormData = {
         customer_name: renewal.customer_name || '',
         policy_number: renewal.policy_number || '',
         policy_type: renewal.policy_type || '',
@@ -80,6 +82,12 @@ export default function AORenewalEdit() {
         moved_carrier: renewal.moved_carrier || '',
         moved_term: renewal.moved_term || '',
         moved_premium: renewal.moved_premium?.toString() || '',
+      };
+      setFormData(nextFormData);
+      setFollowUpDraft({
+        date: nextFormData.follow_up_date,
+        reason: nextFormData.follow_up_reason,
+        note: nextFormData.follow_up_note,
       });
     }
   }, [renewal]);
@@ -112,6 +120,54 @@ export default function AORenewalEdit() {
     setPendingMovedStatus(false);
     setShowMovedModal(false);
   };
+
+  const followUpDirty = useMemo(() => (
+    followUpDraft.date !== formData.follow_up_date ||
+    followUpDraft.reason !== formData.follow_up_reason ||
+    followUpDraft.note !== formData.follow_up_note
+  ), [followUpDraft, formData.follow_up_date, formData.follow_up_reason, formData.follow_up_note]);
+
+  const handleConfirmFollowUp = async () => {
+    if (!id) return;
+
+    setFollowUpSaving(true);
+    try {
+      await updateMutation.mutateAsync({
+        id,
+        updates: {
+          follow_up_date: followUpDraft.date || null,
+          follow_up_reason: followUpDraft.reason.trim() || null,
+          follow_up_note: followUpDraft.note.trim() || null,
+        },
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        follow_up_date: followUpDraft.date,
+        follow_up_reason: followUpDraft.reason,
+        follow_up_note: followUpDraft.note,
+      }));
+
+      toast({
+        title: 'Success',
+        description: 'Follow-up updated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update follow-up',
+        variant: 'destructive',
+      });
+    } finally {
+      setFollowUpSaving(false);
+    }
+  };
+
+  const followUpSummary = [
+    formData.follow_up_date ? `Next follow-up ${new Date(formData.follow_up_date + 'T00:00:00').toLocaleDateString()}` : null,
+    formData.follow_up_reason || null,
+    formData.follow_up_note || null,
+  ].filter(Boolean).join(' • ') || 'No follow-up committed yet';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,10 +510,18 @@ export default function AORenewalEdit() {
               <CardTitle>Follow-Up</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarClock className="h-4 w-4" />
+                  Current follow-up commitment
+                </div>
+                <div className="text-sm text-muted-foreground">{followUpSummary}</div>
+              </div>
+
               <div className="flex items-center gap-3 flex-wrap">
                 {(() => {
                   const today = new Date();
-                  const followUpDate = formData.follow_up_date ? new Date(formData.follow_up_date + 'T00:00:00') : null;
+                  const followUpDate = followUpDraft.date ? new Date(followUpDraft.date + 'T00:00:00') : null;
                   let label = 'Not set';
                   let tone = 'outline';
                   if (followUpDate) {
@@ -485,28 +549,28 @@ export default function AORenewalEdit() {
                   <Input
                     id="follow_up_panel_date"
                     type="date"
-                    value={formData.follow_up_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_date: e.target.value }))}
+                    value={followUpDraft.date}
+                    onChange={(e) => setFollowUpDraft(prev => ({ ...prev, date: e.target.value }))}
                   />
                   <div className="flex flex-wrap gap-2 mt-2">
                     <Button type="button" size="sm" variant="outline" onClick={() => {
                       const d = new Date(); d.setDate(d.getDate() + 1);
-                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
                     }}>Tomorrow</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
                       const d = new Date(); d.setDate(d.getDate() + 3);
-                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
                     }}>+3 days</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
                       const d = new Date(); d.setDate(d.getDate() + 7);
-                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
                     }}>+7 days</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
                       const d = new Date();
                       const day = d.getDay();
                       const add = day === 0 ? 1 : 8 - day;
                       d.setDate(d.getDate() + add);
-                      setFormData(prev => ({ ...prev, follow_up_date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
                     }}>Next week</Button>
                   </div>
                 </div>
@@ -521,9 +585,9 @@ export default function AORenewalEdit() {
                   <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
                   <Input
                     id="follow_up_reason"
-                    value={formData.follow_up_reason}
+                    value={followUpDraft.reason}
                     maxLength={120}
-                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_reason: e.target.value }))}
+                    onChange={(e) => setFollowUpDraft(prev => ({ ...prev, reason: e.target.value }))}
                     placeholder="e.g. waiting on insured, quote review"
                   />
                 </div>
@@ -531,9 +595,9 @@ export default function AORenewalEdit() {
                   <Label htmlFor="follow_up_note">Follow-Up Note</Label>
                   <Textarea
                     id="follow_up_note"
-                    value={formData.follow_up_note}
+                    value={followUpDraft.note}
                     maxLength={240}
-                    onChange={(e) => setFormData(prev => ({ ...prev, follow_up_note: e.target.value }))}
+                    onChange={(e) => setFollowUpDraft(prev => ({ ...prev, note: e.target.value }))}
                     placeholder="Short context for the next call"
                     rows={3}
                   />
@@ -541,8 +605,13 @@ export default function AORenewalEdit() {
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                <Button type="button" variant="outline" onClick={() => setFormData(prev => ({ ...prev, follow_up_date: '', follow_up_reason: '', follow_up_note: '' }))}>Clear follow-up</Button>
-                <Button type="button" variant="outline" onClick={() => setFormData(prev => ({ ...prev, follow_up_date: '', }))}>Mark handled</Button>
+                <Button type="button" variant="outline" onClick={() => setFollowUpDraft({ date: '', reason: '', note: '' })}>Clear</Button>
+                <Button type="button" onClick={handleConfirmFollowUp} disabled={!followUpDirty || followUpSaving || updateMutation.isPending}>
+                  {(followUpSaving || updateMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Confirm Follow-Up
+                </Button>
               </div>
             </CardContent>
           </Card>
