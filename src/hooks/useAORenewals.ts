@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { parseLocalDate, todayLocalDate } from "@/lib/date/localDate";
 
 // Types
 export type AORenewalStatus =
@@ -136,11 +137,11 @@ const ACTIVE_STATUSES: AORenewalStatus[] = [
 const DEFAULT_HIDDEN_STATUSES: AORenewalStatus[] = ["moved", "cancelled", "lost"];
 const COMPLETED_STATUSES: AORenewalStatus[] = ["renewed", "lost", "cancelled", "moved"];
 
-const startOfToday = () => startOfDay(new Date());
+const startOfToday = () => parseLocalDate(todayLocalDate());
 
 const normalizeDate = (date: string | null | undefined) => {
   if (!date) return null;
-  return startOfDay(new Date(date));
+  return parseLocalDate(date.slice(0, 10));
 };
 
 export const getAORenewalOperationalMetrics = (
