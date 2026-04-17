@@ -46,6 +46,7 @@ import type { QuestionTemplate, ClientIntelligenceResponse, ActionItem } from '@
 import { cn } from '@/lib/utils';
 import { CopilotResponse } from './CopilotResponse';
 import { supabase } from '@/integrations/supabase/client';
+import { addDaysLocalDate, localDateToNoonIso, todayLocalDate } from '@/lib/date/localDate';
 
 // =============================================================================
 // ICON MAPPING
@@ -113,19 +114,15 @@ export function ClientIntelligencePanel({
         const lowerSuggestion = actionItem.due_suggestion.toLowerCase();
         
         if (lowerSuggestion.includes('7 day') || lowerSuggestion.includes('week')) {
-          now.setDate(now.getDate() + 7);
-          dueDate = now.toISOString().split('T')[0];
+          dueDate = addDaysLocalDate(now, 7);
         } else if (lowerSuggestion.includes('30 day') || lowerSuggestion.includes('month')) {
-          now.setDate(now.getDate() + 30);
-          dueDate = now.toISOString().split('T')[0];
+          dueDate = addDaysLocalDate(now, 30);
         } else if (lowerSuggestion.includes('14 day') || lowerSuggestion.includes('two week')) {
-          now.setDate(now.getDate() + 14);
-          dueDate = now.toISOString().split('T')[0];
+          dueDate = addDaysLocalDate(now, 14);
         } else if (lowerSuggestion.includes('tomorrow')) {
-          now.setDate(now.getDate() + 1);
-          dueDate = now.toISOString().split('T')[0];
+          dueDate = addDaysLocalDate(now, 1);
         } else if (lowerSuggestion.includes('today') || lowerSuggestion.includes('immediately')) {
-          dueDate = now.toISOString().split('T')[0];
+          dueDate = todayLocalDate();
         }
       }
 

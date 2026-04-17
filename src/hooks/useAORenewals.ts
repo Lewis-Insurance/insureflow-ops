@@ -1,11 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { parseLocalDate, todayLocalDate } from "@/lib/date/localDate";
 
 // Types
-export type AORenewalStatus = "pending" | "contacted" | "quoted" | "renewed" | "lost" | "cancelled" | "moved";
+export type AORenewalStatus =
+  | "pending"
+  | "contacted"
+  | "quoted"
+  | "waiting_on_insured"
+  | "renewed"
+  | "lost"
+  | "cancelled"
+  | "moved";
 export type AORenewalPriority = "low" | "normal" | "high" | "urgent";
 export type AORenewalTerm = "6_month" | "annual";
+export type AORenewalQueue =
+  | "all"
+  | "active"
+  | "needs_first_contact"
+  | "needs_quote"
+  | "waiting_on_insured"
+  | "stale_follow_up"
+  | "follow_up_due"
+  | "expiring_30"
+  | "critical_window";
 
 export interface AORenewalCustomData {
   loss_count?: string;
@@ -36,7 +56,13 @@ export interface AORenewal {
   created_at: string;
   updated_at: string;
   last_contact_date: string | null;
-  // Moved status fields
+  follow_up_date: string | null;
+  follow_up_reason: string | null;
+  follow_up_note: string | null;
+  follow_up_completed_at: string | null;
+  follow_up_cleared_at: string | null;
+  quoted_at: string | null;
+  waiting_on_insured_since: string | null;
   moved_carrier: string | null;
   moved_term: AORenewalTerm | null;
   moved_premium: number | null;
@@ -73,8 +99,206 @@ export interface ImportResult {
   errors: string[];
 }
 
+export interface AORenewalOperationalMetrics {
+  daysUntilRenewal: number;
+  daysSinceContact: number | null;
+  daysUntilFollowUp: number | null;
+  isFollowUpOverdue: boolean;
+  isFollowUpDueSoon: boolean;
+  isPendingInside30Days: boolean;
+  isCriticalWindow: boolean;
+  staleReason: string | null;
+  needsAttention: boolean;
+  urgencyRank: number;
+}
+
+export interface AORenewalWorkQueueSummary {
+  activeCount: number;
+  needsFirstContact: number;
+  needsQuote: number;
+  waitingOnInsured: number;
+  staleFollowUp: number;
+  followUpDue: number;
+  expiringIn30Days: number;
+  criticalWindow: number;
+  onPace: boolean;
+  onPaceReason: string;
+}
+
 type AORenewalInsert = Omit<AORenewal, "id" | "created_at" | "updated_at">;
 type AORenewalUpdate = Partial<Omit<AORenewal, "id" | "created_at" | "updated_at">>;
+
+const ACTIVE_STATUSES: AORenewalStatus[] = [
+  "pending",
+  "contacted",
+  "quoted",
+  "waiting_on_insured",
+];
+const DEFAULT_HIDDEN_STATUSES: AORenewalStatus[] = ["moved", "cancelled", "lost"];
+const COMPLETED_STATUSES: AORenewalStatus[] = ["renewed", "lost", "cancelled", "moved"];
+
+const startOfToday = () => parseLocalDate(todayLocalDate());
+
+const normalizeDate = (date: string | null | undefined) => {
+  if (!date) return null;
+  return parseLocalDate(date.slice(0, 10));
+};
+
+export const getAORenewalOperationalMetrics = (
+  renewal: AORenewal,
+  now = new Date(),
+): AORenewalOperationalMetrics => {
+  const today = startOfDay(now);
+  const renewalDate = normalizeDate(renewal.renewal_date) ?? today;
+  const lastContactDate = normalizeDate(renewal.last_contact_date);
+  const followUpDate = normalizeDate(renewal.follow_up_date);
+
+  const daysUntilRenewal = differenceInCalendarDays(renewalDate, today);
+  const daysSinceContact = lastContactDate
+    ? differenceInCalendarDays(today, lastContactDate)
+    : null;
+  const daysUntilFollowUp = followUpDate
+    ? differenceInCalendarDays(followUpDate, today)
+    : null;
+
+  const isFollowUpOverdue =
+    ACTIVE_STATUSES.includes(renewal.status) && daysUntilFollowUp !== null && daysUntilFollowUp < 0;
+  const isFollowUpDueSoon =
+    ACTIVE_STATUSES.includes(renewal.status) && daysUntilFollowUp !== null && daysUntilFollowUp <= 2;
+  const isPendingInside30Days = renewal.status === "pending" && daysUntilRenewal <= 30;
+  const isCriticalWindow =
+    ["contacted", "quoted", "waiting_on_insured"].includes(renewal.status) &&
+    daysUntilRenewal <= 5;
+
+  let staleReason: string | null = null;
+
+  if (renewal.status === "contacted" && daysSinceContact !== null && daysSinceContact >= 5) {
+    staleReason = `No quote in ${daysSinceContact} days`;
+  } else if (renewal.status === "quoted" && daysSinceContact !== null && daysSinceContact >= 3) {
+    staleReason = `Quoted ${daysSinceContact} days ago, no follow-up`;
+  } else if (
+    renewal.status === "waiting_on_insured" &&
+    daysSinceContact !== null &&
+    daysSinceContact >= 3
+  ) {
+    staleReason = `Waiting on insured for ${daysSinceContact} days`;
+  }
+
+  const missingFollowUp =
+    ["quoted", "waiting_on_insured"].includes(renewal.status) && !followUpDate;
+
+  const needsAttention = Boolean(
+    staleReason || isFollowUpOverdue || isPendingInside30Days || isCriticalWindow || missingFollowUp,
+  );
+
+  let urgencyRank = 0;
+  if (renewal.status === "pending" && daysUntilRenewal <= 30) urgencyRank += 120;
+  if (renewal.status === "pending" && daysUntilRenewal <= 14) urgencyRank += 80;
+  if (isCriticalWindow) urgencyRank += 70;
+  if (isFollowUpOverdue) urgencyRank += 60;
+  if (staleReason) urgencyRank += 50;
+  if (missingFollowUp) urgencyRank += 30;
+  urgencyRank += Math.max(0, 45 - daysUntilRenewal);
+
+  return {
+    daysUntilRenewal,
+    daysSinceContact,
+    daysUntilFollowUp,
+    isFollowUpOverdue,
+    isFollowUpDueSoon,
+    isPendingInside30Days,
+    isCriticalWindow,
+    staleReason,
+    needsAttention,
+    urgencyRank,
+  };
+};
+
+export const getAORenewalWorkQueueSummary = (
+  renewals: AORenewal[],
+  now = new Date(),
+): AORenewalWorkQueueSummary => {
+  const active = renewals.filter((renewal) => ACTIVE_STATUSES.includes(renewal.status));
+  const metrics = active.map((renewal) => ({
+    renewal,
+    metrics: getAORenewalOperationalMetrics(renewal, now),
+  }));
+
+  const needsFirstContact = metrics.filter(({ renewal }) => renewal.status === "pending").length;
+  const needsQuote = metrics.filter(({ renewal }) => renewal.status === "contacted").length;
+  const waitingOnInsured = metrics.filter(({ renewal }) => renewal.status === "waiting_on_insured").length;
+  const staleFollowUp = metrics.filter(({ metrics }) => Boolean(metrics.staleReason)).length;
+  const followUpDue = metrics.filter(({ metrics }) => metrics.isFollowUpOverdue || metrics.isFollowUpDueSoon).length;
+  const expiringIn30Days = metrics.filter(({ metrics }) => metrics.daysUntilRenewal <= 30).length;
+  const criticalWindow = metrics.filter(({ metrics }) => metrics.isCriticalWindow).length;
+
+  const pendingSoonest = metrics
+    .filter(({ renewal }) => renewal.status === "pending")
+    .reduce<number | null>((soonest, { metrics }) => {
+      if (soonest === null) return metrics.daysUntilRenewal;
+      return Math.min(soonest, metrics.daysUntilRenewal);
+    }, null);
+
+  const hasOneMonthLead = pendingSoonest === null || pendingSoonest > 30;
+  const hasNoNearTermDrift = !metrics.some(
+    ({ renewal, metrics }) =>
+      ["contacted", "quoted", "waiting_on_insured"].includes(renewal.status) &&
+      metrics.daysUntilRenewal <= 5,
+  );
+
+  const onPace = hasOneMonthLead && hasNoNearTermDrift;
+  const onPaceReason = onPace
+    ? "Team is at least 30 days ahead and no near-term active files are drifting."
+    : !hasOneMonthLead
+      ? "There are pending renewals inside the next 30 days."
+      : "There are active files inside 5 days that still need movement.";
+
+  return {
+    activeCount: active.length,
+    needsFirstContact,
+    needsQuote,
+    waitingOnInsured,
+    staleFollowUp,
+    followUpDue,
+    expiringIn30Days,
+    criticalWindow,
+    onPace,
+    onPaceReason,
+  };
+};
+
+export const filterAORenewalsByQueue = (
+  renewals: AORenewal[],
+  queue: AORenewalQueue,
+  now = new Date(),
+) => {
+  if (queue === "all") return renewals;
+
+  return renewals.filter((renewal) => {
+    const metrics = getAORenewalOperationalMetrics(renewal, now);
+
+    switch (queue) {
+      case "active":
+        return ACTIVE_STATUSES.includes(renewal.status);
+      case "needs_first_contact":
+        return renewal.status === "pending";
+      case "needs_quote":
+        return renewal.status === "contacted";
+      case "waiting_on_insured":
+        return renewal.status === "waiting_on_insured";
+      case "stale_follow_up":
+        return Boolean(metrics.staleReason);
+      case "follow_up_due":
+        return metrics.isFollowUpOverdue || metrics.isFollowUpDueSoon;
+      case "expiring_30":
+        return ACTIVE_STATUSES.includes(renewal.status) && metrics.daysUntilRenewal <= 30;
+      case "critical_window":
+        return metrics.isCriticalWindow;
+      default:
+        return true;
+    }
+  });
+};
 
 // Fetch all renewals with filters
 export const useAORenewals = (filters?: AORenewalFilters) => {
@@ -120,7 +344,7 @@ export const useAORenewals = (filters?: AORenewalFilters) => {
 
       if (filters?.search) {
         query = query.or(
-          `customer_name.ilike.%${filters.search}%,policy_number.ilike.%${filters.search}%`
+          `customer_name.ilike.%${filters.search}%,policy_number.ilike.%${filters.search}%`,
         );
       }
 
@@ -132,7 +356,6 @@ export const useAORenewals = (filters?: AORenewalFilters) => {
   });
 };
 
-// Fetch single renewal by ID
 export const useAORenewal = (id: string | null | undefined) => {
   return useQuery({
     queryKey: ["ao-renewal", id],
@@ -152,7 +375,6 @@ export const useAORenewal = (id: string | null | undefined) => {
   });
 };
 
-// Fetch renewal statistics
 export const useAORenewalsStats = () => {
   return useQuery({
     queryKey: ["ao-renewals-stats"],
@@ -162,7 +384,7 @@ export const useAORenewalsStats = () => {
       if (error) throw error;
 
       const renewals = data as AORenewal[];
-      const now = new Date();
+      const now = startOfToday();
 
       const stats: AORenewalStats = {
         total_count: renewals.length,
@@ -171,6 +393,7 @@ export const useAORenewalsStats = () => {
           pending: 0,
           contacted: 0,
           quoted: 0,
+          waiting_on_insured: 0,
           renewed: 0,
           lost: 0,
           cancelled: 0,
@@ -193,10 +416,8 @@ export const useAORenewalsStats = () => {
         stats.by_status[renewal.status]++;
         stats.by_priority[renewal.priority]++;
 
-        const renewalDate = new Date(renewal.renewal_date);
-        const daysUntil = Math.floor(
-          (renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const renewalDate = normalizeDate(renewal.renewal_date) ?? now;
+        const daysUntil = differenceInCalendarDays(renewalDate, now);
 
         if (daysUntil <= 5 && daysUntil >= 0) stats.upcoming_5_days++;
         if (daysUntil <= 30 && daysUntil >= 0) stats.upcoming_30_days++;
@@ -211,12 +432,11 @@ export const useAORenewalsStats = () => {
   });
 };
 
-// Fetch upcoming renewals
 export const useUpcomingAORenewals = (days: number = 30) => {
   return useQuery({
     queryKey: ["ao-renewals-upcoming", days],
     queryFn: async () => {
-      const today = new Date();
+      const today = startOfToday();
       const futureDate = new Date(today);
       futureDate.setDate(futureDate.getDate() + days);
 
@@ -233,7 +453,6 @@ export const useUpcomingAORenewals = (days: number = 30) => {
   });
 };
 
-// Create renewal
 export const useCreateAORenewal = () => {
   const queryClient = useQueryClient();
 
@@ -260,7 +479,6 @@ export const useCreateAORenewal = () => {
   });
 };
 
-// Update renewal
 export const useUpdateAORenewal = () => {
   const queryClient = useQueryClient();
 
@@ -277,20 +495,16 @@ export const useUpdateAORenewal = () => {
       return data as AORenewal;
     },
     onSuccess: (data) => {
-      // Invalidate all renewal-related queries
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", data.id] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
-      // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-      
       toast.success("Renewal updated successfully");
     },
     onError: (error) => {
@@ -300,7 +514,6 @@ export const useUpdateAORenewal = () => {
   });
 };
 
-// Delete renewal
 export const useDeleteAORenewal = () => {
   const queryClient = useQueryClient();
 
@@ -322,29 +535,40 @@ export const useDeleteAORenewal = () => {
   });
 };
 
-// Update renewal status
 export const useUpdateAORenewalStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: AORenewalStatus }) => {
+      const updates: Partial<AORenewal> = { status };
+
+      if (["renewed", "lost", "cancelled", "moved"].includes(status)) {
+        updates.follow_up_date = null;
+      }
+      if (status !== "waiting_on_insured") {
+        updates.waiting_on_insured_since = null;
+      }
+      if (status === "quoted") {
+        updates.quoted_at = new Date().toISOString();
+      }
+      if (status === "waiting_on_insured") {
+        updates.waiting_on_insured_since = new Date().toISOString();
+      }
+
       const { data, error } = await supabase
         .from("ao_renewals")
-        .update({ status })
+        .update(updates)
         .eq("id", id)
-        .select('id, status, customer_name, policy_number')
+        .select("id, status, customer_name, policy_number")
         .single();
 
       if (error) throw error;
       return data as AORenewal;
     },
     onSuccess: () => {
-      // Invalidate all renewal-related queries
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
-      // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
@@ -360,7 +584,6 @@ export const useUpdateAORenewalStatus = () => {
   });
 };
 
-// Bulk update renewals
 export const useBulkUpdateAORenewals = () => {
   const queryClient = useQueryClient();
 
@@ -387,7 +610,6 @@ export const useBulkUpdateAORenewals = () => {
   });
 };
 
-// Bulk delete all renewals
 export const useBulkDeleteAllAORenewals = () => {
   const queryClient = useQueryClient();
 
@@ -396,7 +618,7 @@ export const useBulkDeleteAllAORenewals = () => {
       const { error } = await supabase
         .from("ao_renewals")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all records
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) throw error;
     },
@@ -419,7 +641,6 @@ export const useBulkDeleteAllAORenewals = () => {
   });
 };
 
-// Bulk import renewals
 export const useImportAORenewals = () => {
   const queryClient = useQueryClient();
 
@@ -440,12 +661,10 @@ export const useImportAORenewals = () => {
         errors: [],
       };
 
-      // No authentication required for ao_renewals imports
-
       for (const renewal of data) {
         try {
           if (!renewal.customer_name || !renewal.policy_number || !renewal.policy_type || !renewal.renewal_date) {
-            result.errors.push(`Missing required fields for renewal: ${renewal.policy_number || 'unknown'}`);
+            result.errors.push(`Missing required fields for renewal: ${renewal.policy_number || "unknown"}`);
             result.failed++;
             continue;
           }
@@ -459,7 +678,7 @@ export const useImportAORenewals = () => {
           if (checkError) {
             console.error("Error checking for duplicates:", checkError);
             result.errors.push(
-              `Error checking duplicate for ${renewal.policy_number}: ${checkError.message}`
+              `Error checking duplicate for ${renewal.policy_number}: ${checkError.message}`,
             );
             result.failed++;
             continue;
@@ -475,7 +694,7 @@ export const useImportAORenewals = () => {
               if (updateError) {
                 console.error("Error updating renewal:", updateError);
                 result.errors.push(
-                  `Error updating ${renewal.policy_number}: ${updateError.message}`
+                  `Error updating ${renewal.policy_number}: ${updateError.message}`,
                 );
                 result.failed++;
               } else {
@@ -494,7 +713,7 @@ export const useImportAORenewals = () => {
             policy_type: renewal.policy_type,
             renewal_date: renewal.renewal_date,
             current_premium: renewal.current_premium || null,
-            term_months: null, // User will set this manually
+            term_months: null,
             current_carrier: renewal.current_carrier || null,
             status: (renewal.status as AORenewalStatus) || "pending",
             priority: (renewal.priority as AORenewalPriority) || "normal",
@@ -504,16 +723,20 @@ export const useImportAORenewals = () => {
             losses_3yr: renewal.losses_3yr || null,
             oldest_in_household: renewal.oldest_in_household || null,
             last_contact_date: renewal.last_contact_date || null,
+            follow_up_date: renewal.follow_up_date || null,
+            quoted_at: renewal.quoted_at || null,
+            waiting_on_insured_since: renewal.waiting_on_insured_since || null,
+            moved_carrier: renewal.moved_carrier || null,
+            moved_term: renewal.moved_term || null,
+            moved_premium: renewal.moved_premium || null,
           };
 
-          const { error: insertError } = await supabase
-            .from("ao_renewals")
-            .insert([insertData]);
+          const { error: insertError } = await supabase.from("ao_renewals").insert([insertData]);
 
           if (insertError) {
             console.error("Error inserting renewal:", insertError);
             result.errors.push(
-              `Error inserting ${renewal.policy_number}: ${insertError.message}`
+              `Error inserting ${renewal.policy_number}: ${insertError.message}`,
             );
             result.failed++;
           } else {
@@ -524,7 +747,7 @@ export const useImportAORenewals = () => {
           result.errors.push(
             `Unexpected error for ${renewal.policy_number}: ${
               error instanceof Error ? error.message : "Unknown error"
-            }`
+            }`,
           );
           result.failed++;
         }
@@ -535,12 +758,12 @@ export const useImportAORenewals = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
-      
+
       if (result.failed === 0) {
         toast.success(`Successfully imported ${result.successful} renewals!`);
       } else {
         toast.warning(
-          `Import completed with ${result.successful} successes and ${result.failed} failures`
+          `Import completed with ${result.successful} successes and ${result.failed} failures`,
         );
       }
     },
@@ -550,3 +773,5 @@ export const useImportAORenewals = () => {
     },
   });
 };
+
+export { ACTIVE_STATUSES, DEFAULT_HIDDEN_STATUSES, COMPLETED_STATUSES };

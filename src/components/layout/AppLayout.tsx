@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, createContext, useContext } from 'react';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,6 +22,16 @@ import { useGlobalMessageNotifications } from '@/hooks/useGlobalMessageNotificat
 
 interface AppLayoutProps {
   children: ReactNode;
+}
+
+interface NavigationGuardContextValue {
+  onNavigateAttempt?: (path: string) => boolean;
+}
+
+const NavigationGuardContext = createContext<NavigationGuardContextValue>({});
+
+export function useNavigationGuard() {
+  return useContext(NavigationGuardContext);
 }
 
 function AppLayoutContent({ children }: AppLayoutProps) {
@@ -452,18 +462,33 @@ function AppLayoutContent({ children }: AppLayoutProps) {
         context={context}
       />
 
-      {/* Floating Team Messenger */}
-      <FloatingMessenger />
     </SidebarProvider>
   );
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <AIAssistantProvider>
-      <MessengerProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
-      </MessengerProvider>
-    </AIAssistantProvider>
+    <NavigationGuardContext.Provider value={{}}>
+      <AIAssistantProvider>
+        <MessengerProvider>
+          <AppLayoutContent>{children}</AppLayoutContent>
+        </MessengerProvider>
+      </AIAssistantProvider>
+    </NavigationGuardContext.Provider>
+  );
+}
+
+export function AppLayoutWithNavigationGuard({
+  children,
+  onNavigateAttempt,
+}: AppLayoutProps & { onNavigateAttempt?: (path: string) => boolean }) {
+  return (
+    <NavigationGuardContext.Provider value={{ onNavigateAttempt }}>
+      <AIAssistantProvider>
+        <MessengerProvider>
+          <AppLayoutContent>{children}</AppLayoutContent>
+        </MessengerProvider>
+      </AIAssistantProvider>
+    </NavigationGuardContext.Provider>
   );
 }

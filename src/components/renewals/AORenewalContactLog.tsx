@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,9 +11,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Mail, User, MessageSquare, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { addDaysLocalDate, extractLocalDate, formatLocalDateDisplay, todayLocalDate } from "@/lib/date/localDate";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAORenewalEditor } from "./aoRenewalEditor";
 
 interface ContactLog {
   id: string;
@@ -27,6 +29,10 @@ interface ContactLog {
 
 interface AORenewalContactLogProps {
   renewalId: string;
+  currentStatus?: string;
+  currentFollowUpDate?: string | null;
+  currentFollowUpReason?: string | null;
+  currentFollowUpNote?: string | null;
 }
 
 const methodIcons = {
@@ -45,15 +51,36 @@ const methodLabels = {
   other: "Other",
 };
 
-export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
-  const [contactDate, setContactDate] = useState(new Date().toISOString().split("T")[0]);
+export function AORenewalContactLog({
+  renewalId,
+  currentStatus,
+  currentFollowUpDate,
+  currentFollowUpReason,
+  currentFollowUpNote,
+}: AORenewalContactLogProps) {
+  const [contactDate, setContactDate] = useState(todayLocalDate());
   const [contactMethod, setContactMethod] = useState<string>("phone");
-  const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState<string>(currentStatus || "");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const editorContext = useAORenewalEditor();
 
-  // Fetch contact logs
+  useEffect(() => {
+    setStatus(currentStatus || "");
+  }, [currentStatus]);
+
+  const currentFollowUpDateValue = extractLocalDate(currentFollowUpDate);
+  const followUpSummary = useMemo(() => {
+    const parts = [
+      currentFollowUpDateValue ? `Next follow-up ${formatLocalDateDisplay(currentFollowUpDateValue)}` : null,
+      currentFollowUpReason || null,
+      currentFollowUpNote || null,
+    ].filter(Boolean);
+
+    return parts.length ? parts.join(" • ") : "No follow-up set yet";
+  }, [currentFollowUpDateValue, currentFollowUpReason, currentFollowUpNote]);
+
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["ao-renewal-contact-log", renewalId],
     queryFn: async () => {
@@ -65,7 +92,6 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
 
       if (error) throw error;
 
-      // Fetch user names for all logs
       const userIds = [...new Set(data?.map((log: any) => log.created_by) || [])];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -86,66 +112,175 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
     },
   });
 
-  // Add contact log mutation
+  const hasActiveFollowUp = Boolean(currentFollowUpDateValue || currentFollowUpReason || currentFollowUpNote);
+
   const addLogMutation = useMutation({
-    mutationFn: async (data: { contact_date: string; contact_method: string; status: string; notes: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+    mutationFn: async (data: {
+      contact_date: string;
+      contact_method: string;
+      status: string;
+      notes: string;
+      clearFollowUp?: boolean;
+    }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      const normalizedStatus = data.status && data.status !== "no_change" ? data.status : null;
+      const effectiveStatus = normalizedStatus || currentStatus || null;
+
+      const followUpContext = [
+        currentFollowUpDateValue ? `Next follow-up: ${currentFollowUpDateValue}` : null,
+        currentFollowUpReason ? `Reason: ${currentFollowUpReason}` : null,
+        currentFollowUpNote ? `Follow-up note: ${currentFollowUpNote}` : null,
+      ].filter(Boolean);
+
+      const logNotes = [data.notes.trim(), ...followUpContext].filter(Boolean).join("\n");
 
       const { error } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
-        status: data.status && data.status !== 'no_change' ? data.status : null,
-        notes: data.notes.trim(),
+        status: normalizedStatus,
+        notes: logNotes,
         created_by: user.id,
       });
 
       if (error) throw error;
+
+      const updates: Record<string, string | null> = {
+        last_contact_date: data.contact_date,
+      };
+
+      if (normalizedStatus) {
+        updates.status = normalizedStatus;
+      }
+
+      if (effectiveStatus === "quoted") {
+        updates.quoted_at = new Date().toISOString();
+        updates.waiting_on_insured_since = null;
+      }
+
+      if (effectiveStatus === "waiting_on_insured") {
+        updates.waiting_on_insured_since = new Date().toISOString();
+      }
+
+      if (["renewed", "lost", "cancelled", "moved"].includes(effectiveStatus || "")) {
+        updates.waiting_on_insured_since = null;
+      }
+
+      if (data.clearFollowUp) {
+        updates.follow_up_date = null;
+        updates.follow_up_reason = null;
+        updates.follow_up_note = null;
+      }
+
+      const { error: renewalError } = await supabase
+        .from("ao_renewals")
+        .update(updates)
+        .eq("id", renewalId);
+
+      if (renewalError) throw renewalError;
+
+      if (data.clearFollowUp) {
+        const { data: linkedTasks, error: taskFetchError } = await supabase
+          .from('tasks')
+          .select('id, metadata')
+          .eq('entity_type', 'ao_renewal')
+          .eq('entity_id', renewalId)
+          .eq('category', 'renewal')
+          .contains('metadata', { task_origin: 'ao_follow_up' })
+          .in('status', ['pending', 'in_progress']);
+
+        if (taskFetchError) throw taskFetchError;
+
+        if (linkedTasks && linkedTasks.length > 0) {
+          const taskIds = linkedTasks.map((task) => task.id);
+          const { error: taskUpdateError } = await supabase
+            .from('tasks')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            })
+            .in('id', taskIds);
+
+          if (taskUpdateError) throw taskUpdateError;
+        }
+      }
     },
     onSuccess: () => {
-      // Invalidate contact log and renewal data
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
-      // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-      
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tasks:updated'));
+      }
+
       setNotes("");
-      setContactDate(new Date().toISOString().split("T")[0]);
+      setContactDate(todayLocalDate());
       setContactMethod("phone");
-      setStatus("");
+      setStatus(currentStatus || "");
       toast({
         title: "Success",
-        description: "Contact logged successfully",
+        description: "Contact saved",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to log contact",
+        description: "Failed to save contact and follow-up",
         variant: "destructive",
       });
     },
   });
 
-  const handleAddLog = () => {
+  const handleAddLog = (clearFollowUp = false) => {
     if (!notes.trim() || !contactDate) return;
+
     addLogMutation.mutate({
       contact_date: contactDate,
       contact_method: contactMethod,
       status,
       notes,
+      clearFollowUp,
     });
   };
+
+  const contactDraftDirty = useMemo(
+    () => Boolean(notes.trim() || status !== (currentStatus || "") || contactMethod !== "phone" || contactDate !== todayLocalDate()),
+    [notes, status, currentStatus, contactMethod, contactDate],
+  );
+
+  useEffect(() => {
+    if (!editorContext) return;
+
+    return editorContext.registerDirtySource({
+      id: `ao-renewal-contact-${renewalId}`,
+      label: 'Contact Log',
+      isDirty: () => Boolean(notes.trim() || status !== (currentStatus || "") || contactMethod !== "phone" || contactDate !== todayLocalDate()),
+      save: async () => {
+        if (!notes.trim() || !contactDate) return true;
+        await addLogMutation.mutateAsync({
+          contact_date: contactDate,
+          contact_method: contactMethod,
+          status,
+          notes,
+          clearFollowUp: false,
+        });
+        return true;
+      },
+    });
+  }, [editorContext, renewalId, notes, status, currentStatus, contactMethod, contactDate, addLogMutation]);
 
   const getInitials = (name: string) => {
     return name
@@ -171,9 +306,14 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
         <CardTitle>Contact Log</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Add Contact Log Form */}
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+          <div className="text-sm font-medium">Current follow-up commitment</div>
+          <div className="text-sm text-muted-foreground">{followUpSummary}</div>
+          
+        </div>
+
         <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
               <Label htmlFor="contact_date">Contact Date</Label>
               <Input
@@ -191,37 +331,17 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background">
-                  <SelectItem value="phone">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Phone Call
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="email">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="in_person">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      In Person
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sms">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      SMS
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="phone">Phone Call</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="in_person">In Person</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="status">Update Status</Label>
-              <Select value={status || undefined} onValueChange={(v) => setStatus(v === 'no_change' ? '' : v)}>
+              <Label htmlFor="status">Outcome</Label>
+              <Select value={status || undefined} onValueChange={(v) => setStatus(v === "no_change" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
@@ -230,45 +350,74 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
                   <SelectItem value="quoted">Quoted</SelectItem>
-                  <SelectItem value="renewed">Renewed</SelectItem>
+                  <SelectItem value="waiting_on_insured">Waiting on insured</SelectItem>
+                  <SelectItem value="renewed">Retained</SelectItem>
+                  <SelectItem value="moved">Moved</SelectItem>
                   <SelectItem value="lost">Lost</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
           <div>
-            <Label htmlFor="contact_notes">Notes</Label>
+            <Label htmlFor="contact_notes">What happened?</Label>
             <Textarea
               id="contact_notes"
-              placeholder="What was discussed during this contact?"
+              placeholder="What happened on this contact?"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
             />
           </div>
-          <Button
-            onClick={handleAddLog}
-            disabled={!notes.trim() || !contactDate || addLogMutation.isPending}
-            size="sm"
-          >
-            {addLogMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Calendar className="h-4 w-4 mr-2" />
+
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => handleAddLog(false)}
+              disabled={
+                !notes.trim() ||
+                !contactDate ||
+                addLogMutation.isPending
+              }
+              size="sm"
+            >
+              {addLogMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Calendar className="h-4 w-4 mr-2" />
+              )}
+              Save Contact
+            </Button>
+
+            {hasActiveFollowUp && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAddLog(true)}
+                disabled={
+                  !notes.trim() ||
+                  !contactDate ||
+                  addLogMutation.isPending
+                }
+                size="sm"
+              >
+                {addLogMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
+                Save and Clear Follow-Up
+              </Button>
             )}
-            Log Contact
-          </Button>
+          </div>
         </div>
 
         <Separator />
 
-        {/* Contact History */}
         <ScrollArea className="h-[400px] pr-4">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading contact history...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Loading contact history...</div>
           ) : logs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No contacts logged yet. Log your first contact above.
@@ -293,9 +442,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                         {new Date(log.contact_date).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {log.notes}
-                    </p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{log.notes}</p>
                     <p className="text-xs text-muted-foreground">
                       Logged {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                     </p>
