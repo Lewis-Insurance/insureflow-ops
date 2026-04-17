@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Mail, User, MessageSquare, Calendar, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { addDaysLocalDate, todayLocalDate } from "@/lib/date/localDate";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -64,7 +65,7 @@ export function AORenewalContactLog({
   currentFollowUpReason,
   currentFollowUpNote,
 }: AORenewalContactLogProps) {
-  const [contactDate, setContactDate] = useState(new Date().toISOString().split("T")[0]);
+  const [contactDate, setContactDate] = useState(todayLocalDate());
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>(currentStatus || "");
   const [followUpDate, setFollowUpDate] = useState(currentFollowUpDate || "");
@@ -221,7 +222,7 @@ export function AORenewalContactLog({
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
 
       setNotes("");
-      setContactDate(new Date().toISOString().split("T")[0]);
+      setContactDate(todayLocalDate());
       setContactMethod("phone");
       toast({
         title: "Success",
@@ -361,16 +362,13 @@ export function AORenewalContactLog({
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => {
-                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 1);
-                    setFollowUpDate(d.toISOString().split('T')[0]);
+                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 1));
                   }}>Tomorrow</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => {
-                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 3);
-                    setFollowUpDate(d.toISOString().split('T')[0]);
+                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 3));
                   }}>+3 days</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => {
-                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 7);
-                    setFollowUpDate(d.toISOString().split('T')[0]);
+                    setFollowUpDate(addDaysLocalDate(contactDate || todayLocalDate(), 7));
                   }}>+7 days</Button>
                 </div>
               </div>

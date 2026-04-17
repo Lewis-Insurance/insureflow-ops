@@ -19,6 +19,7 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
+import { addDaysLocalDate, todayLocalDate } from '@/lib/date/localDate';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -555,23 +556,19 @@ export default function AORenewalEdit() {
                   />
                   <div className="flex flex-wrap gap-2 mt-2">
                     <Button type="button" size="sm" variant="outline" onClick={() => {
-                      const d = new Date(); d.setDate(d.getDate() + 1);
-                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }));
                     }}>Tomorrow</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
-                      const d = new Date(); d.setDate(d.getDate() + 3);
-                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }));
                     }}>+3 days</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
-                      const d = new Date(); d.setDate(d.getDate() + 7);
-                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }));
                     }}>+7 days</Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => {
-                      const d = new Date();
-                      const day = d.getDay();
+                      const base = new Date();
+                      const day = base.getDay();
                       const add = day === 0 ? 1 : 8 - day;
-                      d.setDate(d.getDate() + add);
-                      setFollowUpDraft(prev => ({ ...prev, date: d.toISOString().split('T')[0] }));
+                      setFollowUpDraft(prev => ({ ...prev, date: addDaysLocalDate(base, add) }));
                     }}>Next week</Button>
                   </div>
                 </div>
