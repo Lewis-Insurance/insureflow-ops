@@ -211,8 +211,9 @@ export default function AORenewalEdit() {
 
     setFollowUpSaving(true);
     try {
+      const normalizedFollowUpDate = extractLocalDate(followUpDraft.date) || null;
       const trimmedReason = followUpDraft.reason.trim();
-      const hasFollowUp = Boolean(followUpDraft.date && trimmedReason);
+      const hasFollowUp = Boolean(normalizedFollowUpDate && trimmedReason);
 
       const { data: existingTasks, error: existingTasksError } = await supabase
         .from("tasks")
@@ -230,8 +231,8 @@ export default function AORenewalEdit() {
       await updateMutation.mutateAsync({
         id,
         updates: {
-          follow_up_date: followUpDraft.date || null,
-          follow_up_reason: followUpDraft.reason.trim() || null,
+          follow_up_date: normalizedFollowUpDate,
+          follow_up_reason: trimmedReason || null,
           follow_up_note: followUpDraft.note.trim() || null,
         },
       });
@@ -240,7 +241,7 @@ export default function AORenewalEdit() {
         const { data: authData } = await supabase.auth.getUser();
         const user = authData.user;
         if (user) {
-          const dueAt = new Date(`${followUpDraft.date}T12:00:00`).toISOString();
+          const dueAt = new Date(`${normalizedFollowUpDate}T12:00:00`).toISOString();
           const descriptionParts = [
             formData.policy_number ? `Policy: ${formData.policy_number}` : null,
             `Status: ${formData.status.replaceAll("_", " ")}`,
@@ -264,7 +265,7 @@ export default function AORenewalEdit() {
               renewal_customer_name: formData.customer_name,
               renewal_policy_number: formData.policy_number,
               renewal_date: formData.renewal_date,
-              renewal_follow_up_date: followUpDraft.date,
+              renewal_follow_up_date: normalizedFollowUpDate,
               renewal_follow_up_reason: trimmedReason,
             },
           };
@@ -316,9 +317,14 @@ export default function AORenewalEdit() {
 
       setFormData((prev) => ({
         ...prev,
-        follow_up_date: followUpDraft.date,
-        follow_up_reason: followUpDraft.reason,
+        follow_up_date: normalizedFollowUpDate || "",
+        follow_up_reason: trimmedReason,
         follow_up_note: followUpDraft.note,
+      }));
+      setFollowUpDraft((prev) => ({
+        ...prev,
+        date: normalizedFollowUpDate || "",
+        reason: trimmedReason,
       }));
 
       if (typeof window !== "undefined") {
