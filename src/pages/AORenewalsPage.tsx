@@ -515,10 +515,7 @@ export default function AORenewalsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-2">
-                            {getStatusBadge(renewal.status)}
-                            <div>{getPriorityBadge(renewal.priority)}</div>
-                          </div>
+                          {getStatusBadge(renewal.status)}
                         </TableCell>
                         <TableCell className="font-medium">{formatCurrency(renewal.current_premium)}</TableCell>
                         <TableCell>

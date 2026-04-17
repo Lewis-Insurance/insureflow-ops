@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Mail, User, MessageSquare, Calendar, Loader2 } from "lucide-react";
+import { Phone, Mail, User, MessageSquare, Calendar, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -49,6 +49,14 @@ const methodLabels = {
   other: "Other",
 };
 
+const FOLLOW_UP_REASON_PRESETS = [
+  "Waiting on insured decision",
+  "Quote review",
+  "Documents needed",
+  "Call back requested",
+  "No answer, retry",
+];
+
 export function AORenewalContactLog({
   renewalId,
   currentStatus,
@@ -62,6 +70,9 @@ export function AORenewalContactLog({
   const [followUpDate, setFollowUpDate] = useState(currentFollowUpDate || "");
   const [followUpReason, setFollowUpReason] = useState(currentFollowUpReason || "");
   const [followUpNote, setFollowUpNote] = useState(currentFollowUpNote || "");
+  const [notes, setNotes] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setStatus(currentStatus || "");
@@ -78,9 +89,21 @@ export function AORenewalContactLog({
   useEffect(() => {
     setFollowUpNote(currentFollowUpNote || "");
   }, [currentFollowUpNote]);
-  const [notes, setNotes] = useState("");
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+
+  const requiresFollowUp = status === "quoted" || status === "waiting_on_insured";
+  const followUpSummary = useMemo(() => {
+    if (!followUpDate && !followUpReason && !followUpNote) {
+      return "No follow-up set yet";
+    }
+
+    const parts = [
+      followUpDate ? `Next follow-up ${new Date(followUpDate).toLocaleDateString()}` : null,
+      followUpReason || null,
+      followUpNote || null,
+    ].filter(Boolean);
+
+    return parts.join(" • ");
+  }, [followUpDate, followUpReason, followUpNote]);
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["ao-renewal-contact-log", renewalId],
@@ -129,21 +152,32 @@ export function AORenewalContactLog({
       if (!user) throw new Error("Not authenticated");
 
       const normalizedStatus = data.status && data.status !== "no_change" ? data.status : null;
+      const effectiveStatus = normalizedStatus || currentStatus || null;
+
+      const followUpContext = [
+        data.follow_up_date ? `Next follow-up: ${data.follow_up_date}` : null,
+        data.follow_up_reason ? `Reason: ${data.follow_up_reason}` : null,
+        data.follow_up_note ? `Follow-up note: ${data.follow_up_note}` : null,
+      ].filter(Boolean);
+
+      const logNotes = [data.notes.trim(), ...followUpContext].filter(Boolean).join("\n");
 
       const { error } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
         status: normalizedStatus,
-        notes: data.notes.trim(),
+        notes: logNotes,
         created_by: user.id,
       });
 
       if (error) throw error;
 
-      const effectiveStatus = normalizedStatus || currentStatus || null;
       const updates: Record<string, string | null> = {
         last_contact_date: data.contact_date,
+        follow_up_date: data.follow_up_date || null,
+        follow_up_reason: data.follow_up_reason.trim() || null,
+        follow_up_note: data.follow_up_note.trim() || null,
       };
 
       if (normalizedStatus) {
@@ -159,17 +193,10 @@ export function AORenewalContactLog({
         updates.waiting_on_insured_since = new Date().toISOString();
       }
 
-      if (["quoted", "waiting_on_insured"].includes(effectiveStatus || "")) {
-        updates.follow_up_date = data.follow_up_date || null;
-      } else if (data.follow_up_date) {
-        updates.follow_up_date = data.follow_up_date;
-      }
-
-      updates.follow_up_reason = data.follow_up_reason.trim() || null;
-      updates.follow_up_note = data.follow_up_note.trim() || null;
-
       if (["renewed", "lost", "cancelled", "moved"].includes(effectiveStatus || "")) {
         updates.follow_up_date = null;
+        updates.follow_up_reason = null;
+        updates.follow_up_note = null;
         updates.waiting_on_insured_since = null;
       }
 
@@ -202,19 +229,17 @@ export function AORenewalContactLog({
       setFollowUpNote(currentFollowUpNote || "");
       toast({
         title: "Success",
-        description: "Contact logged successfully",
+        description: "Contact and follow-up saved",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to log contact",
+        description: "Failed to save contact and follow-up",
         variant: "destructive",
       });
     },
   });
-
-  const requiresFollowUp = status === "quoted" || status === "waiting_on_insured";
 
   const handleAddLog = () => {
     if (!notes.trim() || !contactDate) return;
@@ -255,6 +280,14 @@ export function AORenewalContactLog({
         <CardTitle>Contact Log</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+          <div className="text-sm font-medium">Current follow-up commitment</div>
+          <div className="text-sm text-muted-foreground">{followUpSummary}</div>
+          {requiresFollowUp && !followUpDate && (
+            <Badge variant="destructive">Follow-up required before saving this contact</Badge>
+          )}
+        </div>
+
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
@@ -283,7 +316,7 @@ export function AORenewalContactLog({
               </Select>
             </div>
             <div>
-              <Label htmlFor="status">Update Status</Label>
+              <Label htmlFor="status">Outcome</Label>
               <Select value={status || undefined} onValueChange={(v) => setStatus(v === "no_change" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No change" />
@@ -303,71 +336,92 @@ export function AORenewalContactLog({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <Label htmlFor="follow_up_date">Follow-Up Date</Label>
-              <Input
-                id="follow_up_date"
-                type="date"
-                value={followUpDate}
-                onChange={(e) => setFollowUpDate(e.target.value)}
-                min={contactDate}
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => {
-                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 1);
-                  setFollowUpDate(d.toISOString().split('T')[0]);
-                }}>Tomorrow</Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => {
-                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 3);
-                  setFollowUpDate(d.toISOString().split('T')[0]);
-                }}>+3 days</Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => {
-                  const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 7);
-                  setFollowUpDate(d.toISOString().split('T')[0]);
-                }}>+7 days</Button>
-              </div>
-            </div>
-            <div className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground space-y-2">
-              <div>Required whenever the file is quoted or waiting on insured.</div>
-              <div><strong>Recommended:</strong> {status === 'quoted' ? '1 to 3 days so the quote gets presented.' : status === 'waiting_on_insured' ? '3 to 7 days depending on urgency.' : 'Use this when the next touch is committed.'}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
-              <Input
-                id="follow_up_reason"
-                value={followUpReason}
-                onChange={(e) => setFollowUpReason(e.target.value)}
-                maxLength={120}
-                placeholder="e.g. waiting on insured decision"
-              />
-            </div>
-            <div>
-              <Label htmlFor="follow_up_note">Follow-Up Note</Label>
-              <Textarea
-                id="follow_up_note"
-                value={followUpNote}
-                onChange={(e) => setFollowUpNote(e.target.value)}
-                maxLength={240}
-                placeholder="Short context for the next touch"
-                rows={2}
-              />
-            </div>
-          </div>
-
           <div>
-            <Label htmlFor="contact_notes">Notes</Label>
+            <Label htmlFor="contact_notes">What happened?</Label>
             <Textarea
               id="contact_notes"
-              placeholder="What was discussed during this contact?"
+              placeholder="What happened on this contact?"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
             />
           </div>
+
+          <div className="rounded-lg border border-dashed p-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ArrowRight className="h-4 w-4" />
+              Set the next move
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <Label htmlFor="follow_up_date">Next Follow-Up</Label>
+                <Input
+                  id="follow_up_date"
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  min={contactDate}
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 1);
+                    setFollowUpDate(d.toISOString().split('T')[0]);
+                  }}>Tomorrow</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 3);
+                    setFollowUpDate(d.toISOString().split('T')[0]);
+                  }}>+3 days</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    const d = new Date(contactDate || new Date().toISOString().split('T')[0]); d.setDate(d.getDate() + 7);
+                    setFollowUpDate(d.toISOString().split('T')[0]);
+                  }}>+7 days</Button>
+                </div>
+              </div>
+              <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground space-y-2">
+                <div>Quoted and waiting-on-insured files must leave here with a real next follow-up.</div>
+                <div><strong>Recommended:</strong> {status === 'quoted' ? '1 to 3 days so the quote gets presented.' : status === 'waiting_on_insured' ? '3 to 7 days depending on urgency.' : 'Use a next touch whenever the file is still moving.'}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <Label htmlFor="follow_up_reason">Reason</Label>
+                <Input
+                  id="follow_up_reason"
+                  value={followUpReason}
+                  onChange={(e) => setFollowUpReason(e.target.value)}
+                  maxLength={120}
+                  placeholder="Why is the next touch needed?"
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {FOLLOW_UP_REASON_PRESETS.map((preset) => (
+                    <Button
+                      key={preset}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFollowUpReason(preset)}
+                    >
+                      {preset}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="follow_up_note">Follow-Up Note</Label>
+                <Textarea
+                  id="follow_up_note"
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                  maxLength={240}
+                  placeholder="Short context for the next touch"
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
+
           <Button
             onClick={handleAddLog}
             disabled={
@@ -383,7 +437,7 @@ export function AORenewalContactLog({
             ) : (
               <Calendar className="h-4 w-4 mr-2" />
             )}
-            Log Contact
+            Save Contact + Follow-Up
           </Button>
         </div>
 
