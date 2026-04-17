@@ -16,7 +16,6 @@ import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskMod
 import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
 import { AORenewalNotes } from "@/components/renewals/AORenewalNotes";
 import { AORenewalContactLog } from "@/components/renewals/AORenewalContactLog";
-import { AORenewalQuotes } from "@/components/renewals/AORenewalQuotes";
 import { AORenewalDocuments } from "@/components/renewals/AORenewalDocuments";
 import {
   addDaysLocalDate,
@@ -37,7 +36,8 @@ import {
   DollarSign,
   Loader2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency as formatAppCurrency } from "@/lib/utils";
+import { useAORenewalQuotes } from "@/hooks/useAORenewalQuotes";
 
 const STATUS_STYLES: Record<AORenewalStatus, string> = {
   pending: "bg-slate-500/15 text-slate-200 border-slate-400/30",
@@ -90,6 +90,7 @@ export default function AORenewalEdit() {
   const { toast } = useToast();
 
   const { data: renewal, isLoading } = useAORenewal(id);
+  const { data: quotes = [] } = useAORenewalQuotes(id);
   const updateMutation = useUpdateAORenewal();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -290,6 +291,10 @@ export default function AORenewalEdit() {
           : `Renews in ${daysToRenewal} day${daysToRenewal === 1 ? "" : "s"}`;
   const movedDetailsReady = formData.status === "moved" && formData.moved_carrier;
   const followUpHeadline = formData.follow_up_date ? formatLocalDateDisplay(formData.follow_up_date) : "No follow-up date";
+  const bestQuote = quotes.find((quote) => quote.status === "selected") || quotes.find((quote) => quote.status === "quoted") || quotes[0];
+  const annualCurrentPremium = formData.current_premium ? (formData.term_months === "6" ? Number(formData.current_premium) * 2 : Number(formData.current_premium)) : null;
+  const annualBestQuotePremium = bestQuote ? (bestQuote.term_months === 6 ? bestQuote.premium * 2 : bestQuote.premium) : null;
+  const savingsAmount = annualCurrentPremium !== null && annualBestQuotePremium !== null ? annualCurrentPremium - annualBestQuotePremium : null;
 
   if (isLoading) {
     return <AppLayout><div className="min-h-screen bg-[#060b16] p-6 md:p-8"><div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6"><Skeleton className="h-16 w-full rounded-3xl bg-white/5" /><div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]"><Skeleton className="h-[460px] rounded-3xl bg-white/5" /><Skeleton className="h-[460px] rounded-3xl bg-white/5" /></div><Skeleton className="h-[520px] rounded-3xl bg-white/5" /></div></div></AppLayout>;
@@ -353,9 +358,38 @@ export default function AORenewalEdit() {
                 </div>
               </div>
               <div className="rounded-3xl border border-lime-300/20 bg-lime-300/8 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-lime-200/70">Best next move</div>
-                <div className="mt-2 text-2xl font-semibold text-white">{formData.status === "quoted" ? "Present quote and set callback" : formData.status === "waiting_on_insured" ? "Hold insured to a real callback" : formData.status === "pending" ? "Make first move now" : "Keep outcome aligned"}</div>
-                <p className="mt-2 text-sm text-slate-300">{formData.status === "quoted" ? "This file should leave today with a scheduled review touch, not just a status update." : formData.status === "waiting_on_insured" ? "The insured owes the answer. The page should make the next chase date impossible to miss." : formData.status === "pending" ? "Get contact moving before the renewal window compresses and forces bad timing." : "Use the page to keep the detail honest and the task complete."}</p>
+                <div className="text-xs uppercase tracking-[0.2em] text-lime-200/70">Quote</div>
+                {bestQuote ? (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="text-2xl font-semibold text-white">{bestQuote.carrier}</div>
+                      <p className="mt-1 text-sm text-slate-300">Most useful quote currently on file</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className={heroTile}>
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Carrier</div>
+                        <div className="mt-2 text-lg font-semibold text-white">{bestQuote.carrier}</div>
+                      </div>
+                      <div className={heroTile}>
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Premium</div>
+                        <div className="mt-2 text-lg font-semibold text-white">{formatAppCurrency(bestQuote.premium)}</div>
+                      </div>
+                      <div className={heroTile}>
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Term</div>
+                        <div className="mt-2 text-lg font-semibold text-white">{bestQuote.term_months} months</div>
+                      </div>
+                      <div className={heroTile}>
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Savings</div>
+                        <div className="mt-2 text-lg font-semibold text-white">{savingsAmount === null ? "—" : savingsAmount >= 0 ? formatAppCurrency(savingsAmount) : `+${formatAppCurrency(Math.abs(savingsAmount))}`}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <div className="text-2xl font-semibold text-white">No quote yet</div>
+                    <p className="mt-2 text-sm text-slate-300">Once a quote is added, the key carrier, premium, term, and savings will live here.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -370,7 +404,7 @@ export default function AORenewalEdit() {
             <div className="space-y-6 xl:sticky xl:top-6"><Card className={cn(surfaceCard, "rounded-3xl")}><CardHeader className="pb-4"><div className="flex items-start justify-between gap-3"><div><CardTitle className={sectionTitle}>Follow-Up Command Panel</CardTitle><CardDescription className={sectionDescription}>Set the current commitment here. Make the next touch obvious and enforceable.</CardDescription></div><Button type="button" variant="ghost" size="sm" className="text-slate-300 hover:bg-white/5 hover:text-white" onClick={() => togglePanel("followUp")}>{panelPrefs.followUp ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div></CardHeader>{panelPrefs.followUp && <CardContent className={cn(panelCardContent, "space-y-5")}><div className="rounded-3xl border border-white/10 bg-white/5 p-5"><div className="flex items-center gap-2 text-sm font-medium text-white"><CalendarClock className="h-4 w-4 text-lime-300" />Current follow-up commitment</div><div className="mt-3 text-xl font-semibold text-white">{followUpHeadline}</div><div className="mt-2 text-sm text-slate-300">{formData.follow_up_reason || "No reason set"}</div>{formData.follow_up_note ? <div className="mt-1 text-sm text-slate-400">{formData.follow_up_note}</div> : null}</div><div className="grid gap-3 sm:grid-cols-3"><div className={heroTile}><div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div><div className="mt-2 text-lg font-semibold text-white">{commandStateLabel}</div></div><div className={heroTile}><div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div><div className="mt-2 text-lg font-semibold capitalize text-white">{renewal.status.replaceAll("_", " ")}</div></div><div className={heroTile}><div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div><div className="mt-2 text-lg font-semibold text-white">{renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : "None logged"}</div></div></div><div className="space-y-2"><Label htmlFor="follow_up_panel_date">Follow-Up Date</Label><Input id="follow_up_panel_date" type="date" value={followUpDraft.date} onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))} className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white" /><div className="grid grid-cols-2 gap-2 lg:grid-cols-4"><Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10" onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}>Tomorrow</Button><Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10" onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}>+3 days</Button><Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10" onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}>+7 days</Button><Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10" onClick={() => { const base = new Date(); const day = base.getDay(); const add = day === 0 ? 1 : 8 - day; setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(base, add) })); }}>Next week</Button></div></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label htmlFor="follow_up_reason">Follow-Up Reason</Label><Input id="follow_up_reason" value={followUpDraft.reason} maxLength={120} onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))} placeholder="e.g. quote review, waiting on insured" className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white" /></div><div className="space-y-2"><Label htmlFor="follow_up_note">Follow-Up Note</Label><Textarea id="follow_up_note" value={followUpDraft.note} maxLength={240} onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, note: e.target.value }))} placeholder="Short context for the next call" rows={4} className="rounded-2xl border-white/10 bg-white/5 text-base text-white" /></div></div><div className="rounded-3xl border border-dashed border-white/10 bg-[#11192b] p-4 text-sm text-slate-300"><p>Recommended: <strong className="text-white">{formData.status === "waiting_on_insured" ? "3 to 7 days depending on renewal pressure." : formData.status === "quoted" ? "1 to 3 days so quotes do not sit quietly." : "Use a real follow-up date whenever the next touch is committed."}</strong></p></div><div className="flex flex-wrap gap-3"><Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10" onClick={() => setFollowUpDraft({ date: "", reason: "", note: "" })}>Clear</Button><Button type="button" className="h-11 rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200" onClick={handleConfirmFollowUp} disabled={!followUpDirty || followUpSaving || updateMutation.isPending}>{(followUpSaving || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm Follow-Up</Button></div></CardContent>}</Card></div>
           </div>
 
-          <Card className={cn(surfaceCard, "rounded-3xl")}><CardHeader className="pb-4"><div className="flex items-start justify-between gap-3"><div><CardTitle className={sectionTitle}>Renewal Workspace</CardTitle><CardDescription className={sectionDescription}>Everything valuable stays accessible, but only one panel is open at a time.</CardDescription></div><Button type="button" variant="ghost" size="sm" className="text-slate-300 hover:bg-white/5 hover:text-white" onClick={() => togglePanel("workspace")}>{panelPrefs.workspace ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div></CardHeader>{panelPrefs.workspace && <CardContent className={panelCardContent}><Tabs defaultValue="contact" className="w-full"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><TabsList className="h-11 rounded-2xl bg-white/5 p-1 text-slate-400"><TabsTrigger value="contact" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Contact</TabsTrigger><TabsTrigger value="quotes" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Quotes</TabsTrigger><TabsTrigger value="documents" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Documents</TabsTrigger><TabsTrigger value="notes" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Notes</TabsTrigger></TabsList></div><TabsContent value="contact" className="mt-6"><AORenewalContactLog renewalId={renewal.id} currentStatus={renewal.status} currentFollowUpDate={renewal.follow_up_date} currentFollowUpReason={renewal.follow_up_reason} currentFollowUpNote={renewal.follow_up_note} /></TabsContent><TabsContent value="quotes" className="mt-6"><AORenewalQuotes renewalId={renewal.id} currentPremium={renewal.current_premium} currentTermMonths={renewal.term_months} /></TabsContent><TabsContent value="documents" className="mt-6"><AORenewalDocuments renewalId={renewal.id} customerName={renewal.customer_name} policyNumber={renewal.policy_number} /></TabsContent><TabsContent value="notes" className="mt-6"><AORenewalNotes renewalId={renewal.id} /></TabsContent></Tabs></CardContent>}</Card>
+          <Card className={cn(surfaceCard, "rounded-3xl")}><CardHeader className="pb-4"><div className="flex items-start justify-between gap-3"><div><CardTitle className={sectionTitle}>Renewal Workspace</CardTitle><CardDescription className={sectionDescription}>Everything valuable stays accessible, but only one panel is open at a time.</CardDescription></div><Button type="button" variant="ghost" size="sm" className="text-slate-300 hover:bg-white/5 hover:text-white" onClick={() => togglePanel("workspace")}>{panelPrefs.workspace ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div></CardHeader>{panelPrefs.workspace && <CardContent className={panelCardContent}><Tabs defaultValue="contact" className="w-full"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><TabsList className="h-11 rounded-2xl bg-white/5 p-1 text-slate-400"><TabsTrigger value="contact" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Contact</TabsTrigger><TabsTrigger value="documents" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Documents</TabsTrigger><TabsTrigger value="notes" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">Notes</TabsTrigger></TabsList></div><TabsContent value="contact" className="mt-6"><AORenewalContactLog renewalId={renewal.id} currentStatus={renewal.status} currentFollowUpDate={renewal.follow_up_date} currentFollowUpReason={renewal.follow_up_reason} currentFollowUpNote={renewal.follow_up_note} /></TabsContent><TabsContent value="documents" className="mt-6"><AORenewalDocuments renewalId={renewal.id} customerName={renewal.customer_name} policyNumber={renewal.policy_number} /></TabsContent><TabsContent value="notes" className="mt-6"><AORenewalNotes renewalId={renewal.id} /></TabsContent></Tabs></CardContent>}</Card>
 
           <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
           <MovedStatusModal open={showMovedModal} onOpenChange={handleMovedCancel} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
