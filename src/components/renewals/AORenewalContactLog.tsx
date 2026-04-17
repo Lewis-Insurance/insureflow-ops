@@ -223,10 +223,6 @@ export function AORenewalContactLog({
       setNotes("");
       setContactDate(new Date().toISOString().split("T")[0]);
       setContactMethod("phone");
-      setStatus(currentStatus || "");
-      setFollowUpDate(currentFollowUpDate || "");
-      setFollowUpReason(currentFollowUpReason || "");
-      setFollowUpNote(currentFollowUpNote || "");
       toast({
         title: "Success",
         description: "Contact and follow-up saved",
