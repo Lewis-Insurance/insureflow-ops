@@ -135,7 +135,7 @@ export default function AORenewalEdit() {
         follow_up_date: extractLocalDate(renewal.follow_up_date),
         follow_up_reason: renewal.follow_up_reason || "",
         follow_up_note: renewal.follow_up_note || "",
-        losses_3yr: renewal.losses_3yr?.toString() || "",
+        losses_3yr: renewal.losses_3yr?.toString() ?? "0",
         oldest_in_household: renewal.oldest_in_household?.toString() || "",
         moved_carrier: renewal.moved_carrier || "",
         moved_term: renewal.moved_term || "",
