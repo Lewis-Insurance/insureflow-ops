@@ -324,7 +324,7 @@ export default function AORenewalEdit() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.95fr_0.9fr]">
+            <div className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr]">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happens next</div>
                 <div className="mt-3 text-2xl font-semibold text-white">{commandStateLabel}</div>
@@ -357,7 +357,7 @@ export default function AORenewalEdit() {
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500">File snapshot</div>
-                <div className="mt-3 space-y-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className={heroTile}>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Policy</div>
                     <div className="mt-2 text-base font-semibold text-white">{formData.policy_number || "No policy number"}</div>
@@ -366,6 +366,14 @@ export default function AORenewalEdit() {
                   <div className={heroTile}>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Term</div>
                     <div className="mt-2 text-base font-semibold text-white">{formData.term_months ? `${formData.term_months} month term` : "Term not set"}</div>
+                  </div>
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Auto-Owners Premium</div>
+                    <div className="mt-2 text-base font-semibold text-white">{formatCurrency(formData.current_premium)}</div>
+                  </div>
+                  <div className={heroTile}>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Effective Date</div>
+                    <div className="mt-2 text-base font-semibold text-white">{formData.renewal_date ? formatLocalDateDisplay(formData.renewal_date) : "No effective date"}</div>
                   </div>
                 </div>
               </div>
