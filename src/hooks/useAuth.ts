@@ -28,6 +28,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileErrorShown, setProfileErrorShown] = useState(false);
 
   // Centralized profile fetching with proper error handling
   const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<void> => {
@@ -40,11 +41,14 @@ export function useAuth() {
       
       if (error) {
         logger.error('Profile fetch error:', error);
-        toast({
-          title: "Profile Error",
-          description: `Failed to load profile: ${error.message}`,
-          variant: "destructive",
-        });
+        if (!profileErrorShown) {
+          toast({
+            title: "Profile Error",
+            description: `Failed to load profile: ${error.message}`,
+            variant: "destructive",
+          });
+          setProfileErrorShown(true);
+        }
         
         // Create minimal profile to prevent infinite loading
         const fallbackProfile: UserProfile = {
@@ -74,6 +78,7 @@ export function useAuth() {
           notification_sms: false, // Default since field doesn't exist in database yet
           default_agency_workspace_id: profileData.default_agency_workspace_id || null,
         });
+        setProfileErrorShown(false);
       }
     } catch (error) {
       logger.error('Profile fetch exception:', error);
@@ -88,7 +93,7 @@ export function useAuth() {
       };
       setProfile(fallbackProfile);
     }
-  }, [toast]);
+  }, [toast, profileErrorShown]);
 
   useEffect(() => {
     let mounted = true;
