@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +18,6 @@ interface AddAORenewalTaskModalProps {
   renewal: AORenewal;
 }
 
-const toDateTimeLocal = (value?: string | null) => {
-  if (!value) return '';
-  const date = new Date(value);
-  const timezoneOffset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - timezoneOffset * 60_000);
-  return localDate.toISOString().slice(0, 16);
-};
-
 export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORenewalTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -36,28 +28,6 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!open) return;
-
-    const defaultTitle = renewal.follow_up_reason
-      ? `Follow up with ${renewal.customer_name} (${renewal.follow_up_reason})`
-      : `Follow up with ${renewal.customer_name}`;
-
-    const summaryLines = [
-      `Policy: ${renewal.policy_number}`,
-      `Status: ${renewal.status.replaceAll('_', ' ')}`,
-      renewal.follow_up_reason ? `Follow-up reason: ${renewal.follow_up_reason}` : null,
-      renewal.follow_up_note ? `Follow-up note: ${renewal.follow_up_note}` : null,
-      renewal.last_contact_date ? `Last contact: ${renewal.last_contact_date}` : null,
-    ].filter(Boolean);
-
-    setTitle(defaultTitle);
-    setDescription(summaryLines.join('\n'));
-    setDueAt(toDateTimeLocal(renewal.follow_up_date));
-    setPriority(renewal.priority === 'urgent' ? 'urgent' : renewal.priority === 'high' ? 'high' : 'medium');
-    setCategory('renewal');
-  }, [open, renewal]);
-
   async function handleSave() {
     if (!title.trim()) {
       toast({
@@ -67,7 +37,7 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
       });
       return;
     }
-
+    
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -96,9 +66,6 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
           renewal_policy_number: renewal.policy_number,
           renewal_date: renewal.renewal_date,
           renewal_premium: renewal.current_premium,
-          renewal_follow_up_date: renewal.follow_up_date,
-          renewal_follow_up_reason: renewal.follow_up_reason,
-          renewal_follow_up_note: renewal.follow_up_note,
         },
       });
 
@@ -116,11 +83,12 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
         description: 'Task created successfully',
       });
 
+      // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       if (renewal.account_id) {
         queryClient.invalidateQueries({ queryKey: ['tasks', renewal.account_id] });
       }
-
+      
       setTitle('');
       setDescription('');
       setDueAt('');
@@ -152,22 +120,22 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
 
           <div>
             <Label htmlFor="title">Task Title *</Label>
-            <Input
+            <Input 
               id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Contact customer about renewal"
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+              placeholder="e.g., Contact customer about renewal" 
             />
           </div>
 
           <div>
             <Label htmlFor="description">Description</Label>
-            <Textarea
+            <Textarea 
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={description} 
+              onChange={(e) => setDescription(e.target.value)} 
               placeholder="Add task details..."
-              rows={4}
+              rows={3}
             />
           </div>
 
@@ -206,11 +174,11 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
 
           <div>
             <Label htmlFor="due-date">Due Date</Label>
-            <Input
+            <Input 
               id="due-date"
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
+              type="datetime-local" 
+              value={dueAt} 
+              onChange={(e) => setDueAt(e.target.value)} 
             />
           </div>
 

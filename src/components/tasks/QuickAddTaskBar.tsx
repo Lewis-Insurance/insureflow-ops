@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTasks } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
-import { addDaysLocalDate, localDateToNoonIso, todayLocalDate } from '@/lib/date/localDate';
 
 interface QuickAddTaskBarProps {
   className?: string;
@@ -26,7 +25,7 @@ export default function QuickAddTaskBar({ className }: QuickAddTaskBarProps) {
         title: title.trim(),
         status: 'pending',
         priority: 'medium',
-        due_at: dueAt ? localDateToNoonIso(dueAt) : undefined,
+        due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
         assignee_id: user?.id,
         category: 'general',
       });
