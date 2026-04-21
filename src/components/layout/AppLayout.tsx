@@ -467,3 +467,16 @@ export function AppLayout({ children }: AppLayoutProps) {
     </AIAssistantProvider>
   );
 }
+
+export function AppLayoutWithNavigationGuard({
+  children,
+  onNavigateAttempt,
+}: AppLayoutProps & { onNavigateAttempt?: (path: string) => boolean }) {
+  return (
+    <AIAssistantProvider>
+      <MessengerProvider>
+        <AppLayoutContent>{children}</AppLayoutContent>
+      </MessengerProvider>
+    </AIAssistantProvider>
+  );
+}
