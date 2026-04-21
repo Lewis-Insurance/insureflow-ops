@@ -43,6 +43,11 @@ CREATE INDEX IF NOT EXISTS idx_lead_auto_drivers_lead_id ON lead_auto_drivers(le
 -- Add RLS policies for lead_auto_drivers
 ALTER TABLE lead_auto_drivers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view drivers for their account's leads" ON lead_auto_drivers;
+DROP POLICY IF EXISTS "Users can insert drivers for their account's leads" ON lead_auto_drivers;
+DROP POLICY IF EXISTS "Users can update drivers for their account's leads" ON lead_auto_drivers;
+DROP POLICY IF EXISTS "Users can delete drivers for their account's leads" ON lead_auto_drivers;
+
 CREATE POLICY "Users can view drivers for their account's leads"
   ON lead_auto_drivers FOR SELECT
   USING (
@@ -113,6 +118,11 @@ CREATE INDEX IF NOT EXISTS idx_lead_auto_vehicles_lead_id ON lead_auto_vehicles(
 -- Add RLS policies for lead_auto_vehicles
 ALTER TABLE lead_auto_vehicles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view vehicles for their account's leads" ON lead_auto_vehicles;
+DROP POLICY IF EXISTS "Users can insert vehicles for their account's leads" ON lead_auto_vehicles;
+DROP POLICY IF EXISTS "Users can update vehicles for their account's leads" ON lead_auto_vehicles;
+DROP POLICY IF EXISTS "Users can delete vehicles for their account's leads" ON lead_auto_vehicles;
+
 CREATE POLICY "Users can view vehicles for their account's leads"
   ON lead_auto_vehicles FOR SELECT
   USING (
@@ -177,6 +187,9 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_base_queries_created_at ON knowledge_ba
 
 -- Add RLS for knowledge_base_queries
 ALTER TABLE knowledge_base_queries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own knowledge queries" ON knowledge_base_queries;
+DROP POLICY IF EXISTS "Users can insert their own knowledge queries" ON knowledge_base_queries;
 
 CREATE POLICY "Users can view their own knowledge queries"
   ON knowledge_base_queries FOR SELECT
