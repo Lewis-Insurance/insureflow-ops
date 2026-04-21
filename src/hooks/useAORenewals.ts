@@ -36,6 +36,9 @@ export interface AORenewal {
   created_at: string;
   updated_at: string;
   last_contact_date: string | null;
+  // Follow-up tracking (exactly one active follow-up per renewal)
+  follow_up_date: string | null;
+  follow_up_reason: string | null;
   // Moved status fields
   moved_carrier: string | null;
   moved_term: AORenewalTerm | null;

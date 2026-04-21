@@ -42,18 +42,16 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
 
-  // Fetch documents linked to this renewal
-  // Documents are stored with related_entity_type='policy' and kind='ao_policy'
-  // to work within database constraints while still linking to the renewal ID
+  // Fetch documents linked to this renewal.
+  // New uploads use related_entity_type='ao_renewal'. Legacy records used 'policy' + kind='ao_policy'.
   const { data: documents, isLoading } = useQuery({
     queryKey: ['ao-renewal-documents', renewalId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
         .select('id, filename, storage_path, mime_type, file_size, created_at, document_type')
-        .eq('related_entity_type', 'policy')
         .eq('related_entity_id', renewalId)
-        .eq('kind', 'ao_policy')
+        .or('related_entity_type.eq.ao_renewal,and(related_entity_type.eq.policy,kind.eq.ao_policy)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -82,12 +80,6 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
 
       if (uploadError) throw uploadError;
 
-      // Create document record
-      // document_type must be one of: policy, quote, dec_page, endorsement, claim_form, coi, bill,
-      // loss_run, application, renewal, cancellation, binder, certificate, inspection, unknown
-      // related_entity_type must be one of: account, policy, quote, claim
-      // We use 'renewal' for document_type (valid) but 'policy' for related_entity_type
-      // since the ao_renewals are policy-related and we store the renewal ID
       const { error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -95,9 +87,8 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           storage_path: storagePath,
           mime_type: file.type,
           file_size: file.size,
-          kind: 'ao_policy',
           document_type: 'renewal',
-          related_entity_type: 'policy',
+          related_entity_type: 'ao_renewal',
           related_entity_id: renewalId,
         });
 

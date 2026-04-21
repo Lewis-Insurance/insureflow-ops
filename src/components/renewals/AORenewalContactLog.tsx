@@ -220,7 +220,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
               </Select>
             </div>
             <div>
-              <Label htmlFor="status">Update Status</Label>
+              <Label htmlFor="status">Call Outcome</Label>
               <Select value={status || undefined} onValueChange={(v) => setStatus(v === 'no_change' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No change" />

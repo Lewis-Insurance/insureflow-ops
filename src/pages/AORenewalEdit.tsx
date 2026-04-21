@@ -19,6 +19,7 @@ import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
+import { AORenewalFollowUpPanel } from '@/components/renewals/AORenewalFollowUpPanel';
 
 export default function AORenewalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -437,19 +438,19 @@ export default function AORenewalEdit() {
           </Card>
         </form>
 
-        {/* Documents Section */}
+        {/* Follow-up Panel */}
         {renewal && (
-          <AORenewalDocuments
+          <AORenewalFollowUpPanel
             renewalId={renewal.id}
-            customerName={renewal.customer_name}
-            policyNumber={renewal.policy_number}
+            followUpDate={renewal.follow_up_date}
+            followUpReason={renewal.follow_up_reason}
           />
         )}
 
-        {/* Quotes Section */}
+        {/* Quotes Section — prominent per product decision */}
         {renewal && (
-          <AORenewalQuotes 
-            renewalId={renewal.id} 
+          <AORenewalQuotes
+            renewalId={renewal.id}
             currentPremium={renewal.current_premium}
             currentTermMonths={renewal.term_months}
           />
@@ -460,6 +461,15 @@ export default function AORenewalEdit() {
 
         {/* Notes Section */}
         {renewal && <AORenewalNotes renewalId={renewal.id} />}
+
+        {/* Documents Section */}
+        {renewal && (
+          <AORenewalDocuments
+            renewalId={renewal.id}
+            customerName={renewal.customer_name}
+            policyNumber={renewal.policy_number}
+          />
+        )}
 
         {/* Task Modal */}
         {renewal && (
