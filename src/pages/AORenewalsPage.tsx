@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +61,7 @@ import {
   ArrowRightLeft,
   User,
   Target,
+  CalendarClock,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -63,6 +71,7 @@ import {
   useUpdateAORenewalStatus,
   useDeleteAORenewal,
   useBulkDeleteAllAORenewals,
+  useUpdateAORenewal,
   type AORenewalStatus,
   type AORenewalPriority,
   type AORenewalFilters,
@@ -84,6 +93,9 @@ export default function AORenewalsPage() {
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
   const [showMyAssignments, setShowMyAssignments] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Inline follow-up state: maps renewalId → { date, reason } being edited
+  const [followUpDraft, setFollowUpDraft] = useState<Record<string, { date: string; reason: string }>>({});
+  const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
 
   // Get current user ID
   useEffect(() => {
@@ -124,8 +136,24 @@ export default function AORenewalsPage() {
   const { data: stats } = useAORenewalsStats();
   const { data: myStats } = useMyAORenewalsCount();
   const updateStatusMutation = useUpdateAORenewalStatus();
+  const updateRenewalMutation = useUpdateAORenewal();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
+
+  const handleSaveFollowUp = async (renewalId: string) => {
+    const draft = followUpDraft[renewalId];
+    if (!draft?.date) return;
+    setSavingFollowUp(renewalId);
+    try {
+      await updateRenewalMutation.mutateAsync({
+        id: renewalId,
+        updates: { follow_up_date: draft.date, follow_up_reason: draft.reason.trim() || null },
+      });
+      setFollowUpDraft((prev) => { const next = { ...prev }; delete next[renewalId]; return next; });
+    } finally {
+      setSavingFollowUp(null);
+    }
+  };
 
   const formatCurrency = (value: number | null) => {
     if (!value) return "$0.00";
@@ -543,6 +571,7 @@ export default function AORenewalsPage() {
                       <TableHead>Oldest Age</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
+                      <TableHead>Follow-up</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -574,8 +603,115 @@ export default function AORenewalsPage() {
                         <TableCell className="text-sm text-center">
                           {renewal.oldest_in_household ?? '-'}
                         </TableCell>
-                        <TableCell>{getStatusBadge(renewal.status)}</TableCell>
+                        {/* Inline status dropdown */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={renewal.status}
+                            onValueChange={(value) =>
+                              handleStatusChange(renewal.id, value as AORenewalStatus)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[120px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="contacted">Contacted</SelectItem>
+                              <SelectItem value="quoted">Quoted</SelectItem>
+                              <SelectItem value="renewed">Renewed</SelectItem>
+                              <SelectItem value="moved">Moved</SelectItem>
+                              <SelectItem value="lost">Lost</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell>{getPriorityBadge(renewal.priority)}</TableCell>
+                        {/* Inline follow-up popover */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs gap-1"
+                                onClick={() => {
+                                  if (!followUpDraft[renewal.id]) {
+                                    setFollowUpDraft((prev) => ({
+                                      ...prev,
+                                      [renewal.id]: {
+                                        date: renewal.follow_up_date || "",
+                                        reason: renewal.follow_up_reason || "",
+                                      },
+                                    }));
+                                  }
+                                }}
+                              >
+                                <CalendarClock className="h-3.5 w-3.5" />
+                                {renewal.follow_up_date
+                                  ? new Date(renewal.follow_up_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                                  : "Set"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-4 space-y-3" align="end">
+                              <p className="text-sm font-medium">Set Follow-up</p>
+                              <div>
+                                <Label htmlFor={`fu-date-${renewal.id}`} className="text-xs">Date *</Label>
+                                <Input
+                                  id={`fu-date-${renewal.id}`}
+                                  type="date"
+                                  className="h-8 text-sm mt-1"
+                                  value={followUpDraft[renewal.id]?.date || ""}
+                                  onChange={(e) =>
+                                    setFollowUpDraft((prev) => ({
+                                      ...prev,
+                                      [renewal.id]: { ...prev[renewal.id], date: e.target.value },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`fu-reason-${renewal.id}`} className="text-xs">Reason</Label>
+                                <Textarea
+                                  id={`fu-reason-${renewal.id}`}
+                                  className="text-sm mt-1 resize-none"
+                                  rows={2}
+                                  value={followUpDraft[renewal.id]?.reason || ""}
+                                  onChange={(e) =>
+                                    setFollowUpDraft((prev) => ({
+                                      ...prev,
+                                      [renewal.id]: { ...prev[renewal.id], reason: e.target.value },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  disabled={!followUpDraft[renewal.id]?.date || savingFollowUp === renewal.id}
+                                  onClick={() => handleSaveFollowUp(renewal.id)}
+                                >
+                                  {savingFollowUp === renewal.id ? "Saving…" : "Save"}
+                                </Button>
+                                {renewal.follow_up_date && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={savingFollowUp === renewal.id}
+                                    onClick={() =>
+                                      updateRenewalMutation.mutate({
+                                        id: renewal.id,
+                                        updates: { follow_up_date: null, follow_up_reason: null },
+                                      })
+                                    }
+                                  >
+                                    Clear
+                                  </Button>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -590,28 +726,6 @@ export default function AORenewalsPage() {
                                 onClick={() => setTaskRenewal(renewal)}
                               >
                                 Create Task
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(renewal.id, "contacted")
-                                }
-                              >
-                                Mark as Contacted
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(renewal.id, "quoted")
-                                }
-                              >
-                                Mark as Quoted
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(renewal.id, "renewed")
-                                }
-                              >
-                                Mark as Renewed
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
