@@ -4,6 +4,7 @@ import { Loader2, FileText, Building2, Calendar, DollarSign, Shield, AlertCircle
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 interface DocumentAnalysisDisplayProps {
   documentId: string;
@@ -120,7 +121,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
                 <div>
                   <div className="text-xs text-muted-foreground">Effective</div>
                   <div className="text-sm font-medium">
-                    {format(new Date(analysis.effective_date), 'MM/dd/yyyy')}
+                    {formatLocalDateDisplay(analysis.effective_date)}
                   </div>
                 </div>
               </div>
@@ -132,7 +133,7 @@ export const DocumentAnalysisDisplay = ({ documentId }: DocumentAnalysisDisplayP
                 <div>
                   <div className="text-xs text-muted-foreground">Expires</div>
                   <div className="text-sm font-medium">
-                    {format(new Date(analysis.expiration_date), 'MM/dd/yyyy')}
+                    {formatLocalDateDisplay(analysis.expiration_date)}
                   </div>
                 </div>
               </div>

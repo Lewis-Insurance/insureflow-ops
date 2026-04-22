@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -999,13 +1000,13 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                       {policyData.effective_date && (
                         <div>
                           <span className="text-muted-foreground">Effective:</span>{' '}
-                          {new Date(policyData.effective_date).toLocaleDateString()}
+                          {formatLocalDateDisplay(policyData.effective_date)}
                         </div>
                       )}
                       {policyData.expiration_date && (
                         <div>
                           <span className="text-muted-foreground">Expires:</span>{' '}
-                          {new Date(policyData.expiration_date).toLocaleDateString()}
+                          {formatLocalDateDisplay(policyData.expiration_date)}
                         </div>
                       )}
                     </div>

@@ -6,6 +6,7 @@ import { usePolicies } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
 import { AddNoteModal } from './AddNoteModal';
@@ -228,7 +229,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <label className="text-muted-foreground">Effective:</label>
                                     <div className="flex items-center gap-1">
                                       <Calendar className="h-3 w-3" />
-                                      <span>{new Date(policy.effective_date).toLocaleDateString()}</span>
+                                      <span>{formatLocalDateDisplay(policy.effective_date)}</span>
                                     </div>
                                   </div>
                                 )}
@@ -237,7 +238,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <label className="text-muted-foreground">Expires:</label>
                                     <div className="flex items-center gap-1">
                                       <Calendar className="h-3 w-3" />
-                                      <span>{new Date(policy.expiration_date).toLocaleDateString()}</span>
+                                      <span>{formatLocalDateDisplay(policy.expiration_date)}</span>
                                     </div>
                                   </div>
                                 )}
@@ -372,7 +373,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <label className="text-muted-foreground">Effective:</label>
                                     <div className="flex items-center gap-1">
                                       <Calendar className="h-3 w-3" />
-                                      <span>{new Date(policy.effective_date).toLocaleDateString()}</span>
+                                      <span>{formatLocalDateDisplay(policy.effective_date)}</span>
                                     </div>
                                   </div>
                                 )}
@@ -381,7 +382,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                                     <label className="text-muted-foreground">Expires:</label>
                                     <div className="flex items-center gap-1">
                                       <Calendar className="h-3 w-3" />
-                                      <span>{new Date(policy.expiration_date).toLocaleDateString()}</span>
+                                      <span>{formatLocalDateDisplay(policy.expiration_date)}</span>
                                     </div>
                                   </div>
                                 )}
@@ -535,7 +536,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                               <label className="text-muted-foreground">Expires:</label>
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                <span>{new Date(quote.expires_at).toLocaleDateString()}</span>
+                                <span>{formatLocalDateDisplay(quote.expires_at)}</span>
                               </div>
                             </div>
                           )}

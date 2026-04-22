@@ -21,6 +21,7 @@ import {
 import { usePortalIDCards } from '@/hooks/usePortalIDCards';
 import { DataAsOfBadge } from './DataAsOfBadge';
 import type { PortalIDCard } from '@/types/portal';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 interface IDCardViewProps {
   showWalletButtons?: boolean;
@@ -212,11 +213,11 @@ function IDCardItem({
                   <div className="flex gap-4">
                     <div>
                       <p className="opacity-70">Effective</p>
-                      <p>{new Date(card_data.effective_date).toLocaleDateString()}</p>
+                      <p>{formatLocalDateDisplay(card_data.effective_date)}</p>
                     </div>
                     <div>
                       <p className="opacity-70">Expires</p>
-                      <p>{new Date(card_data.expiration_date).toLocaleDateString()}</p>
+                      <p>{formatLocalDateDisplay(card_data.expiration_date)}</p>
                     </div>
                   </div>
                 </div>
@@ -233,7 +234,7 @@ function IDCardItem({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>Expires {new Date(card_data.expiration_date).toLocaleDateString()}</span>
+            <span>Expires {formatLocalDateDisplay(card_data.expiration_date)}</span>
           </div>
           {card_data.claims_phone && (
             <div className="flex items-center gap-2">

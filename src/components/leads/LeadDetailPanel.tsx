@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/accordion";
 import { Phone, Mail, MapPin, Calendar, DollarSign, ExternalLink, Shield, Car, User, FileText, Home, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 interface LeadDetailPanelProps {
   lead: Lead | null;
@@ -345,10 +346,10 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
                                   <div>Policy #: <span className="text-foreground">{policy.policy_number}</span></div>
                                 )}
                                 {policy.effective_date && (
-                                  <div>Effective: <span className="text-foreground">{format(new Date(policy.effective_date), 'MM/dd/yyyy')}</span></div>
+                                  <div>Effective: <span className="text-foreground">{format(parseLocalDate(policy.effective_date), 'MM/dd/yyyy')}</span></div>
                                 )}
                                 {policy.expiration_date && (
-                                  <div>Expires: <span className="text-foreground font-medium">{format(new Date(policy.expiration_date), 'MM/dd/yyyy')}</span></div>
+                                  <div>Expires: <span className="text-foreground font-medium">{format(parseLocalDate(policy.expiration_date), 'MM/dd/yyyy')}</span></div>
                                 )}
                                 {policy.deductible && (
                                   <div>Deductible: <span className="text-foreground">${policy.deductible.toLocaleString()}</span></div>
@@ -457,7 +458,7 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
                               </div>
                               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                 {driver.date_of_birth && (
-                                  <div>DOB: <span className="text-foreground">{format(new Date(driver.date_of_birth), 'MM/dd/yyyy')}</span></div>
+                                  <div>DOB: <span className="text-foreground">{format(parseLocalDate(driver.date_of_birth), 'MM/dd/yyyy')}</span></div>
                                 )}
                                 {driver.gender && (
                                   <div>Gender: <span className="text-foreground capitalize">{driver.gender}</span></div>

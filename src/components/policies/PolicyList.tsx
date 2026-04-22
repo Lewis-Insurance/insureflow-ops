@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { 
   FileText, 
   Calendar, 
@@ -214,7 +215,7 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
-                      {format(new Date(policy.effective_date), 'MMM dd, yyyy')}
+                      {format(parseLocalDate(policy.effective_date), 'MMM dd, yyyy')}
                     </div>
                   </TableCell>
 
@@ -222,7 +223,7 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                     <div className="space-y-1">
                       <div className={`flex items-center gap-1 text-sm ${isExpired(policy.expiration_date) ? 'text-red-600 font-bold dark:text-red-400' : ''}`}>
                         <Calendar className={`h-3 w-3 ${isExpired(policy.expiration_date) ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`} />
-                        {format(new Date(policy.expiration_date), 'MMM dd, yyyy')}
+                        {format(parseLocalDate(policy.expiration_date), 'MMM dd, yyyy')}
                       </div>
                       {isExpired(policy.expiration_date) && (
                         <Badge variant="destructive" className="text-xs">
