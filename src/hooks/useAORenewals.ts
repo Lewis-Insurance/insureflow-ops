@@ -505,7 +505,8 @@ export const useSetAORenewalFollowUp = () => {
       currentUserId: string;
     }) => {
       if (!date) {
-        // CLEAR path: complete existing task, null out follow-up fields
+        // CLEAR path: mark pending child row as cleared, complete linked task.
+        // Trigger nulls the parent shortcut cols.
         if (renewal.follow_up_task_id) {
           const { error: taskErr } = await supabase
             .from('tasks')
@@ -513,73 +514,60 @@ export const useSetAORenewalFollowUp = () => {
             .eq('id', renewal.follow_up_task_id);
           if (taskErr) throw new Error(`Task completion failed: ${taskErr.message}`);
         }
-        const { error: renewalErr } = await supabase
-          .from('ao_renewals')
-          .update({ follow_up_date: null, follow_up_reason: null, follow_up_task_id: null })
-          .eq('id', renewal.id);
-        if (renewalErr) throw new Error(`Failed to clear follow-up: ${renewalErr.message}`);
+        const { error: clearErr } = await supabase
+          .from('ao_renewal_follow_ups')
+          .update({ status: 'cleared', completed_at: new Date().toISOString() })
+          .eq('renewal_id', renewal.id)
+          .eq('status', 'pending');
+        if (clearErr) throw new Error(`Failed to clear follow-up: ${clearErr.message}`);
         return { renewalId: renewal.id, taskId: null as string | null };
       }
 
-      // SET/EDIT path
+      // SET/EDIT path — upsert task, then upsert child row.
+      // Trigger keeps ao_renewals shortcut cols in sync.
       const priorityMap: Record<string, string> = {
         low: 'low', normal: 'medium', high: 'high', urgent: 'urgent',
       };
       const taskPriority = priorityMap[renewal.priority] || 'medium';
       const assignee = renewal.assigned_to || currentUserId;
-      const dueAt = `${date}T09:00:00-05:00`; // 9 AM ET (EST offset, acceptable for throwaway module)
+      const dueAt = `${date}T09:00:00-05:00`;
       const taskTitle = `Follow up: ${renewal.customer_name}`;
       const taskDesc = `Policy ${renewal.policy_number}.${reason ? ` Reason: ${reason}` : ''}`;
 
       let taskId = renewal.follow_up_task_id;
 
       if (taskId) {
-        // UPDATE existing task
         const { error: taskErr } = await supabase
           .from('tasks')
-          .update({
-            title: taskTitle,
-            description: taskDesc,
-            due_at: dueAt,
-            status: 'pending',
-            priority: taskPriority,
-            assignee_id: assignee,
-          })
+          .update({ title: taskTitle, description: taskDesc, due_at: dueAt, status: 'pending', priority: taskPriority, assignee_id: assignee })
           .eq('id', taskId);
         if (taskErr) throw new Error(`Task update failed: ${taskErr.message}`);
       } else {
-        // INSERT new task
         const { data: newTask, error: taskErr } = await supabase
           .from('tasks')
-          .insert({
-            entity_type: 'ao_renewal',
-            entity_id: renewal.id,
-            title: taskTitle,
-            description: taskDesc,
-            due_at: dueAt,
-            priority: taskPriority,
-            status: 'pending',
-            category: 'renewal',
-            assignee_id: assignee,
-            created_by: currentUserId,
-            source: 'manual',
-          })
+          .insert({ entity_type: 'ao_renewal', entity_id: renewal.id, title: taskTitle, description: taskDesc, due_at: dueAt, priority: taskPriority, status: 'pending', category: 'renewal', assignee_id: assignee, created_by: currentUserId, source: 'manual' })
           .select('id')
           .single();
         if (taskErr) throw new Error(`Task creation failed: ${taskErr.message}`);
         taskId = newTask.id;
       }
 
-      // Update renewal with follow-up fields + task link
-      const { error: renewalErr } = await supabase
-        .from('ao_renewals')
-        .update({
-          follow_up_date: date,
-          follow_up_reason: reason || null,
-          follow_up_task_id: taskId,
-        })
-        .eq('id', renewal.id);
-      if (renewalErr) throw new Error(`Renewal update failed: ${renewalErr.message}`);
+      // Try to update the existing pending follow-up row
+      const { data: updated, error: updateErr } = await supabase
+        .from('ao_renewal_follow_ups')
+        .update({ follow_up_date: date, reason: reason || null, task_id: taskId, updated_at: new Date().toISOString() })
+        .eq('renewal_id', renewal.id)
+        .eq('status', 'pending')
+        .select('id');
+      if (updateErr) throw new Error(`Follow-up update failed: ${updateErr.message}`);
+
+      if (!updated || updated.length === 0) {
+        // No pending row — insert one
+        const { error: insertErr } = await supabase
+          .from('ao_renewal_follow_ups')
+          .insert({ renewal_id: renewal.id, follow_up_date: date, reason: reason || null, status: 'pending', task_id: taskId, created_by: currentUserId });
+        if (insertErr) throw new Error(`Follow-up insert failed: ${insertErr.message}`);
+      }
 
       return { renewalId: renewal.id, taskId };
     },
@@ -587,6 +575,72 @@ export const useSetAORenewalFollowUp = () => {
       queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
       queryClient.invalidateQueries({ queryKey: ['ao-renewal', data.renewalId] });
       queryClient.invalidateQueries({ queryKey: ['ao-renewals-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-follow-up-history', data.renewalId] });
+    },
+  });
+};
+
+export interface AORenewalFollowUpHistoryEntry {
+  id: string;
+  renewal_id: string;
+  follow_up_date: string;
+  reason: string | null;
+  status: 'pending' | 'completed' | 'cleared';
+  completed_at: string | null;
+  completion_note: string | null;
+  task_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export const useAORenewalFollowUpHistory = (renewalId: string | undefined) => {
+  return useQuery({
+    queryKey: ['ao-renewal-follow-up-history', renewalId],
+    enabled: !!renewalId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ao_renewal_follow_ups')
+        .select('*')
+        .eq('renewal_id', renewalId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as AORenewalFollowUpHistoryEntry[];
+    },
+  });
+};
+
+export const useMarkAORenewalFollowUpDone = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      renewalId,
+      taskId,
+      completionNote,
+    }: {
+      renewalId: string;
+      taskId: string | null;
+      completionNote: string | null;
+    }) => {
+      const now = new Date().toISOString();
+      if (taskId) {
+        const { error: taskErr } = await supabase
+          .from('tasks')
+          .update({ status: 'completed', completed_at: now })
+          .eq('id', taskId);
+        if (taskErr) throw new Error(`Task completion failed: ${taskErr.message}`);
+      }
+      const { error } = await supabase
+        .from('ao_renewal_follow_ups')
+        .update({ status: 'completed', completed_at: now, completion_note: completionNote || null })
+        .eq('renewal_id', renewalId)
+        .eq('status', 'pending');
+      if (error) throw new Error(`Mark done failed: ${error.message}`);
+      return { renewalId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal', data.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-follow-up-history', data.renewalId] });
     },
   });
 };
