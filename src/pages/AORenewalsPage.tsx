@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { formatLocalDateDisplay, extractLocalDate, todayLocalDate } from "@/lib/date/localDate";
+import { formatLocalDateDisplay, extractLocalDate, todayLocalDate, differenceFromTodayInLocalDays } from "@/lib/date/localDate";
 import {
-  AlertTriangle,
   ArrowUpDown,
   Calendar,
   CalendarClock,
   CheckCircle,
-  DollarSign,
   Download,
   MoreVertical,
   RefreshCcw,
@@ -66,10 +64,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
+  ACTIVE_STATUSES,
   getAORenewalOperationalMetrics,
-  getAORenewalWorkQueueSummary,
   useAORenewals,
-  useAORenewalsStats,
   useDeleteAORenewal,
   useBulkDeleteAllAORenewals,
   useUpdateAORenewal,
@@ -83,6 +80,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 
 type SortField = "renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date";
+type ActiveTile = "follow_up_today" | "overdue_follow_up" | "renewing_7" | "no_contact_7";
 
 const formatCurrency = (value: number | null) => {
   if (!value) return "$0";
@@ -91,6 +89,20 @@ const formatCurrency = (value: number | null) => {
 
 const formatRenewalDate = (date: string) => formatLocalDateDisplay(date);
 const formatFollowUpDate = (date: string | null) => (!date ? "Not set" : formatLocalDateDisplay(date));
+
+const TERMINAL_STATUSES: AORenewalStatus[] = ["moved", "lost", "cancelled", "renewed"];
+
+function RenewalUrgencyBadge({ renewal }: { renewal: AORenewal }) {
+  if (TERMINAL_STATUSES.includes(renewal.status)) return <span className="text-muted-foreground text-xs">—</span>;
+  const days = differenceFromTodayInLocalDays(extractLocalDate(renewal.renewal_date));
+  if (days === null) return null;
+  if (days < 0) return <Badge variant="destructive" className="text-xs font-semibold">OVERDUE</Badge>;
+  if (days === 0) return <Badge className="bg-amber-600 hover:bg-amber-600 text-xs">Today</Badge>;
+  if (days === 1) return <Badge className="bg-amber-500 hover:bg-amber-500 text-xs">Tomorrow</Badge>;
+  if (days <= 7) return <Badge className="bg-amber-400 hover:bg-amber-400 text-amber-950 text-xs">{days}d</Badge>;
+  if (days <= 14) return <Badge variant="outline" className="text-xs">{days}d</Badge>;
+  return <span className="text-xs text-muted-foreground">{days}d</span>;
+}
 
 const getStatusBadge = (status: AORenewalStatus) => {
   const config: Record<AORenewalStatus, { label: string; className: string }> = {
@@ -111,6 +123,7 @@ export default function AORenewalsPage() {
   const navigate = useNavigate();
 
   const [searchInput, setSearchInput] = useState("");
+  const [activeTile, setActiveTile] = useState<ActiveTile | null>(null);
   const [sortField, setSortField] = useState<SortField>("renewal_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -133,6 +146,7 @@ export default function AORenewalsPage() {
           if (raw) {
             const saved = JSON.parse(raw);
             if (saved.searchInput !== undefined) setSearchInput(saved.searchInput);
+            if (saved.activeTile !== undefined) setActiveTile(saved.activeTile);
             if (saved.sortField !== undefined) setSortField(saved.sortField as SortField);
             if (saved.sortDirection !== undefined) setSortDirection(saved.sortDirection);
           }
@@ -145,23 +159,60 @@ export default function AORenewalsPage() {
   useEffect(() => {
     if (!currentUserId) return;
     try {
-      localStorage.setItem(QUEUE_STATE_KEY(currentUserId), JSON.stringify({ searchInput, sortField, sortDirection }));
+      localStorage.setItem(QUEUE_STATE_KEY(currentUserId), JSON.stringify({ searchInput, activeTile, sortField, sortDirection }));
     } catch {}
-  }, [currentUserId, searchInput, sortField, sortDirection]);
+  }, [currentUserId, searchInput, activeTile, sortField, sortDirection]);
 
   const { data: renewals = [], isLoading } = useAORenewals(
     debouncedSearch.trim() ? { search: debouncedSearch.trim() } : undefined
   );
-  const { data: stats } = useAORenewalsStats();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const updateRenewalMutation = useUpdateAORenewal();
   const followUpMutation = useSetAORenewalFollowUp();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
 
+  const tileCounts = useMemo(() => {
+    const today = todayLocalDate();
+    return {
+      followUpToday: renewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length,
+      overdueFollowUp: renewals.filter((r) => {
+        const fuDate = extractLocalDate(r.follow_up_date);
+        return fuDate !== "" && fuDate < today && ACTIVE_STATUSES.includes(r.status);
+      }).length,
+      renewing7: renewals.filter((r) => {
+        if (!ACTIVE_STATUSES.includes(r.status)) return false;
+        const d = differenceFromTodayInLocalDays(extractLocalDate(r.renewal_date));
+        return d !== null && d >= 0 && d <= 7;
+      }).length,
+      noContact7: renewals.filter((r) => {
+        if (!ACTIVE_STATUSES.includes(r.status)) return false;
+        const m = getAORenewalOperationalMetrics(r);
+        return r.last_contact_date === null || (m.daysSinceContact !== null && m.daysSinceContact >= 7);
+      }).length,
+    };
+  }, [renewals]);
+
   const visibleRenewals = useMemo(() => {
+    const today = todayLocalDate();
     return renewals
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
+      .filter(({ renewal, metrics }) => {
+        if (!activeTile) return true;
+        if (activeTile === "follow_up_today") return extractLocalDate(renewal.follow_up_date) === today;
+        if (activeTile === "overdue_follow_up") {
+          const fuDate = extractLocalDate(renewal.follow_up_date);
+          return fuDate !== "" && fuDate < today && ACTIVE_STATUSES.includes(renewal.status);
+        }
+        if (activeTile === "renewing_7") {
+          return ACTIVE_STATUSES.includes(renewal.status) && metrics.daysUntilRenewal >= 0 && metrics.daysUntilRenewal <= 7;
+        }
+        if (activeTile === "no_contact_7") {
+          return ACTIVE_STATUSES.includes(renewal.status) &&
+            (renewal.last_contact_date === null || (metrics.daysSinceContact !== null && metrics.daysSinceContact >= 7));
+        }
+        return true;
+      })
       .sort((a, b) => {
         const dir = sortDirection === "asc" ? 1 : -1;
         const getTime = (v?: string | null) => (v ? new Date(v).getTime() : Number.POSITIVE_INFINITY);
@@ -173,14 +224,7 @@ export default function AORenewalsPage() {
         if (cmp === 0) cmp = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
         return cmp * dir;
       });
-  }, [renewals, sortField, sortDirection]);
-
-  const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
-
-  const followUpsTodayCount = useMemo(() => {
-    const today = todayLocalDate();
-    return renewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length;
-  }, [renewals]);
+  }, [renewals, activeTile, sortField, sortDirection]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -260,11 +304,11 @@ export default function AORenewalsPage() {
   };
 
   const exportVisibleRows = () => {
-    const headers = ["Customer","Policy Number","Renewal Date","Status","Premium","Days Since Contact","Follow Up Due","Priority","Urgency"];
+    const headers = ["Customer","Policy Number","Renewal Date","Status","Premium","Days Since Contact","Follow Up Due","Urgency"];
     const rows = visibleRenewals.map(({ renewal, metrics }) => [
       renewal.customer_name, renewal.policy_number, renewal.renewal_date, renewal.status,
       renewal.current_premium ?? "", metrics.daysSinceContact ?? "", renewal.follow_up_date ?? "",
-      renewal.priority, metrics.staleReason || (metrics.isFollowUpOverdue ? "Overdue follow-up" : ""),
+      metrics.staleReason || (metrics.isFollowUpOverdue ? "Overdue follow-up" : ""),
     ]);
     const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -305,124 +349,34 @@ export default function AORenewalsPage() {
           </div>
         </div>
 
-        {/* Work Queue KPI Tiles */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active workload</CardTitle>
-              <CardDescription>Files still in play</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{queueSummary.activeCount}</div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {queueSummary.needsFirstContact} pending, {queueSummary.needsQuote} contacted
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Follow-up pressure</CardTitle>
-              <CardDescription>Due today or drifting</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{queueSummary.followUpDue + queueSummary.staleFollowUp}</div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {queueSummary.staleFollowUp} stale, {queueSummary.followUpDue} due or overdue
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">30-day window</CardTitle>
-              <CardDescription>How far ahead the team is</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{queueSummary.expiringIn30Days}</div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {queueSummary.criticalWindow} inside 5 days and still active
-              </p>
-            </CardContent>
-          </Card>
-          <Card className={queueSummary.onPace ? "border-emerald-200" : "border-amber-200"}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pace check</CardTitle>
-              <CardDescription>30-day discipline</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 text-3xl font-semibold">
-                {queueSummary.onPace
-                  ? <CheckCircle className="h-7 w-7 text-emerald-600" />
-                  : <AlertTriangle className="h-7 w-7 text-amber-600" />}
-                {queueSummary.onPace ? "On pace" : "Behind"}
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">{queueSummary.onPaceReason}</p>
-            </CardContent>
-          </Card>
+        {/* Filter tiles — click to filter the queue */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          {([
+            { id: "follow_up_today",  count: tileCounts.followUpToday,  label: "Follow-ups due today",    sub: "Scheduled for today" },
+            { id: "overdue_follow_up",count: tileCounts.overdueFollowUp, label: "Overdue follow-ups",      sub: "Past due, still active" },
+            { id: "renewing_7",       count: tileCounts.renewing7,       label: "Renewing in ≤7 days",     sub: "Active files in critical window" },
+            { id: "no_contact_7",     count: tileCounts.noContact7,      label: "No contact in 7+ days",   sub: "Active files going stale" },
+          ] as { id: ActiveTile; count: number; label: string; sub: string }[]).map((tile) => {
+            const isActive = activeTile === tile.id;
+            return (
+              <button
+                key={tile.id}
+                type="button"
+                onClick={() => setActiveTile(isActive ? null : tile.id)}
+                className={`rounded-lg border p-4 text-left transition-all hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isActive ? "border-primary bg-primary/5 ring-1 ring-primary" : ""}`}
+              >
+                <div className={`text-3xl font-bold tabular-nums ${tile.count > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                  {tile.count}
+                </div>
+                <div className="mt-1 text-sm font-medium">{tile.label}</div>
+                <div className="text-xs text-muted-foreground">{tile.sub}</div>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />Total
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total_count}</div>
-                <p className="text-xs text-muted-foreground mt-1">All renewals</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />Premium
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.total_premium)}</div>
-                <p className="text-xs text-muted-foreground mt-1">Avg: {formatCurrency(stats.avg_premium)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />Next 30 Days
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.upcoming_30_days}</div>
-                <p className="text-xs text-muted-foreground mt-1">Upcoming renewals</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />Urgent
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.upcoming_5_days}</div>
-                <p className="text-xs text-muted-foreground mt-1">Due within 5 days</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4" />Follow-ups Due Today
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{followUpsTodayCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">Scheduled for today</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="flex items-center gap-3">
+        {/* Search + active filter chip */}
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -432,8 +386,17 @@ export default function AORenewalsPage() {
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
+          {activeTile && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1 font-normal"
+              onClick={() => setActiveTile(null)}
+            >
+              Filter active · click to clear ×
+            </Badge>
+          )}
           <Button variant="ghost" size="sm" onClick={() => {
-            setSearchInput("");
+            setSearchInput(""); setActiveTile(null);
             setSortField("renewal_date"); setSortDirection("asc");
           }}>
             <RefreshCcw className="mr-2 h-4 w-4" />Reset
@@ -489,11 +452,7 @@ export default function AORenewalsPage() {
                         </TableCell>
                         <TableCell>
                           <div>{formatRenewalDate(renewal.renewal_date)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {metrics.daysUntilRenewal < 0
-                              ? `${Math.abs(metrics.daysUntilRenewal)} days late`
-                              : `${metrics.daysUntilRenewal} days out`}
-                          </div>
+                          <div className="mt-0.5"><RenewalUrgencyBadge renewal={renewal} /></div>
                         </TableCell>
                         {/* Inline status dropdown */}
                         <TableCell onClick={(e) => e.stopPropagation()}>
