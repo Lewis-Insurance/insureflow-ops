@@ -19,11 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Phone, Mail, User, MessageSquare, Calendar, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
+import { Phone, Mail, User, MessageSquare, Calendar, CheckCircle2, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMarkAORenewalFollowUpDone } from "@/hooks/useAORenewals";
 
 interface ContactLog {
   id: string;
@@ -37,6 +38,7 @@ interface ContactLog {
 
 interface AORenewalContactLogProps {
   renewalId: string;
+  renewal?: { follow_up_date: string | null; follow_up_task_id: string | null };
 }
 
 const methodIcons = {
@@ -55,7 +57,7 @@ const methodLabels = {
   other: "Other",
 };
 
-export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
+export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogProps) {
   const [contactDate, setContactDate] = useState(new Date().toISOString().split("T")[0]);
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>("");
@@ -63,8 +65,10 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ContactLog | null>(null);
+  const [completing, setCompleting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const markDoneMutation = useMarkAORenewalFollowUpDone();
 
   // Fetch contact logs
   const { data: logs = [], isLoading } = useQuery({
@@ -137,11 +141,6 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-      setNotes("");
-      setContactDate(new Date().toISOString().split("T")[0]);
-      setContactMethod("phone");
-      setStatus("");
-      toast({ title: "Success", description: "Contact logged successfully" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message || "Failed to log contact", variant: "destructive" });
@@ -184,9 +183,54 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
     },
   });
 
-  const handleAddLog = () => {
+  const resetForm = () => {
+    setNotes("");
+    setContactDate(new Date().toISOString().split("T")[0]);
+    setContactMethod("phone");
+    setStatus("");
+  };
+
+  const handleAddLog = async () => {
     if (!notes.trim() || !contactDate) return;
-    addLogMutation.mutate({ contact_date: contactDate, contact_method: contactMethod, status, notes });
+    try {
+      await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, status, notes });
+      resetForm();
+      toast({ title: "Success", description: "Contact logged successfully" });
+    } catch {
+      // onError already showed the error toast
+    }
+  };
+
+  const handleLogAndComplete = async () => {
+    if (!notes.trim() || !contactDate || !renewal?.follow_up_date) return;
+    setCompleting(true);
+    try {
+      // Step 1: insert contact log
+      try {
+        await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, status, notes });
+      } catch {
+        return; // onError showed error toast; form stays; don't proceed to mark done
+      }
+      // Step 2: mark follow-up done
+      try {
+        await markDoneMutation.mutateAsync({
+          renewalId,
+          taskId: renewal.follow_up_task_id,
+          completionNote: notes.trim(),
+        });
+        resetForm();
+        toast({ title: "Done", description: "Contact logged and follow-up completed." });
+      } catch {
+        toast({
+          title: "Partial",
+          description: "Contact logged, but couldn't complete the follow-up — please use Mark Done.",
+          variant: "destructive",
+        });
+        // Don't clear form — user knows where they stand
+      }
+    } finally {
+      setCompleting(false);
+    }
   };
 
   const startEdit = (log: ContactLog) => {
@@ -282,18 +326,35 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
               rows={3}
             />
           </div>
-          <Button
-            onClick={handleAddLog}
-            disabled={!notes.trim() || !contactDate || addLogMutation.isPending}
-            size="sm"
-          >
-            {addLogMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Calendar className="h-4 w-4 mr-2" />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleAddLog}
+              disabled={!notes.trim() || !contactDate || addLogMutation.isPending || completing}
+              size="sm"
+            >
+              {addLogMutation.isPending && !completing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Calendar className="h-4 w-4 mr-2" />
+              )}
+              Log Contact
+            </Button>
+            {renewal?.follow_up_date && (
+              <Button
+                onClick={handleLogAndComplete}
+                disabled={!notes.trim() || !contactDate || addLogMutation.isPending || completing}
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {completing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                Log &amp; Complete Follow-up
+              </Button>
             )}
-            Log Contact
-          </Button>
+          </div>
         </div>
 
         <Separator />

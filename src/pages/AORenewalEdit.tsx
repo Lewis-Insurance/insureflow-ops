@@ -855,7 +855,7 @@ export default function AORenewalEdit() {
                           </TabsTrigger>
                         </TabsList>
                         <TabsContent value="contact" className="mt-6">
-                          <AORenewalContactLog renewalId={renewal.id} />
+                          <AORenewalContactLog renewalId={renewal.id} renewal={renewal} />
                         </TabsContent>
                         <TabsContent value="documents" className="mt-6">
                           <AORenewalDocuments
