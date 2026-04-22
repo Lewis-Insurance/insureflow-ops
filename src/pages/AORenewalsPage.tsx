@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { formatLocalDateDisplay, extractLocalDate, todayLocalDate } from "@/lib/date/localDate";
 import {
   AlertTriangle,
-  ArrowRightLeft,
   ArrowUpDown,
   Calendar,
   CalendarClock,
   CheckCircle,
-  Clock,
   DollarSign,
   Download,
   Filter,
@@ -19,8 +17,6 @@ import {
   Target,
   TrendingUp,
   Upload,
-  Users,
-  XCircle,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
@@ -71,7 +67,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
-  ACTIVE_STATUSES,
   filterAORenewalsByQueue,
   getAORenewalOperationalMetrics,
   getAORenewalWorkQueueSummary,
@@ -83,8 +78,6 @@ import {
   useUpdateAORenewalStatus,
   useSetAORenewalFollowUp,
   type AORenewal,
-  type AORenewalFilters,
-  type AORenewalPriority,
   type AORenewalQueue,
   type AORenewalStatus,
   type AORenewalTerm,
@@ -136,17 +129,15 @@ const getPriorityBadge = (priority: AORenewalPriority) => {
   return <Badge variant="outline" className={className}>{priority}</Badge>;
 };
 
+const QUEUE_STATE_KEY = (uid: string) => `ao-renewals-queue-state-v1-${uid}`;
+
 export default function AORenewalsPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [filters, setFilters] = useState<AORenewalFilters>({});
   const [searchInput, setSearchInput] = useState("");
   const [selectedQueue, setSelectedQueue] = useState<AORenewalQueue>("active");
   const [sortField, setSortField] = useState<SortField>("renewal_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [showClosedStatuses, setShowClosedStatuses] = useState(false);
-  const [showMyAssignments, setShowMyAssignments] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
@@ -156,27 +147,36 @@ export default function AORenewalsPage() {
 
   const debouncedSearch = useDebounce(searchInput, 250);
 
+  // Restore persisted queue state after we know the user
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const uid = user?.id || null;
+      setCurrentUserId(uid);
+      if (uid) {
+        try {
+          const raw = localStorage.getItem(QUEUE_STATE_KEY(uid));
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved.searchInput !== undefined) setSearchInput(saved.searchInput);
+            if (saved.sortField !== undefined) setSortField(saved.sortField);
+            if (saved.sortDirection !== undefined) setSortDirection(saved.sortDirection);
+          }
+        } catch {}
+      }
+    });
   }, []);
 
+  // Persist queue state on every change
   useEffect(() => {
-    const assigned = searchParams.get("assigned");
-    if (assigned === "me" && currentUserId) {
-      setShowMyAssignments(true);
-      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
-    }
-  }, [searchParams, currentUserId]);
+    if (!currentUserId) return;
+    try {
+      localStorage.setItem(QUEUE_STATE_KEY(currentUserId), JSON.stringify({ searchInput, sortField, sortDirection }));
+    } catch {}
+  }, [currentUserId, searchInput, sortField, sortDirection]);
 
-  useEffect(() => {
-    setFilters((prev) => ({
-      ...prev,
-      search: debouncedSearch.trim() || undefined,
-      status: showClosedStatuses ? undefined : [...ACTIVE_STATUSES, "renewed"],
-    }));
-  }, [debouncedSearch, showClosedStatuses]);
-
-  const { data: renewals = [], isLoading } = useAORenewals(filters);
+  const { data: renewals = [], isLoading } = useAORenewals(
+    debouncedSearch.trim() ? { search: debouncedSearch.trim() } : undefined
+  );
   const { data: stats } = useAORenewalsStats();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const updateRenewalMutation = useUpdateAORenewal();
@@ -242,18 +242,6 @@ export default function AORenewalsPage() {
       await followUpMutation.mutateAsync({ renewal, date: null, reason: null, currentUserId });
     } finally {
       setSavingFollowUp(null);
-    }
-  };
-
-  const handleToggleMyAssignments = () => {
-    const next = !showMyAssignments;
-    setShowMyAssignments(next);
-    if (next && currentUserId) {
-      setFilters((prev) => ({ ...prev, assigned_to: currentUserId }));
-      setSearchParams({ assigned: "me" });
-    } else {
-      setFilters((prev) => { const { assigned_to, ...rest } = prev; return rest; });
-      setSearchParams({});
     }
   };
 
@@ -469,7 +457,7 @@ export default function AORenewalsPage() {
             <CardDescription>Keep the page focused on who needs action now.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_200px_200px_200px]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -487,37 +475,13 @@ export default function AORenewalsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select
-                value={filters.priority?.[0] || "all"}
-                onValueChange={(v) => setFilters((prev) => ({ ...prev, priority: v === "all" ? undefined : [v as AORenewalPriority] }))}
-              >
-                <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All priorities</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={showClosedStatuses ? "all_statuses" : "active_statuses"}
-                onValueChange={(v) => setShowClosedStatuses(v === "all_statuses")}
-              >
-                <SelectTrigger><SelectValue placeholder="Visibility" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active_statuses">Hide closed outcomes</SelectItem>
-                  <SelectItem value="all_statuses">Show all statuses</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge variant="outline" className="font-normal">Queue: {selectedQueueMeta.label}</Badge>
               <span>{selectedQueueMeta.description}</span>
               <Button variant="ghost" size="sm" onClick={() => {
-                setSearchInput(""); setSelectedQueue("active"); setShowClosedStatuses(false);
-                setSortField("renewal_date"); setSortDirection("asc"); setFilters({});
-                setShowMyAssignments(false); setSearchParams({});
+                setSearchInput(""); setSelectedQueue("active");
+                setSortField("renewal_date"); setSortDirection("asc");
               }}>
                 <RefreshCcw className="mr-2 h-4 w-4" />Reset view
               </Button>
@@ -683,7 +647,12 @@ export default function AORenewalsPage() {
                         </TableCell>
                         {/* Attention badge */}
                         <TableCell>
-                          {renewal.status === "pending" ? (
+                          {(renewal.status === "moved" || renewal.status === "lost" || renewal.status === "cancelled" || renewal.status === "renewed") ? (
+                            <div className="flex items-center gap-1.5 text-emerald-500" title="Handled — off your plate">
+                              <CheckCircle className="h-4 w-4" />
+                              <span className="text-xs capitalize text-emerald-600">{renewal.status}</span>
+                            </div>
+                          ) : renewal.status === "pending" ? (
                             <Badge className="bg-slate-700 hover:bg-slate-700">No contact yet</Badge>
                           ) : renewal.status === "contacted" ? (
                             <Badge className="bg-blue-600 hover:bg-blue-600">Quote needed</Badge>
