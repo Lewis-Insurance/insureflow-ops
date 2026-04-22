@@ -18,6 +18,7 @@ export function NavItem({ icon: Icon, label, to, badge }: NavItemProps) {
   const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
 
   const handleClick = (e: React.MouseEvent) => {
+    console.log('[NavGuard] NavItem click', { to, guardCtxExists: !!guardCtx, isAnyDirty: guardCtx?.isAnyDirty() });
     if (guardCtx?.isAnyDirty()) {
       e.preventDefault();
       guardCtx.requestNavigation(to);
