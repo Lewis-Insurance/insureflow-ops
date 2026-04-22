@@ -211,10 +211,10 @@ export default function AORenewalsPage() {
         if (activeTile === "follow_up_today") return extractLocalDate(renewal.follow_up_date) === today;
         if (activeTile === "overdue_follow_up") {
           const fuDate = extractLocalDate(renewal.follow_up_date);
-          return fuDate !== "" && fuDate < today && ACTIVE_STATUSES.includes(renewal.status);
+          return fuDate !== "" && fuDate < today;
         }
         if (activeTile === "renewing_7") {
-          return ACTIVE_STATUSES.includes(renewal.status) && metrics.daysUntilRenewal >= 0 && metrics.daysUntilRenewal <= 7;
+          return metrics.daysUntilRenewal >= 0 && metrics.daysUntilRenewal <= 7;
         }
         if (activeTile === "no_contact_7") {
           return renewal.status !== 'pending' &&
