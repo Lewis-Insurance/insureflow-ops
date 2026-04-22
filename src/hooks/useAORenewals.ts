@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInCalendarDays, startOfDay } from "date-fns";
-import { parseLocalDate, todayLocalDate } from "@/lib/date/localDate";
+import { parseLocalDate, todayLocalDate, addDaysLocalDate } from "@/lib/date/localDate";
 
 // Types
 export type AORenewalStatus =
@@ -411,15 +411,14 @@ export const useUpcomingAORenewals = (days: number = 30) => {
   return useQuery({
     queryKey: ["ao-renewals-upcoming", days],
     queryFn: async () => {
-      const today = startOfToday();
-      const futureDate = new Date(today);
-      futureDate.setDate(futureDate.getDate() + days);
+      const todayStr = todayLocalDate();
+      const futureDateStr = addDaysLocalDate(todayStr, days);
 
       const { data, error } = await supabase
         .from("ao_renewals")
         .select("*")
-        .gte("renewal_date", today.toISOString().split("T")[0])
-        .lte("renewal_date", futureDate.toISOString().split("T")[0])
+        .gte("renewal_date", todayStr)
+        .lte("renewal_date", futureDateStr)
         .order("renewal_date", { ascending: true });
 
       if (error) throw error;
