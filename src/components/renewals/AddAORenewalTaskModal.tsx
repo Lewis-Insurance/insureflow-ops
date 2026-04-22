@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import type { AORenewal } from '@/hooks/useAORenewals';
-import type { TaskPriority, TaskCategory } from '@/hooks/useTasks';
+import type { TaskCategory } from '@/hooks/useTasks';
 
 interface AddAORenewalTaskModalProps {
   open: boolean;
@@ -22,31 +22,41 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueAt, setDueAt] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>('medium');
   const [category, setCategory] = useState<TaskCategory>('renewal');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; full_name: string }>>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    if (!open) return;
+    const init = async () => {
+      const [{ data: { user } }, { data: staff }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from('profiles').select('id, full_name').eq('is_staff', true).order('full_name'),
+      ]);
+      setStaffMembers(staff || []);
+      if (user?.id) setAssigneeId((prev) => prev || user.id);
+    };
+    init();
+  }, [open]);
+
   async function handleSave() {
     if (!title.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a task title',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Please enter a task title', variant: 'destructive' });
       return;
     }
-    
+    if (!assigneeId) {
+      toast({ title: 'Error', description: 'Please assign this task to a staff member', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to create tasks',
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: 'You must be logged in to create tasks', variant: 'destructive' });
         return;
       }
 
@@ -55,12 +65,13 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
         title: title.trim(),
         description: description.trim() || null,
         due_at: dueAt || null,
-        priority,
+        priority: 'medium',
         category,
         entity_type: 'ao_renewal',
         entity_id: renewal.id,
         status: 'pending',
         created_by: user.id,
+        assignee_id: assigneeId,
         metadata: {
           renewal_customer_name: renewal.customer_name,
           renewal_policy_number: renewal.policy_number,
@@ -92,8 +103,8 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
       setTitle('');
       setDescription('');
       setDueAt('');
-      setPriority('medium');
       setCategory('renewal');
+      setAssigneeId('');
       onOpenChange(false);
     } catch (error) {
       toast({
@@ -139,54 +150,53 @@ export function AddAORenewalTaskModal({ open, onOpenChange, renewal }: AddAORene
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="priority">Priority</Label>
-              <Select value={priority} onValueChange={(value) => setPriority(value as TaskPriority)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Select value={category} onValueChange={(value) => setCategory(value as TaskCategory)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="renewal">Renewal</SelectItem>
-                  <SelectItem value="quote">Quote</SelectItem>
-                  <SelectItem value="policy">Policy</SelectItem>
-                  <SelectItem value="service">Service</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="category">Category</Label>
+            <Select value={category} onValueChange={(value) => setCategory(value as TaskCategory)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="renewal">Renewal</SelectItem>
+                <SelectItem value="quote">Quote</SelectItem>
+                <SelectItem value="policy">Policy</SelectItem>
+                <SelectItem value="service">Service</SelectItem>
+                <SelectItem value="general">General</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <Label htmlFor="due-date">Due Date</Label>
-            <Input 
+            <Input
               id="due-date"
-              type="datetime-local" 
-              value={dueAt} 
-              onChange={(e) => setDueAt(e.target.value)} 
+              type="datetime-local"
+              value={dueAt}
+              onChange={(e) => setDueAt(e.target.value)}
             />
+          </div>
+
+          <div>
+            <Label htmlFor="assignee">Assigned To *</Label>
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
+              <SelectTrigger id="assignee">
+                <SelectValue placeholder="Select staff member" />
+              </SelectTrigger>
+              <SelectContent>
+                {staffMembers.map((staff) => (
+                  <SelectItem key={staff.id} value={staff.id}>
+                    {staff.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={loading || !title.trim()}>
+            <Button onClick={handleSave} disabled={loading || !title.trim() || !assigneeId}>
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Create Task
             </Button>

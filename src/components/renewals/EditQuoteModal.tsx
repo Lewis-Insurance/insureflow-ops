@@ -52,7 +52,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
         premium: premiumValue,
         term_months: parseInt(termMonths) as 6 | 12,
         status,
-        denial_reason: status === 'denied' ? denialReason : undefined,
+        denial_reason: status === 'denied' ? denialReason : null,
         notes: notes || undefined,
       },
     });

@@ -93,10 +93,11 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!carrier || !premium) {
+    const premiumValue = parseFloat(premium);
+    if (!carrier || !premium || isNaN(premiumValue) || premiumValue <= 0) {
       toast({
         title: 'Validation Error',
-        description: 'Please fill in all required fields',
+        description: !carrier || !premium ? 'Please fill in all required fields' : 'Premium must be greater than zero',
         variant: 'destructive',
       });
       return;
@@ -125,7 +126,7 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
         premium: parseFloat(premium),
         term_months: parseInt(termMonths) as 6 | 12,
         status,
-        denial_reason: status === 'denied' ? denialReason : undefined,
+        denial_reason: status === 'denied' ? denialReason : null,
         document_url: documentUrl,
         notes: notes || undefined,
       });
@@ -180,6 +181,7 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
                 id="premium"
                 type="number"
                 step="0.01"
+                min="0.01"
                 value={premium}
                 onChange={(e) => setPremium(e.target.value)}
                 placeholder="0.00"

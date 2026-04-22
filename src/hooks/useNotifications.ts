@@ -114,12 +114,14 @@ export function useNotifications() {
 
   // Subscribe to real-time notifications
   useEffect(() => {
-    const setupRealtimeSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-      const channel = supabase
-        .channel('notifications')
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || !mounted) return;
+
+      channel = supabase
+        .channel(`notifications-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -131,8 +133,6 @@ export function useNotifications() {
           (payload) => {
             setNotifications(prev => [payload.new as Notification, ...prev]);
             setUnreadCount(prev => prev + 1);
-            
-            // Show toast for new notification
             toast({
               title: (payload.new as Notification).title,
               description: (payload.new as Notification).message,
@@ -140,13 +140,12 @@ export function useNotifications() {
           }
         )
         .subscribe();
+    });
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
     };
-
-    setupRealtimeSubscription();
   }, []);
 
   return {

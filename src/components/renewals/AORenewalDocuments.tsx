@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   FileText,
   Upload,
   Loader2,
@@ -41,19 +51,18 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RenewalDocument | null>(null);
 
-  // Fetch documents linked to this renewal
-  // Documents are stored with related_entity_type='policy' and kind='ao_policy'
-  // to work within database constraints while still linking to the renewal ID
+  // Fetch documents linked to this renewal.
+  // New uploads use related_entity_type='ao_renewal'. Legacy records used 'policy' + kind='ao_policy'.
   const { data: documents, isLoading } = useQuery({
     queryKey: ['ao-renewal-documents', renewalId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
         .select('id, filename, storage_path, mime_type, file_size, created_at, document_type')
-        .eq('related_entity_type', 'policy')
         .eq('related_entity_id', renewalId)
-        .eq('kind', 'ao_policy')
+        .or('related_entity_type.eq.ao_renewal,and(related_entity_type.eq.policy,kind.eq.ao_policy)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -82,12 +91,6 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
 
       if (uploadError) throw uploadError;
 
-      // Create document record
-      // document_type must be one of: policy, quote, dec_page, endorsement, claim_form, coi, bill,
-      // loss_run, application, renewal, cancellation, binder, certificate, inspection, unknown
-      // related_entity_type must be one of: account, policy, quote, claim
-      // We use 'renewal' for document_type (valid) but 'policy' for related_entity_type
-      // since the ao_renewals are policy-related and we store the renewal ID
       const { error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -95,10 +98,11 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           storage_path: storagePath,
           mime_type: file.type,
           file_size: file.size,
-          kind: 'ao_policy',
+          kind: 'ao_renewal',
           document_type: 'renewal',
-          related_entity_type: 'policy',
+          related_entity_type: 'ao_renewal',
           related_entity_id: renewalId,
+          created_by: user.id,
         });
 
       if (insertError) throw insertError;
@@ -304,7 +308,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(doc)}
+                      onClick={() => setDeleteTarget(doc)}
                       disabled={deleteMutation.isPending}
                       title="Delete"
                       className="text-destructive hover:text-destructive"
@@ -322,6 +326,25 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           </p>
         )}
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteTarget?.filename}" will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) { deleteMutation.mutate(deleteTarget); setDeleteTarget(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
