@@ -8,6 +8,8 @@ import {
   CalendarClock,
   CheckCircle,
   Download,
+  Eye,
+  EyeOff,
   MoreVertical,
   RefreshCcw,
   Search,
@@ -124,6 +126,7 @@ export default function AORenewalsPage() {
 
   const [searchInput, setSearchInput] = useState("");
   const [activeTile, setActiveTile] = useState<ActiveTile | null>(null);
+  const [hideClosed, setHideClosed] = useState(true);
   const [sortField, setSortField] = useState<SortField>("renewal_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -147,6 +150,7 @@ export default function AORenewalsPage() {
             const saved = JSON.parse(raw);
             if (saved.searchInput !== undefined) setSearchInput(saved.searchInput);
             if (saved.activeTile !== undefined) setActiveTile(saved.activeTile);
+            if (saved.hideClosed !== undefined) setHideClosed(saved.hideClosed);
             if (saved.sortField !== undefined) setSortField(saved.sortField as SortField);
             if (saved.sortDirection !== undefined) setSortDirection(saved.sortDirection);
           }
@@ -159,9 +163,9 @@ export default function AORenewalsPage() {
   useEffect(() => {
     if (!currentUserId) return;
     try {
-      localStorage.setItem(QUEUE_STATE_KEY(currentUserId), JSON.stringify({ searchInput, activeTile, sortField, sortDirection }));
+      localStorage.setItem(QUEUE_STATE_KEY(currentUserId), JSON.stringify({ searchInput, activeTile, hideClosed, sortField, sortDirection }));
     } catch {}
-  }, [currentUserId, searchInput, activeTile, sortField, sortDirection]);
+  }, [currentUserId, searchInput, activeTile, hideClosed, sortField, sortDirection]);
 
   const { data: renewals = [], isLoading } = useAORenewals(
     debouncedSearch.trim() ? { search: debouncedSearch.trim() } : undefined
@@ -197,6 +201,7 @@ export default function AORenewalsPage() {
     const today = todayLocalDate();
     return renewals
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
+      .filter(({ renewal }) => !hideClosed || !TERMINAL_STATUSES.includes(renewal.status))
       .filter(({ renewal, metrics }) => {
         if (!activeTile) return true;
         if (activeTile === "follow_up_today") return extractLocalDate(renewal.follow_up_date) === today;
@@ -224,7 +229,7 @@ export default function AORenewalsPage() {
         if (cmp === 0) cmp = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
         return cmp * dir;
       });
-  }, [renewals, activeTile, sortField, sortDirection]);
+  }, [renewals, activeTile, hideClosed, sortField, sortDirection]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -395,8 +400,20 @@ export default function AORenewalsPage() {
               Filter active · click to clear ×
             </Badge>
           )}
+          <Button
+            size="sm"
+            onClick={() => setHideClosed((v) => !v)}
+            className={hideClosed
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+              : ""}
+            variant={hideClosed ? "default" : "outline"}
+          >
+            {hideClosed
+              ? <><EyeOff className="mr-2 h-4 w-4" />Hide closed</>
+              : <><Eye className="mr-2 h-4 w-4" />Show closed</>}
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => {
-            setSearchInput(""); setActiveTile(null);
+            setSearchInput(""); setActiveTile(null); setHideClosed(true);
             setSortField("renewal_date"); setSortDirection("asc");
           }}>
             <RefreshCcw className="mr-2 h-4 w-4" />Reset
