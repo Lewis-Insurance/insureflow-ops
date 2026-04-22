@@ -10,7 +10,6 @@ import {
   CheckCircle,
   DollarSign,
   Download,
-  Filter,
   MoreVertical,
   RefreshCcw,
   Search,
@@ -67,7 +66,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
-  filterAORenewalsByQueue,
   getAORenewalOperationalMetrics,
   getAORenewalWorkQueueSummary,
   useAORenewals,
@@ -78,23 +76,11 @@ import {
   useUpdateAORenewalStatus,
   useSetAORenewalFollowUp,
   type AORenewal,
-  type AORenewalQueue,
   type AORenewalStatus,
   type AORenewalTerm,
 } from "@/hooks/useAORenewals";
 import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
-
-const QUEUE_OPTIONS: { value: AORenewalQueue; label: string; description: string }[] = [
-  { value: "all",                label: "All files",            description: "Every renewal matching the current filters" },
-  { value: "active",             label: "Active work",          description: "Everything still being worked" },
-  { value: "needs_first_contact",label: "Needs first contact",  description: "Pending files only" },
-  { value: "needs_quote",        label: "Needs quote",          description: "Contacted but not yet quoted" },
-  { value: "follow_up_due",      label: "Follow-up issues",     description: "Due, overdue, or drifting follow-up files" },
-  { value: "stale_follow_up",    label: "Stale follow-up",      description: "Active files with no follow-up committed" },
-  { value: "expiring_30",        label: "Expiring in 30 days",  description: "Renewal date within 30 days" },
-  { value: "critical_window",    label: "Critical window",      description: "Inside 5 days and still active" },
-];
 
 type SortField = "renewal_date" | "current_premium" | "days_since_contact" | "follow_up_date";
 
@@ -119,23 +105,12 @@ const getStatusBadge = (status: AORenewalStatus) => {
   return <Badge variant="outline" className={config[status].className}>{config[status].label}</Badge>;
 };
 
-const getPriorityBadge = (priority: AORenewalPriority) => {
-  const className = {
-    low:    "bg-slate-100 text-slate-700 border-slate-200",
-    normal: "bg-slate-100 text-slate-800 border-slate-300",
-    high:   "bg-orange-100 text-orange-700 border-orange-200",
-    urgent: "bg-red-100 text-red-700 border-red-200",
-  }[priority];
-  return <Badge variant="outline" className={className}>{priority}</Badge>;
-};
-
 const QUEUE_STATE_KEY = (uid: string) => `ao-renewals-queue-state-v1-${uid}`;
 
 export default function AORenewalsPage() {
   const navigate = useNavigate();
 
   const [searchInput, setSearchInput] = useState("");
-  const [selectedQueue, setSelectedQueue] = useState<AORenewalQueue>("active");
   const [sortField, setSortField] = useState<SortField>("renewal_date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -158,7 +133,7 @@ export default function AORenewalsPage() {
           if (raw) {
             const saved = JSON.parse(raw);
             if (saved.searchInput !== undefined) setSearchInput(saved.searchInput);
-            if (saved.sortField !== undefined) setSortField(saved.sortField);
+            if (saved.sortField !== undefined) setSortField(saved.sortField as SortField);
             if (saved.sortDirection !== undefined) setSortDirection(saved.sortDirection);
           }
         } catch {}
@@ -185,7 +160,7 @@ export default function AORenewalsPage() {
   const deleteAllMutation = useBulkDeleteAllAORenewals();
 
   const visibleRenewals = useMemo(() => {
-    return filterAORenewalsByQueue(renewals, selectedQueue)
+    return renewals
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
       .sort((a, b) => {
         const dir = sortDirection === "asc" ? 1 : -1;
@@ -198,7 +173,7 @@ export default function AORenewalsPage() {
         if (cmp === 0) cmp = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
         return cmp * dir;
       });
-  }, [renewals, selectedQueue, sortField, sortDirection]);
+  }, [renewals, sortField, sortDirection]);
 
   const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
 
@@ -295,11 +270,9 @@ export default function AORenewalsPage() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `ao-renewals-${selectedQueue}-${format(new Date(), "yyyyMMdd-HHmm")}.csv`;
+    a.href = url; a.download = `ao-renewals-${format(new Date(), "yyyyMMdd-HHmm")}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   };
-
-  const selectedQueueMeta = QUEUE_OPTIONS.find((q) => q.value === selectedQueue)!;
 
   return (
     <AppLayout>
@@ -448,46 +421,24 @@ export default function AORenewalsPage() {
           </div>
         )}
 
-        {/* Work Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Filter className="h-4 w-4" />Work filters
-            </CardTitle>
-            <CardDescription>Keep the page focused on who needs action now.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_220px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="Search insured or policy number"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                />
-              </div>
-              <Select value={selectedQueue} onValueChange={(v) => setSelectedQueue(v as AORenewalQueue)}>
-                <SelectTrigger><SelectValue placeholder="Queue" /></SelectTrigger>
-                <SelectContent>
-                  {QUEUE_OPTIONS.map((q) => (
-                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <Badge variant="outline" className="font-normal">Queue: {selectedQueueMeta.label}</Badge>
-              <span>{selectedQueueMeta.description}</span>
-              <Button variant="ghost" size="sm" onClick={() => {
-                setSearchInput(""); setSelectedQueue("active");
-                setSortField("renewal_date"); setSortDirection("asc");
-              }}>
-                <RefreshCcw className="mr-2 h-4 w-4" />Reset view
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Search */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search insured or policy number"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => {
+            setSearchInput("");
+            setSortField("renewal_date"); setSortDirection("asc");
+          }}>
+            <RefreshCcw className="mr-2 h-4 w-4" />Reset
+          </Button>
+        </div>
 
         {/* Renewals Table */}
         <Card>
@@ -505,9 +456,9 @@ export default function AORenewalsPage() {
             ) : visibleRenewals.length === 0 ? (
               <div className="py-12 text-center">
                 <Calendar className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-medium">No renewals match this queue</h3>
+                <h3 className="text-lg font-medium">No renewals found</h3>
                 <p className="mt-2 text-muted-foreground">
-                  Try a broader queue or show closed outcomes if you need historical files.
+                  Try a different search term, or import data to get started.
                 </p>
               </div>
             ) : (
