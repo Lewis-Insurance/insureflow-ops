@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Phone, Mail, MessageSquare, Plus, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { formatDistanceToNow, addDays, format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import type { Renewal } from '@/hooks/useRenewalWorkflow';
 import { useRenewalStatusHistory, useLogRenewalContact, ContactType, ContactDirection } from '@/hooks/useRenewalWorkflow';
 import { useTasks, TaskPriority, TaskCategory } from '@/hooks/useTasks';
@@ -150,7 +151,7 @@ export function RenewalOverview({ renewal }: RenewalOverviewProps) {
           toast.error('Failed to compose email. Using template...');
           setEmailForm({
             subject: `Renewal Reminder - Policy ${renewal.policy?.policy_number || ''}`,
-            body: `Dear ${renewal.account?.name || 'Valued Customer'},\n\nThis is a friendly reminder about your upcoming policy renewal.\n\nPolicy: ${renewal.policy?.policy_number || 'N/A'}\nExpiration: ${renewal.expiration_date ? format(new Date(renewal.expiration_date), 'MMM d, yyyy') : 'N/A'}\n\nPlease contact us at your earliest convenience to discuss your renewal options.\n\nBest regards,\nYour Insurance Team`,
+            body: `Dear ${renewal.account?.name || 'Valued Customer'},\n\nThis is a friendly reminder about your upcoming policy renewal.\n\nPolicy: ${renewal.policy?.policy_number || 'N/A'}\nExpiration: ${renewal.expiration_date ? format(parseLocalDate(renewal.expiration_date), 'MMM d, yyyy') : 'N/A'}\n\nPlease contact us at your earliest convenience to discuss your renewal options.\n\nBest regards,\nYour Insurance Team`,
           });
         },
       }

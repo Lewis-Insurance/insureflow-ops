@@ -17,7 +17,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfToday } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import {
   GripVertical,
   Building2,
@@ -352,7 +353,7 @@ function PipelineCard({
   };
 
   const daysRemaining = renewal.renewal_date
-    ? differenceInDays(new Date(renewal.renewal_date), new Date())
+    ? differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday())
     : null;
 
   const getDaysColor = () => {

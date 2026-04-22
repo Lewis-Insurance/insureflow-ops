@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format, differenceInDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -491,7 +492,7 @@ export default function RenewalEditPage() {
                 <span className="text-muted-foreground">Renewal Date</span>
                 <span className="font-medium">
                   {renewal.renewal_date
-                    ? format(new Date(renewal.renewal_date), 'MMM d, yyyy')
+                    ? format(parseLocalDate(renewal.renewal_date), 'MMM d, yyyy')
                     : 'N/A'}
                 </span>
               </div>
@@ -499,7 +500,7 @@ export default function RenewalEditPage() {
                 <span className="text-muted-foreground">Expiration</span>
                 <span className="font-medium">
                   {renewal.expiration_date
-                    ? format(new Date(renewal.expiration_date), 'MMM d, yyyy')
+                    ? format(parseLocalDate(renewal.expiration_date), 'MMM d, yyyy')
                     : 'N/A'}
                 </span>
               </div>
@@ -600,7 +601,7 @@ export default function RenewalEditPage() {
                 <span className="text-sm">
                   Reason: <strong>{renewal.cancelled_reason}</strong>
                   {renewal.termination_effective_date && (
-                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                    <> • Effective: {format(parseLocalDate(renewal.termination_effective_date), 'MMM d, yyyy')}</>
                   )}
                 </span>
               </div>
@@ -616,7 +617,7 @@ export default function RenewalEditPage() {
                 <span className="text-sm">
                   Reason: <strong>{renewal.lapsed_reason}</strong>
                   {renewal.termination_effective_date && (
-                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                    <> • Effective: {format(parseLocalDate(renewal.termination_effective_date), 'MMM d, yyyy')}</>
                   )}
                 </span>
               </div>
@@ -632,7 +633,7 @@ export default function RenewalEditPage() {
                 <span className="text-sm">
                   Reason: <strong>{renewal.non_renewed_reason}</strong>
                   {renewal.termination_effective_date && (
-                    <> • Effective: {format(new Date(renewal.termination_effective_date), 'MMM d, yyyy')}</>
+                    <> • Effective: {format(parseLocalDate(renewal.termination_effective_date), 'MMM d, yyyy')}</>
                   )}
                 </span>
               </div>

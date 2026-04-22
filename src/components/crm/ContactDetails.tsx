@@ -6,6 +6,7 @@ import { Edit, Phone, Mail, MapPin, Calendar, User } from 'lucide-react';
 import { SSNReveal } from './SSNReveal';
 import { PermissionGuard } from '@/components/common/PermissionGuard';
 import type { Database } from '@/integrations/supabase/types';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 type Contact = Database['public']['Tables']['contacts']['Row'];
 
@@ -66,7 +67,7 @@ export function ContactDetails({ contact, onEdit, className = "" }: ContactDetai
               {contact.date_of_birth && (
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-4 w-4" />
-                  <span><strong>DOB:</strong> {new Date(contact.date_of_birth).toLocaleDateString()}</span>
+                  <span><strong>DOB:</strong> {formatLocalDateDisplay(contact.date_of_birth)}</span>
                 </div>
               )}
               {contact.gender && (

@@ -30,6 +30,7 @@ import { usePortalDocuments } from '@/hooks/usePortalDocuments';
 import { DataAsOfBadge } from './DataAsOfBadge';
 import { POLICY_DATA_DISCLAIMER } from '@/types/portal';
 import type { PortalDocument, DocumentType } from '@/types/portal';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   dec_page: 'Declaration Page',
@@ -186,7 +187,7 @@ function DocumentItem({ document, isLoading, onDownload }: DocumentItemProps) {
               {document.document_date && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {new Date(document.document_date).toLocaleDateString()}
+                  {formatLocalDateDisplay(document.document_date)}
                 </span>
               )}
               {document.file_size_bytes && (

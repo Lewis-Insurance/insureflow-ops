@@ -29,6 +29,7 @@ import {
 } from '@/hooks/useRetentionRiskScores';
 import { AlertTriangle, TrendingUp, Users, FileText, Clock, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 interface RetentionDashboardProps {
   agencyWorkspaceId: string;
@@ -231,7 +232,7 @@ export function RetentionDashboard({ agencyWorkspaceId }: RetentionDashboardProp
                             </div>
                           </TableCell>
                           <TableCell>
-                            {format(new Date(score.renewal_date), 'MMM d, yyyy')}
+                            {format(parseLocalDate(score.renewal_date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">

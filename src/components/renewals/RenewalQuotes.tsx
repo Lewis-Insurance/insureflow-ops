@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { parseLocalDate, todayLocalDate } from '@/lib/date/localDate';
 import { Plus, CheckCircle, Trash2, DollarSign, FileText, ExternalLink, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -80,7 +81,7 @@ export function RenewalQuotes({ renewalId, currentPremium }: RenewalQuotesProps)
     premium: '',
     term_months: '12',
     coverage_summary: '',
-    quote_date: format(new Date(), 'yyyy-MM-dd'),
+    quote_date: todayLocalDate(),
     expiration_date: '',
     notes: '',
   });
@@ -108,7 +109,7 @@ export function RenewalQuotes({ renewalId, currentPremium }: RenewalQuotesProps)
             premium: '',
             term_months: '12',
             coverage_summary: '',
-            quote_date: format(new Date(), 'yyyy-MM-dd'),
+            quote_date: todayLocalDate(),
             expiration_date: '',
             notes: '',
           });
@@ -456,10 +457,10 @@ function QuoteCard({
 
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
             {quote.quote_date && (
-              <span>Quoted: {format(new Date(quote.quote_date), 'MMM d, yyyy')}</span>
+              <span>Quoted: {format(parseLocalDate(quote.quote_date), 'MMM d, yyyy')}</span>
             )}
             {quote.expiration_date && (
-              <span>Expires: {format(new Date(quote.expiration_date), 'MMM d, yyyy')}</span>
+              <span>Expires: {format(parseLocalDate(quote.expiration_date), 'MMM d, yyyy')}</span>
             )}
           </div>
 

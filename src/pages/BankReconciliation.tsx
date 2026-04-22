@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -213,12 +214,12 @@ export default function BankReconciliation() {
                       onClick={() => setSelectedStatement(statement)}
                     >
                       <TableCell className="font-medium">
-                        {format(new Date(statement.statement_date), 'MMM d, yyyy')}
+                        {format(parseLocalDate(statement.statement_date), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell>{statement.bank_account?.account_name}</TableCell>
                       <TableCell>
-                        {format(new Date(statement.period_start), 'MMM d')} -{' '}
-                        {format(new Date(statement.period_end), 'MMM d')}
+                        {format(parseLocalDate(statement.period_start), 'MMM d')} -{' '}
+                        {format(parseLocalDate(statement.period_end), 'MMM d')}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(statement.beginning_balance)}
@@ -262,7 +263,7 @@ export default function BankReconciliation() {
                   </Button>
                   <div>
                     <h2 className="text-xl font-bold">
-                      {format(new Date(selectedStatement.statement_date), 'MMMM d, yyyy')}
+                      {format(parseLocalDate(selectedStatement.statement_date), 'MMMM d, yyyy')}
                     </h2>
                     <p className="text-muted-foreground">
                       {selectedStatement.bank_account?.account_name} -{' '}
@@ -360,7 +361,7 @@ export default function BankReconciliation() {
                           return (
                             <TableRow key={line.id}>
                               <TableCell>
-                                {format(new Date(line.line_date), 'MMM d')}
+                                {format(parseLocalDate(line.line_date), 'MMM d')}
                               </TableCell>
                               <TableCell className="max-w-[300px] truncate">
                                 {line.description}
@@ -459,7 +460,7 @@ export default function BankReconciliation() {
                       <p className="text-sm text-muted-foreground">Statement Line</p>
                       <p className="font-medium">{selectedLine.description}</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(selectedLine.line_date), 'MMM d, yyyy')}
+                        {format(parseLocalDate(selectedLine.line_date), 'MMM d, yyyy')}
                       </p>
                     </div>
                     <div className="text-right">
@@ -495,7 +496,7 @@ export default function BankReconciliation() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium">
-                                    {format(new Date(deposit.deposit_date), 'MMM d, yyyy')}
+                                    {format(parseLocalDate(deposit.deposit_date), 'MMM d, yyyy')}
                                   </p>
                                   {isExactMatch && (
                                     <Badge className="bg-green-100 text-green-800">

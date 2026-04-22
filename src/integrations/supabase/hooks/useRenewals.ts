@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { todayLocalDate, addDaysLocalDate, extractLocalDate } from "@/lib/date/localDate";
 
 type Renewal = Database["public"]["Tables"]["renewals"]["Row"];
 type RenewalInsert = Database["public"]["Tables"]["renewals"]["Insert"];
@@ -71,9 +72,7 @@ export const useRenewals = (filters?: {
       }
 
       if (filters?.daysUntilRenewal) {
-        const targetDate = new Date();
-        targetDate.setDate(targetDate.getDate() + filters.daysUntilRenewal);
-        query = query.lte("renewal_date", targetDate.toISOString().split("T")[0]);
+        query = query.lte("renewal_date", addDaysLocalDate(todayLocalDate(), filters.daysUntilRenewal));
       }
 
       if (filters?.minRiskScore) {
@@ -228,9 +227,8 @@ export const useUpcomingRenewals = (days: number = 30, assignedTo?: string) => {
   return useQuery({
     queryKey: ["renewals", "upcoming", days, assignedTo],
     queryFn: async () => {
-      const today = new Date();
-      const futureDate = new Date();
-      futureDate.setDate(today.getDate() + days);
+      const todayStr = todayLocalDate();
+      const futureDateStr = addDaysLocalDate(todayStr, days);
 
       let query = supabase
         .from("renewals")
@@ -255,8 +253,8 @@ export const useUpcomingRenewals = (days: number = 30, assignedTo?: string) => {
           )
         `
         )
-        .gte("renewal_date", today.toISOString().split("T")[0])
-        .lte("renewal_date", futureDate.toISOString().split("T")[0])
+        .gte("renewal_date", todayStr)
+        .lte("renewal_date", futureDateStr)
         .in("status", ["upcoming", "in_progress"]);
 
       if (assignedTo) {
@@ -290,18 +288,17 @@ export const useRenewalsDashboardMetrics = (assignedTo?: string) => {
 
       if (error) throw error;
 
-      // Calculate metrics
-      const today = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      // Calculate metrics — compare date strings directly (lexicographic = correct for ISO dates)
+      const todayMetrics = todayLocalDate();
+      const thirtyDaysStr = addDaysLocalDate(todayMetrics, 30);
 
       const metrics = {
         total: data.length,
         upcoming: data.filter(
           (r) =>
             r.status === "upcoming" &&
-            new Date(r.renewal_date) >= today &&
-            new Date(r.renewal_date) <= thirtyDaysFromNow
+            extractLocalDate(r.renewal_date) >= todayMetrics &&
+            extractLocalDate(r.renewal_date) <= thirtyDaysStr
         ).length,
         inProgress: data.filter((r) => r.status === "in_progress").length,
         completed: data.filter((r) => r.status === "completed").length,

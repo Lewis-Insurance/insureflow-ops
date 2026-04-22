@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { differenceInDays, startOfToday } from 'date-fns';
+import { parseLocalDate, todayLocalDate, addDaysLocalDate, extractLocalDate } from '@/lib/date/localDate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,33 +69,31 @@ export default function RetentionPage() {
   };
 
   // Calculate total at-risk value from upcoming renewals
+  const _atRiskTodayStr = todayLocalDate();
+  const _atRiskFutureStr = addDaysLocalDate(_atRiskTodayStr, 30);
   const atRiskValue = policies
     ?.filter(p => {
       if (!p.expiration_date) return false;
-      const expirationDate = new Date(p.expiration_date);
-      const today = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(today.getDate() + 30);
-      return expirationDate >= today && expirationDate <= thirtyDaysFromNow && 
+      const expStr = extractLocalDate(p.expiration_date);
+      return expStr >= _atRiskTodayStr && expStr <= _atRiskFutureStr &&
              (p.status === 'active' || p.status === 'pending');
     })
     .reduce((sum, p) => sum + (Number(p.premium) || 0), 0) || 0;
 
   // Get at-risk customers (policies expiring within 30 days)
-  const today = new Date();
-  const thirtyDaysFromNow = new Date();
-  thirtyDaysFromNow.setDate(today.getDate() + 30);
-  
+  const todayStr = todayLocalDate();
+  const thirtyDaysStr = addDaysLocalDate(todayStr, 30);
+
   const atRiskCustomers: RiskCustomer[] = policies
     ?.filter(p => {
       if (!p.expiration_date) return false;
-      const expirationDate = new Date(p.expiration_date);
-      return expirationDate >= today && expirationDate <= thirtyDaysFromNow && 
+      const expStr = extractLocalDate(p.expiration_date);
+      return expStr >= todayStr && expStr <= thirtyDaysStr &&
              (p.status === 'active' || p.status === 'pending');
     })
     .slice(0, 10) // Show top 10
     .map(p => {
-      const daysUntilExpiration = Math.ceil((new Date(p.expiration_date!).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiration = differenceInDays(parseLocalDate(p.expiration_date!), startOfToday());
       const riskScore = Math.max(0, Math.min(100, 100 - (daysUntilExpiration * 3.33))); // Higher score = closer to expiration
       
       let riskLevel: RiskLevel = 'low';

@@ -65,6 +65,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCarriers } from '@/hooks/useLookupData';
 import { formatCurrency } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 type ViewMode = 'policies' | 'workflow' | 'pipeline';
 type SortField = 'renewal_date' | 'premium' | 'risk_score' | 'days_remaining' | 'account_name';
@@ -880,7 +881,7 @@ function RenewalCard({
             </p>
             <p className="text-xs text-muted-foreground">
               {renewal.renewal_date
-                ? format(new Date(renewal.renewal_date), 'MMM d')
+                ? format(parseLocalDate(renewal.renewal_date), 'MMM d')
                 : 'No date'}
             </p>
           </div>

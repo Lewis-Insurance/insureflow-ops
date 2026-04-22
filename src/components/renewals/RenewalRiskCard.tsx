@@ -25,8 +25,9 @@ import {
   User,
   Building2
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfToday } from 'date-fns';
 import { useCalculateRenewalRisk } from '@/hooks/useRenewalIntelligence';
+import { parseLocalDate } from '@/lib/date/localDate';
 import type { AtRiskRenewal } from '@/hooks/useRenewalIntelligence';
 import RenewalCampaignManager from './RenewalCampaignManager';
 
@@ -60,8 +61,8 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
     }).format(amount || 0);
   };
 
-  const daysToRenewal = renewal.renewal_date 
-    ? differenceInDays(new Date(renewal.renewal_date), new Date())
+  const daysToRenewal = renewal.renewal_date
+    ? differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday())
     : 0;
 
   const priceChange = renewal.price_change_pct || 0;
@@ -105,7 +106,7 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
             </div>
             <p className="text-sm font-medium">
               {renewal.renewal_date 
-                ? format(new Date(renewal.renewal_date), 'MMM d, yyyy')
+                ? format(parseLocalDate(renewal.renewal_date), 'MMM d, yyyy')
                 : 'N/A'}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -320,7 +321,7 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
                       <div className="text-sm font-medium text-muted-foreground">Last Contact</div>
                       <div className="text-sm">
                         {renewal.last_contact_date 
-                          ? format(new Date(renewal.last_contact_date), 'MMM d, yyyy')
+                          ? format(parseLocalDate(renewal.last_contact_date), 'MMM d, yyyy')
                           : 'Never'}
                       </div>
                     </div>
@@ -396,7 +397,7 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
                       <div className="text-sm font-medium text-muted-foreground">Renewal Date</div>
                       <div className="text-sm">
                         {renewal.renewal_date 
-                          ? format(new Date(renewal.renewal_date), 'MMM d, yyyy')
+                          ? format(parseLocalDate(renewal.renewal_date), 'MMM d, yyyy')
                           : 'N/A'}
                       </div>
                     </div>
@@ -404,7 +405,7 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
                       <div className="text-sm font-medium text-muted-foreground">Expiration Date</div>
                       <div className="text-sm">
                         {renewal.expiration_date 
-                          ? format(new Date(renewal.expiration_date), 'MMM d, yyyy')
+                          ? format(parseLocalDate(renewal.expiration_date), 'MMM d, yyyy')
                           : 'N/A'}
                       </div>
                     </div>

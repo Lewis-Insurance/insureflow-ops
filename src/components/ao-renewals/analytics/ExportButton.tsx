@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { todayLocalDate } from "@/lib/date/localDate";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,7 +81,7 @@ export function ExportButton({ data, filename = "ao-renewals-analytics" }: Expor
       const url = URL.createObjectURL(blob);
       
       link.setAttribute("href", url);
-      link.setAttribute("download", `${filename}-${new Date().toISOString().split("T")[0]}.csv`);
+      link.setAttribute("download", `${filename}-${todayLocalDate()}.csv`);
       link.style.visibility = "hidden";
       
       document.body.appendChild(link);
@@ -102,7 +103,7 @@ export function ExportButton({ data, filename = "ao-renewals-analytics" }: Expor
       const url = URL.createObjectURL(blob);
       
       link.setAttribute("href", url);
-      link.setAttribute("download", `${filename}-${new Date().toISOString().split("T")[0]}.json`);
+      link.setAttribute("download", `${filename}-${todayLocalDate()}.json`);
       link.style.visibility = "hidden";
       
       document.body.appendChild(link);

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AORenewal, AORenewalTerm } from "./useAORenewals";
 import { logger } from '@/lib/logger';
+import { formatLocalDate } from "@/lib/date/localDate";
 
 export interface CarrierBreakdown {
   carrier: string;
@@ -72,10 +73,10 @@ export function useAORenewalAnalytics(dateRange?: DateRange) {
 
       // Apply date range filter if provided
       if (dateRange?.from) {
-        query = query.gte("renewal_date", dateRange.from.toISOString().split("T")[0]);
+        query = query.gte("renewal_date", formatLocalDate(dateRange.from));
       }
       if (dateRange?.to) {
-        query = query.lte("renewal_date", dateRange.to.toISOString().split("T")[0]);
+        query = query.lte("renewal_date", formatLocalDate(dateRange.to));
       }
 
       const { data, error } = await query;

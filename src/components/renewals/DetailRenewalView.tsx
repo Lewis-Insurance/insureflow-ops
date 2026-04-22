@@ -43,8 +43,9 @@ import {
   PauseCircle,
   Plus
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfToday } from 'date-fns';
 import { toast } from 'sonner';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const DetailRenewalView = () => {
@@ -110,7 +111,7 @@ const DetailRenewalView = () => {
     );
   }
 
-  const daysToRenewal = differenceInDays(new Date(renewal.renewal_date), new Date());
+  const daysToRenewal = differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday());
   const priceChange = renewal.price_change_pct || 0;
   const activeCampaign = campaigns?.find(c => c.status === 'active');
 
@@ -274,7 +275,7 @@ const DetailRenewalView = () => {
               <div>
                 <div className="text-sm text-muted-foreground">Renewal Date</div>
                 <div className="text-lg font-semibold">
-                  {format(new Date(renewal.renewal_date), 'MMMM dd, yyyy')}
+                  {format(parseLocalDate(renewal.renewal_date), 'MMMM dd, yyyy')}
                 </div>
                 <Badge variant={daysToRenewal < 30 ? 'destructive' : 'secondary'} className="mt-1">
                   {daysToRenewal} days remaining
@@ -314,13 +315,13 @@ const DetailRenewalView = () => {
                 <div className="text-sm text-muted-foreground">Last Contact</div>
                 <div className="font-medium">
                   {renewal.last_contact_date 
-                    ? format(new Date(renewal.last_contact_date), 'MMM dd, yyyy')
+                    ? format(parseLocalDate(renewal.last_contact_date), 'MMM dd, yyyy')
                     : 'No contact recorded'
                   }
                 </div>
                 {renewal.last_contact_date && (
                   <div className="text-sm text-muted-foreground">
-                    {differenceInDays(new Date(), new Date(renewal.last_contact_date))} days ago
+                    {differenceInDays(startOfToday(), parseLocalDate(renewal.last_contact_date))} days ago
                   </div>
                 )}
               </div>

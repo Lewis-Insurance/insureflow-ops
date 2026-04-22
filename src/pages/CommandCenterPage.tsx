@@ -19,8 +19,9 @@ import {
   FileText,
   Bell
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, differenceInDays, startOfToday } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 interface ActivityItem {
   id: string;
@@ -49,9 +50,7 @@ export default function CommandCenterPage() {
 
   const criticalRenewals = renewals?.filter(r => {
     if (!r.expiration_date) return false;
-    const daysUntilExpiration = Math.ceil(
-      (new Date(r.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
+    const daysUntilExpiration = differenceInDays(parseLocalDate(r.expiration_date), startOfToday());
     return daysUntilExpiration <= 7;
   }) || [];
 
@@ -74,7 +73,7 @@ export default function CommandCenterPage() {
       id: r.id,
       type: 'renewal' as const,
       title: `Urgent Renewal`,
-      description: `Policy ${r.policy_number} expires ${format(new Date(r.expiration_date), 'MMM d')}`,
+      description: `Policy ${r.policy_number} expires ${format(parseLocalDate(r.expiration_date), 'MMM d')}`,
       status: 'critical' as const,
       timestamp: new Date(r.expiration_date),
       link: `/policies/${r.id}`,
@@ -110,9 +109,7 @@ export default function CommandCenterPage() {
 
       // Recent renewals
       renewals?.slice(0, 3).forEach(r => {
-        const daysUntil = Math.ceil(
-          (new Date(r.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
+        const daysUntil = differenceInDays(parseLocalDate(r.expiration_date), startOfToday());
         activities.push({
           id: r.id,
           type: 'renewal',
@@ -544,7 +541,7 @@ export default function CommandCenterPage() {
                             </TableCell>
                             <TableCell>
                               {renewal.expiration_date
-                                ? format(new Date(renewal.expiration_date), 'MMM d, yyyy')
+                                ? format(parseLocalDate(renewal.expiration_date), 'MMM d, yyyy')
                                 : 'N/A'}
                             </TableCell>
                             <TableCell>
