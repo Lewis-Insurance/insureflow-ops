@@ -12,7 +12,6 @@ import {
   Clock,
   DollarSign,
   Download,
-  EyeOff,
   Filter,
   MoreVertical,
   RefreshCcw,
@@ -74,7 +73,6 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   ACTIVE_STATUSES,
-  DEFAULT_HIDDEN_STATUSES,
   filterAORenewalsByQueue,
   getAORenewalOperationalMetrics,
   getAORenewalWorkQueueSummary,
@@ -188,11 +186,7 @@ export default function AORenewalsPage() {
   const deleteAllMutation = useBulkDeleteAllAORenewals();
 
   const visibleRenewals = useMemo(() => {
-    const base = showClosedStatuses
-      ? renewals
-      : renewals.filter((r) => !DEFAULT_HIDDEN_STATUSES.includes(r.status));
-
-    return filterAORenewalsByQueue(base, selectedQueue)
+    return filterAORenewalsByQueue(renewals, selectedQueue)
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
       .sort((a, b) => {
         const dir = sortDirection === "asc" ? 1 : -1;
@@ -205,7 +199,7 @@ export default function AORenewalsPage() {
         if (cmp === 0) cmp = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
         return cmp * dir;
       });
-  }, [renewals, selectedQueue, showClosedStatuses, sortField, sortDirection]);
+  }, [renewals, selectedQueue, sortField, sortDirection]);
 
   const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
 
@@ -514,10 +508,6 @@ export default function AORenewalsPage() {
                 setShowMyAssignments(false); setSearchParams({});
               }}>
                 <RefreshCcw className="mr-2 h-4 w-4" />Reset view
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowClosedStatuses((prev) => !prev)}>
-                <EyeOff className="mr-2 h-4 w-4" />
-                {showClosedStatuses ? "Hide closed outcomes" : "Show closed outcomes"}
               </Button>
             </div>
           </CardContent>
