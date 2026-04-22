@@ -20,8 +20,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
+import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, useMarkAORenewalFollowUpDone, useAORenewalFollowUpHistory, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
@@ -42,11 +43,15 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   CalendarClock,
+  CheckCircle2,
   CheckSquare,
   ChevronDown,
   ChevronUp,
+  Clock,
+  History,
   Loader2,
   Pencil,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -91,6 +96,8 @@ export default function AORenewalEdit() {
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
   const followUpMutation = useSetAORenewalFollowUp();
+  const markDoneMutation = useMarkAORenewalFollowUpDone();
+  const { data: followUpHistory = [] } = useAORenewalFollowUpHistory(id);
   const { profiles } = useProfiles();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -101,6 +108,9 @@ export default function AORenewalEdit() {
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
   const [editingFollowUp, setEditingFollowUp] = useState(false);
   const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [showMarkDoneDialog, setShowMarkDoneDialog] = useState(false);
+  const [markDoneNote, setMarkDoneNote] = useState('');
+  const [showFollowUpHistory, setShowFollowUpHistory] = useState(false);
   const [panelPrefs, setPanelPrefs] = useState(loadPanelPrefs);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   // Tracks the last-saved form snapshot so overviewDirty resets immediately on save
@@ -254,6 +264,24 @@ export default function AORenewalEdit() {
       toast({ title: 'Error', description: err?.message || 'Failed to clear follow-up', variant: 'destructive' });
     } finally {
       setFollowUpSaving(false);
+    }
+  };
+
+  const handleMarkDoneConfirm = async () => {
+    if (!renewal) return;
+    try {
+      await markDoneMutation.mutateAsync({
+        renewalId: renewal.id,
+        taskId: renewal.follow_up_task_id,
+        completionNote: markDoneNote.trim() || null,
+      });
+      setFormData((prev) => ({ ...prev, follow_up_date: '', follow_up_reason: '' }));
+      setFollowUpDraft({ date: '', reason: '' });
+      setShowMarkDoneDialog(false);
+      setMarkDoneNote('');
+      toast({ title: 'Done', description: 'Follow-up marked as completed' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to mark done', variant: 'destructive' });
     }
   };
 
@@ -528,7 +556,7 @@ export default function AORenewalEdit() {
               {/* ── Hero Tiles ── */}
               <div className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr]">
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happens next</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happens next — Follow-up</div>
                   <div className="mt-3 text-2xl font-semibold text-white">{commandStateLabel}</div>
                   <p className="mt-2 text-sm text-slate-300">
                     {followUpDraft.date
@@ -550,7 +578,7 @@ export default function AORenewalEdit() {
                 </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happened last</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happened last — Contact log</div>
                   <div className="mt-3 text-2xl font-semibold text-white">
                     {formData.last_contact_date ? formatLocalDateDisplay(formData.last_contact_date) : 'Not logged'}
                   </div>
@@ -570,7 +598,7 @@ export default function AORenewalEdit() {
                 </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">File snapshot</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Customer snapshot</div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className={heroTile}>
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Policy</div>
@@ -607,26 +635,10 @@ export default function AORenewalEdit() {
             )}
 
             {/* ── Two-column body ── */}
-            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-start">
+            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-stretch">
 
-              {/* Left: Quotes + Follow-up */}
-              <div className="space-y-6">
-                <Card className={cn(surfaceCard, 'rounded-3xl')}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className={sectionTitle}>Quotes</CardTitle>
-                    <CardDescription className={sectionDescription}>
-                      The active selling surface. Add, compare, and manage live options without leaving the top of the file.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <AORenewalQuotes
-                      renewalId={renewal.id}
-                      currentPremium={renewal.current_premium}
-                      currentTermMonths={renewal.term_months}
-                    />
-                  </CardContent>
-                </Card>
-
+              {/* Left: Follow-up + Quotes */}
+              <div className="flex flex-col gap-6">
                 <Card className={cn(surfaceCard, 'rounded-3xl')}>
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between gap-3">
@@ -695,17 +707,78 @@ export default function AORenewalEdit() {
                           </div>
 
                           {formData.follow_up_date && (
-                            <div className="flex">
+                            <div className="flex flex-wrap gap-3">
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                                size="sm"
+                                className="h-9 rounded-2xl border-lime-300/30 bg-lime-300/10 text-lime-200 hover:bg-lime-300/20"
+                                onClick={() => { setMarkDoneNote(''); setShowMarkDoneDialog(true); }}
+                                disabled={markDoneMutation.isPending}
+                              >
+                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Mark Done
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 rounded-2xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
                                 onClick={handleClearFollowUp}
                                 disabled={followUpSaving}
                               >
-                                {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Clear follow-up
+                                {followUpSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <XCircle className="mr-1.5 h-3.5 w-3.5" />}
+                                Clear
                               </Button>
+                            </div>
+                          )}
+
+                          {/* ── History accordion ── */}
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
+                            onClick={() => setShowFollowUpHistory((v) => !v)}
+                          >
+                            <span className="flex items-center gap-2">
+                              <History className="h-4 w-4" />
+                              Follow-up history
+                              {followUpHistory.length > 0 && (
+                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{followUpHistory.length}</span>
+                              )}
+                            </span>
+                            {showFollowUpHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+
+                          {showFollowUpHistory && (
+                            <div className="space-y-2">
+                              {followUpHistory.length === 0 ? (
+                                <p className="px-1 text-sm text-slate-500">No follow-up history yet.</p>
+                              ) : (
+                                followUpHistory.map((entry) => (
+                                  <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/3 p-3 text-sm">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-medium text-white">{formatLocalDateDisplay(entry.follow_up_date)}</span>
+                                      <span className={cn(
+                                        'rounded-full px-2 py-0.5 text-xs capitalize',
+                                        entry.status === 'pending' ? 'bg-amber-400/20 text-amber-300' :
+                                        entry.status === 'completed' ? 'bg-emerald-400/20 text-emerald-300' :
+                                        'bg-zinc-400/20 text-zinc-300',
+                                      )}>
+                                        {entry.status}
+                                      </span>
+                                    </div>
+                                    {entry.reason && <p className="mt-1 text-slate-400">{entry.reason}</p>}
+                                    {entry.completed_at && (
+                                      <p className="mt-1 text-xs text-slate-500">
+                                        {entry.status === 'completed' ? 'Completed' : 'Cleared'}{' '}
+                                        {formatLocalDateDisplay(entry.completed_at.slice(0, 10))}
+                                      </p>
+                                    )}
+                                    {entry.completion_note && (
+                                      <p className="mt-1 text-xs italic text-slate-400">"{entry.completion_note}"</p>
+                                    )}
+                                  </div>
+                                ))
+                              )}
                             </div>
                           )}
                         </>
@@ -781,11 +854,27 @@ export default function AORenewalEdit() {
                     </CardContent>
                   )}
                 </Card>
+
+                <Card className={cn(surfaceCard, 'rounded-3xl')}>
+                  <CardHeader className="pb-4">
+                    <CardTitle className={sectionTitle}>Quotes</CardTitle>
+                    <CardDescription className={sectionDescription}>
+                      The active selling surface. Add, compare, and manage live options without leaving the top of the file.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AORenewalQuotes
+                      renewalId={renewal.id}
+                      currentPremium={renewal.current_premium}
+                      currentTermMonths={renewal.term_months}
+                    />
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Right: Workspace tabs */}
-              <div className="space-y-6">
-                <Card className={cn(surfaceCard, 'rounded-3xl')}>
+              <div className="flex flex-col gap-6">
+                <Card className={cn(surfaceCard, 'rounded-3xl flex-1')}>
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1093,6 +1182,30 @@ export default function AORenewalEdit() {
         </div>
 
         {/* ── Modals ── */}
+        <AlertDialog open={showMarkDoneDialog} onOpenChange={(open) => { if (!open) setShowMarkDoneDialog(false); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Mark Follow-Up Done</AlertDialogTitle>
+              <AlertDialogDescription>
+                Optionally add an outcome note. The follow-up will be marked complete and the linked task closed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Textarea
+              placeholder="Outcome note (optional)…"
+              value={markDoneNote}
+              onChange={(e) => setMarkDoneNote(e.target.value)}
+              rows={3}
+              className="border-white/10 bg-white/5 text-white"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowMarkDoneDialog(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleMarkDoneConfirm} disabled={markDoneMutation.isPending}>
+                {markDoneMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Mark Done
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
         <MovedStatusModal open={showMovedModal} onOpenChange={handleMovedCancel} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
         <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) cancelNavigation(); }}>

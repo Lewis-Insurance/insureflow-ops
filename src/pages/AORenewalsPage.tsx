@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
-import { formatLocalDateDisplay } from "@/lib/date/localDate";
+import { formatLocalDateDisplay, extractLocalDate, todayLocalDate } from "@/lib/date/localDate";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -19,7 +19,6 @@ import {
   Target,
   TrendingUp,
   Upload,
-  User,
   Users,
   XCircle,
 } from "lucide-react";
@@ -90,7 +89,6 @@ import {
   type AORenewalStatus,
   type AORenewalTerm,
 } from "@/hooks/useAORenewals";
-import { useMyAORenewalsCount } from "@/hooks/useMyAORenewals";
 import { supabase } from "@/integrations/supabase/client";
 import { AddAORenewalTaskModal } from "@/components/renewals/AddAORenewalTaskModal";
 
@@ -180,7 +178,6 @@ export default function AORenewalsPage() {
 
   const { data: renewals = [], isLoading } = useAORenewals(filters);
   const { data: stats } = useAORenewalsStats();
-  const { data: myStats } = useMyAORenewalsCount();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const updateRenewalMutation = useUpdateAORenewal();
   const followUpMutation = useSetAORenewalFollowUp();
@@ -204,6 +201,11 @@ export default function AORenewalsPage() {
   }, [renewals, selectedQueue, sortField, sortDirection]);
 
   const queueSummary = useMemo(() => getAORenewalWorkQueueSummary(renewals), [renewals]);
+
+  const followUpsTodayCount = useMemo(() => {
+    const today = todayLocalDate();
+    return renewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length;
+  }, [renewals]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -444,19 +446,15 @@ export default function AORenewalsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Due within 5 days</p>
               </CardContent>
             </Card>
-            <Card
-              className={`cursor-pointer transition-all ${showMyAssignments ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted/50"}`}
-              onClick={handleToggleMyAssignments}
-            >
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <User className="h-4 w-4" />Mine
-                  {showMyAssignments && <Badge variant="secondary" className="ml-auto text-xs">Active</Badge>}
+                  <CalendarClock className="h-4 w-4" />Follow-ups Due Today
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{myStats?.count || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">{myStats?.upcomingWithin7Days || 0} due within 7 days</p>
+                <div className="text-2xl font-bold">{followUpsTodayCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">Scheduled for today</p>
               </CardContent>
             </Card>
           </div>
