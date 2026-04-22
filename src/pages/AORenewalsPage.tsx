@@ -176,32 +176,37 @@ export default function AORenewalsPage() {
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
 
+  // Shared base: hide-closed gate applied once, used by both tileCounts and visibleRenewals
+  const openRenewals = useMemo(
+    () => renewals.filter((r) => !hideClosed || !TERMINAL_STATUSES.includes(r.status)),
+    [renewals, hideClosed],
+  );
+
   const tileCounts = useMemo(() => {
     const today = todayLocalDate();
     return {
-      followUpToday: renewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length,
-      overdueFollowUp: renewals.filter((r) => {
+      followUpToday: openRenewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length,
+      overdueFollowUp: openRenewals.filter((r) => {
         const fuDate = extractLocalDate(r.follow_up_date);
         return fuDate !== "" && fuDate < today && ACTIVE_STATUSES.includes(r.status);
       }).length,
-      renewing7: renewals.filter((r) => {
+      renewing7: openRenewals.filter((r) => {
         if (!ACTIVE_STATUSES.includes(r.status)) return false;
         const d = differenceFromTodayInLocalDays(extractLocalDate(r.renewal_date));
         return d !== null && d >= 0 && d <= 7;
       }).length,
-      noContact7: renewals.filter((r) => {
+      noContact7: openRenewals.filter((r) => {
         if (!ACTIVE_STATUSES.includes(r.status)) return false;
         const m = getAORenewalOperationalMetrics(r);
         return r.last_contact_date === null || (m.daysSinceContact !== null && m.daysSinceContact >= 7);
       }).length,
     };
-  }, [renewals]);
+  }, [openRenewals]);
 
   const visibleRenewals = useMemo(() => {
     const today = todayLocalDate();
-    return renewals
+    return openRenewals
       .map((renewal) => ({ renewal, metrics: getAORenewalOperationalMetrics(renewal) }))
-      .filter(({ renewal }) => !hideClosed || !TERMINAL_STATUSES.includes(renewal.status))
       .filter(({ renewal, metrics }) => {
         if (!activeTile) return true;
         if (activeTile === "follow_up_today") return extractLocalDate(renewal.follow_up_date) === today;
@@ -229,7 +234,7 @@ export default function AORenewalsPage() {
         if (cmp === 0) cmp = getTime(a.renewal.renewal_date) - getTime(b.renewal.renewal_date);
         return cmp * dir;
       });
-  }, [renewals, activeTile, hideClosed, sortField, sortDirection]);
+  }, [openRenewals, activeTile, sortField, sortDirection]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
