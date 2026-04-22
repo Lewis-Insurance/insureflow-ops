@@ -409,7 +409,6 @@ export default function AORenewalEdit() {
     return success;
   };
 
-  console.log('[NavGuard] AORenewalEdit render', { overviewDirty, followUpDirty, dirtyChildSources: dirtyChildSources.length, anyDirty, baselineIsNull: cleanBaselineRef.current === null });
   useNavigationGuard(anyDirty, handleSaveAllPendingChanges);
 
   const confirmNavigation = async (save: boolean) => {

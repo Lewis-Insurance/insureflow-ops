@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DashboardSkeleton } from "@/components/ui/skeleton-components";
 import { ThemeProvider } from "next-themes";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { NavigationGuardProvider } from "@/contexts/NavigationGuardContext";
 
 // Lazy load pages for code splitting
 const Index = React.lazy(() => import("./pages/Index"));
@@ -150,6 +151,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <NavigationGuardProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -1081,6 +1083,7 @@ const App = () => (
               </Routes>
             </Suspense>
           </TooltipProvider>
+          </NavigationGuardProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

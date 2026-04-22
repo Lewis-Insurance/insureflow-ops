@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
@@ -40,13 +40,11 @@ export function useNavigationGuard(isDirty: boolean, onSave: () => Promise<boole
   onSaveRef.current = onSave;
 
   useEffect(() => {
-    if (!ctx) { console.log('[NavGuard] useNavigationGuard: ctx is null — no provider found'); return; }
-    console.log('[NavGuard] guard registered', { isDirty: isDirtyRef.current });
-    const cleanup = ctx.registerGuard({
+    if (!ctx) return;
+    return ctx.registerGuard({
       isDirty: () => isDirtyRef.current,
       onSave: () => onSaveRef.current(),
     });
-    return () => { console.log('[NavGuard] guard unregistered'); cleanup(); };
   }, [ctx]);
 }
 
@@ -62,10 +60,7 @@ export function NavigationGuardProvider({ children }: { children: React.ReactNod
   }, []);
 
   const isAnyDirty = useCallback(() => {
-    const guards = Array.from(guardsRef.current);
-    const dirtyStates = guards.map((g) => g.isDirty());
-    console.log('[NavGuard] isAnyDirty', { guardCount: guards.length, dirtyStates });
-    return dirtyStates.some(Boolean);
+    return Array.from(guardsRef.current).some((g) => g.isDirty());
   }, []);
 
   const requestNavigation = useCallback((to: string) => {
@@ -97,8 +92,13 @@ export function NavigationGuardProvider({ children }: { children: React.ReactNod
     }
   };
 
+  const contextValue = useMemo(
+    () => ({ registerGuard, requestNavigation, isAnyDirty }),
+    [registerGuard, requestNavigation, isAnyDirty],
+  );
+
   return (
-    <NavigationGuardContext.Provider value={{ registerGuard, requestNavigation, isAnyDirty }}>
+    <NavigationGuardContext.Provider value={contextValue}>
       {children}
       <AlertDialog open={pendingPath !== null} onOpenChange={(open) => { if (!open && !saving) handleStay(); }}>
         <AlertDialogContent>
