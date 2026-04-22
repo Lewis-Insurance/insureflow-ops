@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, useMarkAORenewalFollowUpDone, useAORenewalFollowUpHistory, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
+import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, useMarkAORenewalFollowUpDone, useAORenewalFollowUpHistory, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm } from '@/hooks/useAORenewals';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
@@ -139,7 +139,6 @@ export default function AORenewalEdit() {
     current_premium: '',
     term_months: '' as '' | '6' | '12',
     status: 'pending' as AORenewalStatus,
-    priority: 'normal' as AORenewalPriority,
     assigned_to: '',
     last_contact_date: '',
     follow_up_date: '',
@@ -162,7 +161,6 @@ export default function AORenewalEdit() {
         current_premium: renewal.current_premium?.toString() || '',
         term_months: renewal.term_months ? (renewal.term_months.toString() as '6' | '12') : '',
         status: renewal.status || 'pending',
-        priority: renewal.priority || 'normal',
         assigned_to: renewal.assigned_to || '',
         last_contact_date: extractLocalDate(renewal.last_contact_date),
         follow_up_date: extractLocalDate(renewal.follow_up_date),
@@ -178,7 +176,7 @@ export default function AORenewalEdit() {
         customer_name: next.customer_name, policy_number: next.policy_number,
         policy_type: next.policy_type, renewal_date: next.renewal_date,
         current_premium: next.current_premium, term_months: next.term_months,
-        status: next.status, priority: next.priority, assigned_to: next.assigned_to,
+        status: next.status, assigned_to: next.assigned_to,
         last_contact_date: next.last_contact_date, losses_3yr: next.losses_3yr,
         oldest_in_household: next.oldest_in_household, moved_carrier: next.moved_carrier,
         moved_term: next.moved_term, moved_premium: next.moved_premium,
@@ -304,7 +302,6 @@ export default function AORenewalEdit() {
           current_premium: parseFloat(formData.current_premium) || null,
           term_months: formData.term_months ? (parseInt(formData.term_months) as 6 | 12) : null,
           status: formData.status,
-          priority: formData.priority,
           assigned_to: formData.assigned_to.trim() || null,
           last_contact_date: formData.last_contact_date || null,
           losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
@@ -322,7 +319,7 @@ export default function AORenewalEdit() {
         customer_name: formData.customer_name, policy_number: formData.policy_number,
         policy_type: formData.policy_type, renewal_date: formData.renewal_date,
         current_premium: formData.current_premium, term_months: formData.term_months,
-        status: formData.status, priority: formData.priority, assigned_to: formData.assigned_to,
+        status: formData.status, assigned_to: formData.assigned_to,
         last_contact_date: formData.last_contact_date, losses_3yr: formData.losses_3yr,
         oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
         moved_term: formData.moved_term, moved_premium: formData.moved_premium,
@@ -342,7 +339,7 @@ export default function AORenewalEdit() {
       customer_name: formData.customer_name, policy_number: formData.policy_number,
       policy_type: formData.policy_type, renewal_date: formData.renewal_date,
       current_premium: formData.current_premium, term_months: formData.term_months,
-      status: formData.status, priority: formData.priority, assigned_to: formData.assigned_to,
+      status: formData.status, assigned_to: formData.assigned_to,
       last_contact_date: formData.last_contact_date, losses_3yr: formData.losses_3yr,
       oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
       moved_term: formData.moved_term, moved_premium: formData.moved_premium,
@@ -1061,23 +1058,6 @@ export default function AORenewalEdit() {
                             <SelectItem value="moved">Moved</SelectItem>
                             <SelectItem value="lost">Lost</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="priority">Priority</Label>
-                        <Select
-                          value={formData.priority}
-                          onValueChange={(value) => setFormData((prev) => ({ ...prev, priority: value as AORenewalPriority }))}
-                        >
-                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-950 text-white">
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
