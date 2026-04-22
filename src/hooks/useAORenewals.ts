@@ -552,12 +552,13 @@ export const useSetAORenewalFollowUp = () => {
         taskId = newTask.id;
       }
 
-      // Try to update the existing pending follow-up row
+      // Try to update the existing pending follow-up row (at most one enforced by partial unique index)
       const { data: updated, error: updateErr } = await supabase
         .from('ao_renewal_follow_ups')
         .update({ follow_up_date: date, reason: reason || null, task_id: taskId, updated_at: new Date().toISOString() })
         .eq('renewal_id', renewal.id)
         .eq('status', 'pending')
+        .limit(1)
         .select('id');
       if (updateErr) throw new Error(`Follow-up update failed: ${updateErr.message}`);
 
