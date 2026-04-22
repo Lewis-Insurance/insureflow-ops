@@ -20,7 +20,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useAORenewal, useUpdateAORenewal, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
+import { supabase } from '@/integrations/supabase/client';
+import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
@@ -37,6 +38,7 @@ import {
   todayLocalDate,
 } from '@/lib/date/localDate';
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRightLeft,
   CalendarClock,
@@ -44,6 +46,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +90,7 @@ export default function AORenewalEdit() {
 
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
+  const followUpMutation = useSetAORenewalFollowUp();
   const { profiles } = useProfiles();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -95,12 +99,20 @@ export default function AORenewalEdit() {
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
+  const [editingFollowUp, setEditingFollowUp] = useState(false);
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [panelPrefs, setPanelPrefs] = useState(loadPanelPrefs);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Tracks the last-saved form snapshot so overviewDirty resets immediately on save
+  const cleanBaselineRef = useRef<Record<string, string> | null>(null);
 
   const initialDataLoaded = useRef(false);
   const dirtySourcesRef = useRef<Map<string, AORenewalDirtyRegistration>>(new Map());
   const [, forceDirtyRegistryRender] = useState(0);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -151,6 +163,15 @@ export default function AORenewalEdit() {
         moved_premium: renewal.moved_premium?.toString() || '',
       };
       setFormData(next);
+      cleanBaselineRef.current = {
+        customer_name: next.customer_name, policy_number: next.policy_number,
+        policy_type: next.policy_type, renewal_date: next.renewal_date,
+        current_premium: next.current_premium, term_months: next.term_months,
+        status: next.status, priority: next.priority, assigned_to: next.assigned_to,
+        last_contact_date: next.last_contact_date, losses_3yr: next.losses_3yr,
+        oldest_in_household: next.oldest_in_household, moved_carrier: next.moved_carrier,
+        moved_term: next.moved_term, moved_premium: next.moved_premium,
+      };
       setFollowUpDraft({ date: next.follow_up_date, reason: next.follow_up_reason });
     }
   }, [renewal]);
@@ -189,7 +210,7 @@ export default function AORenewalEdit() {
   );
 
   const handleConfirmFollowUp = async () => {
-    if (!id) return false;
+    if (!renewal || !currentUserId) return false;
 
     if (followUpDraft.date && !followUpDraft.reason.trim()) {
       toast({ title: 'Error', description: 'Follow-up reason is required', variant: 'destructive' });
@@ -198,26 +219,39 @@ export default function AORenewalEdit() {
 
     setFollowUpSaving(true);
     try {
-      await updateMutation.mutateAsync({
-        id,
-        updates: {
-          follow_up_date: followUpDraft.date || null,
-          follow_up_reason: followUpDraft.reason.trim() || null,
-        },
+      await followUpMutation.mutateAsync({
+        renewal,
+        date: followUpDraft.date || null,
+        reason: followUpDraft.reason.trim() || null,
+        currentUserId,
       });
-
       setFormData((prev) => ({
         ...prev,
         follow_up_date: followUpDraft.date,
         follow_up_reason: followUpDraft.reason,
       }));
-
-      forceDirtyRegistryRender((v) => v + 1);
+      setEditingFollowUp(false);
       toast({ title: 'Success', description: 'Follow-up updated' });
       return true;
-    } catch {
-      toast({ title: 'Error', description: 'Failed to update follow-up', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to update follow-up', variant: 'destructive' });
       return false;
+    } finally {
+      setFollowUpSaving(false);
+    }
+  };
+
+  const handleClearFollowUp = async () => {
+    if (!renewal || !currentUserId) return;
+    setFollowUpSaving(true);
+    try {
+      await followUpMutation.mutateAsync({ renewal, date: null, reason: null, currentUserId });
+      setFollowUpDraft({ date: '', reason: '' });
+      setFormData((prev) => ({ ...prev, follow_up_date: '', follow_up_reason: '' }));
+      setEditingFollowUp(false);
+      toast({ title: 'Cleared', description: 'Follow-up removed' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to clear follow-up', variant: 'destructive' });
     } finally {
       setFollowUpSaving(false);
     }
@@ -255,6 +289,15 @@ export default function AORenewalEdit() {
         },
       });
 
+      cleanBaselineRef.current = {
+        customer_name: formData.customer_name, policy_number: formData.policy_number,
+        policy_type: formData.policy_type, renewal_date: formData.renewal_date,
+        current_premium: formData.current_premium, term_months: formData.term_months,
+        status: formData.status, priority: formData.priority, assigned_to: formData.assigned_to,
+        last_contact_date: formData.last_contact_date, losses_3yr: formData.losses_3yr,
+        oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
+        moved_term: formData.moved_term, moved_premium: formData.moved_premium,
+      };
       toast({ title: 'Success', description: 'Renewal updated successfully' });
       return true;
     } catch {
@@ -264,43 +307,19 @@ export default function AORenewalEdit() {
   };
 
   const overviewDirty = useMemo(() => {
-    if (!renewal) return false;
-    const baseline = {
-      customer_name: renewal.customer_name || '',
-      policy_number: renewal.policy_number || '',
-      policy_type: renewal.policy_type || '',
-      renewal_date: extractLocalDate(renewal.renewal_date),
-      current_premium: renewal.current_premium?.toString() || '',
-      term_months: renewal.term_months ? renewal.term_months.toString() : '',
-      status: renewal.status || 'pending',
-      priority: renewal.priority || 'normal',
-      assigned_to: renewal.assigned_to || '',
-      last_contact_date: extractLocalDate(renewal.last_contact_date),
-      losses_3yr: renewal.losses_3yr?.toString() ?? '0',
-      oldest_in_household: renewal.oldest_in_household?.toString() || '',
-      moved_carrier: renewal.moved_carrier || '',
-      moved_term: renewal.moved_term || '',
-      moved_premium: renewal.moved_premium?.toString() || '',
-    };
+    const baseline = cleanBaselineRef.current;
+    if (!baseline) return false;
     const current = {
-      customer_name: formData.customer_name,
-      policy_number: formData.policy_number,
-      policy_type: formData.policy_type,
-      renewal_date: formData.renewal_date,
-      current_premium: formData.current_premium,
-      term_months: formData.term_months,
-      status: formData.status,
-      priority: formData.priority,
-      assigned_to: formData.assigned_to,
-      last_contact_date: formData.last_contact_date,
-      losses_3yr: formData.losses_3yr,
-      oldest_in_household: formData.oldest_in_household,
-      moved_carrier: formData.moved_carrier,
-      moved_term: formData.moved_term,
-      moved_premium: formData.moved_premium,
+      customer_name: formData.customer_name, policy_number: formData.policy_number,
+      policy_type: formData.policy_type, renewal_date: formData.renewal_date,
+      current_premium: formData.current_premium, term_months: formData.term_months,
+      status: formData.status, priority: formData.priority, assigned_to: formData.assigned_to,
+      last_contact_date: formData.last_contact_date, losses_3yr: formData.losses_3yr,
+      oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
+      moved_term: formData.moved_term, moved_premium: formData.moved_premium,
     };
     return JSON.stringify(current) !== JSON.stringify(baseline);
-  }, [formData, renewal]);
+  }, [formData]);
 
   const hasUnsavedChanges = overviewDirty || followUpDirty;
 
@@ -579,6 +598,14 @@ export default function AORenewalEdit() {
               </div>
             </div>
 
+            {/* ── Unsaved changes banner ── */}
+            {anyDirty && (
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                <span>You have unsaved changes.{dirtyChildSources.length > 0 ? ` Pending: ${dirtyChildSources.map((s) => s.label).join(', ')}.` : ''}</span>
+              </div>
+            )}
+
             {/* ── Two-column body ── */}
             <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-start">
 
@@ -622,116 +649,135 @@ export default function AORenewalEdit() {
                   </CardHeader>
                   {panelPrefs.followUp && (
                     <CardContent className="space-y-5">
-                      <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                        <div className="flex items-center gap-2 text-sm font-medium text-white">
-                          <CalendarClock className="h-4 w-4 text-lime-300" />
-                          Current follow-up commitment
-                        </div>
-                        <div className="mt-3 text-xl font-semibold text-white">{followUpHeadline}</div>
-                        <div className="mt-2 text-sm text-slate-300">{formData.follow_up_reason || 'No reason set'}</div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div>
-                          <div className="mt-2 text-lg font-semibold text-white">{commandStateLabel}</div>
-                        </div>
-                        <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
-                          <div className="mt-2 text-lg font-semibold capitalize text-white">{renewal.status}</div>
-                        </div>
-                        <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div>
-                          <div className="mt-2 text-lg font-semibold text-white">
-                            {renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : 'None logged'}
+                      {!editingFollowUp ? (
+                        /* ── View mode ── */
+                        <>
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2 text-sm font-medium text-white">
+                                  <CalendarClock className="h-4 w-4 text-lime-300" />
+                                  Current follow-up commitment
+                                </div>
+                                <div className="mt-3 text-xl font-semibold text-white">{followUpHeadline}</div>
+                                <div className="mt-2 text-sm text-slate-300">{formData.follow_up_reason || 'No reason set'}</div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                                onClick={() => {
+                                  setFollowUpDraft({ date: formData.follow_up_date, reason: formData.follow_up_reason });
+                                  setEditingFollowUp(true);
+                                }}
+                              >
+                                <Pencil className="mr-1.5 h-3.5 w-3.5" />Edit
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="follow_up_panel_date">Follow-Up Date</Label>
-                        <Input
-                          id="follow_up_panel_date"
-                          type="date"
-                          value={followUpDraft.date}
-                          onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))}
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
-                        />
-                        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}
-                          >Tomorrow</Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}
-                          >+3 days</Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}
-                          >+7 days</Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                            onClick={() => {
-                              const base = new Date();
-                              const day = base.getDay();
-                              const add = day === 0 ? 1 : 8 - day;
-                              setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(base, add) }));
-                            }}
-                          >Next week</Button>
-                        </div>
-                      </div>
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <div className={heroTile}>
+                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div>
+                              <div className="mt-2 text-lg font-semibold text-white">{commandStateLabel}</div>
+                            </div>
+                            <div className={heroTile}>
+                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
+                              <div className="mt-2 text-lg font-semibold capitalize text-white">{renewal.status}</div>
+                            </div>
+                            <div className={heroTile}>
+                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div>
+                              <div className="mt-2 text-lg font-semibold text-white">
+                                {renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : 'None logged'}
+                              </div>
+                            </div>
+                          </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
-                        <Input
-                          id="follow_up_reason"
-                          value={followUpDraft.reason}
-                          maxLength={120}
-                          onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))}
-                          placeholder="e.g. quote review, waiting on insured response"
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
-                        />
-                      </div>
-
-                      <div className="rounded-3xl border border-dashed border-white/10 bg-[#11192b] p-4 text-sm text-slate-300">
-                        <p>
-                          Recommended:{' '}
-                          <strong className="text-white">
-                            {formData.status === 'quoted'
-                              ? '1 to 3 days so quotes do not sit quietly.'
-                              : 'Use a real follow-up date whenever the next touch is committed.'}
-                          </strong>
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                          onClick={() => setFollowUpDraft({ date: '', reason: '' })}
-                        >Clear</Button>
-                        <Button
-                          type="button"
-                          className="h-11 rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200"
-                          onClick={handleConfirmFollowUp}
-                          disabled={!followUpDirty || followUpSaving || updateMutation.isPending}
-                        >
-                          {(followUpSaving || updateMutation.isPending) && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {formData.follow_up_date && (
+                            <div className="flex">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                                onClick={handleClearFollowUp}
+                                disabled={followUpSaving}
+                              >
+                                {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Clear follow-up
+                              </Button>
+                            </div>
                           )}
-                          Confirm Follow-Up
-                        </Button>
-                      </div>
+                        </>
+                      ) : (
+                        /* ── Edit mode ── */
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="follow_up_panel_date">Follow-Up Date</Label>
+                            <Input
+                              id="follow_up_panel_date"
+                              type="date"
+                              value={followUpDraft.date}
+                              onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))}
+                              className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                            />
+                            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
+                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}>Tomorrow</Button>
+                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
+                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}>+3 days</Button>
+                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
+                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}>+7 days</Button>
+                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
+                                onClick={() => {
+                                  const base = new Date();
+                                  const day = base.getDay();
+                                  const add = day === 0 ? 1 : 8 - day;
+                                  setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(base, add) }));
+                                }}>Next week</Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
+                            <Input
+                              id="follow_up_reason"
+                              value={followUpDraft.reason}
+                              maxLength={120}
+                              onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))}
+                              placeholder="e.g. quote review, waiting on insured response"
+                              className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                            />
+                          </div>
+
+                          <div className="rounded-3xl border border-dashed border-white/10 bg-[#11192b] p-4 text-sm text-slate-300">
+                            <p>Recommended: <strong className="text-white">
+                              {formData.status === 'quoted' ? '1 to 3 days so quotes do not sit quietly.' : 'Use a real follow-up date whenever the next touch is committed.'}
+                            </strong></p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                              onClick={() => {
+                                setFollowUpDraft({ date: formData.follow_up_date, reason: formData.follow_up_reason });
+                                setEditingFollowUp(false);
+                              }}
+                            >Cancel</Button>
+                            <Button
+                              type="button"
+                              className="h-11 rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200"
+                              onClick={handleConfirmFollowUp}
+                              disabled={!followUpDirty || followUpSaving}
+                            >
+                              {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Confirm Follow-Up
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   )}
                 </Card>
