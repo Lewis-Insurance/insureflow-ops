@@ -51,7 +51,6 @@ import {
   Clock,
   History,
   Loader2,
-  Pencil,
   XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -107,7 +106,6 @@ export default function AORenewalEdit() {
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
-  const [editingFollowUp, setEditingFollowUp] = useState(false);
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [showMarkDoneDialog, setShowMarkDoneDialog] = useState(false);
   const [markDoneNote, setMarkDoneNote] = useState('');
@@ -239,7 +237,6 @@ export default function AORenewalEdit() {
         follow_up_date: followUpDraft.date,
         follow_up_reason: followUpDraft.reason,
       }));
-      setEditingFollowUp(false);
       toast({ title: 'Success', description: 'Follow-up updated' });
       return true;
     } catch (err: any) {
@@ -257,7 +254,6 @@ export default function AORenewalEdit() {
       await followUpMutation.mutateAsync({ renewal, date: null, reason: null, currentUserId });
       setFollowUpDraft({ date: '', reason: '' });
       setFormData((prev) => ({ ...prev, follow_up_date: '', follow_up_reason: '' }));
-      setEditingFollowUp(false);
       toast({ title: 'Cleared', description: 'Follow-up removed' });
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message || 'Failed to clear follow-up', variant: 'destructive' });
@@ -644,9 +640,6 @@ export default function AORenewalEdit() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <CardTitle className={sectionTitle}>Follow-Up Command Panel</CardTitle>
-                        <CardDescription className={sectionDescription}>
-                          This is the live commitment. Update it whenever the next move changes.
-                        </CardDescription>
                       </div>
                       <Button
                         type="button"
@@ -660,196 +653,152 @@ export default function AORenewalEdit() {
                     </div>
                   </CardHeader>
                   {panelPrefs.followUp && (
-                    <CardContent className="space-y-5">
-                      {!editingFollowUp ? (
-                        /* ── View mode ── */
-                        <>
-                          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="flex items-center gap-2 text-sm font-medium text-white">
-                                  <CalendarClock className="h-4 w-4 text-lime-300" />
-                                  Current follow-up commitment
-                                </div>
-                                <div className="mt-3 text-xl font-semibold text-white">{followUpHeadline}</div>
-                                <div className="mt-2 text-sm text-slate-300">{formData.follow_up_reason || 'No reason set'}</div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="shrink-0 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                                onClick={() => {
-                                  setFollowUpDraft({ date: formData.follow_up_date, reason: formData.follow_up_reason });
-                                  setEditingFollowUp(true);
-                                }}
-                              >
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" />Edit
-                              </Button>
-                            </div>
+                    <CardContent className="space-y-4 pt-0">
+                      {/* Date input + quick chips */}
+                      <div className="space-y-2">
+                        <Label htmlFor="follow_up_panel_date" className="text-sm text-slate-300">Follow-Up Date</Label>
+                        <Input
+                          id="follow_up_panel_date"
+                          type="date"
+                          value={followUpDraft.date}
+                          onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))}
+                          className="h-10 rounded-2xl border-white/10 bg-white/5 text-sm text-white"
+                        />
+                        <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}>Tomorrow</Button>
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}>+3 days</Button>
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                            onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}>+7 days</Button>
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                            onClick={() => {
+                              const base = new Date();
+                              const day = base.getDay();
+                              const add = day === 0 ? 1 : 8 - day;
+                              setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(base, add) }));
+                            }}>Next week</Button>
+                        </div>
+                      </div>
+
+                      {/* Reason textarea */}
+                      <div className="space-y-2">
+                        <Label htmlFor="follow_up_reason_panel" className="text-sm text-slate-300">Reason</Label>
+                        <Textarea
+                          id="follow_up_reason_panel"
+                          value={followUpDraft.reason}
+                          maxLength={120}
+                          rows={2}
+                          onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))}
+                          placeholder="e.g. quote review, waiting on insured response"
+                          className="resize-none rounded-2xl border-white/10 bg-white/5 text-sm text-white"
+                        />
+                      </div>
+
+                      {/* Save / Update */}
+                      <Button
+                        type="button"
+                        className="h-10 w-full rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200 disabled:opacity-40"
+                        onClick={handleConfirmFollowUp}
+                        disabled={!followUpDirty || followUpSaving}
+                      >
+                        {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {formData.follow_up_date ? 'Update' : 'Save'}
+                      </Button>
+
+                      {/* Context chips — always visible */}
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div className={heroTile}>
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div>
+                          <div className="mt-1.5 text-sm font-semibold text-white">{commandStateLabel}</div>
+                        </div>
+                        <div className={heroTile}>
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
+                          <div className="mt-1.5 text-sm font-semibold capitalize text-white">{formData.status}</div>
+                        </div>
+                        <div className={heroTile}>
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div>
+                          <div className="mt-1.5 text-sm font-semibold text-white">
+                            {renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : 'None logged'}
                           </div>
+                        </div>
+                      </div>
 
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <div className={heroTile}>
-                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div>
-                              <div className="mt-2 text-lg font-semibold text-white">{commandStateLabel}</div>
-                            </div>
-                            <div className={heroTile}>
-                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
-                              <div className="mt-2 text-lg font-semibold capitalize text-white">{renewal.status}</div>
-                            </div>
-                            <div className={heroTile}>
-                              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div>
-                              <div className="mt-2 text-lg font-semibold text-white">
-                                {renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : 'None logged'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {formData.follow_up_date && (
-                            <div className="flex flex-wrap gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 rounded-2xl border-lime-300/30 bg-lime-300/10 text-lime-200 hover:bg-lime-300/20"
-                                onClick={() => { setMarkDoneNote(''); setShowMarkDoneDialog(true); }}
-                                disabled={markDoneMutation.isPending}
-                              >
-                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Mark Done
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 rounded-2xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
-                                onClick={handleClearFollowUp}
-                                disabled={followUpSaving}
-                              >
-                                {followUpSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <XCircle className="mr-1.5 h-3.5 w-3.5" />}
-                                Clear
-                              </Button>
-                            </div>
-                          )}
-
-                          {/* ── History accordion ── */}
-                          <button
+                      {/* Mark Done + Clear — only when active follow-up exists */}
+                      {formData.follow_up_date && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
                             type="button"
-                            className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
-                            onClick={() => setShowFollowUpHistory((v) => !v)}
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-2xl border-lime-300/30 bg-lime-300/10 text-lime-200 hover:bg-lime-300/20"
+                            onClick={() => { setMarkDoneNote(''); setShowMarkDoneDialog(true); }}
+                            disabled={markDoneMutation.isPending}
                           >
-                            <span className="flex items-center gap-2">
-                              <History className="h-4 w-4" />
-                              Follow-up history
-                              {followUpHistory.length > 0 && (
-                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{followUpHistory.length}</span>
-                              )}
-                            </span>
-                            {showFollowUpHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </button>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Mark Done
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-2xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                            onClick={handleClearFollowUp}
+                            disabled={followUpSaving}
+                          >
+                            {followUpSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <XCircle className="mr-1.5 h-3.5 w-3.5" />}
+                            Clear
+                          </Button>
+                        </div>
+                      )}
 
-                          {showFollowUpHistory && (
-                            <div className="space-y-2">
-                              {followUpHistory.length === 0 ? (
-                                <p className="px-1 text-sm text-slate-500">No follow-up history yet.</p>
-                              ) : (
-                                followUpHistory.map((entry) => (
-                                  <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/3 p-3 text-sm">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-medium text-white">{formatLocalDateDisplay(entry.follow_up_date)}</span>
-                                      <span className={cn(
-                                        'rounded-full px-2 py-0.5 text-xs capitalize',
-                                        entry.status === 'pending' ? 'bg-amber-400/20 text-amber-300' :
-                                        entry.status === 'completed' ? 'bg-emerald-400/20 text-emerald-300' :
-                                        'bg-zinc-400/20 text-zinc-300',
-                                      )}>
-                                        {entry.status}
-                                      </span>
-                                    </div>
-                                    {entry.reason && <p className="mt-1 text-slate-400">{entry.reason}</p>}
-                                    {entry.completed_at && (
-                                      <p className="mt-1 text-xs text-slate-500">
-                                        {entry.status === 'completed' ? 'Completed' : 'Cleared'}{' '}
-                                        {formatLocalDateDisplay(entry.completed_at.slice(0, 10))}
-                                      </p>
-                                    )}
-                                    {entry.completion_note && (
-                                      <p className="mt-1 text-xs italic text-slate-400">"{entry.completion_note}"</p>
-                                    )}
-                                  </div>
-                                ))
-                              )}
-                            </div>
+                      {/* History accordion */}
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
+                        onClick={() => setShowFollowUpHistory((v) => !v)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <History className="h-4 w-4" />
+                          Follow-up history
+                          {followUpHistory.length > 0 && (
+                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{followUpHistory.length}</span>
                           )}
-                        </>
-                      ) : (
-                        /* ── Edit mode ── */
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="follow_up_panel_date">Follow-Up Date</Label>
-                            <Input
-                              id="follow_up_panel_date"
-                              type="date"
-                              value={followUpDraft.date}
-                              onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))}
-                              className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
-                            />
-                            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}>Tomorrow</Button>
-                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}>+3 days</Button>
-                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                                onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}>+7 days</Button>
-                              <Button type="button" variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/5 text-sm text-slate-100 hover:bg-white/10"
-                                onClick={() => {
-                                  const base = new Date();
-                                  const day = base.getDay();
-                                  const add = day === 0 ? 1 : 8 - day;
-                                  setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(base, add) }));
-                                }}>Next week</Button>
-                            </div>
-                          </div>
+                        </span>
+                        {showFollowUpHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="follow_up_reason">Follow-Up Reason</Label>
-                            <Input
-                              id="follow_up_reason"
-                              value={followUpDraft.reason}
-                              maxLength={120}
-                              onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))}
-                              placeholder="e.g. quote review, waiting on insured response"
-                              className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
-                            />
-                          </div>
-
-                          <div className="rounded-3xl border border-dashed border-white/10 bg-[#11192b] p-4 text-sm text-slate-300">
-                            <p>Recommended: <strong className="text-white">
-                              {formData.status === 'quoted' ? '1 to 3 days so quotes do not sit quietly.' : 'Use a real follow-up date whenever the next touch is committed.'}
-                            </strong></p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-3">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-11 rounded-2xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                              onClick={() => {
-                                setFollowUpDraft({ date: formData.follow_up_date, reason: formData.follow_up_reason });
-                                setEditingFollowUp(false);
-                              }}
-                            >Cancel</Button>
-                            <Button
-                              type="button"
-                              className="h-11 rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200"
-                              onClick={handleConfirmFollowUp}
-                              disabled={!followUpDirty || followUpSaving}
-                            >
-                              {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Confirm Follow-Up
-                            </Button>
-                          </div>
-                        </>
+                      {showFollowUpHistory && (
+                        <div className="space-y-2">
+                          {followUpHistory.length === 0 ? (
+                            <p className="px-1 text-sm text-slate-500">No follow-up history yet.</p>
+                          ) : (
+                            followUpHistory.map((entry) => (
+                              <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/3 p-3 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-medium text-white">{formatLocalDateDisplay(entry.follow_up_date)}</span>
+                                  <span className={cn(
+                                    'rounded-full px-2 py-0.5 text-xs capitalize',
+                                    entry.status === 'pending' ? 'bg-amber-400/20 text-amber-300' :
+                                    entry.status === 'completed' ? 'bg-emerald-400/20 text-emerald-300' :
+                                    'bg-zinc-400/20 text-zinc-300',
+                                  )}>
+                                    {entry.status}
+                                  </span>
+                                </div>
+                                {entry.reason && <p className="mt-1 text-slate-400">{entry.reason}</p>}
+                                {entry.completed_at && (
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {entry.status === 'completed' ? 'Completed' : 'Cleared'}{' '}
+                                    {formatLocalDateDisplay(entry.completed_at.slice(0, 10))}
+                                  </p>
+                                )}
+                                {entry.completion_note && (
+                                  <p className="mt-1 text-xs italic text-slate-400">"{entry.completion_note}"</p>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
                       )}
                     </CardContent>
                   )}
@@ -858,9 +807,6 @@ export default function AORenewalEdit() {
                 <Card className={cn(surfaceCard, 'rounded-3xl')}>
                   <CardHeader className="pb-4">
                     <CardTitle className={sectionTitle}>Quotes</CardTitle>
-                    <CardDescription className={sectionDescription}>
-                      The active selling surface. Add, compare, and manage live options without leaving the top of the file.
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <AORenewalQuotes
