@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const DetailRenewalView = () => {
@@ -274,7 +275,7 @@ const DetailRenewalView = () => {
               <div>
                 <div className="text-sm text-muted-foreground">Renewal Date</div>
                 <div className="text-lg font-semibold">
-                  {format(new Date(renewal.renewal_date), 'MMMM dd, yyyy')}
+                  {format(parseLocalDate(renewal.renewal_date), 'MMMM dd, yyyy')}
                 </div>
                 <Badge variant={daysToRenewal < 30 ? 'destructive' : 'secondary'} className="mt-1">
                   {daysToRenewal} days remaining
@@ -314,7 +315,7 @@ const DetailRenewalView = () => {
                 <div className="text-sm text-muted-foreground">Last Contact</div>
                 <div className="font-medium">
                   {renewal.last_contact_date 
-                    ? format(new Date(renewal.last_contact_date), 'MMM dd, yyyy')
+                    ? format(parseLocalDate(renewal.last_contact_date), 'MMM dd, yyyy')
                     : 'No contact recorded'
                   }
                 </div>

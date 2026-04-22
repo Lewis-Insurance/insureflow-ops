@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, startOfDay, endOfDay } from 'date-fns';
 import { useEffect } from 'react';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { PendingFollowupsWidget } from './PendingFollowupsWidget';
 
 export function CustomerSearchWidget() {
@@ -233,7 +234,7 @@ export function UpcomingRenewalsWidget() {
                       </div>
                     </div>
                     <Badge variant="outline" className="ml-2">
-                      {format(new Date(renewal.expiration_date), 'MMM d')}
+                      {format(parseLocalDate(renewal.expiration_date), 'MMM d')}
                     </Badge>
                   </div>
                 </div>
