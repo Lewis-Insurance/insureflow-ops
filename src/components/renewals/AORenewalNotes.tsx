@@ -5,7 +5,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MessageSquarePlus, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MessageSquarePlus, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -26,11 +36,13 @@ interface AORenewalNotesProps {
 
 export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
   const [newNote, setNewNote] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const editorContext = useAORenewalEditor();
 
-  // Fetch notes
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ["ao-renewal-notes", renewalId],
     queryFn: async () => {
@@ -42,7 +54,6 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
 
       if (error) throw error;
 
-      // Fetch user names for all notes
       const userIds = [...new Set(data?.map((note: any) => note.created_by) || [])];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -61,7 +72,6 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     },
   });
 
-  // Add note mutation
   const addNoteMutation = useMutation({
     mutationFn: async (content: string) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -78,17 +88,44 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-notes", renewalId] });
       setNewNote("");
-      toast({
-        title: "Success",
-        description: "Note added successfully",
-      });
+      toast({ title: "Success", description: "Note added successfully" });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add note",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const { error } = await supabase
+        .from("ao_renewal_notes")
+        .update({ content: content.trim() })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ao-renewal-notes", renewalId] });
+      setEditingId(null);
+      toast({ title: "Updated", description: "Note updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ao_renewal_notes").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ao-renewal-notes", renewalId] });
+      setDeleteTarget(null);
+      toast({ title: "Deleted", description: "Note removed" });
+    },
+    onError: (err: Error) => {
+      setDeleteTarget(null);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -113,14 +150,15 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
     addNoteMutation.mutate(newNote);
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const startEdit = (note: Note) => { setEditingId(note.id); setEditContent(note.content); };
+  const cancelEdit = () => { setEditingId(null); setEditContent(""); };
+  const saveEdit = (id: string) => {
+    if (!editContent.trim()) return;
+    updateNoteMutation.mutate({ id, content: editContent });
   };
+
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <Card>
@@ -155,9 +193,7 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
         {/* Notes List */}
         <ScrollArea className="h-[400px] pr-4">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading notes...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Loading notes...</div>
           ) : notes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No notes yet. Add your first note above.
@@ -172,20 +208,65 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{note.user_name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(note.created_at), {
-                          addSuffix: true,
-                        })}
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{note.user_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => startEdit(note)}
+                          disabled={editingId === note.id || updateNoteMutation.isPending}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(note)}
+                          disabled={deleteNoteMutation.isPending}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {note.content}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(note.created_at).toLocaleString()}
-                    </p>
+                    {editingId === note.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => saveEdit(note.id)}
+                            disabled={!editContent.trim() || updateNoteMutation.isPending}
+                          >
+                            {updateNoteMutation.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                            <X className="h-3.5 w-3.5 mr-1" />Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{note.content}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -193,6 +274,26 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
           )}
         </ScrollArea>
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This note will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteNoteMutation.mutate(deleteTarget.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
+import { formatLocalDateDisplay } from "@/lib/date/localDate";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -24,6 +25,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +89,7 @@ import {
   type AORenewalPriority,
   type AORenewalQueue,
   type AORenewalStatus,
+  type AORenewalTerm,
 } from "@/hooks/useAORenewals";
 import { useMyAORenewalsCount } from "@/hooks/useMyAORenewals";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,8 +113,8 @@ const formatCurrency = (value: number | null) => {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 };
 
-const formatRenewalDate = (date: string) => format(new Date(date), "MMM d, yyyy");
-const formatFollowUpDate = (date: string | null) => (!date ? "Not set" : format(new Date(date), "MMM d, yyyy"));
+const formatRenewalDate = (date: string) => formatLocalDateDisplay(date);
+const formatFollowUpDate = (date: string | null) => (!date ? "Not set" : formatLocalDateDisplay(date));
 
 const getStatusBadge = (status: AORenewalStatus) => {
   const config: Record<AORenewalStatus, { label: string; className: string }> = {
@@ -152,6 +155,7 @@ export default function AORenewalsPage() {
   const [taskRenewal, setTaskRenewal] = useState<AORenewal | null>(null);
   const [followUpDraft, setFollowUpDraft] = useState<Record<string, { date: string; reason: string }>>({});
   const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
+  const [movedModalRenewal, setMovedModalRenewal] = useState<AORenewal | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 250);
 
@@ -243,8 +247,28 @@ export default function AORenewalsPage() {
     }
   };
 
-  const handleStatusChange = (id: string, status: AORenewalStatus) => {
-    updateStatusMutation.mutate({ id, status });
+  const handleStatusChange = (renewal: AORenewal, status: AORenewalStatus) => {
+    if (status === 'moved' && renewal.status !== 'moved') {
+      setMovedModalRenewal(renewal);
+      return;
+    }
+    updateStatusMutation.mutate({ id: renewal.id, status });
+  };
+
+  const handleMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
+    if (!movedModalRenewal) return;
+    updateRenewalMutation.mutate({
+      id: movedModalRenewal.id,
+      updates: {
+        status: 'moved',
+        moved_carrier: data.carrier,
+        moved_term: data.term,
+        moved_premium: data.premium,
+        follow_up_date: null,
+        follow_up_reason: null,
+      },
+    });
+    setMovedModalRenewal(null);
   };
 
   const handleDelete = () => {
@@ -556,7 +580,7 @@ export default function AORenewalsPage() {
                         </TableCell>
                         {/* Inline status dropdown */}
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Select value={renewal.status} onValueChange={(v) => handleStatusChange(renewal.id, v as AORenewalStatus)}>
+                          <Select value={renewal.status} onValueChange={(v) => handleStatusChange(renewal, v as AORenewalStatus)}>
                             <SelectTrigger className="h-8 w-[120px] text-xs">
                               <SelectValue />
                             </SelectTrigger>
@@ -715,6 +739,12 @@ export default function AORenewalsPage() {
           renewal={taskRenewal}
         />
       )}
+      <MovedStatusModal
+        open={!!movedModalRenewal}
+        onOpenChange={(open) => !open && setMovedModalRenewal(null)}
+        onConfirm={handleMovedConfirm}
+        customerName={movedModalRenewal?.customer_name}
+      />
     </AppLayout>
   );
 }

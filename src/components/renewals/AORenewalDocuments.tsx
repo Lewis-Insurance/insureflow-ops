@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   FileText,
   Upload,
   Loader2,
@@ -41,6 +51,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RenewalDocument | null>(null);
 
   // Fetch documents linked to this renewal.
   // New uploads use related_entity_type='ao_renewal'. Legacy records used 'policy' + kind='ao_policy'.
@@ -87,9 +98,11 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           storage_path: storagePath,
           mime_type: file.type,
           file_size: file.size,
+          kind: 'ao_renewal',
           document_type: 'renewal',
           related_entity_type: 'ao_renewal',
           related_entity_id: renewalId,
+          created_by: user.id,
         });
 
       if (insertError) throw insertError;
@@ -295,7 +308,7 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(doc)}
+                      onClick={() => setDeleteTarget(doc)}
                       disabled={deleteMutation.isPending}
                       title="Delete"
                       className="text-destructive hover:text-destructive"
@@ -313,6 +326,25 @@ export function AORenewalDocuments({ renewalId, customerName, policyNumber }: AO
           </p>
         )}
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteTarget?.filename}" will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) { deleteMutation.mutate(deleteTarget); setDeleteTarget(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
