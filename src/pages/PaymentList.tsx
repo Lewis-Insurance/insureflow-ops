@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -366,7 +367,7 @@ export default function PaymentList() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Date Received</p>
-                  <p>{format(new Date(selectedPayment.received_date), 'MMMM d, yyyy')}</p>
+                  <p>{format(parseLocalDate(selectedPayment.received_date), 'MMMM d, yyyy')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Payment Method</p>

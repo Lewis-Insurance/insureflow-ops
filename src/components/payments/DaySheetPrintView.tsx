@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import { format, parseISO } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import type { PremiumPayment } from '@/types/payments';
 
 interface DaySheetData {
@@ -233,7 +234,7 @@ export const DaySheetPrintView = forwardRef<HTMLDivElement, DaySheetPrintViewPro
                         {payment.check_number || '-'}
                       </td>
                       <td className="border border-gray-300 px-2 py-1.5">
-                        {payment.check_date ? format(new Date(payment.check_date), 'MM/dd/yyyy') : '-'}
+                        {payment.check_date ? format(parseLocalDate(payment.check_date), 'MM/dd/yyyy') : '-'}
                       </td>
                       <td className="border border-gray-300 px-2 py-1.5">
                         {payment.payer_name || '-'}

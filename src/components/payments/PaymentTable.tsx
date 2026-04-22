@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import {
   Table,
   TableBody,
@@ -198,7 +199,7 @@ export function PaymentTable({
                       )}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(payment.received_date), 'MMM d, yyyy')}
+                      {format(parseLocalDate(payment.received_date), 'MMM d, yyyy')}
                     </TableCell>
                     <TableCell>
                       <div>

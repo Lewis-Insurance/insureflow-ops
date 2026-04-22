@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, CreditCard, FileText, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 interface PaymentHistoryWidgetProps {
   accountId?: string;
@@ -142,7 +143,7 @@ export function PaymentHistoryWidget({
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">
                         {payment.received_date
-                          ? format(new Date(payment.received_date), 'MMM d, yyyy')
+                          ? format(parseLocalDate(payment.received_date), 'MMM d, yyyy')
                           : 'No date'}
                       </span>
                       <Badge variant={getStatusVariant(payment.status)} className="text-xs">

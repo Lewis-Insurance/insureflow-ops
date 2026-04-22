@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { format } from 'date-fns';
+import { todayLocalDate } from '@/lib/date/localDate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +33,7 @@ interface BankStatementUploaderProps {
 export function BankStatementUploader({ onSuccess, onCancel }: BankStatementUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [bankAccountId, setBankAccountId] = useState('');
-  const [statementDate, setStatementDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [statementDate, setStatementDate] = useState(todayLocalDate());
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [beginningBalance, setBeginningBalance] = useState('');

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { todayLocalDate } from '@/lib/date/localDate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
     policy_id: '',
     amount: '',
     payment_method_id: '',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: todayLocalDate(),
     reference_number: '',
     payer_name: '',
     notes: '',
@@ -190,7 +191,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
         policy_id: '',
         amount: '',
         payment_method_id: paymentMethods[0]?.id || '',
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: todayLocalDate(),
         reference_number: '',
         payer_name: '',
         notes: '',

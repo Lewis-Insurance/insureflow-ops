@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
+import { parseLocalDate, todayLocalDate } from '@/lib/date/localDate';
 import { CalendarIcon, DollarSign, Search, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -96,7 +97,7 @@ export function PaymentEntryForm({
       check_date: null,
       payer_name: null,
       payer_address: null,
-      received_date: format(new Date(), 'yyyy-MM-dd'),
+      received_date: todayLocalDate(),
       payment_source: 'in_person',
       invoice_number: null,
       notes: null,
@@ -492,7 +493,7 @@ export function PaymentEntryForm({
                               )}
                             >
                               {field.value ? (
-                                format(new Date(field.value), 'PPP')
+                                format(parseLocalDate(field.value), 'PPP')
                               ) : (
                                 <span>Pick a date</span>
                               )}
@@ -503,7 +504,7 @@ export function PaymentEntryForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={field.value ? new Date(field.value) : undefined}
+                            selected={field.value ? parseLocalDate(field.value) : undefined}
                             onSelect={(date) =>
                               field.onChange(date ? format(date, 'yyyy-MM-dd') : null)
                             }
@@ -578,7 +579,7 @@ export function PaymentEntryForm({
                             )}
                           >
                             {field.value ? (
-                              format(new Date(field.value), 'PPP')
+                              format(parseLocalDate(field.value), 'PPP')
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -589,7 +590,7 @@ export function PaymentEntryForm({
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
+                          selected={field.value ? parseLocalDate(field.value) : undefined}
                           onSelect={(date) =>
                             field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
                           }
