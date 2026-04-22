@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayoutWithNavigationGuard } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,6 +92,7 @@ export default function AORenewalEdit() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMovedModal, setShowMovedModal] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
   const [followUpSaving, setFollowUpSaving] = useState(false);
@@ -325,17 +326,25 @@ export default function AORenewalEdit() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [anyDirty]);
 
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    if (currentLocation.pathname === nextLocation.pathname) return false;
-    return anyDirty;
-  });
-
+  // Intercept browser back/forward while dirty (popstate fires before RR processes it)
   useEffect(() => {
-    if (blocker.state === 'blocked') setShowUnsavedDialog(true);
-  }, [blocker.state]);
+    if (!anyDirty) return;
+    // Push a sentinel so the browser has somewhere to pop back to
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      // Re-push so the user stays put visually
+      window.history.pushState(null, '', window.location.href);
+      setPendingNavPath('BACK');
+      setShowUnsavedDialog(true);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [anyDirty]);
 
   const handleBackNavigation = () => {
-    navigate(-1);
+    if (!anyDirty) { navigate(-1); return; }
+    setPendingNavPath('BACK');
+    setShowUnsavedDialog(true);
   };
 
   const handleSaveAllPendingChanges = async () => {
@@ -358,12 +367,15 @@ export default function AORenewalEdit() {
       if (!success) return;
     }
     setShowUnsavedDialog(false);
-    blocker.proceed?.();
+    const target = pendingNavPath;
+    setPendingNavPath(null);
+    if (target === 'BACK') navigate(-1);
+    else if (target) navigate(target);
   };
 
   const cancelNavigation = () => {
     setShowUnsavedDialog(false);
-    blocker.reset?.();
+    setPendingNavPath(null);
   };
 
   const togglePanel = (panel: keyof typeof panelPrefs) => {
