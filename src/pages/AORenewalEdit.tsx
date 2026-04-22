@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AppLayoutWithNavigationGuard } from '@/components/layout/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -477,7 +477,7 @@ export default function AORenewalEdit() {
 
   if (isLoading) {
     return (
-      <AppLayoutWithNavigationGuard>
+      <AppLayout>
         <div className="min-h-screen bg-[#060b16] p-6 md:p-8">
           <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
             <Skeleton className="h-16 w-full rounded-3xl bg-white/5" />
@@ -488,13 +488,13 @@ export default function AORenewalEdit() {
             <Skeleton className="h-[520px] rounded-3xl bg-white/5" />
           </div>
         </div>
-      </AppLayoutWithNavigationGuard>
+      </AppLayout>
     );
   }
 
   if (!renewal) {
     return (
-      <AppLayoutWithNavigationGuard>
+      <AppLayout>
         <div className="min-h-screen bg-[#060b16] p-6 md:p-8">
           <Card className={cn(surfaceCard, 'mx-auto max-w-2xl rounded-3xl')}>
             <CardContent className="pt-6 text-center">
@@ -503,13 +503,13 @@ export default function AORenewalEdit() {
             </CardContent>
           </Card>
         </div>
-      </AppLayoutWithNavigationGuard>
+      </AppLayout>
     );
   }
 
   return (
     <AORenewalEditorContext.Provider value={{ registerDirtySource }}>
-      <AppLayoutWithNavigationGuard>
+      <AppLayout>
         <div className="min-h-screen bg-[#060b16] p-4 md:p-6 xl:p-8">
           <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
 
@@ -1155,7 +1155,7 @@ export default function AORenewalEdit() {
           </AlertDialogContent>
         </AlertDialog>
         <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
-        <MovedStatusModal open={showMovedModal} onOpenChange={handleMovedCancel} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
+        <MovedStatusModal open={showMovedModal} onOpenChange={(open) => { if (!open) handleMovedCancel(); }} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
         <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) cancelNavigation(); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1174,7 +1174,7 @@ export default function AORenewalEdit() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </AppLayoutWithNavigationGuard>
+      </AppLayout>
     </AORenewalEditorContext.Provider>
   );
 }

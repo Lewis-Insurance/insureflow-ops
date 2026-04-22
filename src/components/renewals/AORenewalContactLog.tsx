@@ -119,15 +119,6 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
         created_by: user.id,
       });
       if (logError) throw new Error(`Failed to log contact: ${logError.message}`);
-
-      // B4: stamp last_contact_date; optionally advance status in one round-trip
-      const renewalPatch: Record<string, string | null> = { last_contact_date: data.contact_date };
-      if (newStatus) renewalPatch.status = newStatus;
-      const { error: patchError } = await supabase
-        .from("ao_renewals")
-        .update(renewalPatch)
-        .eq("id", renewalId);
-      if (patchError) throw new Error(`Contact logged but renewal update failed: ${patchError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
