@@ -630,7 +630,7 @@ export default function AORenewalsPage() {
                               >
                                 <CalendarClock className="h-3.5 w-3.5" />
                                 {renewal.follow_up_date
-                                  ? new Date(renewal.follow_up_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                                  ? formatFollowUpDate(renewal.follow_up_date)
                                   : "Set"}
                               </Button>
                             </PopoverTrigger>
