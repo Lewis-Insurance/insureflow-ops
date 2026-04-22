@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -405,7 +406,7 @@ export default function TemplateManagement() {
                           <TableCell className="font-medium">{template.version}</TableCell>
                           <TableCell>
                             {template.effective_date
-                              ? new Date(template.effective_date).toLocaleDateString()
+                              ? formatLocalDateDisplay(template.effective_date)
                               : '-'}
                           </TableCell>
                           <TableCell>{template.field_inventory?.length || 0}</TableCell>

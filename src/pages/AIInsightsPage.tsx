@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { differenceInDays, startOfToday } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +81,7 @@ export default function AIInsightsPage() {
       // Expiring policies
       const expiringPolicies = policies.filter(p => {
         if (!p.expiration_date) return false;
-        const daysUntilExpiry = Math.floor((new Date(p.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const daysUntilExpiry = differenceInDays(parseLocalDate(p.expiration_date), startOfToday());
         return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
       });
 

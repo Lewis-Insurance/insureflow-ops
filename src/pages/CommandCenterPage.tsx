@@ -19,7 +19,7 @@ import {
   FileText,
   Bell
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, differenceInDays, startOfToday } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { parseLocalDate } from '@/lib/date/localDate';
 
@@ -50,9 +50,7 @@ export default function CommandCenterPage() {
 
   const criticalRenewals = renewals?.filter(r => {
     if (!r.expiration_date) return false;
-    const daysUntilExpiration = Math.ceil(
-      (new Date(r.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
+    const daysUntilExpiration = differenceInDays(parseLocalDate(r.expiration_date), startOfToday());
     return daysUntilExpiration <= 7;
   }) || [];
 
@@ -111,9 +109,7 @@ export default function CommandCenterPage() {
 
       // Recent renewals
       renewals?.slice(0, 3).forEach(r => {
-        const daysUntil = Math.ceil(
-          (new Date(r.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
+        const daysUntil = differenceInDays(parseLocalDate(r.expiration_date), startOfToday());
         activities.push({
           id: r.id,
           type: 'renewal',

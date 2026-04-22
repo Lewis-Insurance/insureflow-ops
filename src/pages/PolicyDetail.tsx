@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -330,7 +331,7 @@ export default function PolicyDetail() {
                     <Calendar className="h-4 w-4" />
                     <span>
                       {policy.effective_date
-                        ? new Date(policy.effective_date).toLocaleDateString()
+                        ? formatLocalDateDisplay(policy.effective_date)
                         : 'N/A'}
                     </span>
                   </div>
@@ -341,7 +342,7 @@ export default function PolicyDetail() {
                     <Calendar className="h-4 w-4" />
                     <span>
                       {policy.expiration_date
-                        ? new Date(policy.expiration_date).toLocaleDateString()
+                        ? formatLocalDateDisplay(policy.expiration_date)
                         : 'N/A'}
                     </span>
                   </div>
