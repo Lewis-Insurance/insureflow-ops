@@ -188,15 +188,13 @@ export default function AORenewalsPage() {
       followUpToday: openRenewals.filter((r) => extractLocalDate(r.follow_up_date) === today).length,
       overdueFollowUp: openRenewals.filter((r) => {
         const fuDate = extractLocalDate(r.follow_up_date);
-        return fuDate !== "" && fuDate < today && ACTIVE_STATUSES.includes(r.status);
+        return fuDate !== "" && fuDate < today;
       }).length,
       renewing7: openRenewals.filter((r) => {
-        if (!ACTIVE_STATUSES.includes(r.status)) return false;
         const d = differenceFromTodayInLocalDays(extractLocalDate(r.renewal_date));
         return d !== null && d >= 0 && d <= 7;
       }).length,
       noContact7: openRenewals.filter((r) => {
-        if (!ACTIVE_STATUSES.includes(r.status)) return false;
         const m = getAORenewalOperationalMetrics(r);
         return r.last_contact_date === null || (m.daysSinceContact !== null && m.daysSinceContact >= 7);
       }).length,
