@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TableSkeleton } from '@/components/ui/skeleton-components';
+import { parseLocalDate } from '@/lib/date/localDate';
 import {
   Dialog,
   DialogContent,
@@ -130,7 +131,7 @@ export default function CoverageGapDetail() {
           <div>
             <h1 className="text-3xl font-bold">{analysis.customer_name || 'Coverage Gap Analysis'}</h1>
             <p className="text-muted-foreground">
-              Analyzed {format(new Date(analysis.analysis_date), 'PPP')}
+              Analyzed {format(parseLocalDate(analysis.analysis_date), 'PPP')}
             </p>
           </div>
 

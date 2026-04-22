@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TableSkeleton } from '@/components/ui/skeleton-components';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 export default function CoverageGapAnalysis() {
   const { accountId } = useParams();
@@ -235,7 +236,7 @@ export default function CoverageGapAnalysis() {
                       </div>
                     </div>
                     <CardDescription>
-                      Analyzed {format(new Date(analysis.analysis_date), 'PPP')} ·
+                      Analyzed {format(parseLocalDate(analysis.analysis_date), 'PPP')} ·
                       Risk Score: {analysis.risk_score}/100 ·
                       {analysis.identified_gaps?.length || 0} gap{(analysis.identified_gaps?.length || 0) !== 1 ? 's' : ''} found
                     </CardDescription>

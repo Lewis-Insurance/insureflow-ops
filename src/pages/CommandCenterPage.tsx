@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 interface ActivityItem {
   id: string;
@@ -74,7 +75,7 @@ export default function CommandCenterPage() {
       id: r.id,
       type: 'renewal' as const,
       title: `Urgent Renewal`,
-      description: `Policy ${r.policy_number} expires ${format(new Date(r.expiration_date), 'MMM d')}`,
+      description: `Policy ${r.policy_number} expires ${format(parseLocalDate(r.expiration_date), 'MMM d')}`,
       status: 'critical' as const,
       timestamp: new Date(r.expiration_date),
       link: `/policies/${r.id}`,
@@ -544,7 +545,7 @@ export default function CommandCenterPage() {
                             </TableCell>
                             <TableCell>
                               {renewal.expiration_date
-                                ? format(new Date(renewal.expiration_date), 'MMM d, yyyy')
+                                ? format(parseLocalDate(renewal.expiration_date), 'MMM d, yyyy')
                                 : 'N/A'}
                             </TableCell>
                             <TableCell>

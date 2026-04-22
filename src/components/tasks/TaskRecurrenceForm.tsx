@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRecurringTasks } from '@/hooks/useRecurringTasks';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -120,8 +121,8 @@ export function TaskRecurrenceForm({ taskId }: TaskRecurrenceFormProps) {
                   Every {existingRule.interval} {existingRule.frequency}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Started: {new Date(existingRule.start_date).toLocaleDateString()}
-                  {existingRule.end_date && ` • Ends: ${new Date(existingRule.end_date).toLocaleDateString()}`}
+                  Started: {formatLocalDateDisplay(existingRule.start_date)}
+                  {existingRule.end_date && ` • Ends: ${formatLocalDateDisplay(existingRule.end_date)}`}
                 </div>
                 {existingRule.days_of_week && existingRule.days_of_week.length > 0 && (
                   <div className="text-sm text-muted-foreground">
