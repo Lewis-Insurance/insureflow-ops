@@ -127,8 +127,9 @@ export default function AORenewalEdit() {
   const [showFollowUpHistory, setShowFollowUpHistory] = useState(false);
   const [panelPrefs, setPanelPrefs] = useState(loadPanelPrefs);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  // Tracks the last-saved form snapshot so overviewDirty resets immediately on save
-  const cleanBaselineRef = useRef<Record<string, string> | null>(null);
+  // Tracks the last-saved form snapshot so overviewDirty resets immediately on save.
+  // Must be state (not a ref) so changing it invalidates the overviewDirty useMemo.
+  const [cleanBaseline, setCleanBaseline] = useState<Record<string, string> | null>(null);
 
   const initialDataLoaded = useRef(false);
   const dirtySourcesRef = useRef<Map<string, AORenewalDirtyRegistration>>(new Map());
@@ -185,7 +186,7 @@ export default function AORenewalEdit() {
         moved_premium: renewal.moved_premium?.toString() || '',
       };
       setFormData(next);
-      cleanBaselineRef.current = {
+      setCleanBaseline({
         customer_name: next.customer_name, policy_number: next.policy_number,
         policy_type: next.policy_type, renewal_date: next.renewal_date,
         current_premium: next.current_premium, term_months: next.term_months,
@@ -193,7 +194,7 @@ export default function AORenewalEdit() {
         last_contact_date: next.last_contact_date, losses_3yr: next.losses_3yr,
         oldest_in_household: next.oldest_in_household, moved_carrier: next.moved_carrier,
         moved_term: next.moved_term, moved_premium: next.moved_premium,
-      };
+      });
       setFollowUpDraft({ date: next.follow_up_date, reason: next.follow_up_reason });
     }
   }, [renewal]);
@@ -326,7 +327,7 @@ export default function AORenewalEdit() {
         },
       });
 
-      cleanBaselineRef.current = {
+      setCleanBaseline({
         customer_name: formData.customer_name, policy_number: formData.policy_number,
         policy_type: formData.policy_type, renewal_date: formData.renewal_date,
         current_premium: formData.current_premium, term_months: formData.term_months,
@@ -334,7 +335,7 @@ export default function AORenewalEdit() {
         last_contact_date: formData.last_contact_date, losses_3yr: formData.losses_3yr,
         oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
         moved_term: formData.moved_term, moved_premium: formData.moved_premium,
-      };
+      });
       toast({ title: 'Success', description: 'Renewal updated successfully' });
       return true;
     } catch {
@@ -344,8 +345,7 @@ export default function AORenewalEdit() {
   };
 
   const overviewDirty = useMemo(() => {
-    const baseline = cleanBaselineRef.current;
-    if (!baseline) return false;
+    if (!cleanBaseline) return false;
     const current = {
       customer_name: formData.customer_name, policy_number: formData.policy_number,
       policy_type: formData.policy_type, renewal_date: formData.renewal_date,
@@ -355,8 +355,8 @@ export default function AORenewalEdit() {
       oldest_in_household: formData.oldest_in_household, moved_carrier: formData.moved_carrier,
       moved_term: formData.moved_term, moved_premium: formData.moved_premium,
     };
-    return JSON.stringify(current) !== JSON.stringify(baseline);
-  }, [formData]);
+    return JSON.stringify(current) !== JSON.stringify(cleanBaseline);
+  }, [formData, cleanBaseline]);
 
   const hasUnsavedChanges = overviewDirty || followUpDirty;
 
