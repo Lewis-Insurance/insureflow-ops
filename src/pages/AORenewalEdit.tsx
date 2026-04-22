@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayoutWithNavigationGuard } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -98,6 +99,20 @@ export default function AORenewalEdit() {
   const followUpMutation = useSetAORenewalFollowUp();
   const markDoneMutation = useMarkAORenewalFollowUpDone();
   const { data: followUpHistory = [] } = useAORenewalFollowUpHistory(id);
+  const { data: latestContact } = useQuery({
+    queryKey: ['ao-renewal-latest-contact', id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('ao_renewal_contact_log')
+        .select('notes')
+        .eq('renewal_id', id!)
+        .order('contact_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!id,
+  });
   const { profiles } = useProfiles();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -579,7 +594,11 @@ export default function AORenewalEdit() {
                     {formData.last_contact_date ? formatLocalDateDisplay(formData.last_contact_date) : 'Not logged'}
                   </div>
                   <p className="mt-2 text-sm text-slate-300">
-                    {formData.follow_up_reason || 'No recent contact context saved.'}
+                    {latestContact?.notes
+                      ? latestContact.notes.length > 120
+                        ? latestContact.notes.slice(0, 120) + '…'
+                        : latestContact.notes
+                      : 'No recent contact context saved.'}
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className={heroTile}>
