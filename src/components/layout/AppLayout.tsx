@@ -15,6 +15,7 @@ import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { AIAssistantSidebar } from '@/components/ai/AIAssistantSidebar';
 import { AIAssistantProvider, useAIAssistantContext } from '@/contexts/AIAssistantContext';
+import { NavigationGuardProvider } from '@/contexts/NavigationGuardContext';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { FloatingMessenger } from '@/components/messaging/FloatingMessenger';
 import { MessengerProvider } from '@/contexts/MessengerContext';
@@ -462,7 +463,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <AIAssistantProvider>
       <MessengerProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
+        <NavigationGuardProvider>
+          <AppLayoutContent>{children}</AppLayoutContent>
+        </NavigationGuardProvider>
       </MessengerProvider>
     </AIAssistantProvider>
   );
@@ -475,7 +478,9 @@ export function AppLayoutWithNavigationGuard({
   return (
     <AIAssistantProvider>
       <MessengerProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
+        <NavigationGuardProvider>
+          <AppLayoutContent>{children}</AppLayoutContent>
+        </NavigationGuardProvider>
       </MessengerProvider>
     </AIAssistantProvider>
   );

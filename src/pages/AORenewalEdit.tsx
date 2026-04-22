@@ -31,6 +31,7 @@ import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
 import { AORenewalDocuments } from '@/components/renewals/AORenewalDocuments';
 import { AORenewalEditorContext, type AORenewalDirtyRegistration } from '@/components/renewals/aoRenewalEditor';
+import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
 import {
   addDaysLocalDate,
   differenceFromTodayInLocalDays,
@@ -407,6 +408,8 @@ export default function AORenewalEdit() {
     }
     return success;
   };
+
+  useNavigationGuard(anyDirty, handleSaveAllPendingChanges);
 
   const confirmNavigation = async (save: boolean) => {
     if (save) {
