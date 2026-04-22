@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,8 +90,8 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
       setNewNote("");
       toast({ title: "Success", description: "Note added successfully" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message || "Failed to add note", variant: "destructive" });
     },
   });
 
@@ -130,20 +130,24 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
   });
 
   const hasDraft = useMemo(() => newNote.trim().length > 0, [newNote]);
+  const newNoteRef = useRef(newNote);
+  newNoteRef.current = newNote;
+  const addNoteMutationRef = useRef(addNoteMutation);
+  addNoteMutationRef.current = addNoteMutation;
 
   useEffect(() => {
     if (!editorContext) return;
     return editorContext.registerDirtySource({
       id: `ao-renewal-notes-${renewalId}`,
       label: 'Notes',
-      isDirty: () => newNote.trim().length > 0,
+      isDirty: () => newNoteRef.current.trim().length > 0,
       save: async () => {
-        if (!newNote.trim()) return true;
-        await addNoteMutation.mutateAsync(newNote);
+        if (!newNoteRef.current.trim()) return true;
+        await addNoteMutationRef.current.mutateAsync(newNoteRef.current);
         return true;
       },
     });
-  }, [editorContext, renewalId, newNote, addNoteMutation]);
+  }, [editorContext, renewalId]);
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;

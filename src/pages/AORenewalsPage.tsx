@@ -82,6 +82,7 @@ import {
   useBulkDeleteAllAORenewals,
   useUpdateAORenewal,
   useUpdateAORenewalStatus,
+  useSetAORenewalFollowUp,
   type AORenewal,
   type AORenewalFilters,
   type AORenewalPriority,
@@ -182,6 +183,7 @@ export default function AORenewalsPage() {
   const { data: myStats } = useMyAORenewalsCount();
   const updateStatusMutation = useUpdateAORenewalStatus();
   const updateRenewalMutation = useUpdateAORenewal();
+  const followUpMutation = useSetAORenewalFollowUp();
   const deleteMutation = useDeleteAORenewal();
   const deleteAllMutation = useBulkDeleteAllAORenewals();
 
@@ -214,16 +216,28 @@ export default function AORenewalsPage() {
     </button>
   );
 
-  const handleSaveFollowUp = async (renewalId: string) => {
-    const draft = followUpDraft[renewalId];
-    if (!draft?.date) return;
-    setSavingFollowUp(renewalId);
+  const handleSaveFollowUp = async (renewal: AORenewal) => {
+    const draft = followUpDraft[renewal.id];
+    if (!draft?.date || !currentUserId) return;
+    setSavingFollowUp(renewal.id);
     try {
-      await updateRenewalMutation.mutateAsync({
-        id: renewalId,
-        updates: { follow_up_date: draft.date, follow_up_reason: draft.reason.trim() || null },
+      await followUpMutation.mutateAsync({
+        renewal,
+        date: draft.date,
+        reason: draft.reason.trim() || null,
+        currentUserId,
       });
-      setFollowUpDraft((prev) => { const next = { ...prev }; delete next[renewalId]; return next; });
+      setFollowUpDraft((prev) => { const next = { ...prev }; delete next[renewal.id]; return next; });
+    } finally {
+      setSavingFollowUp(null);
+    }
+  };
+
+  const handleClearFollowUp = async (renewal: AORenewal) => {
+    if (!currentUserId) return;
+    setSavingFollowUp(renewal.id);
+    try {
+      await followUpMutation.mutateAsync({ renewal, date: null, reason: null, currentUserId });
     } finally {
       setSavingFollowUp(null);
     }
@@ -651,7 +665,7 @@ export default function AORenewalsPage() {
                                   size="sm"
                                   className="flex-1"
                                   disabled={!followUpDraft[renewal.id]?.date || savingFollowUp === renewal.id}
-                                  onClick={() => handleSaveFollowUp(renewal.id)}
+                                  onClick={() => handleSaveFollowUp(renewal)}
                                 >
                                   {savingFollowUp === renewal.id ? "Saving…" : "Save"}
                                 </Button>
@@ -660,7 +674,7 @@ export default function AORenewalsPage() {
                                     size="sm"
                                     variant="outline"
                                     disabled={savingFollowUp === renewal.id}
-                                    onClick={() => updateRenewalMutation.mutate({ id: renewal.id, updates: { follow_up_date: null, follow_up_reason: null } })}
+                                    onClick={() => handleClearFollowUp(renewal)}
                                   >
                                     Clear
                                   </Button>

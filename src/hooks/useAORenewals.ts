@@ -57,6 +57,7 @@ export interface AORenewal {
   // Follow-up tracking (exactly one active follow-up per renewal)
   follow_up_date: string | null;
   follow_up_reason: string | null;
+  follow_up_task_id: string | null;
   // Moved status fields
   moved_carrier: string | null;
   moved_term: AORenewalTerm | null;
@@ -484,6 +485,108 @@ export const useUpdateAORenewal = () => {
     onError: (error: any) => {
       console.error("Error updating renewal:", error);
       toast.error(error?.message || "Failed to update renewal");
+    },
+  });
+};
+
+export const useSetAORenewalFollowUp = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      renewal,
+      date,
+      reason,
+      currentUserId,
+    }: {
+      renewal: AORenewal;
+      date: string | null;
+      reason: string | null;
+      currentUserId: string;
+    }) => {
+      if (!date) {
+        // CLEAR path: complete existing task, null out follow-up fields
+        if (renewal.follow_up_task_id) {
+          const { error: taskErr } = await supabase
+            .from('tasks')
+            .update({ status: 'completed', completed_at: new Date().toISOString() })
+            .eq('id', renewal.follow_up_task_id);
+          if (taskErr) throw new Error(`Task completion failed: ${taskErr.message}`);
+        }
+        const { error: renewalErr } = await supabase
+          .from('ao_renewals')
+          .update({ follow_up_date: null, follow_up_reason: null, follow_up_task_id: null })
+          .eq('id', renewal.id);
+        if (renewalErr) throw new Error(`Failed to clear follow-up: ${renewalErr.message}`);
+        return { renewalId: renewal.id, taskId: null as string | null };
+      }
+
+      // SET/EDIT path
+      const priorityMap: Record<string, string> = {
+        low: 'low', normal: 'medium', high: 'high', urgent: 'urgent',
+      };
+      const taskPriority = priorityMap[renewal.priority] || 'medium';
+      const assignee = renewal.assigned_to || currentUserId;
+      const dueAt = `${date}T09:00:00-05:00`; // 9 AM ET (EST offset, acceptable for throwaway module)
+      const taskTitle = `Follow up: ${renewal.customer_name}`;
+      const taskDesc = `Policy ${renewal.policy_number}.${reason ? ` Reason: ${reason}` : ''}`;
+
+      let taskId = renewal.follow_up_task_id;
+
+      if (taskId) {
+        // UPDATE existing task
+        const { error: taskErr } = await supabase
+          .from('tasks')
+          .update({
+            title: taskTitle,
+            description: taskDesc,
+            due_at: dueAt,
+            status: 'pending',
+            priority: taskPriority,
+            assignee_id: assignee,
+          })
+          .eq('id', taskId);
+        if (taskErr) throw new Error(`Task update failed: ${taskErr.message}`);
+      } else {
+        // INSERT new task
+        const { data: newTask, error: taskErr } = await supabase
+          .from('tasks')
+          .insert({
+            entity_type: 'ao_renewal',
+            entity_id: renewal.id,
+            title: taskTitle,
+            description: taskDesc,
+            due_at: dueAt,
+            priority: taskPriority,
+            status: 'pending',
+            category: 'renewal',
+            assignee_id: assignee,
+            created_by: currentUserId,
+            source: 'manual',
+          })
+          .select('id')
+          .single();
+        if (taskErr) throw new Error(`Task creation failed: ${taskErr.message}`);
+        taskId = newTask.id;
+      }
+
+      // Update renewal with follow-up fields + task link
+      const { error: renewalErr } = await supabase
+        .from('ao_renewals')
+        .update({
+          follow_up_date: date,
+          follow_up_reason: reason || null,
+          follow_up_task_id: taskId,
+        })
+        .eq('id', renewal.id);
+      if (renewalErr) throw new Error(`Renewal update failed: ${renewalErr.message}`);
+
+      return { renewalId: renewal.id, taskId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal', data.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewals-stats'] });
     },
   });
 };
