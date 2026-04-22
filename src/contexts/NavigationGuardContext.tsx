@@ -40,11 +40,13 @@ export function useNavigationGuard(isDirty: boolean, onSave: () => Promise<boole
   onSaveRef.current = onSave;
 
   useEffect(() => {
-    if (!ctx) return;
-    return ctx.registerGuard({
+    if (!ctx) { console.log('[NavGuard] useNavigationGuard: ctx is null — no provider found'); return; }
+    console.log('[NavGuard] guard registered', { isDirty: isDirtyRef.current });
+    const cleanup = ctx.registerGuard({
       isDirty: () => isDirtyRef.current,
       onSave: () => onSaveRef.current(),
     });
+    return () => { console.log('[NavGuard] guard unregistered'); cleanup(); };
   }, [ctx]);
 }
 
@@ -60,7 +62,10 @@ export function NavigationGuardProvider({ children }: { children: React.ReactNod
   }, []);
 
   const isAnyDirty = useCallback(() => {
-    return Array.from(guardsRef.current).some((g) => g.isDirty());
+    const guards = Array.from(guardsRef.current);
+    const dirtyStates = guards.map((g) => g.isDirty());
+    console.log('[NavGuard] isAnyDirty', { guardCount: guards.length, dirtyStates });
+    return dirtyStates.some(Boolean);
   }, []);
 
   const requestNavigation = useCallback((to: string) => {
