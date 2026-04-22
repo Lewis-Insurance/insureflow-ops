@@ -195,6 +195,7 @@ export default function AORenewalsPage() {
         return d !== null && d >= 0 && d <= 7;
       }).length,
       noContact7: openRenewals.filter((r) => {
+        if (r.status === 'pending') return false;
         const m = getAORenewalOperationalMetrics(r);
         return r.last_contact_date === null || (m.daysSinceContact !== null && m.daysSinceContact >= 7);
       }).length,
@@ -216,7 +217,7 @@ export default function AORenewalsPage() {
           return ACTIVE_STATUSES.includes(renewal.status) && metrics.daysUntilRenewal >= 0 && metrics.daysUntilRenewal <= 7;
         }
         if (activeTile === "no_contact_7") {
-          return ACTIVE_STATUSES.includes(renewal.status) &&
+          return renewal.status !== 'pending' &&
             (renewal.last_contact_date === null || (metrics.daysSinceContact !== null && metrics.daysSinceContact >= 7));
         }
         return true;
