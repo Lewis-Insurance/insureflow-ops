@@ -25,7 +25,7 @@ import {
   User,
   Building2
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfToday } from 'date-fns';
 import { useCalculateRenewalRisk } from '@/hooks/useRenewalIntelligence';
 import { parseLocalDate } from '@/lib/date/localDate';
 import type { AtRiskRenewal } from '@/hooks/useRenewalIntelligence';
@@ -61,8 +61,8 @@ export default function RenewalRiskCard({ renewal }: RenewalRiskCardProps) {
     }).format(amount || 0);
   };
 
-  const daysToRenewal = renewal.renewal_date 
-    ? differenceInDays(new Date(renewal.renewal_date), new Date())
+  const daysToRenewal = renewal.renewal_date
+    ? differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday())
     : 0;
 
   const priceChange = renewal.price_change_pct || 0;

@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 import type { PolicyWithAccount } from '@/hooks/usePolicies';
 import type { RenewalType } from '@/hooks/useRenewals';
+import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
 interface RenewalsListProps {
   policies: PolicyWithAccount[];
@@ -160,14 +161,14 @@ export function RenewalsList({ policies, type, loading, onPolicySelect }: Renewa
                     <Calendar className="h-4 w-4" />
                     <span>Effective:</span>
                     <span className="font-medium">
-                      {policy.effective_date ? new Date(policy.effective_date).toLocaleDateString() : 'N/A'}
+                      {policy.effective_date ? formatLocalDateDisplay(policy.effective_date) : 'N/A'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span>Expires:</span>
                     <span className="font-medium">
-                      {policy.expiration_date ? new Date(policy.expiration_date).toLocaleDateString() : 'N/A'}
+                      {policy.expiration_date ? formatLocalDateDisplay(policy.expiration_date) : 'N/A'}
                     </span>
                   </div>
                   {policy.premium && (

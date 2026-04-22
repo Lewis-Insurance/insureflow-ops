@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AORenewal } from "./useAORenewals";
 import { logger } from '@/lib/logger';
+import { differenceInDays, startOfToday } from 'date-fns';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 export interface MyAORenewalsStats {
   count: number;
@@ -81,7 +83,6 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
       }
 
       const renewals = (data || []) as AORenewal[];
-      const now = new Date();
 
       // Calculate stats
       const stats: MyAORenewalsStats = {
@@ -94,10 +95,7 @@ export function useMyAORenewals(limit?: number, excludeCompleted: boolean = fals
 
       // Count upcoming renewals
       renewals.forEach((renewal) => {
-        const renewalDate = new Date(renewal.renewal_date);
-        const daysUntil = Math.floor(
-          (renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const daysUntil = differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday());
 
         if (daysUntil >= 0 && daysUntil <= 7) {
           stats.upcomingWithin7Days++;
@@ -146,7 +144,6 @@ export function useMyAORenewalsCount() {
       }
 
       const renewals = data || [];
-      const now = new Date();
 
       const stats: MyAORenewalsStats = {
         count: renewals.length,
@@ -156,10 +153,7 @@ export function useMyAORenewalsCount() {
       };
 
       renewals.forEach((renewal) => {
-        const renewalDate = new Date(renewal.renewal_date);
-        const daysUntil = Math.floor(
-          (renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const daysUntil = differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday());
 
         if (daysUntil >= 0 && daysUntil <= 7) {
           stats.upcomingWithin7Days++;

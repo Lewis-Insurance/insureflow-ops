@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { todayLocalDate, addDaysLocalDate } from '@/lib/date/localDate';
 
 interface RiskFactor {
   factor: string;
@@ -118,9 +119,6 @@ export function useUpcomingRenewals(days: number = 90) {
   return useQuery({
     queryKey: ['upcoming-renewals', days],
     queryFn: async () => {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + days);
-
       const { data, error } = await supabase
         .from('renewals')
         .select(`
@@ -129,7 +127,7 @@ export function useUpcomingRenewals(days: number = 90) {
           assigned:profiles!renewals_assigned_to_fkey(id, full_name)
         `)
         .in('status', ['upcoming', 'in_progress'])
-        .lte('renewal_date', futureDate.toISOString().split('T')[0])
+        .lte('renewal_date', addDaysLocalDate(todayLocalDate(), days))
         .order('renewal_date', { ascending: true });
 
       if (error) throw error;

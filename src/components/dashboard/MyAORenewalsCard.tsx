@@ -6,6 +6,7 @@ import { useMyAORenewals } from "@/hooks/useMyAORenewals";
 import { useNavigate } from "react-router-dom";
 import { Calendar, ExternalLink, AlertTriangle } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { parseLocalDate } from "@/lib/date/localDate";
 
 export function MyAORenewalsCard() {
   const navigate = useNavigate();
@@ -166,7 +167,7 @@ export function MyAORenewalsCard() {
                     {renewal.policy_number}
                   </div>
                   <div className="col-span-3 text-xs">
-                    {format(new Date(renewal.renewal_date), "MMM d")}
+                    {format(parseLocalDate(renewal.renewal_date), "MMM d")}
                     {daysUntil <= 7 && daysUntil >= 0 && (
                       <span className="ml-1 text-orange-600 font-medium">
                         ({daysUntil}d)

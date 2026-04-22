@@ -43,7 +43,7 @@ import {
   PauseCircle,
   Plus
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfToday } from 'date-fns';
 import { toast } from 'sonner';
 import { parseLocalDate } from '@/lib/date/localDate';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -111,7 +111,7 @@ const DetailRenewalView = () => {
     );
   }
 
-  const daysToRenewal = differenceInDays(new Date(renewal.renewal_date), new Date());
+  const daysToRenewal = differenceInDays(parseLocalDate(renewal.renewal_date), startOfToday());
   const priceChange = renewal.price_change_pct || 0;
   const activeCampaign = campaigns?.find(c => c.status === 'active');
 
@@ -321,7 +321,7 @@ const DetailRenewalView = () => {
                 </div>
                 {renewal.last_contact_date && (
                   <div className="text-sm text-muted-foreground">
-                    {differenceInDays(new Date(), new Date(renewal.last_contact_date))} days ago
+                    {differenceInDays(startOfToday(), parseLocalDate(renewal.last_contact_date))} days ago
                   </div>
                 )}
               </div>

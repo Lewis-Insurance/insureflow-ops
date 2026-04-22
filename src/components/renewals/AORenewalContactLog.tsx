@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { todayLocalDate } from "@/lib/date/localDate";
+import { todayLocalDate, formatLocalDateDisplay } from "@/lib/date/localDate";
 import { useMarkAORenewalFollowUpDone } from "@/hooks/useAORenewals";
 
 interface ContactLog {
@@ -377,7 +377,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
                           {getMethodLabel(log.contact_method)}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(log.contact_date).toLocaleDateString()}
+                          {formatLocalDateDisplay(log.contact_date)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
