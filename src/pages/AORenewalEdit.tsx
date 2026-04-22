@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { AppLayoutWithNavigationGuard } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useAORenewal, useUpdateAORenewal, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
+import { useAORenewal, useUpdateAORenewal, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm, type AORenewalPriority } from '@/hooks/useAORenewals';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
@@ -92,14 +92,12 @@ export default function AORenewalEdit() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMovedModal, setShowMovedModal] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<string | number | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState({ date: '', reason: '' });
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [panelPrefs, setPanelPrefs] = useState(loadPanelPrefs);
 
   const initialDataLoaded = useRef(false);
-  const skipNavigationGuardRef = useRef(false);
   const dirtySourcesRef = useRef<Map<string, AORenewalDirtyRegistration>>(new Map());
   const [, forceDirtyRegistryRender] = useState(0);
 
@@ -228,6 +226,9 @@ export default function AORenewalEdit() {
     e.preventDefault();
     if (!id) return false;
 
+    const isTerminal = COMPLETED_STATUSES.includes(formData.status);
+    const isMoved = formData.status === 'moved';
+
     try {
       await updateMutation.mutateAsync({
         id,
@@ -244,9 +245,12 @@ export default function AORenewalEdit() {
           last_contact_date: formData.last_contact_date || null,
           losses_3yr: formData.losses_3yr ? parseInt(formData.losses_3yr) : null,
           oldest_in_household: formData.oldest_in_household ? parseInt(formData.oldest_in_household) : null,
-          moved_carrier: formData.moved_carrier || null,
-          moved_term: formData.moved_term || null,
-          moved_premium: formData.moved_premium ? parseFloat(formData.moved_premium) : null,
+          // B7: clear follow-up when saving into a terminal status
+          ...(isTerminal ? { follow_up_date: null, follow_up_reason: null } : {}),
+          // B9: clear moved fields when status is not moved
+          moved_carrier: isMoved ? (formData.moved_carrier || null) : null,
+          moved_term: isMoved ? (formData.moved_term || null) : null,
+          moved_premium: isMoved ? (formData.moved_premium ? parseFloat(formData.moved_premium) : null) : null,
         },
       });
 
@@ -321,32 +325,17 @@ export default function AORenewalEdit() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [anyDirty]);
 
-  const completeNavigation = (target: string | number | null) => {
-    if (target === null) return;
-    skipNavigationGuardRef.current = true;
-    if (typeof target === 'number') navigate(target);
-    else navigate(target);
-  };
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (currentLocation.pathname === nextLocation.pathname) return false;
+    return anyDirty;
+  });
 
-  const handleNavigationAttempt = (target: string) => {
-    if (skipNavigationGuardRef.current) {
-      skipNavigationGuardRef.current = false;
-      return true;
-    }
-    if (!anyDirty) return true;
-    setPendingNavigation(target);
-    setShowUnsavedDialog(true);
-    return false;
-  };
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowUnsavedDialog(true);
+  }, [blocker.state]);
 
   const handleBackNavigation = () => {
-    if (!anyDirty) {
-      skipNavigationGuardRef.current = true;
-      navigate(-1);
-      return;
-    }
-    setPendingNavigation(-1);
-    setShowUnsavedDialog(true);
+    navigate(-1);
   };
 
   const handleSaveAllPendingChanges = async () => {
@@ -369,9 +358,12 @@ export default function AORenewalEdit() {
       if (!success) return;
     }
     setShowUnsavedDialog(false);
-    const target = pendingNavigation;
-    setPendingNavigation(null);
-    completeNavigation(target);
+    blocker.proceed?.();
+  };
+
+  const cancelNavigation = () => {
+    setShowUnsavedDialog(false);
+    blocker.reset?.();
   };
 
   const togglePanel = (panel: keyof typeof panelPrefs) => {
@@ -447,7 +439,7 @@ export default function AORenewalEdit() {
 
   return (
     <AORenewalEditorContext.Provider value={{ registerDirtySource }}>
-      <AppLayoutWithNavigationGuard onNavigateAttempt={handleNavigationAttempt}>
+      <AppLayoutWithNavigationGuard>
         <div className="min-h-screen bg-[#060b16] p-4 md:p-6 xl:p-8">
           <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
 
@@ -1045,7 +1037,7 @@ export default function AORenewalEdit() {
         {/* ── Modals ── */}
         <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
         <MovedStatusModal open={showMovedModal} onOpenChange={handleMovedCancel} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
-        <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) cancelNavigation(); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
@@ -1057,7 +1049,8 @@ export default function AORenewalEdit() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => confirmNavigation(false)}>Leave Anyway</AlertDialogCancel>
+              <AlertDialogCancel onClick={cancelNavigation}>Stay</AlertDialogCancel>
+              <Button variant="ghost" onClick={() => confirmNavigation(false)}>Leave Anyway</Button>
               <AlertDialogAction onClick={() => confirmNavigation(true)}>Save Changes</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

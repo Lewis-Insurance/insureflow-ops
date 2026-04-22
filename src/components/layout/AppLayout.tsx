@@ -470,7 +470,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
 export function AppLayoutWithNavigationGuard({
   children,
-  onNavigateAttempt,
+  onNavigateAttempt: _onNavigateAttempt,
 }: AppLayoutProps & { onNavigateAttempt?: (path: string) => boolean }) {
   return (
     <AIAssistantProvider>

@@ -9,7 +9,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Mail, User, MessageSquare, Calendar, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Phone, Mail, User, MessageSquare, Calendar, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -50,6 +60,9 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
   const [contactMethod, setContactMethod] = useState<string>("phone");
   const [status, setStatus] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<ContactLog | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -65,7 +78,6 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
 
       if (error) throw error;
 
-      // Fetch user names for all logs
       const userIds = [...new Set(data?.map((log: any) => log.created_by) || [])];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -92,78 +104,113 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("ao_renewal_contact_log").insert({
+      const newStatus = data.status && data.status !== 'no_change' ? data.status : null;
+
+      const { error: logError } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
-        status: data.status && data.status !== 'no_change' ? data.status : null,
+        status: newStatus,
         notes: data.notes.trim(),
         created_by: user.id,
       });
+      if (logError) throw new Error(`Failed to log contact: ${logError.message}`);
 
-      if (error) throw error;
+      // B4: stamp last_contact_date; optionally advance status in one round-trip
+      const renewalPatch: Record<string, string | null> = { last_contact_date: data.contact_date };
+      if (newStatus) renewalPatch.status = newStatus;
+      const { error: patchError } = await supabase
+        .from("ao_renewals")
+        .update(renewalPatch)
+        .eq("id", renewalId);
+      if (patchError) throw new Error(`Contact logged but renewal update failed: ${patchError.message}`);
     },
     onSuccess: () => {
-      // Invalidate contact log and renewal data
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals-stats"] });
       queryClient.invalidateQueries({ queryKey: ["upcoming-ao-renewals"] });
-      
-      // Invalidate analytics queries
       queryClient.invalidateQueries({ queryKey: ["ao-analytics-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["ao-pipeline-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-priority-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
-      
       setNotes("");
       setContactDate(new Date().toISOString().split("T")[0]);
       setContactMethod("phone");
       setStatus("");
-      toast({
-        title: "Success",
-        description: "Contact logged successfully",
-      });
+      toast({ title: "Success", description: "Contact logged successfully" });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to log contact",
-        variant: "destructive",
-      });
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message || "Failed to log contact", variant: "destructive" });
+    },
+  });
+
+  // Edit contact log mutation
+  const updateLogMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const { error } = await supabase
+        .from("ao_renewal_contact_log")
+        .update({ notes: notes.trim() })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
+      setEditingId(null);
+      toast({ title: "Updated", description: "Contact log entry updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Delete contact log mutation
+  const deleteLogMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ao_renewal_contact_log").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
+      setDeleteTarget(null);
+      toast({ title: "Deleted", description: "Contact log entry removed" });
+    },
+    onError: (err: Error) => {
+      setDeleteTarget(null);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
   const handleAddLog = () => {
     if (!notes.trim() || !contactDate) return;
-    addLogMutation.mutate({
-      contact_date: contactDate,
-      contact_method: contactMethod,
-      status,
-      notes,
-    });
+    addLogMutation.mutate({ contact_date: contactDate, contact_method: contactMethod, status, notes });
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const startEdit = (log: ContactLog) => {
+    setEditingId(log.id);
+    setEditNotes(log.notes);
   };
+
+  const cancelEdit = () => { setEditingId(null); setEditNotes(""); };
+
+  const saveEdit = (id: string) => {
+    if (!editNotes.trim()) return;
+    updateLogMutation.mutate({ id, notes: editNotes });
+  };
+
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   const getMethodIcon = (method: string) => {
     const Icon = methodIcons[method as keyof typeof methodIcons] || Calendar;
     return <Icon className="h-4 w-4" />;
   };
 
-  const getMethodLabel = (method: string) => {
-    return methodLabels[method as keyof typeof methodLabels] || method;
-  };
+  const getMethodLabel = (method: string) =>
+    methodLabels[method as keyof typeof methodLabels] || method;
 
   return (
     <Card>
@@ -192,28 +239,16 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                 </SelectTrigger>
                 <SelectContent className="bg-background">
                   <SelectItem value="phone">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Phone Call
-                    </div>
+                    <div className="flex items-center gap-2"><Phone className="h-4 w-4" />Phone Call</div>
                   </SelectItem>
                   <SelectItem value="email">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </div>
+                    <div className="flex items-center gap-2"><Mail className="h-4 w-4" />Email</div>
                   </SelectItem>
                   <SelectItem value="in_person">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      In Person
-                    </div>
+                    <div className="flex items-center gap-2"><User className="h-4 w-4" />In Person</div>
                   </SelectItem>
                   <SelectItem value="sms">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      SMS
-                    </div>
+                    <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4" />SMS</div>
                   </SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
@@ -266,9 +301,7 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
         {/* Contact History */}
         <ScrollArea className="h-[400px] pr-4">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading contact history...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Loading contact history...</div>
           ) : logs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No contacts logged yet. Log your first contact above.
@@ -283,19 +316,69 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{log.user_name}</span>
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        {getMethodIcon(log.contact_method)}
-                        {getMethodLabel(log.contact_method)}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(log.contact_date).toLocaleDateString()}
-                      </span>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{log.user_name}</span>
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          {getMethodIcon(log.contact_method)}
+                          {getMethodLabel(log.contact_method)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log.contact_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => startEdit(log)}
+                          disabled={editingId === log.id || updateLogMutation.isPending}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(log)}
+                          disabled={deleteLogMutation.isPending}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {log.notes}
-                    </p>
+                    {editingId === log.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editNotes}
+                          onChange={(e) => setEditNotes(e.target.value)}
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => saveEdit(log.id)}
+                            disabled={!editNotes.trim() || updateLogMutation.isPending}
+                          >
+                            {updateLogMutation.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                            <X className="h-3.5 w-3.5 mr-1" />Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{log.notes}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Logged {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                     </p>
@@ -306,6 +389,26 @@ export function AORenewalContactLog({ renewalId }: AORenewalContactLogProps) {
           )}
         </ScrollArea>
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete contact log entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This contact log entry will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteLogMutation.mutate(deleteTarget.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
