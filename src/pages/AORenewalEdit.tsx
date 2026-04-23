@@ -28,7 +28,6 @@ import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from '@/components/renewals/TerminalStatusModal';
-import { RenewalCompletionModal, type RenewalCompletionData } from '@/components/renewals/RenewalCompletionModal';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
@@ -123,8 +122,6 @@ export default function AORenewalEdit() {
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [pendingTerminalStatus, setPendingTerminalStatus] = useState<'lost' | 'cancelled' | null>(null);
   const [terminalModalLoading, setTerminalModalLoading] = useState(false);
-  const [showRenewalModal, setShowRenewalModal] = useState(false);
-  const [renewalModalLoading, setRenewalModalLoading] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
@@ -238,10 +235,6 @@ export default function AORenewalEdit() {
       setShowTerminalModal(true);
       return;
     }
-    if (newStatus === 'renewed') {
-      setShowRenewalModal(true);
-      return;
-    }
     // pending / contacted / quoted — commit immediately
     updateStatusMutation.mutate(
       { id, status: newStatus },
@@ -321,26 +314,6 @@ export default function AORenewalEdit() {
     );
   };
 
-  const handleRenewalComplete = (data: RenewalCompletionData) => {
-    if (!id) return;
-    setRenewalModalLoading(true);
-    updateStatusMutation.mutate(
-      { id, status: 'renewed' },
-      {
-        onSuccess: () => {
-          setFormData((prev) => ({ ...prev, status: 'renewed' }));
-          setCleanBaseline((prev) => prev ? { ...prev, status: 'renewed' } : prev);
-          setShowRenewalModal(false);
-          setRenewalModalLoading(false);
-          toast({ title: 'Renewal completed', description: 'Marked as retained' });
-        },
-        onError: () => {
-          setRenewalModalLoading(false);
-          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
-        },
-      },
-    );
-  };
 
   const followUpDirty = useMemo(
     () =>
@@ -678,7 +651,9 @@ export default function AORenewalEdit() {
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="contacted">Contacted</SelectItem>
                         <SelectItem value="quoted">Quoted</SelectItem>
-                        <SelectItem value="renewed">Retained</SelectItem>
+                        {formData.status === 'renewed' && (
+                          <SelectItem value="renewed" disabled>Retained (existing)</SelectItem>
+                        )}
                         <SelectItem value="moved">Moved</SelectItem>
                         <SelectItem value="lost">Lost</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -1294,17 +1269,6 @@ export default function AORenewalEdit() {
             currentExpirationDate={renewal?.renewal_date}
           />
         )}
-        {/* Renewal completion (retained) */}
-        <RenewalCompletionModal
-          open={showRenewalModal}
-          onOpenChange={(open) => { if (!open) setShowRenewalModal(false); }}
-          onConfirm={handleRenewalComplete}
-          isLoading={renewalModalLoading}
-          currentPolicyNumber={formData.policy_number}
-          currentPremium={formData.current_premium ? parseFloat(formData.current_premium) : 0}
-          currentExpirationDate={renewal?.renewal_date}
-          policyTerm={formData.term_months === '6' ? '6_month' : 'annual'}
-        />
         <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) cancelNavigation(); }}>
           <AlertDialogContent>
             <AlertDialogHeader>

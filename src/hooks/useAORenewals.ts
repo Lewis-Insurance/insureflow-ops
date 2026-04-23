@@ -127,6 +127,24 @@ export const ACTIVE_STATUSES: AORenewalStatus[] = ["pending", "contacted", "quot
 export const DEFAULT_HIDDEN_STATUSES: AORenewalStatus[] = ["moved", "cancelled", "lost"];
 export const COMPLETED_STATUSES: AORenewalStatus[] = ["renewed", "lost", "cancelled", "moved"];
 
+/**
+ * Given the log_type just saved and the renewal's current status, returns the
+ * status the CSR should probably advance to — or null if no suggestion applies.
+ * Never suggests advancement on terminal statuses.
+ */
+export function suggestStatusAdvance(
+  logType: string | null | undefined,
+  currentStatus: AORenewalStatus,
+): AORenewalStatus | null {
+  if (COMPLETED_STATUSES.includes(currentStatus)) return null;
+  if (logType === "spoke_with_insured" && currentStatus === "pending") return "contacted";
+  if (
+    (logType === "quote_presented" || logType === "quote_sent") &&
+    (currentStatus === "pending" || currentStatus === "contacted")
+  ) return "quoted";
+  return null;
+}
+
 const startOfToday = () => startOfDay(new Date());
 
 const normalizeDate = (date: string | null | undefined) => {
