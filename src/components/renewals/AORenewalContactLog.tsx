@@ -61,7 +61,7 @@ const methodLabels = {
 export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogProps) {
   const [contactDate, setContactDate] = useState(todayLocalDate());
   const [contactMethod, setContactMethod] = useState<string>("phone");
-  const [status, setStatus] = useState<string>("");
+  const [logType, setLogType] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
@@ -105,17 +105,15 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
 
   // Add contact log mutation
   const addLogMutation = useMutation({
-    mutationFn: async (data: { contact_date: string; contact_method: string; status: string; notes: string }) => {
+    mutationFn: async (data: { contact_date: string; contact_method: string; log_type: string; notes: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
-      const newStatus = data.status && data.status !== 'no_change' ? data.status : null;
 
       const { error: logError } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
-        status: newStatus,
+        log_type: data.log_type || null,
         notes: data.notes.trim(),
         created_by: user.id,
       });
@@ -179,13 +177,13 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
     setNotes("");
     setContactDate(todayLocalDate());
     setContactMethod("phone");
-    setStatus("");
+    setLogType("");
   };
 
   const handleAddLog = async () => {
     if (!notes.trim() || !contactDate) return;
     try {
-      await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, status, notes });
+      await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, log_type: logType, notes });
       resetForm();
       toast({ title: "Success", description: "Contact logged successfully" });
     } catch {
@@ -199,7 +197,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
     try {
       // Step 1: insert contact log
       try {
-        await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, status, notes });
+        await addLogMutation.mutateAsync({ contact_date: contactDate, contact_method: contactMethod, log_type: logType, notes });
       } catch {
         return; // onError showed error toast; form stays; don't proceed to mark done
       }
@@ -291,19 +289,21 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
               </Select>
             </div>
             <div>
-              <Label htmlFor="status">Call Outcome</Label>
-              <Select value={status || undefined} onValueChange={(v) => setStatus(v === 'no_change' ? '' : v)}>
+              <Label htmlFor="log_type">Log Type</Label>
+              <Select value={logType || undefined} onValueChange={(v) => setLogType(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="No change" />
+                  <SelectValue placeholder="Optional" />
                 </SelectTrigger>
                 <SelectContent className="bg-background">
-                  <SelectItem value="no_change">No change</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="quoted">Quoted</SelectItem>
-                  <SelectItem value="renewed">Renewed</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="voicemail">Voicemail</SelectItem>
+                  <SelectItem value="spoke_with_insured">Spoke with insured</SelectItem>
+                  <SelectItem value="no_answer">No answer</SelectItem>
+                  <SelectItem value="email_sent">Email sent</SelectItem>
+                  <SelectItem value="text_sent">Text sent</SelectItem>
+                  <SelectItem value="quote_presented">Quote presented</SelectItem>
+                  <SelectItem value="quote_sent">Quote sent</SelectItem>
+                  <SelectItem value="follow_up_scheduled">Follow-up scheduled</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

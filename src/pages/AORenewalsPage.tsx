@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
+import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from "@/components/renewals/TerminalStatusModal";
+import { RenewalCompletionModal, type RenewalCompletionData } from "@/components/renewals/RenewalCompletionModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -135,6 +137,11 @@ export default function AORenewalsPage() {
   const [followUpDraft, setFollowUpDraft] = useState<Record<string, { date: string; reason: string }>>({});
   const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
   const [movedModalRenewal, setMovedModalRenewal] = useState<AORenewal | null>(null);
+  const [terminalModalRenewal, setTerminalModalRenewal] = useState<AORenewal | null>(null);
+  const [terminalModalStatus, setTerminalModalStatus] = useState<'lost' | 'cancelled' | null>(null);
+  const [terminalModalLoading, setTerminalModalLoading] = useState(false);
+  const [renewalModalRenewal, setRenewalModalRenewal] = useState<AORenewal | null>(null);
+  const [renewalModalLoading, setRenewalModalLoading] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 250);
 
@@ -278,7 +285,47 @@ export default function AORenewalsPage() {
       setMovedModalRenewal(renewal);
       return;
     }
+    if (status === 'lost' || status === 'cancelled') {
+      setTerminalModalRenewal(renewal);
+      setTerminalModalStatus(status);
+      return;
+    }
+    if (status === 'renewed') {
+      setRenewalModalRenewal(renewal);
+      return;
+    }
     updateStatusMutation.mutate({ id: renewal.id, status });
+  };
+
+  const handleTerminalConfirm = (_data: TerminalStatusData) => {
+    if (!terminalModalRenewal || !terminalModalStatus) return;
+    setTerminalModalLoading(true);
+    updateStatusMutation.mutate(
+      { id: terminalModalRenewal.id, status: terminalModalStatus },
+      {
+        onSuccess: () => {
+          setTerminalModalRenewal(null);
+          setTerminalModalStatus(null);
+          setTerminalModalLoading(false);
+        },
+        onError: () => setTerminalModalLoading(false),
+      },
+    );
+  };
+
+  const handleRenewalComplete = (_data: RenewalCompletionData) => {
+    if (!renewalModalRenewal) return;
+    setRenewalModalLoading(true);
+    updateStatusMutation.mutate(
+      { id: renewalModalRenewal.id, status: 'renewed' },
+      {
+        onSuccess: () => {
+          setRenewalModalRenewal(null);
+          setRenewalModalLoading(false);
+        },
+        onError: () => setRenewalModalLoading(false),
+      },
+    );
   };
 
   const handleMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
@@ -646,6 +693,28 @@ export default function AORenewalsPage() {
         onOpenChange={(open) => !open && setMovedModalRenewal(null)}
         onConfirm={handleMovedConfirm}
         customerName={movedModalRenewal?.customer_name}
+      />
+      {terminalModalStatus && (
+        <TerminalStatusModal
+          open={!!terminalModalRenewal}
+          onOpenChange={(open) => {
+            if (!open) { setTerminalModalRenewal(null); setTerminalModalStatus(null); }
+          }}
+          onConfirm={handleTerminalConfirm}
+          isLoading={terminalModalLoading}
+          statusType={terminalModalStatus as TerminalStatusType}
+          currentExpirationDate={terminalModalRenewal?.renewal_date}
+        />
+      )}
+      <RenewalCompletionModal
+        open={!!renewalModalRenewal}
+        onOpenChange={(open) => !open && setRenewalModalRenewal(null)}
+        onConfirm={handleRenewalComplete}
+        isLoading={renewalModalLoading}
+        currentPolicyNumber={renewalModalRenewal?.policy_number}
+        currentPremium={renewalModalRenewal?.current_premium ?? 0}
+        currentExpirationDate={renewalModalRenewal?.renewal_date}
+        policyTerm={renewalModalRenewal?.term_months === 6 ? '6_month' : 'annual'}
       />
     </AppLayout>
   );
