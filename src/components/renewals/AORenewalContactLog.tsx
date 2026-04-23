@@ -25,7 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { todayLocalDate, formatLocalDateDisplay } from "@/lib/date/localDate";
-import { useMarkAORenewalFollowUpDone } from "@/hooks/useAORenewals";
+import { useMarkAORenewalFollowUpDone, useUpdateAORenewalStatus, suggestStatusAdvance, type AORenewalStatus } from "@/hooks/useAORenewals";
+import { toast as sonnerToast } from "sonner";
 
 interface ContactLog {
   id: string;
@@ -39,7 +40,7 @@ interface ContactLog {
 
 interface AORenewalContactLogProps {
   renewalId: string;
-  renewal?: { follow_up_date: string | null; follow_up_task_id: string | null };
+  renewal?: { follow_up_date: string | null; follow_up_task_id: string | null; status?: AORenewalStatus };
 }
 
 const methodIcons = {
@@ -70,6 +71,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const markDoneMutation = useMarkAORenewalFollowUpDone();
+  const updateStatusMutation = useUpdateAORenewalStatus();
 
   // Fetch contact logs
   const { data: logs = [], isLoading } = useQuery({
@@ -119,7 +121,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
       });
       if (logError) throw new Error(`Failed to log contact: ${logError.message}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["ao-renewal-contact-log", renewalId] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-renewal", renewalId] });
@@ -131,6 +133,30 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
       queryClient.invalidateQueries({ queryKey: ["ao-monthly-forecast"] });
       queryClient.invalidateQueries({ queryKey: ["ao-at-risk-renewals"] });
       queryClient.invalidateQueries({ queryKey: ["ao-top-renewals"] });
+
+      // Non-intrusive prompt: suggest status advance if log_type implies one
+      const suggestion = renewal?.status
+        ? suggestStatusAdvance(variables.log_type, renewal.status)
+        : null;
+      if (suggestion) {
+        const label = suggestion === "contacted" ? "Contacted" : "Quoted";
+        sonnerToast(`Advance status to ${label}?`, {
+          duration: 10000,
+          action: {
+            label: "Yes, advance",
+            onClick: () => {
+              updateStatusMutation.mutate(
+                { id: renewalId, status: suggestion },
+                {
+                  onSuccess: () => sonnerToast.success(`Status advanced to ${label}`),
+                  onError: () => sonnerToast.error("Failed to update status"),
+                },
+              );
+            },
+          },
+          cancel: { label: "Dismiss", onClick: () => {} },
+        });
+      }
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message || "Failed to log contact", variant: "destructive" });
