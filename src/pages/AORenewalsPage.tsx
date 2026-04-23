@@ -20,7 +20,6 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MovedStatusModal } from "@/components/renewals/MovedStatusModal";
 import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from "@/components/renewals/TerminalStatusModal";
-import { RenewalCompletionModal, type RenewalCompletionData } from "@/components/renewals/RenewalCompletionModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,8 +139,6 @@ export default function AORenewalsPage() {
   const [terminalModalRenewal, setTerminalModalRenewal] = useState<AORenewal | null>(null);
   const [terminalModalStatus, setTerminalModalStatus] = useState<'lost' | 'cancelled' | null>(null);
   const [terminalModalLoading, setTerminalModalLoading] = useState(false);
-  const [renewalModalRenewal, setRenewalModalRenewal] = useState<AORenewal | null>(null);
-  const [renewalModalLoading, setRenewalModalLoading] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 250);
 
@@ -290,10 +287,6 @@ export default function AORenewalsPage() {
       setTerminalModalStatus(status);
       return;
     }
-    if (status === 'renewed') {
-      setRenewalModalRenewal(renewal);
-      return;
-    }
     updateStatusMutation.mutate({ id: renewal.id, status });
   };
 
@@ -309,21 +302,6 @@ export default function AORenewalsPage() {
           setTerminalModalLoading(false);
         },
         onError: () => setTerminalModalLoading(false),
-      },
-    );
-  };
-
-  const handleRenewalComplete = (_data: RenewalCompletionData) => {
-    if (!renewalModalRenewal) return;
-    setRenewalModalLoading(true);
-    updateStatusMutation.mutate(
-      { id: renewalModalRenewal.id, status: 'renewed' },
-      {
-        onSuccess: () => {
-          setRenewalModalRenewal(null);
-          setRenewalModalLoading(false);
-        },
-        onError: () => setRenewalModalLoading(false),
       },
     );
   };
@@ -532,7 +510,9 @@ export default function AORenewalsPage() {
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="contacted">Contacted</SelectItem>
                               <SelectItem value="quoted">Quoted</SelectItem>
-                              <SelectItem value="renewed">Renewed</SelectItem>
+                              {renewal.status === 'renewed' && (
+                                <SelectItem value="renewed" disabled>Retained (existing)</SelectItem>
+                              )}
                               <SelectItem value="moved">Moved</SelectItem>
                               <SelectItem value="lost">Lost</SelectItem>
                               <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -706,16 +686,6 @@ export default function AORenewalsPage() {
           currentExpirationDate={terminalModalRenewal?.renewal_date}
         />
       )}
-      <RenewalCompletionModal
-        open={!!renewalModalRenewal}
-        onOpenChange={(open) => !open && setRenewalModalRenewal(null)}
-        onConfirm={handleRenewalComplete}
-        isLoading={renewalModalLoading}
-        currentPolicyNumber={renewalModalRenewal?.policy_number}
-        currentPremium={renewalModalRenewal?.current_premium ?? 0}
-        currentExpirationDate={renewalModalRenewal?.renewal_date}
-        policyTerm={renewalModalRenewal?.term_months === 6 ? '6_month' : 'annual'}
-      />
     </AppLayout>
   );
 }
