@@ -23,10 +23,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { useAORenewal, useUpdateAORenewal, useSetAORenewalFollowUp, useMarkAORenewalFollowUpDone, useAORenewalFollowUpHistory, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm } from '@/hooks/useAORenewals';
+import { useAORenewal, useUpdateAORenewal, useUpdateAORenewalStatus, useSetAORenewalFollowUp, useMarkAORenewalFollowUpDone, useAORenewalFollowUpHistory, COMPLETED_STATUSES, type AORenewalStatus, type AORenewalTerm } from '@/hooks/useAORenewals';
 import { useProfiles } from '@/hooks/useProfiles';
 import { AddAORenewalTaskModal } from '@/components/renewals/AddAORenewalTaskModal';
 import { MovedStatusModal } from '@/components/renewals/MovedStatusModal';
+import { TerminalStatusModal, type TerminalStatusData, type TerminalStatusType } from '@/components/renewals/TerminalStatusModal';
+import { RenewalCompletionModal, type RenewalCompletionData } from '@/components/renewals/RenewalCompletionModal';
 import { AORenewalNotes } from '@/components/renewals/AORenewalNotes';
 import { AORenewalContactLog } from '@/components/renewals/AORenewalContactLog';
 import { AORenewalQuotes } from '@/components/renewals/AORenewalQuotes';
@@ -96,6 +98,7 @@ export default function AORenewalEdit() {
 
   const { data: renewal, isLoading } = useAORenewal(id);
   const updateMutation = useUpdateAORenewal();
+  const updateStatusMutation = useUpdateAORenewalStatus();
   const followUpMutation = useSetAORenewalFollowUp();
   const markDoneMutation = useMarkAORenewalFollowUpDone();
   const { data: followUpHistory = [] } = useAORenewalFollowUpHistory(id);
@@ -117,6 +120,11 @@ export default function AORenewalEdit() {
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMovedModal, setShowMovedModal] = useState(false);
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
+  const [pendingTerminalStatus, setPendingTerminalStatus] = useState<'lost' | 'cancelled' | null>(null);
+  const [terminalModalLoading, setTerminalModalLoading] = useState(false);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [renewalModalLoading, setRenewalModalLoading] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [pendingMovedStatus, setPendingMovedStatus] = useState(false);
@@ -199,16 +207,8 @@ export default function AORenewalEdit() {
     }
   }, [renewal]);
 
-  const handleStatusChange = (newStatus: AORenewalStatus) => {
-    if (newStatus === 'moved' && formData.status !== 'moved') {
-      setPendingMovedStatus(true);
-      setShowMovedModal(true);
-    } else {
-      setFormData((prev) => ({ ...prev, status: newStatus }));
-    }
-  };
-
   const handleMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
+    // Used by the "Edit moved details" banner button — updates formData for deferred save
     setFormData((prev) => ({
       ...prev,
       status: 'moved',
@@ -223,6 +223,123 @@ export default function AORenewalEdit() {
   const handleMovedCancel = () => {
     setPendingMovedStatus(false);
     setShowMovedModal(false);
+  };
+
+  // Top-of-page status dropdown — writes immediately, routes to modals for moved/lost/cancelled/renewed
+  const handleTopStatusChange = (newStatus: AORenewalStatus) => {
+    if (!id) return;
+    if (newStatus === 'moved' && formData.status !== 'moved') {
+      setPendingMovedStatus(true);
+      setShowMovedModal(true);
+      return;
+    }
+    if (newStatus === 'lost' || newStatus === 'cancelled') {
+      setPendingTerminalStatus(newStatus);
+      setShowTerminalModal(true);
+      return;
+    }
+    if (newStatus === 'renewed') {
+      setShowRenewalModal(true);
+      return;
+    }
+    // pending / contacted / quoted — commit immediately
+    updateStatusMutation.mutate(
+      { id, status: newStatus },
+      {
+        onSuccess: () => {
+          setFormData((prev) => ({ ...prev, status: newStatus }));
+          setCleanBaseline((prev) => prev ? { ...prev, status: newStatus } : prev);
+          toast({ title: 'Status updated', description: `Renewal marked as ${newStatus}` });
+        },
+        onError: () => toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' }),
+      },
+    );
+  };
+
+  const handleTopMovedConfirm = (data: { carrier: string; term: AORenewalTerm; premium: number }) => {
+    if (!id) return;
+    updateMutation.mutate(
+      {
+        id,
+        updates: {
+          status: 'moved',
+          moved_carrier: data.carrier,
+          moved_term: data.term,
+          moved_premium: data.premium,
+          follow_up_date: null,
+          follow_up_reason: null,
+        },
+      },
+      {
+        onSuccess: () => {
+          setFormData((prev) => ({
+            ...prev,
+            status: 'moved',
+            moved_carrier: data.carrier,
+            moved_term: data.term,
+            moved_premium: data.premium.toString(),
+            follow_up_date: '',
+            follow_up_reason: '',
+          }));
+          setCleanBaseline((prev) =>
+            prev ? { ...prev, status: 'moved', moved_carrier: data.carrier, moved_term: data.term, moved_premium: data.premium.toString() } : prev,
+          );
+          setFollowUpDraft({ date: '', reason: '' });
+          setPendingMovedStatus(false);
+          setShowMovedModal(false);
+          toast({ title: 'Status updated', description: 'Renewal marked as moved' });
+        },
+        onError: () => {
+          setPendingMovedStatus(false);
+          setShowMovedModal(false);
+          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
+        },
+      },
+    );
+  };
+
+  const handleTerminalConfirm = (data: TerminalStatusData) => {
+    if (!id || !pendingTerminalStatus) return;
+    const newStatus = pendingTerminalStatus;
+    setTerminalModalLoading(true);
+    updateStatusMutation.mutate(
+      { id, status: newStatus },
+      {
+        onSuccess: () => {
+          setFormData((prev) => ({ ...prev, status: newStatus }));
+          setCleanBaseline((prev) => prev ? { ...prev, status: newStatus } : prev);
+          setShowTerminalModal(false);
+          setPendingTerminalStatus(null);
+          setTerminalModalLoading(false);
+          toast({ title: 'Status updated', description: `Renewal marked as ${newStatus}` });
+        },
+        onError: () => {
+          setTerminalModalLoading(false);
+          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
+        },
+      },
+    );
+  };
+
+  const handleRenewalComplete = (data: RenewalCompletionData) => {
+    if (!id) return;
+    setRenewalModalLoading(true);
+    updateStatusMutation.mutate(
+      { id, status: 'renewed' },
+      {
+        onSuccess: () => {
+          setFormData((prev) => ({ ...prev, status: 'renewed' }));
+          setCleanBaseline((prev) => prev ? { ...prev, status: 'renewed' } : prev);
+          setShowRenewalModal(false);
+          setRenewalModalLoading(false);
+          toast({ title: 'Renewal completed', description: 'Marked as retained' });
+        },
+        onError: () => {
+          setRenewalModalLoading(false);
+          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
+        },
+      },
+    );
   };
 
   const followUpDirty = useMemo(
@@ -546,6 +663,28 @@ export default function AORenewalEdit() {
                 </div>
 
                 <div className="flex w-full flex-col gap-3 xl:max-w-sm">
+                  {/* Top status dropdown — single authoritative editor for renewal status */}
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Status</p>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(v) => handleTopStatusChange(v as AORenewalStatus)}
+                      disabled={updateStatusMutation.isPending || updateMutation.isPending}
+                    >
+                      <SelectTrigger className="h-12 rounded-2xl border-white/15 bg-white/8 text-base font-medium text-white hover:bg-white/12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-950 text-white">
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="contacted">Contacted</SelectItem>
+                        <SelectItem value="quoted">Quoted</SelectItem>
+                        <SelectItem value="renewed">Retained</SelectItem>
+                        <SelectItem value="moved">Moved</SelectItem>
+                        <SelectItem value="lost">Lost</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     className="h-12 rounded-2xl bg-white text-slate-950 hover:bg-slate-100"
                     onClick={() => setShowTaskModal(true)}
@@ -1007,26 +1146,6 @@ export default function AORenewalEdit() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Select
-                          value={formData.status}
-                          onValueChange={(value) => handleStatusChange(value as AORenewalStatus)}
-                        >
-                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-950 text-white">
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="contacted">Contacted</SelectItem>
-                            <SelectItem value="quoted">Quoted</SelectItem>
-                            <SelectItem value="renewed">Retained</SelectItem>
-                            <SelectItem value="moved">Moved</SelectItem>
-                            <SelectItem value="lost">Lost</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
                         <Label htmlFor="assigned_to">Assigned To</Label>
                         <Select
                           value={formData.assigned_to || 'unassigned'}
@@ -1155,7 +1274,37 @@ export default function AORenewalEdit() {
           </AlertDialogContent>
         </AlertDialog>
         <AddAORenewalTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} renewal={renewal} />
-        <MovedStatusModal open={showMovedModal} onOpenChange={(open) => { if (!open) handleMovedCancel(); }} onConfirm={handleMovedConfirm} customerName={formData.customer_name} />
+        {/* Moved modal — used by both the top status dropdown and the in-form "edit moved details" button */}
+        <MovedStatusModal
+          open={showMovedModal}
+          onOpenChange={(open) => { if (!open) handleMovedCancel(); }}
+          onConfirm={pendingMovedStatus ? handleTopMovedConfirm : handleMovedConfirm}
+          customerName={formData.customer_name}
+        />
+        {/* Terminal status (lost / cancelled) */}
+        {pendingTerminalStatus && (
+          <TerminalStatusModal
+            open={showTerminalModal}
+            onOpenChange={(open) => {
+              if (!open) { setShowTerminalModal(false); setPendingTerminalStatus(null); }
+            }}
+            onConfirm={handleTerminalConfirm}
+            isLoading={terminalModalLoading}
+            statusType={pendingTerminalStatus as TerminalStatusType}
+            currentExpirationDate={renewal?.renewal_date}
+          />
+        )}
+        {/* Renewal completion (retained) */}
+        <RenewalCompletionModal
+          open={showRenewalModal}
+          onOpenChange={(open) => { if (!open) setShowRenewalModal(false); }}
+          onConfirm={handleRenewalComplete}
+          isLoading={renewalModalLoading}
+          currentPolicyNumber={formData.policy_number}
+          currentPremium={formData.current_premium ? parseFloat(formData.current_premium) : 0}
+          currentExpirationDate={renewal?.renewal_date}
+          policyTerm={formData.term_months === '6' ? '6_month' : 'annual'}
+        />
         <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) cancelNavigation(); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
