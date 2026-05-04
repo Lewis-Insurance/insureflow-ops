@@ -339,12 +339,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   to="/customer-success"
                 />
                 <NavItem
-                  icon={Building2}
-                  label="Facility Launch"
-                  to="/facility-launch"
-                  badge="MVP"
-                />
-                <NavItem
                   icon={Radio}
                   label="Command Center"
                   to="/command-center"

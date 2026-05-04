@@ -86,7 +86,6 @@ const IssueTracker = React.lazy(() => import("./pages/IssueTracker"));
 const ReportIssue = React.lazy(() => import("./pages/ReportIssue"));
 const IssueDetail = React.lazy(() => import("./pages/IssueDetail"));
 const PredictiveAnalytics = React.lazy(() => import("./pages/PredictiveAnalytics"));
-const FacilityLaunchCenter = React.lazy(() => import("./pages/FacilityLaunchCenter"));
 const PortalLoginPage = React.lazy(() => import("./pages/PortalLoginPage"));
 const PortalDashboard = React.lazy(() => import("./pages/PortalDashboard"));
 const MarketingAutomationsPage = React.lazy(() => import("./pages/MarketingAutomationsPage"));
@@ -987,16 +986,6 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <PredictiveAnalytics />
-                      </ErrorBoundary>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/facility-launch"
-                  element={
-                    <ProtectedRoute>
-                      <ErrorBoundary level="page" resetOnPropsChange>
-                        <FacilityLaunchCenter />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }
