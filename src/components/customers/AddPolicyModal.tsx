@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { EnumCombobox } from '@/components/ui/enum-combobox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
 import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
+import { mapLineOfBusiness, mapCarrier } from '@/lib/policyParserMap';
 import { format } from 'date-fns';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
@@ -54,6 +56,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Tracks fields where the parser returned a value but we couldn't cleanly
+  // map it to a canonical option, so the user must explicitly confirm.
+  const [needsConfirmation, setNeedsConfirmation] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -165,28 +170,25 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
 
       // Auto-fill policy form
       const newFormData = { ...formData };
-      if (extracted.policy_number) newFormData.policy_number = extracted.policy_number;
-      if (extracted.carrier) newFormData.carrier = extracted.carrier;
+      const newNeedsConfirmation: Record<string, boolean> = {};
 
-      // Map line_of_business - check both line_of_business and document_type
-      if (extracted.line_of_business) {
-        newFormData.line_of_business = extracted.line_of_business;
-      } else if (extracted.document_type) {
-        // Map document_type values to friendly line of business names
-        const docTypeMap: Record<string, string> = {
-          'auto_policy': 'Auto',
-          'auto': 'Auto',
-          'home_policy': 'Home',
-          'home': 'Home',
-          'homeowners': 'Home',
-          'commercial_policy': 'Commercial',
-          'commercial': 'Commercial',
-          'application': '', // Don't set LOB for generic applications
-        };
-        const mappedLob = docTypeMap[extracted.document_type.toLowerCase()];
-        if (mappedLob) {
-          newFormData.line_of_business = mappedLob;
-        }
+      if (extracted.policy_number) newFormData.policy_number = extracted.policy_number;
+
+      // Carrier — best-effort match against the carriers lookup, but free-text is allowed
+      const carrierResult = mapCarrier(extracted.carrier, carriers);
+      if (carrierResult.value) newFormData.carrier = carrierResult.value;
+
+      // Line of Business — must match the canonical lookup; otherwise leave empty
+      // and flag for user confirmation rather than save a non-canonical value.
+      const lobResult = mapLineOfBusiness(
+        { line_of_business: extracted.line_of_business, document_type: extracted.document_type },
+        linesOfBusiness,
+      );
+      if (lobResult.value) {
+        newFormData.line_of_business = lobResult.value;
+      } else if (lobResult.needsConfirmation) {
+        newFormData.line_of_business = '';
+        newNeedsConfirmation.line_of_business = true;
       }
 
       if (extracted.effective_date) {
@@ -236,10 +238,14 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
       }
 
       setFormData(newFormData);
+      setNeedsConfirmation(newNeedsConfirmation);
       setParseStatus('success');
+      const confirmCount = Object.values(newNeedsConfirmation).filter(Boolean).length;
       toast({
         title: 'Document parsed successfully',
-        description: 'Policy information has been extracted. Please review and make any corrections.',
+        description: confirmCount > 0
+          ? `Extracted policy info — please confirm ${confirmCount} highlighted field${confirmCount > 1 ? 's' : ''}.`
+          : 'Policy information has been extracted. Please review and make any corrections.',
       });
     } catch (error) {
       console.error('Document parsing error:', error);
@@ -276,6 +282,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
     setUploadedFile(null);
     setUploadedFilePath(null);
     setParseStatus('idle');
+    setNeedsConfirmation({});
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -393,6 +400,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
       setUploadedFilePath(null);
       setParseStatus('idle');
       setErrors({});
+      setNeedsConfirmation({});
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -410,6 +418,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (needsConfirmation[field]) {
+      setNeedsConfirmation(prev => ({ ...prev, [field]: false }));
     }
 
     // Auto-calculate expiration date when effective date or policy term changes
@@ -555,21 +566,25 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
 
           <div>
             <Label htmlFor="line_of_business">Line of Business *</Label>
-            <Input
+            <EnumCombobox
               id="line_of_business"
-              list="lob-list"
               value={formData.line_of_business}
-              onChange={(e) => handleInputChange('line_of_business', e.target.value)}
-              placeholder="Type or select line of business"
-              className={errors.line_of_business ? 'border-destructive' : ''}
+              onChange={(v) => handleInputChange('line_of_business', v)}
+              options={linesOfBusiness.map(lob => ({ value: lob.name }))}
+              placeholder="Select line of business"
+              searchPlaceholder="Search lines of business..."
+              emptyText="No matching line of business."
+              loading={lobLoading}
+              error={!!errors.line_of_business}
+              needsConfirmation={!!needsConfirmation.line_of_business}
             />
-            <datalist id="lob-list">
-              {linesOfBusiness.map(lob => (
-                <option key={lob.id} value={lob.name} />
-              ))}
-            </datalist>
             {errors.line_of_business && (
               <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
+            )}
+            {needsConfirmation.line_of_business && !errors.line_of_business && (
+              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                Couldn't auto-match the parsed line of business — please pick one.
+              </p>
             )}
           </div>
 
