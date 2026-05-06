@@ -10,8 +10,6 @@ import { PoliciesQuotesTab } from '@/components/dashboard/PoliciesQuotesTab';
 import { AIInsightsCard } from '@/components/dashboard/AIInsightsCard';
 import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
-import { PendingFollowupsWidget } from '@/components/quotes/PendingFollowupsWidget';
-import { MyAORenewalsCard } from '@/components/dashboard/MyAORenewalsCard';
 import { CanopyStatsCard } from '@/components/canopy/CanopyStatsCard';
 import { DashboardGlobalSearch } from '@/components/dashboard/DashboardGlobalSearch';
 
@@ -39,28 +37,20 @@ const DashboardContent = React.memo(() => {
         </div>
       </div>
 
-      {/* Prominent Global Search */}
-      <ErrorBoundary level="component">
-        <DashboardGlobalSearch />
-      </ErrorBoundary>
-
-      {/* My AO Renewals */}
-      <ErrorBoundary level="component">
-        <MyAORenewalsCard />
-      </ErrorBoundary>
-
-      {/* Upcoming Tasks, Pending Follow-Ups, and Canopy Stats */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Upcoming Tasks and Canopy Stats */}
+      <div className="grid gap-6 md:grid-cols-2">
         <ErrorBoundary level="component">
           <UpcomingTasksCard />
-        </ErrorBoundary>
-        <ErrorBoundary level="component">
-          <PendingFollowupsWidget limit={5} />
         </ErrorBoundary>
         <ErrorBoundary level="component">
           <CanopyStatsCard />
         </ErrorBoundary>
       </div>
+
+      {/* Prominent Global Search */}
+      <ErrorBoundary level="component">
+        <DashboardGlobalSearch />
+      </ErrorBoundary>
 
       {/* AI Knowledge Search */}
       <ErrorBoundary level="component">
