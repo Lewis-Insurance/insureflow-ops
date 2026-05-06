@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, startOfDay, endOfDay } from 'date-fns';
 import { useEffect } from 'react';
 import { parseLocalDate } from '@/lib/date/localDate';
-import { PendingFollowupsWidget } from './PendingFollowupsWidget';
 
 export function CustomerSearchWidget() {
   const [search, setSearch] = useState('');
@@ -250,15 +249,12 @@ export function UpcomingRenewalsWidget() {
 export function WorkspaceWidgets() {
   return (
     <div className="space-y-4">
-      {/* Pending Follow-ups - Full Width */}
-      <PendingFollowupsWidget />
-      
       {/* Search Widgets - Same Row */}
       <div className="grid gap-4 md:grid-cols-2">
         <CustomerSearchWidget />
         <PolicySearchWidget />
       </div>
-      
+
       {/* Upcoming Renewals - Full Width */}
       <UpcomingRenewalsWidget />
     </div>

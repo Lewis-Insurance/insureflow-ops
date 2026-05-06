@@ -33,7 +33,6 @@ import {
 } from 'recharts';
 import { Link } from 'react-router-dom';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
-import { MyAORenewalsCard } from '@/components/dashboard/MyAORenewalsCard';
 import QuickAddTaskBar from '@/components/tasks/QuickAddTaskBar';
 import { CustomerSearchWidget, PolicySearchWidget, UpcomingRenewalsWidget, WorkspaceWidgets } from '@/components/dashboard/WorkspaceWidgets';
 import { DashboardGlobalSearch } from '@/components/dashboard/DashboardGlobalSearch';
@@ -88,16 +87,8 @@ export default function ProducerDashboard() {
 
           {/* Workspace Tab */}
           <TabsContent value="workspace" className="space-y-6 mt-6">
-            {/* My AO Renewals - User's assigned renewals */}
-            <MyAORenewalsCard />
-
-            {/* Quick Add + Upcoming Tasks */}
-            <div className="space-y-4">
-              <QuickAddTaskBar />
-              <UpcomingTasksCard />
-            </div>
-
-            {/* Widgets Grid - includes pending follow-ups, customer search, policy search, renewals */}
+            <UpcomingTasksCard />
+            <QuickAddTaskBar />
             <WorkspaceWidgets />
           </TabsContent>
 
