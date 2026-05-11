@@ -108,16 +108,12 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
   // Add contact log mutation
   const addLogMutation = useMutation({
     mutationFn: async (data: { contact_date: string; contact_method: string; log_type: string; notes: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
       const { error: logError } = await supabase.from("ao_renewal_contact_log").insert({
         renewal_id: renewalId,
         contact_date: data.contact_date,
         contact_method: data.contact_method,
         log_type: data.log_type || null,
         notes: data.notes.trim(),
-        created_by: user.id,
       });
       if (logError) throw new Error(`Failed to log contact: ${logError.message}`);
     },
