@@ -74,13 +74,9 @@ export function AORenewalNotes({ renewalId }: AORenewalNotesProps) {
 
   const addNoteMutation = useMutation({
     mutationFn: async (content: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
       const { error } = await supabase.from("ao_renewal_notes").insert({
         renewal_id: renewalId,
         content: content.trim(),
-        created_by: user.id,
       });
 
       if (error) throw error;
