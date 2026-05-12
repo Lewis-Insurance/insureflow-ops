@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 import type { PolicyWithAccount } from '@/hooks/usePolicies';
 import type { RenewalType } from '@/hooks/useRenewals';
-import { formatLocalDateDisplay } from '@/lib/date/localDate';
+import { formatLocalDateDisplay, differenceFromTodayInLocalDays } from '@/lib/date/localDate';
 
 interface RenewalsListProps {
   policies: PolicyWithAccount[];
@@ -20,16 +20,8 @@ interface RenewalsListProps {
 export function RenewalsList({ policies, type, loading, onPolicySelect }: RenewalsListProps) {
   const navigate = useNavigate();
   
-  const getDaysUntilExpiration = (expirationDate: string) => {
-    const today = new Date();
-    const expDate = new Date(expirationDate);
-    const diffTime = expDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
   const getExpirationBadge = (expirationDate: string, policyType: RenewalType) => {
-    const days = getDaysUntilExpiration(expirationDate);
+    const days = differenceFromTodayInLocalDays(expirationDate) ?? 0;
     
     if (policyType === 'expired' || days < 0) {
       return (

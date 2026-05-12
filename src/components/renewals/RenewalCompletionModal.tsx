@@ -7,11 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { z } from 'zod';
 import { CheckCircle, DollarSign, Calendar, FileText } from 'lucide-react';
+import { parseLocalDate, addDaysLocalDate, extractLocalDate } from '@/lib/date/localDate';
 
-// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
+// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY using local timezone
+// (avoids UTC-midnight off-by-one when parsing date-only strings).
 const formatDateForDisplay = (dateStr: string | null): string => {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -81,9 +83,8 @@ export function RenewalCompletionModal({
       // Calculate new effective date (day after current expiration)
       let newEffectiveDate = '';
       if (currentExpirationDate) {
-        const expDate = new Date(currentExpirationDate);
-        expDate.setDate(expDate.getDate() + 1);
-        newEffectiveDate = formatDateForDisplay(expDate.toISOString().split('T')[0]);
+        const nextDay = addDaysLocalDate(extractLocalDate(currentExpirationDate), 1);
+        newEffectiveDate = formatDateForDisplay(nextDay);
       }
 
       // Calculate new expiration date based on term

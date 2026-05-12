@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { z } from 'zod';
 import { AlertTriangle, Calendar, Building2, DollarSign, XCircle, Clock, Ban, TrendingDown, ArrowRightLeft } from 'lucide-react';
 import { useCarriers } from '@/hooks/useLookupData';
+import { parseLocalDate } from '@/lib/date/localDate';
 
 export type TerminalStatusType = 'cancelled' | 'lapsed' | 'non_renewed' | 'lost' | 'moved';
 
@@ -85,10 +86,11 @@ const STATUS_CONFIG: Record<TerminalStatusType, { label: string; icon: typeof XC
   },
 };
 
-// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
+// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY using local timezone
+// (avoids UTC-midnight off-by-one when parsing date-only strings).
 const formatDateForDisplay = (dateStr: string | null): string => {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const year = date.getFullYear();
