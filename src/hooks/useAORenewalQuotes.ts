@@ -6,7 +6,7 @@ export interface AORenewalQuote {
   id: string;
   renewal_id: string;
   carrier: string;
-  premium: number;
+  premium: number | null;
   term_months: 6 | 12;
   status: 'quoted' | 'denied' | 'selected' | 'expired';
   denial_reason?: string | null;
@@ -20,10 +20,10 @@ export interface AORenewalQuote {
 export interface CreateQuoteInput {
   renewal_id: string;
   carrier: string;
-  premium: number;
+  premium: number | null;
   term_months: 6 | 12;
   status?: 'quoted' | 'denied' | 'selected' | 'expired';
-  denial_reason?: string;
+  denial_reason?: string | null;
   document_url?: string;
   notes?: string;
 }
