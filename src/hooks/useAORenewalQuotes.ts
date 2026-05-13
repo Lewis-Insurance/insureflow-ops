@@ -122,6 +122,114 @@ export function useUpdateAORenewalQuote() {
   });
 }
 
+const AO_QUOTE_BUCKET = 'ao-renewal-quotes';
+
+function extractQuoteDocStoragePath(documentUrl: string): string | null {
+  const marker = `/object/public/${AO_QUOTE_BUCKET}/`;
+  const idx = documentUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return documentUrl.slice(idx + marker.length);
+}
+
+export function useAttachAORenewalQuoteDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      quoteId,
+      renewalId,
+      file,
+    }: {
+      quoteId: string;
+      renewalId: string;
+      file: File;
+    }) => {
+      const ext = file.name.split('.').pop();
+      const path = `${renewalId}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(AO_QUOTE_BUCKET)
+        .upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(AO_QUOTE_BUCKET)
+        .getPublicUrl(path);
+
+      const { data, error } = await supabase
+        .from('ao_renewal_quotes')
+        .update({ document_url: publicUrl })
+        .eq('id', quoteId)
+        .select()
+        .single();
+
+      if (error) {
+        // best-effort cleanup of orphaned object
+        await supabase.storage.from(AO_QUOTE_BUCKET).remove([path]);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-quotes', data.renewal_id] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
+      toast({ title: 'Success', description: 'Document attached' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: `Failed to attach document: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useRemoveAORenewalQuoteDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      quoteId,
+      documentUrl,
+    }: {
+      quoteId: string;
+      documentUrl: string;
+    }) => {
+      const path = extractQuoteDocStoragePath(documentUrl);
+      if (path) {
+        const { error: removeError } = await supabase.storage
+          .from(AO_QUOTE_BUCKET)
+          .remove([path]);
+        if (removeError) throw removeError;
+      }
+
+      const { data, error } = await supabase
+        .from('ao_renewal_quotes')
+        .update({ document_url: null })
+        .eq('id', quoteId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ao-renewal-quotes', data.renewal_id] });
+      queryClient.invalidateQueries({ queryKey: ['ao-renewals'] });
+      toast({ title: 'Success', description: 'Document removed' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: `Failed to remove document: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useDeleteAORenewalQuote() {
   const queryClient = useQueryClient();
 
