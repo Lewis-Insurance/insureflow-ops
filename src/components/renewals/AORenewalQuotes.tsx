@@ -23,9 +23,17 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
   const { data: quotes = [], isLoading } = useAORenewalQuotes(renewalId);
   const deleteMutation = useDeleteAORenewalQuote();
 
-  const selectedQuote = useMemo(
-    () => quotes.find((q) => q.status === 'selected') || quotes.find((q) => q.status === 'quoted') || null,
+  const priceableQuotes = useMemo(
+    () => quotes.filter((q) => q.status !== 'denied' && q.premium != null),
     [quotes],
+  );
+
+  const selectedQuote = useMemo(
+    () =>
+      priceableQuotes.find((q) => q.status === 'selected') ||
+      priceableQuotes.find((q) => q.status === 'quoted') ||
+      null,
+    [priceableQuotes],
   );
 
   const quoteCountLabel = `${quotes.length} quote${quotes.length === 1 ? '' : 's'}`;
@@ -41,15 +49,17 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  const calculateAnnualPremium = (quote: AORenewalQuote) =>
-    quote.term_months === 6 ? quote.premium * 2 : quote.premium;
+  const calculateAnnualPremium = (quote: AORenewalQuote) => {
+    if (quote.premium == null) return null;
+    return quote.term_months === 6 ? quote.premium * 2 : quote.premium;
+  };
 
   const calculateSavings = (
     quote: AORenewalQuote,
     currentPremiumValue: number | null,
     currentTermMonths: 6 | 12 | null,
   ) => {
-    if (!currentPremiumValue || !currentTermMonths) return null;
+    if (!currentPremiumValue || !currentTermMonths || quote.premium == null) return null;
     const annualAO = currentTermMonths === 6 ? currentPremiumValue * 2 : currentPremiumValue;
     const annualQuote = quote.term_months === 6 ? quote.premium * 2 : quote.premium;
     const difference = annualAO - annualQuote;
@@ -72,7 +82,7 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
               <span>Competitive Quotes</span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 normal-case tracking-normal text-slate-300">{quoteCountLabel}</span>
             </div>
-            {selectedQuote ? (
+            {selectedQuote && selectedQuote.premium != null ? (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="text-2xl font-semibold text-white">{selectedQuote.carrier}</div>
@@ -133,17 +143,30 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                   </TableHeader>
                   <TableBody>
                     {quotes.map((quote) => {
+                      const isDenied = quote.status === 'denied';
                       const annualPremium = calculateAnnualPremium(quote);
-                      const savings = calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
+                      const savings = isDenied ? null : calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
+                      const rowClass = isDenied
+                        ? 'border-white/10 text-slate-500 hover:bg-white/5'
+                        : 'border-white/10 hover:bg-white/5';
+                      const cellMuted = isDenied ? 'text-slate-500' : 'text-slate-200';
                       return (
-                        <TableRow key={quote.id} className="border-white/10 hover:bg-white/5">
-                          <TableCell className="font-medium text-white">{quote.carrier}</TableCell>
-                          <TableCell className="text-slate-200">{formatCurrency(quote.premium)}</TableCell>
-                          <TableCell className="text-slate-300">{quote.term_months} months</TableCell>
-                          <TableCell className="text-slate-200">{formatCurrency(annualPremium)}</TableCell>
+                        <TableRow key={quote.id} className={rowClass}>
+                          <TableCell className={isDenied ? 'font-medium text-slate-500' : 'font-medium text-white'}>
+                            {quote.carrier}
+                          </TableCell>
+                          <TableCell className={cellMuted}>
+                            {quote.premium != null ? formatCurrency(quote.premium) : '—'}
+                          </TableCell>
+                          <TableCell className={isDenied ? 'text-slate-500' : 'text-slate-300'}>
+                            {quote.term_months} months
+                          </TableCell>
+                          <TableCell className={cellMuted}>
+                            {annualPremium != null ? formatCurrency(annualPremium) : '—'}
+                          </TableCell>
                           {currentPremium && currentTermMonths && (
                             <TableCell>
-                              {savings && (
+                              {savings ? (
                                 <div className="flex items-center gap-1.5">
                                   {savings.amount > 0 ? (
                                     <>
@@ -158,13 +181,15 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                                   )}
                                   <span className="text-xs text-slate-500">({savings.percentage.toFixed(1)}%)</span>
                                 </div>
+                              ) : (
+                                <span className="text-slate-500">—</span>
                               )}
                             </TableCell>
                           )}
                           <TableCell>
                             <div className="space-y-1">
                               {getStatusBadge(quote.status)}
-                              {quote.status === 'denied' && quote.denial_reason && (
+                              {isDenied && quote.denial_reason && (
                                 <div className="text-xs text-slate-500">{quote.denial_reason}</div>
                               )}
                             </div>
