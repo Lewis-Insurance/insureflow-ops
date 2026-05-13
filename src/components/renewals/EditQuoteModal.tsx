@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { FileText, Loader2, Trash2, Upload } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { toast } from '@/hooks/use-toast';
-import { useUpdateAORenewalQuote, type AORenewalQuote } from '@/hooks/useAORenewalQuotes';
+import {
+  useAttachAORenewalQuoteDocument,
+  useRemoveAORenewalQuoteDocument,
+  useUpdateAORenewalQuote,
+  type AORenewalQuote,
+} from '@/hooks/useAORenewalQuotes';
 
 const CARRIERS = ['Progressive', 'Geico', 'Nationwide', 'Allstate', 'State Farm', 'Liberty Mutual', 'Farmers', 'USAA', 'Other'];
 
@@ -35,8 +51,20 @@ function splitDenialReason(reason: string | null | undefined): { choice: DenialR
   return { choice: 'Other', other: reason };
 }
 
+function extractFileNameFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const last = parsed.pathname.split('/').pop();
+    return last ? decodeURIComponent(last) : url;
+  } catch {
+    return url;
+  }
+}
+
 export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProps) {
   const updateMutation = useUpdateAORenewalQuote();
+  const attachDocument = useAttachAORenewalQuoteDocument();
+  const removeDocument = useRemoveAORenewalQuoteDocument();
 
   const initialReason = splitDenialReason(quote.denial_reason);
 
@@ -49,6 +77,42 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
   const [denialReasonChoice, setDenialReasonChoice] = useState<DenialReasonOption | ''>(initialReason.choice);
   const [denialReasonOther, setDenialReasonOther] = useState(initialReason.other);
   const [notes, setNotes] = useState(quote.notes || '');
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+
+  const hasDocument = Boolean(quote.document_url);
+  const docBusy = attachDocument.isPending || removeDocument.isPending;
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    },
+    maxSize: 10485760,
+    multiple: false,
+    disabled: hasDocument || docBusy,
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length === 0) return;
+      attachDocument.mutate({
+        quoteId: quote.id,
+        renewalId: quote.renewal_id,
+        file: acceptedFiles[0],
+      });
+    },
+  });
+
+  const handleConfirmRemove = () => {
+    if (!quote.document_url) {
+      setConfirmRemoveOpen(false);
+      return;
+    }
+    removeDocument.mutate(
+      { quoteId: quote.id, documentUrl: quote.document_url },
+      { onSettled: () => setConfirmRemoveOpen(false) },
+    );
+  };
 
   const wasDenied = quote.status === 'denied';
   const isDenied = status === 'denied';
@@ -147,6 +211,68 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label>Quote Document</Label>
+            {hasDocument && quote.document_url ? (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                <FileText className="h-5 w-5 text-primary" />
+                <a
+                  href={quote.document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-sm truncate underline-offset-2 hover:underline"
+                >
+                  {extractFileNameFromUrl(quote.document_url)}
+                </a>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmRemoveOpen(true)}
+                  disabled={docBusy}
+                  aria-label="Remove document"
+                >
+                  {removeDocument.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
+                  isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+                } ${docBusy ? 'opacity-60 pointer-events-none' : ''}`}
+              >
+                <input {...getInputProps()} />
+                {attachDocument.isPending ? (
+                  <div className="flex flex-col items-center text-sm text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                    Uploading...
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    {isDragActive ? (
+                      <p className="text-sm text-muted-foreground">Drop the file here...</p>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          Drag &amp; drop a file here, or click to select
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          PDF, JPG, PNG, DOC, DOCX (max 10MB)
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="carrier">Carrier *</Label>
@@ -263,6 +389,30 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
             </Button>
           </div>
         </form>
+
+        <AlertDialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove this document?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The file will be permanently deleted from storage and detached from this quote.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={removeDocument.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleConfirmRemove();
+                }}
+                disabled={removeDocument.isPending}
+              >
+                {removeDocument.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
