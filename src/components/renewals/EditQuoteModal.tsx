@@ -6,9 +6,20 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { useUpdateAORenewalQuote, type AORenewalQuote } from '@/hooks/useAORenewalQuotes';
 
 const CARRIERS = ['Progressive', 'Geico', 'Nationwide', 'Allstate', 'State Farm', 'Liberty Mutual', 'Farmers', 'USAA', 'Other'];
+
+const DENIAL_REASON_OPTIONS = [
+  'Underwriting decline',
+  'Coverage gap',
+  'High premium',
+  'Carrier not appointed',
+  'Other',
+] as const;
+
+type DenialReasonOption = typeof DENIAL_REASON_OPTIONS[number];
 
 interface EditQuoteModalProps {
   open: boolean;
@@ -16,33 +27,101 @@ interface EditQuoteModalProps {
   quote: AORenewalQuote;
 }
 
+function splitDenialReason(reason: string | null | undefined): { choice: DenialReasonOption | ''; other: string } {
+  if (!reason) return { choice: '', other: '' };
+  if ((DENIAL_REASON_OPTIONS as readonly string[]).includes(reason)) {
+    return { choice: reason as DenialReasonOption, other: '' };
+  }
+  return { choice: 'Other', other: reason };
+}
+
 export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProps) {
   const updateMutation = useUpdateAORenewalQuote();
-  
+
+  const initialReason = splitDenialReason(quote.denial_reason);
+
   const [carrier, setCarrier] = useState(quote.carrier);
-  const [premium, setPremium] = useState(quote.premium.toString());
+  const [premium, setPremium] = useState(
+    quote.status === 'denied' || quote.premium == null ? '' : quote.premium.toString(),
+  );
   const [termMonths, setTermMonths] = useState<'6' | '12'>(quote.term_months.toString() as '6' | '12');
   const [status, setStatus] = useState<'quoted' | 'denied' | 'selected' | 'expired'>(quote.status);
-  const [denialReason, setDenialReason] = useState(quote.denial_reason || '');
+  const [denialReasonChoice, setDenialReasonChoice] = useState<DenialReasonOption | ''>(initialReason.choice);
+  const [denialReasonOther, setDenialReasonOther] = useState(initialReason.other);
   const [notes, setNotes] = useState(quote.notes || '');
 
+  const wasDenied = quote.status === 'denied';
+  const isDenied = status === 'denied';
+
   useEffect(() => {
-    if (quote) {
-      setCarrier(quote.carrier);
-      setPremium(quote.premium.toString());
-      setTermMonths(quote.term_months.toString() as '6' | '12');
-      setStatus(quote.status);
-      setDenialReason(quote.denial_reason || '');
-      setNotes(quote.notes || '');
-    }
+    if (!quote) return;
+    const reason = splitDenialReason(quote.denial_reason);
+    setCarrier(quote.carrier);
+    setPremium(quote.status === 'denied' || quote.premium == null ? '' : quote.premium.toString());
+    setTermMonths(quote.term_months.toString() as '6' | '12');
+    setStatus(quote.status);
+    setDenialReasonChoice(reason.choice);
+    setDenialReasonOther(reason.other);
+    setNotes(quote.notes || '');
   }, [quote]);
+
+  const handleStatusChange = (next: 'quoted' | 'denied' | 'selected' | 'expired') => {
+    setStatus(next);
+    if (next === 'denied') {
+      setPremium('');
+    } else {
+      setDenialReasonChoice('');
+      setDenialReasonOther('');
+    }
+  };
+
+  const resolveDenialReason = (): string => {
+    if (denialReasonChoice === 'Other') return denialReasonOther.trim();
+    return denialReasonChoice;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const premiumValue = parseFloat(premium);
-    if (isNaN(premiumValue) || premiumValue <= 0) {
+
+    if (wasDenied && status === 'selected') {
+      toast({
+        title: 'Not allowed',
+        description: 'Flip status to Quoted first, save, then mark Selected.',
+        variant: 'destructive',
+      });
       return;
+    }
+
+    if (!carrier) {
+      toast({ title: 'Validation Error', description: 'Please select a carrier', variant: 'destructive' });
+      return;
+    }
+
+    let premiumValue: number | null = null;
+
+    if (isDenied) {
+      const reason = resolveDenialReason();
+      if (!reason) {
+        toast({
+          title: 'Validation Error',
+          description: denialReasonChoice === 'Other'
+            ? 'Please enter a custom denial reason'
+            : 'Please select a denial reason',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      const parsed = parseFloat(premium);
+      if (!premium || isNaN(parsed) || parsed <= 0) {
+        toast({
+          title: 'Validation Error',
+          description: !premium ? 'Premium required' : 'Premium must be greater than zero',
+          variant: 'destructive',
+        });
+        return;
+      }
+      premiumValue = parsed;
     }
 
     await updateMutation.mutateAsync({
@@ -52,7 +131,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
         premium: premiumValue,
         term_months: parseInt(termMonths) as 6 | 12,
         status,
-        denial_reason: status === 'denied' ? denialReason : null,
+        denial_reason: isDenied ? resolveDenialReason() : null,
         notes: notes || undefined,
       },
     });
@@ -66,7 +145,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
         <DialogHeader>
           <DialogTitle>Edit Quote</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -84,14 +163,19 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
             </div>
 
             <div>
-              <Label htmlFor="premium">Premium *</Label>
+              <Label htmlFor="premium" className={isDenied ? 'text-muted-foreground' : undefined}>
+                Premium {isDenied ? '' : '*'}
+              </Label>
               <Input
                 id="premium"
                 type="number"
                 step="0.01"
-                value={premium}
+                value={isDenied ? '' : premium}
                 onChange={(e) => setPremium(e.target.value)}
-                required
+                placeholder={isDenied ? 'N/A (denied)' : '0.00'}
+                disabled={isDenied}
+                required={!isDenied}
+                aria-disabled={isDenied}
               />
             </div>
 
@@ -110,29 +194,51 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
 
             <div>
               <Label htmlFor="status">Status *</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as "denied" | "quoted" | "selected")}>
+              <Select value={status} onValueChange={(v) => handleStatusChange(v as "denied" | "quoted" | "selected" | "expired")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="quoted">Quoted</SelectItem>
                   <SelectItem value="denied">Denied</SelectItem>
-                  <SelectItem value="selected">Selected</SelectItem>
+                  <SelectItem value="selected" disabled={wasDenied}>Selected</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
+              {wasDenied && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Flip status to Quoted first to mark Selected.
+                </p>
+              )}
             </div>
           </div>
 
-          {status === 'denied' && (
-            <div>
-              <Label htmlFor="denial_reason">Denial Reason</Label>
-              <Input
-                id="denial_reason"
-                value={denialReason}
-                onChange={(e) => setDenialReason(e.target.value)}
-                placeholder="e.g., MVR, Claims History, etc."
-              />
+          {isDenied && (
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="denial_reason">Denial Reason *</Label>
+                <Select value={denialReasonChoice} onValueChange={(v) => setDenialReasonChoice(v as DenialReasonOption)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DENIAL_REASON_OPTIONS.map((reason) => (
+                      <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {denialReasonChoice === 'Other' && (
+                <div>
+                  <Label htmlFor="denial_reason_other">Custom reason *</Label>
+                  <Input
+                    id="denial_reason_other"
+                    value={denialReasonOther}
+                    onChange={(e) => setDenialReasonOther(e.target.value)}
+                    placeholder="Describe the denial reason"
+                  />
+                </div>
+              )}
             </div>
           )}
 

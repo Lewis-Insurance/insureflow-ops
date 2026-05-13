@@ -2246,7 +2246,7 @@ export type Database = {
           document_url: string | null
           id: string
           notes: string | null
-          premium: number
+          premium: number | null
           renewal_id: string
           status: string
           term_months: number
@@ -2260,7 +2260,7 @@ export type Database = {
           document_url?: string | null
           id?: string
           notes?: string | null
-          premium: number
+          premium?: number | null
           renewal_id: string
           status?: string
           term_months: number
@@ -2274,7 +2274,7 @@ export type Database = {
           document_url?: string | null
           id?: string
           notes?: string | null
-          premium?: number
+          premium?: number | null
           renewal_id?: string
           status?: string
           term_months?: number

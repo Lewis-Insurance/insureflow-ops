@@ -31,30 +31,30 @@ const CARRIERS = [
   'Other'
 ];
 
-const DENIAL_REASONS = [
-  'High Risk Driver',
-  'Credit Score',
-  'Claims History',
-  'Lapse in Coverage',
-  'Vehicle Type',
-  'Location/Territory',
-  'DUI/DWI',
-  'License Status',
-  'Age/Experience',
-  'Other'
-];
+const DENIAL_REASON_OPTIONS = [
+  'Underwriting decline',
+  'Coverage gap',
+  'High premium',
+  'Carrier not appointed',
+  'Other',
+] as const;
+
+type DenialReasonOption = typeof DENIAL_REASON_OPTIONS[number];
 
 export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalProps) {
   const [carrier, setCarrier] = useState('');
   const [premium, setPremium] = useState('');
   const [termMonths, setTermMonths] = useState<'6' | '12'>('6');
   const [status, setStatus] = useState<'quoted' | 'denied' | 'selected'>('quoted');
-  const [denialReason, setDenialReason] = useState('');
+  const [denialReasonChoice, setDenialReasonChoice] = useState<DenialReasonOption | ''>('');
+  const [denialReasonOther, setDenialReasonOther] = useState('');
   const [notes, setNotes] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const createMutation = useCreateAORenewalQuote();
+
+  const isDenied = status === 'denied';
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -73,6 +73,16 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
     },
   });
 
+  const handleStatusChange = (next: 'quoted' | 'denied' | 'selected') => {
+    setStatus(next);
+    if (next === 'denied') {
+      setPremium('');
+    } else {
+      setDenialReasonChoice('');
+      setDenialReasonOther('');
+    }
+  };
+
   const uploadDocument = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${renewalId}/${Date.now()}.${fileExt}`;
@@ -90,26 +100,44 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
     return publicUrl;
   };
 
+  const resolveDenialReason = (): string => {
+    if (denialReasonChoice === 'Other') return denialReasonOther.trim();
+    return denialReasonChoice;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const premiumValue = parseFloat(premium);
-    if (!carrier || !premium || isNaN(premiumValue) || premiumValue <= 0) {
-      toast({
-        title: 'Validation Error',
-        description: !carrier || !premium ? 'Please fill in all required fields' : 'Premium must be greater than zero',
-        variant: 'destructive',
-      });
+    if (!carrier) {
+      toast({ title: 'Validation Error', description: 'Please select a carrier', variant: 'destructive' });
       return;
     }
 
-    if (status === 'denied' && !denialReason) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please provide a denial reason',
-        variant: 'destructive',
-      });
-      return;
+    let premiumValue: number | null = null;
+
+    if (isDenied) {
+      const reason = resolveDenialReason();
+      if (!reason) {
+        toast({
+          title: 'Validation Error',
+          description: denialReasonChoice === 'Other'
+            ? 'Please enter a custom denial reason'
+            : 'Please select a denial reason',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      const parsed = parseFloat(premium);
+      if (!premium || isNaN(parsed) || parsed <= 0) {
+        toast({
+          title: 'Validation Error',
+          description: !premium ? 'Premium required' : 'Premium must be greater than zero',
+          variant: 'destructive',
+        });
+        return;
+      }
+      premiumValue = parsed;
     }
 
     try {
@@ -123,20 +151,20 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
       await createMutation.mutateAsync({
         renewal_id: renewalId,
         carrier,
-        premium: parseFloat(premium),
+        premium: premiumValue,
         term_months: parseInt(termMonths) as 6 | 12,
         status,
-        denial_reason: status === 'denied' ? denialReason : null,
+        denial_reason: isDenied ? resolveDenialReason() : null,
         document_url: documentUrl,
         notes: notes || undefined,
       });
 
-      // Reset form
       setCarrier('');
       setPremium('');
       setTermMonths('6');
       setStatus('quoted');
-      setDenialReason('');
+      setDenialReasonChoice('');
+      setDenialReasonOther('');
       setNotes('');
       setUploadedFile(null);
       onOpenChange(false);
@@ -176,16 +204,20 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
             </div>
 
             <div>
-              <Label htmlFor="premium">Premium Amount *</Label>
+              <Label htmlFor="premium" className={isDenied ? 'text-muted-foreground' : undefined}>
+                Premium Amount {isDenied ? '' : '*'}
+              </Label>
               <Input
                 id="premium"
                 type="number"
                 step="0.01"
                 min="0.01"
-                value={premium}
+                value={isDenied ? '' : premium}
                 onChange={(e) => setPremium(e.target.value)}
-                placeholder="0.00"
-                required
+                placeholder={isDenied ? 'N/A (denied)' : '0.00'}
+                disabled={isDenied}
+                required={!isDenied}
+                aria-disabled={isDenied}
               />
             </div>
 
@@ -204,7 +236,7 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
 
             <div>
               <Label htmlFor="status">Status *</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as "denied" | "quoted" | "selected")}>
+              <Select value={status} onValueChange={(v) => handleStatusChange(v as "denied" | "quoted" | "selected")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -217,21 +249,34 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
             </div>
           </div>
 
-          {status === 'denied' && (
-            <div>
-              <Label htmlFor="denial-reason">Denial Reason *</Label>
-              <Select value={denialReason} onValueChange={setDenialReason}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select reason" />
-                </SelectTrigger>
-                <SelectContent className="bg-background">
-                  {DENIAL_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {isDenied && (
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="denial-reason">Denial Reason *</Label>
+                <Select value={denialReasonChoice} onValueChange={(v) => setDenialReasonChoice(v as DenialReasonOption)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background">
+                    {DENIAL_REASON_OPTIONS.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {reason}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {denialReasonChoice === 'Other' && (
+                <div>
+                  <Label htmlFor="denial-reason-other">Custom reason *</Label>
+                  <Input
+                    id="denial-reason-other"
+                    value={denialReasonOther}
+                    onChange={(e) => setDenialReasonOther(e.target.value)}
+                    placeholder="Describe the denial reason"
+                  />
+                </div>
+              )}
             </div>
           )}
 
