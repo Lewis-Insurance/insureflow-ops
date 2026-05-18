@@ -341,9 +341,12 @@ export async function getCachedData<T>(tableName: string): Promise<{ data: T; ca
 async function updateCacheId(tableName: string, localId: string, serverId: string): Promise<void> {
   const cached = await getCachedData<unknown[]>(tableName);
   if (cached?.data && Array.isArray(cached.data)) {
-    const updated = cached.data.map((item: Record<string, unknown>) =>
-      item.localId === localId ? { ...item, id: serverId, localId: undefined } : item
-    );
+    const updated = cached.data.map((item) => {
+      const record = item as Record<string, unknown>;
+      return record.localId === localId
+        ? { ...record, id: serverId, localId: undefined }
+        : record;
+    });
     await cacheData(tableName, updated);
   }
 }
@@ -354,7 +357,10 @@ async function updateCacheId(tableName: string, localId: string, serverId: strin
 async function removeFromCache(tableName: string, recordId: string): Promise<void> {
   const cached = await getCachedData<unknown[]>(tableName);
   if (cached?.data && Array.isArray(cached.data)) {
-    const filtered = cached.data.filter((item: Record<string, unknown>) => item.id !== recordId);
+    const filtered = cached.data.filter((item) => {
+      const record = item as Record<string, unknown>;
+      return record.id !== recordId;
+    });
     await cacheData(tableName, filtered);
   }
 }
@@ -444,9 +450,10 @@ export async function updateRecord(
     // Update local cache
     const cached = await getCachedData<unknown[]>(tableName);
     if (cached?.data && Array.isArray(cached.data)) {
-      const updated = cached.data.map((item: Record<string, unknown>) =>
-        item.id === recordId ? { ...item, ...data } : item
-      );
+      const updated = cached.data.map((item) => {
+        const record = item as Record<string, unknown>;
+        return record.id === recordId ? { ...record, ...data } : record;
+      });
       await cacheData(tableName, updated);
     }
 

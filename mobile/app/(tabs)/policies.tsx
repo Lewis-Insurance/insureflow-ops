@@ -67,7 +67,12 @@ export default function PoliciesScreen() {
 
       const { data, error } = await query.limit(50);
       if (error) throw error;
-      return data as Policy[];
+      return (data ?? []).map((row) => ({
+        ...row,
+        accounts: Array.isArray(row.accounts)
+          ? (row.accounts[0] ?? null)
+          : (row.accounts ?? null),
+      })) as Policy[];
     },
   });
 
