@@ -17,8 +17,27 @@
     "site_slug": "insureflow-ops",
     "site_id": "42494172-3d10-4c48-9b17-dd20d23b192e"
   },
+  "sup001_rls_audit": {
+    "live_query_rpc": "patrol_export_rls_policies",
+    "baseline_snapshot_path": "patrol/baselines/pg_policies.snapshot.json",
+    "schemas": ["public", "storage"],
+    "refresh_interval_hours": 6,
+    "export_script": "scripts/export-rls-policy-baseline.ts",
+    "diff_script": "scripts/diff-rls-policy-baseline.ts",
+    "required_secret_env": ["SUPABASE_SERVICE_ROLE_KEY"]
+  },
+  "sup007_data_integrity": {
+    "live_query_rpc": "patrol_data_integrity_snapshot",
+    "probe_script": "scripts/probe-data-integrity.ts",
+    "patrol_migration": "supabase/migrations/20260518150000_patrol_data_integrity_snapshot.sql",
+    "required_secret_env": ["SUPABASE_SERVICE_ROLE_KEY"]
+  },
   "checks": {
-    "SUP-001": { "enabled": true },
+    "SUP-001": {
+      "enabled": true,
+      "severity": "high",
+      "frequency_minutes": 360
+    },
     "SUP-002": { "enabled": true },
     "SUP-003": { "enabled": true },
     "SUP-004": { "enabled": true },
@@ -68,5 +87,70 @@
     }
   },
   "known_drift": [],
-  "integrity_queries": []
+  "integrity_queries": [
+    {
+      "id": "accounts_missing_agency_workspace",
+      "label": "Accounts missing agency workspace",
+      "description": "accounts.agency_workspace_id IS NULL (active rows)",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "accounts_missing_agency_workspace"
+    },
+    {
+      "id": "leads_orphan_account",
+      "label": "Leads with orphan account reference",
+      "description": "leads.account_id set but no matching accounts row",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "leads_orphan_account"
+    },
+    {
+      "id": "policies_missing_or_invalid_account",
+      "label": "Policies missing or invalid account",
+      "description": "policies.account_id IS NULL or does not resolve to accounts",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "policies_missing_or_invalid_account"
+    },
+    {
+      "id": "quotes_invalid_account",
+      "label": "Quotes with invalid account reference",
+      "description": "quotes.account_id does not resolve to accounts",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "quotes_invalid_account"
+    },
+    {
+      "id": "tasks_without_account",
+      "label": "Tasks without account (no workspace linkage)",
+      "description": "tasks.account_id IS NULL",
+      "severity": "warn",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "tasks_without_account"
+    },
+    {
+      "id": "tasks_orphan_or_unscoped_account",
+      "label": "Tasks with orphan or unscoped account",
+      "description": "tasks.account_id missing account or account.agency_workspace_id IS NULL",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "tasks_orphan_or_unscoped_account"
+    },
+    {
+      "id": "duplicate_active_workspace_memberships",
+      "label": "Duplicate active workspace memberships",
+      "description": "more than one active agency_workspace_memberships per user/workspace",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "duplicate_active_workspace_memberships"
+    },
+    {
+      "id": "staff_without_workspace_membership",
+      "label": "Staff without active workspace membership",
+      "description": "profiles.is_staff = true with no active agency_workspace_memberships row",
+      "severity": "fail",
+      "pass_condition": { "field": "count", "op": "eq", "value": 0 },
+      "snapshot_key": "staff_without_workspace_membership"
+    }
+  ]
 }
