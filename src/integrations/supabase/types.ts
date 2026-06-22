@@ -39564,6 +39564,15 @@ export type Database = {
           similarity: number
         }[]
       }
+      merge_customers_transactional_v1: {
+        Args: {
+          p_confirmation_phrase: string
+          p_duplicate_customer_id: string
+          p_master_customer_id: string
+          p_options?: Json
+        }
+        Returns: Json
+      }
       merge_duplicate_records: {
         Args: { group_id: string; merged_data?: Json; survivor_id: string }
         Returns: Json
@@ -39580,6 +39589,13 @@ export type Database = {
       pick_enum_label: {
         Args: { candidates: string[]; enum_type: unknown }
         Returns: string
+      }
+      preview_customer_merge_v1: {
+        Args: {
+          p_duplicate_customer_id: string
+          p_master_customer_id: string
+        }
+        Returns: Json
       }
       portal_accessible_account_ids: {
         Args: never
