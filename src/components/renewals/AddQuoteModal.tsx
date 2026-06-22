@@ -186,6 +186,22 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Did this carrier decline?</p>
+              <p className="text-xs text-muted-foreground">
+                Use this instead of entering a price when the company denied the quote.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant={isDenied ? 'destructive' : 'outline'}
+              onClick={() => handleStatusChange(isDenied ? 'quoted' : 'denied')}
+            >
+              {isDenied ? 'Carrier marked declined' : 'Mark carrier declined'}
+            </Button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="carrier">Carrier *</Label>
