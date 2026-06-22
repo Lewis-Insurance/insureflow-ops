@@ -155,18 +155,18 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                       const annualPremium = calculateAnnualPremium(quote);
                       const savings = isDenied ? null : calculateSavings(quote, currentPremium ?? null, currentTermMonths ?? null);
                       const rowClass = isDenied
-                        ? 'border-white/10 text-slate-500 hover:bg-white/5'
+                        ? 'border-white/10 border-l-2 border-l-rose-400/70 bg-rose-500/[0.07] text-slate-400 hover:bg-rose-500/10'
                         : 'border-white/10 hover:bg-white/5';
-                      const cellMuted = isDenied ? 'text-slate-500' : 'text-slate-200';
+                      const cellMuted = isDenied ? 'text-slate-400' : 'text-slate-200';
                       return (
                         <TableRow key={quote.id} className={rowClass}>
-                          <TableCell className={isDenied ? 'font-medium text-slate-500' : 'font-medium text-white'}>
+                          <TableCell className={isDenied ? 'font-medium text-slate-400 line-through decoration-rose-400/50' : 'font-medium text-white'}>
                             {quote.carrier}
                           </TableCell>
                           <TableCell className={cellMuted}>
                             {formatQuotePremium(quote)}
                           </TableCell>
-                          <TableCell className={isDenied ? 'text-slate-500' : 'text-slate-300'}>
+                          <TableCell className={isDenied ? 'text-slate-400' : 'text-slate-300'}>
                             {quote.term_months == null ? '—' : `${quote.term_months} months`}
                           </TableCell>
                           <TableCell className={cellMuted}>
@@ -198,7 +198,7 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                             <div className="space-y-1">
                               {getStatusBadge(quote.status)}
                               {isDenied && quote.denial_reason && (
-                                <div className="text-xs text-slate-500">{quote.denial_reason}</div>
+                                <div className="text-xs text-rose-300/70">{quote.denial_reason}</div>
                               )}
                             </div>
                           </TableCell>
