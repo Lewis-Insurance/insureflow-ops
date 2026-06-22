@@ -1,30 +1,45 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Users, Building2, ArrowRight, Merge, X, Check } from 'lucide-react';
+import { AlertTriangle, Users, Building2, Merge, X, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import type { Account, Contact } from '@/types/crm';
+
+type DuplicateEntityType = 'account' | 'accounts' | 'contact' | 'contacts';
+type DuplicateGroupStatus = 'pending' | 'reviewed' | 'merged' | 'dismissed' | 'review_later';
+type PairReviewStatus = 'not_duplicate' | 'confirmed_duplicate' | 'merged' | 'review_later';
+type DuplicatePairReviewClient = {
+  from: (table: 'duplicate_pair_reviews') => {
+    upsert: (
+      values: Record<string, unknown>,
+      options: { onConflict: string }
+    ) => Promise<{ error: unknown | null }>;
+  };
+};
 
 interface DuplicateGroup {
   id: string;
-  entity_type: 'account' | 'contact';
+  entity_type: DuplicateEntityType;
   entity_ids: string[];
   match_score: number;
-  status: 'pending' | 'reviewed' | 'merged' | 'dismissed';
+  status: DuplicateGroupStatus;
   created_at: string;
+  is_mock?: boolean;
 }
 
-interface MergeCandidate {
-  id: string;
-  data: Account | Contact;
-  isSelected: boolean;
-  isSurvivor: boolean;
+interface DuplicateScanResponseGroup {
+  id?: string;
+  primary_id?: string;
+  duplicate_id?: string;
+  entity_type?: DuplicateEntityType;
+  entity_ids?: string[];
+  match_score?: number;
+  status?: DuplicateGroupStatus;
+  created_at?: string;
 }
 
 interface DuplicateDetectionProps {
@@ -32,177 +47,241 @@ interface DuplicateDetectionProps {
   className?: string;
 }
 
+function isAccountGroup(group: DuplicateGroup) {
+  return group.entity_type === 'account' || group.entity_type === 'accounts';
+}
+
+function formatEntityType(group: DuplicateGroup) {
+  return isAccountGroup(group) ? 'Account' : 'Contact';
+}
+
+function normalizeScanGroups(groups: unknown): DuplicateGroup[] {
+  if (!Array.isArray(groups)) return [];
+
+  return groups.flatMap((raw): DuplicateGroup[] => {
+    const group = raw as DuplicateScanResponseGroup;
+    const entityIds = group.entity_ids ?? [group.primary_id, group.duplicate_id].filter((id): id is string => Boolean(id));
+
+    if (entityIds.length < 2) return [];
+
+    return [
+      {
+        id: group.id ?? entityIds.join(':'),
+        entity_type: group.entity_type ?? 'accounts',
+        entity_ids: entityIds,
+        match_score: Number(group.match_score ?? 0),
+        status: group.status ?? 'pending',
+        created_at: group.created_at ?? new Date().toISOString(),
+      },
+    ];
+  });
+}
+
+function orderedPair(ids: string[]) {
+  const [customerAId, customerBId] = ids.slice(0, 2).sort();
+  return { customerAId, customerBId };
+}
+
 export function DuplicateDetection({ onMergeComplete, className }: DuplicateDetectionProps) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<DuplicateGroup | null>(null);
-  const [mergeCandidates, setMergeCandidates] = useState<MergeCandidate[]>([]);
-  const [mergeInProgress, setMergeInProgress] = useState(false);
+  const [triageInProgress, setTriageInProgress] = useState<string | null>(null);
 
   // Mock data for demonstration
   const mockDuplicateGroups: DuplicateGroup[] = [
     {
-      id: '1',
-      entity_type: 'account',
-      entity_ids: ['acc1', 'acc2'],
+      id: 'mock-account-pair',
+      entity_type: 'accounts',
+      entity_ids: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'],
       match_score: 0.95,
       status: 'pending',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      is_mock: true,
     },
     {
-      id: '2', 
-      entity_type: 'contact',
-      entity_ids: ['cont1', 'cont2', 'cont3'],
+      id: 'mock-contact-pair',
+      entity_type: 'contacts',
+      entity_ids: ['33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444'],
       match_score: 0.87,
       status: 'pending',
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+      is_mock: true,
+    },
   ];
+
+  const persistDuplicateGroupStatus = async (group: DuplicateGroup, status: DuplicateGroupStatus) => {
+    if (group.is_mock) return;
+
+    let query = supabase
+      .from('duplicate_groups')
+      .update({
+        status,
+        reviewed_by: user?.id ?? null,
+        reviewed_at: new Date().toISOString(),
+      });
+
+    if (group.id.includes(':')) {
+      query = query.contains('entity_ids', group.entity_ids);
+    } else {
+      query = query.eq('id', group.id);
+    }
+
+    const { error } = await query;
+    if (error) throw error;
+  };
+
+  const persistPairReview = async (group: DuplicateGroup, status: PairReviewStatus, reason: string) => {
+    if (group.is_mock || !isAccountGroup(group) || group.entity_ids.length < 2) return;
+
+    const { customerAId, customerBId } = orderedPair(group.entity_ids);
+    const duplicatePairReviews = supabase as unknown as DuplicatePairReviewClient;
+    const { error } = await duplicatePairReviews
+      .from('duplicate_pair_reviews')
+      .upsert(
+        {
+          customer_a_id: customerAId,
+          customer_b_id: customerBId,
+          status,
+          reason,
+          reviewed_by: user?.id ?? null,
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'customer_a_id,customer_b_id' }
+      );
+
+    if (error) throw error;
+  };
 
   const scanForDuplicates = async () => {
     setLoading(true);
     try {
+      let groups: DuplicateGroup[];
+
       // In development, simulate duplicate scanning
       if (import.meta.env.DEV) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setDuplicateGroups(mockDuplicateGroups);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        groups = mockDuplicateGroups;
       } else {
         // Real duplicate detection using Supabase RPC
         const { data, error } = await supabase.rpc('scan_for_duplicates', { 
           entity_type: 'accounts',
-          similarity_threshold: 0.8
+          similarity_threshold: 0.8,
         });
-        
+
         if (error) throw error;
-        const response = data as { groups?: DuplicateGroup[] } | null;
-        setDuplicateGroups(response?.groups || []);
+        const response = data as { groups?: unknown } | null;
+        groups = normalizeScanGroups(response?.groups);
       }
-      
+
+      setDuplicateGroups(groups);
+
       toast({
-        title: "Duplicate scan completed",
-        description: `Found ${mockDuplicateGroups.length} potential duplicate groups.`,
+        title: 'Duplicate scan completed',
+        description: `Found ${groups.length} potential duplicate group${groups.length === 1 ? '' : 's'}.`,
       });
     } catch (error) {
       toast({
-        title: "Error scanning for duplicates",
-        description: "Please try again later.",
-        variant: "destructive",
+        title: 'Error scanning for duplicates',
+        description: 'Please try again later.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const openMergeDialog = async (group: DuplicateGroup) => {
-    setSelectedGroup(group);
-    
-    // Mock loading candidates
-    const mockCandidates: MergeCandidate[] = [
-      {
-        id: 'acc1',
-        data: {
-          id: 'acc1',
-                account_type: 'individual' as const,
-                account_status: 'lead' as const,
-          name: 'John Smith Family',
-          email: 'john.smith@email.com',
-          phone: '(555) 123-4567',
-          created_at: '2024-01-15T10:00:00Z',
-          updated_at: '2024-01-15T10:00:00Z'
-        } as Account,
-        isSelected: true,
-        isSurvivor: true
-      },
-      {
-        id: 'acc2', 
-        data: {
-          id: 'acc2',
-                account_type: 'individual' as const,
-                account_status: 'lead' as const,
-          name: 'Smith, John',
-          email: 'j.smith@email.com',
-          phone: '555-123-4567',
-          created_at: '2024-02-01T15:30:00Z',
-          updated_at: '2024-02-01T15:30:00Z'
-        } as Account,
-        isSelected: true,
-        isSurvivor: false
-      }
-    ];
-    
-    setMergeCandidates(mockCandidates);
-    setMergeDialogOpen(true);
-  };
-
-  const handleMerge = async () => {
-    if (!selectedGroup) return;
-    
-    setMergeInProgress(true);
-    try {
-      // In development, simulate merge processing
-      if (import.meta.env.DEV) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      } else {
-        // Real merge using Supabase RPC
-        const { data, error } = await supabase.rpc('merge_duplicate_records', { 
-          group_id: selectedGroup.id,
-          survivor_id: selectedGroup.entity_ids[0]
-        });
-        
-        if (error) throw error;
-        // Records merged successfully
-      }
-      
-      // Update the group status
-      setDuplicateGroups(prev => 
-        prev.map(group => 
-          group.id === selectedGroup.id 
-            ? { ...group, status: 'merged' as const }
-            : group
-        )
-      );
-      
-      setMergeDialogOpen(false);
-      onMergeComplete?.();
-      
+  const reviewInSafeMergeFlow = async (group: DuplicateGroup) => {
+    if (!isAccountGroup(group) || group.entity_ids.length < 2) {
       toast({
-        title: "Records merged successfully",
-        description: "The duplicate records have been merged. All related data has been preserved.",
+        title: 'Account merge required',
+        description: 'The safe merge flow currently supports account/customer records only.',
+        variant: 'destructive',
       });
+      return;
+    }
+
+    setTriageInProgress(group.id);
+    try {
+      await persistPairReview(group, 'confirmed_duplicate', 'Sent from duplicate detection to safe merge review');
+
+      const [masterId, duplicateId] = group.entity_ids;
+      const params = new URLSearchParams({
+        masterId,
+        duplicateId,
+        masterCustomerId: masterId,
+        duplicateCustomerId: duplicateId,
+        source: 'duplicate_detection',
+      });
+
+      navigate(`/merge-customers?${params.toString()}`);
     } catch (error) {
       toast({
-        title: "Error merging records",
-        description: "Please try again later.",
-        variant: "destructive",
+        title: 'Error preparing merge review',
+        description: 'Please try again later.',
+        variant: 'destructive',
       });
     } finally {
-      setMergeInProgress(false);
+      setTriageInProgress(null);
     }
   };
 
-  const dismissGroup = async (groupId: string) => {
+  const updateLocalGroupStatus = (groupId: string, status: DuplicateGroupStatus) => {
     setDuplicateGroups(prev =>
       prev.map(group =>
         group.id === groupId
-          ? { ...group, status: 'dismissed' as const }
+          ? { ...group, status }
           : group
       )
     );
-    
-    toast({
-      title: "Duplicate dismissed",
-      description: "This group has been marked as not a duplicate.",
-    });
   };
 
-  const setSurvivor = (candidateId: string) => {
-    setMergeCandidates(prev =>
-      prev.map(candidate => ({
-        ...candidate,
-        isSurvivor: candidate.id === candidateId
-      }))
-    );
+  const dismissGroup = async (group: DuplicateGroup) => {
+    setTriageInProgress(group.id);
+    try {
+      await persistPairReview(group, 'not_duplicate', 'Dismissed from duplicate detection');
+      await persistDuplicateGroupStatus(group, 'dismissed');
+      updateLocalGroupStatus(group.id, 'dismissed');
+      onMergeComplete?.();
+
+      toast({
+        title: 'Duplicate dismissed',
+        description: 'This group has been marked as not a duplicate.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error dismissing duplicate',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTriageInProgress(null);
+    }
+  };
+
+  const reviewLater = async (group: DuplicateGroup) => {
+    setTriageInProgress(group.id);
+    try {
+      await persistPairReview(group, 'review_later', 'Deferred from duplicate detection');
+      await persistDuplicateGroupStatus(group, 'review_later');
+      updateLocalGroupStatus(group.id, 'review_later');
+      onMergeComplete?.();
+
+      toast({
+        title: 'Review deferred',
+        description: 'This duplicate group has been marked for later review.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error deferring review',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTriageInProgress(null);
+    }
   };
 
   const pendingGroups = duplicateGroups.filter(g => g.status === 'pending');
@@ -218,7 +297,7 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
                 Duplicate Detection
               </CardTitle>
               <CardDescription>
-                Find and merge duplicate accounts and contacts to maintain data quality
+                Find duplicate accounts and send account pairs through the safe merge flow
               </CardDescription>
             </div>
             <Button onClick={scanForDuplicates} disabled={loading}>
@@ -226,7 +305,7 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
             </Button>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {loading && (
             <div className="space-y-2">
@@ -249,36 +328,47 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
           {pendingGroups.map((group) => (
             <Card key={group.id} className="border-orange-200">
               <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    {group.entity_type === 'account' ? (
+                    {isAccountGroup(group) ? (
                       <Building2 className="h-5 w-5 text-orange-600" />
                     ) : (
                       <Users className="h-5 w-5 text-orange-600" />
                     )}
                     <div>
                       <h4 className="font-medium">
-                        {group.entity_ids.length} Potential {group.entity_type === 'account' ? 'Account' : 'Contact'} Duplicates
+                        {group.entity_ids.length} Potential {formatEntityType(group)} Duplicates
                       </h4>
                       <p className="text-sm text-muted-foreground">
-                        Match score: {Math.round(group.match_score * 100)}% • 
+                        Match score: {Math.round(group.match_score * 100)}% •{' '}
                         Found {format(new Date(group.created_at), 'MMM d, yyyy')}
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => dismissGroup(group.id)}
+                      disabled={triageInProgress === group.id}
+                      onClick={() => dismissGroup(group)}
                     >
                       <X className="h-4 w-4 mr-2" />
                       Dismiss
                     </Button>
                     <Button
+                      variant="outline"
                       size="sm"
-                      onClick={() => openMergeDialog(group)}
+                      disabled={triageInProgress === group.id}
+                      onClick={() => reviewLater(group)}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Review Later
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={triageInProgress === group.id || !isAccountGroup(group)}
+                      onClick={() => reviewInSafeMergeFlow(group)}
                     >
                       <Merge className="h-4 w-4 mr-2" />
                       Review & Merge
@@ -290,119 +380,6 @@ export function DuplicateDetection({ onMergeComplete, className }: DuplicateDete
           ))}
         </CardContent>
       </Card>
-
-      {/* Merge Dialog */}
-      <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Merge Duplicate Records</DialogTitle>
-            <DialogDescription>
-              Review the records below and select which one should be the surviving record. 
-              All data from other records will be preserved and merged.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {mergeCandidates.map((candidate, index) => (
-              <Card 
-                key={candidate.id} 
-                className={`cursor-pointer transition-colors ${
-                  candidate.isSurvivor ? 'border-green-500 bg-green-50' : 'border-gray-200'
-                }`}
-                onClick={() => setSurvivor(candidate.id)}
-              >
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">
-                        {candidate.isSurvivor ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <div className="h-5 w-5 border-2 border-gray-300 rounded" />
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div>
-                          <h4 className="font-medium">
-                            {'name' in candidate.data ? candidate.data.name : `${candidate.data.first_name} ${candidate.data.last_name}`}
-                          </h4>
-                          {candidate.isSurvivor && (
-                            <Badge variant="default" className="bg-green-600">
-                              Surviving Record
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Email:</span>
-                            <span className="ml-2">{candidate.data.email || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Phone:</span>
-                            <span className="ml-2">{candidate.data.phone || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Created:</span>
-                            <span className="ml-2">
-                              {format(new Date(candidate.data.created_at), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Type:</span>
-                            <span className="ml-2 capitalize">
-                              {candidate.data && typeof candidate.data === 'object' && 'type' in candidate.data ? String(candidate.data.type) : 'contact'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            
-            {mergeCandidates.length > 1 && (
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <ArrowRight className="h-5 w-5 text-blue-600 mt-1" />
-                    <div>
-                      <h4 className="font-medium text-blue-800">Merge Process</h4>
-                      <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                        <li>• All timeline events will be preserved</li>
-                        <li>• Documents and attachments will be transferred</li>
-                        <li>• Contact relationships will be maintained</li>
-                        <li>• Merged records will be marked in audit logs</li>
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMergeDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleMerge} disabled={mergeInProgress}>
-              {mergeInProgress ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Merging...
-                </>
-              ) : (
-                <>
-                  <Merge className="h-4 w-4 mr-2" />
-                  Merge Records
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
