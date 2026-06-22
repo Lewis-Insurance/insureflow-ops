@@ -37,6 +37,9 @@ const DENIAL_REASON_OPTIONS = [
 
 type DenialReasonOption = typeof DENIAL_REASON_OPTIONS[number];
 
+const getTermMonthsValue = (termMonths: AORenewalQuote['term_months']): '6' | '12' =>
+  termMonths === 12 ? '12' : '6';
+
 interface EditQuoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,7 +75,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
   const [premium, setPremium] = useState(
     quote.status === 'denied' || quote.premium == null ? '' : quote.premium.toString(),
   );
-  const [termMonths, setTermMonths] = useState<'6' | '12'>(quote.term_months.toString() as '6' | '12');
+  const [termMonths, setTermMonths] = useState<'6' | '12'>(getTermMonthsValue(quote.term_months));
   const [status, setStatus] = useState<'quoted' | 'denied' | 'selected' | 'expired'>(quote.status);
   const [denialReasonChoice, setDenialReasonChoice] = useState<DenialReasonOption | ''>(initialReason.choice);
   const [denialReasonOther, setDenialReasonOther] = useState(initialReason.other);
@@ -122,7 +125,7 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
     const reason = splitDenialReason(quote.denial_reason);
     setCarrier(quote.carrier);
     setPremium(quote.status === 'denied' || quote.premium == null ? '' : quote.premium.toString());
-    setTermMonths(quote.term_months.toString() as '6' | '12');
+    setTermMonths(getTermMonthsValue(quote.term_months));
     setStatus(quote.status);
     setDenialReasonChoice(reason.choice);
     setDenialReasonOther(reason.other);
@@ -193,10 +196,10 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
       updates: {
         carrier,
         premium: premiumValue,
-        term_months: parseInt(termMonths) as 6 | 12,
+        term_months: isDenied ? null : (parseInt(termMonths) as 6 | 12),
         status,
         denial_reason: isDenied ? resolveDenialReason() : null,
-        notes: notes || undefined,
+        notes: notes || null,
       },
     });
 
@@ -306,10 +309,12 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
             </div>
 
             <div>
-              <Label htmlFor="term">Term *</Label>
-              <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')}>
-                <SelectTrigger>
-                  <SelectValue />
+              <Label htmlFor="term" className={isDenied ? 'text-muted-foreground' : undefined}>
+                Term {isDenied ? '' : '*'}
+              </Label>
+              <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')} disabled={isDenied}>
+                <SelectTrigger aria-disabled={isDenied}>
+                  <SelectValue placeholder={isDenied ? 'N/A (denied)' : undefined} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="6">6 Months</SelectItem>

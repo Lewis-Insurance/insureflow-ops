@@ -32,8 +32,9 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
     () =>
       priceableQuotes.find((q) => q.status === 'selected') ||
       priceableQuotes.find((q) => q.status === 'quoted') ||
+      quotes[0] ||
       null,
-    [priceableQuotes],
+    [priceableQuotes, quotes],
   );
 
   const quoteCountLabel = `${quotes.length} quote${quotes.length === 1 ? '' : 's'}`;
@@ -50,8 +51,13 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
   };
 
   const calculateAnnualPremium = (quote: AORenewalQuote) => {
-    if (quote.premium == null) return null;
+    if (quote.premium == null || quote.term_months == null) return null;
     return quote.term_months === 6 ? quote.premium * 2 : quote.premium;
+  };
+
+  const formatQuotePremium = (quote: AORenewalQuote) => {
+    if (quote.premium == null) return quote.status === 'denied' ? 'Declined' : '—';
+    return formatCurrency(quote.premium);
   };
 
   const calculateSavings = (
@@ -59,7 +65,7 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
     currentPremiumValue: number | null,
     currentTermMonths: 6 | 12 | null,
   ) => {
-    if (!currentPremiumValue || !currentTermMonths || quote.premium == null) return null;
+    if (!currentPremiumValue || !currentTermMonths || quote.premium == null || quote.term_months == null) return null;
     const annualAO = currentTermMonths === 6 ? currentPremiumValue * 2 : currentPremiumValue;
     const annualQuote = quote.term_months === 6 ? quote.premium * 2 : quote.premium;
     const difference = annualAO - annualQuote;
@@ -82,7 +88,7 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
               <span>Competitive Quotes</span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 normal-case tracking-normal text-slate-300">{quoteCountLabel}</span>
             </div>
-            {selectedQuote && selectedQuote.premium != null ? (
+            {selectedQuote ? (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="text-2xl font-semibold text-white">{selectedQuote.carrier}</div>
@@ -90,11 +96,13 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                 </div>
                 <div className="flex flex-wrap gap-3 text-sm text-slate-300">
                   <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                    <ShieldCheck className="h-4 w-4 text-lime-300" />{formatCurrency(selectedQuote.premium)}
+                    <ShieldCheck className="h-4 w-4 text-lime-300" />{formatQuotePremium(selectedQuote)}
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                    <Clock3 className="h-4 w-4 text-sky-300" />{selectedQuote.term_months} month term
-                  </span>
+                  {selectedQuote.term_months != null && (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                      <Clock3 className="h-4 w-4 text-sky-300" />{selectedQuote.term_months} month term
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -156,10 +164,10 @@ export function AORenewalQuotes({ renewalId, currentPremium, currentTermMonths }
                             {quote.carrier}
                           </TableCell>
                           <TableCell className={cellMuted}>
-                            {quote.premium != null ? formatCurrency(quote.premium) : '—'}
+                            {formatQuotePremium(quote)}
                           </TableCell>
                           <TableCell className={isDenied ? 'text-slate-500' : 'text-slate-300'}>
-                            {quote.term_months} months
+                            {quote.term_months == null ? '—' : `${quote.term_months} months`}
                           </TableCell>
                           <TableCell className={cellMuted}>
                             {annualPremium != null ? formatCurrency(annualPremium) : '—'}

@@ -2249,7 +2249,7 @@ export type Database = {
           premium: number | null
           renewal_id: string
           status: string
-          term_months: number
+          term_months: number | null
           updated_at: string
         }
         Insert: {
@@ -2263,7 +2263,7 @@ export type Database = {
           premium?: number | null
           renewal_id: string
           status?: string
-          term_months: number
+          term_months?: number | null
           updated_at?: string
         }
         Update: {
@@ -2277,7 +2277,7 @@ export type Database = {
           premium?: number | null
           renewal_id?: string
           status?: string
-          term_months?: number
+          term_months?: number | null
           updated_at?: string
         }
         Relationships: [

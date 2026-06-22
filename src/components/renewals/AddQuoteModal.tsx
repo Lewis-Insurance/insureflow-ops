@@ -152,11 +152,11 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
         renewal_id: renewalId,
         carrier,
         premium: premiumValue,
-        term_months: parseInt(termMonths) as 6 | 12,
+        term_months: isDenied ? null : (parseInt(termMonths) as 6 | 12),
         status,
         denial_reason: isDenied ? resolveDenialReason() : null,
-        document_url: documentUrl,
-        notes: notes || undefined,
+        document_url: documentUrl ?? null,
+        notes: notes || null,
       });
 
       setCarrier('');
@@ -222,10 +222,12 @@ export function AddQuoteModal({ open, onOpenChange, renewalId }: AddQuoteModalPr
             </div>
 
             <div>
-              <Label htmlFor="term">Term *</Label>
-              <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')}>
-                <SelectTrigger>
-                  <SelectValue />
+              <Label htmlFor="term" className={isDenied ? 'text-muted-foreground' : undefined}>
+                Term {isDenied ? '' : '*'}
+              </Label>
+              <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')} disabled={isDenied}>
+                <SelectTrigger aria-disabled={isDenied}>
+                  <SelectValue placeholder={isDenied ? 'N/A (denied)' : undefined} />
                 </SelectTrigger>
                 <SelectContent className="bg-background">
                   <SelectItem value="6">6 Months</SelectItem>
