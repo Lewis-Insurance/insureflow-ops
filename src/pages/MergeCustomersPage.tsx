@@ -50,7 +50,7 @@ function formatStrategy(strategy: string) {
     preserve_via_customer_account_reassignment: 'Preserved through account reassignment',
   };
 
-  return labels[strategy] ?? strategy.replaceAll('_', ' ');
+  return labels[strategy] ?? strategy.replace(/_/g, ' ');
 }
 
 function formatValue(value: unknown) {
