@@ -5,6 +5,9 @@ ALTER TABLE public.ao_renewal_quotes
   ALTER COLUMN term_months DROP NOT NULL;
 
 ALTER TABLE public.ao_renewal_quotes
+  DROP CONSTRAINT IF EXISTS ao_renewal_quotes_non_denied_requires_rate_term;
+
+ALTER TABLE public.ao_renewal_quotes
   ADD CONSTRAINT ao_renewal_quotes_non_denied_requires_rate_term
   CHECK (
     status = 'denied'

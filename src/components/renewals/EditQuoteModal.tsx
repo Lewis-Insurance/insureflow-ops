@@ -328,15 +328,19 @@ export function EditQuoteModal({ open, onOpenChange, quote }: EditQuoteModalProp
               <Label htmlFor="term" className={isDenied ? 'text-muted-foreground' : undefined}>
                 Term {isDenied ? '' : '*'}
               </Label>
-              <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')} disabled={isDenied}>
-                <SelectTrigger aria-disabled={isDenied}>
-                  <SelectValue placeholder={isDenied ? 'N/A (denied)' : undefined} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">6 Months</SelectItem>
-                  <SelectItem value="12">12 Months</SelectItem>
-                </SelectContent>
-              </Select>
+              {isDenied ? (
+                <Input value="N/A (denied)" disabled aria-disabled />
+              ) : (
+                <Select value={termMonths} onValueChange={(v) => setTermMonths(v as '6' | '12')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6 Months</SelectItem>
+                    <SelectItem value="12">12 Months</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div>
