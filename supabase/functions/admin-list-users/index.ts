@@ -45,29 +45,59 @@ serve(async (req) => {
       )
     }
 
-    // List all auth users
-    const { data: authData, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-    
-    if (listError) {
-      throw listError
+    // List all Auth users. Auth is canonical for identity/email/existence.
+    const authUsers: any[] = []
+    const perPage = 1000
+    let page = 1
+
+    while (true) {
+      const { data: authData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      })
+
+      if (listError) {
+        throw listError
+      }
+
+      const users = authData.users || []
+      authUsers.push(...users)
+
+      if (users.length < perPage) break
+      page += 1
     }
 
-    const authUsers = authData.users || []
-
-    // Get all profiles
-    const { data: profiles } = await supabaseAdmin
+    // Get profile/admin metadata. profiles is canonical for app/admin metadata.
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, created_at')
-    
-    // Combine auth and profile data
+      .select('id, email, full_name, role, status, last_seen_at, created_at, updated_at, admin_notes, deleted_at, deleted_by')
+
+    if (profilesError) {
+      throw profilesError
+    }
+
+    const profileById = new Map((profiles || []).map((p: any) => [p.id, p]))
+
+    // Combine Auth and profile data into the single admin list shape used by the UI.
     const combinedUsers = authUsers.map((authUser: any) => {
-      const profile = profiles?.find((p: any) => p.id === authUser.id)
+      const profile = profileById.get(authUser.id)
+      const email = authUser.email || profile?.email || ''
+
       return {
         id: authUser.id,
-        email: authUser.email,
-        full_name: profile?.full_name || authUser.user_metadata?.full_name || 'No Name',
+        email,
+        full_name: profile?.full_name || authUser.user_metadata?.full_name || email || 'No Name',
         role: profile?.role || 'customer',
+        status: profile?.status || 'active',
+        last_seen_at: profile?.last_seen_at || authUser.last_sign_in_at || null,
         created_at: profile?.created_at || authUser.created_at,
+        updated_at: profile?.updated_at || authUser.updated_at || null,
+        admin_notes: profile?.admin_notes || null,
+        deleted_at: profile?.deleted_at || null,
+        deleted_by: profile?.deleted_by || null,
+        auth_created_at: authUser.created_at,
+        last_sign_in_at: authUser.last_sign_in_at || null,
+        email_confirmed_at: authUser.email_confirmed_at || null,
       }
     })
 

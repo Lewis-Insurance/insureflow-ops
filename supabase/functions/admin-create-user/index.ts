@@ -46,21 +46,39 @@ serve(async (req) => {
 
     // Get request body
     const { email, password, fullName, role } = await req.json()
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    const normalizedFullName = String(fullName || '').trim()
+    const selectedRole = String(role || 'customer').trim() || 'customer'
+    const allowedRoles = ['customer', 'staff', 'admin']
 
-    if (!email || !password || !fullName) {
+    if (!normalizedEmail || !password || !normalizedFullName) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'Password must be at least 8 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!allowedRoles.includes(selectedRole)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid role selected' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Create the user
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: {
-        full_name: fullName,
+        full_name: normalizedFullName,
       },
     })
 
@@ -68,22 +86,38 @@ serve(async (req) => {
       throw createError
     }
 
-    // Create profile with role
-    const { error: profileError } = await supabaseAdmin
+    // Upsert profile metadata after Auth creation. A database trigger may have
+    // already inserted the profile row, so INSERT can conflict and lose the role.
+    // profiles remains canonical for app/admin metadata.
+    const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        id: newUser.user.id,
-        full_name: fullName,
-        role: role || 'customer',
-      })
+      .upsert(
+        {
+          id: newUser.user.id,
+          email: normalizedEmail,
+          full_name: normalizedFullName,
+          role: selectedRole,
+          status: 'active',
+          deleted_at: null,
+          deleted_by: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      .select('id, email, full_name, role, status')
+      .single()
 
     if (profileError) {
-      console.error('Profile creation error:', profileError)
-      // Don't fail the request if profile creation fails
+      console.error('Profile upsert error:', profileError)
+      const { error: rollbackError } = await supabaseAdmin.auth.admin.deleteUser(newUser.user.id)
+      if (rollbackError) {
+        console.error('Failed to roll back auth user after profile upsert error:', rollbackError)
+      }
+      throw profileError
     }
 
     return new Response(
-      JSON.stringify({ success: true, user: newUser.user }),
+      JSON.stringify({ success: true, user: newUser.user, profile: profileData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: unknown) {

@@ -21,6 +21,8 @@ interface UserProfile {
   locale?: string;
   avatar_url?: string | null;
   default_agency_workspace_id?: string | null;
+  status?: string | null;
+  deleted_at?: string | null;
 }
 
 export function useAuth() {
@@ -64,6 +66,21 @@ export function useAuth() {
       }
 
       if (profileData) {
+        if (profileData.deleted_at || profileData.status === 'disabled' || profileData.status === 'banned') {
+          await supabase.auth.signOut();
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          toast({
+            title: 'Account unavailable',
+            description: profileData.status === 'banned'
+              ? 'This account has been banned. Please contact an administrator.'
+              : 'This account has been disabled. Please contact an administrator.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         // Determine is_staff from role or explicit flag
         const staffRoles = ['admin', 'staff', 'producer', 'csr', 'accounting', 'owner'];
         const isStaffByRole = staffRoles.includes(profileData.role || '');
@@ -93,7 +110,7 @@ export function useAuth() {
       };
       setProfile(fallbackProfile);
     }
-  }, [toast, profileErrorShown]);
+  }, [profileErrorShown]);
 
   useEffect(() => {
     let mounted = true;

@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Plus, Building2, Users, Shield, FileText } from 'lucide-react';
+import { Building2, Users, Shield, FileText } from 'lucide-react';
 // Temporarily comment out potentially problematic imports
 // import { CompanyManagement } from '@/components/admin/CompanyManagement';
 // import { CarrierManagement } from '@/components/admin/CarrierManagement';
@@ -12,7 +10,6 @@ import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { LinesOfBusinessManagement } from '@/components/admin/LinesOfBusinessManagement';
 import { TaskTemplateManager } from '@/components/tasks/TaskTemplateManager';
-import { UserManagement } from '@/components/admin/UserManagement';
 import { EnhancedUserDirectory } from '@/components/admin/EnhancedUserDirectory';
 import { RBACManagement } from '@/components/admin/RBACManagement';
 import { LeadScoringAdmin } from '@/components/leads/LeadScoringAdmin';
@@ -56,15 +53,11 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="users-enhanced" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Users (Basic)
-            </TabsTrigger>
-            <TabsTrigger value="users-enhanced" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Users (Enhanced)
+              Users
             </TabsTrigger>
             <TabsTrigger value="rbac" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -101,10 +94,6 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="users" className="space-y-6">
-            <UserManagement />
-          </TabsContent>
-
-          <TabsContent value="users-enhanced" className="space-y-6">
             <EnhancedUserDirectory />
           </TabsContent>
 
