@@ -53,6 +53,33 @@ function formatStrategy(strategy: string) {
   return labels[strategy] ?? strategy.replace(/_/g, ' ');
 }
 
+function formatTableLink(row: Pick<TransferPreviewRow, 'table' | 'foreignKeyColumn'>) {
+  return `${row.table}.${row.foreignKeyColumn}`;
+}
+
+function getBlockingTransferRows(preview: CustomerMergePreview) {
+  return preview.transferableTables.filter(
+    (row) => row.count > 0 && (row.strategy === 'manual_review' || row.blockers.length > 0)
+  );
+}
+
+function summarizeBlockingTables(rows: TransferPreviewRow[]) {
+  return rows.reduce<Record<string, { total: number; links: TransferPreviewRow[] }>>((summary, row) => {
+    summary[row.table] = summary[row.table] ?? { total: 0, links: [] };
+    summary[row.table].total += row.count;
+    summary[row.table].links.push(row);
+    return summary;
+  }, {});
+}
+
+function getBlockerAction(row: TransferPreviewRow) {
+  if (row.strategy === 'manual_review') {
+    return 'Needs explicit merge support or manual data cleanup/reassignment before this merge can run.';
+  }
+
+  return 'Review this row-level blocker before executing the merge.';
+}
+
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === '') return 'Blank';
   if (typeof value === 'string') return value;
@@ -111,18 +138,55 @@ function SelectedRoleSummary({ preview }: { preview: CustomerMergePreview }) {
 }
 
 function BlockerWarningPanel({ preview }: { preview: CustomerMergePreview }) {
+  const blockingRows = getBlockingTransferRows(preview);
+  const blockingTables = summarizeBlockingTables(blockingRows);
+  const hasBlockers = preview.blockers.length > 0 || blockingRows.length > 0;
+
   return (
     <div className="space-y-3">
-      {preview.blockers.length > 0 && (
+      {hasBlockers && (
         <Alert variant="destructive">
           <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Merge blocked</AlertTitle>
-          <AlertDescription>
-            <ul className="list-disc pl-5 space-y-1">
-              {preview.blockers.map((blocker, index) => (
-                <li key={`${blocker}-${index}`}>{blocker}</li>
-              ))}
-            </ul>
+          <AlertTitle>Merge blocked — manual review required</AlertTitle>
+          <AlertDescription className="space-y-4">
+            <p>
+              The merge is intentionally fail-closed. Resolve the blocking table links below, then rerun preview.
+            </p>
+
+            {blockingRows.length > 0 && (
+              <div className="rounded-md border border-destructive/30 bg-background/70 p-3">
+                <p className="font-medium mb-2">Blocking tables</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {Object.entries(blockingTables).map(([table, summary]) => (
+                    <div key={table} className="rounded-md border bg-muted/40 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-semibold">{table}</span>
+                        <Badge variant="destructive">{formatCountLabel(summary.total)}</Badge>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-xs">
+                        {summary.links.map((row) => (
+                          <li key={formatTableLink(row)}>
+                            <span className="font-mono">{row.foreignKeyColumn}</span>: {formatCountLabel(row.count)} ·{' '}
+                            {getBlockerAction(row)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {preview.blockers.length > 0 && (
+              <details className="rounded-md border border-destructive/30 bg-background/70 p-3" open={blockingRows.length === 0}>
+                <summary className="cursor-pointer font-medium">Detailed RPC blockers</summary>
+                <ul className="list-disc pl-5 space-y-1 mt-2">
+                  {preview.blockers.map((blocker, index) => (
+                    <li key={`${blocker}-${index}`}>{blocker}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -168,14 +232,28 @@ function TransferInventory({ rows }: { rows: TransferPreviewRow[] }) {
           </TableHeader>
           <TableBody>
             {Object.entries(groupedRows).flatMap(([table, tableRows]) =>
-              tableRows.map((row, index) => (
-                <TableRow key={`${row.table}-${row.foreignKeyColumn}`}>
+              tableRows.map((row, index) => {
+                const requiresManualReview = row.strategy === 'manual_review' || row.blockers.length > 0;
+
+                return (
+                <TableRow
+                  key={`${row.table}-${row.foreignKeyColumn}`}
+                  className={requiresManualReview ? 'bg-destructive/5 hover:bg-destructive/10' : undefined}
+                >
                   <TableCell className="font-medium">{index === 0 ? table : ''}</TableCell>
                   <TableCell className="font-mono text-xs">{row.foreignKeyColumn}</TableCell>
                   <TableCell className="text-right">{row.count.toLocaleString()}</TableCell>
-                  <TableCell>{formatStrategy(row.strategy)}</TableCell>
                   <TableCell>
-                    {row.blockers.length > 0 ? (
+                    <Badge variant={requiresManualReview ? 'destructive' : 'secondary'} className="whitespace-normal">
+                      {formatStrategy(row.strategy)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {requiresManualReview && row.blockers.length === 0 ? (
+                      <Badge variant="outline" className="border-destructive/50 text-destructive whitespace-normal">
+                        Unsupported table; blocks only if duplicate-linked rows exist
+                      </Badge>
+                    ) : row.blockers.length > 0 ? (
                       <div className="space-y-1">
                         {row.blockers.map((blocker, blockerIndex) => (
                           <Badge key={`${blocker}-${blockerIndex}`} variant="destructive" className="mr-1 whitespace-normal">
@@ -188,7 +266,8 @@ function TransferInventory({ rows }: { rows: TransferPreviewRow[] }) {
                     )}
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -375,9 +454,8 @@ export default function MergeCustomersPage() {
   const previewQuery = useCustomerMergePreview(masterId, duplicateId, !successResult);
   const executeMerge = useExecuteCustomerMerge();
   const preview = previewQuery.data;
-  const hasBlockers = Boolean(
-    preview?.blockers.length || preview?.transferableTables.some((row) => row.blockers.length > 0)
-  );
+  const hasBlockingTransferRows = preview ? getBlockingTransferRows(preview).length > 0 : false;
+  const hasBlockers = Boolean(preview?.blockers.length || hasBlockingTransferRows);
   const confirmationMatches = Boolean(preview?.confirmationPhrase && confirmationInput === preview.confirmationPhrase);
   const canExecute = Boolean(preview && !hasBlockers && acknowledged && confirmationMatches && !successResult);
 

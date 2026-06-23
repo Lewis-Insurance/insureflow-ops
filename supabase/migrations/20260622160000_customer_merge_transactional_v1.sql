@@ -170,6 +170,20 @@ DECLARE
     'renewals.account_id',
     'ao_renewals.account_id',
     'canopy_pulls.account_id',
+    'opportunities.account_id',
+    'tickets.account_id',
+    'service_tickets.account_id',
+    'invoices.account_id',
+    'premium_payments.account_id',
+    'certificates_of_insurance.account_id',
+    'submission_packages.account_id',
+    'comparison_workspaces.account_id',
+    'parsed_documents.account_id',
+    'document_analyses.account_id',
+    'document_analysis.account_id',
+    'document_extractions.account_id',
+    'acord_forms.account_id',
+    'communication_history.account_id',
     'account_tags.account_id',
     'tags.account_id',
     'notes.account_id',
@@ -297,6 +311,24 @@ BEGIN
     jsonb_build_object('table', 'renewals', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
     jsonb_build_object('table', 'ao_renewals', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
     jsonb_build_object('table', 'canopy_pulls', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    -- Phase 1.5: high-confidence many-to-one account children/artifacts.
+    -- These are direct account links with no known per-account uniqueness or
+    -- membership/contact-detail/cache semantics; every entry remains guarded by
+    -- _customer_merge_column_exists for environments where the table is absent.
+    jsonb_build_object('table', 'opportunities', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'tickets', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'service_tickets', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'invoices', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'premium_payments', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'certificates_of_insurance', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'submission_packages', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'comparison_workspaces', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'parsed_documents', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'document_analyses', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'document_analysis', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'document_extractions', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'acord_forms', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
+    jsonb_build_object('table', 'communication_history', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
     jsonb_build_object('table', 'account_tags', 'foreignKeyColumn', 'account_id', 'strategy', 'dedupe_then_reassign'),
     jsonb_build_object('table', 'tags', 'foreignKeyColumn', 'account_id', 'strategy', 'dedupe_then_reassign'),
     jsonb_build_object('table', 'notes', 'foreignKeyColumn', 'account_id', 'strategy', 'reassign_fk'),
@@ -566,6 +598,19 @@ BEGIN
     RAISE EXCEPTION 'Merge blocked: %', v_preview->'blockers';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_to_recordset(COALESCE(v_preview->'transferableTables', '[]'::jsonb))
+      AS transfer_row("table" text, "foreignKeyColumn" text, "count" bigint, strategy text, blockers jsonb)
+    WHERE transfer_row."count" > 0
+      AND (
+        transfer_row.strategy = 'manual_review'
+        OR jsonb_array_length(COALESCE(transfer_row.blockers, '[]'::jsonb)) > 0
+      )
+  ) THEN
+    RAISE EXCEPTION 'Merge blocked: transfer inventory contains duplicate-linked manual-review rows';
+  END IF;
+
   IF p_confirmation_phrase IS DISTINCT FROM (v_preview->>'confirmationPhrase') THEN
     RAISE EXCEPTION 'Confirmation phrase does not match';
   END IF;
@@ -685,6 +730,21 @@ BEGIN
       ('renewals', 'account_id'),
       ('ao_renewals', 'account_id'),
       ('canopy_pulls', 'account_id'),
+      -- Phase 1.5 high-confidence many-to-one account children/artifacts.
+      ('opportunities', 'account_id'),
+      ('tickets', 'account_id'),
+      ('service_tickets', 'account_id'),
+      ('invoices', 'account_id'),
+      ('premium_payments', 'account_id'),
+      ('certificates_of_insurance', 'account_id'),
+      ('submission_packages', 'account_id'),
+      ('comparison_workspaces', 'account_id'),
+      ('parsed_documents', 'account_id'),
+      ('document_analyses', 'account_id'),
+      ('document_analysis', 'account_id'),
+      ('document_extractions', 'account_id'),
+      ('acord_forms', 'account_id'),
+      ('communication_history', 'account_id'),
       ('notes', 'account_id'),
       ('call_sessions', 'account_id'),
       ('sms_messages', 'account_id')
