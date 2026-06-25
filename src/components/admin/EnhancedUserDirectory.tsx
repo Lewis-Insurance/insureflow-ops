@@ -60,6 +60,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -71,6 +72,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useAgencyMemberships } from '@/hooks/useAgencyWorkspace';
+
+interface UserProvisioningMetadata {
+  is_provisioned: boolean;
+  active_membership_count: number;
+  has_active_default_membership: boolean;
+  default_agency_status: string | null;
+  default_agency_name: string | null;
+  active_memberships: Array<{
+    agency_workspace_id: string;
+    role: string;
+    status: string;
+  }>;
+}
 
 interface UserProfile {
   id: string;
@@ -78,15 +93,23 @@ interface UserProfile {
   full_name: string;
   role: string;
   status: 'active' | 'disabled' | 'banned' | null;
+  is_staff?: boolean;
+  default_agency_workspace_id?: string | null;
   last_seen_at: string | null;
   created_at: string;
   admin_notes: string | null;
   deleted_at: string | null;
+  provisioning?: UserProvisioningMetadata;
   usage_metrics?: {
     api_calls: number;
     tokens_used: number;
     cost_spent: number;
   };
+}
+
+interface AgencyWorkspaceOption {
+  id: string;
+  name: string;
 }
 
 type SortField = 'name' | 'email' | 'created_at' | 'last_seen_at' | 'role' | 'status';
@@ -98,7 +121,49 @@ const ROLE_OPTIONS = ['customer', 'staff', 'admin'];
 
 const DEFAULT_USAGE = { api_calls: 0, tokens_used: 0, cost_spent: 0 };
 
-const getErrorMessage = (error: unknown, fallback: string) => {
+const isStaffAdminRole = (value: string | null | undefined) => value === 'staff' || value === 'admin';
+
+const isActiveUserProfile = (user: UserProfile) => (user.status || 'active') === 'active' && !user.deleted_at;
+
+const hasValidDefaultAgencyMembership = (user: UserProfile) => {
+  return Boolean(
+    user.default_agency_workspace_id &&
+    user.provisioning?.has_active_default_membership &&
+    user.provisioning?.default_agency_status === 'active'
+  );
+};
+
+const userNeedsWorkspaceForStaffRole = (user: UserProfile, targetRole: string) => {
+  return isStaffAdminRole(targetRole) && isActiveUserProfile(user) && !hasValidDefaultAgencyMembership(user);
+};
+
+const getProvisioningWarning = (user: UserProfile) => {
+  if (user.provisioning?.is_provisioned !== false) return null;
+
+  const issues: string[] = [];
+  if (!user.default_agency_workspace_id) issues.push('missing default workspace');
+  if (user.default_agency_workspace_id && user.provisioning.default_agency_status !== 'active') {
+    issues.push('default workspace inactive');
+  }
+  if (!user.provisioning.has_active_default_membership) issues.push('missing active membership');
+
+  return `Provisioning issue${issues.length ? `: ${issues.join(', ')}` : ''}`;
+};
+
+const getErrorMessage = async (error: unknown, fallback: string) => {
+  const context = (error as { context?: unknown } | null)?.context;
+
+  if (typeof Response !== 'undefined' && context instanceof Response) {
+    try {
+      const payload = await context.clone().json();
+      if (payload?.error) {
+        return payload.code ? `${payload.error} (${payload.code})` : payload.error;
+      }
+    } catch {
+      // Fall through to the generic error message below.
+    }
+  }
+
   return error instanceof Error ? error.message : fallback;
 };
 
@@ -116,12 +181,14 @@ export function EnhancedUserDirectory() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('customer');
+  const [createAgencyWorkspaceId, setCreateAgencyWorkspaceId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   // Edit user dialog
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState('customer');
+  const [editAgencyWorkspaceId, setEditAgencyWorkspaceId] = useState('');
 
   // Password reset dialog
   const [passwordResetUser, setPasswordResetUser] = useState<UserProfile | null>(null);
@@ -135,9 +202,37 @@ export function EnhancedUserDirectory() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
   const [notes, setNotes] = useState('');
+  const [statusAgencyWorkspaceId, setStatusAgencyWorkspaceId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { toast } = useToast();
+  const {
+    data: agencyMemberships = [],
+    isLoading: isLoadingAgencyWorkspaces,
+    error: agencyWorkspacesError,
+  } = useAgencyMemberships();
+
+  const agencyWorkspaceOptions = useMemo<AgencyWorkspaceOption[]>(() => {
+    const optionsById = new Map<string, AgencyWorkspaceOption>();
+
+    for (const membership of agencyMemberships) {
+      const agency = membership.agency;
+      if (!agency || agency.status !== 'active') continue;
+      optionsById.set(agency.id, { id: agency.id, name: agency.name });
+    }
+
+    return Array.from(optionsById.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [agencyMemberships]);
+
+  useEffect(() => {
+    if (!agencyWorkspacesError) return;
+
+    toast({
+      title: 'Workspace options unavailable',
+      description: 'Could not load your active agency workspaces for provisioning.',
+      variant: 'destructive',
+    });
+  }, [agencyWorkspacesError, toast]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -174,7 +269,7 @@ export function EnhancedUserDirectory() {
       console.error('Error fetching users:', error);
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to fetch users'),
+        description: await getErrorMessage(error, 'Failed to fetch users'),
         variant: 'destructive',
       });
     } finally {
@@ -248,6 +343,16 @@ export function EnhancedUserDirectory() {
       return;
     }
 
+    const createRequiresWorkspace = isStaffAdminRole(role);
+    if (createRequiresWorkspace && !createAgencyWorkspaceId) {
+      toast({
+        title: 'Workspace Required',
+        description: 'Select an active agency workspace before creating a staff/admin user.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -257,6 +362,7 @@ export function EnhancedUserDirectory() {
           password,
           fullName,
           role,
+          agencyWorkspaceId: createRequiresWorkspace ? createAgencyWorkspaceId : undefined,
         },
       });
 
@@ -271,11 +377,12 @@ export function EnhancedUserDirectory() {
       setPassword('');
       setFullName('');
       setRole('customer');
+      setCreateAgencyWorkspaceId('');
       fetchUsers();
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to create user'),
+        description: await getErrorMessage(error, 'Failed to create user'),
         variant: 'destructive',
       });
     } finally {
@@ -287,10 +394,25 @@ export function EnhancedUserDirectory() {
     setEditUser(user);
     setEditFullName(user.full_name || '');
     setEditRole(user.role || 'customer');
+    setEditAgencyWorkspaceId(
+      user.default_agency_workspace_id && agencyWorkspaceOptions.some((option) => option.id === user.default_agency_workspace_id)
+        ? user.default_agency_workspace_id
+        : ''
+    );
   };
 
   const handleEditUser = async () => {
     if (!editUser) return;
+
+    const editRequiresWorkspace = userNeedsWorkspaceForStaffRole(editUser, editRole);
+    if (editRequiresWorkspace && !editAgencyWorkspaceId) {
+      toast({
+        title: 'Workspace Required',
+        description: 'Select an active agency workspace before making this user staff/admin.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const { error } = await supabase.functions.invoke('admin-update-user', {
@@ -299,6 +421,7 @@ export function EnhancedUserDirectory() {
           userId: editUser.id,
           fullName: editFullName,
           role: editRole,
+          agencyWorkspaceId: editRequiresWorkspace ? editAgencyWorkspaceId : undefined,
         },
       });
 
@@ -314,7 +437,7 @@ export function EnhancedUserDirectory() {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to update user'),
+        description: await getErrorMessage(error, 'Failed to update user'),
         variant: 'destructive',
       });
     }
@@ -381,7 +504,7 @@ export function EnhancedUserDirectory() {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to update password'),
+        description: await getErrorMessage(error, 'Failed to update password'),
         variant: 'destructive',
       });
     } finally {
@@ -389,15 +512,26 @@ export function EnhancedUserDirectory() {
     }
   };
 
-  const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
+  const handleStatusChange = async (user: UserProfile, newStatus: UserStatus, agencyWorkspaceId?: string) => {
+    const statusRequiresWorkspace = newStatus === 'active' && isStaffAdminRole(user.role) && !hasValidDefaultAgencyMembership(user);
+    if (statusRequiresWorkspace && !agencyWorkspaceId) {
+      toast({
+        title: 'Workspace Required',
+        description: 'Select an active agency workspace before reactivating this staff/admin user.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true);
 
       const { error } = await supabase.functions.invoke('admin-update-user', {
         body: {
           action: 'status',
-          userId,
+          userId: user.id,
           status: newStatus,
+          agencyWorkspaceId: statusRequiresWorkspace ? agencyWorkspaceId : undefined,
         },
       });
 
@@ -413,7 +547,7 @@ export function EnhancedUserDirectory() {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to update user status'),
+        description: await getErrorMessage(error, 'Failed to update user status'),
         variant: 'destructive',
       });
     } finally {
@@ -444,7 +578,7 @@ export function EnhancedUserDirectory() {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to delete user'),
+        description: await getErrorMessage(error, 'Failed to delete user'),
         variant: 'destructive',
       });
     } finally {
@@ -479,7 +613,7 @@ export function EnhancedUserDirectory() {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: getErrorMessage(error, 'Failed to save notes'),
+        description: await getErrorMessage(error, 'Failed to save notes'),
         variant: 'destructive',
       });
     } finally {
@@ -491,6 +625,7 @@ export function EnhancedUserDirectory() {
   const closeActionDialog = () => {
     setActionDialog(null);
     setSelectedUser(null);
+    setStatusAgencyWorkspaceId('');
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -540,7 +675,7 @@ export function EnhancedUserDirectory() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreateUser} className="grid gap-4 md:grid-cols-5 md:items-end">
+          <form onSubmit={handleCreateUser} className="grid gap-4 md:grid-cols-6 md:items-end">
             <div className="space-y-2 md:col-span-1">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -577,7 +712,14 @@ export function EnhancedUserDirectory() {
             </div>
             <div className="space-y-2 md:col-span-1">
               <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={setRole} disabled={isCreating}>
+              <Select
+                value={role}
+                onValueChange={(value) => {
+                  setRole(value);
+                  if (!isStaffAdminRole(value)) setCreateAgencyWorkspaceId('');
+                }}
+                disabled={isCreating}
+              >
                 <SelectTrigger id="role">
                   <SelectValue />
                 </SelectTrigger>
@@ -590,6 +732,30 @@ export function EnhancedUserDirectory() {
                 </SelectContent>
               </Select>
             </div>
+            {isStaffAdminRole(role) && (
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="create-agency-workspace">Workspace</Label>
+                <Select
+                  value={createAgencyWorkspaceId}
+                  onValueChange={setCreateAgencyWorkspaceId}
+                  disabled={isCreating || isLoadingAgencyWorkspaces || agencyWorkspaceOptions.length === 0}
+                >
+                  <SelectTrigger id="create-agency-workspace">
+                    <SelectValue placeholder={isLoadingAgencyWorkspaces ? 'Loading...' : 'Select workspace'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agencyWorkspaceOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {agencyWorkspaceOptions.length === 0 && !isLoadingAgencyWorkspaces && (
+                  <p className="text-xs text-muted-foreground">No active agency workspaces available.</p>
+                )}
+              </div>
+            )}
             <Button type="submit" disabled={isCreating} className="md:col-span-1">
               {isCreating ? (
                 <>
@@ -703,6 +869,12 @@ export function EnhancedUserDirectory() {
                       <div>
                         <div className="font-medium">{user.full_name || 'No name'}</div>
                         <div className="text-sm text-muted-foreground">{user.email}</div>
+                        {getProvisioningWarning(user) && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>{getProvisioningWarning(user)}</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
@@ -769,6 +941,11 @@ export function EnhancedUserDirectory() {
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedUser(user);
+                                setStatusAgencyWorkspaceId(
+                                  user.default_agency_workspace_id && agencyWorkspaceOptions.some((option) => option.id === user.default_agency_workspace_id)
+                                    ? user.default_agency_workspace_id
+                                    : ''
+                                );
                                 setActionDialog('enable');
                               }}
                             >
@@ -829,7 +1006,13 @@ export function EnhancedUserDirectory() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role</Label>
-              <Select value={editRole} onValueChange={setEditRole}>
+              <Select
+                value={editRole}
+                onValueChange={(value) => {
+                  setEditRole(value);
+                  if (!isStaffAdminRole(value)) setEditAgencyWorkspaceId('');
+                }}
+              >
                 <SelectTrigger id="edit-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -842,6 +1025,30 @@ export function EnhancedUserDirectory() {
                 </SelectContent>
               </Select>
             </div>
+            {editUser && userNeedsWorkspaceForStaffRole(editUser, editRole) && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-agency-workspace">Workspace</Label>
+                <Select
+                  value={editAgencyWorkspaceId}
+                  onValueChange={setEditAgencyWorkspaceId}
+                  disabled={isLoadingAgencyWorkspaces || agencyWorkspaceOptions.length === 0}
+                >
+                  <SelectTrigger id="edit-agency-workspace">
+                    <SelectValue placeholder={isLoadingAgencyWorkspaces ? 'Loading...' : 'Select workspace'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agencyWorkspaceOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Required because this active staff/admin user does not have a valid default workspace membership.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)}>
@@ -944,14 +1151,44 @@ export function EnhancedUserDirectory() {
                     Are you sure you want to {actionDialog} {selectedUser.full_name} ({selectedUser.email})?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                {actionDialog === 'enable' && isStaffAdminRole(selectedUser.role) && !hasValidDefaultAgencyMembership(selectedUser) && (
+                  <div className="space-y-2 py-2">
+                    <Label htmlFor="status-agency-workspace">Workspace</Label>
+                    <Select
+                      value={statusAgencyWorkspaceId}
+                      onValueChange={setStatusAgencyWorkspaceId}
+                      disabled={isProcessing || isLoadingAgencyWorkspaces || agencyWorkspaceOptions.length === 0}
+                    >
+                      <SelectTrigger id="status-agency-workspace">
+                        <SelectValue placeholder={isLoadingAgencyWorkspaces ? 'Loading...' : 'Select workspace'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agencyWorkspaceOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Required because this staff/admin user lacks a valid active default workspace membership.
+                    </p>
+                  </div>
+                )}
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => {
                       const nextStatus: UserStatus = actionDialog === 'enable' ? 'active' : actionDialog === 'ban' ? 'banned' : 'disabled';
-                      handleStatusChange(selectedUser.id, nextStatus);
+                      handleStatusChange(selectedUser, nextStatus, statusAgencyWorkspaceId);
                     }}
-                    disabled={isProcessing}
+                    disabled={
+                      isProcessing ||
+                      (actionDialog === 'enable' &&
+                        isStaffAdminRole(selectedUser.role) &&
+                        !hasValidDefaultAgencyMembership(selectedUser) &&
+                        !statusAgencyWorkspaceId)
+                    }
                     className={actionDialog === 'ban' ? 'bg-destructive text-destructive-foreground' : undefined}
                   >
                     {isProcessing ? 'Processing...' : 'Confirm'}
