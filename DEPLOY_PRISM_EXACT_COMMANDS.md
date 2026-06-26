@@ -15,7 +15,7 @@ supabase functions deploy prism-api --project-ref lrqajzwcmdwahnjyidgv
 ## Step 2: Set System-Wide API Key
 
 ```bash
-supabase secrets set PRISM_SYSTEM_API_KEY=PRISM_SYSTEM_API_KEY_REDACTED --project-ref lrqajzwcmdwahnjyidgv
+supabase secrets set PRISM_SYSTEM_API_KEY=YOUR_PRISM_SYSTEM_API_KEY --project-ref lrqajzwcmdwahnjyidgv
 ```
 
 ---
@@ -51,7 +51,7 @@ You should see:
 ### Test via API
 ```bash
 curl -X POST https://lrqajzwcmdwahnjyidgv.supabase.co/functions/v1/prism-api/run \
-  -H "Authorization: Bearer PRISM_SYSTEM_API_KEY_REDACTED" \
+  -H "Authorization: Bearer YOUR_PRISM_SYSTEM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Test prompt",
@@ -71,7 +71,7 @@ Copy and paste these one by one:
 supabase functions deploy prism-api --project-ref lrqajzwcmdwahnjyidgv
 
 # 2. Set API key
-supabase secrets set PRISM_SYSTEM_API_KEY=PRISM_SYSTEM_API_KEY_REDACTED --project-ref lrqajzwcmdwahnjyidgv
+supabase secrets set PRISM_SYSTEM_API_KEY=YOUR_PRISM_SYSTEM_API_KEY --project-ref lrqajzwcmdwahnjyidgv
 
 # 3. Set service URL
 supabase secrets set PRISM_SERVICE_URL=https://ahnnwwxhchdwwigaixdm.supabase.co/functions/v1/prism-api --project-ref lrqajzwcmdwahnjyidgv
