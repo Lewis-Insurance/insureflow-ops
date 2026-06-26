@@ -137,18 +137,27 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
       const amount = parseFloat(formData.amount);
       const selectedPolicy = policies.find(p => p.id === formData.policy_id);
 
-      // Get user's org_id from profile
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
+      // Resolve the user's agency workspace (org) using the DB's own
+      // get_user_org_id() function. This guarantees the inserted org_id matches
+      // the premium_payments RLS WITH CHECK (org_id = get_user_org_id()).
+      // NOTE: the previous code read from a non-existent `user_profiles` table,
+      // which silently resolved to null and now fails RLS now that it is enabled.
+      const { data: orgId, error: orgError } = await supabase.rpc('get_user_org_id');
+
+      if (orgError || !orgId) {
+        toast({
+          title: 'Error',
+          description: 'Could not determine your agency workspace. Please re-select your workspace and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       // Get or create today's day sheet
       let daySheetId: string | null = null;
-      if (profile?.org_id) {
+      {
         const { data: sheetId, error: sheetError } = await supabase
-          .rpc('get_or_create_day_sheet', { p_org_id: profile.org_id });
+          .rpc('get_or_create_day_sheet', { p_org_id: orgId });
 
         if (!sheetError && sheetId) {
           daySheetId = sheetId;
@@ -171,7 +180,7 @@ export function AddPaymentModal({ open, onOpenChange, accountId, onSuccess }: Ad
           notes: formData.notes || null,
           payer_name: formData.payer_name || null,
           day_sheet_id: daySheetId,
-          org_id: profile?.org_id || null,
+          org_id: orgId,
         });
 
       if (error) throw error;
