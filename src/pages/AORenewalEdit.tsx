@@ -649,8 +649,8 @@ export default function AORenewalEdit() {
                       </SelectTrigger>
                       <SelectContent className="bg-slate-950 text-white">
                         <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="contacted">Contacted</SelectItem>
                         <SelectItem value="quoted">Quoted</SelectItem>
+                        <SelectItem value="contacted">Contacted</SelectItem>
                         {formData.status === 'renewed' && (
                           <SelectItem value="renewed" disabled>Retained (existing)</SelectItem>
                         )}
