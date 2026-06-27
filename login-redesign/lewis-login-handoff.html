@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lewis Insurance — Sign-in Redesign · Developer Handoff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --deepwater:#06182A;--harbor:#0E2C49;--navy:#143A5E;--steel:#1E4A75;
+  --orange:#E8772E;--deep-orange:#B4540F;--sail:#fff;--mist:#F6F8FB;--hairline:#E4EAF1;
+  --field-border:#D8E0EA;--ink:#0F1E2E;--fog:#5B6B7C;--haze:#9AA7B6;--seafoam:#EAF1F8;--tide:#93A8C0;
+  --error:#DC3545;--success:#14955F;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--mist);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:0 22px 90px}
+h1,h2,h3,h4{font-family:'Plus Jakarta Sans','Inter',sans-serif;letter-spacing:-.02em;color:var(--ink);line-height:1.2}
+code,pre,.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+/* header */
+header{background:linear-gradient(160deg,var(--harbor),var(--deepwater));color:var(--seafoam);padding:46px 0 40px;margin-bottom:38px;position:relative;overflow:hidden}
+header .wrap{position:relative;z-index:1}
+header .eyebrow{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--orange);font-weight:700;margin-bottom:12px}
+header h1{color:#fff;font-size:33px;font-weight:800}
+header p{color:var(--tide);margin-top:12px;max-width:62ch;font-size:15.5px}
+header .meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-block;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#dce8f5}
+.badge.warn{background:rgba(232,119,46,.16);border-color:rgba(232,119,46,.4);color:#ffd9bd}
+header .wave{position:absolute;left:0;right:0;bottom:-1px;height:70px;opacity:.5}
+
+/* sections */
+section{background:#fff;border:1px solid var(--hairline);border-radius:16px;padding:30px 32px;margin-bottom:20px;box-shadow:0 1px 2px rgba(16,30,46,.04)}
+section>h2{font-size:21px;display:flex;align-items:center;gap:11px;margin-bottom:6px}
+section>h2 .n{flex:none;width:28px;height:28px;border-radius:8px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Inter'}
+section .lead{color:var(--fog);margin:2px 0 18px;font-size:14.5px}
+h3{font-size:16px;margin:22px 0 9px;color:var(--navy)}
+h4{font-size:13.5px;margin:16px 0 6px;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
+p{margin:9px 0;font-size:14.5px}
+ul,ol{margin:8px 0 8px 4px;padding-left:20px}
+li{margin:6px 0;font-size:14.5px}
+strong{font-weight:600;color:var(--ink)}
+a{color:var(--deep-orange);text-decoration:none;font-weight:500}a:hover{text-decoration:underline}
+.mono.inl{background:var(--mist);border:1px solid var(--hairline);border-radius:6px;padding:1px 6px;font-size:12.5px;color:var(--steel)}
+
+pre{background:var(--deepwater);color:#cfe0f0;border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:12.7px;line-height:1.55;margin:12px 0}
+pre .c{color:#6f8aa8}.pre .k{color:#7cc0f0}pre .s{color:#e8a87c}pre .del{color:#ff9a9a}pre .add{color:#9be8b6}
+
+/* callouts */
+.call{border-radius:12px;padding:14px 16px;margin:14px 0;font-size:14px;border:1px solid}
+.call h4{margin:0 0 5px;text-transform:none;letter-spacing:0;font-size:13.5px}
+.call.fix{background:#fff6ef;border-color:#f6d3b3}.call.fix h4{color:var(--deep-orange)}
+.call.guard{background:#fdecee;border-color:#f4c7cd}.call.guard h4{color:#8E1620}
+.call.ok{background:#ecf8f1;border-color:#bce6cf}.call.ok h4{color:#0d6b44}
+.call.info{background:#eef4fb;border-color:#cfe0f2}.call.info h4{color:var(--navy)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.3px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--hairline);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--fog);font-weight:700;background:var(--mist)}
+td.mono{font-size:12.3px}
+.pass{color:var(--success);font-weight:700}.fail{color:var(--error);font-weight:700}
+
+/* swatches */
+.sw{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.chip{width:130px;border:1px solid var(--hairline);border-radius:10px;overflow:hidden;font-size:11px}
+.chip .c{height:46px}.chip .t{padding:6px 8px;line-height:1.35}
+.chip .t b{display:block;font-size:11.5px}.chip .t span{color:var(--fog);font-family:'JetBrains Mono',monospace;font-size:10.5px}
+
+/* checklist */
+.chk{list-style:none;padding-left:0}
+.chk li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--hairline)}
+.chk li::before{content:"";flex:none;width:17px;height:17px;border:2px solid var(--field-border);border-radius:5px;margin-top:2px}
+.phase{font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy);margin:18px 0 4px;font-size:15px}
+
+.toc{columns:2;gap:26px;font-size:14px}
+.toc a{display:block;padding:3px 0;color:var(--steel)}
+@media(max-width:640px){.toc{columns:1}.chip{width:46%}}
+.foot{text-align:center;color:var(--haze);font-size:12.5px;margin-top:30px}
+.kbd{font-family:'JetBrains Mono';font-size:11px;background:#fff;border:1px solid var(--field-border);border-bottom-width:2px;border-radius:5px;padding:1px 5px}
+</style>
+</head>
+<body>
+<header>
+  <svg class="wave" viewBox="0 0 1440 70" preserveAspectRatio="none" aria-hidden="true"><path d="M0,40 q180,-26 360,0 q180,26 360,0 q180,-26 360,0 q180,26 360,0 L1440,70 L0,70Z" fill="#11314F"/></svg>
+  <div class="wrap">
+    <div class="eyebrow">Developer Handoff · Presentation layer</div>
+    <h1>InsureFlow — Sign-in Redesign</h1>
+    <p>A world-class split-screen login that establishes the InsureFlow design language (deep-navy + signal-orange, Plus Jakarta Sans + Inter, the shield-and-tide motif) for every CRM screen that follows. InsureFlow is the platform; Lewis Insurance is the agency it runs. Pairs with the interactive prototype <span class="mono inl">lewis-login-redesign.html</span>.</p>
+    <div class="meta">
+      <span class="badge">Route: /auth · src/pages/Auth.tsx</span>
+      <span class="badge">Stack: Vite + React + Tailwind + shadcn/ui</span>
+      <span class="badge warn">⚑ Halt before merge — Brian approves the design language</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2><span class="n">0</span>TL;DR & contents</h2>
+  <p class="lead">What to build, in one breath.</p>
+  <p>Replace the centered-card login at <span class="mono inl">/auth</span> with a 55/45 split: a deep-navy brand panel carrying an animated "tide" (the signature) on the left, and a quiet, fast, fully-stated auth form on the right. Keep Supabase auth and the <span class="mono inl">is_staff</span> gate exactly as they are — this is a <strong>presentation-layer</strong> refactor. The prototype shows the target; this doc is the spec, corrected for your real stack.</p>
+  <div class="call info"><h4>Five things the original brief got wrong about this codebase</h4>
+  <ol style="margin-bottom:0">
+    <li>It assumes <strong>Next.js</strong> (<span class="mono inl">next/font</span>, <span class="mono inl">/public/brand</span>). This is <strong>Vite + React</strong> — load fonts via <span class="mono inl">index.html</span>, no Next conventions.</li>
+    <li>The "stray duplicate Sign In button" isn't an SSO stub — it's the shadcn <span class="mono inl">&lt;TabsList&gt;</span> rendering a single tab when signup is off. Exact fix in §3.</li>
+    <li><strong>Google SSO doesn't exist in the repo — and you've chosen password-only for v1</strong>, so the button is removed. Wiring notes are kept in §11 for when you add it later.</li>
+    <li><strong>No forgot-password route exists.</strong> "Forgot password?" needs a real flow or should be hidden for v1.</li>
+    <li><strong>The InsureFlow logo now exists</strong> (your 4-variant sheet). It's raster/AI-generated, so production still needs clean SVGs + a simplified favicon (§8). The prototype uses an SVG interpretation of the shield-and-waves mark.</li>
+  </ol></div>
+  <div class="toc">
+    <a href="#s1">1 · What this page is & who uses it</a>
+    <a href="#s2">2 · Brand decision (read before building)</a>
+    <a href="#s3">3 · Current-state audit + the button fix</a>
+    <a href="#s4">4 · Scope & guardrails</a>
+    <a href="#s5">5 · Design tokens (hex + HSL)</a>
+    <a href="#s6">6 · Type, spacing, motion</a>
+    <a href="#s7">7 · Layout & responsive</a>
+    <a href="#s8">8 · Components & states</a>
+    <a href="#s9">9 · Copy deck (exact strings)</a>
+    <a href="#s10">10 · Accessibility & verified contrast</a>
+    <a href="#s11">11 · How to build it in this stack</a>
+    <a href="#s12">12 · Acceptance criteria</a>
+    <a href="#s13">13 · Build → Review → Ship</a>
+    <a href="#s14">14 · Open questions for Brian</a>
+  </div>
+</section>
+
+<section id="s1">
+  <h2><span class="n">1</span>What this page is</h2>
+  <p class="lead">The front door to the system that runs the agency.</p>
+  <p>This is the staff authentication gate for the Lewis Insurance Agency OS (the InsureFlow Ops platform). It's the screen the team starts every workday on — <strong>no public signups</strong>; access is email + password, then gated post-auth on <span class="mono inl">is_staff</span> + active status. Three jobs: get an authorized person in fast, signal a real and secure product, and carry the brand as the first thing anyone sees. It's the most-seen screen in the build, so it sets the tone for everything else.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="n">2</span>Brand decision — read before building</h2>
+  <p class="lead">One naming call that affects logo, wordmark, and copy throughout.</p>
+  <p>You supplied the <strong>InsureFlow</strong> brand mark (the 4-variant sheet), so the design is now <strong>InsureFlow-first</strong>: the shield-and-waves logo, wordmark <em>Insure</em> (navy) + <em>Flow</em> (orange), with <strong>Lewis Insurance</strong> as the parent endorsement in the footer ("by Lewis Insurance · Since 1981"). The palette and tide motif already draw from the same shield / waves / orange-signal vocabulary, so everything is consistent.</p>
+  <div class="call ok"><h4>Resolved</h4>InsureFlow-first, confirmed by the supplied logo. Shield = protection, waves = flow, orange = signal — the exact concepts this system is built on.</div>
+</section>
+
+<section id="s3">
+  <h2><span class="n">3</span>Current-state audit + the duplicate-button fix</h2>
+  <p class="lead">Grounded in the actual files, not the screenshot alone.</p>
+  <table>
+    <tr><th>Item</th><th>Reality in the repo</th></tr>
+    <tr><td>File / route</td><td class="mono">src/pages/Auth.tsx → /auth</td></tr>
+    <tr><td>Auth call</td><td class="mono">useAuth().signIn → supabase.auth.signInWithPassword</td></tr>
+    <tr><td>Logo</td><td class="mono">/public/lovable-uploads/638e588a-…png (raster, rendered h-48 in a Card)</td></tr>
+    <tr><td>Header copy</td><td>"Authentication Required" / "Sign in to access the agency management system"</td></tr>
+    <tr><td>Staff gate</td><td><span class="mono inl">is_staff</span> enforced post-auth in <span class="mono inl">useAuth.ts</span> + <span class="mono inl">ProtectedRoute</span> (requireStaff). Not at the form.</td></tr>
+    <tr><td>Fonts</td><td>None loaded — system stack only.</td></tr>
+    <tr><td>"Pages" badge</td><td>Not present in <span class="mono inl">index.html</span>. <span class="mono inl">lovable-tagger</span> runs in dev only. Nothing to strip in prod.</td></tr>
+  </table>
+
+  <div class="call fix"><h4>The "two Sign In buttons" — root cause & fix</h4>
+  <p style="margin-top:6px">The form is a shadcn <span class="mono inl">&lt;Tabs&gt;</span>. Because <span class="mono inl">ENABLE_SIGNUP</span> defaults <span class="mono inl">false</span>, the <span class="mono inl">&lt;TabsList&gt;</span> still renders with one tab — a "Sign In" pill floating above the fields — while the submit button at the bottom is also "Sign In." That's the redundant pair in your screenshot. Fix: render the plain form and skip the tab strip entirely when signup is disabled.</p>
+  <pre><span class="c">// Auth.tsx — only wrap in Tabs when signup is actually enabled (lines ~182-186)</span>
+<span class="del">- &lt;TabsList className={`grid w-full ${ENABLE_SIGNUP ? 'grid-cols-2' : 'grid-cols-1'}`}&gt;</span>
+<span class="del">-   &lt;TabsTrigger value="signin"&gt;Sign In&lt;/TabsTrigger&gt;</span>
+<span class="del">- &lt;/TabsList&gt;</span>
+<span class="add">+ {ENABLE_SIGNUP && (</span>
+<span class="add">+   &lt;TabsList className="grid w-full grid-cols-2"&gt;…two triggers…&lt;/TabsList&gt;</span>
+<span class="add">+ )}</span>
+<span class="c">// Result: exactly one primary "Sign in" on the page when signup is off (the default).</span></pre>
+  </div>
+</section>
+
+<section id="s4">
+  <h2><span class="n">4</span>Scope & guardrails</h2>
+  <div class="call guard"><h4>Do NOT touch</h4>
+  <ul style="margin-bottom:0">
+    <li>Supabase auth logic, <span class="mono inl">useAuth</span> sign-in, session handling.</li>
+    <li>The <span class="mono inl">is_staff</span> gate, <span class="mono inl">ProtectedRoute</span>, RLS, or any schema/policy.</li>
+    <li>Redirect targets (<span class="mono inl">/</span>, <span class="mono inl">/profile?tab=security</span> for MFA/phone).</li>
+  </ul></div>
+  <div class="call ok"><h4>In scope</h4>
+  <ul style="margin-bottom:0">
+    <li>Everything visual: layout, tokens, type, the tide, fields, buttons, states, motion, copy.</li>
+    <li>The Tabs/duplicate-button fix above.</li>
+    <li>Adding Google SSO <em>UI</em> (wiring is a flagged dependency — §11).</li>
+  </ul></div>
+</section>
+
+<section id="s5">
+  <h2><span class="n">5</span>Design tokens</h2>
+  <p class="lead">Hex for the prototype; HSL so they drop into your <span class="mono inl">hsl(var(--x))</span> Tailwind system.</p>
+  <div class="sw">
+    <div class="chip"><div class="c" style="background:#06182A"></div><div class="t"><b>Deepwater</b><span>#06182A</span></div></div>
+    <div class="chip"><div class="c" style="background:#0E2C49"></div><div class="t"><b>Harbor</b><span>#0E2C49</span></div></div>
+    <div class="chip"><div class="c" style="background:#143A5E"></div><div class="t"><b>Brand Navy</b><span>#143A5E</span></div></div>
+    <div class="chip"><div class="c" style="background:#1E4A75"></div><div class="t"><b>Steel</b><span>#1E4A75</span></div></div>
+    <div class="chip"><div class="c" style="background:#E8772E"></div><div class="t"><b>Signal Orange</b><span>#E8772E</span></div></div>
+    <div class="chip"><div class="c" style="background:#B4540F"></div><div class="t"><b>Deep Orange</b><span>#B4540F</span></div></div>
+    <div class="chip"><div class="c" style="background:#0F1E2E"></div><div class="t"><b>Slate Ink</b><span>#0F1E2E</span></div></div>
+    <div class="chip"><div class="c" style="background:#5B6B7C"></div><div class="t"><b>Fog</b><span>#5B6B7C</span></div></div>
+    <div class="chip"><div class="c" style="background:#D8E0EA"></div><div class="t"><b>Field Border</b><span>#D8E0EA</span></div></div>
+    <div class="chip"><div class="c" style="background:#F6F8FB;border:1px solid #eee"></div><div class="t"><b>Mist</b><span>#F6F8FB</span></div></div>
+  </div>
+  <table>
+    <tr><th>Token</th><th>Hex</th><th>HSL (for index.css)</th><th>Use</th></tr>
+    <tr><td>--deepwater</td><td class="mono">#06182A</td><td class="mono">210 75% 9%</td><td>brand-panel gradient base</td></tr>
+    <tr><td>--harbor</td><td class="mono">#0E2C49</td><td class="mono">209 68% 17%</td><td>brand-panel gradient top</td></tr>
+    <tr><td>--navy</td><td class="mono">#143A5E</td><td class="mono">209 65% 22%</td><td><strong>primary button</strong>, focus border, checked states</td></tr>
+    <tr><td>--steel</td><td class="mono">#1E4A75</td><td class="mono">210 59% 29%</td><td>navy hover / wave accents</td></tr>
+    <tr><td>--orange</td><td class="mono">#E8772E</td><td class="mono">24 80% 55%</td><td><strong>non-text accent only</strong>: horizon, glow, focus ring, logo</td></tr>
+    <tr><td>--deep-orange</td><td class="mono">#B4540F</td><td class="mono">25 85% 38%</td><td>text links on light (AA-safe)</td></tr>
+    <tr><td>--ink</td><td class="mono">#0F1E2E</td><td class="mono">211 51% 12%</td><td>headings / body on light</td></tr>
+    <tr><td>--fog</td><td class="mono">#5B6B7C</td><td class="mono">211 15% 42%</td><td>secondary text, footer</td></tr>
+    <tr><td>--field-border</td><td class="mono">#D8E0EA</td><td class="mono">213 30% 88%</td><td>input borders (rest)</td></tr>
+    <tr><td>--hairline</td><td class="mono">#E4EAF1</td><td class="mono">212 32% 92%</td><td>dividers</td></tr>
+    <tr><td>--mist</td><td class="mono">#F6F8FB</td><td class="mono">216 38% 97%</td><td>subtle fills, SSO hover</td></tr>
+    <tr><td>--success / --error</td><td class="mono">#14955F / #DC3545</td><td class="mono">155 76% 33% / 354 70% 54%</td><td>success check / error</td></tr>
+  </table>
+  <div class="call info"><h4>Relationship to existing repo tokens</h4>Your <span class="mono inl">tailwind.config.ts</span> already defines <span class="mono inl">--lewis-blue: 213 94% 54%</span> and <span class="mono inl">--lewis-orange: 22 100% 58%</span> (both bright). The redesign introduces a <strong>deeper navy as the brand surface</strong> and a slightly deeper signal orange. Keep <span class="mono inl">lewis-blue</span> as a bright interactive accent if you like, but the login's surface should be the deepwater family. Add the new tokens as CSS vars in <span class="mono inl">src/index.css</span> and expose them in <span class="mono inl">tailwind.config.ts</span>.</div>
+</section>
+
+<section id="s6">
+  <h2><span class="n">6</span>Type, spacing, radius, motion</h2>
+  <h4>Type — Plus Jakarta Sans (display) + Inter (UI)</h4>
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / line</th><th>Weight</th></tr>
+    <tr><td>Brand headline</td><td>Plus Jakarta Sans</td><td>34 / 1.18</td><td>700</td></tr>
+    <tr><td>H1 (form)</td><td>Plus Jakarta Sans</td><td>28 / 1.2</td><td>700</td></tr>
+    <tr><td>Subhead / body</td><td>Inter</td><td>15 / 1.5</td><td>400</td></tr>
+    <tr><td>Label</td><td>Inter</td><td>13 / 1.2</td><td>500</td></tr>
+    <tr><td>Input</td><td>Inter</td><td>15.5</td><td>400</td></tr>
+    <tr><td>Button</td><td>Inter</td><td>15</td><td>600</td></tr>
+    <tr><td>Footer / legal</td><td>Inter</td><td>12.5</td><td>400</td></tr>
+  </table>
+  <h4>Dimensions</h4>
+  <p>Split 55 : 45 (≥1024px) · form max-width <strong>384px</strong> · auth padding 48px (32 mobile) · brand padding 56px · field & button height <strong>48px</strong> · radius <strong>12px</strong> · eye-toggle target 44px · field gap 18px · brand logo 44px / form logo 34px · checkbox 18px (r5).</p>
+  <h4>Shadow & focus</h4>
+  <p>Button hover <span class="mono inl">0 8px 20px rgba(20,58,94,.26)</span> · input focus <span class="mono inl">border:Brand Navy + 0 0 0 4px rgba(232,119,46,.16)</span> · button focus ring <span class="mono inl">0 0 0 4px rgba(232,119,46,.30)</span>. The split itself is the structure — no heavy card shadow on the form.</p>
+  <h4>Motion</h4>
+  <p>ease-standard <span class="mono inl">cubic-bezier(.4,0,.2,1)</span> · ease-entrance <span class="mono inl">cubic-bezier(.16,1,.3,1)</span>. Tide waves loop 26 / 22 / 18s linear; orange glow breathes 8s; horizon pulses 4s. On load, form elements rise+fade with a 70ms stagger (logo → H1 → subhead → SSO → divider → email → password → row → submit → footer). <span class="mono inl">prefers-reduced-motion</span>: freeze waves/glow/horizon, collapse entrance to a 200ms fade. (All implemented in the prototype.)</p>
+</section>
+
+<section id="s7">
+  <h2><span class="n">7</span>Layout & responsive</h2>
+  <ul>
+    <li><strong>≥1024px</strong> — split: brand panel 55% left, auth column 45% right.</li>
+    <li><strong>768–1023px</strong> — brand collapses to a ~30vh top band (logo + headline over the tide); form centered below.</li>
+    <li><strong>&lt;768px</strong> — slim ~108px navy header (logo + thin animated wave strip); form full-width; 50px tap targets.</li>
+  </ul>
+  <div class="call info"><h4>The tide (the signature — don't over-build it)</h4>Three layered SVG wave paths (<span class="mono inl">#11314F</span> / <span class="mono inl">#0C2742</span> / <span class="mono inl">#08203A</span>) animated by CSS <span class="mono inl">translateX</span>; one orange horizon line at 70% opacity that pulses; one breathing radial orange glow; a 3.5% grain overlay (<span class="mono inl">feTurbulence</span>); a faint sail watermark. That's the whole recipe. No canvas, no three.js, no parallax, no third accent color — the restraint is the brand. Build it as inline SVG + CSS keyframes (GPU-friendly).</div>
+</section>
+
+<section id="s8">
+  <h2><span class="n">8</span>Components & states</h2>
+  <h3>Logo — InsureFlow shield + waves (supplied)</h3>
+  <ul>
+    <li><strong>Brand panel (dark):</strong> reversed — orange shield, white waves, orange signal dot; "Insure" white + "Flow" orange. (Sheet variant 4.)</li>
+    <li><strong>Auth column (light):</strong> full-color — orange shield, navy waves, orange dot; "Insure" navy + "Flow" orange. (Variant 1.)</li>
+    <li><strong>Favicon / loading core:</strong> icon-only (variant 3) — but simplify first, see below.</li>
+  </ul>
+  <div class="call fix"><h4>Logo polish before it propagates (it's raster/AI-generated today)</h4>
+  <ul style="margin-bottom:0">
+    <li><strong>Build a dedicated simplified favicon</strong> — the interior waves blur below ~32px. Reduce to shield + two wave strokes + dot.</li>
+    <li><strong>Resolve the floating orange dot</strong> — anchor it as a deliberate "rising signal" in the shield gap, or drop it.</li>
+    <li><strong>Pick one shield behavior</strong> — the horizontal lockup lets waves spill past (and tangent) the shield edge; stacked/reversed contain them. Containment sells "protection." Unify it.</li>
+    <li><strong>Even out wave stroke weights</strong> and leave a sliver of clearance from the shield outline (kills tangents).</li>
+    <li><strong>Ship the full set when vectorized:</strong> full-color, reversed, icon-only (have these) + all-white + all-navy monos + the favicon.</li>
+  </ul></div>
+  <h3>Inputs</h3>
+  <p>Persistent visible <strong>label</strong> above each field (never placeholder-only). Rest border <span class="mono inl">#D8E0EA</span> → hover <span class="mono inl">#C2CDDA</span> → focus navy border + orange glow ring. Invalid: error border + inline message with icon, wired via <span class="mono inl">aria-describedby</span>. Restyle <span class="mono inl">:-webkit-autofill</span> so it stays white-bg / ink-text (don't let it turn yellow).</p>
+  <h3>Password field</h3>
+  <p>Trailing show/hide eye (44px target, toggles <span class="mono inl">type</span> + <span class="mono inl">aria-pressed</span>); inline "Caps Lock is on" hint via <span class="mono inl">getModifierState('CapsLock')</span>.</p>
+  <h3>Primary button</h3>
+  <p>Brand Navy bg + white text (<strong>not</strong> orange — fails AA, see §10). Hover → darken + lift + shadow; active → scale .99; <strong>loading</strong> → spinner + "Signing in…", disabled; <strong>success</strong> → morph to check + "Signed in"; then route.</p>
+  <h3>Google SSO — removed for v1</h3>
+  <p>Per your call, the login is <strong>password-only</strong> at launch (matches the app today): no SSO button, no "or" divider. Wiring notes are retained in §11 for when you add it.</p>
+  <h3>Form-level error banner</h3>
+  <p>Top of form, <span class="mono inl">role="alert" aria-live="polite"</span>, icon + message. Used for credential/locked/network/not-authorized cases.</p>
+</section>
+
+<section id="s9">
+  <h2><span class="n">9</span>Copy deck — exact strings</h2>
+  <table>
+    <tr><th>Element</th><th>String</th></tr>
+    <tr><td>Brand eyebrow</td><td>Agency Operating System</td></tr>
+    <tr><td>Brand headline</td><td>Every client, in one current.</td></tr>
+    <tr><td>Brand subline</td><td>Where every policy, quote, and renewal keeps moving, and stays protected.</td></tr>
+    <tr><td>Brand anchor</td><td>by Lewis Insurance · Lake City, FL · Since 1981</td></tr>
+    <tr><td>H1 / subhead</td><td>Welcome back / Sign in to your InsureFlow workspace</td></tr>
+    <tr><td>SSO / divider</td><td>— removed for v1 (password-only)</td></tr>
+    <tr><td>Email</td><td>label "Email" · placeholder "you@lewisinsurance.com"</td></tr>
+    <tr><td>Password</td><td>label "Password" · placeholder "Enter your password"</td></tr>
+    <tr><td>Row</td><td>Keep me signed in · Forgot password?</td></tr>
+    <tr><td>Submit / loading</td><td>Sign in / Signing in…</td></tr>
+    <tr><td>Bad credentials</td><td>That email or password didn't match. Try again.</td></tr>
+    <tr><td>Not authorized</td><td>This account isn't authorized for the InsureFlow workspace. Contact your administrator.</td></tr>
+    <tr><td>Locked</td><td>Too many attempts. Try again in 5 minutes, or reset your password.</td></tr>
+    <tr><td>Network</td><td>Can't reach the workspace. Check your connection and try again.</td></tr>
+    <tr><td>Footer</td><td>Authorized staff only · Encrypted connection — InsureFlow · by Lewis Insurance · Since 1981</td></tr>
+  </table>
+  <div class="call info" style="margin-bottom:0"><h4>Security note on error copy</h4>Your current <span class="mono inl">handleSignIn</span> deliberately collapses bad-email and bad-password into one generic message (anti-enumeration). Keep that for the <em>bad-credentials</em> case. "Not authorized / locked / network" are distinct UX states you can add only where the Supabase response actually distinguishes them — otherwise fall back to generic. Don't leak which accounts exist.</div>
+</section>
+
+<section id="s10">
+  <h2><span class="n">10</span>Accessibility & verified contrast</h2>
+  <p class="lead">Ratios computed against WCAG 2.1; AA = 4.5:1 text, 3:1 large/UI.</p>
+  <table>
+    <tr><th>Pair</th><th>Ratio</th><th>AA text</th></tr>
+    <tr><td>Navy button #143A5E / white text</td><td class="mono">11.69</td><td class="pass">PASS</td></tr>
+    <tr><td>Deep-orange link #B4540F / white</td><td class="mono">4.98</td><td class="pass">PASS</td></tr>
+    <tr><td>Ink #0F1E2E / white</td><td class="mono">16.86</td><td class="pass">PASS</td></tr>
+    <tr><td>Fog #5B6B7C / white (secondary, footer)</td><td class="mono">5.47</td><td class="pass">PASS</td></tr>
+    <tr><td>White text / harbor panel #0E2C49</td><td class="mono">14.24</td><td class="pass">PASS</td></tr>
+    <tr><td>Tide #93A8C0 / harbor (brand secondary)</td><td class="mono">5.83</td><td class="pass">PASS</td></tr>
+    <tr><td>Orange eyebrow #E8772E / harbor</td><td class="mono">4.82</td><td class="pass">PASS</td></tr>
+    <tr><td>Error #DC3545 / white</td><td class="mono">4.53</td><td class="pass">PASS</td></tr>
+    <tr><td>⚠ Orange #E8772E / white as TEXT</td><td class="mono">2.95</td><td class="fail">FAIL → accent only</td></tr>
+  </table>
+  <div class="call fix"><h4>Two things this proves</h4>
+  <ul style="margin-bottom:0">
+    <li><strong>Primary button stays navy, not orange.</strong> Orange + white text is 2.95:1 (fails). If brand insists on an orange CTA to echo marketing, the only AA-safe combo is orange bg + <em>navy</em> text (<span class="mono inl">#0A2038</span>). Recommend navy bg.</li>
+    <li><strong>Footer uses Fog, not the lighter Haze</strong> (#9AA7B6 was 2.45:1 — failed; corrected in the prototype).</li>
+  </ul></div>
+  <p><strong>Also required:</strong> visible <span class="mono inl">:focus-visible</span> ring on every interactive element; logical tab order; <span class="kbd">Enter</span> submits; email autofocus; the rest-state field border (1.33:1) is decorative — fields are identified by label + fill + the high-contrast focus state (common AA-passing pattern); target Lighthouse a11y ≥ 95.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="n">11</span>How to build it in <em>this</em> stack</h2>
+  <h4>1 · Fonts (Vite, not next/font)</h4>
+  <pre><span class="c">&lt;!-- index.html &lt;head&gt; --&gt;</span>
+&lt;link rel="preconnect" href="https://fonts.gstatic.com" crossorigin&gt;
+&lt;link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"&gt;</pre>
+  <p>Then set the families in <span class="mono inl">tailwind.config.ts</span> (<span class="mono inl">fontFamily.sans = ['Inter',…]</span>, <span class="mono inl">fontFamily.display = ['Plus Jakarta Sans',…]</span>). Self-host later if you want zero third-party requests.</p>
+  <h4>2 · Tokens</h4>
+  <p>Add the §5 HSL values as CSS vars in <span class="mono inl">src/index.css</span> (<span class="mono inl">:root</span>) and register them in <span class="mono inl">tailwind.config.ts</span> under <span class="mono inl">colors</span>, following the existing <span class="mono inl">hsl(var(--x))</span> pattern.</p>
+  <h4>3 · Refactor Auth.tsx</h4>
+  <p>Build the split layout; drop the Card; apply the Tabs fix (§3). Reuse the existing <span class="mono inl">signInData</span> state, <span class="mono inl">validateSignInForm</span>, and <span class="mono inl">handleSignIn</span> untouched — only the markup/classes change. shadcn <span class="mono inl">Input</span>/<span class="mono inl">Label</span>/<span class="mono inl">Button</span>/<span class="mono inl">Alert</span> can stay (restyled via tokens) or be replaced with token-styled elements.</p>
+  <h4>4 · Google SSO — deferred (removed for v1)</h4>
+  <pre><span class="c">// Only after the Google provider is enabled in Supabase Auth</span>
+<span class="c">// (Dashboard → Authentication → Providers → Google) + redirect URLs set:</span>
+await supabase.auth.signInWithOAuth({ provider: <span class="s">'google'</span>,
+  options: { redirectTo: <span class="s">`${location.origin}/`</span> } });
+<span class="c">// Removed for v1. When you add it: enable the provider, render the button, then call this.</span></pre>
+  <h4>5 · Forgot-password — no route exists</h4>
+  <p>Either (a) add a <span class="mono inl">/reset</span> route using <span class="mono inl">supabase.auth.resetPasswordForEmail()</span>, or (b) hide the link for v1. Don't ship a link to nowhere.</p>
+  <h4>6 · Logo</h4>
+  <p>The InsureFlow mark exists but is raster/AI-generated. The prototype ships a clean <strong>SVG interpretation</strong> of the shield-and-waves (reversed + full-color) you can lift. For production, get the official logo professionally vectorized to <span class="mono inl">/public/</span> (full-color, reversed, icon-only, mono-white, mono-navy) and build the <strong>simplified favicon</strong> (§8); swap the favicon set in <span class="mono inl">index.html</span>. The prototype auto-loads <span class="mono inl">insureflow-logo-color.png</span> / <span class="mono inl">insureflow-logo-reversed.png</span> from its folder if present (drop in transparent-bg exports); otherwise it shows the vector stand-in.</p>
+  <div class="call ok" style="margin-bottom:0"><h4>Lovable artifacts</h4><span class="mono inl">lovable-tagger</span> is dev-only in <span class="mono inl">vite.config.ts</span> — fine to leave. No "Pages" badge exists in <span class="mono inl">index.html</span>; nothing to remove.</div>
+</section>
+
+<section id="s12">
+  <h2><span class="n">12</span>Acceptance criteria</h2>
+  <ul>
+    <li><span class="mono inl">npm run typecheck</span> + lint + <span class="mono inl">npm run build</span> pass.</li>
+    <li>Exactly one primary "Sign in"; the phantom Tabs button is gone.</li>
+    <li>Split at ≥1024, top-band 768–1023, slim header &lt;768.</li>
+    <li>Every input has a visible persistent label; orange focus-visible ring on every interactive element.</li>
+    <li>States implemented: focus/hover, show/hide + caps-lock, loading/disabled/success, field errors, form banner (bad-creds / not-authorized / locked / network).</li>
+    <li><span class="mono inl">prefers-reduced-motion</span> freezes waves + glow.</li>
+    <li>WCAG AA verified (navy button, deep-orange links); autofill keeps field styling.</li>
+    <li><span class="kbd">Enter</span> submits; email autofocus; logical tab order; Lighthouse a11y ≥ 95.</li>
+    <li>Supabase auth, <span class="mono inl">is_staff</span>, RLS untouched.</li>
+    <li>Prototype-only chrome (the demo "preview states" pill) is <strong>not</strong> ported to production.</li>
+  </ul>
+</section>
+
+<section id="s13">
+  <h2><span class="n">13</span>Build → Review → Ship</h2>
+  <p class="lead">Your sequence. Isolate this as one segment — it ratifies the design language.</p>
+  <div class="phase">Build</div>
+  <ul class="chk">
+    <li>Add fonts + tokens (§11.1–2)</li>
+    <li>Refactor Auth.tsx to the split layout + Tabs fix (§3, §7)</li>
+    <li>Build the tide (inline SVG + CSS keyframes, §7)</li>
+    <li>Wire all fields, password toggle, caps-lock, button states (§8)</li>
+    <li>Vectorize & drop in the logo; SSO visual + TODO (§11.4, §11.6)</li>
+  </ul>
+  <div class="phase">Review (halt for Brian)</div>
+  <ul class="chk">
+    <li>Open the prototype side-by-side; confirm the brand decision (§2)</li>
+    <li>Walk all states via the prototype's preview switcher</li>
+    <li>Confirm copy deck + founding year (§9, §14)</li>
+    <li>Run Lighthouse + keyboard-only pass</li>
+  </ul>
+  <div class="phase">Ship</div>
+  <ul class="chk">
+    <li>Decide SSO + forgot-password for v1 (wire or defer)</li>
+    <li>Atomic commit, gate-PASS, PR for review</li>
+    <li>Merge after Brian signs off — then propagate tokens to other screens</li>
+  </ul>
+</section>
+
+<section id="s14">
+  <h2><span class="n">14</span>Open questions for Brian</h2>
+  <ol>
+    <li><strong>Brand:</strong> ✓ Resolved — InsureFlow-first (logo supplied); Lewis Insurance as the parent line in the footer.</li>
+    <li><strong>Founding year:</strong> the prototype says "Since 1981," but public sources vary (1976 / 1980 / 1981) and there's a deeper "since 1949" heritage story. Confirm the canonical line.</li>
+    <li><strong>Google SSO:</strong> ✓ Resolved — removed for v1 (password-only). Revisit if staff move to Google Workspace SSO.</li>
+    <li><strong>Forgot-password in v1?</strong> Build the reset flow, or hide the link for now.</li>
+    <li><strong>CTA color:</strong> navy (recommended, AA-safe) confirmed, or push for orange (requires navy text)?</li>
+  </ol>
+</section>
+
+<p class="foot">InsureFlow · by Lewis Insurance — Sign-in redesign handoff · Presentation-layer only · Halt before merge for Brian's review.</p>
+</div>
+</body>
+</html>

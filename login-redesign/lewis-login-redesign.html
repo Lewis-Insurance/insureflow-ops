@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InsureFlow · Sign in (Redesign Prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LEWIS INSURANCE — SIGN-IN REDESIGN (interactive prototype)
+   Standalone mockup. Does NOT touch the app. Tokens mirror the
+   handoff so the dev can lift values 1:1.
+   ============================================================ */
+:root{
+  /* Brand surface (deep navy family — derived from the Lewis sail mark) */
+  --deepwater:#06182A; --harbor:#0E2C49; --navy:#143A5E; --steel:#1E4A75;
+  /* Signal */
+  --orange:#E8772E; --deep-orange:#B4540F;
+  /* Light auth column */
+  --sail:#FFFFFF; --mist:#F6F8FB; --hairline:#E4EAF1; --field-border:#D8E0EA;
+  --ink:#0F1E2E; --fog:#5B6B7C; --haze:#9AA7B6;
+  /* On-navy text */
+  --seafoam:#EAF1F8; --tide:#93A8C0;
+  /* Feedback */
+  --error:#DC3545; --success:#14955F;
+  /* System */
+  --radius:12px; --radius-sm:8px; --radius-lg:16px;
+  --ease-standard:cubic-bezier(.4,0,.2,1);
+  --ease-entrance:cubic-bezier(.16,1,.3,1);
+  --shadow-btn:0 8px 20px rgba(20,58,94,.26);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  color:var(--ink); background:var(--sail);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,.brand-headline,.wordmark b{font-family:'Plus Jakarta Sans','Inter',sans-serif}
+
+/* ---------- Stage / split ---------- */
+.stage{display:grid; grid-template-columns:55% 45%; min-height:100dvh}
+@media (max-width:1023px){ .stage{grid-template-columns:1fr; grid-template-rows:auto 1fr} }
+
+/* ============================================================
+   BRAND PANEL (left)
+   ============================================================ */
+.brand{
+  position:relative; overflow:hidden; color:var(--seafoam);
+  background:linear-gradient(160deg,var(--harbor) 0%,#0a223b 45%,var(--deepwater) 100%);
+  padding:56px; display:flex; flex-direction:column; justify-content:flex-start;
+  isolation:isolate;
+}
+.tide{position:absolute; inset:0; z-index:-1; overflow:hidden}
+.wave{position:absolute; left:0; bottom:0; width:200%; will-change:transform}
+.wave svg{display:block; width:100%; height:100%}
+.wave.back{height:29%; opacity:.55; animation:drift 26s linear infinite}
+.wave.mid{height:23%; opacity:.85; animation:drift 22s linear infinite}
+.wave.front{height:18%; animation:drift 18s linear infinite}
+@keyframes drift{to{transform:translateX(-50%)}}
+
+.horizon{position:absolute; left:0; right:0; bottom:30%; height:1.5px;
+  background:var(--orange); opacity:.7; z-index:-1; box-shadow:0 0 12px rgba(232,119,46,.55);
+  animation:horizon 4s var(--ease-standard) infinite}
+@keyframes horizon{0%,100%{opacity:.38}50%{opacity:.85}}
+
+.glow{position:absolute; left:38%; bottom:14%; width:620px; height:620px; z-index:-1;
+  transform:translate(-50%,30%); border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle,rgba(232,119,46,.20) 0%,rgba(232,119,46,.08) 35%,transparent 70%);
+  filter:blur(8px); animation:breath 8s ease-in-out infinite; opacity:0}
+@keyframes breath{0%,100%{transform:translate(-50%,30%) scale(.9);opacity:.55}50%{transform:translate(-50%,30%) scale(1.08);opacity:.9}}
+
+.grain{position:absolute; inset:0; z-index:-1; opacity:.05; mix-blend-mode:overlay; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+.watermark{position:absolute; top:-20px; right:-40px; width:440px; height:440px; z-index:-1;
+  opacity:.03; color:#fff; pointer-events:none; transform:rotate(-8deg)}
+
+/* logo */
+.logo{display:flex; align-items:center; gap:12px}
+.logo .emblem{width:44px; height:44px; flex:none}
+.logo.sm .emblem{width:34px; height:34px}
+.logo-img{height:46px; width:auto; display:block}
+.logo.sm .logo-img{height:38px}
+.logo-fb{display:none; align-items:center; gap:12px}
+.wordmark{display:flex; align-items:baseline; line-height:1}
+.wordmark b{font-weight:800; font-size:25px; letter-spacing:-.01em}
+.logo.sm .wordmark b{font-size:21px}
+.wordmark .o{color:var(--orange)}
+.brand .wordmark b{color:#fff}
+.auth .wordmark b{color:var(--navy)}
+
+.brand-mid{max-width:34ch; margin-top:clamp(28px,8vh,90px)}
+.brand-eyebrow{font-size:12.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--orange); font-weight:600; margin-bottom:18px}
+.brand-headline{font-size:34px; line-height:1.18; font-weight:700; letter-spacing:-.02em; color:#fff}
+.brand-sub{margin-top:14px; font-size:15.5px; line-height:1.6; color:#C6D4E4; max-width:36ch}
+.brand-anchor{font-size:13px; letter-spacing:.04em; color:#A9BCCF; display:flex; align-items:center; gap:10px; margin-top:auto}
+.brand-anchor .dot{width:4px;height:4px;border-radius:50%;background:var(--orange);opacity:.8}
+
+/* ============================================================
+   AUTH COLUMN (right)
+   ============================================================ */
+.auth{display:flex; align-items:center; justify-content:center; padding:48px; background:var(--sail)}
+.auth-inner{width:100%; max-width:384px}
+.auth-logo{margin-bottom:34px}
+h1.title{font-size:28px; line-height:1.2; font-weight:700; letter-spacing:-.02em; color:var(--ink)}
+.subtitle{margin-top:8px; font-size:15px; color:var(--fog)}
+
+/* Google SSO */
+.sso{margin-top:26px; width:100%; height:48px; border:1px solid var(--field-border);
+  border-radius:var(--radius); background:#fff; color:var(--ink); font-size:15px; font-weight:600;
+  font-family:inherit; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;
+  transition:background .15s var(--ease-standard),border-color .15s var(--ease-standard),box-shadow .15s var(--ease-standard)}
+.sso:hover{background:var(--mist); border-color:#C2CDDA}
+.sso svg{width:18px;height:18px}
+
+.divider{display:flex; align-items:center; gap:14px; margin:22px 0; color:var(--haze); font-size:13px}
+.divider::before,.divider::after{content:""; height:1px; flex:1; background:var(--hairline)}
+
+/* fields */
+.field{margin-bottom:18px}
+.field label{display:block; font-size:13px; font-weight:500; letter-spacing:.005em; color:var(--ink); margin-bottom:7px}
+.control{position:relative}
+.input{width:100%; height:48px; padding:0 14px; font-size:15.5px; font-family:inherit; color:var(--ink);
+  background:#fff; border:1px solid var(--field-border); border-radius:var(--radius);
+  transition:border-color .15s var(--ease-standard),box-shadow .15s var(--ease-standard)}
+.input::placeholder{color:var(--haze)}
+.input:hover{border-color:#C2CDDA}
+.input:focus{outline:none; border-color:var(--navy); box-shadow:0 0 0 4px rgba(232,119,46,.16)}
+.has-pw .input{padding-right:48px}
+.input.invalid{border-color:var(--error)}
+.input.invalid:focus{box-shadow:0 0 0 4px rgba(220,53,69,.14)}
+/* keep autofill from turning yellow */
+.input:-webkit-autofill,.input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--ink); -webkit-box-shadow:0 0 0 1000px #fff inset; caret-color:var(--ink)}
+
+.pw-toggle{position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+  border:none; background:none; color:var(--fog); cursor:pointer; border-radius:10px}
+.pw-toggle:hover{color:var(--navy)}
+.pw-toggle:focus-visible{outline:none; box-shadow:0 0 0 3px rgba(232,119,46,.3)}
+.pw-toggle svg{width:20px;height:20px}
+
+.field-error{display:none; margin-top:7px; font-size:13px; color:var(--error); align-items:center; gap:6px}
+.field-error svg{width:14px;height:14px;flex:none}
+.field.show-error .field-error{display:flex}
+.caps{display:none; margin-top:7px; font-size:12.5px; color:var(--deep-orange); align-items:center; gap:6px}
+.caps.on{display:flex}
+
+.row{display:flex; align-items:center; justify-content:space-between; margin:4px 0 22px}
+.remember{display:flex; align-items:center; gap:9px; font-size:13.5px; color:var(--ink); cursor:pointer; user-select:none}
+.remember input{position:absolute;opacity:0;width:0;height:0}
+.box{width:18px;height:18px;border:1.5px solid var(--field-border);border-radius:5px;display:flex;align-items:center;justify-content:center;transition:.15s var(--ease-standard)}
+.box svg{width:12px;height:12px;color:#fff;opacity:0;transform:scale(.6);transition:.15s var(--ease-standard)}
+.remember input:checked + .box{background:var(--navy);border-color:var(--navy)}
+.remember input:checked + .box svg{opacity:1;transform:scale(1)}
+.remember input:focus-visible + .box{box-shadow:0 0 0 3px rgba(232,119,46,.3)}
+.link{font-size:13.5px; font-weight:500; color:var(--deep-orange); text-decoration:none}
+.link:hover{text-decoration:underline}
+
+/* primary button */
+.btn{position:relative; width:100%; height:48px; border:none; border-radius:var(--radius); cursor:pointer;
+  background:var(--navy); color:#fff; font-size:15px; font-weight:600; letter-spacing:.01em; font-family:inherit;
+  display:flex; align-items:center; justify-content:center; gap:9px; overflow:hidden;
+  transition:background .15s var(--ease-standard),transform .12s var(--ease-standard),box-shadow .15s var(--ease-standard)}
+.btn:hover{background:#102F4D; transform:translateY(-1px); box-shadow:var(--shadow-btn)}
+.btn:active{transform:scale(.99)}
+.btn:focus-visible{outline:none; box-shadow:0 0 0 4px rgba(232,119,46,.30)}
+.btn[disabled]{opacity:.85; cursor:default; transform:none; box-shadow:none}
+.btn .arrow{transition:transform .2s var(--ease-standard)}
+.btn:hover .arrow{transform:translateX(3px)}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn.ok{background:var(--success)}
+.check path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw .4s var(--ease-entrance) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* form-level error banner */
+.banner{display:none; align-items:flex-start; gap:10px; padding:12px 14px; margin-bottom:20px;
+  background:#FDECEE; border:1px solid #F4C7CD; border-radius:var(--radius); color:#8E1620; font-size:13.5px; line-height:1.45}
+.banner.show{display:flex; animation:rise .3s var(--ease-entrance) both}
+.banner svg{width:17px;height:17px;flex:none;margin-top:1px;color:var(--error)}
+
+.foot{margin-top:28px; text-align:center; font-size:12.5px; line-height:1.7; color:var(--fog); letter-spacing:.01em}
+.foot .lock{display:inline-flex;align-items:center;gap:5px;color:#45556A}
+.foot .lock svg{width:12px;height:12px}
+.foot b{font-weight:600;color:#45556A}
+
+/* ---------- entrance orchestration ---------- */
+.reveal{opacity:0; transform:translateY(12px)}
+body.in .reveal{animation:rise .6s var(--ease-entrance) both}
+@keyframes rise{to{opacity:1;transform:none}}
+body.in .glow{animation:breath 8s ease-in-out infinite, glowin 1.2s ease both}
+@keyframes glowin{from{opacity:0}}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:1023px){
+  .brand{min-height:32vh; padding:30px 40px; justify-content:flex-start; gap:12px}
+  .brand-mid{margin-top:0}
+  .brand-headline{font-size:26px}
+  .brand-sub{display:none}
+  .brand-anchor{display:none}
+  .watermark{width:300px;height:300px;top:-60px;opacity:.03}
+  .auth{padding:40px 32px}
+}
+@media (max-width:767px){
+  .brand{min-height:auto; height:108px; padding:0 20px; flex-direction:row; align-items:center; justify-content:flex-start}
+  .brand .brand-mid,.brand .brand-anchor{display:none}
+  .wave.back{height:46px} .wave.mid{height:36px} .wave.front{height:26px}
+  .horizon{bottom:14px} .glow{display:none} .watermark{display:none}
+  .auth{padding:32px 20px; align-items:flex-start}
+  .auth-inner{max-width:100%}
+  .auth-logo{margin-bottom:24px}
+  h1.title{font-size:25px}
+  .input,.btn,.sso{height:50px}
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .wave,.horizon,.glow,.btn .arrow,.spinner{animation:none !important}
+  .glow{opacity:.7}
+  .reveal{opacity:1;transform:none}
+  body.in .reveal{animation:fadein .2s ease both}
+  @keyframes fadein{from{opacity:0}}
+}
+
+/* ============================================================
+   DEMO CONTROLS (prototype only — not part of production)
+   ============================================================ */
+.demo{position:fixed; top:12px; right:12px; z-index:50; background:rgba(10,28,46,.92);
+  backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.14); border-radius:14px;
+  padding:9px 11px; color:#cfe0f0; font-size:11px; max-width:min(92vw,330px); box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.demo .hd{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px}
+.demo .hd span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:9.5px; color:#7f9bbb}
+.demo .chips{display:flex; flex-wrap:wrap; gap:5px}
+.demo button{font-family:inherit; font-size:11px; color:#dbe7f4; background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:5px 9px; cursor:pointer; transition:.12s}
+.demo button:hover{background:rgba(255,255,255,.14)}
+.demo button.active{background:var(--orange); border-color:var(--orange); color:#1a1205; font-weight:600}
+.demo .x{background:none;border:none;color:#7f9bbb;cursor:pointer;font-size:13px;padding:2px 4px}
+.demo.min .chips,.demo.min .note{display:none}
+.demo .note{margin-top:7px;font-size:10px;color:#7f9bbb;line-height:1.4}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);z-index:60;
+  background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:13px;opacity:0;
+  transition:.25s var(--ease-entrance);box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ===== DEMO CONTROLS (remove in production) ===== -->
+<div class="demo" id="demo">
+  <div class="hd"><span>Prototype · preview states</span><button class="x" id="demoMin" title="minimize">▾</button></div>
+  <div class="chips" id="chips">
+    <button data-state="default" class="active">Default</button>
+    <button data-state="loading">Loading</button>
+    <button data-state="success">Success</button>
+    <button data-state="badcreds">Bad credentials</button>
+    <button data-state="notauth">Not authorized</button>
+    <button data-state="locked">Locked</button>
+    <button data-state="network">Network</button>
+    <button data-state="caps">Caps lock</button>
+    <button data-state="invalid">Field errors</button>
+  </div>
+  <div class="note">Live mockup of the redesigned sign-in. Try focus rings, the show/hide eye, hover the button, and resize the window (split → top-band → slim header).</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<main class="stage">
+  <!-- ============ BRAND PANEL ============ -->
+  <section class="brand">
+    <div class="tide" id="tide" aria-hidden="true"></div>
+    <div class="horizon" aria-hidden="true"></div>
+    <div class="glow" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <!-- faint watermark emblem -->
+    <svg class="watermark" viewBox="0 0 64 64" aria-hidden="true" fill="none">
+      <path d="M22 10C16 11 12 13 12 16L12 34C12 46 22 54 32 58C42 54 52 46 52 34L52 16C52 13 48 11 42 10" stroke="currentColor" stroke-width="2.4"/>
+      <path d="M16 30C21.5 26 26.5 34 32 30C37.5 26 42.5 34 48 30" stroke="currentColor" stroke-width="3"/>
+      <path d="M16 38C21.5 34 26.5 42 32 38C37.5 34 42.5 42 48 38" stroke="currentColor" stroke-width="3"/>
+    </svg>
+
+    <div class="logo reveal" style="animation-delay:.05s">
+      <!-- Uses the real logo if insureflow-logo-reversed.png is in this folder; else a vector stand-in -->
+      <img class="logo-img" src="insureflow-logo-reversed.png" alt="InsureFlow" onerror="this.remove();this.parentNode.querySelector('.logo-fb').style.display='flex'">
+      <span class="logo-fb">
+        <svg class="emblem" viewBox="0 0 64 64" aria-hidden="true" fill="none">
+          <path d="M22 10C16 11 12 13 12 16L12 34C12 46 22 54 32 58C42 54 52 46 52 34L52 16C52 13 48 11 42 10" stroke="#E8772E" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="32" cy="14" r="2.6" fill="#E8772E"/>
+          <path d="M16 30C21.5 26 26.5 34 32 30C37.5 26 42.5 34 48 30" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/>
+          <path d="M16 38C21.5 34 26.5 42 32 38C37.5 34 42.5 42 48 38" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/>
+        </svg>
+        <span class="wordmark"><b>Insure<span class="o">Flow</span></b></span>
+      </span>
+    </div>
+
+    <div class="brand-mid reveal" style="animation-delay:.12s">
+      <div class="brand-eyebrow">Agency Operating System</div>
+      <h2 class="brand-headline">Every client, in one current.</h2>
+      <p class="brand-sub">Where every policy, quote, and renewal keeps moving, and stays protected.</p>
+    </div>
+
+    <div class="brand-anchor reveal" style="animation-delay:.18s">
+      <span>by Lewis Insurance</span><span class="dot"></span><span>Lake City, FL</span><span class="dot"></span><span>Since 1981</span>
+    </div>
+  </section>
+
+  <!-- ============ AUTH COLUMN ============ -->
+  <section class="auth">
+    <div class="auth-inner">
+      <div class="logo sm auth-logo reveal" style="animation-delay:.10s">
+        <img class="logo-img" src="insureflow-logo-color.png" alt="InsureFlow" onerror="this.remove();this.parentNode.querySelector('.logo-fb').style.display='flex'">
+        <span class="logo-fb">
+          <svg class="emblem" viewBox="0 0 64 64" aria-hidden="true" fill="none">
+            <path d="M22 10C16 11 12 13 12 16L12 34C12 46 22 54 32 58C42 54 52 46 52 34L52 16C52 13 48 11 42 10" stroke="#E8772E" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="32" cy="14" r="2.6" fill="#E8772E"/>
+            <path d="M16 30C21.5 26 26.5 34 32 30C37.5 26 42.5 34 48 30" stroke="#143A5E" stroke-width="4.4" stroke-linecap="round"/>
+            <path d="M16 38C21.5 34 26.5 42 32 38C37.5 34 42.5 42 48 38" stroke="#143A5E" stroke-width="4.4" stroke-linecap="round"/>
+          </svg>
+          <span class="wordmark"><b>Insure<span class="o">Flow</span></b></span>
+        </span>
+      </div>
+
+      <h1 class="title reveal" style="animation-delay:.16s">Welcome back</h1>
+      <p class="subtitle reveal" style="animation-delay:.20s">Sign in to your InsureFlow workspace</p>
+
+      <!-- form-level banner -->
+      <div class="banner reveal" id="banner" role="alert" aria-live="polite" style="animation-delay:.24s">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        <span id="bannerText"></span>
+      </div>
+
+      <form id="form" novalidate>
+        <div class="field reveal" id="f-email" style="animation-delay:.34s">
+          <label for="email">Email</label>
+          <div class="control">
+            <input class="input" id="email" name="email" type="email" placeholder="you@lewisinsurance.com"
+                   autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" autofocus
+                   aria-describedby="email-err" />
+          </div>
+          <p class="field-error" id="email-err">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+            Enter your email address
+          </p>
+        </div>
+
+        <div class="field has-pw reveal" id="f-pw" style="animation-delay:.38s">
+          <label for="password">Password</label>
+          <div class="control">
+            <input class="input" id="password" name="password" type="password" placeholder="Enter your password"
+                   autocomplete="current-password" aria-describedby="pw-err pw-caps" />
+            <button class="pw-toggle" id="pwToggle" type="button" aria-label="Show password" aria-pressed="false">
+              <svg id="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="caps" id="pw-caps">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4 4 12h5v5h6v-5h5z"/></svg>
+            Caps Lock is on
+          </p>
+          <p class="field-error" id="pw-err">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+            Enter your password
+          </p>
+        </div>
+
+        <div class="row reveal" style="animation-delay:.42s">
+          <label class="remember">
+            <input type="checkbox" id="remember" checked />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            Keep me signed in
+          </label>
+          <a class="link" href="#" id="forgot">Forgot password?</a>
+        </div>
+
+        <button class="btn reveal" id="submit" type="submit" style="animation-delay:.46s">
+          <span class="btn-label">Sign in</span>
+          <svg class="arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+
+      <p class="foot reveal" style="animation-delay:.52s">
+        <span class="lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Authorized staff only · Encrypted connection</span><br>
+        <b>InsureFlow</b> · by Lewis Insurance · Since 1981
+      </p>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- build the tide (3 layered seamless waves) ---------- */
+(function(){
+  const tide = document.getElementById('tide');
+  function wavePath(baseline, amp){
+    const period=480, total=2880; let d='M0,'+baseline;
+    for(let x=0;x<total;x+=period){ d+=` q${period/4},${-amp} ${period/2},0 q${period/4},${amp} ${period/2},0`; }
+    return d+` L${total},160 L0,160 Z`;
+  }
+  [['back',62,30,'#11314F'],['mid',96,26,'#0C2742'],['front',120,22,'#08203A']].forEach(([cls,base,amp,fill])=>{
+    const w=document.createElement('div'); w.className='wave '+cls;
+    w.innerHTML=`<svg viewBox="0 0 2880 160" preserveAspectRatio="none"><path d="${wavePath(base,amp)}" fill="${fill}"/></svg>`;
+    tide.appendChild(w);
+  });
+})();
+
+/* ---------- entrance ---------- */
+window.addEventListener('load',()=>requestAnimationFrame(()=>document.body.classList.add('in')));
+
+/* ---------- toast helper ---------- */
+let toastT; const toastEl=document.getElementById('toast');
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('show'),3400); }
+
+/* ---------- password show/hide ---------- */
+const pw=document.getElementById('password'), pwToggle=document.getElementById('pwToggle'), eye=document.getElementById('eye');
+const eyeOpen='<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>';
+const eyeOff='<path d="M3 3l18 18"/><path d="M10.6 6.1A9.7 9.7 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4-.9"/><path d="M9.5 9.5a3 3 0 0 0 4.2 4.2"/>';
+pwToggle.addEventListener('click',()=>{
+  const show=pw.type==='password'; pw.type=show?'text':'password';
+  eye.innerHTML=show?eyeOff:eyeOpen; pwToggle.setAttribute('aria-pressed',String(show));
+  pwToggle.setAttribute('aria-label',show?'Hide password':'Show password'); pw.focus();
+});
+
+/* ---------- caps lock detection ---------- */
+const caps=document.getElementById('pw-caps');
+function capsCheck(e){ if(e.getModifierState) caps.classList.toggle('on', e.getModifierState('CapsLock')); }
+pw.addEventListener('keydown',capsCheck); pw.addEventListener('keyup',capsCheck);
+pw.addEventListener('blur',()=>caps.classList.remove('on'));
+
+/* ---------- error helpers ---------- */
+const banner=document.getElementById('banner'), bannerText=document.getElementById('bannerText');
+const fEmail=document.getElementById('f-email'), fPw=document.getElementById('f-pw');
+const emailEl=document.getElementById('email'), btn=document.getElementById('submit'), label=()=>btn.querySelector('.btn-label');
+const COPY={
+  badcreds:"That email or password didn't match. Try again.",
+  notauth:"This account isn't authorized for the InsureFlow workspace. Contact your administrator.",
+  locked:"Too many attempts. Try again in 5 minutes, or reset your password.",
+  network:"Can't reach the workspace. Check your connection and try again."
+};
+function clearAll(){
+  banner.classList.remove('show'); fEmail.classList.remove('show-error'); fPw.classList.remove('show-error');
+  emailEl.classList.remove('invalid'); pw.classList.remove('invalid'); caps.classList.remove('on');
+  resetBtn();
+}
+function showBanner(key){ bannerText.textContent=COPY[key]||key; banner.classList.add('show'); }
+function resetBtn(){ btn.disabled=false; btn.classList.remove('ok'); btn.innerHTML='<span class="btn-label">Sign in</span><svg class="arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'; }
+function btnLoading(){ btn.disabled=true; btn.classList.remove('ok'); btn.innerHTML='<span class="spinner"></span><span class="btn-label">Signing in…</span>'; }
+function btnSuccess(){ btn.disabled=true; btn.classList.add('ok'); btn.innerHTML='<svg class="check" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><span class="btn-label">Signed in</span>'; }
+
+/* ---------- form submit (demo) ---------- */
+document.getElementById('form').addEventListener('submit',(e)=>{
+  e.preventDefault(); clearAll();
+  let bad=false;
+  if(!emailEl.value.trim()){ fEmail.classList.add('show-error'); emailEl.classList.add('invalid'); bad=true; }
+  if(!pw.value){ fPw.classList.add('show-error'); pw.classList.add('invalid'); bad=true; }
+  if(bad){ (emailEl.value.trim()?pw:emailEl).focus(); return; }
+  btnLoading();
+  setTimeout(()=>{
+    // demo: emails containing "wrong" fail; everything else succeeds
+    if(/wrong|fail/i.test(emailEl.value)){ resetBtn(); showBanner('badcreds'); }
+    else { btnSuccess(); toast('Demo only. Real sign-in stays on Supabase signInWithPassword.'); }
+  },1400);
+});
+
+/* ---------- SSO (honest: not wired) ---------- */
+/* Google SSO removed for v1 — password-only (matches the app's signInWithPassword). */
+document.getElementById('forgot').addEventListener('click',(e)=>{e.preventDefault();toast('No /forgot-password route exists yet. The handoff covers the options.');});
+
+/* ---------- demo state switcher ---------- */
+const chips=document.getElementById('chips');
+chips.addEventListener('click',(e)=>{
+  const b=e.target.closest('button[data-state]'); if(!b) return;
+  [...chips.children].forEach(c=>c.classList.remove('active')); b.classList.add('active');
+  const s=b.dataset.state; clearAll();
+  if(s==='loading') btnLoading();
+  else if(s==='success') btnSuccess();
+  else if(s==='caps'){ caps.classList.add('on'); pw.focus(); }
+  else if(s==='invalid'){ fEmail.classList.add('show-error'); emailEl.classList.add('invalid'); fPw.classList.add('show-error'); pw.classList.add('invalid'); }
+  else if(['badcreds','notauth','locked','network'].includes(s)){ showBanner(s); }
+});
+
+/* ---------- minimize demo panel ---------- */
+document.getElementById('demoMin').addEventListener('click',()=>document.getElementById('demo').classList.toggle('min'));
+</script>
+</body>
+</html>
