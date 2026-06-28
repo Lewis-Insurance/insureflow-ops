@@ -1,0 +1,16 @@
+-- =====================================================================
+-- Wave 3 (hotfix) — household matcher: fix MIN(uuid) aggregate error
+-- =====================================================================
+-- RECONSTRUCTION FOR REPO↔PROD HISTORY COMPLETENESS (Batch 2B).
+-- Applied to prod during Effort 1; already in schema_migrations (db push skips it).
+--
+-- WHAT IT DID: the connected-components label-propagation LOOP in
+-- cleanup.refresh_households() used MIN(c.label) over a uuid column, but Postgres
+-- has no MIN(uuid) aggregate -> "function min(uuid) does not exist". Fixed to
+-- MIN(c.label::text)::uuid (canonical uuids sort identically as text).
+--
+-- The authoritative full function body (this fix + the exclusion fix) is in the
+-- companion reconstruction 20260628153545_wave3_households_fix_exclusion.sql.
+-- =====================================================================
+-- (no-op: see 20260628153545 for the authoritative reconstructed definition)
+SELECT 1;

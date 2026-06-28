@@ -1,3 +1,15 @@
+-- ############################################################################
+-- ## SUPERSEDED / DEAD — NEVER APPLIED TO PROD — DO NOT APPLY (Batch 2B decision)
+-- ##
+-- ## Replaced by public.merge_accounts() (Wave 2, migration
+-- ## 20260628151600_wave2_dup1b_merge_engine_hardened.sql), the hardened,
+-- ## service-role-only, dynamic-FK merge engine actually used in production.
+-- ## This file's version (20260622160000) has been marked APPLIED in prod's
+-- ## supabase_migrations.schema_migrations (migration-repair) so `supabase db
+-- ## push` SKIPS it and can never clobber the cleanup. Retained for history only.
+-- ## Verified 2026-06-28: no customer_merge_transactional* function exists in prod.
+-- ############################################################################
+
 -- Phase 1 safe customer/account merge foundation
 --
 -- This migration intentionally treats the app's merge target as public.accounts.
