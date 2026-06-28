@@ -39,11 +39,19 @@ export default function CustomersPage() {
   const { seedDefaultTags } = useTags();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didMountRef = useRef(false);
 
   const handleCustomerAdded = () => fetchCustomers(searchQuery);
 
-  // Debounced server-side search.
+  // Debounced server-side search. The hook already loads the book on mount, so
+  // skip the first run here. Firing on mount too would launch a second
+  // concurrent full-book fetch that races the hook's and trips a statement
+  // timeout over the REST API (data loads from one, the other throws a toast).
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchCustomers(searchQuery), 300);
     return () => {
