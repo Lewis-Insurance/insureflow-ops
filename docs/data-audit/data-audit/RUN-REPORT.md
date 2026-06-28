@@ -200,4 +200,41 @@ Every merge is reversible from its `merge_history` row: restore each loser (`del
 
 ---
 
-_(Waves 4–5 sections appended as they execute.)_
+---
+
+## Wave 4 — Business classification (review-gated) — STATUS: ✅ APPLIED & VERIFIED on production (2026-06-28 UTC)
+
+**Migration:** `20260628154858_wave4_business_classification.sql` — BIZ-5 exclusions; BIZ-2 Tier-1 auto-flip; BIZ-4 firmographics + `business_type_id`; BIZ-8 Blue Oak; BIZ-6 DQ view + guardrail trigger.
+
+**BIZ-0 predicate:** `household` account holding a `policies.line_category='commercial'` policy. Tier-1 = + business-name; Tier-2 = personal/brand name; Tier-3 = business-name, no commercial line.
+
+### Apply results — verified live 2026-06-28
+| Verification | Result | Pass |
+|---|---|---|
+| Tier-1 auto-flipped to `commercial_business` | **23** | ✅ |
+| `type` + `account_type` both consistent (business) | 23 / 23 | ✅ |
+| `commercial_business_accounts` rows / with `business_type_id` | 23 / 21 (2 ambiguous → NULL) | ✅ |
+| Blue Oak demo active | 0 (soft-deleted) | ✅ |
+| Guardrail trigger `zz_enforce_commercial_type` on `policies` | present | ✅ |
+| Active commercial_business accounts | 23 | ✅ |
+| Active accounts / policies | 1,720 / 2,164 | ✅ |
+| Residual Tier-2 violations (review) | 27 | ✅ |
+
+**Flipped (23):** Assured Property Management, B & B Homes Builders, Beachville Advent Church, Cannon Cleaning, China House 58, D And H Tractor Works, Donald Roberts Masonry, Elite Rc Productions, Evergreen Baptist Church, Ferrell's, Friendly Hands Cleaning, Garden Maze, Levings Forest Products, Local Roots Apothecary, Meeks Grain, Pbc, Plumbing Concepts, Robey Investments, Seth Heitzman Construction, **Sorensen & Smith (Ranchera survivor)**, Stan Jacobs, Topline Home & Aluminum, True Life Apostolic Church.
+
+**Excluded (BIZ-5):** Lewis & Lewis Insurance Agency (internal), Blue Oak (demo), Harry/Shelia Branch (RANCH FP), Meredith Lapradd as Trustee (trust → review).
+
+**Pre-existing trigger gap flagged:** `sync_account_types` does NOT resolve `commercial_business` (its `pick_enum_label` candidates don't match the enum label), so it never auto-syncs `account_type` on a `commercial_business` flip. Worked around by setting `account_type='business'` explicitly. Recommend fixing `pick_enum_label`/`sync_account_types` in separate app work.
+
+### Guardrail (BIZ-6)
+`zz_enforce_commercial_type` (AFTER INS/UPD OF line_of_business, account_id ON policies): auto-promotes a `household` account with a **clear business name** + a new **commercial-line** policy to `commercial_business`; **never** promotes sole-props (personal names) or exclusion-list accounts. `v_business_type_violations` is the standing DQ view.
+
+### Parked (review)
+- Tier-2 (27) + Tier-3 (47, incl. the 5 Sorensen Mesa/Vista commercial multi-property) → `review/wave4-business-review-workbook.md`. BIZ-7 person↔business relate (Horace Witt, BoxDrop/Max Bass) deferred to the party model (Wave 5).
+
+### Reversibility (Wave 4)
+`UPDATE accounts SET type=s.old_type::account_type_v2, account_type=s.old_account_type::account_type_new FROM cleanup.biz_reclass_snapshot s WHERE accounts.id=s.account_id;` + `DELETE FROM commercial_business_accounts WHERE account_id IN (SELECT account_id FROM cleanup.biz_reclass_snapshot);` + un-soft-delete Blue Oak + `DROP TRIGGER zz_enforce_commercial_type`.
+
+---
+
+_(Wave 5 draft + final completion gate below.)_
