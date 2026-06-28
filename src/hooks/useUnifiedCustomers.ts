@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -27,48 +27,58 @@ export interface UnifiedCustomer {
   rank?: number;
 }
 
+const PAGE_SIZE = 250;
+
+interface CustomerFilters {
+  q?: string;
+  sort?: string;
+  cohort?: string;
+  type?: string;
+}
+
 export function useUnifiedCustomers() {
   const [customers, setCustomers] = useState<UnifiedCustomer[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc', cohort?: string) => {
+  // Active filters + how many rows are loaded, so fetchNextPage pages from the
+  // right offset without re-running the whole query.
+  const filtersRef = useRef<CustomerFilters>({ q: '', sort: 'updated_at_desc' });
+  const loadedRef = useRef(0);
+
+  const buildFilters = (f: CustomerFilters): Record<string, string> => {
+    const out: Record<string, string> = { q: f.q ?? '' };
+    if (f.cohort && f.cohort !== 'all') out.cohort = f.cohort;
+    if (f.type) out.type = f.type;
+    return out;
+  };
+
+  // Load the FIRST page for a given filter set. Replaces the prior approach of
+  // accumulating the entire book on every call (which was heavy and, run twice
+  // concurrently, tripped a statement timeout). Cohort and type are applied
+  // server-side so the rendered rows match the triage tile / type filter.
+  const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc', cohort?: string, type?: string) => {
     try {
       setLoading(true);
+      filtersRef.current = { q: searchQuery, sort, cohort, type };
 
-      // Cohort (renewals_30d, overdue, no_active_policy, new_30d) is applied
-      // server-side so the rendered rows match the triage tile that was clicked.
-      const filters: Record<string, string> = { q: searchQuery };
-      if (cohort && cohort !== 'all') filters.cohort = cohort;
+      const { data, error } = await supabase.rpc('unified_customer_search', {
+        p_filters: buildFilters(filtersRef.current),
+        p_limit: PAGE_SIZE,
+        p_offset: 0,
+        p_sort: sort,
+      });
 
-      // Use pagination to handle >1000 customers (Supabase default API limit)
-      const allCustomers: UnifiedCustomer[] = [];
-      const pageSize = 1000;
-      let offset = 0;
-      let hasMore = true;
+      if (error) throw error;
 
-      while (hasMore) {
-        const { data, error } = await supabase.rpc('unified_customer_search', {
-          p_filters: filters,
-          p_limit: pageSize,
-          p_offset: offset,
-          p_sort: sort
-        });
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allCustomers.push(...data);
-          hasMore = data.length === pageSize; // If we got a full page, there might be more
-          offset += pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      setCustomers(allCustomers);
-      setTotalCount(allCustomers.length);
+      const rows = data || [];
+      setCustomers(rows);
+      loadedRef.current = rows.length;
+      setHasMore(rows.length === PAGE_SIZE);
+      setTotalCount(rows.length);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -80,6 +90,36 @@ export function useUnifiedCustomers() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Append the next page for the current filter set.
+  const fetchNextPage = async () => {
+    if (loadingMore || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      const { data, error } = await supabase.rpc('unified_customer_search', {
+        p_filters: buildFilters(filtersRef.current),
+        p_limit: PAGE_SIZE,
+        p_offset: loadedRef.current,
+        p_sort: filtersRef.current.sort ?? 'updated_at_desc',
+      });
+
+      if (error) throw error;
+
+      const rows = data || [];
+      setCustomers((prev) => [...prev, ...rows]);
+      loadedRef.current += rows.length;
+      setHasMore(rows.length === PAGE_SIZE);
+      setTotalCount(loadedRef.current);
+    } catch (err) {
+      toast({
+        title: "Error loading more customers",
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -208,8 +248,11 @@ export function useUnifiedCustomers() {
     customers,
     totalCount,
     loading,
+    loadingMore,
+    hasMore,
     error,
     fetchCustomers,
+    fetchNextPage,
     createCustomer,
     updateCustomer,
     deleteCustomer,

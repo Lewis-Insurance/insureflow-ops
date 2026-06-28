@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, UserPlus, Tag, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,37 +29,38 @@ export default function CustomersPage() {
   const [cohort, setCohort] = useState<Cohort>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
-  const { customers, loading, fetchCustomers } = useUnifiedCustomers();
+  const { customers, loading, loadingMore, hasMore, fetchCustomers, fetchNextPage } = useUnifiedCustomers();
   const { counts } = useCustomerTriageCounts();
   const { seedDefaultTags } = useTags();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didMountRef = useRef(false);
 
-  const handleCustomerAdded = () => fetchCustomers(searchQuery, 'updated_at_desc', cohort);
+  // 'business' maps to the real account type value; search, cohort and type are
+  // all applied server-side so paging stays correct.
+  const serverType =
+    typeFilter === 'household' ? 'household' : typeFilter === 'business' ? 'commercial_business' : undefined;
 
-  // One fetch path for search + cohort. The hook already loads the book on mount,
-  // so skip the first run here (a second concurrent fetch would race it).
+  const handleCustomerAdded = () => fetchCustomers(searchQuery, 'updated_at_desc', cohort, serverType);
+
+  // Single server-side fetch path for search + cohort + type. The hook loads the
+  // first page on mount, so skip the first run here (a second concurrent fetch
+  // would race it). Search is debounced; cohort/type changes refetch too.
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchCustomers(searchQuery, 'updated_at_desc', cohort), 250);
+    debounceRef.current = setTimeout(
+      () => fetchCustomers(searchQuery, 'updated_at_desc', cohort, serverType),
+      250,
+    );
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [searchQuery, cohort]);
-
-  // Type is the only client-side narrowing; search and cohort are server-side.
-  const filtered = useMemo(() => {
-    return customers.filter((c) => {
-      if (typeFilter === 'business' && !isBusiness(c.type)) return false;
-      if (typeFilter === 'household' && isBusiness(c.type)) return false;
-      return true;
-    });
-  }, [customers, typeFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, cohort, typeFilter]);
 
   const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
   const filtersActive = cohort !== 'all' || typeFilter !== 'all' || searchQuery.length > 0;
@@ -179,7 +180,10 @@ export default function CustomersPage() {
             </button>
           )}
 
-          <span className="ml-auto cc-num text-sm text-cc-text-muted">{filtered.length} shown</span>
+          <span className="ml-auto cc-num text-sm text-cc-text-muted">
+            {customers.length}
+            {hasMore ? '+' : ''} shown
+          </span>
         </div>
 
         {/* Dense, uniform list */}
@@ -195,7 +199,7 @@ export default function CustomersPage() {
 
           {loading ? (
             Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-          ) : filtered.length === 0 ? (
+          ) : customers.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
               <p className="max-w-sm text-sm text-cc-text-secondary">
                 {filtersActive
@@ -222,7 +226,7 @@ export default function CustomersPage() {
               )}
             </div>
           ) : (
-            filtered.map((customer) => {
+            customers.map((customer) => {
               const name = customer.display_name || customer.name;
               const secondary =
                 customer.email ||
@@ -283,6 +287,19 @@ export default function CustomersPage() {
             })
           )}
         </div>
+
+        {hasMore && !loading && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => fetchNextPage()}
+              disabled={loadingMore}
+              className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+            >
+              {loadingMore ? 'Loading' : 'Load more'}
+            </Button>
+          </div>
+        )}
       </div>
 
       <AddCustomerModal open={addCustomerOpen} onOpenChange={setAddCustomerOpen} onSuccess={handleCustomerAdded} />
