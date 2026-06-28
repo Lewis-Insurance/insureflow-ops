@@ -170,4 +170,34 @@ Every merge is reversible from its `merge_history` row: restore each loser (`del
 
 ---
 
-_(Waves 3–5 sections appended as they execute.)_
+---
+
+## Wave 3 — Households (link, not merge) — STATUS: ✅ APPLIED & VERIFIED on production (2026-06-28 UTC)
+
+**Migration:** `20260628153222_wave3_households.sql` — `accounts.household_id` + `households` canonical columns; `cleanup.refresh_households(apply)` deterministic cycle-safe connected-components matcher (signals A/B_same=HIGH · B_diff/C=MEDIUM · D=LOW down-weighted); `household_rollup` + `cleanup.hh_review_queue` views; legacy constructs comment-deprecated (HH-9). (Two follow-up migrations `wave3_households_fix_minuuid` / `wave3_households_fix_exclusion` corrected `MIN(uuid)` → `MIN(text)::uuid` and narrowed the dup-review exclusion to genuinely-unresolved clusters; both folded into the committed file's final function.)
+
+**Matcher pre-flight (HH-1):** dedup done (78 merges), LOB normalized, 187 FL stamped — all satisfied. Exclusions: office-trap ZIP 32055, internal/agency rows, PM phone, business-name tokens, `commercial_business`, and **unresolved** DUP-review accounts (so a person is never linked to their own un-merged duplicate).
+
+### Apply results — verified live 2026-06-28
+| Verification | Result | Pass |
+|---|---|---|
+| HIGH households auto-linked / accounts linked | **25 / 51** | ✅ |
+| Households total (incl. review) | 37 | ✅ |
+| Review households (MEDIUM 9 / LOW 2 / same-name 1) | 12 | ✅ |
+| Households missing display name | 0 | ✅ |
+| Mixed-line households (cross-sell) | 19 | ✅ |
+| Orphan household links | 0 | ✅ |
+
+**Quality:** the 25 HIGH households are verified genuine different-person families (Osteen, Salazar, Floyd boat+home, the Rhodes/Myers blended household, Barrs+Darlene, …). Thomas Sealey + Thomas Sealey (same name) auto-downgraded to review.
+
+**Count divergence (surfaced, expected):** roadmap baseline was **45 HIGH**; live post-dedup is **25**. PLAN-B explicitly predicted this — the pre-dedup baseline counted the ~25 same-name-same-address **duplicate pairs** (merged in Wave 2) as households; after dedup they collapse to single survivors. The pipeline order (dedup → household) produced the correct result; no households were lost.
+
+### Parked (review)
+- 12 MEDIUM/LOW + same-name households → `review/wave3-household-review-queue.md` (incl. BoxDrop↔Max Bass person/business, Edna Smith cross-state data error, Davis/Montemurno, Williams/Dorman).
+
+### Reversibility (Wave 3)
+`UPDATE accounts SET household_id=NULL; DELETE FROM households WHERE created_at >= '<run>';` (link is a nullable FK, `ON DELETE SET NULL`). Re-run `cleanup.refresh_households(true)` is idempotent (deterministic md5 ids).
+
+---
+
+_(Waves 4–5 sections appended as they execute.)_
