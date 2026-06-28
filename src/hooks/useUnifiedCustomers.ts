@@ -21,6 +21,7 @@ export interface UnifiedCustomer {
   policies_count: number;
   balance?: number;
   last_contact_at?: string;
+  next_expiration_at?: string | null;
   created_at: string;
   updated_at: string;
   rank?: number;
@@ -32,9 +33,14 @@ export function useUnifiedCustomers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc') => {
+  const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc', cohort?: string) => {
     try {
       setLoading(true);
+
+      // Cohort (renewals_30d, overdue, no_active_policy, new_30d) is applied
+      // server-side so the rendered rows match the triage tile that was clicked.
+      const filters: Record<string, string> = { q: searchQuery };
+      if (cohort && cohort !== 'all') filters.cohort = cohort;
 
       // Use pagination to handle >1000 customers (Supabase default API limit)
       const allCustomers: UnifiedCustomer[] = [];
@@ -44,7 +50,7 @@ export function useUnifiedCustomers() {
 
       while (hasMore) {
         const { data, error } = await supabase.rpc('unified_customer_search', {
-          p_filters: { q: searchQuery },
+          p_filters: filters,
           p_limit: pageSize,
           p_offset: offset,
           p_sort: sort

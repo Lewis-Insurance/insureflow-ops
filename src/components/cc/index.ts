@@ -8,5 +8,6 @@ export { Chip } from './Chip';
 export { SectionLabel } from './SectionLabel';
 export { Skeleton, SkeletonRow } from './Skeleton';
 export { LastContact } from './LastContact';
+export { NextRenewal } from './NextRenewal';
 export { TriageTile } from './TriageTile';
 export { maskTaxId, maskDln, maskDob } from './mask';

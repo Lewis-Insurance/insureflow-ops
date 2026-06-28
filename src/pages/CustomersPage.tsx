@@ -6,84 +6,68 @@ import { Input } from '@/components/ui/input';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ActionMenu } from '@/components/customers/ActionMenu';
 import { AddCustomerModal } from '@/components/customers/AddCustomerModal';
-import { useUnifiedCustomers, type UnifiedCustomer } from '@/hooks/useUnifiedCustomers';
+import { useUnifiedCustomers } from '@/hooks/useUnifiedCustomers';
+import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
 import { useTags } from '@/hooks/useTags';
-import { StatusPill, Chip, SectionLabel, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
-import { differenceInCalendarDays } from 'date-fns';
+import { StatusPill, Chip, SectionLabel, NextRenewal, TriageTile, SkeletonRow } from '@/components/cc';
 import { cn } from '@/lib/utils';
 
-type Segment = 'all' | 'leads' | 'stale' | 'balance' | 'active';
+// Cohorts are computed server-side; clicking a tile filters the rows to it.
+type Cohort = 'all' | 'renewals_30d' | 'overdue' | 'no_active_policy' | 'new_30d';
 type TypeFilter = 'all' | 'household' | 'business';
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-
-const isLead = (s?: string) => /lead|prospect|^new$|qualif|nurtur/i.test(s ?? '');
-const isActive = (s?: string) => /active|customer|client/i.test(s ?? '');
 const isBusiness = (t?: string) => /business|commercial|organization|org/i.test(t ?? '');
-const isStale = (c: UnifiedCustomer) =>
-  !c.last_contact_at || differenceInCalendarDays(new Date(), new Date(c.last_contact_at)) > 30;
-const hasBalance = (c: UnifiedCustomer) => (c.balance ?? 0) > 0;
 
-// Dense table column template, shared by header and every row so no row is sparse.
-// Gated to md+ so the row collapses to a compact two-part layout on narrow screens.
-const COLS = 'md:grid-cols-[minmax(0,1fr)_104px_120px_72px_110px_150px_44px]';
+// Dense table column template (md+). Renewal replaces the structurally-null
+// balance/last-contact columns; the real signal in this book is policy renewal.
+const COLS = 'md:grid-cols-[minmax(0,1fr)_104px_120px_72px_150px_44px]';
 
 export default function CustomersPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
-  const [segment, setSegment] = useState<Segment>('all');
+  const [cohort, setCohort] = useState<Cohort>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
   const { customers, loading, fetchCustomers } = useUnifiedCustomers();
+  const { counts } = useCustomerTriageCounts();
   const { seedDefaultTags } = useTags();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didMountRef = useRef(false);
 
-  const handleCustomerAdded = () => fetchCustomers(searchQuery);
+  const handleCustomerAdded = () => fetchCustomers(searchQuery, 'updated_at_desc', cohort);
 
-  // Debounced server-side search. The hook already loads the book on mount, so
-  // skip the first run here. Firing on mount too would launch a second
-  // concurrent full-book fetch that races the hook's and trips a statement
-  // timeout over the REST API (data loads from one, the other throws a toast).
+  // One fetch path for search + cohort. The hook already loads the book on mount,
+  // so skip the first run here (a second concurrent fetch would race it).
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchCustomers(searchQuery), 300);
+    debounceRef.current = setTimeout(() => fetchCustomers(searchQuery, 'updated_at_desc', cohort), 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [searchQuery]);
+  }, [searchQuery, cohort]);
 
-  // Counts route the triage strip; computed from the full returned set.
-  const counts = useMemo(
-    () => ({
-      leads: customers.filter((c) => isLead(c.status)).length,
-      stale: customers.filter(isStale).length,
-      balance: customers.filter(hasBalance).length,
-      active: customers.filter((c) => isActive(c.status)).length,
-    }),
-    [customers],
-  );
-
+  // Type is the only client-side narrowing; search and cohort are server-side.
   const filtered = useMemo(() => {
     return customers.filter((c) => {
       if (typeFilter === 'business' && !isBusiness(c.type)) return false;
       if (typeFilter === 'household' && isBusiness(c.type)) return false;
-      if (segment === 'leads' && !isLead(c.status)) return false;
-      if (segment === 'stale' && !isStale(c)) return false;
-      if (segment === 'balance' && !hasBalance(c)) return false;
-      if (segment === 'active' && !isActive(c.status)) return false;
       return true;
     });
-  }, [customers, segment, typeFilter]);
+  }, [customers, typeFilter]);
 
-  const toggleSegment = (s: Segment) => setSegment((cur) => (cur === s ? 'all' : s));
-  const filtersActive = segment !== 'all' || typeFilter !== 'all' || searchQuery.length > 0;
+  const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
+  const filtersActive = cohort !== 'all' || typeFilter !== 'all' || searchQuery.length > 0;
+  const clearAll = () => {
+    setCohort('all');
+    setTypeFilter('all');
+    setSearchQuery('');
+  };
 
   return (
     <AppLayout>
@@ -93,7 +77,7 @@ export default function CustomersPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">Customers</h1>
             <p className="mt-1 text-sm text-cc-text-muted">
-              <span className="cc-num">{customers.length}</span> in the book. Work the ones that need you.
+              <span className="cc-num">{counts.total || customers.length}</span> in the book. Work the ones that need you.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -116,39 +100,39 @@ export default function CustomersPage() {
           </div>
         </header>
 
-        {/* Triage strip: at most four tiles, each routes into work */}
+        {/* Triage strip: real renewal/policy cohorts, counted server-side */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TriageTile
-            label="Leads to work"
-            count={counts.leads}
-            sub="Pending follow up"
+            label="Renewals 30 days"
+            count={counts.renewals_30d}
+            sub="Renew now"
             tone="warning"
-            active={segment === 'leads'}
-            onClick={() => toggleSegment('leads')}
+            active={cohort === 'renewals_30d'}
+            onClick={() => toggleCohort('renewals_30d')}
           />
           <TriageTile
-            label="No contact 30+ days"
-            count={counts.stale}
-            sub="Reach out"
-            tone={counts.stale > 0 ? 'danger' : 'neutral'}
-            active={segment === 'stale'}
-            onClick={() => toggleSegment('stale')}
+            label="Overdue renewals"
+            count={counts.overdue}
+            sub="Lapsed, act"
+            tone={counts.overdue > 0 ? 'danger' : 'neutral'}
+            active={cohort === 'overdue'}
+            onClick={() => toggleCohort('overdue')}
           />
           <TriageTile
-            label="Open balance"
-            count={counts.balance}
-            sub="Collect"
-            tone={counts.balance > 0 ? 'warning' : 'neutral'}
-            active={segment === 'balance'}
-            onClick={() => toggleSegment('balance')}
+            label="No active policy"
+            count={counts.no_active_policy}
+            sub="Cross sell"
+            tone="neutral"
+            active={cohort === 'no_active_policy'}
+            onClick={() => toggleCohort('no_active_policy')}
           />
           <TriageTile
-            label="Active book"
-            count={counts.active}
-            sub="In force"
-            tone="success"
-            active={segment === 'active'}
-            onClick={() => toggleSegment('active')}
+            label="New this 30 days"
+            count={counts.new_30d}
+            sub="Onboard"
+            tone="info"
+            active={cohort === 'new_30d'}
+            onClick={() => toggleCohort('new_30d')}
           />
         </div>
 
@@ -165,12 +149,7 @@ export default function CustomersPage() {
             />
           </div>
 
-          {/* Type segmented control */}
-          <div
-            role="group"
-            aria-label="Filter by type"
-            className="inline-flex rounded-cc-md bg-cc-surface-raised p-0.5"
-          >
+          <div role="group" aria-label="Filter by type" className="inline-flex rounded-cc-md bg-cc-surface-raised p-0.5">
             {(['all', 'household', 'business'] as TypeFilter[]).map((t) => (
               <button
                 key={t}
@@ -192,11 +171,7 @@ export default function CustomersPage() {
           {filtersActive && (
             <button
               type="button"
-              onClick={() => {
-                setSegment('all');
-                setTypeFilter('all');
-                setSearchQuery('');
-              }}
+              onClick={clearAll}
               className="inline-flex items-center gap-1 text-sm text-cc-text-secondary hover:text-cc-text-primary"
             >
               <X className="h-3.5 w-3.5" />
@@ -204,21 +179,17 @@ export default function CustomersPage() {
             </button>
           )}
 
-          <span className="ml-auto cc-num text-sm text-cc-text-muted">
-            {filtered.length} shown
-          </span>
+          <span className="ml-auto cc-num text-sm text-cc-text-muted">{filtered.length} shown</span>
         </div>
 
         {/* Dense, uniform list */}
         <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
-          {/* Column header */}
           <div className={cn('hidden gap-4 border-b border-cc-border-subtle px-4 py-2.5 md:grid', COLS)}>
             <SectionLabel>Customer</SectionLabel>
             <SectionLabel>Type</SectionLabel>
             <SectionLabel>Status</SectionLabel>
             <SectionLabel className="text-right">Policies</SectionLabel>
-            <SectionLabel className="text-right">Balance</SectionLabel>
-            <SectionLabel>Last contact</SectionLabel>
+            <SectionLabel>Renewal</SectionLabel>
             <span className="sr-only">Actions</span>
           </div>
 
@@ -234,17 +205,12 @@ export default function CustomersPage() {
               {filtersActive ? (
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setSegment('all');
-                    setTypeFilter('all');
-                    setSearchQuery('');
-                  }}
+                  onClick={clearAll}
                   className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
                 >
                   Clear filters
                 </Button>
               ) : (
-                // Ghost, not lime: the header already carries the one lime primary (Rule 9).
                 <Button
                   variant="outline"
                   onClick={() => setAddCustomerOpen(true)}
@@ -283,43 +249,28 @@ export default function CustomersPage() {
                   {/* Customer (carries status inline on mobile) */}
                   <div className="min-w-0">
                     <div className="font-semibold text-cc-text-primary break-words">{name}</div>
-                    {secondary && (
-                      <div className="truncate text-xs text-cc-text-muted">{secondary}</div>
-                    )}
+                    {secondary && <div className="truncate text-xs text-cc-text-muted">{secondary}</div>}
                     <div className="mt-1.5 md:hidden">
                       <StatusPill status={customer.status} />
                     </div>
                   </div>
 
-                  {/* Type */}
                   <div className="hidden md:block">
                     <Chip>{isBusiness(customer.type) ? 'Business' : 'Household'}</Chip>
                   </div>
 
-                  {/* Status */}
                   <div className="hidden md:block">
                     <StatusPill status={customer.status} />
                   </div>
 
-                  {/* Policies */}
                   <div className="cc-num hidden text-right text-sm text-cc-text-secondary md:block">
                     {customer.policies_count ?? 0}
                   </div>
 
-                  {/* Balance (money never truncates) */}
-                  <div
-                    className="cc-num hidden text-right text-sm md:block"
-                    style={{ color: hasBalance(customer) ? 'var(--cc-warning)' : 'var(--cc-text-muted)' }}
-                  >
-                    {usd.format(customer.balance ?? 0)}
+                  <div className="hidden md:block">
+                    <NextRenewal date={customer.next_expiration_at} />
                   </div>
 
-                  {/* Last contact */}
-                  <div className="hidden text-sm md:block">
-                    <LastContact date={customer.last_contact_at} />
-                  </div>
-
-                  {/* Per-row overflow */}
                   <div
                     className="flex shrink-0 justify-end"
                     onClick={(e) => e.stopPropagation()}
@@ -334,11 +285,7 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <AddCustomerModal
-        open={addCustomerOpen}
-        onOpenChange={setAddCustomerOpen}
-        onSuccess={handleCustomerAdded}
-      />
+      <AddCustomerModal open={addCustomerOpen} onOpenChange={setAddCustomerOpen} onSuccess={handleCustomerAdded} />
     </AppLayout>
   );
 }
