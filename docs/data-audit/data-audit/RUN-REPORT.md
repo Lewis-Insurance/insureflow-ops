@@ -86,4 +86,38 @@ Migrations (in `supabase/migrations/`; filename timestamp == recorded prod `sche
 - HYG-3: `UPDATE accounts SET deleted_at=NULL WHERE id='1b9b9834-436f-453a-bdc1-abe530d77de0';` and `ALTER TABLE accounts DROP COLUMN name_display;`
 - MODEL-2: `UPDATE policies SET carrier_id=NULL WHERE id IN (SELECT policy_id FROM cleanup.model2_carrier_backfill_snapshot);`
 
-_(Waves 1–5 sections appended as they execute.)_
+---
+
+## Wave 1 — Normalization schema (additive) — STATUS: ✅ APPLIED & VERIFIED on production (2026-06-28 UTC)
+
+Reviewed by a 2-lens adversarial agent pass (SQL correctness/idempotency/reversibility + app-impact/RLS/side-effects) → no blockers; 3 refinements incorporated (line_category vocabulary documented; shared-email view moved to non-API `cleanup` schema; header wording corrected).
+
+Migrations:
+1. `20260628143406_wave1_hyg7_shared_email_signal.sql` — `cleanup.v_shared_email_clusters` (security_invoker; not API-exposed) — DUP/HH signal feed.
+2. `20260628143427_wave1_model3_lob_fk_and_ref_normalization.sql` — `policies.line_of_business_id` FK (+ `line_canonical`, `line_category`); normalize dirty `lines_of_business.category`; add 8 canonical ref rows; apply crosswalk.
+
+### Apply results — verified live 2026-06-28 (actual query results)
+| Verification | Result | Pass |
+|---|---|---|
+| `policies.line_of_business_id` populated (active) | **2,158** | ✅ |
+| `line_of_business_id` NULL (active) — residual | 6 (all `commercial_policy`, documented review) | ✅ |
+| `line_canonical` / `line_category` set (active) | 2,164 / 2,164 | ✅ |
+| Orphaned `line_of_business_id` (FK integrity) | 0 | ✅ |
+| `lines_of_business` rows (was 16) | **24** (+8 canonical) | ✅ |
+| `lines_of_business.category` not in {personal,commercial,specialty} | 0 (10 dirty rows normalized) | ✅ |
+| `lob_crosswalk` needs_new_ref remaining | 0 | ✅ |
+| `cleanup.v_shared_email_clusters` rows | 17 (36 accounts) | ✅ |
+| Commercial-line policies (BIZ-0 universe signal) | 56 | ✅ |
+| Raw `line_of_business` mutated | **No** (additive only) | ✅ |
+
+**Note (count divergence, surfaced):** added **8** canonical ref rows (roadmap grouped as "7"). DP-1/DP-3 and Personal-Liability/CPL kept distinct (live data carries both); `commercial_policy` (6 policies) left as an explicit `line_of_business_id` review residual rather than inventing a catch-all line.
+
+**Pre-existing issue flagged (out of cleanup scope):** `accounts` RLS is effectively open (`qual=true` policies; 97 `rls_policy_always_true` advisors). Low impact on this single-tenant DB but worth hardening — recommend workspace-scoped RLS in separate work.
+
+### Reversibility / rollback (Wave 1)
+- MODEL-3: `ALTER TABLE policies DROP COLUMN line_of_business_id, DROP COLUMN line_canonical, DROP COLUMN line_category;` + `DELETE FROM lines_of_business WHERE code IN ('DP3','DP1','RENTERS','MOBILE','PERS_LIAB','CPL','BOP','INLAND_MAR');` (category normalization + crosswalk lob_code wiring intentionally not auto-reversed).
+- HYG-7: `DROP VIEW cleanup.v_shared_email_clusters;`
+
+---
+
+_(Waves 2–5 sections appended as they execute.)_
