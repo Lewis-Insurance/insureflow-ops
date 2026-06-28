@@ -266,5 +266,5 @@ BEGIN
 END;
 $fn$;
 
-REVOKE ALL ON FUNCTION public.merge_accounts(uuid, uuid[], text, uuid, boolean) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.merge_accounts(uuid, uuid[], text, uuid, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.merge_accounts(uuid, uuid[], text, uuid, boolean) TO service_role;
