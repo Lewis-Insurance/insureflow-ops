@@ -151,6 +151,9 @@ verify_jwt = true
 [functions.canopy-webhook]
 verify_jwt = false
 
+[functions.canopy-batch-initiate]
+verify_jwt = false
+
 [functions.canopy-initiate]
 verify_jwt = true
 
@@ -159,3 +162,7 @@ verify_jwt = true
 
 [functions.canopy-servicing]
 verify_jwt = true
+
+# Phase-0 batch enqueue uses its own x-batch-secret + fire-gate auth (no user JWT).
+[functions.phase0-batch-enqueue]
+verify_jwt = false

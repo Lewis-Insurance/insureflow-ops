@@ -16,8 +16,25 @@ import { requireAuth } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
 };
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ * Mirrors timingSafeEqual in ../_shared/cron-auth.ts (copied here because it is
+ * not exported from that module).
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 interface ComplianceIssue {
   field: string;
@@ -99,17 +116,42 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Require authentication
-    const authResult = await requireAuth(req, supabase, corsHeaders);
-    if (authResult instanceof Response) {
-      return authResult;
+    // Authentication: two mutually-exclusive paths. NOTE: compliance is NEVER
+    // skipped here — only the auth mechanism differs. Both paths fall through to
+    // the identical validateContent(...) call below, which runs every check
+    // (prohibited phrases, CAN-SPAM unsubscribe+postal, state rules, subject
+    // hygiene, SMS/TCPA).
+    //
+    // Path A (trusted server-to-server): the phase0-batch-enqueue function runs
+    // as service role and has no user JWT. It presents a shared secret in the
+    // x-internal-secret header. We accept it ONLY when COMPLIANCE_INTERNAL_SECRET
+    // is configured AND the header matches via a constant-time compare. An unset
+    // env var is never treated as a match, so the internal path stays unavailable
+    // unless explicitly enabled.
+    //
+    // Path B (normal user): standard JWT auth via requireAuth, unchanged.
+    const internalSecret = Deno.env.get('COMPLIANCE_INTERNAL_SECRET');
+    const providedSecret = req.headers.get('x-internal-secret');
+    const isInternal =
+      !!internalSecret &&
+      !!providedSecret &&
+      timingSafeEqual(providedSecret, internalSecret);
+
+    let userId = '';
+    if (!isInternal) {
+      // Path B: require a valid user JWT (returns 401 Response on failure).
+      const authResult = await requireAuth(req, supabase, corsHeaders);
+      if (authResult instanceof Response) {
+        return authResult;
+      }
+      userId = authResult.id;
     }
-    const user = authResult;
 
     const body: ValidateRequest = await req.json();
-    console.log(`🔍 Validating ${body.content_type} content...`);
+    console.log(`🔍 Validating ${body.content_type} content (internal=${isInternal})...`);
 
-    const result = await validateContent(supabase, body, user.id);
+    // Compliance is enforced identically regardless of the auth path above.
+    const result = await validateContent(supabase, body, userId);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
