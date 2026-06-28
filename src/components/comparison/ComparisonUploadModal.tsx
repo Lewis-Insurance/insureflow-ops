@@ -193,12 +193,15 @@ export function ComparisonUploadModal({
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
+        // Get public URL (kept transitional; signed URLs generated on read)
         const { data: urlData } = supabase.storage
           .from("workspace-documents")
           .getPublicUrl(filePath);
 
-        // Create workspace_document record
+        // Create workspace_document record.
+        // TODO(6A): add a `workspace_documents.file_path` column so the object
+        // path can be persisted; for now file_url holds the (durable) public URL
+        // and reads sign from the extracted path via getSignedStorageUrl.
         const { error: dbError } = await supabase
           .from("workspace_documents")
           .insert({

@@ -82,6 +82,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { CameraCapture } from './CameraCapture';
 import { qualityAssessor, QualityReport } from '@/services/QualityAssessor';
 import { draftManager, DraftField } from '@/services/DraftManager';
@@ -336,14 +337,12 @@ export function DocumentImportModalV2({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+      // Get signed URL
+      const signedUrl = await getSignedStorageUrl('documents', fileName);
 
       // Run extraction with retries
       const result = await retryController.extractWithRetries(
-        urlData.publicUrl,
+        signedUrl,
         primaryFile.name,
         {
           accountId,

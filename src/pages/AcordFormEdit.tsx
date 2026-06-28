@@ -56,6 +56,7 @@ import { SignatureRequestModal, SignatureStatusTracker } from '@/components/sign
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import type { AcordTemplate, FieldInventoryItem, SectionDefinition, ValidationResult } from '@/types/acord';
 
 // ============================================
@@ -70,6 +71,7 @@ interface FormData {
   submission_status: string;
   signature_status: string;
   pdf_url?: string;
+  pdf_path?: string;
   created_at: string;
   updated_at: string;
 }
@@ -126,6 +128,7 @@ export default function AcordFormEdit() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string>('');
 
   // Load form data
   useEffect(() => {
@@ -180,6 +183,15 @@ export default function AcordFormEdit() {
       setTemplate(formData.acord_templates as TemplateData);
       setFieldValues(formData.field_values || {});
       setOriginalValues(formData.field_values || {});
+
+      // Sign a short-lived URL from the stored object path (Batch 6A) for
+      // viewing / sending the generated PDF; fall back to the legacy URL.
+      const fd = formData as any;
+      if (fd.pdf_path || fd.pdf_url) {
+        setPdfSignedUrl((await getSignedStorageUrl('documents', fd.pdf_path ?? fd.pdf_url)) ?? '');
+      } else {
+        setPdfSignedUrl('');
+      }
 
       // Load account data
       if (formData.account_id) {
@@ -654,7 +666,8 @@ export default function AcordFormEdit() {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => window.open(form.pdf_url, '_blank')}
+                    onClick={() => pdfSignedUrl && window.open(pdfSignedUrl, '_blank')}
+                    disabled={!pdfSignedUrl}
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     View PDF
@@ -807,7 +820,7 @@ export default function AcordFormEdit() {
         <SignatureRequestModal
           open={showSignatureModal}
           onOpenChange={setShowSignatureModal}
-          documentUrl={form?.pdf_url || ''}
+          documentUrl={pdfSignedUrl}
           documentName={`ACORD ${template?.form_number} - ${account?.name || 'Form'}`}
           formNumber={template?.form_number}
           acordFormId={id}

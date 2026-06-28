@@ -55,6 +55,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordTemplates } from '@/hooks/useAcordTemplates';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { ACORD_FORMS } from '@/types/acord';
 import type { AcordTemplate } from '@/types/acord';
 
@@ -442,7 +443,10 @@ export default function TemplateManagement() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(template.pdf_template_url, '_blank')}
+                                onClick={async () => {
+                                  const url = await getSignedStorageUrl('documents', template.pdf_template_path ?? template.pdf_template_url);
+                                  if (url) window.open(url, '_blank');
+                                }}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>

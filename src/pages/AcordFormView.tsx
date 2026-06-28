@@ -32,6 +32,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { SignatureRequestModal, SignatureStatusTracker } from '@/components/signatures';
 import type { SignatureStatus, SubmissionStatus } from '@/types/acord';
 
@@ -48,6 +49,7 @@ export default function AcordFormView() {
   const [form, setForm] = useState<any>(null);
   const [template, setTemplate] = useState<any>(null);
   const [account, setAccount] = useState<any>(null);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [auditHistory, setAuditHistory] = useState<any[]>([]);
   const [showAudit, setShowAudit] = useState(false);
@@ -84,6 +86,15 @@ export default function AcordFormView() {
 
       setForm(formData);
       setTemplate(formData.acord_templates);
+
+      // Resolve a short-lived signed URL from the stored object path (Batch 6A)
+      // for opening / sending the generated PDF; falls back to the legacy URL.
+      const fd = formData as any;
+      if (fd.pdf_path || fd.pdf_url) {
+        setPdfSignedUrl((await getSignedStorageUrl('documents', fd.pdf_path ?? fd.pdf_url)) ?? '');
+      } else {
+        setPdfSignedUrl('');
+      }
 
       // Load account data
       if (formData.account_id) {
@@ -233,7 +244,7 @@ export default function AcordFormView() {
               Edit
             </Button>
             {form.pdf_url ? (
-              <Button onClick={() => window.open(form.pdf_url, '_blank')}>
+              <Button onClick={() => pdfSignedUrl && window.open(pdfSignedUrl, '_blank')} disabled={!pdfSignedUrl}>
                 <Eye className="h-4 w-4 mr-2" />
                 View PDF
               </Button>
@@ -426,7 +437,7 @@ export default function AcordFormView() {
       <SignatureRequestModal
         open={showSignatureModal}
         onOpenChange={setShowSignatureModal}
-        documentUrl={form?.pdf_url || ''}
+        documentUrl={pdfSignedUrl}
         documentName={`ACORD ${template?.form_number} - ${account?.name || 'Form'}`}
         formNumber={template?.form_number}
         acordFormId={id}

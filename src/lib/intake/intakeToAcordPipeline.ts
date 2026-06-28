@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { processMultiFormMapping, MappingResult } from '@/lib/mapping/mappingProcessor';
 import { fillPdfForm, FillPdfResult } from '@/lib/acord/pdfFiller';
 import { validateForm, ValidationResult } from '@/lib/validation/validationEngine';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import type { IntakeSubmission, IntakeAcordMapping } from '@/types/intake';
 import type { AcordTemplate, AcordForm, FieldDefinition, ValidationRule, CarrierOverride } from '@/types/acord';
 
@@ -289,11 +290,14 @@ async function processForm(
     validationResult.warnings.forEach(w => warnings.push(`${w.field}: ${w.message}`));
   }
 
-  // Generate PDF if requested
-  if (context.options.generatePdfs && template.pdf_url) {
+  // Generate PDF if requested. Sign a fresh URL from the stored template path
+  // (Batch 6A) so this works once the storage bucket is private.
+  const templatePdfSource = (template as any).pdf_template_path ?? template.pdf_url ?? template.pdf_template_url;
+  if (context.options.generatePdfs && templatePdfSource) {
     try {
+      const signedTemplateUrl = await getSignedStorageUrl('documents', templatePdfSource);
       pdfResult = await fillPdfForm({
-        pdfUrl: template.pdf_url,
+        pdfUrl: signedTemplateUrl ?? templatePdfSource,
         fieldValues,
         fieldDefinitions: (template.field_definitions || []) as FieldDefinition[],
         options: {

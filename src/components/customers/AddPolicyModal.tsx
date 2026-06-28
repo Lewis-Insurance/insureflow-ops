@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EnumCombobox } from '@/components/ui/enum-combobox';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
@@ -143,16 +144,14 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
       // Generate a unique document ID
       const documentId = crypto.randomUUID();
 
-      // Get the public URL for the document
-      const { data: publicUrlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+      // Get the signed URL for the document
+      const signedUrl = await getSignedStorageUrl('documents', fileName);
 
       // Call document analysis edge function
       const { data: analysisResult, error: analysisError } = await supabase.functions
         .invoke('ai-document-analysis-azure', {
           body: {
-            document_url: publicUrlData.publicUrl,
+            document_url: signedUrl,
             document_id: documentId,
             file_name: file.name,
             account_id: accountId,

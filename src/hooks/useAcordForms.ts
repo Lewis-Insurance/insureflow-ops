@@ -16,6 +16,7 @@ import type {
   SubmissionStatus,
 } from '@/types/acord';
 import { fillAcordPdf, extractFieldValues } from '@/lib/acord/pdfFiller';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 
 // ============================================
 // TYPES
@@ -296,12 +297,21 @@ export function useAcordForms(): UseAcordFormsReturn {
           .single();
 
         if (formError) throw formError;
-        if (!form.acord_templates?.pdf_template_url) {
+        const templateRow = form.acord_templates as any;
+        if (!templateRow?.pdf_template_url && !templateRow?.pdf_template_path) {
           throw new Error('Template PDF not found');
         }
 
-        // Fetch the template PDF
-        const templateResponse = await fetch(form.acord_templates.pdf_template_url);
+        // Fetch the template PDF via a signed URL generated from the stored path
+        // (falls back to the legacy public URL during the transition).
+        const templateUrl = await getSignedStorageUrl(
+          'documents',
+          templateRow.pdf_template_path ?? templateRow.pdf_template_url,
+        );
+        if (!templateUrl) {
+          throw new Error('Failed to sign template PDF URL');
+        }
+        const templateResponse = await fetch(templateUrl);
         if (!templateResponse.ok) {
           throw new Error('Failed to fetch template PDF');
         }
@@ -330,16 +340,18 @@ export function useAcordForms(): UseAcordFormsReturn {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
+        // Get public URL (kept transitional; signed URLs generated on read)
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(fileName);
 
-        // Update form record
+        // Update form record. Store the object PATH (Batch 6A) in addition to the
+        // legacy public URL so reads can sign a fresh URL once buckets go private.
         const { error: updateError } = await supabase
           .from('acord_forms')
           .update({
             pdf_url: urlData.publicUrl,
+            pdf_path: fileName,
             pdf_generated_at: new Date().toISOString(),
-          })
+          } as any)
           .eq('id', formId);
 
         if (updateError) throw updateError;
@@ -348,7 +360,7 @@ export function useAcordForms(): UseAcordFormsReturn {
         setForms(prev =>
           prev.map(f =>
             f.id === formId
-              ? { ...f, pdf_url: urlData.publicUrl, pdf_generated_at: new Date().toISOString() }
+              ? { ...f, pdf_url: urlData.publicUrl, pdf_path: fileName, pdf_generated_at: new Date().toISOString() }
               : f
           )
         );
@@ -358,7 +370,9 @@ export function useAcordForms(): UseAcordFormsReturn {
           description: `ACORD ${form.acord_templates.form_number} PDF is ready`,
         });
 
-        return urlData.publicUrl;
+        // Return a freshly signed URL for immediate display; fall back to the
+        // legacy public URL if signing is unavailable.
+        return (await getSignedStorageUrl('documents', fileName)) ?? urlData.publicUrl;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate PDF';
         toast({
@@ -778,6 +792,7 @@ function transformForm(data: any): AcordForm {
     intake_submission_id: data.intake_submission_id,
     field_values: data.field_values || {},
     pdf_url: data.pdf_url,
+    pdf_path: data.pdf_path,
     pdf_generated_at: data.pdf_generated_at,
     has_addendum: data.has_addendum || false,
     addendum_url: data.addendum_url,

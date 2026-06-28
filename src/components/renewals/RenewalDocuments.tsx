@@ -42,6 +42,7 @@ import {
   DocumentType,
 } from '@/hooks/useRenewalWorkflow';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 
 interface RenewalDocumentsProps {
   renewalId: string;
@@ -184,13 +185,8 @@ export function RenewalDocuments({ renewalId }: RenewalDocumentsProps) {
   };
 
   const handleView = async (doc: RenewalDocument) => {
-    const { data } = await supabase.storage
-      .from('documents')
-      .getPublicUrl(doc.file_path);
-
-    if (data?.publicUrl) {
-      window.open(data.publicUrl, '_blank');
-    }
+    const signedUrl = await getSignedStorageUrl('documents', doc.file_path);
+    if (signedUrl) window.open(signedUrl, '_blank');
   };
 
   if (isLoading) {

@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DocumentAnalysisDisplay } from './DocumentAnalysisDisplay';
 import { DocumentFocusSelector } from './DocumentFocusSelector';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { logger } from '@/lib/logger';
 
 interface DocumentUploadWithAnalysisProps {
@@ -114,13 +115,10 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
 
       setUploadProgress(40);
       
-      // Step 2: Get public URL
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('documents')
-        .getPublicUrl(filePath);
+      // Step 2: Get signed URL
+      const signedUrl = await getSignedStorageUrl('documents', filePath);
 
-      logger.debug('File uploaded:', publicUrl);
+      logger.debug('File uploaded:', signedUrl);
       setUploadProgress(50);
 
       // Step 3: Get current user
@@ -158,7 +156,7 @@ export const DocumentUploadWithAnalysis: React.FC<DocumentUploadWithAnalysisProp
         'ai-document-analysis-azure',
         {
           body: {
-            document_url: publicUrl,
+            document_url: signedUrl,
             document_id: documentRecord.id,
             file_name: fileName,
             account_id: accountId || null,

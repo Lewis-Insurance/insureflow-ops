@@ -165,7 +165,7 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
+        // Get public URL (kept transitional; signed URLs generated on read)
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(fileName);
 
         // Before inserting, check if there's an existing current version
@@ -188,6 +188,8 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
           is_current: true,
           pdf_type: result.template.pdf_type,
           pdf_template_url: urlData.publicUrl,
+          // Store the durable object PATH (Batch 6A); sign on read.
+          pdf_template_path: fileName,
           field_inventory: result.template.field_inventory,
           field_schema: result.template.field_schema,
           section_definitions: result.template.section_definitions,
@@ -200,7 +202,7 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
 
         const { data: insertData, error: insertError } = await supabase
           .from('acord_templates')
-          .insert(templateData)
+          .insert(templateData as any)
           .select()
           .single();
 
@@ -461,6 +463,7 @@ function transformTemplate(data: any): AcordTemplate {
     sunset_date: data.sunset_date,
     pdf_type: data.pdf_type,
     pdf_template_url: data.pdf_template_url,
+    pdf_template_path: data.pdf_template_path,
     field_inventory: (data.field_inventory as FieldInventoryItem[]) || [],
     field_schema: (data.field_schema as FieldSchemaItem[]) || [],
     section_definitions: (data.section_definitions as SectionDefinition[]) || [],

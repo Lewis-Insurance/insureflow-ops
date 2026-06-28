@@ -16,6 +16,7 @@ export interface AcordTemplate {
   sunset_date: string | null;
   pdf_type: 'acroform' | 'xfa' | 'static';
   pdf_template_url: string;
+  pdf_template_path?: string; // Storage object path (Batch 6A); sign on read
   pdf_url?: string; // Alias for pdf_template_url
   field_inventory: FieldInventoryItem[];
   field_schema: FieldSchemaItem[];
@@ -129,6 +130,7 @@ export interface AcordForm {
   intake_submission_id?: string;
   field_values: Record<string, any>;
   pdf_url?: string;
+  pdf_path?: string; // Storage object path (Batch 6A); sign on read
   pdf_generated_at?: string;
   has_addendum: boolean;
   addendum_url?: string;

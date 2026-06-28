@@ -70,10 +70,6 @@ export function DocumentAnalysisUpload() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-
       // Step 2: Create document record
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id;

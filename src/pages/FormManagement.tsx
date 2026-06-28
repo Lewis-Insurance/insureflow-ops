@@ -85,6 +85,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAcordForms } from '@/hooks/useAcordForms';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { SignatureRequestModal } from '@/components/signatures';
 import { ACORD_FORMS } from '@/types/acord';
 import type { AcordForm, SignatureStatus, SubmissionStatus } from '@/types/acord';
@@ -125,6 +126,7 @@ export default function FormManagement() {
   const [templates, setTemplates] = useState<{ id: string; form_number: string; form_name: string }[]>([]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureForm, setSignatureForm] = useState<FormWithDetails | null>(null);
+  const [signatureDocUrl, setSignatureDocUrl] = useState<string>('');
 
   // Account search state
   const [accountSearchOpen, setAccountSearchOpen] = useState(false);
@@ -844,16 +846,24 @@ export default function FormManagement() {
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => window.open(form.pdf_url, '_blank')} disabled={!form.pdf_url}>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              const url = await getSignedStorageUrl('documents', form.pdf_path ?? form.pdf_url);
+                              if (url) window.open(url, '_blank');
+                            }}
+                            disabled={!form.pdf_path && !form.pdf_url}
+                          >
                             <Download className="h-4 w-4 mr-2" />
                             Download PDF
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => {
+                            onClick={async () => {
                               setSignatureForm(form);
+                              const url = await getSignedStorageUrl('documents', form.pdf_path ?? form.pdf_url);
+                              setSignatureDocUrl(url ?? '');
                               setShowSignatureModal(true);
                             }}
-                            disabled={!form.pdf_url || form.signature_status === 'signed'}
+                            disabled={(!form.pdf_path && !form.pdf_url) || form.signature_status === 'signed'}
                           >
                             <FileSignature className="h-4 w-4 mr-2" />
                             Send for Signature
@@ -892,9 +902,12 @@ export default function FormManagement() {
           open={showSignatureModal}
           onOpenChange={(open) => {
             setShowSignatureModal(open);
-            if (!open) setSignatureForm(null);
+            if (!open) {
+              setSignatureForm(null);
+              setSignatureDocUrl('');
+            }
           }}
-          documentUrl={signatureForm.pdf_url || ''}
+          documentUrl={signatureDocUrl}
           documentName={`ACORD ${signatureForm.templateFormNumber} - ${signatureForm.accountName || 'Form'}`}
           formNumber={signatureForm.templateFormNumber}
           acordFormId={signatureForm.id}

@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { logger } from '@/lib/logger';
 
 interface QueuedDocument {
@@ -248,10 +249,8 @@ export function useOfflineQueue() {
       await updateQueuedDocument(doc.id, { status: 'processing' });
       await loadQueue();
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+      // Get signed URL
+      const signedUrl = await getSignedStorageUrl('documents', fileName);
 
       // Call extraction edge function
       const { data: { session } } = await supabase.auth.getSession();
@@ -265,7 +264,7 @@ export function useOfflineQueue() {
             'Authorization': `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            document_url: urlData.publicUrl,
+            document_url: signedUrl,
             document_name: doc.fileName,
             account_id: doc.accountId,
             acord_form_id: doc.acordFormId,

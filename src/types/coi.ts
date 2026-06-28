@@ -2,6 +2,8 @@
 export interface COIVersion {
   version: number;
   url: string;
+  /** Durable Storage object path (Batch 6A); sign on read via getSignedStorageUrl. */
+  path?: string;
   created_at: string;
   created_by: string;
   changes?: string;

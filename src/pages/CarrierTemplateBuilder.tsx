@@ -46,6 +46,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { useToast } from '@/hooks/use-toast';
 
 // Common ACORD fields for quick selection
@@ -130,6 +131,7 @@ export default function CarrierTemplateBuilder() {
 
   // Document state
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [documentPath, setDocumentPath] = useState<string | null>(null);
   const [documentImages, setDocumentImages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
@@ -176,7 +178,15 @@ export default function CarrierTemplateBuilder() {
       setLineOfBusiness(template.line_of_business || '');
       setTemplateName(template.template_name);
       setTemplateDescription(template.template_description || '');
-      setDocumentUrl(template.sample_document_url);
+      // Sign a fresh URL from the stored object path (Batch 6A) for display;
+      // fall back to the legacy public URL during the transition.
+      const samplePath = (template as any).sample_document_path ?? template.sample_document_url;
+      setDocumentPath((template as any).sample_document_path ?? null);
+      const signedSampleUrl = await getSignedStorageUrl('documents', samplePath);
+      setDocumentUrl(signedSampleUrl ?? template.sample_document_url);
+      if (signedSampleUrl) {
+        setDocumentImages([signedSampleUrl]);
+      }
 
       // Load field zones
       const { data: fieldZones } = await supabase
@@ -231,7 +241,13 @@ export default function CarrierTemplateBuilder() {
         .from('documents')
         .getPublicUrl(filePath);
 
-      setDocumentUrl(urlData.publicUrl);
+      // Track the durable object PATH (Batch 6A) for persistence; sign on read.
+      setDocumentPath(filePath);
+
+      // For display, prefer a short-lived signed URL generated from the path
+      // (falls back to the legacy public URL during the transition).
+      const previewUrl = (await getSignedStorageUrl('documents', filePath)) ?? urlData.publicUrl;
+      setDocumentUrl(previewUrl);
 
       // For demo purposes, create a preview using PDF.js or convert to image
       // In production, you'd use a service to convert PDF pages to images
@@ -240,9 +256,9 @@ export default function CarrierTemplateBuilder() {
       // Simulate document loaded
       const img = new Image();
       img.onload = () => {
-        setDocumentImages([urlData.publicUrl]);
+        setDocumentImages([previewUrl]);
       };
-      img.src = urlData.publicUrl;
+      img.src = previewUrl;
 
       toast({ title: 'Document uploaded successfully' });
 
@@ -367,6 +383,12 @@ export default function CarrierTemplateBuilder() {
     setIsSaving(true);
 
     try {
+      // Persist a durable public URL (derived from the stored path) rather than
+      // the short-lived signed URL currently held in `documentUrl`.
+      const durableSampleUrl = documentPath
+        ? supabase.storage.from('documents').getPublicUrl(documentPath).data.publicUrl
+        : documentUrl;
+
       const templateData = {
         carrier_name: carrierName,
         carrier_code: carrierCode || null,
@@ -374,7 +396,9 @@ export default function CarrierTemplateBuilder() {
         line_of_business: lineOfBusiness || null,
         template_name: templateName,
         template_description: templateDescription || null,
-        sample_document_url: documentUrl,
+        sample_document_url: durableSampleUrl,
+        // Store the durable object PATH (Batch 6A); sign on read.
+        sample_document_path: documentPath,
         page_count: documentImages.length || 1,
         is_active: true,
       };
@@ -385,7 +409,7 @@ export default function CarrierTemplateBuilder() {
         // Update existing template
         const { error } = await supabase
           .from('carrier_document_templates')
-          .update(templateData)
+          .update(templateData as any)
           .eq('id', id);
 
         if (error) throw error;
@@ -393,7 +417,7 @@ export default function CarrierTemplateBuilder() {
         // Create new template
         const { data, error } = await supabase
           .from('carrier_document_templates')
-          .insert(templateData)
+          .insert(templateData as any)
           .select()
           .single();
 

@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAcordTemplates } from '@/hooks/useAcordTemplates';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { useToast } from '@/hooks/use-toast';
 import {
   Upload,
@@ -456,7 +457,10 @@ export default function AcordTemplates() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => window.open(template.pdf_template_url, '_blank')}
+                            onClick={async () => {
+                              const url = await getSignedStorageUrl('documents', template.pdf_template_path ?? template.pdf_template_url);
+                              if (url) window.open(url, '_blank');
+                            }}
                             title="Download"
                           >
                             <Download className="h-4 w-4" />

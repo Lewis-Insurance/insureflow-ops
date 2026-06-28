@@ -118,12 +118,13 @@ export async function createSubmissionPackage(
       }
     }
 
-    // Transform forms
+    // Transform forms. Persist the durable storage PATH (Batch 6A) into the
+    // package JSONB rather than an expiring public URL; sign at display time.
     const forms: PackageForm[] = acordForms?.map(f => ({
       acordFormId: f.id,
       formNumber: f.form_number || '',
       formName: f.form_name || '',
-      pdfUrl: f.pdf_url,
+      pdfUrl: (f as any).pdf_path ?? f.pdf_url,
       signed: f.signature_status === 'signed',
       validated: f.validation_status === 'valid',
       signatureStatus: f.signature_status as any,

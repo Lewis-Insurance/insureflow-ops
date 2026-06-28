@@ -331,16 +331,11 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       // Generate a unique document ID
       const documentId = crypto.randomUUID();
 
-      // Get the public URL for the document
-      const { data: publicUrlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
       // Call document analysis edge function with correct parameters
       const { data: analysisResult, error: analysisError } = await supabase.functions
         .invoke('ai-document-analysis-azure', {
           body: {
-            document_url: publicUrlData.publicUrl,
+            document_url: urlData.signedUrl,
             document_id: documentId,
             file_name: file.name,
             account_id: null, // No account yet, we're creating one

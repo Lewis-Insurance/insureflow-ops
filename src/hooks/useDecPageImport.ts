@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -146,12 +147,8 @@ export function useDecPageImport() {
       setIsUploading(false);
       setIsParsing(true);
 
-      // 2. Get public URL for the document
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      const documentUrl = urlData.publicUrl;
+      // 2. Get signed URL for the document
+      const documentUrl = await getSignedStorageUrl('documents', fileName);
 
       // 3. Create document record (using correct column names)
       const { data: docRecord, error: docError } = await supabase

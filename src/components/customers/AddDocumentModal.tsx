@@ -93,11 +93,6 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
       // Create document record
       const { error: dbError } = await supabase
         .from('documents')

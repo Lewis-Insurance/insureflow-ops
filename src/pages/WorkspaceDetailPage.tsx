@@ -8,6 +8,7 @@ import { Loader2, FileText, Calendar, User, Building, CheckCircle2, XCircle, Clo
 import { formatDistanceToNow, format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { getSignedStorageUrl } from "@/lib/storageUrl";
 
 export default function WorkspaceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -196,6 +197,13 @@ export default function WorkspaceDetailPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-sm text-primary hover:underline"
+                              onClick={async (e) => {
+                                // Sign a fresh URL from the stored path (Batch 6A).
+                                // The helper extracts the object path from the legacy public URL.
+                                e.preventDefault();
+                                const url = await getSignedStorageUrl('workspace-documents', doc.file_url);
+                                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                              }}
                             >
                               View
                             </a>

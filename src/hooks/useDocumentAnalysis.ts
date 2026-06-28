@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -217,10 +218,8 @@ export const useDocumentUploadAndAnalysis = () => {
 
       setUploadProgress(50);
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+      // Get signed URL
+      const signedUrl = await getSignedStorageUrl('documents', filePath);
 
       setUploadProgress(60);
 
@@ -259,7 +258,7 @@ export const useDocumentUploadAndAnalysis = () => {
 
       // Analyze document
       const analysisResult = await analyzeDocument({
-        documentUrl: publicUrl,
+        documentUrl: signedUrl,
         documentId: docRecord.id,
         fileName: file.name,
         accountId: accountId,
@@ -354,11 +353,6 @@ export const useDocumentComparison = () => {
           throw uploadError;
         }
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('documents')
-          .getPublicUrl(filePath);
-
         // Create document record
         const { data: docRecord, error: docError } = await supabase
           .from('documents')
@@ -384,7 +378,9 @@ export const useDocumentComparison = () => {
 
         uploadedDocs.push({
           document_id: docRecord.id,
-          document_url: publicUrl,
+          // Store the durable object PATH (Batch 6A) in the persisted session
+          // JSONB rather than an expiring public URL; sign on read.
+          document_path: filePath,
           file_name: doc.file.name,
           label: doc.label || `Option ${i + 1}`
         });
@@ -400,12 +396,16 @@ export const useDocumentComparison = () => {
 
       for (let i = 0; i < uploadedDocs.length; i++) {
         const doc = uploadedDocs[i];
-        
+
+        // Sign a short-lived URL from the stored path for the (transient) edge
+        // function call; the signed URL is never persisted.
+        const signedDocUrl = await getSignedStorageUrl('documents', doc.document_path);
+
         const { data, error } = await supabase.functions.invoke(
           'analyze-insurance-document',
           {
             body: {
-              document_url: doc.document_url,
+              document_url: signedDocUrl,
               document_id: doc.document_id,
               file_name: doc.file_name,
               account_id: accountId,

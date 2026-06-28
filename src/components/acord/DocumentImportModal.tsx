@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 
 const DOCUMENT_TYPES = [
   { value: 'dec_page', label: 'Declaration Page' },
@@ -192,10 +193,8 @@ export function DocumentImportModal({
       setProgress(30);
       setStatus('extracting');
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+      // Get signed URL
+      const signedUrl = await getSignedStorageUrl('documents', fileName);
 
       // Call extraction edge function (v2 with ensemble)
       const { data: { session } } = await supabase.auth.getSession();
@@ -209,7 +208,7 @@ export function DocumentImportModal({
             'Authorization': `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            document_url: urlData.publicUrl,
+            document_url: signedUrl,
             document_name: selectedFile.name,
             account_id: accountId,
             acord_form_id: acordFormId,

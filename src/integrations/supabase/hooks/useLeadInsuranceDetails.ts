@@ -338,12 +338,7 @@ export const useUploadInsuranceDocument = (leadId: string, insuranceType: Insura
 
       if (uploadError) throw uploadError;
 
-      // Step 2: Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-
-      // Step 3: Call ai-document-analysis edge function
+      // Step 2: Call ai-document-analysis edge function
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
         'ai-document-analysis',
         {
@@ -360,7 +355,6 @@ export const useUploadInsuranceDocument = (leadId: string, insuranceType: Insura
 
       const extracted = (analysisData)?.extracted ?? analysisData;
       return {
-        documentUrl: publicUrl,
         documentPath: filePath,
         extractedData: extracted,
       };

@@ -121,11 +121,8 @@ export default function ModuleTestPanel({ moduleId }: ModuleTestPanelProps) {
           continue;
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('documents')
-          .getPublicUrl(filePath);
-
+        // Don't persist a public URL (Batch 6A): the durable `storage_path` is
+        // stored instead; sign on read via getSignedStorageUrl when display is needed.
         // Create document record
         const { data: docData, error: docError } = await supabase
           .from('documents')
@@ -134,7 +131,7 @@ export default function ModuleTestPanel({ moduleId }: ModuleTestPanelProps) {
             file_type: uploadFile.file.type,
             file_size: uploadFile.file.size,
             storage_path: filePath,
-            file_url: urlData.publicUrl,
+            file_url: null,
             status: 'pending',
           })
           .select()

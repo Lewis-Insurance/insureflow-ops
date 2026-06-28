@@ -10,6 +10,7 @@ import { retry } from '@/lib/utils/retry';
 import { COIQueue } from '@/lib/utils/queue';
 import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
 import { logger } from '@/lib/logger';
+import { getSignedStorageUrl } from '@/lib/storageUrl';
 
 enum COIErrorType {
   VALIDATION = 'VALIDATION',
@@ -250,7 +251,7 @@ export function useCOIGeneration() {
         throw new Error('Upload failed - no data returned');
       }
 
-      // Get public URL
+      // Get public URL (kept transitional; signed URLs generated on read)
       const { data: { publicUrl } } = supabase.storage
         .from('certificates')
         .getPublicUrl(fileName);
@@ -262,10 +263,12 @@ export function useCOIGeneration() {
         message: 'Updating records...'
       });
 
-      // Create version data
+      // Create version data. Store the durable object PATH (Batch 6A) in the
+      // version JSONB so reads can sign a fresh URL once the bucket goes private.
       const versionData: COIVersion = {
         version,
         url: publicUrl,
+        path: fileName,
         created_at: new Date().toISOString(),
         created_by: user?.id || 'system',
         changes: exportOptions?.revisionNote,
@@ -277,7 +280,10 @@ export function useCOIGeneration() {
         p_version_data: versionData as any,
       });
 
-      // Update COI record with document URL and current version
+      // Update COI record with document URL and current version.
+      // TODO(6A): add a `certificates_of_insurance.document_path` column so the
+      // object path can be stored alongside document_url; for now the durable
+      // path lives in the `versions` JSONB and reads sign from the extracted path.
       await updateCOI({
         id: coiId,
         updates: {
@@ -599,12 +605,15 @@ export function useCOIGeneration() {
         throw new Error('Failed to generate COI');
       }
 
-      // Step 2: Send email via edge function
+      // Step 2: Send email via edge function. Sign a fresh URL (Batch 6A) so the
+      // certificate stays fetchable once the bucket is private; falls back to the
+      // returned public URL during the transition.
+      const certificateUrl = (await getSignedStorageUrl('certificates', publicUrl)) ?? publicUrl;
       const { data, error } = await supabase.functions.invoke('send-coi-email', {
         body: {
           to: emailValidation.sanitized,
           certificateNumber: coiData.certificate_number,
-          certificateUrl: publicUrl,
+          certificateUrl,
           holderName: coiData.certificate_holder_name,
         },
       });
@@ -734,7 +743,10 @@ export function useCOIGeneration() {
 
   const downloadCOI = async (documentUrl: string, certificateNumber: string) => {
     try {
-      const response = await fetch(documentUrl);
+      // Sign a fresh URL from the stored value (Batch 6A). The helper tolerates
+      // a legacy full public URL (it extracts the object path) as well as a bare path.
+      const signedUrl = (await getSignedStorageUrl('certificates', documentUrl)) ?? documentUrl;
+      const response = await fetch(signedUrl);
       const blob = await response.blob();
       
       const url = URL.createObjectURL(blob);
