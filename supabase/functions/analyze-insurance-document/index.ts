@@ -122,8 +122,10 @@ serve(async (req) => {
       throw new Error('Azure Document Intelligence credentials not configured');
     }
 
-    // Download document from Supabase Storage
-    const urlPath = document_url.split('/storage/v1/object/public/')[1];
+    // Download document from Supabase Storage. Accept public OR signed URLs (Batch 6A:
+    // buckets are private, the frontend now passes signed URLs) and strip any ?query string.
+    const marker = (document_url || '').includes('/object/sign/') ? '/object/sign/' : '/object/public/';
+    const urlPath = (document_url || '').split(marker)[1]?.split('?')[0];
     if (!urlPath) {
       throw new Error('Invalid document URL format');
     }

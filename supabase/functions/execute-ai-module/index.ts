@@ -220,8 +220,9 @@ serve(async (req) => {
         if (!text && doc.storage_path) {
           console.log(`[OCR] No cached text for ${doc.filename}, running Azure OCR...`);
 
-          const documentUrl = `${SUPABASE_URL}/storage/v1/object/public/documents/${doc.storage_path}`;
-          text = await extractTextWithAzure(documentUrl, doc.storage_path, supabase);
+          // Bucket may be private (Batch 6A); extractTextWithAzure signs storage_path internally,
+          // so the legacy public-URL first arg is unused — pass the path, no public-URL dependency.
+          text = await extractTextWithAzure(doc.storage_path, doc.storage_path, supabase);
 
           // Cache the extracted text for future use
           if (text && text.length > 0) {
