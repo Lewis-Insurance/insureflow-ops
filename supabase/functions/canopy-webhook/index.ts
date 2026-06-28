@@ -913,7 +913,7 @@ async function handlePolicyAvailable(supabase: ReturnType<typeof createClient>, 
 async function handlePullComplete(supabase: ReturnType<typeof createClient>, payload: CanopyWebhookPayload) {
   // First check if the pull exists
   const { data: existingPull } = await supabase.from('canopy_pulls')
-    .select('id, lead_id')
+    .select('id, lead_id, account_id')
     .eq('canopy_pull_id', payload.pull_id)
     .single();
 
@@ -928,7 +928,7 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .select('id, lead_id')
+      .select('id, lead_id, account_id')
       .single();
 
     if (createError) {
@@ -1145,65 +1145,62 @@ async function handlePullComplete(supabase: ReturnType<typeof createClient>, pay
     })
     .eq('id', pull.id);
 
-  let leadId = pull?.lead_id;
+  const accountId = (pull as any)?.account_id ?? null;
+  let leadId = pull?.lead_id ?? null;
 
-  // If no lead is linked, create one automatically from the Canopy data
-  if (!leadId && pull?.id) {
+  if (accountId) {
+    // ---- BOOK CROSS-SELL PULL (attach_account): keep on the account, never spawn a lead ----
     try {
-      // Pass consumer data from API if available
-      const consumerData = (pull as any).consumer_data;
-      leadId = await createLeadFromCanopyPull(supabase, pull.id, consumerData);
+      await handleAccountCanopyComplete(supabase, accountId, pull.id, (pull as any).consumer_data);
+      logger.info('Linked completed Canopy pull to existing account', { accountId, pullId: payload.pull_id });
+    } catch (acctError) {
+      logger.error('Failed to process account-linked Canopy pull', {
+        accountId,
+        pullId: pull.id,
+        error: acctError instanceof Error ? acctError.message : String(acctError),
+      });
+    }
+  } else {
+    // ---- NEW PROSPECT PULL: create + link a lead (original behavior) ----
+    if (!leadId && pull?.id) {
+      try {
+        const consumerData = (pull as any).consumer_data;
+        leadId = await createLeadFromCanopyPull(supabase, pull.id, consumerData);
 
-      if (leadId) {
-        // Link the new lead to the pull - with error handling and retry
-        const { error: linkError } = await supabase.from('canopy_pulls')
-          .update({ lead_id: leadId })
-          .eq('id', pull.id);
-
-        if (linkError) {
-          logger.error('Failed to link lead to canopy_pulls', {
-            leadId,
-            pullId: pull.id,
-            error: linkError.message
-          });
-
-          // Retry once after a short delay
-          await new Promise(resolve => setTimeout(resolve, 500));
-          const { error: retryError } = await supabase.from('canopy_pulls')
+        if (leadId) {
+          const { error: linkError } = await supabase.from('canopy_pulls')
             .update({ lead_id: leadId })
             .eq('id', pull.id);
 
-          if (retryError) {
-            logger.error('Retry failed - lead created but not linked to pull', {
-              leadId,
-              pullId: pull.id,
-              error: retryError.message
-            });
+          if (linkError) {
+            logger.error('Failed to link lead to canopy_pulls', { leadId, pullId: pull.id, error: linkError.message });
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const { error: retryError } = await supabase.from('canopy_pulls')
+              .update({ lead_id: leadId })
+              .eq('id', pull.id);
+            if (retryError) {
+              logger.error('Retry failed - lead created but not linked to pull', { leadId, pullId: pull.id, error: retryError.message });
+            } else {
+              logger.info('Successfully linked lead on retry', { leadId, pullId: pull.id });
+            }
           } else {
-            logger.info('Successfully linked lead on retry', { leadId, pullId: pull.id });
+            logger.info('Created and linked new lead from Canopy pull', { leadId, pullId: payload.pull_id });
           }
-        } else {
-          logger.info('Created and linked new lead from Canopy pull', { leadId, pullId: payload.pull_id });
         }
+      } catch (createError) {
+        logger.error('Failed to create lead from Canopy data', { error: createError instanceof Error ? createError.message : String(createError) });
       }
-    } catch (createError) {
-      logger.error('Failed to create lead from Canopy data', { error: createError instanceof Error ? createError.message : String(createError) });
     }
-  }
 
-  // If we have a lead (existing or newly created), update lead score
-  if (leadId) {
-    try {
-      // Give Canopy-imported leads a high initial score (verified data)
-      await supabase.from('leads')
-        .update({
-          lead_score: 75, // High score for verified Canopy data
-          status: 'qualified',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', leadId);
-    } catch (scoreError) {
-      logger.error('Failed to update lead score', { error: scoreError instanceof Error ? scoreError.message : String(scoreError) });
+    // If we have a lead (existing or newly created), update lead score
+    if (leadId) {
+      try {
+        await supabase.from('leads')
+          .update({ lead_score: 75, status: 'qualified', updated_at: new Date().toISOString() })
+          .eq('id', leadId);
+      } catch (scoreError) {
+        logger.error('Failed to update lead score', { error: scoreError instanceof Error ? scoreError.message : String(scoreError) });
+      }
     }
   }
 
@@ -2334,6 +2331,79 @@ interface CanopyConsumerData {
 }
 
 // Create a new lead from Canopy pull data
+// ============================================================================
+// ACCOUNT-LINKED COMPLETION (book cross-sell)
+// ============================================================================
+// When a Canopy pull was initiated in attach_account mode, the shared policy
+// data belongs to an EXISTING client. Do NOT create a lead. Instead surface the
+// cross-sell on the account: a coverage-gap opportunity + a producer follow-up
+// task, both idempotent on the pull id so repeated COMPLETE webhooks are safe.
+async function handleAccountCanopyComplete(
+  supabase: ReturnType<typeof createClient>,
+  accountId: string,
+  pullId: string,
+  _consumerData?: { first_name?: string; last_name?: string; email?: string; phone?: string },
+) {
+  const { data: account } = await supabase.from('accounts')
+    .select('id, name, owner_agent_id, agency_workspace_id')
+    .eq('id', accountId)
+    .single();
+
+  const { data: pulledPolicies } = await supabase.from('canopy_policies')
+    .select('policy_type, carrier_name, premium_amount')
+    .eq('pull_id', pullId);
+
+  const summary = {
+    canopy_pull_id: pullId,
+    policies: (pulledPolicies || []).map((p: any) => ({
+      type: p.policy_type, carrier: p.carrier_name, premium: p.premium_amount,
+    })),
+  };
+
+  // 1. Coverage-gap opportunity (idempotent via idempotency_key = canopy:<pullId>)
+  try {
+    await supabase.from('coverage_gap_opportunities').insert({
+      account_id: accountId,
+      agency_workspace_id: account?.agency_workspace_id ?? null,
+      opportunity_key: 'canopy_cross_sell',
+      severity: 'high',
+      confidence: 0.95,
+      rationale: { source: 'canopy_pull', detail: 'Client shared current policy via Canopy; quote bundle/cross-sell.' },
+      current_coverage_summary: summary,
+      recommended_next_step: 'Review Canopy share and build cross-sell/bundle quote.',
+      status: 'new',
+      detection_version: 'canopy-webhook-v1',
+      idempotency_key: `canopy:${pullId}`,
+    });
+  } catch (e) {
+    logger.warn('coverage_gap_opportunities insert skipped (likely duplicate)', { pullId, error: e instanceof Error ? e.message : String(e) });
+  }
+
+  // 2. Producer follow-up task (guarded by dedupe_key so repeats do not duplicate)
+  try {
+    const { data: existingTask } = await supabase.from('tasks')
+      .select('id').eq('dedupe_key', `canopy-xsell:${pullId}`).maybeSingle();
+    if (!existingTask) {
+      await supabase.from('tasks').insert({
+        title: `Canopy share received — quote cross-sell for ${account?.name ?? 'client'}`,
+        description: 'Client shared their current policy via Canopy Connect. Review the verified data and build a bundle/cross-sell quote.',
+        account_id: accountId,
+        agency_workspace_id: account?.agency_workspace_id ?? null,
+        entity_type: 'account',
+        entity_id: accountId,
+        assignee_agent_id: account?.owner_agent_id ?? null,
+        priority: 'high',
+        source: 'canopy',
+        ai_generated: true,
+        metadata: { canopy_pull_id: pullId, summary },
+        dedupe_key: `canopy-xsell:${pullId}`,
+      });
+    }
+  } catch (e) {
+    logger.warn('tasks insert skipped', { pullId, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
 async function createLeadFromCanopyPull(
   supabase: ReturnType<typeof createClient>,
   pullId: string,
