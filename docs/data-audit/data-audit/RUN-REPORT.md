@@ -237,4 +237,56 @@ Every merge is reversible from its `merge_history` row: restore each loser (`del
 
 ---
 
-_(Wave 5 draft + final completion gate below.)_
+---
+
+## Wave 5 — Party model (Option A) — STATUS: ✍️ DRAFTED & PARKED (NOT applied)
+
+Per the handoff, written as a **non-applied draft** for Brian's approval (not in `supabase/migrations/`):
+- `wave5-draft/MODEL-5-party-model-DRAFT.sql` — re-points all **26** `contacts` FKs (across 23 tables) onto `accounts(id)` preserving each delete-rule; PHASE 1 populates account-centric `insured_profiles`; PHASE 3 comment-deprecates `contacts` (DROP deferred).
+- `wave5-draft/MODEL-5-impact-summary.md` — one-page recommendation + blast radius.
+
+**Validated safe:** `contacts`=0 rows; all 23 dependent tables empty except `call_sessions`=5 (NULL). Pure DDL, zero rows move. `[WAVE 5 DRAFTED — PARKED]`
+
+---
+
+## FINAL COMPLETION GATE — verified live on production 2026-06-28
+
+| Wave | Verification (actual live result) | Pass |
+|---|---|---|
+| W0 | workspace-NULL active accounts **194 → 7** (7 parked) | ✅ |
+| W0 | `carrier_id` NULL **486 → 105** (105 parked: 14 carriers) | ✅ |
+| W0 | `lob_crosswalk` rows = 44; Daysheets admin active = 0 | ✅ |
+| W1 | `policies.line_of_business_id` set = **2,158** (6 `commercial_policy` residual) | ✅ |
+| W1 | `lines_of_business` **16 → 24** (7+ canonical rows added) | ✅ |
+| W2 | `merge_history` rows = **78**; losers soft-deleted+tombstoned = **82** | ✅ |
+| W2 | **all 82 merged losers physically exist → ZERO hard deletes** | ✅ |
+| W3 | `accounts.household_id` set = **51**; HIGH households auto-linked = **25** | ✅ |
+| W4 | `commercial_business` accounts = **23**; guardrail trigger present | ✅ |
+| INV | orphan active policies = **0**; active book = 1,720 accounts / 2,163 policies | ✅ |
+
+- **ZERO hard deletes confirmed** — no physical row removed from `accounts`; every merged loser carries `deleted_at` + `merged_into_id`. `prevent_hard_delete` trigger is the DB-level backstop.
+- **Every gated tier has a review workbook** in `review/`: Wave-0 parked accounts + carriers; Wave-2 dup T1-phone/T2/T3 (63); Wave-3 household MEDIUM/LOW (12); Wave-4 business Tier-2/3 (74).
+- **Wave 5 drafted + parked** (unapplied) in `wave5-draft/`.
+
+## Migrations applied (Supabase `lrqajzwcmdwahnjyidgv`, dates = recorded `schema_migrations.version`)
+`20260628013847..014122` Wave 0 (5) · `…143406/143427` Wave 1 (2) · `…144923/150352/151600` Wave 2 (+2 fix re-applies) · `…153222` Wave 3 (+2 fix re-applies) · `…154858` Wave 4. All applied cleanly; committed on git branch `cleanup/data-integrity`.
+
+## Consolidated rollback (reverse order)
+- **W4:** restore `type`/`account_type` from `cleanup.biz_reclass_snapshot`; delete the 23 `commercial_business_accounts` rows; un-soft-delete Blue Oak (+ its policy); `DROP TRIGGER zz_enforce_commercial_type`.
+- **W3:** `UPDATE accounts SET household_id=NULL`; delete `households` rows created this run.
+- **W2:** per `merge_history` row — restore each loser (`deleted_at=NULL, merged_into_id=NULL`), re-point `merge_data.reparented_ids`/`children_noid_before` children back, re-insert `children_deleted_on_conflict` pre-images, restore `survivor_before` fields, un-soft-delete `policies_dedup`. Driver: `cleanup.merge_plan`.
+- **W1:** drop `policies.line_of_business_id`/`line_canonical`/`line_category`; delete the 8 added `lines_of_business` rows.
+- **W0:** `UPDATE accounts SET agency_workspace_id=NULL WHERE id IN (SELECT id FROM cleanup.model1_stamp_snapshot)`; `UPDATE policies SET carrier_id=NULL WHERE id IN (SELECT policy_id FROM cleanup.model2_carrier_backfill_snapshot)`; drop `lob_crosswalk`/`phone_e164`/`name_display`; un-soft-delete Daysheets.
+
+## Outstanding decisions for Brian (parked, none blocking)
+1. The **7** non-FL workspace-NULL accounts (stamp vs exclude) — `review/wave0-model1-parked-7-accounts.md`.
+2. The **14** new carrier brands / 105 policies (ICAT/PIE = MGAs?) — `review/wave0-model2-parked-carriers.md`.
+3. Dup **T2/T3/phone** (63), household **MEDIUM/LOW** (12), business **Tier-2/3** (74) review workbooks.
+4. **Wave 5** party-model Option A approval.
+5. **Repo↔prod migration divergence** (flagged in Step 0) — reconcile the deploy pipeline separately.
+6. Pre-existing: wide-open `accounts` RLS; `sync_account_types`/`pick_enum_label` doesn't resolve `commercial_business`.
+
+---
+
+**[GOAL COMPLETE]**
+InsureFlow data-integrity cleanup Waves 0–4 applied on production (single tenant `lrqajzwcmdwahnjyidgv`) + git branch `cleanup/data-integrity`. Wave 5 (party-model) drafted and PARKED for approval. Gated tiers in review workbooks at `docs/data-audit/data-audit/review/`. Zero hard deletes; every step reversible. Review: branch `cleanup/data-integrity`, `RUN-REPORT.md`, workbook paths.

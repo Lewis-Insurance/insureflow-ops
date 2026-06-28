@@ -71,9 +71,12 @@ JOIN LATERAL (
 WHERE c.account_id = a.id AND a.id IN (SELECT account_id FROM cleanup.biz_reclass_snapshot)
   AND bt.id IS NOT NULL AND c.business_type_id IS NULL;
 
--- BIZ-8: soft-delete the Blue Oak demo commercial_business account.
+-- BIZ-8: soft-delete the Blue Oak demo commercial_business account + its demo policies
+-- (else the policies orphan on the soft-deleted account).
 UPDATE public.accounts SET deleted_at = now()
 WHERE id = '22222222-2222-4222-8222-222222222222' AND deleted_at IS NULL;
+UPDATE public.policies SET deleted_at = now()
+WHERE account_id = '22222222-2222-4222-8222-222222222222' AND deleted_at IS NULL;
 
 -- BIZ-6a: standing data-quality view (residual household-with-commercial-line violators).
 CREATE OR REPLACE VIEW public.v_business_type_violations
