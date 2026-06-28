@@ -38242,6 +38242,80 @@ export type Database = {
       }
     }
     Functions: {
+      get_customer_triage_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total: number
+          renewals_30d: number
+          renewals_60d: number
+          overdue: number
+          no_active_policy: number
+          new_30d: number
+        }[]
+      }
+      get_policy_triage_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total: number
+          expiring_30d: number
+          lapsed: number
+          no_renewal_date: number
+          recently_bound: number
+        }[]
+      }
+      get_ao_migration_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total: number
+          not_started: number
+          quote_out: number
+          bound_elsewhere: number
+          lapsing_week: number
+        }[]
+      }
+      search_policies: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          id: string
+          account_id: string
+          named_insured: string
+          policy_number: string
+          carrier: string
+          line: string
+          status: string
+          premium: number
+          expiration_date: string
+          created_at: string
+        }[]
+      }
+      search_ao_renewals: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          id: string
+          account_id: string
+          customer_name: string
+          policy_number: string
+          policy_type: string
+          current_carrier: string
+          renewal_date: string
+          current_premium: number
+          status: string
+          moved_carrier: string
+          best_alternative_carrier: string
+          last_contact_date: string
+          follow_up_date: string
+        }[]
+      }
       add_tag_to_customer: {
         Args: {
           p_account_id: string
@@ -39930,6 +40004,7 @@ export type Database = {
           status: string
           type: string
           updated_at: string
+          next_expiration_at: string
         }[]
       }
       update_account_secure: {

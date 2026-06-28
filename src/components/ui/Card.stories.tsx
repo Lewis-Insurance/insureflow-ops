@@ -1,3 +1,4 @@
+/* eslint-disable storybook/no-renderer-packages -- pre-existing; /react-vite not resolvable in node_modules */
 import type { Meta, StoryObj } from '@storybook/react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './card';
 import { Button } from './button';

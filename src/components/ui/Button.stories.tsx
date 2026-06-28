@@ -1,3 +1,4 @@
+/* eslint-disable storybook/no-renderer-packages -- pre-existing; /react-vite not resolvable in node_modules */
 import type { Meta, StoryObj } from '@storybook/react';
 import { Button } from './button';
 import { Mail, Loader2, ChevronRight } from 'lucide-react';
