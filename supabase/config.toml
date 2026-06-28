@@ -166,3 +166,9 @@ verify_jwt = true
 # Phase-0 batch enqueue uses its own x-batch-secret + fire-gate auth (no user JWT).
 [functions.phase0-batch-enqueue]
 verify_jwt = false
+
+# Postmark delivery-event webhook (PLAN-INT-B §4.7). Postmark cannot send a
+# Supabase JWT; auth is enforced in-function via embedded secret (HTTP Basic
+# and/or ?token=/x-postmark-token).
+[functions.postmark-webhook]
+verify_jwt = false
