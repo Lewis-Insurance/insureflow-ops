@@ -308,23 +308,24 @@ async function checkStateRules(
               issue: 'state_prohibited_phrase',
               severity: 'error',
               phrase,
-              reason: `Prohibited in ${state}: ${rule.regulation_name || 'state regulation'}`,
+              reason: `Prohibited in ${state}: ${rule.source_reference || rule.notes || 'state regulation'}`,
             });
           }
         }
       }
 
-      if (rule.required_disclosures) {
-        for (const disclosure of rule.required_disclosures) {
-          if (!content.includes(disclosure.toLowerCase())) {
-            issues.push({
-              field: 'content',
-              issue: 'missing_state_disclosure',
-              severity: 'warning',
-              reason: `${state} requires: "${disclosure}"`,
-              suggestion: `Add required disclosure: "${disclosure}"`,
-            });
-          }
+      // required_disclaimers is jsonb; normalize to an array of strings.
+      const disclaimers = Array.isArray(rule.required_disclaimers) ? rule.required_disclaimers : [];
+      for (const disclaimer of disclaimers) {
+        if (typeof disclaimer !== 'string') continue;
+        if (!content.includes(disclaimer.toLowerCase())) {
+          issues.push({
+            field: 'content',
+            issue: 'missing_state_disclosure',
+            severity: 'warning',
+            reason: `${state} requires: "${disclaimer}"`,
+            suggestion: `Add required disclosure: "${disclaimer}"`,
+          });
         }
       }
     }

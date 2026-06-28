@@ -51,23 +51,36 @@ interface QueuePayload {
 }
 
 interface GovernorConfig {
-  max_emails_per_minute_per_sender: number;
-  max_sms_per_minute_per_sender: number;
-  max_emails_per_day_per_org: number;
-  max_sms_per_day_per_org: number;
+  per_user_hourly_limit: number;
+  per_user_daily_limit: number;
+  marketing_per_contact_per_day: number;
+  marketing_per_contact_per_week: number;
+  marketing_per_household_per_day: number;
+  business_hours_start: number;
+  business_hours_end: number;
+  business_days: number[];
+  org_timezone: string;
+  max_concurrent_sends: number;
+  jitter_max_seconds: number;
+  // Not DB-backed; sensible constants used by the processor
   batch_size: number;
   claim_timeout_seconds: number;
-  circuit_breaker_threshold: number;
 }
 
 const DEFAULT_CONFIG: GovernorConfig = {
-  max_emails_per_minute_per_sender: 30,
-  max_sms_per_minute_per_sender: 10,
-  max_emails_per_day_per_org: 5000,
-  max_sms_per_day_per_org: 1000,
+  per_user_hourly_limit: 100,
+  per_user_daily_limit: 500,
+  marketing_per_contact_per_day: 2,
+  marketing_per_contact_per_week: 5,
+  marketing_per_household_per_day: 2,
+  business_hours_start: 9,
+  business_hours_end: 17,
+  business_days: [1, 2, 3, 4, 5],
+  org_timezone: 'America/New_York',
+  max_concurrent_sends: 10,
+  jitter_max_seconds: 30,
   batch_size: 50,
   claim_timeout_seconds: 300,
-  circuit_breaker_threshold: 10,
 };
 
 // Generate unique processor ID
@@ -89,6 +102,7 @@ Deno.serve(async (req) => {
     suppressed: 0,
     rate_limited: 0,
     preference_stale: 0,
+    deferred_quiet_hours: 0,
   };
 
   try {
@@ -177,7 +191,14 @@ Deno.serve(async (req) => {
 
         // Check frequency caps
         if (item.to_contact_id) {
-          const canSend = await checkFrequencyCap(supabase, item.org_id, item.to_contact_id, item.channel);
+          const canSend = await checkFrequencyCap(
+            supabase,
+            item.org_id,
+            item.to_contact_id,
+            item.household_id,
+            item.classification,
+            item.channel
+          );
           if (!canSend) {
             console.log(`🚫 Frequency cap reached for contact ${item.to_contact_id}`);
             await markRateLimited(supabase, item.id);
@@ -203,6 +224,15 @@ Deno.serve(async (req) => {
           console.log(`🛑 Suppression rule triggered for item ${item.id}`);
           await markSuppressed(supabase, item.id, suppressed);
           stats.suppressed++;
+          continue;
+        }
+
+        // Quiet-hours guard: defer if outside org/state allowed send window.
+        const deferUntil = await checkQuietHours(supabase, item, config);
+        if (deferUntil) {
+          console.log(`🌙 Quiet hours for item ${item.id}, deferring until ${deferUntil.toISOString()}`);
+          await markDeferredQuietHours(supabase, item.id, deferUntil);
+          stats.deferred_quiet_hours++;
           continue;
         }
 
@@ -275,22 +305,29 @@ function jsonResponse(data: object, status = 200) {
 }
 
 async function loadGovernorConfig(supabase: SupabaseClient): Promise<GovernorConfig> {
+  // Single config row; no is_active column exists.
   const { data } = await supabase
     .from('marketing_governor_config')
     .select('*')
-    .eq('is_active', true)
     .limit(1)
     .maybeSingle();
 
   if (data) {
     return {
-      max_emails_per_minute_per_sender: data.max_emails_per_minute_per_sender ?? DEFAULT_CONFIG.max_emails_per_minute_per_sender,
-      max_sms_per_minute_per_sender: data.max_sms_per_minute_per_sender ?? DEFAULT_CONFIG.max_sms_per_minute_per_sender,
-      max_emails_per_day_per_org: data.max_emails_per_day_per_org ?? DEFAULT_CONFIG.max_emails_per_day_per_org,
-      max_sms_per_day_per_org: data.max_sms_per_day_per_org ?? DEFAULT_CONFIG.max_sms_per_day_per_org,
-      batch_size: data.batch_size ?? DEFAULT_CONFIG.batch_size,
-      claim_timeout_seconds: data.claim_timeout_seconds ?? DEFAULT_CONFIG.claim_timeout_seconds,
-      circuit_breaker_threshold: data.circuit_breaker_threshold ?? DEFAULT_CONFIG.circuit_breaker_threshold,
+      per_user_hourly_limit: data.per_user_hourly_limit ?? DEFAULT_CONFIG.per_user_hourly_limit,
+      per_user_daily_limit: data.per_user_daily_limit ?? DEFAULT_CONFIG.per_user_daily_limit,
+      marketing_per_contact_per_day: data.marketing_per_contact_per_day ?? DEFAULT_CONFIG.marketing_per_contact_per_day,
+      marketing_per_contact_per_week: data.marketing_per_contact_per_week ?? DEFAULT_CONFIG.marketing_per_contact_per_week,
+      marketing_per_household_per_day: data.marketing_per_household_per_day ?? DEFAULT_CONFIG.marketing_per_household_per_day,
+      business_hours_start: data.business_hours_start ?? DEFAULT_CONFIG.business_hours_start,
+      business_hours_end: data.business_hours_end ?? DEFAULT_CONFIG.business_hours_end,
+      business_days: data.business_days ?? DEFAULT_CONFIG.business_days,
+      org_timezone: data.org_timezone ?? DEFAULT_CONFIG.org_timezone,
+      max_concurrent_sends: data.max_concurrent_sends ?? DEFAULT_CONFIG.max_concurrent_sends,
+      jitter_max_seconds: data.jitter_max_seconds ?? DEFAULT_CONFIG.jitter_max_seconds,
+      // No DB columns for these; use sensible constants.
+      batch_size: data.max_concurrent_sends ? Math.max(data.max_concurrent_sends, 50) : DEFAULT_CONFIG.batch_size,
+      claim_timeout_seconds: DEFAULT_CONFIG.claim_timeout_seconds,
     };
   }
   return DEFAULT_CONFIG;
@@ -309,15 +346,103 @@ async function checkGlobalPause(supabase: SupabaseClient): Promise<boolean> {
 async function checkServiceHealth(supabase: SupabaseClient): Promise<boolean> {
   const { data } = await supabase
     .from('external_service_health')
-    .select('service_name, is_healthy')
-    .in('service_name', ['postmark', 'sendgrid', 'twilio']);
+    .select('service_name, status, circuit_open')
+    .eq('service_name', 'email_provider')
+    .maybeSingle();
 
-  // Return true if at least one email and one SMS service is healthy
-  const hasHealthyEmail = data?.some(s =>
-    (s.service_name === 'postmark' || s.service_name === 'sendgrid') && s.is_healthy
-  ) ?? true;
+  // No row means we have no negative signal; treat as healthy.
+  if (!data) return true;
 
-  return hasHealthyEmail;
+  // Healthy = provider not reported down and circuit not open.
+  return data.status !== 'down' && !data.circuit_open;
+}
+
+/**
+ * Quiet-hours guard. Returns the next allowed Date if the message must be deferred,
+ * or null if it may send now.
+ *
+ * Rules:
+ * - Current hour in org_timezone must be within [business_hours_start, business_hours_end).
+ * - If the recipient has a state, the hour must also be within the state's
+ *   [earliest_hour, latest_hour) from state_communication_rules.
+ */
+async function checkQuietHours(
+  supabase: SupabaseClient,
+  item: QueueItem,
+  config: GovernorConfig
+): Promise<Date | null> {
+  // Current hour in the org timezone.
+  const now = new Date();
+  const orgHour = getHourInTimeZone(now, config.org_timezone);
+
+  let earliest = config.business_hours_start;
+  let latest = config.business_hours_end;
+
+  // Tighten the window using the recipient's state rule, if any.
+  const state = await getRecipientState(supabase, item);
+  if (state) {
+    const { data: rule } = await supabase
+      .from('state_communication_rules')
+      .select('earliest_hour, latest_hour')
+      .eq('state_code', state.toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (rule) {
+      if (typeof rule.earliest_hour === 'number') earliest = Math.max(earliest, rule.earliest_hour);
+      if (typeof rule.latest_hour === 'number') latest = Math.min(latest, rule.latest_hour);
+    }
+  }
+
+  if (orgHour >= earliest && orgHour < latest) {
+    return null; // within allowed window, ok to send now
+  }
+
+  // Outside the window: compute the next time the window opens.
+  return nextAllowedTime(now, config.org_timezone, earliest);
+}
+
+/** Hour-of-day (0-23) for a Date as observed in the given IANA timezone. */
+function getHourInTimeZone(date: Date, timeZone: string): number {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: 'numeric',
+    hour12: false,
+  });
+  const parsed = parseInt(fmt.format(date), 10);
+  // Intl may emit "24" for midnight in some runtimes; normalize to 0.
+  return Number.isNaN(parsed) ? 0 : parsed % 24;
+}
+
+/**
+ * Next moment at which the local hour in `timeZone` reaches `earliestHour`.
+ * If we are already past the open hour today, roll to the next day.
+ */
+function nextAllowedTime(now: Date, timeZone: string, earliestHour: number): Date {
+  const currentHour = getHourInTimeZone(now, timeZone);
+  // Hours to advance until we hit the open hour (next occurrence).
+  let hoursAhead = earliestHour - currentHour;
+  if (hoursAhead <= 0) hoursAhead += 24;
+
+  const target = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
+  // Snap to the top of the hour for tidiness.
+  target.setMinutes(0, 0, 0);
+  return target;
+}
+
+/** Best-effort lookup of the recipient's state for quiet-hours enforcement. */
+async function getRecipientState(supabase: SupabaseClient, item: QueueItem): Promise<string | null> {
+  // Audience is account-based (the `contacts` table was retired in Wave 5); read accounts.state
+  // via the queue's to_account_id. Returns null -> only the org-level quiet-hours window applies.
+  if (!item.to_account_id) return null;
+
+  const { data } = await supabase
+    .from('accounts')
+    .select('state')
+    .eq('id', item.to_account_id)
+    .maybeSingle();
+
+  return (data?.state as string | null) ?? null;
 }
 
 async function reclaimOrphanedClaims(supabase: SupabaseClient, timeoutSeconds: number) {
@@ -408,15 +533,27 @@ async function checkFrequencyCap(
   supabase: SupabaseClient,
   orgId: string,
   contactId: string,
+  householdId: string | null,
+  classification: string,
   channel: string
 ): Promise<boolean> {
-  const { data } = await supabase.rpc('check_frequency_cap', {
+  const { data, error } = await supabase.rpc('check_frequency_cap', {
     p_org_id: orgId,
     p_contact_id: contactId,
+    p_household_id: householdId,
+    p_classification: classification,
     p_channel: channel,
   });
 
-  return data ?? true;
+  // RPC returns TABLE(allowed boolean, reason text, ...); supabase-js yields an array of rows.
+  if (error) {
+    // Fail closed: if we can't confirm the cap, do not send.
+    console.error('check_frequency_cap error, failing closed:', error);
+    return false;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return row?.allowed ?? false;
 }
 
 async function checkHouseholdDedupe(supabase: SupabaseClient, dedupeKey: string, currentId: string): Promise<boolean> {
@@ -668,13 +805,20 @@ async function markSent(supabase: SupabaseClient, queueId: string, providerMessa
 }
 
 async function markFailed(supabase: SupabaseClient, queueId: string, error: string) {
+  // Read current attempts so we can increment numerically (no scalar increment RPC available).
+  const { data: current } = await supabase
+    .from('marketing_send_queue')
+    .select('attempts')
+    .eq('id', queueId)
+    .single();
+
   await supabase
     .from('marketing_send_queue')
     .update({
       status: 'failed',
       last_error: error,
       last_attempt_at: new Date().toISOString(),
-      attempts: supabase.rpc('increment', { row_id: queueId, column_name: 'attempts' }).catch(() => undefined),
+      attempts: (current?.attempts || 0) + 1,
       updated_at: new Date().toISOString(),
     })
     .eq('id', queueId);
@@ -737,6 +881,22 @@ async function markRateLimited(supabase: SupabaseClient, queueId: string) {
       claimed_at: null,
       claim_expires_at: null,
       next_retry_at: nextRetry.toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', queueId);
+}
+
+async function markDeferredQuietHours(supabase: SupabaseClient, queueId: string, nextAllowed: Date) {
+  // Return the item to the queue; do NOT send. It will be re-claimed at/after nextAllowed.
+  await supabase
+    .from('marketing_send_queue')
+    .update({
+      status: 'pending',
+      processor_id: null,
+      claimed_at: null,
+      claim_expires_at: null,
+      next_retry_at: nextAllowed.toISOString(),
+      scheduled_for: nextAllowed.toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', queueId);
