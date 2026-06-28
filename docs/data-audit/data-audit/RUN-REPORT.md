@@ -120,4 +120,54 @@ Migrations:
 
 ---
 
-_(Waves 2–5 sections appended as they execute.)_
+---
+
+## Wave 2 — Deduplication (destructive, soft-delete + re-parent) — STATUS: ✅ APPLIED & VERIFIED on production (2026-06-28 UTC), owner-approved scope
+
+A **3-lens adversarial review** of the merge engine ran before any merge and caught real defects — all incorporated before applying. The pause-and-review gate paid off.
+
+**Tooling (migrations):**
+- `20260628144923_wave2_dup1_merge_tooling.sql` — rule taxonomy, tombstone columns (`accounts.merged_into_id/merged_at`), `compute_account_survivor()`, and `merge_accounts(survivor, losers[], rule, merged_by, apply=false)` — **dry-run by default**, SECURITY DEFINER / service_role only.
+- `20260628150352_wave2_dup2_detection.sql` — `cleanup.norm_addr()` + `cleanup.dup_clusters` regenerated detection + back-link into `duplicate_groups` with `rule_id`.
+- `20260628151600_wave2_dup1b_merge_engine_hardened.sql` — **hardened `merge_accounts`** after review.
+
+**`merge_accounts` does:** dynamic re-parent of every FK column → `accounts.id` (pg_catalog-driven, 106 cols), within-cluster policy dedup (soft-delete), field-union (survivor wins, cascade-best loser backfill), soft-delete losers + tombstone, full `merge_history` undo manifest. **Never hard-deletes an account or a policy.**
+
+**Review findings — all fixed:** idempotency replay guard; soft-delete redundant policies BEFORE re-parent (avoids hard-delete via the `policies(policy_number)` partial-unique index); collision-deletes restricted to an allowlist of redundant derived tables (else RAISE — protects `client_portal_users`→`portal_household_members` CASCADE, `insured_profiles`, etc.); full-row capture of moved/deleted children into the manifest (precise un-merge); account_id-PK collision branch gated on real uniqueness; full-cluster advisory lock. **Validated** via a rolled-back 3-way apply test (soft-delete + re-parent + collision capture + idempotent replay all confirmed, then rolled back).
+
+**Detection (full post-stamp book):** T1_SHARED_ADDR 25 (auto), T1_SHARED_PHONE 2, T2_EMAIL_OR_ZIP 57, T3_CONFLICT_ADDR 4.
+
+**New systemic finding (surfaced + acted on):** a bulk `autoowners_inforce` import created ~62 **no-address, policy-only stub accounts** for customers who also have an addressed account — stranding auto coverage on an invisible second record.
+
+**Applied — 78 merges, owner-approved scope (core 24 + ~58 stub-orphans):**
+| Batch | Rule | Clusters | Losers |
+|---|---|---|---|
+| 1 | T1_SHARED_ADDR (clean 2-way) | 20 | 20 |
+| 2 | T1_SHARED_ADDR_STUB (3-way, folds stranded stub) | 3 | 6 |
+| 2 | SORENSEN_RANCHERA (3→1) | 1 | 2 |
+| 3 | AUTOOWNERS_STUB (split-record fold) | 54 | 54 |
+| **Total** | | **78** | **82** |
+
+**Downgraded to review** (review flagged as likely NOT duplicates): **Thomas Sealey** (two different people — distinct phones AND emails) and **Thomas Allen/Winfield** (probable spouses).
+
+### Apply results — verified live 2026-06-28
+| Verification | Result | Pass |
+|---|---|---|
+| `merge_history` rows / `duplicate_flags` | 78 / 82 | ✅ |
+| Active accounts (1,803 → ) | **1,721** (−82 losers) | ✅ |
+| Active policies | **2,164 unchanged** (zero lost) | ✅ |
+| Losers soft-deleted + tombstoned | 82 | ✅ |
+| **Merged losers still physically exist (zero hard deletes)** | **82/82** | ✅ |
+| **Orphan active policies (stranded coverage)** | **0** | ✅ |
+| Sorensen active rows | 6 (survivor + 5 properties) | ✅ |
+| Stub-fold recovered coverage (e.g. John W Lindsey survivor) | 3 active policies | ✅ |
+
+### Parked (review workbook)
+- T1-phone (2) / T2 (57) / T3 (4) review clusters → `review/wave2-dup-review-workbook.md`. Includes Gary Howard, Melinda Shrum, Lydia Novakowski, and the 2 downgraded clusters.
+
+### Reversibility (Wave 2)
+Every merge is reversible from its `merge_history` row: restore each loser (`deleted_at=NULL, merged_into_id=NULL`), re-point `merge_data.reparented_ids` children back to the loser, re-insert `children_deleted_on_conflict` + `children_noid_before` pre-images, restore `survivor_before` fields, un-soft-delete `policies_dedup`. Driver: `cleanup.merge_plan` (78 rows, `applied=true` + per-cluster `result`).
+
+---
+
+_(Waves 3–5 sections appended as they execute.)_
