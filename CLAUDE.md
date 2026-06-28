@@ -10,6 +10,22 @@
 
 ---
 
+## Design System: Calm Command (binding for all UI)
+
+The in-app CRM follows **Calm Command** — a dark-only operations console extracted from the AO Renewal Command Center. One lime accent (`#BEF264`), hierarchy from weight and spacing, not color. The full system lives in `design-system/`:
+
+- `design-system/constitution.md` — the ten rules and non-negotiables (read first)
+- `design-system/surface-map.md` — page archetypes (Record Command, Index/List, Form, etc.)
+- `design-system/component-rules.md` — every component, states, action hierarchy
+- `design-system/design-tokens.css` — source of color/spacing/radius/shadow/motion/z-index (mirrored into `src/index.css`)
+- `design-system/acceptance-checklist.md` — the gate before any screen is done
+- `design-system/anti-patterns.md` — forbidden (rainbow toolbar, vanity metric wall, carrier-by-color, etc.)
+- `design-system/builder-prompt.md` — drop into a fresh agent session to build a surface
+
+Reusable primitives live in `src/components/cc/`. The app is dark-only (`class="dark"` on `<html>`, ThemeProvider `forcedTheme="dark"`, no theme toggle). Tokens are consumed via Tailwind `cc-*` classes (e.g. `bg-cc-surface`, `text-cc-text-muted`, `rounded-cc-xl`). Non-negotiables: one lime primary per surface, tabular figures, mask SSN/DOB/DLN, carriers are name chips not colors, no em or en dashes in copy.
+
+---
+
 ## Deployment Architecture
 
 ### Production Environment

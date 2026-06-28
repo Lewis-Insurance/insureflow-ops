@@ -1,0 +1,185 @@
+/* Calm Command - Design Tokens (v2) */
+/* Lewis Insurance Agency OS (InsureFlow CRM) */
+/* Extracted from the AO Renewal Command Center, the locked standard. */
+/* Dark theme only. Single lime accent. Text tokens verified WCAG AA on --cc-bg. */
+/* The app is dark-only: tokens apply on :root and .dark so either strategy works. */
+
+:root,
+.dark {
+  /* ===== shadcn/ui base (HSL, space-separated; consume as hsl(var(--x))) ===== */
+  /* NOTE: shadcn --accent is the subtle hover SURFACE, not the brand lime.   */
+  /*       The brand lime is --primary in shadcn terms.                       */
+  --background: 222 33% 6%;
+  --foreground: 210 22% 96%;
+  --card: 220 26% 9%;
+  --card-foreground: 210 22% 96%;
+  --popover: 220 25% 12%;
+  --popover-foreground: 210 22% 96%;
+  --primary: 82 85% 67%;            /* the lime brand accent */
+  --primary-foreground: 222 33% 6%;
+  --secondary: 220 23% 15%;
+  --secondary-foreground: 219 17% 80%;
+  --muted: 220 25% 12%;
+  --muted-foreground: 218 10% 59%;
+  --accent: 220 23% 15%;            /* shadcn semantics: subtle hover surface */
+  --accent-foreground: 210 22% 96%;
+  --destructive: 2 68% 62%;
+  --destructive-foreground: 222 33% 6%;
+  --border: 219 19% 21%;
+  --input: 220 12% 47%;             /* = #6A7488 interactive input border, AA non-text >=3:1 */
+  --ring: 82 85% 67%;
+  --radius: 0.75rem;
+
+  /* ===== Calm Command extended tokens (cc- prefix, hex) ===== */
+
+  /* Surfaces (layer stack, darkest to lightest) */
+  --cc-bg: #0A0D14;
+  --cc-surface: #11151D;
+  --cc-surface-raised: #171C26;
+  --cc-surface-overlay: #1E2430;
+
+  /* Borders */
+  --cc-border-subtle: #1E2430;        /* non-interactive dividers, card edges */
+  --cc-border-strong: #2C3340;        /* heavier non-interactive separation */
+  --cc-border-interactive: #6A7488;   /* inputs, ghost buttons, selects: >=3:1 on every surface */
+
+  /* Text (on --cc-bg: primary 17.9:1, secondary 11.7:1, muted 6.3:1) */
+  --cc-text-primary: #F4F6F8;
+  --cc-text-secondary: #C3C9D4;
+  --cc-text-muted: #8B93A1;
+  --cc-text-faint: #5A6270;   /* 3.16:1 on bg, decorative or disabled ONLY, never body, never a label */
+
+  /* Accent (lime 14.9:1 on bg; dark text on accent 14.9:1) */
+  --cc-accent: #BEF264;
+  --cc-accent-hover: #CEF58A;
+  --cc-accent-deep: #A6ED2C;   /* pressed state, accent border */
+  --cc-accent-muted: #7E8B4A;  /* olive, the second-rank confirm fill (hero "Save") */
+  --cc-accent-glow: rgba(190, 242, 100, 0.20);
+  --cc-on-accent: #0A0D14;     /* text and icons on accent fills */
+
+  /* Focus (Rule 5; lime ring, dark inner ring on the lime button so it never reads lime-on-lime) */
+  --cc-focus-ring: var(--cc-accent);
+  --cc-focus-offset: var(--cc-bg);
+  --cc-focus-inner: var(--cc-on-accent);
+
+  /* Disabled */
+  --cc-disabled-surface: var(--cc-surface-raised);
+  --cc-disabled-text: var(--cc-text-faint);
+
+  /* Semantic (restrained, all >=5.6:1 on bg) */
+  --cc-success: #46B17B;
+  --cc-warning: #E0B341;
+  --cc-danger: #E0625E;
+  --cc-info: #6BA3DC;
+  --cc-on-semantic: #0A0D14;
+  --cc-danger-pill-text: #F0918E;  /* lightened danger text for the 14% danger pill, AA >=4.5 on every surface */
+
+  /* Links and selection */
+  --cc-link: var(--cc-info);
+  --cc-link-hover: #8FBEE8;
+
+  /* Skeleton (loading) */
+  --cc-skeleton-base: var(--cc-surface-raised);
+  --cc-skeleton-sheen: var(--cc-surface-overlay);
+
+  /* Scrim (modal/drawer overlay) */
+  --cc-scrim: rgba(0, 0, 0, 0.6);
+
+  /* Hero glow (the ONLY blue glow in the app, top hero panel only) */
+  --cc-hero-glow: radial-gradient(60% 80% at 15% 0%, rgba(107, 163, 220, 0.10), transparent 70%);
+
+  /* Data visualization ramp (the one place multiple hues are allowed; color encodes data) */
+  /* All >=3:1 on bg as graphical objects. Never use --cc-accent for a non-primary series. */
+  --cc-chart-1: #BEF264;
+  --cc-chart-2: #6BA3DC;
+  --cc-chart-3: #46B17B;
+  --cc-chart-4: #E0B341;
+  --cc-chart-5: #9B8AFB;
+  --cc-chart-6: #E0625E;
+  --cc-chart-grid: var(--cc-border-subtle);
+  --cc-chart-axis: var(--cc-text-muted);
+  --cc-chart-track: var(--cc-surface-raised);
+
+  /* Radius */
+  --cc-radius-sm: 8px;
+  --cc-radius-md: 12px;
+  --cc-radius-lg: 16px;
+  --cc-radius-xl: 20px;
+  --cc-radius-2xl: 24px;
+  --cc-radius-pill: 9999px;
+
+  /* Spacing (4pt scale; matches Tailwind default p-1..p-16) */
+  --cc-space-1: 4px;
+  --cc-space-2: 8px;
+  --cc-space-3: 12px;
+  --cc-space-4: 16px;
+  --cc-space-5: 20px;
+  --cc-space-6: 24px;
+  --cc-space-8: 32px;
+  --cc-space-10: 40px;
+  --cc-space-12: 48px;
+  --cc-space-16: 64px;
+
+  /* Elevation */
+  --cc-shadow-card: 0 1px 2px rgba(0,0,0,0.40), 0 1px 1px rgba(0,0,0,0.30);
+  --cc-shadow-lift: 0 8px 24px rgba(0,0,0,0.45);
+  --cc-shadow-glow: 0 6px 20px var(--cc-accent-glow); /* hover glow only, no inset ring (avoids double-ring with focus) */
+
+  /* Z-index scale (single source for all stacking) */
+  --cc-z-base: 0;
+  --cc-z-sticky: 10;
+  --cc-z-rail: 20;
+  --cc-z-dropdown: 30;
+  --cc-z-overlay: 40;
+  --cc-z-modal: 50;
+  --cc-z-toast: 60;
+  --cc-z-tooltip: 70;
+
+  /* Typography */
+  --cc-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cc-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --cc-text-label: 11px;   /* uppercase section labels, tracked */
+  --cc-text-xs: 12px;
+  --cc-text-sm: 13px;
+  --cc-text-base: 15px;
+  --cc-text-lg: 18px;
+  --cc-text-xl: 22px;
+  --cc-text-2xl: 28px;
+  --cc-text-3xl: 34px;
+  --cc-tracking-label: 0.08em;
+  --cc-leading-tight: 1.25;
+  --cc-leading-normal: 1.5;
+
+  /* Motion (reduced-motion users get instant, see media query below) */
+  --cc-dur-fast: 120ms;
+  --cc-dur-base: 180ms;
+  --cc-dur-slow: 240ms;
+  --cc-dur-slower: 320ms;
+  --cc-ease-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cc-ease-snap: cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* All numeric data uses tabular, lining figures */
+.cc-num,
+[data-numeric],
+input[type="number"] {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Off-brand default selection is jarring on near-black */
+::selection {
+  background: var(--cc-accent-glow);
+  color: var(--cc-text-primary);
+}
+
+/* Rule 5: reduced-motion users get instant transitions */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

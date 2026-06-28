@@ -46,6 +46,13 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
+      {/* Skip to content (acceptance checklist: keyboard + landmarks) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-toast focus:rounded-cc-md focus:bg-cc-surface-overlay focus:px-4 focus:py-2 focus:text-cc-text-primary focus:outline focus:outline-2 focus:outline-cc-accent"
+      >
+        Skip to content
+      </a>
       <div className="flex min-h-screen w-full">
         <Sidebar>
           <SidebarHeader>
@@ -432,7 +439,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
           </header>
           {/* New Lead Banner - shows when there are unacknowledged Canopy leads */}
           <NewLeadBanner />
-          <main className="flex-1 overflow-auto">
+          <main id="main-content" className="flex-1 overflow-auto">
             {children}
           </main>
         </div>

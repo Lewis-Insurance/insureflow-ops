@@ -7,101 +7,151 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    /* Lewis Insurance brand colors */
-    --primary: 213 94% 54%; /* Lewis Insurance blue */
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 22 100% 58%; /* Lewis Insurance orange accent */
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 213 94% 54%;
-
-    /* Lewis brand specific colors */
-    --lewis-blue: 213 94% 54%;
-    --lewis-orange: 22 100% 58%;
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 98%;
-    --warning: 22 100% 58%; /* Using Lewis orange for warnings */
-    --warning-foreground: 0 0% 98%;
-    --info: 213 94% 54%;
-    --info-foreground: 0 0% 98%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
+  /* ===================================================================== */
+  /* Calm Command tokens (extracted from the AO Renewal Command Center).    */
+  /* Dark only: applied on :root AND .dark so either strategy resolves dark. */
+  /* Source of truth mirror: design-system/design-tokens.css                 */
+  /* ===================================================================== */
+  :root,
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* ----- shadcn/ui base (HSL; consume as hsl(var(--x))) ----- */
+    /* NOTE: shadcn --accent is the subtle hover SURFACE; brand lime is --primary. */
+    --background: 222 33% 6%;
+    --foreground: 210 22% 96%;
+    --card: 220 26% 9%;
+    --card-foreground: 210 22% 96%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 210 22% 96%;
+    --primary: 82 85% 67%;            /* lime brand accent */
+    --primary-foreground: 222 33% 6%;
+    --secondary: 220 23% 15%;
+    --secondary-foreground: 219 17% 80%;
+    --muted: 220 25% 12%;
+    --muted-foreground: 218 10% 59%;
+    --accent: 220 23% 15%;            /* subtle hover surface */
+    --accent-foreground: 210 22% 96%;
+    --destructive: 2 68% 62%;
+    --destructive-foreground: 222 33% 6%;
+    --border: 219 19% 21%;
+    --input: 220 12% 47%;             /* interactive input border, >=3:1 non-text */
+    --ring: 82 85% 67%;
+    --radius: 0.75rem;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Legacy Lewis brand + semantic aliases (kept so other pages compile).
+       Repointed onto the Calm Command palette; carriers are never colored. */
+    --lewis-blue: 210 60% 64%;
+    --lewis-orange: 82 85% 67%;
+    --success: 150 43% 49%;
+    --success-foreground: 222 33% 6%;
+    --warning: 44 72% 57%;
+    --warning-foreground: 222 33% 6%;
+    --info: 210 60% 64%;
+    --info-foreground: 222 33% 6%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    /* Sidebar (shadcn Sidebar in AppLayout) mapped to Calm Command surfaces */
+    --sidebar-background: 220 26% 9%;
+    --sidebar-foreground: 219 17% 80%;
+    --sidebar-primary: 82 85% 67%;
+    --sidebar-primary-foreground: 222 33% 6%;
+    --sidebar-accent: 220 23% 15%;
+    --sidebar-accent-foreground: 210 22% 96%;
+    --sidebar-border: 219 19% 21%;
+    --sidebar-ring: 82 85% 67%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* ===== Calm Command extended tokens (cc- prefix, hex) ===== */
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Surfaces (darkest to lightest; surfaces step up, never down) */
+    --cc-bg: #0A0D14;
+    --cc-surface: #11151D;
+    --cc-surface-raised: #171C26;
+    --cc-surface-overlay: #1E2430;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Borders */
+    --cc-border-subtle: #1E2430;
+    --cc-border-strong: #2C3340;
+    --cc-border-interactive: #6A7488;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Text (on --cc-bg: primary 17.9:1, secondary 11.7:1, muted 6.3:1) */
+    --cc-text-primary: #F4F6F8;
+    --cc-text-secondary: #C3C9D4;
+    --cc-text-muted: #8B93A1;
+    --cc-text-faint: #5A6270;   /* decorative or disabled ONLY, never body/label */
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Accent (lime 14.9:1 on bg) */
+    --cc-accent: #BEF264;
+    --cc-accent-hover: #CEF58A;
+    --cc-accent-deep: #A6ED2C;
+    --cc-accent-muted: #7E8B4A;  /* olive, the second-rank confirm fill */
+    --cc-accent-glow: rgba(190, 242, 100, 0.20);
+    --cc-on-accent: #0A0D14;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Focus */
+    --cc-focus-ring: var(--cc-accent);
+    --cc-focus-offset: var(--cc-bg);
+    --cc-focus-inner: var(--cc-on-accent);
+
+    /* Disabled */
+    --cc-disabled-surface: var(--cc-surface-raised);
+    --cc-disabled-text: var(--cc-text-faint);
+
+    /* Semantic (restrained, all >=5.6:1 on bg) */
+    --cc-success: #46B17B;
+    --cc-warning: #E0B341;
+    --cc-danger: #E0625E;
+    --cc-info: #6BA3DC;
+    --cc-on-semantic: #0A0D14;
+    --cc-danger-pill-text: #F0918E;  /* lightened danger text for the 14% danger pill */
+
+    /* Links and selection */
+    --cc-link: var(--cc-info);
+    --cc-link-hover: #8FBEE8;
+
+    /* Skeleton (loading) */
+    --cc-skeleton-base: var(--cc-surface-raised);
+    --cc-skeleton-sheen: var(--cc-surface-overlay);
+
+    /* Scrim (modal/drawer overlay) */
+    --cc-scrim: rgba(0, 0, 0, 0.6);
+
+    /* Hero glow (the ONLY blue glow in the app, top hero panel only) */
+    --cc-hero-glow: radial-gradient(60% 80% at 15% 0%, rgba(107, 163, 220, 0.10), transparent 70%);
+
+    /* Data visualization ramp (the one place multiple hues are allowed) */
+    --cc-chart-1: #BEF264;
+    --cc-chart-2: #6BA3DC;
+    --cc-chart-3: #46B17B;
+    --cc-chart-4: #E0B341;
+    --cc-chart-5: #9B8AFB;
+    --cc-chart-6: #E0625E;
+    --cc-chart-grid: var(--cc-border-subtle);
+    --cc-chart-axis: var(--cc-text-muted);
+    --cc-chart-track: var(--cc-surface-raised);
+
+    /* Radius */
+    --cc-radius-sm: 8px;
+    --cc-radius-md: 12px;
+    --cc-radius-lg: 16px;
+    --cc-radius-xl: 20px;
+    --cc-radius-2xl: 24px;
+    --cc-radius-pill: 9999px;
+
+    /* Elevation */
+    --cc-shadow-card: 0 1px 2px rgba(0,0,0,0.40), 0 1px 1px rgba(0,0,0,0.30);
+    --cc-shadow-lift: 0 8px 24px rgba(0,0,0,0.45);
+    --cc-shadow-glow: 0 6px 20px var(--cc-accent-glow);
+
+    /* Typography */
+    --cc-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --cc-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --cc-tracking-label: 0.08em;
+
+    /* Motion */
+    --cc-dur-fast: 120ms;
+    --cc-dur-base: 180ms;
+    --cc-dur-slow: 240ms;
+    --cc-dur-slower: 320ms;
+    --cc-ease-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --cc-ease-snap: cubic-bezier(0.4, 0.0, 0.2, 1);
   }
   
   /* Custom utilities */
@@ -118,8 +168,61 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    color-scheme: dark; /* native form controls and scrollbars render dark */
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--cc-font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  code,
+  kbd,
+  pre,
+  .font-mono {
+    font-family: var(--cc-font-mono);
+  }
+
+  /* Rule 5: visible focus on every interactive element, never removed. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--cc-focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* The lime primary button gets a dark inner ring so focus never reads lime-on-lime. */
+  .btn-primary:focus-visible,
+  [data-primary]:focus-visible {
+    outline: 2px solid var(--cc-focus-ring);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--cc-focus-inner);
+  }
+}
+
+/* All numeric data uses tabular, lining figures (Rule 7) */
+.cc-num,
+[data-numeric],
+input[type="number"] {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* On-brand selection on the near-black base */
+::selection {
+  background: var(--cc-accent-glow);
+  color: var(--cc-text-primary);
+}
+
+/* Rule 5: reduced-motion users get instant transitions */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
