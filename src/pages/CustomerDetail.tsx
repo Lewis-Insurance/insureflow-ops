@@ -371,7 +371,7 @@ export default function CustomerDetail() {
                   primary at ~half size. Only the account's own named insureds —
                   not linked accounts (those live on the Relationships tab). */}
               {[account.spouse_name].filter((n) => n && n.trim()).map((n) => (
-                <p key={n} className="mt-0.5 text-base font-medium text-cc-text-secondary break-words sm:text-lg">
+                <p key={n} className="mt-0.5 text-sm font-medium text-cc-text-secondary break-words sm:text-base">
                   {n}
                 </p>
               ))}
