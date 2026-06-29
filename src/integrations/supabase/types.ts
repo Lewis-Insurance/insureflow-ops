@@ -35158,6 +35158,75 @@ export type Database = {
           },
         ]
       }
+      retype_candidates: {
+        Row: {
+          account_id: string
+          applied_at: string | null
+          commercial_policies: number | null
+          created_at: string
+          current_account_type: string | null
+          current_type: string | null
+          id: string
+          personal_policies: number | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signal: string
+          status: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Insert: {
+          account_id: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Update: {
+          account_id?: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type?: string
+          suggested_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_queue_items: {
         Row: {
           assigned_to: string | null
@@ -40485,6 +40554,7 @@ export type Database = {
         Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
       }
+      approve_retype_candidate: { Args: { p_id: string }; Returns: Json }
       assert_active_staff_profile_provisioned_for_user: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -40913,6 +40983,7 @@ export type Database = {
         Returns: string
       }
       generate_relationship_suggestions: { Args: never; Returns: Json }
+      generate_retype_candidates: { Args: never; Returns: Json }
       generate_review_queue: {
         Args: { p_extraction_id: string }
         Returns: number
@@ -42216,6 +42287,7 @@ export type Database = {
         }[]
       }
       refresh_task_generation_analytics: { Args: never; Returns: undefined }
+      reject_retype_candidate: { Args: { p_id: string }; Returns: Json }
       relgraph_merge_duplicate_group: {
         Args: { p_group_id: string; p_survivor_id: string }
         Returns: Json
