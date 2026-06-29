@@ -19,6 +19,7 @@ import {
   Building2,
   User,
   Home,
+  Heart,
   Sparkles,
   Check,
   X,
@@ -51,6 +52,8 @@ interface Props {
   accountId: string;
   accountName: string;
   householdId?: string | null;
+  /** Spouse / co-insured captured on this household account (accounts.spouse_name). */
+  spouseName?: string | null;
   relationships: AccountRelationship[];
   loading: boolean;
   onRelationshipsChange: () => void;
@@ -64,6 +67,7 @@ export function CustomerRelationshipsSection({
   accountId,
   accountName,
   householdId,
+  spouseName,
   relationships,
   loading,
   onRelationshipsChange,
@@ -86,7 +90,9 @@ export function CustomerRelationshipsSection({
   };
 
   const showHousehold = !!household && household.member_count > 1;
-  const isEmpty = !loading && relationships.length === 0 && !showHousehold && suggestions.length === 0;
+  const hasSpouse = !!(spouseName && spouseName.trim());
+  const isEmpty =
+    !loading && relationships.length === 0 && !showHousehold && !hasSpouse && suggestions.length === 0;
 
   return (
     <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
@@ -173,6 +179,25 @@ export function CustomerRelationshipsSection({
             <span className="cc-num font-mono text-lg font-semibold text-cc-text-primary">
               {formatPremium(household.household_premium)}
             </span>
+          </div>
+        </AccentSpine>
+      )}
+
+      {/* Spouse / co-insured on this household (accounts.spouse_name) — a named
+          insured on this account's policies, not a separate linkable record. */}
+      {hasSpouse && (
+        <AccentSpine active className="mb-3 p-4">
+          <div className="flex items-start gap-2.5">
+            <Heart className="mt-0.5 h-4 w-4 shrink-0 text-cc-accent" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip>Spouse / co-insured</Chip>
+                <h4 className="font-semibold text-cc-text-primary">{spouseName}</h4>
+              </div>
+              <p className="mt-1 text-xs text-cc-text-muted">
+                Named insured on this household, covered on its policies. Edit under Customer Information.
+              </p>
+            </div>
           </div>
         </AccentSpine>
       )}
