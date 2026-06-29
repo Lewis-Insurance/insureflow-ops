@@ -367,6 +367,14 @@ export default function CustomerDetail() {
               <h1 className="mt-3 text-2xl font-bold uppercase tracking-tight text-cc-text-primary break-words sm:text-3xl">
                 {displayWithGoesBy(account.name, account.goes_by)}
               </h1>
+              {/* Spouse / other named insureds on THIS account, listed under the
+                  primary at ~half size. Only the account's own named insureds —
+                  not linked accounts (those live on the Relationships tab). */}
+              {[account.spouse_name].filter((n) => n && n.trim()).map((n) => (
+                <p key={n} className="mt-0.5 text-base font-medium text-cc-text-secondary break-words sm:text-lg">
+                  {n}
+                </p>
+              ))}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusPill status={account.account_status} />
                 <Chip>{isBusiness ? 'Business' : 'Household'}</Chip>
