@@ -368,7 +368,7 @@ export function useDuplicateGroups() {
         .from('duplicate_groups')
         .select('id', { count: 'exact', head: true })
         .eq('entity_type', 'accounts')
-        .eq('status', 'pending'),
+        .in('status', ['pending', 'link_candidate']),
     ]);
     if (error) {
       logger.error('duplicate groups error', error);
@@ -401,7 +401,124 @@ export function useDuplicateGroups() {
     [refetch],
   );
 
-  return { groups, total, loading, refetch, merge };
+  const linkInstead = useCallback(
+    async (fromId: string, toId: string, groupId: string) => {
+      const ok = await linkAccounts({
+        fromAccount: fromId,
+        toAccount: toId,
+        relType: 'related',
+        note: 'Linked from duplicate review (not a merge)',
+      });
+      if (!ok) return false;
+      await supabase
+        .from('duplicate_groups')
+        .update({ status: 'linked', reviewed_at: new Date().toISOString() })
+        .eq('id', groupId);
+      await refetch();
+      return true;
+    },
+    [refetch],
+  );
+
+  return { groups, total, loading, refetch, merge, linkInstead };
+}
+
+// ---------------------------------------------------------------------------
+// Merge UX: read-only preview, manual merge, recent merges, un-merge.
+// Every merge path routes through the DB shared internal (_do_account_merge)
+// -> merge_accounts + assert_mergeable + apply_consent_strictest_wins.
+// ---------------------------------------------------------------------------
+
+export interface MergeFieldDiff {
+  [field: string]: { current: unknown; incoming: unknown };
+}
+
+export interface MergePreview {
+  mergeable: boolean;
+  block_reason: string | null;
+  reparent_counts: Record<string, number>;
+  reparent_total: number;
+  policies_dedup_count: number;
+  computed_survivor: string | null;
+  field_diff: MergeFieldDiff;
+}
+
+/** Read-only blast-radius preview. Mutates nothing. */
+export async function previewMerge(survivorId: string, loserIds: string[]): Promise<MergePreview | null> {
+  const { data, error } = await supabase.rpc('preview_merge', { p_survivor: survivorId, p_losers: loserIds });
+  if (error) {
+    toast({ title: 'Could not preview merge', description: error.message, variant: 'destructive' });
+    return null;
+  }
+  return data as unknown as MergePreview;
+}
+
+/** Manual two-account merge through the shared path (same guards/consent/same_as). */
+export async function mergeAccountsManual(survivorId: string, loserIds: string[]): Promise<boolean> {
+  const { error } = await supabase.rpc('merge_accounts_manual', { p_survivor: survivorId, p_losers: loserIds });
+  if (error) {
+    toast({ title: 'Merge failed', description: error.message, variant: 'destructive' });
+    return false;
+  }
+  toast({ title: 'Records merged', description: 'History preserved with a same-as link.' });
+  return true;
+}
+
+export interface RecentMerge {
+  merge_history_id: string;
+  rule: string | null;
+  merged_at: string;
+  survivor_id: string;
+  survivor_name: string | null;
+  loser_id: string;
+  loser_name: string | null;
+  reparent_total: number;
+}
+
+/** Reversible (single-loser, not-yet-unmerged) account merges for the undo view. */
+export function useRecentMerges() {
+  const [merges, setMerges] = useState<RecentMerge[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc('list_recent_merges', { p_limit: 50 });
+    if (error) {
+      logger.error('recent merges error', error);
+      setMerges([]);
+    } else {
+      setMerges((data || []) as RecentMerge[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { merges, loading, refetch };
+}
+
+export async function unmergeAccount(mergeHistoryId: string): Promise<boolean> {
+  const { error } = await supabase.rpc('unmerge_account', { p_merge_history_id: mergeHistoryId });
+  if (error) {
+    toast({ title: 'Un-merge failed', description: error.message, variant: 'destructive' });
+    return false;
+  }
+  toast({ title: 'Merge reversed', description: 'The record was restored.' });
+  return true;
+}
+
+/** Mask a stored tax id / SSN last-4 for merge-diff display. */
+export function maskField(field: string, value: unknown): string {
+  if (value == null || value === '') return '—';
+  const s = String(value);
+  if (/tin|ssn|tax/i.test(field)) return s.length <= 4 ? `XXX-XX-${s}` : `XXX-XX-${s.slice(-4)}`;
+  if (/(date_of_birth|dob)/i.test(field)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? '••/••/••••' : `••/••/${d.getFullYear()}`;
+  }
+  return s;
 }
 
 /** Display "David \"Lance\" McDonald" when a goes_by is present. */
