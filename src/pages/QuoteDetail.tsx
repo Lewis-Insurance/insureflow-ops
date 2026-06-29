@@ -1,16 +1,26 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, AlertCircle, DollarSign, Calendar, Building, FileText, TrendingUp } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { QuoteFollowUpTimeline } from "@/components/quotes/QuoteFollowUpTimeline";
 import { FollowUpStatsCard } from "@/components/quotes/FollowUpStatsCard";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { AccentSpine, StatusPill, SectionLabel } from "@/components/cc";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency, cn } from "@/lib/utils";
 import { format } from "date-fns";
+
+// The quote_score is a metric, not a stoplight. Render a tabular number plus a
+// plain-language band so the meaning never rides on hue alone (constitution
+// rule 3). No per-dimension colors: the bars are uniform; the value carries it.
+function scoreBand(score: number | null): string {
+  if (!score) return "Unscored";
+  if (score >= 85) return "Strong";
+  if (score >= 70) return "Good";
+  if (score >= 55) return "Fair";
+  return "Needs work";
+}
 
 export default function QuoteDetail() {
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -52,15 +62,13 @@ export default function QuoteDetail() {
       return data;
     },
     enabled: !!quoteId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000,
   });
 
   if (!quoteId) {
     return (
       <AppLayout>
-        <div className="p-6">
-          <p className="text-destructive">No quote ID provided</p>
-        </div>
+        <div className="p-6 text-sm text-cc-danger">No quote ID provided</div>
       </AppLayout>
     );
   }
@@ -68,8 +76,8 @@ export default function QuoteDetail() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-cc-text-muted" aria-hidden="true" />
         </div>
       </AppLayout>
     );
@@ -78,265 +86,153 @@ export default function QuoteDetail() {
   if (error || !quote) {
     return (
       <AppLayout>
-        <div className="p-6">
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            <span>Failed to load quote: {error?.message || "Unknown error"}</span>
-          </div>
+        <div className="flex items-center gap-2 p-6 text-sm text-cc-danger">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          <span>Failed to load quote: {error?.message || "Unknown error"}</span>
         </div>
       </AppLayout>
     );
   }
 
-  const getScoreColor = (score: number | null) => {
-    if (!score) return "text-gray-600";
-    if (score >= 85) return "text-green-600";
-    if (score >= 70) return "text-blue-600";
-    if (score >= 55) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      open: "default",
-      sent: "secondary",
-      accepted: "default",
-      rejected: "destructive",
-      expired: "secondary",
-    };
-    return variants[status] || "outline";
-  };
+  const scoreBars = [
+    { label: "Price competitiveness", value: quote.price_score, max: 30 },
+    { label: "Coverage completeness", value: quote.coverage_completeness_score, max: 25 },
+    { label: "Carrier rating", value: quote.carrier_rating_score, max: 20 },
+    { label: "Deductible quality", value: quote.deductible_score, max: 15 },
+    { label: "Value", value: quote.value_score, max: 10 },
+  ];
 
   return (
     <AppLayout>
-      <div className="space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="mx-auto max-w-[1100px] space-y-6 p-4 md:p-8">
+        {/* Header: back + identity + status */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => navigate(-1)}
+              className="gap-2 text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+            >
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold">
-                {quote.quote_ref || `Quote #${quote.id.slice(0, 8)}`}
+              <h1 className="text-2xl font-bold tracking-tight text-cc-text-primary">
+                {quote.quote_ref || `Quote ${quote.id.slice(0, 8)}`}
               </h1>
-              <p className="text-muted-foreground">
-                {quote.account?.name || "Unknown Account"}
-              </p>
+              <p className="text-sm text-cc-text-muted">{quote.account?.name || "Unknown account"}</p>
             </div>
           </div>
-          <Badge variant={getStatusBadge(quote.status)}>
-            {quote.status}
-          </Badge>
+          <StatusPill status={quote.status} />
         </div>
 
-        {/* Key Metrics */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Quote Score</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(quote.quote_score)}`}>
-                {quote.quote_score || "N/A"}{quote.quote_score ? "/100" : ""}
+        {/* Hero: the live record carries the single lime spine; premium is the */}
+        {/* anchor, the rest of the present-state reads quiet beside it. */}
+        <AccentSpine active className="p-5 md:p-6">
+          <div className="grid gap-6 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <SectionLabel>Annual premium</SectionLabel>
+              <div className="cc-num mt-1 text-3xl font-bold tracking-tight text-cc-text-primary">
+                {quote.premium ? formatCurrency(quote.premium) : "N/A"}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Overall ranking score
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Premium</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {quote.premium ? `$${quote.premium.toLocaleString()}` : "N/A"}
-              </div>
-              <p className="text-xs text-muted-foreground">Annual premium</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Carrier</CardTitle>
-              <Building className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            </div>
+            <div>
+              <SectionLabel>Carrier</SectionLabel>
+              <div className="mt-1 text-base font-semibold text-cc-text-primary">
                 {quote.carrier_info?.name || "Unknown"}
               </div>
-              {quote.carrier_info?.rating && (
-                <p className="text-xs text-muted-foreground">
-                  Rating: {quote.carrier_info.rating}/5
-                </p>
+              {quote.carrier_info?.rating != null && (
+                <div className="cc-num mt-0.5 text-xs text-cc-text-muted">Rating {quote.carrier_info.rating}/5</div>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Expires</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {quote.expires_at
-                  ? format(new Date(quote.expires_at), "MMM d, yyyy")
-                  : "N/A"}
+            </div>
+            <div>
+              <SectionLabel>Expires</SectionLabel>
+              <div className="mt-1 text-base font-semibold text-cc-text-primary">
+                {quote.expires_at ? format(new Date(quote.expires_at), "MMM d, yyyy") : "N/A"}
               </div>
-              <p className="text-xs text-muted-foreground">Quote expiration</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Score Breakdown */}
-        {quote.quote_score && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Score Breakdown</CardTitle>
-              <CardDescription>
-                Multi-dimensional analysis of this quote
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Price Competitiveness</span>
-                    <span className="font-semibold">
-                      {quote.price_score}/30
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{ width: `${((quote.price_score || 0) / 30) * 100}%` }}
-                    />
-                  </div>
+              {quote.quote_score != null && (
+                <div className="cc-num mt-0.5 text-xs text-cc-text-muted">
+                  Score {quote.quote_score}/100 - {scoreBand(quote.quote_score)}
                 </div>
+              )}
+            </div>
+          </div>
+        </AccentSpine>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Coverage Completeness</span>
-                    <span className="font-semibold">
-                      {quote.coverage_completeness_score}/25
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full"
-                      style={{
-                        width: `${((quote.coverage_completeness_score || 0) / 25) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Carrier Rating</span>
-                    <span className="font-semibold">
-                      {quote.carrier_rating_score}/20
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full"
-                      style={{
-                        width: `${((quote.carrier_rating_score || 0) / 20) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Deductible Quality</span>
-                    <span className="font-semibold">
-                      {quote.deductible_score}/15
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-yellow-600 h-2 rounded-full"
-                      style={{
-                        width: `${((quote.deductible_score || 0) / 15) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Value Score</span>
-                    <span className="font-semibold">{quote.value_score}/10</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-orange-600 h-2 rounded-full"
-                      style={{ width: `${((quote.value_score || 0) / 10) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                {quote.ai_recommendation && (
-                  <div className="pt-4 border-t">
-                    <div className="text-sm font-medium mb-2">AI Recommendation:</div>
-                    <div className="text-sm text-muted-foreground">
-                      {quote.ai_recommendation}
+        {/* Score breakdown: uniform neutral bars, value-led */}
+        {quote.quote_score != null && (
+          <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+            <div className="flex items-center justify-between border-b border-cc-border-subtle px-5 py-3">
+              <SectionLabel>Score breakdown</SectionLabel>
+              <span className="cc-num text-sm font-semibold text-cc-text-primary">
+                {quote.quote_score}
+                <span className="text-cc-text-muted">/100</span>
+              </span>
+            </div>
+            <div className="space-y-4 p-5">
+              {scoreBars.map((bar) => {
+                const value = bar.value || 0;
+                const pct = Math.max(0, Math.min(100, (value / bar.max) * 100));
+                return (
+                  <div key={bar.label} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-cc-text-secondary">{bar.label}</span>
+                      <span className="cc-num font-semibold text-cc-text-primary">
+                        {value}
+                        <span className="text-cc-text-muted">/{bar.max}</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-pill bg-cc-surface-overlay">
+                      <div className="h-full rounded-pill bg-cc-text-secondary" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                );
+              })}
+
+              {quote.ai_recommendation && (
+                <div className="border-t border-cc-border-subtle pt-4">
+                  <SectionLabel>AI recommendation</SectionLabel>
+                  <p className="mt-1.5 text-sm text-cc-text-secondary">{quote.ai_recommendation}</p>
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
-        {/* Coverage Details */}
+        {/* Coverage details */}
         {quote.quote_coverages && quote.quote_coverages.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Coverage Details</CardTitle>
-              <CardDescription>
-                Coverages included in this quote
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {quote.quote_coverages.map((coverage: any) => (
-                  <div
-                    key={coverage.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div>
-                      <div className="font-medium">{coverage.coverage_type}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {coverage.limit_amount && `Limit: ${coverage.limit_amount}`}
-                        {coverage.deductible_amount &&
-                          ` • Deductible: ${coverage.deductible_amount}`}
-                      </div>
+          <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+            <div className="border-b border-cc-border-subtle px-5 py-3">
+              <SectionLabel>Coverage details</SectionLabel>
+            </div>
+            <div>
+              {quote.quote_coverages.map((coverage: any) => (
+                <div
+                  key={coverage.id}
+                  className="flex items-center justify-between gap-4 border-b border-cc-border-subtle px-5 py-3 last:border-b-0"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium text-cc-text-primary">{coverage.coverage_type}</div>
+                    <div className="cc-num text-sm text-cc-text-muted">
+                      {coverage.limit_amount && `Limit ${coverage.limit_amount}`}
+                      {coverage.deductible_amount && ` - Deductible ${coverage.deductible_amount}`}
                     </div>
-                    {coverage.premium_amount && (
-                      <div className="text-right">
-                        <div className="font-semibold">
-                          ${coverage.premium_amount.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Premium</div>
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  {coverage.premium_amount != null && (
+                    <div className="text-right">
+                      <div className={cn("cc-num whitespace-nowrap font-semibold text-cc-text-primary")}>
+                        {formatCurrency(coverage.premium_amount)}
+                      </div>
+                      <div className="text-xs text-cc-text-muted">Premium</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* Follow-Up Timeline and Stats */}
+        {/* Follow-up timeline + stats */}
         <div className="grid gap-6 md:grid-cols-2">
           <ErrorBoundary level="component">
             <QuoteFollowUpTimeline quoteId={quoteId} />

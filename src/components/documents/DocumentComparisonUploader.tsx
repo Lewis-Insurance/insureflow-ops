@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Loader2, X, FileCheck, FileQuestion } from 'lucide-react';
+import { Upload, Loader2, X, FileCheck, FileQuestion } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { SectionLabel } from '@/components/cc';
 import { useDocumentComparison } from '@/hooks/useDocumentAnalysis';
+import { cn } from '@/lib/utils';
 
 interface DocumentComparisonUploaderProps {
   accountId?: string;
@@ -26,129 +26,100 @@ interface SelectedDocument {
 export const DocumentComparisonUploader: React.FC<DocumentComparisonUploaderProps> = ({
   accountId,
   minDocuments = 2,
-  maxDocuments = 5
+  maxDocuments = 5,
 }) => {
   const [documents, setDocuments] = useState<SelectedDocument[]>([]);
   const { compareDocuments, isComparing, progress } = useDocumentComparison();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    
     const newDocs = files.map((file, index) => {
       const docIndex = documents.length + index;
       return {
         id: `${Date.now()}-${index}`,
         file,
         label: docIndex === 0 ? 'Current Policy' : `Quote ${docIndex}`,
-        role: (docIndex === 0 ? 'CURRENT_POLICY' : 'QUOTE') as DocRole
+        role: (docIndex === 0 ? 'CURRENT_POLICY' : 'QUOTE') as DocRole,
       };
     });
-
-    setDocuments(prev => [...prev, ...newDocs].slice(0, maxDocuments));
+    setDocuments((prev) => [...prev, ...newDocs].slice(0, maxDocuments));
     event.target.value = '';
   };
 
-  const updateRole = (id: string, role: DocRole) => {
-    setDocuments(prev => 
-      prev.map(doc => doc.id === id ? { ...doc, role } : doc)
-    );
-  };
+  const updateRole = (id: string, role: DocRole) =>
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, role } : doc)));
 
-  const removeDocument = (id: string) => {
-    setDocuments(prev => prev.filter(doc => doc.id !== id));
-  };
+  const removeDocument = (id: string) =>
+    setDocuments((prev) => prev.filter((doc) => doc.id !== id));
 
-  const updateLabel = (id: string, label: string) => {
-    setDocuments(prev => 
-      prev.map(doc => doc.id === id ? { ...doc, label } : doc)
-    );
-  };
+  const updateLabel = (id: string, label: string) =>
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, label } : doc)));
 
   const handleCompare = async () => {
-    if (documents.length < minDocuments) {
-      return;
-    }
-
-    // Validate: need at least one CURRENT_POLICY
-    const hasCurrentPolicy = documents.some(d => d.role === 'CURRENT_POLICY');
-    const hasQuote = documents.some(d => d.role === 'QUOTE');
-    
-    if (!hasCurrentPolicy || !hasQuote) {
-      console.warn('Comparison requires at least one Current Policy and one Quote');
-    }
-
+    if (documents.length < minDocuments) return;
     try {
       await compareDocuments(
-        documents.map(doc => ({ 
-          file: doc.file, 
-          label: doc.label,
-          role: doc.role 
-        })),
-        accountId
+        documents.map((doc) => ({ file: doc.file, label: doc.label, role: doc.role })),
+        accountId,
       );
-      
       setDocuments([]);
     } catch (error) {
       console.error('Comparison error:', error);
     }
   };
 
+  const needMore = minDocuments - documents.length;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Upload Documents to Compare</CardTitle>
-        <CardDescription>
-          Upload {minDocuments}-{maxDocuments} insurance documents to compare side-by-side
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+      <div className="border-b border-cc-border-subtle px-5 py-4">
+        <h2 className="text-sm font-semibold text-cc-text-primary">Upload documents to compare</h2>
+        <p className="mt-0.5 text-sm text-cc-text-muted">
+          Add {minDocuments} to {maxDocuments} insurance documents to line up side by side.
+        </p>
+      </div>
+
+      <div className="space-y-4 p-5">
         {documents.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {documents.map((doc, index) => (
-              <div key={doc.id} className={`flex items-center gap-3 p-3 border rounded-lg ${
-                doc.role === 'CURRENT_POLICY' 
-                  ? 'border-blue-300 bg-blue-50/50 dark:bg-blue-950/20' 
-                  : 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
-              }`}>
+              <div
+                key={doc.id}
+                className="flex items-center gap-3 rounded-cc-lg border border-cc-border-subtle bg-cc-surface-raised p-3"
+              >
                 {doc.role === 'CURRENT_POLICY' ? (
-                  <FileCheck className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                  <FileCheck className="h-7 w-7 shrink-0 text-cc-text-secondary" aria-hidden="true" />
                 ) : (
-                  <FileQuestion className="h-8 w-8 text-amber-500 flex-shrink-0" />
+                  <FileQuestion className="h-7 w-7 shrink-0 text-cc-text-secondary" aria-hidden="true" />
                 )}
-                <div className="flex-1 min-w-0 space-y-2">
+                <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex items-center gap-2">
                     <Input
                       value={doc.label}
                       onChange={(e) => updateLabel(doc.id, e.target.value)}
                       placeholder={`Document ${index + 1}`}
+                      aria-label={`Label for document ${index + 1}`}
                       disabled={isComparing}
-                      className="h-8 flex-1"
+                      className="h-8 flex-1 rounded-cc-md border-cc-border-interactive bg-cc-surface text-cc-text-primary placeholder:text-cc-text-muted"
                     />
                     <Select
                       value={doc.role}
                       onValueChange={(value) => updateRole(doc.id, value as DocRole)}
                       disabled={isComparing}
                     >
-                      <SelectTrigger className="w-[160px] h-8">
+                      <SelectTrigger
+                        aria-label={`Role for ${doc.label}`}
+                        className="h-8 w-[170px] rounded-cc-md border-cc-border-interactive bg-cc-surface text-cc-text-primary"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="CURRENT_POLICY">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">A</Badge>
-                            Current Policy
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="QUOTE">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-700">B</Badge>
-                            Quote/Proposal
-                          </div>
-                        </SelectItem>
+                        <SelectItem value="CURRENT_POLICY">Current policy</SelectItem>
+                        <SelectItem value="QUOTE">Quote / proposal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
+                  <p className="cc-num truncate text-xs text-cc-text-muted">
                     {doc.file.name} ({(doc.file.size / 1024 / 1024).toFixed(2)} MB)
                   </p>
                 </div>
@@ -157,7 +128,8 @@ export const DocumentComparisonUploader: React.FC<DocumentComparisonUploaderProp
                   variant="ghost"
                   size="icon"
                   disabled={isComparing}
-                  className="flex-shrink-0"
+                  aria-label={`Remove ${doc.label}`}
+                  className="shrink-0 text-cc-text-muted hover:bg-cc-surface-overlay hover:text-cc-text-primary"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -167,87 +139,91 @@ export const DocumentComparisonUploader: React.FC<DocumentComparisonUploaderProp
         )}
 
         {documents.length < maxDocuments && (
-          <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-            <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <div className="space-y-2">
-              <label htmlFor="comparison-upload" className="cursor-pointer">
-                <span className="text-blue-600 hover:text-blue-700 font-medium">
-                  {documents.length === 0 ? 'Choose files' : 'Add more files'}
-                </span>
-                <span className="text-muted-foreground"> or drag and drop</span>
-              </label>
-              <input
-                id="comparison-upload"
-                type="file"
-                className="hidden"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileSelect}
-                disabled={isComparing}
-                multiple
-              />
-              <p className="text-xs text-muted-foreground">
-                {documents.length} of {maxDocuments} documents selected
-              </p>
-            </div>
+          <div className="rounded-cc-lg border-2 border-dashed border-cc-border-interactive p-8 text-center transition-colors hover:border-cc-accent">
+            <Upload className="mx-auto mb-3 h-10 w-10 text-cc-text-muted" aria-hidden="true" />
+            <label htmlFor="comparison-upload" className="cursor-pointer">
+              <span className="font-medium text-cc-text-primary underline-offset-4 hover:underline">
+                {documents.length === 0 ? 'Choose files' : 'Add more files'}
+              </span>
+              <span className="text-cc-text-muted"> or drag and drop</span>
+            </label>
+            {/* sr-only (not hidden) so the input stays in the tab order and a */}
+            {/* keyboard user can open the picker; the label click path is unchanged. */}
+            <input
+              id="comparison-upload"
+              type="file"
+              className="sr-only"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileSelect}
+              disabled={isComparing}
+              multiple
+            />
+            <p className="cc-num mt-2 text-xs text-cc-text-muted">
+              {documents.length} of {maxDocuments} documents selected
+            </p>
           </div>
         )}
 
         {isComparing && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Analyzing and comparing documents...
-              </span>
-              <span className="font-medium">{progress}%</span>
+              <span className="text-cc-text-secondary">Analyzing and comparing documents</span>
+              <span className="cc-num font-medium text-cc-text-primary">{progress}%</span>
             </div>
-            <Progress value={progress} />
+            <Progress value={progress} aria-label="Comparison progress" aria-valuenow={progress} />
           </div>
         )}
 
         <div className="flex gap-2">
           <Button
+            data-primary
             onClick={handleCompare}
             disabled={documents.length < minDocuments || isComparing}
-            className="flex-1"
+            className="flex-1 gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
           >
             {isComparing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Comparing...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Comparing
               </>
             ) : (
-              <>
-                Compare {documents.length} Documents
-              </>
+              <>Compare {documents.length || ''} documents</>
             )}
           </Button>
-          
+
           {documents.length > 0 && !isComparing && (
             <Button
               onClick={() => setDocuments([])}
               variant="outline"
+              className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
             >
-              Clear All
+              Clear all
             </Button>
           )}
         </div>
 
-        {documents.length < minDocuments && documents.length > 0 && (
-          <p className="text-sm text-amber-600">
-            Please add at least {minDocuments - documents.length} more document(s) to compare
+        {needMore > 0 && documents.length > 0 && (
+          <p className="text-sm text-cc-warning">
+            Add at least {needMore} more document{needMore > 1 ? 's' : ''} to compare.
           </p>
         )}
-        
+
         {documents.length >= minDocuments && (
-          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            <p className="font-medium mb-1">📋 Comparison Setup</p>
-            <ul className="space-y-1 text-xs">
-              <li>• <span className="text-blue-600 font-medium">Document A (Current Policy)</span>: Your existing in-force policy or dec page</li>
-              <li>• <span className="text-amber-600 font-medium">Document B (Quote)</span>: The quote, proposal, or binder you're comparing</li>
+          <div className="rounded-cc-lg border border-cc-border-subtle bg-cc-surface-raised p-3">
+            <SectionLabel>Comparison setup</SectionLabel>
+            <ul className="mt-2 space-y-1 text-xs text-cc-text-secondary">
+              <li>
+                <span className="font-medium text-cc-text-primary">Current policy</span> is your existing in-force
+                policy or dec page.
+              </li>
+              <li>
+                <span className="font-medium text-cc-text-primary">Quote</span> is the quote, proposal, or binder you
+                are comparing.
+              </li>
             </ul>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
