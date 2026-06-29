@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusPill, Chip } from '@/components/cc';
-import { usePolicies } from '@/hooks/usePolicies';
+import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -48,7 +48,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
-  const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyWithAccount | null>(null);
   const { toast } = useToast();
 
   // Filter policies for this specific customer
@@ -120,7 +120,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   // open the policy. Per-card actions are ghost ("View policy") + a three-dot
   // overflow only. No per-card lime fill: the surface shows many cards and the
   // one lime fill on this tab is the section-level "New policy" button.
-  const renderPolicyCard = (policy: any, variant: 'active' | 'inactive') => {
+  const renderPolicyCard = (policy: PolicyWithAccount, variant: 'active' | 'inactive') => {
     const openPolicy = () => navigate(`/policies/${policy.id}`);
     const stop = (e: React.MouseEvent) => e.stopPropagation();
     const isActive = variant === 'active';
@@ -408,9 +408,13 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                 <p className="text-cc-text-muted mb-4">
                   This customer doesn't have any quotes yet.
                 </p>
-                <Button onClick={() => setAddQuoteOpen(true)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setAddQuoteOpen(true)}
+                  className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Create First Quote
+                  Create first quote
                 </Button>
               </div>
             ) : (
@@ -509,7 +513,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                         }}
                       >
                         <Shield className="h-4 w-4 mr-1" />
-                        Bind Policy
+                        Bind policy
                       </Button>
                     </div>
                   </div>

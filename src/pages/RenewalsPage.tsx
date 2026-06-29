@@ -199,7 +199,7 @@ export default function RenewalsPage() {
                     <div className="font-semibold text-cc-text-primary break-words">{r.customer_name}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 md:hidden">
                       <StatusPill status={r.status} />
-                      <NextRenewal date={r.renewal_date} />
+                      <NextRenewal date={r.renewal_date} emptyLabel="No renewal date" />
                     </div>
                   </div>
 
@@ -219,7 +219,7 @@ export default function RenewalsPage() {
                   </div>
 
                   <div className="hidden md:block">
-                    <NextRenewal date={r.renewal_date} />
+                    <NextRenewal date={r.renewal_date} emptyLabel="No renewal date" />
                   </div>
 
                   <div className="hidden md:block">

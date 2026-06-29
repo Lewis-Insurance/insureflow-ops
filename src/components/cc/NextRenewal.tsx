@@ -8,9 +8,18 @@ import { cn } from '@/lib/utils';
  * is paired with a word: overdue is danger with an icon and the word "Overdue",
  * inside 30 days is warning, otherwise neutral. No active policy reads as such.
  */
-export function NextRenewal({ date, className }: { date?: string | null; className?: string }) {
+export function NextRenewal({
+  date,
+  className,
+  emptyLabel = 'No active policy',
+}: {
+  date?: string | null;
+  className?: string;
+  /** Shown when there is no date. Defaults to "No active policy"; renewal surfaces pass "No renewal date". */
+  emptyLabel?: string;
+}) {
   if (!date) {
-    return <span className={cn('text-sm text-cc-text-muted', className)}>No active policy</span>;
+    return <span className={cn('text-sm text-cc-text-muted', className)}>{emptyLabel}</span>;
   }
 
   const d = new Date(date);
