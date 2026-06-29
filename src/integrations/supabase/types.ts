@@ -40439,7 +40439,12 @@ export type Database = {
     }
     Functions: {
       _do_account_merge: {
-        Args: { p_losers: string[]; p_rule: string; p_survivor: string }
+        Args: {
+          p_apply?: boolean
+          p_losers: string[]
+          p_rule: string
+          p_survivor: string
+        }
         Returns: Json
       }
       add_tag_to_customer: {
@@ -40942,6 +40947,29 @@ export type Database = {
             }
             Returns: Json
           }
+      get_account_cluster: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          account_status: string
+          account_type: string
+          active_premium: number
+          cluster_active_premium: number
+          cluster_business_count: number
+          cluster_member_count: number
+          cluster_size: number
+          cluster_total_policies: number
+          depth: number
+          goes_by: string
+          is_business: boolean
+          name: string
+          next_expiration: string
+          node_role: string
+          owner_account_id: string
+          owner_name: string
+          policies_count: number
+        }[]
+      }
       get_account_insurance_profile: {
         Args: { p_account_id: string }
         Returns: Json
@@ -42047,16 +42075,6 @@ export type Database = {
           similarity: number
         }[]
       }
-      merge_accounts: {
-        Args: {
-          p_apply?: boolean
-          p_losers: string[]
-          p_merged_by?: string
-          p_rule: string
-          p_survivor: string
-        }
-        Returns: Json
-      }
       merge_accounts_manual: {
         Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
@@ -42262,6 +42280,7 @@ export type Database = {
           goes_by: string
           match_reason: string
           name: string
+          owned_business_count: number
           phone: string
           policies_count: number
           score: number

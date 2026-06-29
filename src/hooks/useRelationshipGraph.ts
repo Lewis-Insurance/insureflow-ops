@@ -65,14 +65,50 @@ export interface AccountSearchResult {
   city: string | null;
   state: string | null;
   policies_count: number;
+  owned_business_count: number;
   match_reason: string;
   score: number;
+}
+
+/** One node of the relationship cluster returned by get_account_cluster. */
+export interface ClusterNode {
+  account_id: string;
+  name: string;
+  goes_by: string | null;
+  account_type: string | null;
+  account_status: string | null;
+  is_business: boolean;
+  node_role: string;
+  depth: number;
+  policies_count: number;
+  active_premium: number | null;
+  next_expiration: string | null;
+  owner_account_id: string | null;
+  owner_name: string | null;
+  cluster_size: number;
+  cluster_business_count: number;
+  cluster_member_count: number;
+  cluster_total_policies: number;
+  cluster_active_premium: number | null;
+}
+
+export interface ClusterRollup {
+  owner_account_id: string | null;
+  owner_name: string | null;
+  size: number;
+  business_count: number;
+  member_count: number;
+  total_policies: number;
+  active_premium: number | null;
 }
 
 /** Relationship type vocabulary surfaced for manual linking (enforced, small). */
 export const REL_TYPE_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: 'owns', label: 'Owns', hint: 'This person owns the other account (e.g. a business).' },
+  { value: 'affiliated_business', label: 'Affiliated company', hint: 'Two businesses linked by a shared owner or contact.' },
   { value: 'spouse', label: 'Spouse', hint: 'Married / domestic partner.' },
+  { value: 'household_member', label: 'Household member', hint: 'Lives in the same household.' },
+  { value: 'dependent', label: 'Dependent', hint: 'A dependent (child, etc.) of this person.' },
   { value: 'parent_company', label: 'Parent company', hint: 'This account is the parent of the other.' },
   { value: 'related', label: 'Related', hint: 'Any other connection (family, referral, guarantor).' },
 ];
@@ -103,6 +139,52 @@ export function useAccountRelationships(accountId?: string) {
   }, [refetch]);
 
   return { relationships, loading, refetch };
+}
+
+/**
+ * The full relationship cluster for any member (owner + owned businesses +
+ * co-owned siblings + household), via the recursive get_account_cluster RPC.
+ * The roll-up totals are duplicated on every row, so we lift them off the first.
+ */
+export function useAccountCluster(accountId?: string) {
+  const [cluster, setCluster] = useState<ClusterNode[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    if (!accountId) {
+      setCluster([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase.rpc('get_account_cluster', { p_account_id: accountId });
+    if (error) {
+      logger.error('cluster fetch error', error);
+      setCluster([]);
+    } else {
+      setCluster((data || []) as ClusterNode[]);
+    }
+    setLoading(false);
+  }, [accountId]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  const first = cluster[0];
+  const rollup: ClusterRollup | null = first
+    ? {
+        owner_account_id: first.owner_account_id,
+        owner_name: first.owner_name,
+        size: first.cluster_size,
+        business_count: first.cluster_business_count,
+        member_count: first.cluster_member_count,
+        total_policies: first.cluster_total_policies,
+        active_premium: first.cluster_active_premium,
+      }
+    : null;
+
+  return { cluster, rollup, loading, refetch };
 }
 
 export function useAccountLinkSuggestions(accountId?: string) {

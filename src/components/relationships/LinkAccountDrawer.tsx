@@ -184,6 +184,9 @@ export function LinkAccountDrawer({ accountId, accountName, open, onOpenChange, 
                               <p className="truncate text-sm text-cc-text-primary">{r.name}</p>
                               <p className="truncate text-xs text-cc-text-muted">
                                 {accountTypeLabel(r.type)}
+                                {r.owned_business_count > 0
+                                  ? ` · owns ${r.owned_business_count} ${r.owned_business_count === 1 ? 'company' : 'companies'}`
+                                  : ''}
                                 {r.match_reason && r.match_reason !== 'name' ? ` · ${r.match_reason}` : ''}
                               </p>
                             </div>
