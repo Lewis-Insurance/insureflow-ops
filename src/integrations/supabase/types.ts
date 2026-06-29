@@ -38242,6 +38242,14 @@ export type Database = {
       }
     }
     Functions: {
+      get_needs_me_today: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          renewals_due: number
+          overdue_tasks: number
+          new_leads: number
+        }[]
+      }
       get_customer_triage_counts: {
         Args: Record<PropertyKey, never>
         Returns: {
