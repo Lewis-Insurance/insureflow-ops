@@ -40720,6 +40720,7 @@ export type Database = {
         Args: { p_due_date: string; p_template_task_id: string }
         Returns: string
       }
+      generate_relationship_suggestions: { Args: never; Returns: Json }
       generate_review_queue: {
         Args: { p_extraction_id: string }
         Returns: number
@@ -41283,6 +41284,16 @@ export type Database = {
         }[]
       }
       get_renewal_intelligence_summary: { Args: never; Returns: Json }
+      get_task_triage_counts: {
+        Args: never
+        Returns: {
+          completed: number
+          due_this_week: number
+          high_priority: number
+          open_total: number
+          overdue: number
+        }[]
+      }
       get_top_product_opportunities: {
         Args: { p_limit?: number; p_min_probability?: number }
         Returns: {
@@ -42192,6 +42203,26 @@ export type Database = {
           policy_number: string
           premium: number
           status: string
+        }[]
+      }
+      search_tasks: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          account_name: string
+          completed_at: string
+          created_at: string
+          due_at: string
+          entity_type: string
+          id: string
+          priority: string
+          status: string
+          title: string
         }[]
       }
       seed_default_tags: { Args: { p_account_id: string }; Returns: undefined }

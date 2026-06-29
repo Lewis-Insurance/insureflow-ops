@@ -263,7 +263,7 @@ export async function updateRelationship(
   relationshipId: string,
   fields: { relType?: string; role?: string | null; ownershipPct?: number | null },
 ): Promise<boolean> {
-  const patch: Record<string, string | number | null> = {};
+  const patch: { rel_type?: string; role?: string | null; ownership_pct?: number | null } = {};
   if (fields.relType !== undefined) patch.rel_type = fields.relType;
   if (fields.role !== undefined) patch.role = fields.role;
   if (fields.ownershipPct !== undefined) patch.ownership_pct = fields.ownershipPct;
@@ -370,7 +370,7 @@ export function useDuplicateGroups() {
       logger.error('duplicate groups error', error);
       setGroups([]);
     } else {
-      setGroups((data || []) as DuplicateGroup[]);
+      setGroups((data || []) as unknown as DuplicateGroup[]);
     }
     setTotal(countRes.count || 0);
     setLoading(false);
