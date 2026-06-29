@@ -355,6 +355,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="Merge Customers"
                   to="/merge-customers"
                 />
+                <NavItem
+                  icon={GitMerge}
+                  label="Duplicate review"
+                  to="/duplicates"
+                />
               </NavGroup>
 
               {/* Additional Items */}

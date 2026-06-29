@@ -46,6 +46,7 @@ const TelephonyDashboard = lazyWithRetry(() => import("./pages/TelephonyDashboar
 const ReportsPage = lazyWithRetry(() => import("./pages/ReportsPage"));
 const CommandCenterPage = lazyWithRetry(() => import("./pages/CommandCenterPage"));
 const MergeCustomersPage = lazyWithRetry(() => import("./pages/MergeCustomersPage"));
+const DuplicatesReviewPage = lazyWithRetry(() => import("./pages/DuplicatesReviewPage"));
 const TeamMessagingPage = lazyWithRetry(() => import("./pages/TeamMessagingPage"));
 const ExecutivePage = lazyWithRetry(() => import("./pages/ExecutivePage"));
 const AnalyticsPage = lazyWithRetry(() => import("./pages/AnalyticsPage"));
@@ -517,6 +518,14 @@ const App = () => (
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <MergeCustomersPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/duplicates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DuplicatesReviewPage />
                     </ErrorBoundary>
                   }
                 />
