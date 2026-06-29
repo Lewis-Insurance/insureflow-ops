@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback, memo, Suspense } from 'react';
+import React, { useState, useCallback, memo, Suspense } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users, Building2, TrendingUp } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountSearch } from '@/components/crm/AccountSearch';
 import { AccountList } from '@/components/crm/AccountList';
@@ -18,93 +18,34 @@ import { useCRMData } from '@/hooks/useCRMData';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
-import { memoize } from '@/lib/performance';
+import { SectionLabel } from '@/components/cc';
 import { logger } from '@/lib/logger';
 import { usePermissions } from '@/hooks/usePermissions';
 import { SearchResult } from '@/hooks/useGlobalSearch';
 import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
-import type { 
-  CRMFilters, 
-  SavedView, 
+import { cn } from '@/lib/utils';
+import type {
+  CRMFilters,
+  SavedView,
   BulkAction,
   Account,
   CreateAccountData
 } from '@/types/crm-enhanced-clean';
 
-// Memoized stats calculation
-const calculateStats = memoize((accounts: any[]) => {
-  const isHousehold = (a: any) => {
-    const type = a.type?.toLowerCase() || '';
-    const accountType = a.account_type?.toLowerCase() || '';
-    return accountType === 'individual' || type === 'household' || type === 'individual' || type === 'personal';
-  };
+// Top-level workspace switch. Accounts and Leads keep the exact same content
+// (AccountList / LeadList + analytics) behind a Calm Command segmented control.
+type CrmTab = 'accounts' | 'leads';
+type LeadTab = 'list' | 'analytics';
 
-  const isBusiness = (a: any) => {
-    const type = a.type?.toLowerCase() || '';
-    const accountType = a.account_type?.toLowerCase() || '';
-    return accountType === 'business' || 
-           type === 'business' || 
-           type === 'commercial' || 
-           type === 'commercial_business' ||
-           type === 'corporate';
-  };
+const CRM_TABS: { value: CrmTab; label: string }[] = [
+  { value: 'accounts', label: 'Accounts' },
+  { value: 'leads', label: 'Leads' },
+];
 
-  return {
-    totalAccounts: accounts.length,
-    householdAccounts: accounts.filter(isHousehold).length,
-    businessAccounts: accounts.filter(isBusiness).length,
-  };
-});
-
-// Memoized stats cards component
-const StatsCards = memo(({ accounts }: { accounts: any[] }) => {
-  const stats = useMemo(() => calculateStats(accounts), [accounts]);
-
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.totalAccounts}</div>
-          <p className="text-xs text-muted-foreground">
-            Active customer accounts
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Households</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.householdAccounts}</div>
-          <p className="text-xs text-muted-foreground">
-            Personal/family accounts
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Businesses</CardTitle>
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.businessAccounts}</div>
-          <p className="text-xs text-muted-foreground">
-            Commercial accounts
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-});
-
-StatsCards.displayName = 'StatsCards';
+const LEAD_TABS: { value: LeadTab; label: string }[] = [
+  { value: 'list', label: 'Lead list' },
+  { value: 'analytics', label: 'Analytics' },
+];
 
 // Main CRM content component
 const CRMContent = memo(() => {
@@ -117,7 +58,7 @@ const CRMContent = memo(() => {
     updateAccount,
     deleteAccount
   } = useCRMData();
-  
+
   const { canEdit, canViewAuditLogs } = usePermissions();
 
   const [filters, setFilters] = useState<CRMFilters>({});
@@ -126,6 +67,8 @@ const CRMContent = memo(() => {
   const [formLoading, setFormLoading] = useState(false);
   const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [tab, setTab] = useState<CrmTab>('accounts');
+  const [leadTab, setLeadTab] = useState<LeadTab>('list');
 
   // Debounced search handler for better performance
   const debouncedSearch = useDebouncedCallback(
@@ -147,7 +90,7 @@ const CRMContent = memo(() => {
 
   const handleEditAccount = useCallback(async (data: any) => {
     if (!editingAccount) return;
-    
+
     setFormLoading(true);
     try {
       await updateAccount(editingAccount.id, data);
@@ -328,8 +271,8 @@ const CRMContent = memo(() => {
   }, [fetchAccounts]);
 
   const handleAccountSelection = useCallback((account: Account, selected: boolean) => {
-    setSelectedAccounts(prev => 
-      selected 
+    setSelectedAccounts(prev =>
+      selected
         ? [...prev, account]
         : prev.filter(a => a.id !== account.id)
     );
@@ -369,41 +312,41 @@ const CRMContent = memo(() => {
         phone: result.phone || undefined
       });
     }
-    
+
     logger.debug('Navigating to:', result.type, result.id);
   }, []);
 
   return (
     <AppLayout>
-      <div className="flex-1 space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+      <div className="mx-auto max-w-[1200px] space-y-6 p-6">
+        {/* Header: title + one lime primary */}
+        <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Customer Relationship Management</h2>
-            <p className="text-muted-foreground">
-              Manage customer accounts, contacts, and relationships with advanced data quality tools
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">CRM</h1>
+            <p className="mt-1 text-sm text-cc-text-muted">
+              Accounts and leads in one place. Search the book, then work the record.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            {canEdit && (
-              <Button onClick={() => setShowAccountForm(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Account
-              </Button>
-            )}
-          </div>
-        </div>
+          {canEdit && (
+            <Button
+              data-primary
+              onClick={() => setShowAccountForm(true)}
+              className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+            >
+              <Plus className="h-4 w-4" />
+              New account
+            </Button>
+          )}
+        </header>
 
         {/* Global Search */}
         <ErrorBoundary level="component">
-          <Card>
-            <CardContent className="pt-6">
-              <GlobalSearch 
-                onResultSelect={handleGlobalSearchSelect}
-                placeholder="Search customers, insureds, accounts, businesses..."
-              />
-            </CardContent>
-          </Card>
+          <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
+            <GlobalSearch
+              onResultSelect={handleGlobalSearchSelect}
+              placeholder="Search customers, insureds, accounts, businesses..."
+            />
+          </div>
         </ErrorBoundary>
 
         {/* Recently Accessed */}
@@ -411,65 +354,68 @@ const CRMContent = memo(() => {
           <RecentlyAccessed />
         </ErrorBoundary>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="accounts" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="accounts">Accounts</TabsTrigger>
-            <TabsTrigger value="leads">Leads</TabsTrigger>
-          </TabsList>
+        {/* Top-level tabs as a Calm Command segmented control */}
+        <div role="group" aria-label="Switch CRM view" className="inline-flex rounded-cc-md bg-cc-surface-raised p-0.5">
+          {CRM_TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTab(t.value)}
+              aria-pressed={tab === t.value}
+              className={cn(
+                'rounded-[10px] px-3 py-1.5 text-sm transition-colors duration-fast',
+                tab === t.value
+                  ? 'bg-cc-surface-overlay text-cc-text-primary'
+                  : 'text-cc-text-muted hover:text-cc-text-secondary',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Accounts Tab */}
-          <TabsContent value="accounts" className="space-y-6">
-            {/* Stats Cards */}
-            <ErrorBoundary level="component">
-              <StatsCards accounts={accounts} />
-            </ErrorBoundary>
-
+        {/* Accounts Tab */}
+        {tab === 'accounts' ? (
+          <div className="space-y-6">
             {/* Saved Views */}
             <ErrorBoundary level="component">
-              <Card>
-                <CardContent className="pt-6">
-                  <SavedViewsManager
-                    currentFilters={filters}
-                    savedViews={savedViews}
-                    onViewSelect={handleViewSelect}
-                    onViewSave={handleViewSave}
-                    onViewDelete={handleViewDelete}
-                  />
-                </CardContent>
-              </Card>
+              <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
+                <SavedViewsManager
+                  currentFilters={filters}
+                  savedViews={savedViews}
+                  onViewSelect={handleViewSelect}
+                  onViewSave={handleViewSave}
+                  onViewDelete={handleViewDelete}
+                />
+              </div>
             </ErrorBoundary>
 
             {/* Search and Filters */}
             <ErrorBoundary level="component">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Search Accounts</CardTitle>
-                  <CardDescription>
+              <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
+                <div className="mb-4">
+                  <h2 className="text-sm font-semibold text-cc-text-primary">Search accounts</h2>
+                  <p className="mt-1 text-sm text-cc-text-muted">
                     Find customer accounts by name, phone, email, or other criteria
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AccountSearch
-                    filters={filters}
-                    onFiltersChange={setFilters}
-                    onSearch={debouncedSearch}
-                    loading={loading}
-                  />
-                </CardContent>
-              </Card>
+                  </p>
+                </div>
+                <AccountSearch
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  onSearch={debouncedSearch}
+                  loading={loading}
+                />
+              </div>
             </ErrorBoundary>
 
             {/* Error State */}
             {error && (
-              <Card className="border-destructive">
-                <CardContent className="pt-6">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="destructive">Error</Badge>
-                    <span className="text-sm">{error}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="rounded-cc-xl border border-cc-danger bg-cc-surface p-5 shadow-card">
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive">Error</Badge>
+                  <span className="text-sm text-cc-text-secondary">{error}</span>
+                </div>
+              </div>
             )}
 
             {/* Bulk Actions Bar */}
@@ -484,15 +430,14 @@ const CRMContent = memo(() => {
             {/* Results */}
             <ErrorBoundary level="component">
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium">
-                    Accounts ({accounts.length})
-                  </h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-cc-text-primary">
+                    Accounts <span className="cc-num text-cc-text-muted">({accounts.length})</span>
+                  </h2>
                   {accounts.length > 0 && (
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Showing {accounts.length} accounts</span>
-                    </div>
+                    <SectionLabel>
+                      <span className="cc-num">{accounts.length}</span> shown
+                    </SectionLabel>
                   )}
                 </div>
 
@@ -506,30 +451,40 @@ const CRMContent = memo(() => {
                 />
               </div>
             </ErrorBoundary>
-          </TabsContent>
+          </div>
+        ) : (
+          /* Leads Tab */
+          <div className="space-y-6">
+            <div role="group" aria-label="Switch lead view" className="inline-flex rounded-cc-md bg-cc-surface-raised p-0.5">
+              {LEAD_TABS.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setLeadTab(t.value)}
+                  aria-pressed={leadTab === t.value}
+                  className={cn(
+                    'rounded-[10px] px-3 py-1.5 text-sm transition-colors duration-fast',
+                    leadTab === t.value
+                      ? 'bg-cc-surface-overlay text-cc-text-primary'
+                      : 'text-cc-text-muted hover:text-cc-text-secondary',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Leads Tab */}
-          <TabsContent value="leads" className="space-y-6">
-            <Tabs defaultValue="list" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="list">Lead List</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="list">
-                <ErrorBoundary level="component">
-                  <LeadList />
-                </ErrorBoundary>
-              </TabsContent>
-
-              <TabsContent value="analytics">
-                <ErrorBoundary level="component">
-                  <LeadAnalyticsDashboard />
-                </ErrorBoundary>
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
-        </Tabs>
+            {leadTab === 'list' ? (
+              <ErrorBoundary level="component">
+                <LeadList />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary level="component">
+                <LeadAnalyticsDashboard />
+              </ErrorBoundary>
+            )}
+          </div>
+        )}
 
         {/* Account Form Dialog */}
         <ErrorBoundary level="component">
