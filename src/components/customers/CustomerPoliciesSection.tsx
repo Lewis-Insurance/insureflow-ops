@@ -7,11 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { StatusPill, Chip } from '@/components/cc';
+import { StatusPill, Chip, AccentSpine } from '@/components/cc';
 import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { humanizeLine, humanizeCarrier } from '@/lib/format';
@@ -127,8 +126,9 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
     const isActive = variant === 'active';
 
     return (
-      <div
+      <AccentSpine
         key={policy.id}
+        active={isActive}
         role="button"
         tabIndex={0}
         onClick={openPolicy}
@@ -138,13 +138,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
             openPolicy();
           }
         }}
-        className={cn(
-          'cursor-pointer rounded-cc-lg border border-cc-border-subtle p-4 transition-colors duration-fast hover:bg-cc-surface-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-offset-2',
-          // Active = live policy: raised surface + a quiet 2px lime spine. Inactive = flat, no spine.
-          isActive
-            ? 'border-l-2 border-l-cc-accent bg-cc-surface-raised shadow-card'
-            : 'bg-cc-surface',
-        )}
+        className="cursor-pointer p-4 hover:bg-cc-surface-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-offset-2"
       >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Policy Basic Info */}
@@ -302,7 +296,7 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
             <span>Coverage on file</span>
           </div>
         )}
-      </div>
+      </AccentSpine>
     );
   };
 

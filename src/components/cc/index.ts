@@ -3,6 +3,7 @@
  * system (design-system/component-rules.md) so every surface is built the same
  * way. Import from '@/components/cc'.
  */
+export { AccentSpine } from './AccentSpine';
 export { StatusPill } from './StatusPill';
 export { Chip } from './Chip';
 export { SectionLabel } from './SectionLabel';
