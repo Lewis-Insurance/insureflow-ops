@@ -1,116 +1,32 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { StatusPill, Chip, AccentSpine, SectionLabel } from '@/components/cc';
-import { GitMerge, RefreshCw, CheckCircle2, Building2, User, ExternalLink } from 'lucide-react';
+import { StatusPill, Chip, SectionLabel } from '@/components/cc';
+import { GitMerge, RefreshCw, CheckCircle2, Building2, User, ExternalLink, Undo2, ShieldAlert, History } from 'lucide-react';
+import { MergePreviewDrawer, type MergeMember } from '@/components/relationships/MergePreviewDrawer';
 import {
   useDuplicateGroups,
+  useRecentMerges,
+  unmergeAccount,
   displayWithGoesBy,
   formatPremium,
   accountTypeLabel,
   type DuplicateGroup,
-  type DuplicateMember,
 } from '@/hooks/useRelationshipGraph';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 
-function MemberTile({
-  member,
-  selected,
-  onSelect,
-}: {
-  member: DuplicateMember;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const Icon = /business|commercial|organization|org/i.test(member.type) ? Building2 : User;
-  return (
-    <AccentSpine
-      active={selected}
-      role="radio"
-      aria-checked={selected}
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className="cursor-pointer p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring"
-    >
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Icon className="h-4 w-4 shrink-0 text-cc-text-muted" />
-          <span className="truncate font-medium text-cc-text-primary">
-            {displayWithGoesBy(member.name, member.goes_by)}
-          </span>
-        </div>
-        {selected ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-cc-accent">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Survivor
-          </span>
-        ) : member.deleted_at ? (
-          <Chip>Deleted</Chip>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-cc-text-muted">
-        <span>{accountTypeLabel(member.type)}</span>
-        {member.status && <StatusPill status={member.status} />}
-        <span className="cc-num">
-          {member.policies_count} polic{member.policies_count === 1 ? 'y' : 'ies'}
-        </span>
-        <span className="cc-num">{formatPremium(member.active_premium)}</span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-cc-text-faint">
-        {(member.city || member.state) && <span>{[member.city, member.state].filter(Boolean).join(', ')}</span>}
-        {member.email && <span className="truncate">{member.email}</span>}
-        {member.phone && <span className="cc-num">{member.phone}</span>}
-        <span className="cc-num">Created {formatLocalDateDisplay(member.created_at)}</span>
-        <Link
-          to={`/customers/${member.account_id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-cc-link hover:text-cc-link-hover"
-        >
-          Open <ExternalLink className="h-3 w-3" />
-        </Link>
-      </div>
-    </AccentSpine>
-  );
+function typeIcon(type: string) {
+  return /business|commercial|organization|org/i.test(type) ? Building2 : User;
 }
 
-function GroupCard({
-  group,
-  onMerge,
-}: {
-  group: DuplicateGroup;
-  onMerge: (groupId: string, survivorId: string) => void;
-}) {
+function GroupCard({ group, onReview }: { group: DuplicateGroup; onReview: (g: DuplicateGroup) => void }) {
   const members = group.members || [];
-  // Default survivor: the oldest live record (most established).
-  const defaultSurvivor = useMemo(() => {
-    const live = members.filter((m) => !m.deleted_at);
-    return (live[0] || members[0])?.account_id ?? '';
-  }, [members]);
-  const [survivor, setSurvivor] = useState<string>(defaultSurvivor);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const survivorName = members.find((m) => m.account_id === survivor)?.name ?? 'this record';
-
+  const isBlocked = group.status === 'link_candidate';
   return (
     <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SectionLabel>{members[0] ? members[0].name : 'Duplicate group'}</SectionLabel>
           <Chip>
             <span className="cc-num">{group.member_count}</span>&nbsp;records
@@ -120,69 +36,126 @@ function GroupCard({
               match&nbsp;<span className="cc-num">{Math.round(group.match_score * 100)}%</span>
             </Chip>
           )}
+          {isBlocked && (
+            <span className="inline-flex items-center gap-1 rounded-pill px-2.5 py-0.5 text-xs"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--cc-danger) 14%, transparent)', color: 'var(--cc-danger-pill-text)' }}>
+              <ShieldAlert className="h-3 w-3" /> Likely not a merge
+            </span>
+          )}
         </div>
-      </div>
-
-      <p className="mb-3 text-xs text-cc-text-muted">
-        Pick the record to keep. Policies, contacts and history from the others move to it; the rest are
-        soft-deleted and a same-as link preserves the trail.
-      </p>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {members.map((m) => (
-          <MemberTile
-            key={m.account_id}
-            member={m}
-            selected={survivor === m.account_id}
-            onSelect={() => setSurvivor(m.account_id)}
-          />
-        ))}
-      </div>
-
-      <div className="mt-4 flex justify-end">
         <Button
           data-primary
           size="sm"
-          disabled={!survivor}
-          onClick={() => setConfirmOpen(true)}
+          onClick={() => onReview(group)}
           className="gap-1.5 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
         >
           <GitMerge className="h-4 w-4" />
-          Merge into selected
+          Review &amp; merge
         </Button>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="rounded-cc-xl border-cc-border-subtle bg-cc-surface">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-cc-text-primary">
-              Merge {group.member_count} records into {survivorName}?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-cc-text-muted">
-              The other records will be soft-deleted and their policies, contacts and history reassigned to{' '}
-              {survivorName}. This is reversible and logged.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              data-primary
-              onClick={() => onMerge(group.group_id, survivor)}
-              className="rounded-cc-md font-semibold"
-            >
-              Merge records
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="grid gap-2 md:grid-cols-2">
+        {members.map((m) => {
+          const Icon = typeIcon(m.type);
+          return (
+            <div key={m.account_id} className="rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0 text-cc-text-muted" />
+                  <span className="truncate text-sm font-medium text-cc-text-primary">
+                    {displayWithGoesBy(m.name, m.goes_by)}
+                  </span>
+                </div>
+                {m.deleted_at ? <Chip>Deleted</Chip> : m.status ? <StatusPill status={m.status} /> : null}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-cc-text-muted">
+                <span>{accountTypeLabel(m.type)}</span>
+                <span className="cc-num">
+                  {m.policies_count} polic{m.policies_count === 1 ? 'y' : 'ies'}
+                </span>
+                <span className="cc-num">{formatPremium(m.active_premium)}</span>
+                {(m.city || m.state) && <span>{[m.city, m.state].filter(Boolean).join(', ')}</span>}
+                <Link
+                  to={`/customers/${m.account_id}`}
+                  className="inline-flex items-center gap-1 text-cc-link hover:text-cc-link-hover"
+                >
+                  Open <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RecentlyMerged() {
+  const { merges, loading, refetch } = useRecentMerges();
+  const [undoing, setUndoing] = useState<string | null>(null);
+
+  const handleUndo = async (id: string) => {
+    setUndoing(id);
+    const ok = await unmergeAccount(id);
+    setUndoing(null);
+    if (ok) refetch();
+  };
+
+  if (loading) {
+    return <div className="h-24 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />;
+  }
+  if (merges.length === 0) {
+    return (
+      <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface px-6 py-8 text-center text-sm text-cc-text-muted shadow-card">
+        No reversible merges yet.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {merges.map((m) => (
+        <div
+          key={m.merge_history_id}
+          className="flex flex-wrap items-center justify-between gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface px-4 py-3 shadow-card"
+        >
+          <div className="min-w-0 text-sm">
+            <span className="text-cc-text-primary">{m.loser_name ?? 'A record'}</span>
+            <span className="text-cc-text-muted"> merged into </span>
+            <span className="text-cc-text-primary">{m.survivor_name ?? 'survivor'}</span>
+            <div className="mt-0.5 text-xs text-cc-text-muted">
+              <span className="cc-num">{m.reparent_total}</span> records moved · {formatLocalDateDisplay(m.merged_at)}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={undoing === m.merge_history_id}
+            onClick={() => handleUndo(m.merge_history_id)}
+            className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+          >
+            <Undo2 className="h-4 w-4" />
+            Undo
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }
 
 export default function DuplicatesReviewPage() {
-  const { groups, total, loading, refetch, merge } = useDuplicateGroups();
+  const { groups, total, loading, refetch, merge, linkInstead } = useDuplicateGroups();
+  const [activeGroup, setActiveGroup] = useState<DuplicateGroup | null>(null);
+
+  const drawerMembers: MergeMember[] = (activeGroup?.members ?? []).map((m) => ({
+    account_id: m.account_id,
+    name: m.name,
+    goes_by: m.goes_by,
+    type: m.type,
+    status: m.status,
+    deleted_at: m.deleted_at,
+    policies_count: m.policies_count,
+    active_premium: m.active_premium,
+  }));
 
   return (
     <AppLayout>
@@ -195,8 +168,8 @@ export default function DuplicatesReviewPage() {
                 Duplicate review
               </h1>
               <p className="mt-1 text-sm text-cc-text-muted">
-                <span className="cc-num">{total}</span> pending group{total === 1 ? '' : 's'} flagged by the
-                duplicate engine. Confirm a survivor to merge.
+                <span className="cc-num">{total}</span> group{total === 1 ? '' : 's'} to review. Preview the blast radius,
+                pick the record to keep, then merge. Blocked pairs can be linked instead.
               </p>
             </div>
             <Button
@@ -213,13 +186,13 @@ export default function DuplicatesReviewPage() {
 
         {loading ? (
           <div className="space-y-4">
-            <div className="h-44 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
-            <div className="h-44 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
+            <div className="h-40 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
+            <div className="h-40 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
           </div>
         ) : groups.length === 0 ? (
           <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface px-6 py-16 text-center shadow-card">
             <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-cc-success" />
-            <p className="text-sm text-cc-text-secondary">No pending duplicate groups. The book is clean.</p>
+            <p className="text-sm text-cc-text-secondary">No groups to review. The book is clean.</p>
             <Button
               asChild
               variant="outline"
@@ -231,11 +204,34 @@ export default function DuplicatesReviewPage() {
         ) : (
           <div className="space-y-4">
             {groups.map((g) => (
-              <GroupCard key={g.group_id} group={g} onMerge={merge} />
+              <GroupCard key={g.group_id} group={g} onReview={setActiveGroup} />
             ))}
           </div>
         )}
+
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-cc-text-muted" />
+            <SectionLabel>Recently merged</SectionLabel>
+          </div>
+          <RecentlyMerged />
+        </section>
       </div>
+
+      <MergePreviewDrawer
+        open={!!activeGroup}
+        onOpenChange={(o) => !o && setActiveGroup(null)}
+        members={drawerMembers}
+        onConfirm={async (survivorId) => {
+          if (!activeGroup) return false;
+          const ok = await merge(activeGroup.group_id, survivorId);
+          return ok;
+        }}
+        onLinkInstead={async (fromId, toId) => {
+          if (!activeGroup) return false;
+          return linkInstead(fromId, toId, activeGroup.group_id);
+        }}
+      />
     </AppLayout>
   );
 }
