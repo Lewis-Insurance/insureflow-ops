@@ -616,6 +616,7 @@ export default function CustomerDetail() {
                   accountId={account.id}
                   accountName={account.name}
                   householdId={account.household_id}
+                  spouseName={account.spouse_name}
                   relationships={relationships}
                   loading={relationshipsLoading}
                   onRelationshipsChange={refetchRelationships}
