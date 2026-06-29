@@ -1121,6 +1121,18 @@ insureflow-ops/
 
 ## Change Log
 
+### 2026-06-29 (Relationship Graph v2 + Merge consolidation + Importer hardening)
+- ✅ **Relationship Graph v2** (PR #13, migrations `20260629210000`–`260000`, applied to prod):
+  - **Edge vocabulary**: `affiliated_business` + `dependent` added to the `rel_type` CHECK on `account_relationships` and `account_relationship_suggestions`.
+  - **Recursive Hub** `get_account_cluster(account_id)`: bounded, cycle-guarded walk over owns/spouse/household_member/dependent/affiliated_business/parent_company; owner-centered, per-node policy/premium/next-expiration + cluster roll-ups. `ClusterHub` renders it in the Customer Relationships tab (owner center, company cards with sibling nav, household block, cross-sell line). `search_accounts` gained `owned_business_count` (shown in the Link drawer).
+  - **Noise-free suggester**: `surname_business` `owns` now requires a co-occurring shared contact (phone/email/address/TIN, read from BOTH normalized `insured_*` and legacy `accounts` columns); added `affiliated_business` (shared owner/contact) + household_member/dependent; one ranked candidate per pair; all human-confirm.
+  - **Confirm-gated retype staging**: `retype_candidates` (RLS staff-only) + `generate_retype_candidates` (stages type/policy mismatches from `policies.line_category='commercial'`, never mutates) + `approve/reject_retype_candidate` (only approve writes a type, human-gated, keeps `account_type`/`type`/`insured_profiles.type` consistent).
+- ✅ **Single merge engine**: `_do_account_merge(survivor, losers, rule, apply boolean default true)` is now the only merge body (apply=false = pure compute path for `preview_merge`). Legacy 5-arg `merge_accounts` **dropped**. EXECUTE on `_do_account_merge` is postgres/service_role only; `merge_accounts_manual` / `relgraph_merge_duplicate_group` / `preview_merge` are `is_staff()`-gated and reach it as SECURITY DEFINER. Carrier de-dup key normalizes `&`↔`and`.
+- ✅ **Importer hardening** (PRs #11/#12): `import_resolve_account` RPC + `normalize_entity_name`; the bulk importer resolves-or-creates instead of blind-inserting (matches businesses by normalized name, individuals by name + shared email/phone, follows `merged_into_id` to the live survivor), tenant-scopes new accounts to the caller's workspace and refuses a null/ambiguous workspace.
+- ✅ **Data fixes (prod)**: Sorensen & Smith LLC cluster merged 6→1; Elite Rc Productions Llc + Pbc Inc cross-type dups merged; Milton G Smith person hub created (owns Sorensen & Smith + GSMS + Hendrix).
+- **Known debt (NOT addressed, by decision)**: `npm run typecheck` carries ~1156 pre-existing TS errors across ~209 files (code↔generated-types drift; not a deploy gate — Vite build + lint are green). This session added 0 new type errors. Tracked as a separate, dedicated effort.
+- Enum reference: `accounts.account_type` is enum `account_type_new` (`individual`/`business`); `accounts.type` is enum `account_type_v2` (`household`/`commercial_business`); `sync_account_types` mirrors them.
+
 ### 2026-06-28 (Relationship Graph)
 - ✅ **One identity-and-relationship graph keyed to `accounts.id`** (docs/Lewis-CRM-Relationship-Graph-Plan.md). All 4 phases, applied directly to prod.
   - **Phase 0 — "goes by" / alias search**: `accounts.goes_by` + `account_aliases` table; `goes_by` folded into `accounts_search_vector_tg`; `unified_customer_search` + `global_search_v1` made alias + trigram (pg_trgm) aware; new `search_accounts(q)` RPC returns a match reason ("goes by Lance", "fuzzy: McDonald"). Inline "Goes by" capture on the customer header.
