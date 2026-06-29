@@ -28,6 +28,14 @@ import { EmailComposerModal, CommunicationHistory } from '@/components/communica
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
 import { StatusPill, Chip, SectionLabel, maskTaxId } from '@/components/cc';
+import { CustomerRelationshipsSection } from '@/components/relationships/CustomerRelationshipsSection';
+import { GoesByEditor } from '@/components/relationships/GoesByEditor';
+import {
+  useAccountRelationships,
+  useHouseholdSummary,
+  displayWithGoesBy,
+  formatPremium,
+} from '@/hooks/useRelationshipGraph';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -43,6 +51,7 @@ import {
   Star,
   AlertTriangle,
   CheckCircle2,
+  Link2,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -51,6 +60,7 @@ import { logger } from '@/lib/logger';
 interface Account {
   id: string;
   name: string;
+  goes_by?: string | null;
   spouse_name?: string;
   type: string;
   account_type?: string;
@@ -65,6 +75,7 @@ interface Account {
   zip_code?: string;
   tin_last4?: string;
   source?: string;
+  household_id?: string | null;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -252,6 +263,13 @@ export default function CustomerDetail() {
     }
   };
 
+  const {
+    relationships,
+    loading: relationshipsLoading,
+    refetch: refetchRelationships,
+  } = useAccountRelationships(account?.id);
+  const householdSummary = useHouseholdSummary(account?.household_id);
+
   if (loading) {
     return (
       <AppLayout>
@@ -298,6 +316,19 @@ export default function CustomerDetail() {
   const nextTaskOverdue = nextTask?.due_at ? new Date(nextTask.due_at) < new Date() : false;
   const lastNote = notes[0];
 
+  // Cross-sell roll-up: a $157 personal-auto record becomes a commercial conversation.
+  const ownsEdge = relationships.find((r) => r.direction === 'outgoing' && r.rel_type === 'owns');
+  let crossSell: string | null = null;
+  if (ownsEdge) {
+    crossSell = `Owner of ${ownsEdge.other_name} · ${ownsEdge.other_policies_count} polic${
+      ownsEdge.other_policies_count === 1 ? 'y' : 'ies'
+    } · ${formatPremium(ownsEdge.other_active_premium)}`;
+  } else if (householdSummary && householdSummary.member_count > 1) {
+    crossSell = `Household: ${householdSummary.member_count} members · ${householdSummary.active_policies} policies · ${formatPremium(
+      householdSummary.household_premium,
+    )}`;
+  }
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1200px] space-y-6 p-6">
@@ -326,12 +357,19 @@ export default function CustomerDetail() {
               </nav>
 
               <h1 className="mt-3 text-2xl font-bold uppercase tracking-tight text-cc-text-primary break-words sm:text-3xl">
-                {account.name}
+                {displayWithGoesBy(account.name, account.goes_by)}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusPill status={account.account_status} />
                 <Chip>{isBusiness ? 'Business' : 'Household'}</Chip>
                 {location && <Chip>{location}</Chip>}
+                {!isBusiness && (
+                  <GoesByEditor
+                    accountId={account.id}
+                    goesBy={account.goes_by}
+                    onSaved={(v) => setAccount({ ...account, goes_by: v })}
+                  />
+                )}
               </div>
             </div>
 
@@ -441,6 +479,16 @@ export default function CustomerDetail() {
                   </>
                 )}
               </dl>
+              {crossSell && (
+                <button
+                  type="button"
+                  onClick={() => setTab('relationships')}
+                  className="mt-2 flex w-full items-center gap-1.5 border-t border-cc-border-subtle pt-2 text-left text-cc-text-primary hover:text-cc-accent"
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0 text-cc-accent" />
+                  <span className="truncate">{crossSell}</span>
+                </button>
+              )}
             </HeroCard>
 
             <HeroCard label="What happens next">
@@ -521,6 +569,7 @@ export default function CustomerDetail() {
                 {[
                   ['contact', 'Contact'],
                   ['policies', 'Policies'],
+                  ['relationships', 'Relationships'],
                   ['documents', 'Documents'],
                   ['notes', 'Notes & tasks'],
                   ['activity', 'Activity'],
@@ -546,6 +595,17 @@ export default function CustomerDetail() {
               <TabsContent value="policies" className="mt-4 space-y-4">
                 <CustomerPoliciesSection accountId={account.id} />
                 <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
+              </TabsContent>
+
+              <TabsContent value="relationships" className="mt-4">
+                <CustomerRelationshipsSection
+                  accountId={account.id}
+                  accountName={account.name}
+                  householdId={account.household_id}
+                  relationships={relationships}
+                  loading={relationshipsLoading}
+                  onRelationshipsChange={refetchRelationships}
+                />
               </TabsContent>
 
               <TabsContent value="documents" className="mt-4 space-y-4">
