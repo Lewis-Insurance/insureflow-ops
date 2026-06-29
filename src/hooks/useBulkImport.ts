@@ -443,15 +443,29 @@ export function useBulkImport() {
     setState(prev => ({ ...prev, step: 'processing', error: null }));
 
     try {
-      // Get agency workspace ID (use a default for now)
-      const { data: membership } = await supabase
+      // Resolve the importing user's workspace. We must have exactly one active
+      // workspace: import_resolve_account scopes all matching to this tenant, so
+      // a missing/ambiguous workspace must abort rather than silently fall back
+      // to an unscoped import (which could resolve to accounts in any tenant).
+      const { data: memberships, error: membershipError } = await supabase
         .from('agency_workspace_memberships')
         .select('agency_workspace_id')
         .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+        .eq('status', 'active');
 
-      const agencyWorkspaceId = membership?.agency_workspace_id || '';
+      const workspaceIds = Array.from(
+        new Set((memberships ?? []).map(m => m.agency_workspace_id).filter(Boolean))
+      );
+      const agencyWorkspaceId = workspaceIds[0];
+
+      if (membershipError || workspaceIds.length !== 1 || !agencyWorkspaceId) {
+        const message = workspaceIds.length > 1
+          ? 'You belong to multiple workspaces. Importing into a specific workspace is not supported yet.'
+          : 'No active workspace found for your account. Cannot import.';
+        setState(prev => ({ ...prev, step: 'failed', error: message }));
+        toast({ title: 'Import blocked', description: message, variant: 'destructive' });
+        return false;
+      }
 
       const result = await runBulkImport(
         validation.contacts.valid,
