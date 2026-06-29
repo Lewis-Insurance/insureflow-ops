@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useChromeAction } from '@/components/layout/chrome/chromeActions';
 import { useNavigate } from 'react-router-dom';
 import { Search, UserPlus, Tag, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,9 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [cohort, setCohort] = useState<Cohort>('all');
+
+  // Global chrome (header "New customer" / Cmd-K) opens the add-customer modal here.
+  useChromeAction('new-customer', useCallback(() => setAddCustomerOpen(true), []));
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
   const { customers, loading, loadingMore, hasMore, fetchCustomers, fetchNextPage } = useUnifiedCustomers();

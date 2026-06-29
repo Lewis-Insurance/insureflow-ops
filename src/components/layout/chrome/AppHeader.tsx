@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useChrome } from './ChromeContext';
 import { destForPath } from './navConfig';
+import { emitChromeAction, type ChromeActionType } from './chromeActions';
+import { useActiveRecord } from './useActiveRecord';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
@@ -393,11 +395,19 @@ function ListHeader({ pathname }: { pathname: string }) {
 
       <SearchField />
 
-      {/* The single lime primary. The header must not touch page content, so it
-          opens the command palette where the matching Action runs. */}
+      {/* The single lime primary. It runs the page's matching action via the
+          chrome action bus; if the page is not listening, it opens the palette. */}
       <Button
         data-primary
-        onClick={() => setPaletteOpen(true)}
+        onClick={() => {
+          const actionByLabel: Record<string, ChromeActionType> = {
+            'New customer': 'new-customer',
+            'New policy': 'new-policy',
+            'New lead': 'new-lead',
+          };
+          const action = actionByLabel[meta.primaryLabel];
+          if (!action || !emitChromeAction(action)) setPaletteOpen(true);
+        }}
         className="shrink-0 gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
       >
         {meta.primaryLabel}
@@ -411,6 +421,7 @@ function ListHeader({ pathname }: { pathname: string }) {
 function RecordHeader({ record }: { record: RecordMatch }) {
   const { setPaletteOpen } = useChrome();
   const { recordName, nextStep, loading } = useRecordHeader(record);
+  const active = useActiveRecord();
 
   // Neutral placeholder while loading; once loaded, fall back to a neutral label
   // if the record has no resolvable name.
@@ -455,11 +466,14 @@ function RecordHeader({ record }: { record: RecordMatch }) {
 
       <span className="flex-1" />
 
-      {/* The record's single lime primary. Opens the palette where the matching
-          Action (e.g. "Log contact for {record}") runs. */}
+      {/* The record's single lime primary. Runs "Log contact" on this record via
+          the chrome action bus; falls back to the palette if the page is not listening. */}
       <Button
         data-primary
-        onClick={() => setPaletteOpen(true)}
+        onClick={() => {
+          const handled = emitChromeAction('log-contact', active ? { entity: active.entity, id: active.id } : {});
+          if (!handled) setPaletteOpen(true);
+        }}
         className="shrink-0 gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
       >
         Log contact

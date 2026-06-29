@@ -15,10 +15,14 @@ import {
   History as HistoryIcon,
   UserPlus,
   Scale,
+  PhoneCall,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import { useChrome } from './ChromeContext';
 import { ALL_DESTINATIONS } from './navConfig';
+import { useActiveRecord } from './useActiveRecord';
+import { emitChromeAction } from './chromeActions';
 import { AccentSpine } from '@/components/cc';
 
 /**
@@ -106,17 +110,51 @@ export function CommandPalette() {
 
   const close = useCallback(() => setPaletteOpen(false), [setPaletteOpen]);
 
-  // The fixed set of context-aware actions. Kept simple per the handoff: each one
-  // navigates and closes. (There is no current-record context wired into the
-  // chrome yet, so "Log contact" routes to the tasks worklist.)
-  const actionDefs = useMemo<{ label: string; icon: LucideIcon; to: string }[]>(
-    () => [
-      { label: 'Log contact', icon: HistoryIcon, to: '/tasks' },
-      { label: 'New customer', icon: UserPlus, to: '/customers' },
-      { label: 'Start quote comparison', icon: Scale, to: '/comparison' },
-    ],
-    [],
-  );
+  const active = useActiveRecord();
+
+  // Context-aware actions. Record actions (Log contact / Compose email) appear
+  // only on a record and target it via the chrome action bus; if the page is not
+  // listening they fall back to opening the record. Nothing is fabricated.
+  const actionDefs = useMemo<{ label: string; icon: LucideIcon; run: () => void }[]>(() => {
+    const list: { label: string; icon: LucideIcon; run: () => void }[] = [];
+    if (active) {
+      const seg = active.entity === 'customer' ? 'customers' : active.entity === 'policy' ? 'policies' : 'leads';
+      const recordPath = `/${seg}/${active.id}`;
+      list.push({
+        label: 'Log contact',
+        icon: PhoneCall,
+        run: () => {
+          if (!emitChromeAction('log-contact', active)) navigate(recordPath);
+          close();
+        },
+      });
+      list.push({
+        label: 'Compose email',
+        icon: Mail,
+        run: () => {
+          if (!emitChromeAction('compose-email', active)) navigate(recordPath);
+          close();
+        },
+      });
+    }
+    list.push({
+      label: 'New customer',
+      icon: UserPlus,
+      run: () => {
+        if (!emitChromeAction('new-customer')) navigate('/customers');
+        close();
+      },
+    });
+    list.push({
+      label: 'Start quote comparison',
+      icon: Scale,
+      run: () => {
+        navigate('/comparison');
+        close();
+      },
+    });
+    return list;
+  }, [active, navigate, close]);
 
   const recent = useMemo<RecentDest[]>(() => (paletteOpen ? readRecent() : []), [paletteOpen]);
 
@@ -137,10 +175,7 @@ export function CommandPalette() {
         id: `${baseId}-action-${i}`,
         label: a.label,
         icon: a.icon,
-        run: () => {
-          navigate(a.to);
-          close();
-        },
+        run: a.run,
       }));
     if (actionRows.length) out.push({ key: 'actions', label: 'Actions', rows: actionRows });
 

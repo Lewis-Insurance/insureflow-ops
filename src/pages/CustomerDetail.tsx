@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useChromeAction } from '@/components/layout/chrome/chromeActions';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -177,6 +178,10 @@ export default function CustomerDetail() {
   const [addCallLogOpen, setAddCallLogOpen] = useState(false);
   const [emailComposerOpen, setEmailComposerOpen] = useState(false);
   const [reviewRequestOpen, setReviewRequestOpen] = useState(false);
+
+  // Let the global chrome (header primary / Cmd-K) run record actions on this page.
+  useChromeAction('log-contact', useCallback(() => setAddCallLogOpen(true), []));
+  useChromeAction('compose-email', useCallback(() => setEmailComposerOpen(true), []));
 
   const refetchTasks = async () => {
     if (!id) return;
