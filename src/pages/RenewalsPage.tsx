@@ -98,7 +98,7 @@ export default function RenewalsPage() {
 
   const rows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return renewals.filter((r) => {
+    const filtered = renewals.filter((r) => {
       if (cohort !== 'all' && !COHORT_PREDICATE[cohort](r)) return false;
       if (carrier !== 'all' && r.carrier !== carrier) return false;
       if (q) {
@@ -107,6 +107,17 @@ export default function RenewalsPage() {
         if (!name.includes(q) && !policy.includes(q)) return false;
       }
       return true;
+    });
+    // Default ordering puts the next thing to work on top: still-open renewals
+    // first, then by renewal date ascending so the most overdue (past) and the
+    // soonest-to-expire come first. Closed outcomes and undated rows sink down.
+    return filtered.sort((a, b) => {
+      const aOpen = isOpen(a) ? 0 : 1;
+      const bOpen = isOpen(b) ? 0 : 1;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+      const at = a.renewal_date ? new Date(a.renewal_date).getTime() : Infinity;
+      const bt = b.renewal_date ? new Date(b.renewal_date).getTime() : Infinity;
+      return at - bt;
     });
   }, [renewals, cohort, carrier, searchQuery]);
 
