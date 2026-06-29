@@ -38263,6 +38263,42 @@ export type Database = {
           recently_bound: number
         }[]
       }
+      get_lead_triage_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total: number
+          new_leads: number
+          hot: number
+          qualified: number
+          quoted: number
+        }[]
+      }
+      search_leads: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          id: string
+          first_name: string
+          last_name: string
+          company_name: string
+          email: string
+          phone: string
+          status: string
+          lead_score: number
+          insurance_types: string[]
+          current_carrier: string
+          last_contact_at: string
+          next_follow_up_date: string
+          account_id: string
+          converted_account_id: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
       get_ao_migration_counts: {
         Args: Record<PropertyKey, never>
         Returns: {
