@@ -117,6 +117,8 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'Knowledge Manager', to: '/knowledge-manager', icon: BookMarked },
   { label: 'Reports', to: '/reports', icon: BarChart3 },
   { label: 'Customer Success', to: '/customer-success', icon: Heart },
+  { label: 'Issues', to: '/issues', icon: Activity },
+  { label: 'Predictive Analytics', to: '/predictive-analytics', icon: TrendingUp },
   { label: 'Merge Customers', to: '/merge-customers', icon: GitMerge },
   { label: 'Customization', to: '/customization', icon: Sliders },
   { label: 'Carriers', to: '/carriers', icon: Building2 },

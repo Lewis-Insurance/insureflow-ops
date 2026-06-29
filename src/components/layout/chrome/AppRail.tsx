@@ -292,15 +292,12 @@ function RailFull() {
 /* -------------------------------------------------------- COLLAPSED rail (72) */
 
 /** A right-side flyout panel anchored to an icon button; opens on hover/focus.
- * The flyout children carry their own group/Today label, which doubles as the
- * accessible name (so it is referenced rather than duplicated as aria-label). */
+ * Plain container (no role="menu"): the rows are <Link>/<button> links, not a
+ * menuitem arrow-key model, so an explicit menu role would be invalid ARIA. */
 function Flyout({ open, children }: { open: boolean; children: ReactNode }) {
   if (!open) return null;
   return (
-    <div
-      role="menu"
-      className="absolute left-[84px] top-0 z-30 w-56 rounded-cc-lg border border-cc-border-subtle bg-cc-surface-raised p-2 shadow-lift"
-    >
+    <div className="absolute left-[84px] top-0 z-30 w-56 rounded-cc-lg border border-cc-border-subtle bg-cc-surface-raised p-2 shadow-lift">
       {children}
     </div>
   );
@@ -380,10 +377,12 @@ function CollapsedGroup({ group, pathname }: { group: NavGroupDef; pathname: str
         </div>
       )}
     >
-      {() => (
+      {(open) => (
         <button
           type="button"
           aria-label={group.label}
+          aria-haspopup="menu"
+          aria-expanded={open}
           className={cn(
             'relative flex h-11 w-11 items-center justify-center rounded-cc-lg transition-colors duration-fast',
             isGroupActive ? 'bg-cc-surface-overlay' : 'hover:bg-cc-surface-raised',
@@ -443,10 +442,12 @@ function RailCollapsed() {
           </div>
         )}
       >
-        {() => (
+        {(open) => (
           <button
             type="button"
             aria-label={`Needs me today, ${total} open items`}
+            aria-haspopup="menu"
+            aria-expanded={open}
             className="relative flex h-11 w-11 items-center justify-center rounded-cc-lg transition-colors duration-fast hover:bg-cc-surface-raised"
           >
             <Zap className="h-[21px] w-[21px] text-cc-text-muted" strokeWidth={1.5} />
@@ -479,11 +480,13 @@ function RailCollapsed() {
           </Link>
         )}
       >
-        {() => (
+        {(open) => (
           <Link
             to={SYSTEM_ADMIN.to}
             aria-label={SYSTEM_ADMIN.label}
             aria-current={adminActive ? 'page' : undefined}
+            aria-haspopup="menu"
+            aria-expanded={open}
             className={cn(
               'relative flex h-11 w-11 items-center justify-center rounded-cc-lg transition-colors duration-fast',
               adminActive ? 'bg-cc-surface-overlay' : 'hover:bg-cc-surface-raised',
