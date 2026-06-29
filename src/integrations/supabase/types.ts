@@ -104,6 +104,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "account_churn_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_churn_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "account_churn_risk_scores_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -2793,6 +2807,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ao_renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ao_renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ao_renewals_follow_up_task_id_fkey"
             columns: ["follow_up_task_id"]
             isOneToOne: false
@@ -3358,7 +3386,22 @@ export type Database = {
           trigger_type?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       automation_settings: {
         Row: {
@@ -3593,6 +3636,20 @@ export type Database = {
           workflow_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "automation_workflow_executions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_workflow_executions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "automation_workflow_executions_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -6323,7 +6380,22 @@ export type Database = {
           updated_at?: string
           widget_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "canopy_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canopy_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       canopy_loss_events: {
         Row: {
@@ -12016,6 +12088,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "coverage_gap_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_gap_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "coverage_gap_opportunities_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -14202,6 +14288,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "document_analysis_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_analysis_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "document_analysis_jobs_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -14267,7 +14367,22 @@ export type Database = {
           storage_bucket?: string | null
           storage_path?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_evidence_items: {
         Row: {
@@ -14606,6 +14721,20 @@ export type Database = {
           tokens_used?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "document_insights_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -24030,6 +24159,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "marketing_survey_responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_survey_responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "marketing_survey_responses_survey_id_fkey"
             columns: ["survey_id"]
             isOneToOne: false
@@ -24227,6 +24370,7 @@ export type Database = {
           merged_by: string
           merged_ids: string[]
           survivor_id: string
+          unmerged_at: string | null
         }
         Insert: {
           created_at?: string
@@ -24236,6 +24380,7 @@ export type Database = {
           merged_by: string
           merged_ids: string[]
           survivor_id: string
+          unmerged_at?: string | null
         }
         Update: {
           created_at?: string
@@ -24245,6 +24390,7 @@ export type Database = {
           merged_by?: string
           merged_ids?: string[]
           survivor_id?: string
+          unmerged_at?: string | null
         }
         Relationships: []
       }
@@ -29256,6 +29402,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "policy_renewal_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_renewal_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policy_renewal_risk_scores_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -30620,7 +30780,22 @@ export type Database = {
           welcome_message?: string | null
           welcome_title?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "portal_branding_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_branding_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       portal_coverage_opportunities: {
         Row: {
@@ -40297,8 +40472,16 @@ export type Database = {
         Args: { p_coi_id: string; p_version_data: Json }
         Returns: undefined
       }
+      apply_consent_strictest_wins: {
+        Args: { p_losers: string[]; p_survivor: string }
+        Returns: Json
+      }
       assert_active_staff_profile_provisioned_for_user: {
         Args: { p_user_id: string }
+        Returns: undefined
+      }
+      assert_mergeable: {
+        Args: { p_losers: string[]; p_survivor: string }
         Returns: undefined
       }
       assign_lead: {
@@ -41838,10 +42021,6 @@ export type Database = {
         }
         Returns: Json
       }
-      merge_duplicate_records: {
-        Args: { group_id: string; merged_data?: Json; survivor_id: string }
-        Returns: Json
-      }
       midday_pulse_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
       morning_brief_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
       move_lead_to_stage: {
@@ -42329,6 +42508,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      unmerge_account: { Args: { p_merge_history_id: string }; Returns: Json }
       update_account_secure: {
         Args: { account_data: Json; account_id: string }
         Returns: Json
