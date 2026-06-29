@@ -170,7 +170,7 @@ const initialPolicyData: PolicyData = {
   policy_number: '',
   carrier: '',
   line_of_business: '',
-  policy_term: '6', // Default to 6-month (semi-annual) term
+  policy_term: 'semiannual', // 6-month term. Must match policies_policy_term_check (semiannual|annual)
   premium: '',
   effective_date: '',
   expiration_date: '',
@@ -521,8 +521,23 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
     setLoading(true);
     try {
+      // Resolve the user's agency workspace so the account is never created
+      // orphaned. The accounts RLS INSERT policy allows staff to insert a row
+      // with a null agency_workspace_id, but a workspace-less account then
+      // breaks every workspace-scoped feature (e.g. recording payments).
+      const { data: orgId, error: orgError } = await supabase.rpc('get_user_org_id');
+      if (orgError || !orgId) {
+        toast({
+          title: 'Error creating customer',
+          description: 'Could not determine your agency workspace. Please re-select your workspace and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Create customer
       const customerData = {
+        agency_workspace_id: orgId,
         name: formData.name.trim() || null,
         spouse_name: formData.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         type: formData.type,
@@ -1126,10 +1141,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                         <SelectValue placeholder="Select term" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1 Month</SelectItem>
-                        <SelectItem value="3">3 Months</SelectItem>
-                        <SelectItem value="6">6 Months</SelectItem>
-                        <SelectItem value="12">12 Months</SelectItem>
+                        <SelectItem value="semiannual">6 Months (Semi-Annual)</SelectItem>
+                        <SelectItem value="annual">12 Months (Annual)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

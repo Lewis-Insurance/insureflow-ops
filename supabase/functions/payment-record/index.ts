@@ -66,37 +66,24 @@ serve(async (req) => {
       throw new ValidationError('Received date is required');
     }
 
-    // Get user's org_id from profiles table
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('org_id')
-      .eq('id', user.id)
-      .single();
+    // Resolve the user's org via the canonical DB resolver. This guarantees the
+    // value matches the premium_payments RLS WITH CHECK (org_id = get_user_org_id()).
+    // NOTE: the previous code read profiles.org_id (no such column) and filtered
+    // payment_methods/policies/accounts by org_id columns that don't exist or are
+    // always null, so every request 400'd. get_user_org_id() falls back to
+    // profiles.default_agency_workspace_id when there is no active membership row.
+    const { data: orgId, error: orgError } = await supabase.rpc('get_user_org_id');
 
-    // If profile doesn't have org_id, try getting from agency_workspace_memberships
-    let orgId = profile?.org_id;
-    if (!orgId) {
-      const { data: membership } = await supabase
-        .from('agency_workspace_memberships')
-        .select('agency_workspace_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .limit(1)
-        .single();
-
-      orgId = membership?.agency_workspace_id;
-    }
-
-    if (!orgId) {
+    if (orgError || !orgId) {
       throw new ValidationError('User organization not found');
     }
 
-    // Validate payment method belongs to org
+    // Validate payment method. Payment methods are global lookup rows
+    // (org_id is null on every row), so they are not org-scoped here.
     const { data: paymentMethod, error: methodError } = await supabase
       .from('payment_methods')
       .select('id, type, requires_check_number, requires_reference')
       .eq('id', body.payment_method_id)
-      .eq('org_id', orgId)
       .eq('is_active', true)
       .is('deleted_at', null)
       .single();
@@ -124,13 +111,13 @@ serve(async (req) => {
       changeGiven = body.amount_tendered - body.amount;
     }
 
-    // Validate policy belongs to org if provided
+    // Validate the policy exists if provided. Policies have no org_id column;
+    // reads are scoped by RLS, so just confirm existence and adopt its account.
     if (body.policy_id) {
       const { data: policy, error: policyError } = await supabase
         .from('policies')
         .select('id, account_id')
         .eq('id', body.policy_id)
-        .eq('org_id', orgId)
         .single();
 
       if (policyError || !policy) {
@@ -143,13 +130,14 @@ serve(async (req) => {
       }
     }
 
-    // Validate account belongs to org if provided
+    // Validate the account exists if provided. Accounts are scoped by
+    // agency_workspace_id (not org_id) and reads are gated by RLS, so an
+    // existence check is sufficient here.
     if (body.account_id) {
       const { data: account, error: accountError } = await supabase
         .from('accounts')
         .select('id')
         .eq('id', body.account_id)
-        .eq('org_id', orgId)
         .single();
 
       if (accountError || !account) {
@@ -157,17 +145,23 @@ serve(async (req) => {
       }
     }
 
-    // Get or create day sheet for the received date (not server UTC date)
-    // This fixes timezone issues where evening payments were assigned to wrong day
-    const { data: daySheetId, error: daySheetError } = await supabase
-      .rpc('get_or_create_day_sheet', {
-        p_org_id: orgId,
-        p_date: body.received_date  // Use client-provided date to avoid UTC issues
-      });
+    // Get or create day sheet for the received date (not server UTC date).
+    // This fixes timezone issues where evening payments were assigned to the wrong day.
+    // If it fails, the ensure_payment_day_sheet BEFORE-INSERT trigger backfills the
+    // day sheet from the payment's org_id, so this is non-fatal.
+    let daySheetId: string | null = null;
+    {
+      const { data: sheetId, error: daySheetError } = await supabase
+        .rpc('get_or_create_day_sheet', {
+          p_org_id: orgId,
+          p_date: body.received_date,  // Use client-provided date to avoid UTC issues
+        });
 
-    if (daySheetError) {
-      logger.error('Failed to get/create day sheet', { error: daySheetError });
-      throw new ValidationError('Failed to create day sheet');
+      if (daySheetError) {
+        logger.error('Failed to get/create day sheet (trigger will backfill)', { error: daySheetError });
+      } else {
+        daySheetId = sheetId;
+      }
     }
 
     // Generate receipt number
@@ -201,7 +195,7 @@ serve(async (req) => {
       .select(`
         *,
         payment_method:payment_methods(id, name, type),
-        policy:policies(policy_number, policy_type),
+        policy:policies(policy_number, line_of_business, carrier),
         account:accounts(name),
         day_sheet:day_sheets(sheet_date, status)
       `)
