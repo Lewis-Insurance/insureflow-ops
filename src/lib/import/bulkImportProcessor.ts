@@ -19,6 +19,7 @@ export interface ImportProgress {
   processed: number;
   total: number;
   accountsCreated: number;
+  accountsMatched?: number;
   contactsCreated: number;
   policiesCreated: number;
   errors: number;
@@ -28,6 +29,8 @@ export interface ImportResult {
   success: boolean;
   batchId: string;
   accountsCreated: number;
+  /** Rows that resolved to an existing account instead of creating a new one. */
+  accountsMatched: number;
   contactsCreated: number;
   policiesCreated: number;
   errors: Array<{
@@ -108,12 +111,14 @@ export async function processContacts(
 ): Promise<{
   masterIdToAccountId: Map<string, string>;
   accountsCreated: number;
+  accountsMatched: number;
   contactsCreated: number;
   errors: Array<{ rowNumber: number; sourceId: string; error: string }>;
 }> {
   const masterIdToAccountId = new Map<string, string>();
   const errors: Array<{ rowNumber: number; sourceId: string; error: string }> = [];
   let accountsCreated = 0;
+  let accountsMatched = 0;
   let contactsCreated = 0;
 
   const totalBatches = Math.ceil(contacts.length / BATCH_SIZE);
@@ -131,6 +136,7 @@ export async function processContacts(
       processed: start,
       total: contacts.length,
       accountsCreated,
+      accountsMatched,
       contactsCreated,
       policiesCreated: 0,
       errors: errors.length,
@@ -142,39 +148,48 @@ export async function processContacts(
       const rowNumber = start + i + 1;
 
       try {
-        // Build account record
-        const accountData = {
-          name: buildAccountName(contact),
-          type: mapContactTypeToAccountType(contact.contact_type),
-          email: contact.email_primary || null,
-          phone: normalizePhone(contact.phone_primary) || null,
-          address_line1: contact.address_street || null,
-          address_line2: contact.address_street2 || null,
-          city: contact.address_city || null,
-          state: contact.address_state || null,
-          zip_code: contact.address_zip || null,
-          source: contact.source_file || null,
-          custom: extractSecondaryContactInfo(contact),
-          import_batch_id: batchId,
-        };
-
-        // Insert account
-        const { data: accountResult, error: accountError } = await supabase
-          .from('accounts')
-          .insert(accountData)
-          .select('id')
-          .single();
+        // Resolve-or-create instead of a blind insert. import_resolve_account
+        // normalizes the name (case, & vs AND, punctuation), matches an existing
+        // account (businesses by name; individuals by name + email/phone), follows
+        // merged_into_id to the live survivor, and only inserts when nothing
+        // matches. This is what stops one business from fragmenting into many
+        // accounts across feeds/imports.
+        const { data: resolved, error: accountError } = await supabase.rpc('import_resolve_account', {
+          p_agency_workspace_id: agencyWorkspaceId || null,
+          p_batch_id: batchId,
+          p_name: buildAccountName(contact),
+          p_type: mapContactTypeToAccountType(contact.contact_type),
+          p_email: contact.email_primary || null,
+          p_phone: normalizePhone(contact.phone_primary) || null,
+          p_address_line1: contact.address_street || null,
+          p_address_line2: contact.address_street2 || null,
+          p_city: contact.address_city || null,
+          p_state: contact.address_state || null,
+          p_zip: contact.address_zip || null,
+          p_source: contact.source_file || null,
+          p_custom: extractSecondaryContactInfo(contact),
+        });
 
         if (accountError) {
-          throw new Error(`Account insert failed: ${accountError.message}`);
+          throw new Error(`Account resolve failed: ${accountError.message}`);
         }
 
-        const accountId = accountResult.id;
+        const resolution = resolved as { account_id: string; matched: boolean } | null;
+        const accountId = resolution?.account_id;
+        if (!accountId) {
+          throw new Error('Account resolve returned no account_id');
+        }
+        const wasMatched = resolution?.matched === true;
         masterIdToAccountId.set(contact.master_id, accountId);
-        accountsCreated++;
+        if (wasMatched) {
+          accountsMatched++;
+        } else {
+          accountsCreated++;
+        }
 
-        // Create contact record for individuals
-        if (contact.contact_type === 'individual' && contact.first_name && contact.last_name) {
+        // Create a contact record for individuals only when we created a brand-new
+        // account; matching an existing account means its contact already exists.
+        if (!wasMatched && contact.contact_type === 'individual' && contact.first_name && contact.last_name) {
           const contactData = {
             account_id: accountId,
             first_name: contact.first_name,
@@ -214,12 +229,13 @@ export async function processContacts(
     processed: contacts.length,
     total: contacts.length,
     accountsCreated,
+    accountsMatched,
     contactsCreated,
     policiesCreated: 0,
     errors: errors.length,
   });
 
-  return { masterIdToAccountId, accountsCreated, contactsCreated, errors };
+  return { masterIdToAccountId, accountsCreated, accountsMatched, contactsCreated, errors };
 }
 
 /**
@@ -363,6 +379,7 @@ export async function runBulkImport(
       success: false,
       batchId: '',
       accountsCreated: 0,
+      accountsMatched: 0,
       contactsCreated: 0,
       policiesCreated: 0,
       errors: [{ rowNumber: 0, sourceId: '', error: 'Failed to create import batch' }],
@@ -410,6 +427,7 @@ export async function runBulkImport(
       success: totalErrors === 0,
       batchId,
       accountsCreated: contactResult.accountsCreated,
+      accountsMatched: contactResult.accountsMatched,
       contactsCreated: contactResult.contactsCreated,
       policiesCreated: policyResult.policiesCreated,
       errors: [...contactResult.errors, ...policyResult.errors],
@@ -423,6 +441,7 @@ export async function runBulkImport(
       success: false,
       batchId,
       accountsCreated: 0,
+      accountsMatched: 0,
       contactsCreated: 0,
       policiesCreated: 0,
       errors: [{

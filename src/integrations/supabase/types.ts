@@ -41772,6 +41772,25 @@ export type Database = {
         Returns: boolean
       }
       has_sms_consent: { Args: { target_contact_id: string }; Returns: boolean }
+      import_resolve_account: {
+        Args: {
+          p_address_line1?: string
+          p_address_line2?: string
+          p_agency_workspace_id: string
+          p_batch_id: string
+          p_city?: string
+          p_custom?: Json
+          p_dob?: string
+          p_email?: string
+          p_name: string
+          p_phone?: string
+          p_source?: string
+          p_state?: string
+          p_type: string
+          p_zip?: string
+        }
+        Returns: Json
+      }
       increment_campaign_enrollment: {
         Args: { campaign_id: string }
         Returns: undefined
@@ -42048,6 +42067,7 @@ export type Database = {
         Args: { p_lead_id: string; p_new_status: string }
         Returns: boolean
       }
+      normalize_entity_name: { Args: { p: string }; Returns: string }
       normalize_phone_number: { Args: { phone_input: string }; Returns: string }
       patrol_connection_pool_stats: { Args: never; Returns: Json }
       patrol_data_integrity_snapshot: {
