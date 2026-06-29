@@ -14,7 +14,7 @@ import { useLeadSearch } from '@/hooks/useLeadSearch';
 import { useLeadTriageCounts } from '@/hooks/useLeadTriageCounts';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebounce } from '@/hooks/useDebounce';
-import { StatusPill, Chip, SectionLabel, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
+import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -214,7 +214,7 @@ export default function Leads() {
                 <SectionLabel>Insurance</SectionLabel>
                 <SectionLabel>Status</SectionLabel>
                 <SectionLabel className="text-right">Score</SectionLabel>
-                <SectionLabel>Last contact</SectionLabel>
+                <SectionLabel>Created</SectionLabel>
               </div>
 
               {loading ? (
@@ -299,8 +299,16 @@ export default function Leads() {
                         {lead.lead_score ?? 0}
                       </div>
 
-                      <div className="hidden md:block">
-                        <LastContact date={lead.last_contact_at} />
+                      {/* Created: a populated signal (last_contact_at is empty across the
+                          book; the recency band lives on the detail hero, not here). */}
+                      <div className="cc-num hidden text-sm text-cc-text-muted md:block">
+                        {lead.created_at
+                          ? new Date(lead.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : ''}
                       </div>
                     </div>
                   );

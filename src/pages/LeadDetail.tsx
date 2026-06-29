@@ -30,10 +30,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useLead, useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
-import { useLeadSources } from "@/integrations/supabase/hooks/useLeadSources";
 import { InsuranceDetailsPanel } from "@/components/leads/insurance/InsuranceDetailsPanel";
 import { AddQuoteModal } from "@/components/customers/AddQuoteModal";
-import { useRankedQuotesByAccount } from "@/hooks/useQuoteScoring";
 import { CanopyDataDisplayRedesign } from "@/components/canopy/CanopyDataDisplayRedesign";
 import { CanopyConnectButton } from "@/components/canopy/CanopyConnectButton";
 import { StatusPill, Chip, SectionLabel, LastContact } from "@/components/cc";
@@ -44,7 +42,6 @@ import {
   Save,
   X,
   FileText,
-  Plus,
   ArrowLeft,
   UserCheck,
   Edit,
@@ -52,7 +49,7 @@ import {
   MoreHorizontal,
   AlertTriangle,
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, differenceInCalendarDays, parseISO } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
 import {
   AlertDialog,
@@ -138,8 +135,6 @@ export default function LeadDetail() {
   const [tab, setTab] = useState('details');
 
   const { data: lead, isLoading } = useLead(leadId || undefined);
-  const { data: sources } = useLeadSources();
-  const { data: rankedQuotes } = useRankedQuotesByAccount(leadId || '');
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
 
@@ -304,7 +299,11 @@ export default function LeadDetail() {
   const lastContactAt = leadAny.last_contact_at as string | null | undefined;
   const lastContactType = leadAny.last_contact_type as string | null | undefined;
   const nextFollowUp = leadAny.next_follow_up_date as string | null | undefined;
-  const nextFollowUpOverdue = nextFollowUp ? new Date(nextFollowUp) < new Date() : false;
+  // Calendar-day comparison so a follow up due today is not flagged overdue
+  // (a bare `date` value parses as UTC midnight, which a naive < check mis-bands).
+  const nextFollowUpOverdue = nextFollowUp
+    ? differenceInCalendarDays(parseISO(nextFollowUp), new Date()) < 0
+    : false;
   const company = leadAny.company_name as string | null | undefined;
 
   return (
@@ -866,7 +865,7 @@ export default function LeadDetail() {
                       onClick={() => setIsEditing(true)}
                       className="gap-1.5 text-cc-text-secondary hover:text-cc-text-primary"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Edit className="h-3.5 w-3.5" />
                       Edit notes
                     </Button>
                   </div>
@@ -887,7 +886,7 @@ export default function LeadDetail() {
 
               {/* ---------------- Insurance ---------------- */}
               <TabsContent value="insurance" className="mt-4 space-y-4">
-                <InsuranceDetailsPanel leadId={leadId} insuranceTypes={insuranceTypes} />
+                {leadId && <InsuranceDetailsPanel leadId={leadId} insuranceTypes={insuranceTypes} />}
                 {canopyPull && <CanopyDataDisplayRedesign pullId={canopyPull.id} />}
               </TabsContent>
             </Tabs>
