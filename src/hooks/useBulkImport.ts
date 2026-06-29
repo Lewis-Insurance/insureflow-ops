@@ -471,9 +471,12 @@ export function useBulkImport() {
       }));
 
       if (result.success) {
+        const matchedNote = result.accountsMatched > 0
+          ? `, linked ${result.accountsMatched} to existing accounts`
+          : '';
         toast({
           title: 'Import complete',
-          description: `Created ${result.accountsCreated} accounts, ${result.contactsCreated} contacts, ${result.policiesCreated} policies`,
+          description: `Created ${result.accountsCreated} accounts${matchedNote}, ${result.contactsCreated} contacts, ${result.policiesCreated} policies`,
         });
       } else {
         toast({
