@@ -17,12 +17,17 @@ import {
   Scale,
   PhoneCall,
   Mail,
+  Users,
+  FileText,
+  Building2,
+  Contact,
   type LucideIcon,
 } from 'lucide-react';
 import { useChrome } from './ChromeContext';
 import { ALL_DESTINATIONS } from './navConfig';
 import { useActiveRecord } from './useActiveRecord';
 import { emitChromeAction } from './chromeActions';
+import { useGlobalSearch, type SearchResult } from '@/hooks/useGlobalSearch';
 import { AccentSpine } from '@/components/cc';
 
 /**
@@ -53,9 +58,28 @@ interface PaletteRow {
   /** stable id for aria-activedescendant + scroll-into-view */
   id: string;
   label: string;
+  /** optional second line (e.g. a policy carrier/line, an account city/state) */
+  subtitle?: string;
   icon: ComponentType<{ className?: string }>;
   run: () => void;
 }
+
+// Live record search (global_search_v1) returns these entity types. Accounts,
+// contacts and businesses all resolve to the customer record; policies to the
+// policy record (mirrors the existing GlobalSearch navigation mapping).
+const RECORD_ICONS: Record<SearchResult['entity_type'], ComponentType<{ className?: string }>> = {
+  account: Users,
+  contact: Contact,
+  business: Building2,
+  policy: FileText,
+};
+
+function recordPath(r: SearchResult): string {
+  return r.entity_type === 'policy' ? `/policies/${r.id}` : `/customers/${r.id}`;
+}
+
+// Keep the palette compact; the RPC returns up to 50, we surface the closest few.
+const RECORD_LIMIT = 8;
 
 interface PaletteSection {
   key: string;
@@ -111,6 +135,14 @@ export function CommandPalette() {
   const close = useCallback(() => setPaletteOpen(false), [setPaletteOpen]);
 
   const active = useActiveRecord();
+
+  // Live record search across customers, policies, businesses and contacts.
+  const {
+    results: recordResults,
+    loading: recordsLoading,
+    search: runRecordSearch,
+    clearResults: clearRecords,
+  } = useGlobalSearch();
 
   // Context-aware actions. Record actions (Log contact / Compose email) appear
   // only on a record and target it via the chrome action bus; if the page is not
@@ -169,6 +201,19 @@ export function CommandPalette() {
       close();
     };
 
+    // Records first: when the user types a name/number they almost always want
+    // to jump to the record, not a page or an action.
+    if (q.length >= 2 && recordResults.length) {
+      const recordRows: PaletteRow[] = recordResults.slice(0, RECORD_LIMIT).map((r, i) => ({
+        id: `${baseId}-record-${i}`,
+        label: r.label,
+        subtitle: r.subtitle,
+        icon: RECORD_ICONS[r.entity_type] ?? Users,
+        run: () => goto(recordPath(r), r.label),
+      }));
+      out.push({ key: 'records', label: 'Customers and policies', rows: recordRows });
+    }
+
     const actionRows: PaletteRow[] = actionDefs
       .filter((a) => matches(a.label, q))
       .map((a, i) => ({
@@ -201,7 +246,7 @@ export function CommandPalette() {
     }
 
     return out;
-  }, [query, actionDefs, recent, baseId, navigate, close]);
+  }, [query, recordResults, actionDefs, recent, baseId, navigate, close]);
 
   // Flatten for a single selection index spanning every visible row.
   const flatRows = useMemo<PaletteRow[]>(() => sections.flatMap((s) => s.rows), [sections]);
@@ -220,6 +265,20 @@ export function CommandPalette() {
       restoreFocusRef.current?.focus?.();
     };
   }, [paletteOpen]);
+
+  // Debounced live record search. Fires on 2+ chars; clears below that and on
+  // close so stale rows never linger. The 180ms wait keeps typing responsive
+  // without a request per keystroke.
+  useEffect(() => {
+    if (!paletteOpen) return;
+    const q = query.trim();
+    if (q.length < 2) {
+      clearRecords();
+      return;
+    }
+    const t = window.setTimeout(() => runRecordSearch(q), 180);
+    return () => window.clearTimeout(t);
+  }, [query, paletteOpen, runRecordSearch, clearRecords]);
 
   // Keep the selection in range as results change.
   useEffect(() => {
@@ -311,9 +370,9 @@ export function CommandPalette() {
             aria-controls={listboxId}
             aria-activedescendant={activeRow?.id}
             aria-autocomplete="list"
-            aria-label="Search or run a command"
+            aria-label="Search customers, policies, or run a command"
             value={query}
-            placeholder="Search or run a command"
+            placeholder="Search customers, policies, or run a command"
             onChange={(e) => {
               setQuery(e.target.value);
               setSelected(0);
@@ -335,7 +394,9 @@ export function CommandPalette() {
         {/* Results */}
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-2">
           {flatRows.length === 0 ? (
-            <div className="px-2 py-6 text-center text-sm text-cc-text-muted">No results</div>
+            <div className="px-2 py-6 text-center text-sm text-cc-text-muted">
+              {query.trim().length >= 2 && recordsLoading ? 'Searching' : 'No results'}
+            </div>
           ) : (
             <div role="listbox" id={listboxId} aria-label="Command palette results">
               {sections.map((section) => (
@@ -373,7 +434,12 @@ export function CommandPalette() {
                               : 'h-[18px] w-[18px] shrink-0 text-cc-text-muted'
                           }
                         />
-                        <span className="min-w-0 flex-1 truncate text-sm">{row.label}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="cc-num block truncate text-sm">{row.label}</span>
+                          {row.subtitle && (
+                            <span className="block truncate text-xs text-cc-text-muted">{row.subtitle}</span>
+                          )}
+                        </span>
                         {isSelected && (
                           <CornerDownLeft
                             aria-hidden="true"
