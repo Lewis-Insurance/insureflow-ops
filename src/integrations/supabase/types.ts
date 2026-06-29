@@ -38242,6 +38242,31 @@ export type Database = {
       }
     }
     Functions: {
+      get_task_triage_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          open_total: number
+          overdue: number
+          due_this_week: number
+          high_priority: number
+          completed: number
+        }[]
+      }
+      search_tasks: {
+        Args: { p_filters?: Json; p_limit?: number; p_offset?: number; p_sort?: string }
+        Returns: {
+          id: string
+          title: string
+          status: string
+          priority: string
+          due_at: string
+          entity_type: string
+          account_id: string
+          account_name: string
+          created_at: string
+          completed_at: string
+        }[]
+      }
       get_needs_me_today: {
         Args: Record<PropertyKey, never>
         Returns: {
