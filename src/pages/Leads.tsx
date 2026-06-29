@@ -1,184 +1,349 @@
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { LeadAnalyticsDashboard } from "@/components/leads/analytics/LeadAnalyticsDashboard";
-import { PipelineKanban } from "@/components/leads/PipelineKanban";
-import { ProducerSalesDashboard } from "@/components/leads/ProducerSalesDashboard";
-import { QuickLeadCapture } from "@/components/leads/QuickLeadCapture";
-import { LeadDetailView } from "@/components/leads/LeadDetailView";
-import { LeadListView } from "@/components/leads/LeadListView";
-import { TeamPipelineView } from "@/components/leads/TeamPipelineView";
-import { TimelineView } from "@/components/leads/TimelineView";
-import { LayoutGrid, BarChart3, Users, Search, Filter, List, TrendingUp } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useLeads } from "@/hooks/useLeads";
-import { useDebounce } from "@/hooks/useDebounce";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Search, X, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { QuickLeadCapture } from '@/components/leads/QuickLeadCapture';
+import { PipelineKanban } from '@/components/leads/PipelineKanban';
+import { TeamPipelineView } from '@/components/leads/TeamPipelineView';
+import { TimelineView } from '@/components/leads/TimelineView';
+import { LeadAnalyticsDashboard } from '@/components/leads/analytics/LeadAnalyticsDashboard';
+import { ProducerSalesDashboard } from '@/components/leads/ProducerSalesDashboard';
+import { useLeadSearch } from '@/hooks/useLeadSearch';
+import { useLeadTriageCounts } from '@/hooks/useLeadTriageCounts';
+import { useAuth } from '@/hooks/useAuth';
+import { useDebounce } from '@/hooks/useDebounce';
+import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
+import { humanizeEnum } from '@/lib/format';
+import { cn } from '@/lib/utils';
+
+// Cohorts are computed server-side; clicking a tile filters the rows to it.
+// 'hot' is lead_score >= 70 (see useLeadTriageCounts).
+type Cohort = 'all' | 'new' | 'hot' | 'qualified' | 'quoted';
+
+// The secondary views are preserved unchanged behind a single segmented control.
+// 'list' is the Calm Command Index list and the default.
+type View = 'list' | 'pipeline' | 'team' | 'timeline' | 'analytics' | 'producer';
+
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'list', label: 'List' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'team', label: 'Team' },
+  { value: 'timeline', label: 'Timeline' },
+  { value: 'analytics', label: 'Analytics' },
+  { value: 'producer', label: 'My dashboard' },
+];
+
+// Dense table column template (md+): Name | Contact | Insurance | Status | Score | Last contact.
+// Score is right-aligned tabular; Last contact is wide enough for the banded recency value.
+const COLS = 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_150px_120px_64px_160px]';
+
+// Score tint by weight/number only, never a colored badge fill.
+function scoreColor(score: number | null): string {
+  const s = score ?? 0;
+  if (s >= 70) return 'var(--cc-success)';
+  if (s >= 40) return 'var(--cc-text-secondary)';
+  return 'var(--cc-text-muted)';
+}
 
 export default function Leads() {
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [detailViewOpen, setDetailViewOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Debounce search query to avoid too many API calls
-  const debouncedSearch = useDebounce(searchQuery, 500);
+  const [view, setView] = useState<View>('list');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cohort, setCohort] = useState<Cohort>('all');
 
-  // Build filters for the leads query
-  const filters = {
+  const { leads, loading, loadingMore, hasMore, fetchLeads, fetchNextPage } = useLeadSearch();
+  const { counts } = useLeadTriageCounts();
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didMountRef = useRef(false);
+
+  // Filters for the preserved secondary views (unchanged contract).
+  const debouncedSearch = useDebounce(searchQuery, 500);
+  const secondaryFilters = {
     search: debouncedSearch || undefined,
-    status: statusFilter !== "all" ? [statusFilter] : undefined,
+    status: cohort !== 'all' && cohort !== 'hot' ? [cohort] : undefined,
   };
 
-  const openLeadDetail = (leadId: string) => {
-    setSelectedLeadId(leadId);
-    setDetailViewOpen(true);
+  // Single server-side fetch path for search + cohort. The hook loads the first
+  // page on mount, so skip the first run here (a second concurrent fetch would
+  // race it). Search is debounced; cohort changes refetch too.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchLeads(searchQuery, 'score_desc', cohort), 250);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, cohort]);
+
+  const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
+  const filtersActive = cohort !== 'all' || searchQuery.length > 0;
+  const clearAll = () => {
+    setCohort('all');
+    setSearchQuery('');
   };
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto max-w-[1200px] space-y-6 p-6">
+        {/* Header: title + one lime primary (the QuickLeadCapture trigger) */}
+        <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Lead Management</h1>
-            <p className="text-muted-foreground">
-              Track and manage your sales pipeline
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">Leads</h1>
+            <p className="mt-1 text-sm text-cc-text-muted">
+              <span className="cc-num">{counts.total || leads.length}</span> in the pipeline. Work the ones
+              that need you.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/leads/analytics">
-              <Button variant="outline">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Advanced Analytics
+              <Button
+                variant="outline"
+                className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              >
+                <TrendingUp className="h-4 w-4" />
+                Advanced analytics
               </Button>
             </Link>
+            {/* QuickLeadCapture renders its own lime default Button trigger: the single primary. */}
             <QuickLeadCapture />
           </div>
+        </header>
+
+        {/* Triage strip: server-counted lead cohorts that route into work */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <TriageTile
+            label="New leads"
+            count={counts.new_leads}
+            sub="Reach out"
+            tone="warning"
+            active={cohort === 'new'}
+            onClick={() => toggleCohort('new')}
+          />
+          <TriageTile
+            label="Hot leads"
+            count={counts.hot}
+            sub="Call now"
+            tone={counts.hot > 0 ? 'danger' : 'neutral'}
+            active={cohort === 'hot'}
+            onClick={() => toggleCohort('hot')}
+          />
+          <TriageTile
+            label="Qualified"
+            count={counts.qualified}
+            sub="Quote them"
+            tone="info"
+            active={cohort === 'qualified'}
+            onClick={() => toggleCohort('qualified')}
+          />
+          <TriageTile
+            label="Quoted"
+            count={counts.quoted}
+            sub="Follow up"
+            tone="success"
+            active={cohort === 'quoted'}
+            onClick={() => toggleCohort('quoted')}
+          />
         </div>
 
-        {/* Search and Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* View switch: List is the Calm Command index; the rest are preserved views */}
+        <div role="group" aria-label="Switch view" className="inline-flex flex-wrap rounded-cc-md bg-cc-surface-raised p-0.5">
+          {VIEWS.map((v) => (
+            <button
+              key={v.value}
+              type="button"
+              onClick={() => setView(v.value)}
+              aria-pressed={view === v.value}
+              className={cn(
+                'rounded-[10px] px-3 py-1.5 text-sm transition-colors duration-fast',
+                view === v.value
+                  ? 'bg-cc-surface-overlay text-cc-text-primary'
+                  : 'text-cc-text-muted hover:text-cc-text-secondary',
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        {view === 'list' ? (
+          <>
+            {/* Filter row */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cc-text-muted" />
                 <Input
-                  placeholder="Search leads by name, email, phone..."
+                  placeholder="Search leads"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  aria-label="Search leads"
+                  className="h-9 rounded-cc-md border-cc-border-interactive bg-cc-surface-raised pl-9 text-cc-text-primary placeholder:text-cc-text-muted"
                 />
               </div>
 
-              {/* Status Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="new">New</SelectItem>
-                  <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="qualified">Qualified</SelectItem>
-                  <SelectItem value="quoted">Quoted</SelectItem>
-                  <SelectItem value="won">Won</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
-                  <SelectItem value="nurturing">Nurturing</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Clear Filters */}
-              {(searchQuery || statusFilter !== "all") && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("all");
-                  }}
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="inline-flex items-center gap-1 text-sm text-cc-text-secondary hover:text-cc-text-primary"
                 >
+                  <X className="h-3.5 w-3.5" />
                   Clear
-                </Button>
+                </button>
+              )}
+
+              <span className="ml-auto cc-num text-sm text-cc-text-muted">
+                {leads.length}
+                {hasMore ? '+' : ''} shown
+              </span>
+            </div>
+
+            {/* Dense, uniform list */}
+            <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+              <div className={cn('hidden gap-4 border-b border-cc-border-subtle px-4 py-2.5 md:grid', COLS)}>
+                <SectionLabel>Name</SectionLabel>
+                <SectionLabel>Contact</SectionLabel>
+                <SectionLabel>Insurance</SectionLabel>
+                <SectionLabel>Status</SectionLabel>
+                <SectionLabel className="text-right">Score</SectionLabel>
+                <SectionLabel>Created</SectionLabel>
+              </div>
+
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+              ) : leads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                  <p className="max-w-sm text-sm text-cc-text-secondary">
+                    {filtersActive
+                      ? 'No leads match these filters. Clear them to see the whole pipeline.'
+                      : 'No leads yet. Add your first lead to start working the pipeline.'}
+                  </p>
+                  {/* No second lime here: the header "Add lead" is the surface's single
+                      lime primary (Rule 9). When filtered, offer a ghost Clear. */}
+                  {filtersActive && (
+                    <Button
+                      variant="outline"
+                      onClick={clearAll}
+                      className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                leads.map((lead) => {
+                  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim();
+                  const name = fullName || lead.company_name || 'Unnamed lead';
+                  const showCompanySub = !!lead.company_name && !!fullName;
+                  const contact = lead.email || lead.phone || '';
+                  const types = lead.insurance_types ?? [];
+                  return (
+                    <div
+                      key={lead.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/leads/${lead.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/leads/${lead.id}`);
+                        }
+                      }}
+                      className={cn(
+                        'flex cursor-pointer flex-col gap-2 border-b border-cc-border-subtle px-4 py-3 transition-colors duration-fast last:border-b-0 hover:bg-cc-surface-raised',
+                        'md:grid md:items-center md:gap-4',
+                        COLS,
+                      )}
+                    >
+                      {/* Name (carries status + score inline on mobile) */}
+                      <div className="min-w-0">
+                        <div className="font-semibold text-cc-text-primary break-words">{name}</div>
+                        {showCompanySub && (
+                          <div className="truncate text-xs text-cc-text-muted">{lead.company_name}</div>
+                        )}
+                        <div className="mt-1.5 flex items-center gap-2 md:hidden">
+                          <StatusPill status={lead.status} />
+                          <span className="cc-num text-sm font-semibold" style={{ color: scoreColor(lead.lead_score) }}>
+                            {lead.lead_score ?? 0}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Contact */}
+                      <div className="truncate text-sm text-cc-text-muted">{contact || 'No contact info'}</div>
+
+                      {/* Insurance: up to 2 neutral chips + overflow */}
+                      <div className="hidden flex-wrap gap-1.5 md:flex">
+                        {types.slice(0, 2).map((t) => (
+                          <Chip key={t}>{humanizeEnum(t)}</Chip>
+                        ))}
+                        {types.length > 2 && <Chip>{`+${types.length - 2}`}</Chip>}
+                      </div>
+
+                      <div className="hidden md:block">
+                        <StatusPill status={lead.status} />
+                      </div>
+
+                      <div
+                        className="cc-num hidden text-right text-sm font-semibold md:block"
+                        style={{ color: scoreColor(lead.lead_score) }}
+                      >
+                        {lead.lead_score ?? 0}
+                      </div>
+
+                      {/* Created: a populated signal (last_contact_at is empty across the
+                          book; the recency band lives on the detail hero, not here). */}
+                      <div className="cc-num hidden text-sm text-cc-text-muted md:block">
+                        {lead.created_at
+                          ? new Date(lead.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : ''}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-          </CardContent>
-        </Card>
 
-        <Tabs defaultValue="list" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-            <TabsTrigger value="list">
-              <List className="mr-2 h-4 w-4" />
-              List
-            </TabsTrigger>
-            <TabsTrigger value="pipeline">
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Pipeline
-            </TabsTrigger>
-            <TabsTrigger value="team">
-              <Users className="mr-2 h-4 w-4" />
-              Team
-            </TabsTrigger>
-            <TabsTrigger value="timeline">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Timeline
-            </TabsTrigger>
-            <TabsTrigger value="analytics">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="producer">
-              <Users className="mr-2 h-4 w-4" />
-              My Dashboard
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="list" className="mt-6">
-            <LeadListView />
-          </TabsContent>
-
-          <TabsContent value="pipeline" className="mt-6">
-            <PipelineKanban filters={filters} />
-          </TabsContent>
-
-          <TabsContent value="team" className="mt-6">
-            <TeamPipelineView />
-          </TabsContent>
-
-          <TabsContent value="timeline" className="mt-6">
-            <TimelineView />
-          </TabsContent>
-
-          <TabsContent value="analytics" className="mt-6">
-            <LeadAnalyticsDashboard filters={filters} />
-          </TabsContent>
-
-          <TabsContent value="producer" className="mt-6">
-            <ProducerSalesDashboard
-              producerId={user?.id || ""}
-              producerName={user?.user_metadata?.full_name || "Your Name"}
-              filters={filters}
-            />
-          </TabsContent>
-        </Tabs>
-
-        <LeadDetailView
-          leadId={selectedLeadId}
-          open={detailViewOpen}
-          onOpenChange={setDetailViewOpen}
-        />
+            {hasMore && !loading && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchNextPage()}
+                  disabled={loadingMore}
+                  className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+                >
+                  {loadingMore ? 'Loading' : 'Load more'}
+                </Button>
+              </div>
+            )}
+          </>
+        ) : view === 'pipeline' ? (
+          <PipelineKanban filters={secondaryFilters} />
+        ) : view === 'team' ? (
+          <TeamPipelineView />
+        ) : view === 'timeline' ? (
+          <TimelineView />
+        ) : view === 'analytics' ? (
+          <LeadAnalyticsDashboard filters={secondaryFilters} />
+        ) : (
+          <ProducerSalesDashboard
+            producerId={user?.id || ''}
+            producerName={user?.user_metadata?.full_name || 'Your Name'}
+            filters={secondaryFilters}
+          />
+        )}
       </div>
     </AppLayout>
   );
