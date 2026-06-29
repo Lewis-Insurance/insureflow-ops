@@ -218,7 +218,11 @@ export function useAccountSearch() {
     setLoading(false);
   }, []);
 
-  return { results, loading, search, clear: () => setResults([]) };
+  // Memoized so consumers (LinkAccountDrawer's debounce effect) get a stable
+  // reference and don't re-run / loop when the drawer is mounted closed.
+  const clear = useCallback(() => setResults([]), []);
+
+  return { results, loading, search, clear };
 }
 
 export async function linkAccounts(params: {
