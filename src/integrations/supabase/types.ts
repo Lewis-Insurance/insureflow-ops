@@ -40438,6 +40438,10 @@ export type Database = {
       }
     }
     Functions: {
+      _do_account_merge: {
+        Args: { p_losers: string[]; p_rule: string; p_survivor: string }
+        Returns: Json
+      }
       add_tag_to_customer: {
         Args: {
           p_account_id: string
@@ -41927,6 +41931,19 @@ export type Database = {
           status: string
         }[]
       }
+      list_recent_merges: {
+        Args: { p_limit?: number }
+        Returns: {
+          loser_id: string
+          loser_name: string
+          merge_history_id: string
+          merged_at: string
+          reparent_total: number
+          rule: string
+          survivor_id: string
+          survivor_name: string
+        }[]
+      }
       log_document_access: {
         Args: {
           p_access_type: string
@@ -42021,6 +42038,10 @@ export type Database = {
         }
         Returns: Json
       }
+      merge_accounts_manual: {
+        Args: { p_losers: string[]; p_survivor: string }
+        Returns: Json
+      }
       midday_pulse_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
       morning_brief_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
       move_lead_to_stage: {
@@ -42052,6 +42073,10 @@ export type Database = {
       portal_has_permission: {
         Args: { p_permission: string }
         Returns: boolean
+      }
+      preview_merge: {
+        Args: { p_losers: string[]; p_survivor: string }
+        Returns: Json
       }
       process_automation_rules: {
         Args: {
