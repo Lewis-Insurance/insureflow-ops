@@ -30,9 +30,11 @@ import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
 import { StatusPill, Chip, SectionLabel, maskTaxId } from '@/components/cc';
 import { CustomerRelationshipsSection } from '@/components/relationships/CustomerRelationshipsSection';
+import { ClusterHub } from '@/components/relationships/ClusterHub';
 import { GoesByEditor } from '@/components/relationships/GoesByEditor';
 import {
   useAccountRelationships,
+  useAccountCluster,
   useHouseholdSummary,
   displayWithGoesBy,
   formatPremium,
@@ -273,6 +275,7 @@ export default function CustomerDetail() {
     loading: relationshipsLoading,
     refetch: refetchRelationships,
   } = useAccountRelationships(account?.id);
+  const { cluster, rollup, loading: clusterLoading } = useAccountCluster(account?.id);
   const householdSummary = useHouseholdSummary(account?.household_id);
 
   if (loading) {
@@ -602,7 +605,13 @@ export default function CustomerDetail() {
                 <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
               </TabsContent>
 
-              <TabsContent value="relationships" className="mt-4">
+              <TabsContent value="relationships" className="mt-4 space-y-4">
+                <ClusterHub
+                  accountId={account.id}
+                  cluster={cluster}
+                  rollup={rollup}
+                  loading={clusterLoading}
+                />
                 <CustomerRelationshipsSection
                   accountId={account.id}
                   accountName={account.name}

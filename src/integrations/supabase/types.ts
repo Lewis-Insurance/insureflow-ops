@@ -35158,6 +35158,75 @@ export type Database = {
           },
         ]
       }
+      retype_candidates: {
+        Row: {
+          account_id: string
+          applied_at: string | null
+          commercial_policies: number | null
+          created_at: string
+          current_account_type: string | null
+          current_type: string | null
+          id: string
+          personal_policies: number | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signal: string
+          status: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Insert: {
+          account_id: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Update: {
+          account_id?: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type?: string
+          suggested_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_queue_items: {
         Row: {
           assigned_to: string | null
@@ -40439,7 +40508,12 @@ export type Database = {
     }
     Functions: {
       _do_account_merge: {
-        Args: { p_losers: string[]; p_rule: string; p_survivor: string }
+        Args: {
+          p_apply?: boolean
+          p_losers: string[]
+          p_rule: string
+          p_survivor: string
+        }
         Returns: Json
       }
       add_tag_to_customer: {
@@ -40480,6 +40554,7 @@ export type Database = {
         Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
       }
+      approve_retype_candidate: { Args: { p_id: string }; Returns: Json }
       assert_active_staff_profile_provisioned_for_user: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -40908,6 +40983,7 @@ export type Database = {
         Returns: string
       }
       generate_relationship_suggestions: { Args: never; Returns: Json }
+      generate_retype_candidates: { Args: never; Returns: Json }
       generate_review_queue: {
         Args: { p_extraction_id: string }
         Returns: number
@@ -40942,6 +41018,29 @@ export type Database = {
             }
             Returns: Json
           }
+      get_account_cluster: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          account_status: string
+          account_type: string
+          active_premium: number
+          cluster_active_premium: number
+          cluster_business_count: number
+          cluster_member_count: number
+          cluster_size: number
+          cluster_total_policies: number
+          depth: number
+          goes_by: string
+          is_business: boolean
+          name: string
+          next_expiration: string
+          node_role: string
+          owner_account_id: string
+          owner_name: string
+          policies_count: number
+        }[]
+      }
       get_account_insurance_profile: {
         Args: { p_account_id: string }
         Returns: Json
@@ -42047,16 +42146,6 @@ export type Database = {
           similarity: number
         }[]
       }
-      merge_accounts: {
-        Args: {
-          p_apply?: boolean
-          p_losers: string[]
-          p_merged_by?: string
-          p_rule: string
-          p_survivor: string
-        }
-        Returns: Json
-      }
       merge_accounts_manual: {
         Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
@@ -42198,6 +42287,7 @@ export type Database = {
         }[]
       }
       refresh_task_generation_analytics: { Args: never; Returns: undefined }
+      reject_retype_candidate: { Args: { p_id: string }; Returns: Json }
       relgraph_merge_duplicate_group: {
         Args: { p_group_id: string; p_survivor_id: string }
         Returns: Json
@@ -42262,6 +42352,7 @@ export type Database = {
           goes_by: string
           match_reason: string
           name: string
+          owned_business_count: number
           phone: string
           policies_count: number
           score: number
