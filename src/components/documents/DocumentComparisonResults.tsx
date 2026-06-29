@@ -1,257 +1,249 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  DollarSign,
-  Shield,
-  AlertTriangle,
-  CheckCircle2
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { SectionLabel } from '@/components/cc';
+import { cn } from '@/lib/utils';
 
 interface DocumentComparisonResultsProps {
   comparisonData: any;
 }
 
+interface ParsedDoc {
+  label: string;
+  data: any;
+}
+
+// Premiums arrive as numbers (preferred) or as strings off the extractor. Coerce
+// so the lowest-price comparison and the tabular figures stay correct either way.
+function toNumber(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(String(v).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtMoney(v: unknown): string {
+  const n = toNumber(v);
+  if (n === null) return 'N/A';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+}
+
 export const DocumentComparisonResults: React.FC<DocumentComparisonResultsProps> = ({
-  comparisonData
+  comparisonData,
 }) => {
   if (!comparisonData?.documents || comparisonData.documents.length < 2) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
-          No comparison data available
-        </CardContent>
-      </Card>
+      <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface px-6 py-12 text-center text-sm text-cc-text-secondary shadow-card">
+        No comparison data available. Upload at least two documents to compare.
+      </div>
     );
   }
 
-  const documents = comparisonData.documents;
-
-  const parsedDocs = documents.map((doc: any) => ({
+  const parsedDocs: ParsedDoc[] = comparisonData.documents.map((doc: any) => ({
     label: doc.label,
-    data: doc.analysis?.data || doc.analysis?.analysis?.parsed_data || {}
+    data: doc.analysis?.data || doc.analysis?.analysis?.parsed_data || {},
   }));
 
   const allCoverageTypes = new Set<string>();
-  parsedDocs.forEach(doc => {
-    doc.data.coverages?.forEach((cov: any) => {
-      allCoverageTypes.add(cov.type);
-    });
+  parsedDocs.forEach((doc) => {
+    doc.data.coverages?.forEach((cov: any) => allCoverageTypes.add(cov.type));
   });
+  const coverageTypes = Array.from(allCoverageTypes);
+
+  // The single decision-positive signal on this surface: which option costs least.
+  // That carrier column carries the one lime accent; every other figure stays
+  // neutral so price is read by the eye, not by hue.
+  const premiums = parsedDocs.map((d) => toNumber(d.data.total_premium));
+  const valid = premiums.filter((p): p is number => p !== null);
+  const minPremium = valid.length > 1 ? Math.min(...valid) : null;
+  const lowestIdx = minPremium === null ? -1 : premiums.findIndex((p) => p === minPremium);
+
+  // Column template: a label column then one equal column per document. Used by
+  // the head, the basic-info rows and each coverage row so figures align exactly.
+  const cols = {
+    gridTemplateColumns: `minmax(140px,180px) repeat(${parsedDocs.length}, minmax(0,1fr))`,
+  };
+
+  const Row: React.FC<{
+    label: React.ReactNode;
+    emphasis?: boolean;
+    children: (doc: ParsedDoc, idx: number) => React.ReactNode;
+  }> = ({ label, emphasis, children }) => (
+    <div
+      className={cn(
+        'grid items-center gap-4 border-b border-cc-border-subtle px-4 py-3 last:border-b-0',
+        emphasis && 'bg-cc-surface-raised',
+      )}
+      style={cols}
+    >
+      <div className={cn('text-sm', emphasis ? 'font-semibold text-cc-text-primary' : 'text-cc-text-secondary')}>
+        {label}
+      </div>
+      {parsedDocs.map((doc, idx) => (
+        <div
+          key={idx}
+          className={cn(
+            'min-w-0',
+            idx === lowestIdx && emphasis && 'border-l-2 border-l-cc-accent pl-3 -ml-px',
+          )}
+        >
+          {children(doc, idx)}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-4 font-medium">Field</th>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <th key={idx} className="text-left py-2 px-4 font-medium">
-                      {doc.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="py-3 px-4 text-sm font-medium">Carrier</td>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <td key={idx} className="py-3 px-4 text-sm">
-                      {doc.data.carrier_name || 'N/A'}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-3 px-4 text-sm font-medium">Policy Number</td>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <td key={idx} className="py-3 px-4 text-sm font-mono">
-                      {doc.data.policy_number || 'N/A'}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-3 px-4 text-sm font-medium">Effective Date</td>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <td key={idx} className="py-3 px-4 text-sm">
-                      {doc.data.effective_date || 'N/A'}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-3 px-4 text-sm font-medium">Expiration Date</td>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <td key={idx} className="py-3 px-4 text-sm">
-                      {doc.data.expiration_date || 'N/A'}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b bg-green-50 dark:bg-green-950/20">
-                  <td className="py-3 px-4 text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-600" />
-                      Total Premium
-                    </div>
-                  </td>
-                  {parsedDocs.map((doc: any, idx: number) => (
-                    <td key={idx} className="py-3 px-4">
-                      <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                        ${doc.data.total_premium?.toLocaleString() || 'N/A'}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Side-by-side comparison: one dense, aligned table. Carrier columns up top, */}
+      {/* the lowest total premium carries the single lime accent. */}
+      <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            {/* Column heads: document label + Best-price marker on the cheapest */}
+            <div className="grid gap-4 border-b border-cc-border-subtle px-4 py-3" style={cols}>
+              <SectionLabel>Field</SectionLabel>
+              {parsedDocs.map((doc, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    'flex flex-wrap items-center gap-2',
+                    idx === lowestIdx && 'border-l-2 border-l-cc-accent pl-3 -ml-px',
+                  )}
+                >
+                  <span className="truncate text-sm font-semibold text-cc-text-primary">{doc.label}</span>
+                  {idx === lowestIdx && (
+                    <span className="rounded-pill bg-cc-accent px-2 py-0.5 text-[11px] font-semibold text-cc-surface">
+                      Best price
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Coverage Comparison
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from(allCoverageTypes).map((coverageType) => (
-              <div key={coverageType} className="border rounded-lg p-4">
-                <h4 className="font-medium mb-3">{coverageType}</h4>
-                <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${parsedDocs.length}, 1fr)` }}>
-                  {parsedDocs.map((doc: any, idx: number) => {
+            <Row label="Carrier">
+              {(doc) => (
+                <span className="truncate text-sm text-cc-text-primary">{doc.data.carrier_name || 'N/A'}</span>
+              )}
+            </Row>
+            <Row label="Policy number">
+              {(doc) => (
+                <span className="cc-num truncate text-sm text-cc-text-secondary">
+                  {doc.data.policy_number || 'N/A'}
+                </span>
+              )}
+            </Row>
+            <Row label="Effective">
+              {(doc) => <span className="text-sm text-cc-text-secondary">{doc.data.effective_date || 'N/A'}</span>}
+            </Row>
+            <Row label="Expiration">
+              {(doc) => <span className="text-sm text-cc-text-secondary">{doc.data.expiration_date || 'N/A'}</span>}
+            </Row>
+            <Row label="Total premium" emphasis>
+              {(doc, idx) => (
+                <span
+                  className={cn(
+                    'cc-num whitespace-nowrap text-lg font-bold',
+                    idx === lowestIdx ? 'text-cc-accent' : 'text-cc-text-primary',
+                  )}
+                >
+                  {fmtMoney(doc.data.total_premium)}
+                </span>
+              )}
+            </Row>
+          </div>
+        </div>
+      </section>
+
+      {/* Coverage comparison: each coverage type aligned across the same columns. */}
+      {coverageTypes.length > 0 && (
+        <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+          <div className="border-b border-cc-border-subtle px-4 py-3">
+            <SectionLabel>Coverage comparison</SectionLabel>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              {coverageTypes.map((coverageType) => (
+                <Row key={coverageType} label={coverageType}>
+                  {(doc) => {
                     const coverage = doc.data.coverages?.find((c: any) => c.type === coverageType);
+                    if (!coverage) {
+                      return (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-cc-danger">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                          Not covered
+                        </span>
+                      );
+                    }
                     return (
-                      <div key={idx} className="p-3 border rounded bg-muted/50">
-                        <p className="text-xs text-muted-foreground mb-1">{doc.label}</p>
-                        {coverage ? (
-                          <div className="space-y-1">
-                            {coverage.limit && (
-                              <p className="text-sm">
-                                <span className="font-medium">Limit:</span> {coverage.limit}
-                              </p>
-                            )}
-                            {coverage.deductible && (
-                              <p className="text-sm">
-                                <span className="font-medium">Deductible:</span> {coverage.deductible}
-                              </p>
-                            )}
-                            {coverage.premium && (
-                              <p className="text-sm font-semibold text-green-600">
-                                ${coverage.premium}
-                              </p>
-                            )}
+                      <div className="space-y-0.5 text-sm">
+                        {coverage.limit && (
+                          <div className="text-cc-text-primary">
+                            <span className="text-cc-text-muted">Limit </span>
+                            <span className="cc-num">{coverage.limit}</span>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-red-600">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm">Not Covered</span>
+                        )}
+                        {coverage.deductible && (
+                          <div className="text-cc-text-secondary">
+                            <span className="text-cc-text-muted">Deductible </span>
+                            <span className="cc-num">{coverage.deductible}</span>
+                          </div>
+                        )}
+                        {coverage.premium && (
+                          <div className="cc-num whitespace-nowrap text-cc-text-secondary">
+                            {fmtMoney(coverage.premium)}
                           </div>
                         )}
                       </div>
                     );
-                  })}
-                </div>
-              </div>
-            ))}
+                  }}
+                </Row>
+              ))}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </section>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Coverage Gaps
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {parsedDocs.map((doc: any, idx: number) => {
-              const missingCoverages = Array.from(allCoverageTypes).filter(
-                (type) => !doc.data.coverages?.some((c: any) => c.type === type)
+      {/* Coverage gaps: a genuine warning state, so it uses the warning tone (not */}
+      {/* the lime accent). Clean documents read calm with a quiet success check. */}
+      {coverageTypes.length > 0 && (
+        <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+          <div className="border-b border-cc-border-subtle px-4 py-3">
+            <SectionLabel>Coverage gaps</SectionLabel>
+          </div>
+          <div className="space-y-2 p-4">
+            {parsedDocs.map((doc, idx) => {
+              const missing = coverageTypes.filter(
+                (type) => !doc.data.coverages?.some((c: any) => c.type === type),
               );
-
-              if (missingCoverages.length === 0) {
+              if (missing.length === 0) {
                 return (
-                  <div key={idx} className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-medium">{doc.label}</span>
-                    <span className="text-sm text-muted-foreground">- No coverage gaps</span>
+                  <div key={idx} className="flex items-center gap-2 rounded-cc-md bg-cc-surface-raised px-3 py-2.5">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-cc-success" aria-hidden="true" />
+                    <span className="text-sm font-medium text-cc-text-primary">{doc.label}</span>
+                    <span className="text-sm text-cc-text-muted">No coverage gaps</span>
                   </div>
                 );
               }
-
               return (
-                <div key={idx} className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    <span className="font-medium">{doc.label}</span>
+                <div key={idx} className="rounded-cc-md bg-cc-surface-raised px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-cc-warning" aria-hidden="true" />
+                    <span className="text-sm font-medium text-cc-text-primary">{doc.label}</span>
+                    <span className="text-sm text-cc-text-muted">
+                      {missing.length} missing
+                    </span>
                   </div>
-                  <div className="ml-7 space-y-1">
-                    <p className="text-sm text-muted-foreground">Missing coverages:</p>
-                    <ul className="text-sm space-y-1">
-                      {missingCoverages.map((coverage, covIdx) => (
-                        <li key={covIdx} className="text-amber-700 dark:text-amber-400">
-                          • {coverage}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ul className="ml-6 mt-1.5 space-y-0.5">
+                    {missing.map((coverage, covIdx) => (
+                      <li key={covIdx} className="text-sm text-cc-text-secondary">
+                        {coverage}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               );
             })}
           </div>
-        </CardContent>
-      </Card>
-
-      {parsedDocs.some((doc: any) => doc.data.total_premium) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Price Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {parsedDocs.map((doc: any, idx: number) => {
-                if (!doc.data.total_premium) return null;
-
-                const premiums = parsedDocs
-                  .map((d: any) => d.data.total_premium)
-                  .filter((p: any) => p != null);
-                
-                const minPremium = Math.min(...premiums);
-                const isLowest = doc.data.total_premium === minPremium;
-
-                return (
-                  <div key={idx} className={`p-4 rounded-lg border-2 ${isLowest ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{doc.label}</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          ${doc.data.total_premium.toLocaleString()}
-                        </p>
-                      </div>
-                      {isLowest && (
-                        <Badge variant="default" className="bg-green-600">
-                          Lowest Price
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        </section>
       )}
     </div>
   );
