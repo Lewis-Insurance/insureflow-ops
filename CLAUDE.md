@@ -1121,6 +1121,14 @@ insureflow-ops/
 
 ## Change Log
 
+### 2026-06-28 (Relationship Graph)
+- ✅ **One identity-and-relationship graph keyed to `accounts.id`** (docs/Lewis-CRM-Relationship-Graph-Plan.md). All 4 phases, applied directly to prod.
+  - **Phase 0 — "goes by" / alias search**: `accounts.goes_by` + `account_aliases` table; `goes_by` folded into `accounts_search_vector_tg`; `unified_customer_search` + `global_search_v1` made alias + trigram (pg_trgm) aware; new `search_accounts(q)` RPC returns a match reason ("goes by Lance", "fuzzy: McDonald"). Inline "Goes by" capture on the customer header.
+  - **Phase 1 — the edge table**: `account_relationships` (typed/directional: owns, spouse, parent_company, same_as, related, household_member) + `get_account_relationships()` RPC. Relationships tab + Link drawer + Snapshot cross-sell line on the customer record. Households stay the set-grouping container (`household_rollup`). Backfilled spouse edges from `spouse_name`.
+  - **Phase 2 — suggestions**: `account_relationship_suggestions` staging table (never auto-commit) + `generate_relationship_suggestions()` engine (shared phone/address, surname-business, business-email-name, spouse name). Edge fn `suggest-account-links` (CRON_SECRET) + nightly GitHub Action. One-click confirm promotes to a `source='suggested'` edge.
+  - **Phase 3 — dedup + consolidation**: `/duplicates` review queue over pending `duplicate_groups` (`list_duplicate_groups_for_review`), merge via `relgraph_merge_duplicate_group()` which records a `same_as` provenance edge then calls the existing `merge_duplicate_records`. Dropped dead `customer_identities` (0 rows). Kept `businesses` (still read by CompanyManagement/global_search).
+  - Key files: `useRelationshipGraph.ts`, `components/relationships/*`, `DuplicatesReviewPage.tsx`, migrations `20260628200000`–`204000`. All new SECURITY DEFINER RPCs revoked from anon/public.
+
 ### 2024-12-28 (Predictive Analytics Suite + CEO Digest Schema Fixes)
 - ✅ **CEO Digest Schema Fixes**
   - Fixed `quote_status` enum values: `'sent'/'accepted'/'declined'` → `'open'/'won'/'lost'`
