@@ -322,10 +322,11 @@ export default function Auth() {
                   value={signUpData.fullName}
                   onChange={(e) => { setSignUpData({ ...signUpData, fullName: e.target.value }); if (signUpErrors.fullName) { const n = { ...signUpErrors }; delete n.fullName; setSignUpErrors(n); } }}
                   aria-invalid={!!signUpErrors.fullName}
+                  aria-describedby={signUpErrors.fullName ? 'signup-name-error' : undefined}
                   required
                 />
                 {signUpErrors.fullName && (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                  <p id="signup-name-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     {signUpErrors.fullName}
                   </p>
@@ -348,10 +349,11 @@ export default function Auth() {
                   value={signUpData.email}
                   onChange={(e) => { setSignUpData({ ...signUpData, email: e.target.value }); if (signUpErrors.email) { const n = { ...signUpErrors }; delete n.email; setSignUpErrors(n); } }}
                   aria-invalid={!!signUpErrors.email}
+                  aria-describedby={signUpErrors.email ? 'signup-email-error' : undefined}
                   required
                 />
                 {signUpErrors.email && (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                  <p id="signup-email-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     {signUpErrors.email}
                   </p>
@@ -376,6 +378,7 @@ export default function Auth() {
                     onBlur={() => setCapsOn(false)}
                     onChange={(e) => { setSignUpData({ ...signUpData, password: e.target.value }); if (signUpErrors.password) { const n = { ...signUpErrors }; delete n.password; setSignUpErrors(n); } }}
                     aria-invalid={!!signUpErrors.password}
+                    aria-describedby={signUpErrors.password ? 'signup-password-error' : undefined}
                     required
                   />
                   <button
@@ -395,7 +398,7 @@ export default function Auth() {
                   </p>
                 )}
                 {signUpErrors.password && (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                  <p id="signup-password-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     {signUpErrors.password}
                   </p>
