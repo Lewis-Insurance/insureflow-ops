@@ -34,6 +34,7 @@ import { Loader2, Search, Filter, Download, Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { LeadDetailView } from './LeadDetailView';
 import { LeadCaptureForm } from './LeadCaptureForm';
+import { humanizeEnum, humanizeStatus } from '@/lib/format';
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New', color: 'bg-blue-500' },
@@ -250,8 +251,8 @@ export function LeadList() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="capitalize">
-                      {lead.status}
+                    <Badge variant="secondary">
+                      {humanizeStatus(lead.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -265,8 +266,8 @@ export function LeadList() {
                       {lead.insurance_types && lead.insurance_types.length > 0 ? (
                         <>
                           {lead.insurance_types.slice(0, 2).map((type) => (
-                            <Badge key={type} variant="outline" className="text-xs capitalize">
-                              {type}
+                            <Badge key={type} variant="outline" className="text-xs">
+                              {humanizeEnum(type)}
                             </Badge>
                           ))}
                           {lead.insurance_types.length > 2 && (

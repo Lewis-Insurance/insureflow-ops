@@ -20,7 +20,9 @@ const isBusiness = (t?: string) => /business|commercial|organization|org/i.test(
 
 // Dense table column template (md+). Renewal replaces the structurally-null
 // balance/last-contact columns; the real signal in this book is policy renewal.
-const COLS = 'md:grid-cols-[minmax(0,1fr)_104px_120px_72px_150px_44px]';
+// The Policies column is right-aligned and wide enough that its tracked label
+// never runs flush into the Renewal column header (was 72px -> collided).
+const COLS = 'md:grid-cols-[minmax(0,1fr)_104px_120px_104px_150px_44px]';
 
 export default function CustomersPage() {
   const navigate = useNavigate();

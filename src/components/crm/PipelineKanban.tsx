@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Mail, Phone, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { humanizeEnum } from '@/lib/format';
 
 const STAGES = [
   { id: 'new', label: 'New', color: 'bg-blue-500' },
@@ -84,8 +85,8 @@ function DraggableLeadCard({ lead, onClick }: Omit<LeadCardProps, 'isDragging'>)
         {lead.insurance_types && lead.insurance_types.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {lead.insurance_types.slice(0, 3).map((type) => (
-              <Badge key={type} variant="outline" className="text-xs capitalize">
-                {type}
+              <Badge key={type} variant="outline" className="text-xs">
+                {humanizeEnum(type)}
               </Badge>
             ))}
             {lead.insurance_types.length > 3 && (
@@ -166,8 +167,8 @@ function LeadCard({ lead, isDragging, onClick }: LeadCardProps) {
         {lead.insurance_types && lead.insurance_types.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {lead.insurance_types.slice(0, 3).map((type) => (
-              <Badge key={type} variant="outline" className="text-xs capitalize">
-                {type}
+              <Badge key={type} variant="outline" className="text-xs">
+                {humanizeEnum(type)}
               </Badge>
             ))}
             {lead.insurance_types.length > 3 && (

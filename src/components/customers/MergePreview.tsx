@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountWithCounts, useAccountWithCounts } from '@/hooks/useCustomerMerge';
 import { formatDistanceToNow } from 'date-fns';
+import { humanizeStatus } from '@/lib/format';
 
 interface MergePreviewProps {
   accountId1: string | null;
@@ -135,7 +136,7 @@ function AccountCard({
           <Badge
             variant={account.account_status === 'active' ? 'default' : 'secondary'}
           >
-            {account.account_status || 'Unknown'}
+            {humanizeStatus(account.account_status) || 'Unknown'}
           </Badge>
         </div>
 
