@@ -1,54 +1,120 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Repeat2, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { differenceInCalendarDays } from 'date-fns';
+import { Search, Brain, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useAoMigrationSearch } from '@/hooks/useAoMigrationSearch';
-import { useAoMigrationCounts } from '@/hooks/useAoMigrationCounts';
+import { useRenewals, type Renewal } from '@/hooks/useRenewalWorkflow';
+import { supabase } from '@/integrations/supabase/client';
 import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeCarrier, humanizeStatus } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-// Cohorts are computed server-side; clicking a tile filters the rows to it.
-// The Auto-Owners book moving off Auto-Owners to Nationwide and Progressive.
-type Cohort = 'all' | 'not_started' | 'quote_out' | 'bound_elsewhere' | 'lapsing_week';
+// The general renewals worklist: EVERY policy renewal, every carrier. The
+// Auto-Owners migration queue is a separate surface and lives at /ao-renewals.
+// Cohorts segment the open book by what needs attention; clicking a tile filters
+// the rows to it. Counts are computed over the whole book, not the filtered view.
+type Cohort = 'all' | 'overdue' | 'due_week' | 'high_risk' | 'quoted';
+
+// Statuses that mean the renewal is still being worked (not a terminal outcome).
+const OPEN_STATUSES = new Set(['pending', 'contacted', 'quoted', 'upcoming', 'in_progress']);
+
+const isOpen = (r: Renewal) => OPEN_STATUSES.has(r.status);
+const daysToRenewal = (r: Renewal) =>
+  r.renewal_date ? differenceInCalendarDays(new Date(r.renewal_date), new Date()) : null;
+const isHighRisk = (r: Renewal) => r.risk_level === 'high' || r.risk_level === 'critical';
+
+// Each cohort is a predicate over a renewal. 'all' is the unfiltered book.
+const COHORT_PREDICATE: Record<Exclude<Cohort, 'all'>, (r: Renewal) => boolean> = {
+  overdue: (r) => isOpen(r) && (daysToRenewal(r) ?? 1) < 0,
+  due_week: (r) => {
+    const d = daysToRenewal(r);
+    return isOpen(r) && d !== null && d >= 0 && d <= 7;
+  },
+  high_risk: (r) => isOpen(r) && isHighRisk(r),
+  quoted: (r) => r.status === 'quoted',
+};
 
 // Dense table column template (md+). Same fields, same order, every row:
-// Client, current AO policy, target carrier, rewrite status, days to lapse, last contact.
-const COLS = 'md:grid-cols-[minmax(0,1fr)_150px_130px_104px_120px_150px]';
+// Client, policy, carrier, status, renewal countdown, last contact.
+const COLS = 'md:grid-cols-[minmax(0,1fr)_150px_140px_116px_120px_150px]';
 
 export default function RenewalsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [cohort, setCohort] = useState<Cohort>('all');
+  const [carrier, setCarrier] = useState<string>('all');
 
-  const { renewals, loading, loadingMore, hasMore, fetchRenewals, fetchNextPage } = useAoMigrationSearch();
-  const { counts } = useAoMigrationCounts();
+  // Pull the whole book once (all carriers, ordered by renewal date). Cohort,
+  // carrier and search are applied client-side so the tile counts stay accurate
+  // and filtering is instant.
+  const { data: renewals = [], isLoading } = useRenewals();
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didMountRef = useRef(false);
-
-  // Single server-side fetch path for search + cohort. The hook loads the first
-  // page on mount, so skip the first run here (a second concurrent fetch would
-  // race it). Search is debounced; cohort changes refetch too.
+  // Keep the renewals table current with upcoming policies. Best-effort and
+  // silent: a toast on every page load would be noise. Runs once per mount.
+  const syncedRef = useRef(false);
   useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchRenewals(searchQuery, 'renewal_asc', cohort), 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, cohort]);
+    if (syncedRef.current) return;
+    syncedRef.current = true;
+    supabase
+      .rpc('sync_policies_to_renewals', { days_ahead: 90 })
+      .then(({ error }) => {
+        if (!error) queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      });
+  }, [queryClient]);
 
-  const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
-  const filtersActive = cohort !== 'all' || searchQuery.length > 0;
+  // Cohort counts over the whole book.
+  const counts = useMemo(
+    () => ({
+      total: renewals.length,
+      overdue: renewals.filter(COHORT_PREDICATE.overdue).length,
+      due_week: renewals.filter(COHORT_PREDICATE.due_week).length,
+      high_risk: renewals.filter(COHORT_PREDICATE.high_risk).length,
+      quoted: renewals.filter(COHORT_PREDICATE.quoted).length,
+    }),
+    [renewals],
+  );
+
+  // Distinct carriers present, for the carrier filter. Name chips, never colored.
+  const carriers = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of renewals) {
+      if (r.carrier && !seen.has(r.carrier)) seen.set(r.carrier, humanizeCarrier(r.carrier));
+    }
+    return Array.from(seen, ([value, label]) => ({ value, label })).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [renewals]);
+
+  const rows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return renewals.filter((r) => {
+      if (cohort !== 'all' && !COHORT_PREDICATE[cohort](r)) return false;
+      if (carrier !== 'all' && r.carrier !== carrier) return false;
+      if (q) {
+        const name = r.account?.name?.toLowerCase() ?? '';
+        const policy = r.policy_number?.toLowerCase() ?? '';
+        if (!name.includes(q) && !policy.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [renewals, cohort, carrier, searchQuery]);
+
+  const toggleCohort = (c: Exclude<Cohort, 'all'>) => setCohort((cur) => (cur === c ? 'all' : c));
+  const filtersActive = cohort !== 'all' || carrier !== 'all' || searchQuery.length > 0;
   const clearAll = () => {
     setCohort('all');
+    setCarrier('all');
     setSearchQuery('');
   };
 
@@ -60,59 +126,59 @@ export default function RenewalsPage() {
         {/* Header: title + one lime primary */}
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">AO Migration</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">Renewals</h1>
             <p className="mt-1 text-sm text-cc-text-muted">
-              Auto-Owners book moving to Nationwide and Progressive.{' '}
-              <span className="cc-num">{counts.total}</span> to rewrite.
+              Every policy renewal across all carriers.{' '}
+              <span className="cc-num">{counts.total}</span> in the book.
             </p>
           </div>
           <Button
             data-primary
-            onClick={() => navigate('/quotes/new')}
+            onClick={() => navigate('/renewals/intelligence')}
             className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
           >
-            <Repeat2 className="h-4 w-4" />
-            Start rewrite
+            <Brain className="h-4 w-4" />
+            Renewal intelligence
           </Button>
         </header>
 
-        {/* Triage strip: AO migration cohorts, counted server-side over the whole book */}
+        {/* Triage strip: open book segmented by what needs attention */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TriageTile
-            label="Not started"
-            count={counts.not_started}
-            sub="Begin rewrite"
-            tone="warning"
-            active={cohort === 'not_started'}
-            onClick={() => toggleCohort('not_started')}
-          />
-          <TriageTile
-            label="Quote out"
-            count={counts.quote_out}
-            sub="Follow up"
-            tone="info"
-            active={cohort === 'quote_out'}
-            onClick={() => toggleCohort('quote_out')}
-          />
-          <TriageTile
-            label="Bound elsewhere"
-            count={counts.bound_elsewhere}
-            sub="Confirm moved"
-            tone="success"
-            active={cohort === 'bound_elsewhere'}
-            onClick={() => toggleCohort('bound_elsewhere')}
-          />
-          <TriageTile
-            label="Lapsing this week"
-            count={counts.lapsing_week}
+            label="Overdue"
+            count={counts.overdue}
             sub="Act now"
             tone="danger"
-            active={cohort === 'lapsing_week'}
-            onClick={() => toggleCohort('lapsing_week')}
+            active={cohort === 'overdue'}
+            onClick={() => toggleCohort('overdue')}
+          />
+          <TriageTile
+            label="Due this week"
+            count={counts.due_week}
+            sub="Reach out"
+            tone="warning"
+            active={cohort === 'due_week'}
+            onClick={() => toggleCohort('due_week')}
+          />
+          <TriageTile
+            label="High risk"
+            count={counts.high_risk}
+            sub="Prioritize"
+            tone="info"
+            active={cohort === 'high_risk'}
+            onClick={() => toggleCohort('high_risk')}
+          />
+          <TriageTile
+            label="Quoted"
+            count={counts.quoted}
+            sub="Awaiting decision"
+            tone="success"
+            active={cohort === 'quoted'}
+            onClick={() => toggleCohort('quoted')}
           />
         </div>
 
-        {/* Filter row */}
+        {/* Filter row: search + carrier */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cc-text-muted" />
@@ -125,6 +191,23 @@ export default function RenewalsPage() {
             />
           </div>
 
+          <Select value={carrier} onValueChange={setCarrier}>
+            <SelectTrigger
+              aria-label="Filter by carrier"
+              className="h-9 w-auto min-w-[160px] gap-2 rounded-cc-md border-cc-border-interactive bg-cc-surface-raised text-cc-text-primary"
+            >
+              <SelectValue placeholder="All carriers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All carriers</SelectItem>
+              {carriers.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {filtersActive && (
             <button
               type="button"
@@ -136,31 +219,28 @@ export default function RenewalsPage() {
             </button>
           )}
 
-          <span className="ml-auto cc-num text-sm text-cc-text-muted">
-            {renewals.length}
-            {hasMore ? '+' : ''} shown
-          </span>
+          <span className="ml-auto cc-num text-sm text-cc-text-muted">{rows.length} shown</span>
         </div>
 
         {/* Dense, uniform list */}
         <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
           <div className={cn('hidden gap-4 border-b border-cc-border-subtle px-4 py-2.5 md:grid', COLS)}>
             <SectionLabel>Client</SectionLabel>
-            <SectionLabel>Current AO policy</SectionLabel>
-            <SectionLabel>Target carrier</SectionLabel>
-            <SectionLabel>Rewrite status</SectionLabel>
-            <SectionLabel>Days to lapse</SectionLabel>
+            <SectionLabel>Policy</SectionLabel>
+            <SectionLabel>Carrier</SectionLabel>
+            <SectionLabel>Status</SectionLabel>
+            <SectionLabel>Renewal</SectionLabel>
             <SectionLabel>Last contact</SectionLabel>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-          ) : renewals.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
               <p className="max-w-sm text-sm text-cc-text-secondary">
                 {filtersActive
-                  ? 'No Auto-Owners renewals match these filters. Clear them to see the whole migration book.'
-                  : 'The Auto-Owners migration book is clear. Nothing left to rewrite right now.'}
+                  ? 'No renewals match these filters. Clear them to see the whole book.'
+                  : 'No renewals in the book yet. Upcoming policies sync in automatically.'}
               </p>
               {filtersActive && (
                 <Button
@@ -173,9 +253,9 @@ export default function RenewalsPage() {
               )}
             </div>
           ) : (
-            renewals.map((r) => {
-              const target = humanizeCarrier(r.moved_carrier || r.best_alternative_carrier || '');
-              const policySub = humanizeStatus(r.policy_type) || humanizeCarrier(r.current_carrier);
+            rows.map((r) => {
+              const carrierName = humanizeCarrier(r.carrier);
+              const policySub = humanizeStatus(r.policy_type);
               return (
                 <div
                   key={r.id}
@@ -196,26 +276,33 @@ export default function RenewalsPage() {
                 >
                   {/* Client (carries status + countdown inline on mobile) */}
                   <div className="min-w-0">
-                    <div className="font-semibold text-cc-text-primary break-words">{r.customer_name}</div>
+                    <div className="font-semibold text-cc-text-primary break-words">
+                      {r.account?.name || 'Unknown client'}
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 md:hidden">
                       <StatusPill status={r.status} />
                       <NextRenewal date={r.renewal_date} emptyLabel="No renewal date" />
                     </div>
                   </div>
 
-                  {/* Current AO policy: number never truncates; sub line is type or carrier */}
+                  {/* Policy: number never truncates; sub line is the policy type */}
                   <div className="hidden min-w-0 md:block">
-                    <div className="cc-num whitespace-nowrap font-mono text-sm text-cc-text-secondary">{r.policy_number}</div>
+                    <div className="cc-num whitespace-nowrap font-mono text-sm text-cc-text-secondary">
+                      {r.policy_number || '--'}
+                    </div>
                     {policySub && <div className="truncate text-xs text-cc-text-muted">{policySub}</div>}
                   </div>
 
-                  {/* Target carrier: name chip, never colored. "Not set" when both null. */}
+                  {/* Carrier: name chip, never colored. "Not set" when null. */}
                   <div className="hidden md:block">
-                    {target ? <Chip>{target}</Chip> : <span className="text-sm text-cc-text-muted">Not set</span>}
+                    {carrierName ? <Chip>{carrierName}</Chip> : <span className="text-sm text-cc-text-muted">Not set</span>}
                   </div>
 
                   <div className="hidden md:block">
-                    <StatusPill status={r.status} />
+                    <StatusPill
+                      status={r.status}
+                      override={r.status === 'renewed' ? { label: 'Renewed', tone: 'success' } : undefined}
+                    />
                   </div>
 
                   <div className="hidden md:block">
@@ -230,19 +317,6 @@ export default function RenewalsPage() {
             })
           )}
         </div>
-
-        {hasMore && !loading && (
-          <div className="flex justify-center">
-            <Button
-              variant="outline"
-              onClick={() => fetchNextPage()}
-              disabled={loadingMore}
-              className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
-            >
-              {loadingMore ? 'Loading' : 'Load more'}
-            </Button>
-          </div>
-        )}
       </div>
     </AppLayout>
   );
