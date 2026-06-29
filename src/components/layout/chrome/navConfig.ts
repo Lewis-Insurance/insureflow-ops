@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, RefreshCw, CheckSquare,
   Users, FileText, Calendar, Phone, MessageSquare, TrendingUp, Contact,
-  Bot, Brain, Scale, FileSearch, FileQuestion, Sliders, FolderKanban,
+  Bot, Brain, Scale, GitCompare, FileSearch, FileQuestion, Sliders, FolderKanban,
   Shield, FileInput, FilePlus2,
   Megaphone, Send, Landmark, UsersRound, Radio,
   Building2, Briefcase, BarChart3, Target, Heart, DollarSign, Sparkles,
@@ -69,6 +69,7 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       { label: 'AI Hub', to: '/ai-hub', icon: Bot },
       { label: 'Renewal Intelligence', to: '/renewals/intelligence', icon: Brain },
       { label: 'Quote Comparison', to: '/comparison', icon: Scale },
+      { label: 'Comparison Analysis', to: '/insurance-comparison', icon: GitCompare },
       { label: 'Explore a Policy', to: '/analyze-documents', icon: FileSearch },
       { label: 'Document Intelligence', to: '/document-intelligence', icon: FileQuestion },
       { label: 'Module Builder', to: '/module-builder', icon: Sliders, isNew: true },

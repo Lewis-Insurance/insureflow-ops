@@ -154,81 +154,87 @@ export default function InsuranceComparison() {
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto max-w-[1100px] space-y-6 p-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Scale className="h-8 w-8" />
-              Insurance Comparison Tool
+            <h1 className="flex items-center gap-2.5 text-2xl font-bold uppercase tracking-tight text-cc-text-primary">
+              <Scale className="h-6 w-6 text-cc-text-secondary" aria-hidden="true" />
+              Comparison analysis
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Upload insurance documents to generate a detailed comparison analysis
+            <p className="mt-1 text-sm text-cc-text-muted">
+              Upload two options to generate a detailed coverage and premium analysis.
             </p>
           </div>
-          
+
           {(option1 || option2) && (
-            <Button variant="outline" onClick={reset}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Start Over
+            <Button
+              variant="outline"
+              onClick={reset}
+              className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Start over
             </Button>
           )}
-        </div>
+        </header>
 
         {!comparison ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <DocumentDropZone
                 title="Option 1"
                 description="Upload quotes or policies for the first option"
                 onFilesDropped={handleOption1Upload}
                 isProcessing={isProcessing}
                 processedFile={
-                  option1 
-                    ? `${option1.carrier} - ${option1.policyNumber || 'Quote'}` 
-                    : uploadedFiles1.length > 0 
-                    ? `${uploadedFiles1.length} file(s) uploaded` 
+                  option1
+                    ? `${option1.carrier} - ${option1.policyNumber || 'Quote'}`
+                    : uploadedFiles1.length > 0
+                    ? `${uploadedFiles1.length} file(s) uploaded`
                     : undefined
                 }
                 error={error || undefined}
               />
-              
+
               <DocumentDropZone
                 title="Option 2"
                 description="Upload quotes or policies for the second option"
                 onFilesDropped={handleOption2Upload}
                 isProcessing={isProcessing}
                 processedFile={
-                  option2 
-                    ? `${option2.carrier} - ${option2.policyNumber || 'Quote'}` 
-                    : uploadedFiles2.length > 0 
-                    ? `${uploadedFiles2.length} file(s) uploaded` 
+                  option2
+                    ? `${option2.carrier} - ${option2.policyNumber || 'Quote'}`
+                    : uploadedFiles2.length > 0
+                    ? `${uploadedFiles2.length} file(s) uploaded`
                     : undefined
                 }
                 error={error || undefined}
               />
             </div>
 
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-3">
               {!option1 && !option2 && (uploadedFiles1.length > 0 || uploadedFiles2.length > 0) && (
                 <Button
+                  data-primary
                   size="lg"
                   onClick={processAllDocuments}
                   disabled={uploadedFiles1.length === 0 || uploadedFiles2.length === 0 || isProcessing}
-                  className="min-w-[200px]"
+                  className="min-w-[200px] gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
                 >
-                  {isProcessing ? 'Processing...' : 'Process Documents'}
+                  {isProcessing ? 'Processing' : 'Process documents'}
                 </Button>
               )}
-              
-              {(uploadedFiles1.length > 0 && uploadedFiles2.length > 0 && !comparison) && (
+
+              {uploadedFiles1.length > 0 && uploadedFiles2.length > 0 && !comparison && (
                 <Button
                   size="lg"
+                  variant="outline"
                   onClick={handleSubmitComparison}
                   disabled={isSubmitting}
-                  className="min-w-[200px]"
+                  className="min-w-[200px] gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
                 >
-                  <Scale className="h-4 w-4 mr-2" />
-                  {isSubmitting ? 'Submitting...' : 'Run in background'}
+                  <Scale className="h-4 w-4" />
+                  {isSubmitting ? 'Submitting' : 'Run in background'}
                 </Button>
               )}
             </div>

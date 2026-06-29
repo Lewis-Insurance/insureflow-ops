@@ -1,14 +1,11 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, AlertCircle, Check, X, AlertTriangle, Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingDown, AlertCircle, Check, X, AlertTriangle, Download } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { PDFReport } from './PDFReport';
 import type { ComparisonResult } from '@/types/insurance-comparison';
 import { GapAnalysisCard } from './GapAnalysisCard';
+import { SectionLabel, AccentSpine } from '@/components/cc';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface ComparisonReportProps {
@@ -18,25 +15,17 @@ interface ComparisonReportProps {
 export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
   const { option1, option2, differences } = comparison;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   const getCoverageStatus = (diff: any) => {
-    if (diff.option1Value === 'Not Included' || diff.option2Value === 'Not Included') {
-      return 'gap';
-    }
-    if (diff.advantage === 'neutral') {
-      return 'identical';
-    }
+    if (diff.option1Value === 'Not Included' || diff.option2Value === 'Not Included') return 'gap';
+    if (diff.advantage === 'neutral') return 'identical';
     return 'different';
   };
 
   const displayValue = (val?: string) => {
-    if (!val) return '—';
+    if (!val) return 'N/A';
     const v = String(val).trim();
     if (/^yes$/i.test(v)) return 'Included';
     if (/^no$/i.test(v)) return 'Not Included';
@@ -44,87 +33,86 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
   };
 
   const hasGaps = differences.gaps && differences.gaps.length > 0;
-  const criticalGaps = differences.gaps?.filter(g => g.severity === 'critical') || [];
-  
-  // Prepare chart data
-  const premiumChartData = [
-    {
-      name: option1.carrier,
-      premium: option1.totalPremium || 0,
-      fill: '#8884d8'
-    },
-    {
-      name: option2.carrier,
-      premium: option2.totalPremium || 0,
-      fill: '#82ca9d'
-    }
-  ];
+  const criticalGaps = differences.gaps?.filter((g) => g.severity === 'critical') || [];
 
-  // Generate E&O concerns
-  const eoConcerns = criticalGaps.length > 0 
-    ? `CRITICAL: ${criticalGaps.length} coverage gap${criticalGaps.length > 1 ? 's' : ''} identified that could expose the insured to significant financial risk. ${criticalGaps.map(g => g.coverageType).join(', ')} missing.`
-    : null;
+  // The single decision-positive signal on this surface: which option costs less.
+  // That row carries the one lime accent; the download action stays a neutral
+  // button so the surface keeps exactly one lime (matches the quote comparison grid).
+  const premiums = [option1.totalPremium || 0, option2.totalPremium || 0];
+  const cheaperIdx = premiums[0] === premiums[1] ? -1 : premiums[0] < premiums[1] ? 0 : 1;
+  const options = [option1, option2];
 
-  // Top 3 differences
+  const eoConcerns =
+    criticalGaps.length > 0
+      ? `CRITICAL: ${criticalGaps.length} coverage gap${criticalGaps.length > 1 ? 's' : ''} identified that could expose the insured to significant financial risk. ${criticalGaps.map((g) => g.coverageType).join(', ')} missing.`
+      : null;
+
   const topDifferences = differences.coverageDifferences
-    .filter(d => d.advantage !== 'neutral')
+    .filter((d) => d.advantage !== 'neutral')
     .slice(0, 3)
-    .map(d => `${d.coverageType}: ${d.description}`);
+    .map((d) => `${d.coverageType}: ${d.description}`);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Action Bar */}
-      <div className="flex justify-between items-center">
+    <div className="mx-auto max-w-[1100px] space-y-6">
+      {/* Action bar */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Comparison Report</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold tracking-tight text-cc-text-primary">Comparison report</h2>
+          <p className="text-sm text-cc-text-muted">
             {option1.carrier} vs {option2.carrier}
           </p>
         </div>
-        
+
         <PDFDownloadLink
           document={<PDFReport comparison={comparison} clientName={option1.insuredName} />}
           fileName={`insurance-comparison-${format(comparison.analysisDate, 'yyyy-MM-dd')}.pdf`}
         >
           {({ loading }) => (
-            <Button disabled={loading} className="gap-2">
+            <Button
+              disabled={loading}
+              variant="outline"
+              className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+            >
               <Download className="h-4 w-4" />
-              {loading ? 'Generating PDF...' : 'Download PDF Report'}
+              {loading ? 'Generating PDF' : 'Download PDF report'}
             </Button>
           )}
         </PDFDownloadLink>
       </div>
-      {/* Executive Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Executive Summary</CardTitle>
-          <CardDescription>
-            Generated on {format(comparison.analysisDate, 'PPP')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert variant={hasGaps ? "destructive" : "default"}>
-            <AlertDescription>
-              <strong>{option1.carrier}</strong> vs <strong>{option2.carrier}</strong>: {' '}
-              {differences.premiumDifference < 0 ? 'Option 1' : 'Option 2'} is{' '}
-              <strong>{Math.abs(differences.premiumPercentage).toFixed(1)}%</strong> more expensive{' '}
-              ({formatCurrency(Math.abs(differences.premiumDifference))} difference).{' '}
-              {hasGaps && (
-                <span className="text-destructive font-semibold">
-                  {differences.gaps?.length} coverage gap{differences.gaps && differences.gaps.length > 1 ? 's' : ''} identified.
-                </span>
-              )}
-            </AlertDescription>
-          </Alert>
+
+      {/* Executive summary */}
+      <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+        <div className="flex items-center justify-between border-b border-cc-border-subtle px-5 py-3">
+          <SectionLabel>Executive summary</SectionLabel>
+          <span className="text-xs text-cc-text-muted">Generated {format(comparison.analysisDate, 'PPP')}</span>
+        </div>
+        <div className="space-y-4 p-5">
+          <p className="text-sm leading-relaxed text-cc-text-secondary">
+            <span className="font-semibold text-cc-text-primary">{option1.carrier}</span> vs{' '}
+            <span className="font-semibold text-cc-text-primary">{option2.carrier}</span>:{' '}
+            {differences.premiumDifference < 0 ? 'Option 1' : 'Option 2'} is{' '}
+            <span className="cc-num font-semibold text-cc-text-primary">
+              {Math.abs(differences.premiumPercentage).toFixed(1)}%
+            </span>{' '}
+            more expensive ({formatCurrency(Math.abs(differences.premiumDifference))} difference).{' '}
+            {hasGaps && (
+              <span className="font-semibold text-cc-danger">
+                {differences.gaps?.length} coverage gap{differences.gaps && differences.gaps.length > 1 ? 's' : ''}{' '}
+                identified.
+              </span>
+            )}
+          </p>
 
           {topDifferences.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-3">Top Differences</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <SectionLabel>Top differences</SectionLabel>
+              <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
                 {topDifferences.map((diff, i) => (
                   <div key={i} className="flex items-start gap-2">
-                    <Badge variant="outline">{i + 1}</Badge>
-                    <span className="text-sm">{diff}</span>
+                    <span className="cc-num mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-cc-surface-raised text-xs font-semibold text-cc-text-secondary">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm text-cc-text-secondary">{diff}</span>
                   </div>
                 ))}
               </div>
@@ -132,134 +120,133 @@ export const ComparisonReport = ({ comparison }: ComparisonReportProps) => {
           )}
 
           {eoConcerns && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>E&O Concerns</AlertTitle>
-              <AlertDescription>{eoConcerns}</AlertDescription>
-            </Alert>
+            <div className="rounded-cc-lg border border-cc-border-subtle bg-cc-surface-raised p-3">
+              <div className="flex items-center gap-2 text-cc-danger">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="text-sm font-semibold">E&O concerns</span>
+              </div>
+              <p className="mt-1 text-sm text-cc-text-secondary">{eoConcerns}</p>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Gap Analysis */}
+      {/* Gap analysis */}
       {differences.gaps && <GapAnalysisCard gaps={differences.gaps} />}
 
-      {/* Coverage Comparison Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Coverage Analysis</CardTitle>
-          <CardDescription>Detailed comparison of policy coverages</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Coverage</TableHead>
-                <TableHead>{option1.carrier}</TableHead>
-                <TableHead>{option2.carrier}</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      {/* Coverage analysis table */}
+      <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+        <div className="border-b border-cc-border-subtle px-5 py-3">
+          <SectionLabel>Coverage analysis</SectionLabel>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse">
+            <thead>
+              <tr className="border-b border-cc-border-subtle">
+                <th className="px-5 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-cc-text-muted">
+                  Coverage
+                </th>
+                <th className="px-5 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-cc-text-muted">
+                  {option1.carrier}
+                </th>
+                <th className="px-5 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-cc-text-muted">
+                  {option2.carrier}
+                </th>
+                <th className="px-5 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-cc-text-muted">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
               {differences.coverageDifferences.map((diff, idx) => {
                 const status = getCoverageStatus(diff);
                 return (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{diff.coverageType}</TableCell>
-                    <TableCell>{displayValue(diff.option1Value)}</TableCell>
-                    <TableCell>{displayValue(diff.option2Value)}</TableCell>
-                    <TableCell className="text-center">
+                  <tr key={idx} className="border-b border-cc-border-subtle last:border-b-0">
+                    <td className="px-5 py-3 text-sm font-medium text-cc-text-primary">{diff.coverageType}</td>
+                    <td className="cc-num px-5 py-3 text-sm text-cc-text-secondary">{displayValue(diff.option1Value)}</td>
+                    <td className="cc-num px-5 py-3 text-sm text-cc-text-secondary">{displayValue(diff.option2Value)}</td>
+                    <td className="px-5 py-3">
                       {status === 'identical' && (
-                        <div className="flex items-center justify-center gap-1">
-                          <Check className="h-4 w-4 text-green-500" />
-                          <span className="text-xs text-muted-foreground">Match</span>
+                        <div className="flex items-center justify-center gap-1 text-cc-success">
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                          <span className="text-xs">Match</span>
                         </div>
                       )}
                       {status === 'different' && (
-                        <div className="flex items-center justify-center gap-1">
-                          <AlertCircle className="h-4 w-4 text-yellow-500" />
-                          <span className="text-xs text-muted-foreground">Differs</span>
+                        <div className="flex items-center justify-center gap-1 text-cc-warning">
+                          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                          <span className="text-xs">Differs</span>
                         </div>
                       )}
                       {status === 'gap' && (
-                        <div className="flex items-center justify-center gap-1">
-                          <X className="h-4 w-4 text-red-500" />
-                          <span className="text-xs text-destructive font-medium">Gap</span>
+                        <div className="flex items-center justify-center gap-1 text-cc-danger">
+                          <X className="h-4 w-4" aria-hidden="true" />
+                          <span className="text-xs font-medium">Gap</span>
                         </div>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      {/* Premium Analysis with Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Premium Analysis</CardTitle>
-          <CardDescription>Visual comparison of annual premiums</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={premiumChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis 
-                tickFormatter={(value) => `$${value.toLocaleString()}`}
-              />
-              <Tooltip 
-                formatter={(value: number) => formatCurrency(value)}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))', 
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend />
-              <Bar 
-                dataKey="premium" 
-                name="Annual Premium"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          
-          <div className="mt-4 p-4 bg-muted rounded-lg">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Absolute Difference</p>
-                <p className="text-lg font-bold">
-                  {formatCurrency(Math.abs(differences.premiumDifference))}
-                </p>
+      {/* Premium analysis: the cheaper option carries the single lime accent. */}
+      <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+        <div className="border-b border-cc-border-subtle px-5 py-3">
+          <SectionLabel>Premium analysis</SectionLabel>
+        </div>
+        <div className="space-y-3 p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {options.map((opt, idx) => (
+              <AccentSpine key={idx} active={idx === cheaperIdx} className="flex items-center justify-between p-4">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-cc-text-primary">{opt.carrier}</div>
+                  <div className="text-xs text-cc-text-muted">Annual premium</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {idx === cheaperIdx && (
+                    <span className="inline-flex items-center gap-1 rounded-pill bg-cc-accent px-2 py-0.5 text-[11px] font-semibold text-cc-surface">
+                      <TrendingDown className="h-3 w-3" aria-hidden="true" />
+                      Lower
+                    </span>
+                  )}
+                  <span className="cc-num whitespace-nowrap text-lg font-bold text-cc-text-primary">
+                    {formatCurrency(opt.totalPremium || 0)}
+                  </span>
+                </div>
+              </AccentSpine>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 rounded-cc-lg bg-cc-surface-raised p-4">
+            <div>
+              <div className="text-xs text-cc-text-muted">Absolute difference</div>
+              <div className="cc-num mt-0.5 text-lg font-bold text-cc-text-primary">
+                {formatCurrency(Math.abs(differences.premiumDifference))}
               </div>
-              <div>
-                <p className="text-muted-foreground">Percentage Difference</p>
-                <p className="text-lg font-bold">
-                  {Math.abs(differences.premiumPercentage).toFixed(1)}%
-                </p>
+            </div>
+            <div>
+              <div className="text-xs text-cc-text-muted">Percentage difference</div>
+              <div className="cc-num mt-0.5 text-lg font-bold text-cc-text-primary">
+                {Math.abs(differences.premiumPercentage).toFixed(1)}%
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Recommendation */}
       {comparison.recommendation && (
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Recommendation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed">{comparison.recommendation}</p>
-          </CardContent>
-        </Card>
+        <section className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+          <div className="flex items-center gap-2 border-b border-cc-border-subtle px-5 py-3">
+            <AlertCircle className="h-4 w-4 text-cc-text-secondary" aria-hidden="true" />
+            <SectionLabel>Recommendation</SectionLabel>
+          </div>
+          <p className="p-5 text-sm leading-relaxed text-cc-text-secondary">{comparison.recommendation}</p>
+        </section>
       )}
     </div>
   );

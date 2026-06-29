@@ -788,6 +788,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/insurance-comparison"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <InsuranceComparison />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
                   path="/ai-brain"
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>

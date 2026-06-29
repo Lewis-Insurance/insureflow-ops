@@ -1,8 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface DocumentDropZoneProps {
@@ -20,95 +18,102 @@ export const DocumentDropZone = ({
   onFilesDropped,
   isProcessing = false,
   processedFile,
-  error
+  error,
 }: DocumentDropZoneProps) => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    setUploadedFiles(acceptedFiles);
-    await onFilesDropped(acceptedFiles);
-  }, [onFilesDropped]);
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      setUploadedFiles(acceptedFiles);
+      await onFilesDropped(acceptedFiles);
+    },
+    [onFilesDropped],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'text/csv': ['.csv']
+      'text/csv': ['.csv'],
     },
     maxFiles: 5,
-    disabled: isProcessing
+    disabled: isProcessing,
   });
 
-  const getStatusIcon = () => {
-    if (error) return <XCircle className="h-8 w-8 text-destructive" />;
-    if (processedFile) return <CheckCircle2 className="h-8 w-8 text-green-500" />;
-    if (isProcessing) return <Loader2 className="h-8 w-8 animate-spin text-primary" />;
-    return <Upload className="h-8 w-8 text-muted-foreground" />;
-  };
+  const statusIcon = error ? (
+    <XCircle className="h-8 w-8 text-cc-danger" aria-hidden="true" />
+  ) : processedFile ? (
+    <CheckCircle2 className="h-8 w-8 text-cc-success" aria-hidden="true" />
+  ) : isProcessing ? (
+    <Loader2 className="h-8 w-8 animate-spin text-cc-text-muted" aria-hidden="true" />
+  ) : (
+    <Upload className="h-8 w-8 text-cc-text-muted" aria-hidden="true" />
+  );
 
   return (
-    <Card className="border-2 border-dashed">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          {title}
-          {processedFile && (
-            <Badge variant="outline" className="bg-green-50">
-              Ready
-            </Badge>
-          )}
-        </CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+      <div className="flex items-start justify-between gap-3 border-b border-cc-border-subtle px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-cc-text-primary">{title}</h2>
+          <p className="mt-0.5 text-sm text-cc-text-muted">{description}</p>
+        </div>
+        {processedFile && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-cc-surface-overlay px-2.5 py-0.5 text-xs font-medium text-cc-success">
+            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+            Ready
+          </span>
+        )}
+      </div>
+
+      <div className="p-5">
         <div
           {...getRootProps()}
           className={cn(
-            "flex flex-col items-center justify-center p-8 rounded-lg transition-colors cursor-pointer min-h-[200px]",
-            isDragActive && "bg-primary/5 border-primary",
-            isProcessing && "opacity-50 cursor-not-allowed",
-            !isDragActive && !isProcessing && "hover:bg-muted/50"
+            'flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-cc-lg border-2 border-dashed p-8 text-center transition-colors',
+            isDragActive ? 'border-cc-accent bg-cc-surface-raised' : 'border-cc-border-interactive',
+            isProcessing ? 'cursor-not-allowed opacity-50' : !isDragActive && 'hover:bg-cc-surface-raised',
           )}
         >
-          <input {...getInputProps()} />
-          
-          {getStatusIcon()}
-          
-          <div className="mt-4 text-center">
+          <input {...getInputProps()} aria-label={`Upload documents for ${title}`} />
+
+          {statusIcon}
+
+          <div className="mt-4">
             {isProcessing ? (
-              <p className="text-sm text-muted-foreground">Processing documents...</p>
+              <p className="text-sm text-cc-text-muted">Processing documents</p>
             ) : processedFile ? (
               <>
-                <p className="text-sm font-medium">{processedFile}</p>
-                <p className="text-xs text-muted-foreground mt-1">Document processed successfully</p>
+                <p className="text-sm font-medium text-cc-text-primary">{processedFile}</p>
+                <p className="mt-1 text-xs text-cc-text-muted">Document processed successfully</p>
               </>
             ) : error ? (
               <>
-                <p className="text-sm font-medium text-destructive">Processing failed</p>
-                <p className="text-xs text-muted-foreground mt-1">{error}</p>
+                <p className="text-sm font-medium text-cc-danger">Processing failed</p>
+                <p className="mt-1 text-xs text-cc-text-muted">{error}</p>
               </>
             ) : isDragActive ? (
-              <p className="text-sm text-primary font-medium">Drop files here...</p>
+              <p className="text-sm font-medium text-cc-text-primary">Drop files here</p>
             ) : (
               <>
-                <p className="text-sm font-medium">Drop files or click to upload</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, XLSX, or CSV files</p>
+                <p className="text-sm font-medium text-cc-text-primary">Drop files or click to upload</p>
+                <p className="mt-1 text-xs text-cc-text-muted">PDF, XLSX, or CSV files</p>
               </>
             )}
           </div>
 
           {uploadedFiles.length > 0 && !processedFile && !error && (
-            <div className="mt-4 w-full">
+            <div className="mt-4 w-full space-y-1">
               {uploadedFiles.map((file, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FileText className="h-4 w-4" />
-                  <span>{file.name}</span>
+                <div key={idx} className="flex items-center justify-center gap-2 text-sm text-cc-text-secondary">
+                  <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="cc-num truncate">{file.name}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
