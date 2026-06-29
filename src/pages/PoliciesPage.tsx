@@ -305,7 +305,7 @@ export default function PoliciesPage() {
                   <StatusPill status={policy.status} />
                 </div>
 
-                <div className="cc-num hidden whitespace-nowrap text-right text-sm text-cc-text-secondary md:block">
+                <div className="cc-num hidden whitespace-nowrap text-right text-sm font-semibold text-cc-text-primary md:block">
                   {usd.format(Number(policy.premium) || 0)}
                 </div>
 

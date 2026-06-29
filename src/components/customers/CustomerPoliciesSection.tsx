@@ -10,7 +10,8 @@ import {
 import { StatusPill, Chip } from '@/components/cc';
 import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
-import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
+import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { humanizeLine, humanizeCarrier } from '@/lib/format';
@@ -137,7 +138,13 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
             openPolicy();
           }
         }}
-        className="cursor-pointer rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-4 transition-colors duration-fast hover:border-cc-border-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-offset-2"
+        className={cn(
+          'cursor-pointer rounded-cc-lg border border-cc-border-subtle p-4 transition-colors duration-fast hover:bg-cc-surface-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-offset-2',
+          // Active = live policy: raised surface + a quiet 2px lime spine. Inactive = flat, no spine.
+          isActive
+            ? 'border-l-2 border-l-cc-accent bg-cc-surface-raised shadow-card'
+            : 'bg-cc-surface',
+        )}
       >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Policy Basic Info */}
@@ -188,19 +195,18 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
             </div>
           </div>
 
-          {/* Premium */}
+          {/* Premium: the anchor. Carried by weight, rendered once (no standalone $ glyph). */}
           <div>
-            <div className="text-sm">
-              <span className="text-cc-text-muted">Premium:</span>
-              <div className="flex items-center gap-1 font-semibold text-cc-text-primary">
-                <DollarSign className="h-3 w-3" />
-                <span className="cc-num">{formatCurrency(policy.premium)}</span>
-              </div>
-              {policy.premium && (
-                <span className="text-cc-text-muted text-xs">
+            <span className="text-cc-text-muted text-xs">Premium</span>
+            <div className="mt-0.5 flex items-baseline gap-1.5">
+              <span className="cc-num font-mono text-xl font-semibold text-cc-text-primary">
+                {formatCurrency(policy.premium)}
+              </span>
+              {policy.premium ? (
+                <span className="text-sm text-cc-text-muted">
                   / {policy.billing_frequency || 'annual'}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -478,10 +484,9 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                       {/* Premium */}
                       <div>
                         <div className="text-sm">
-                          <label className="text-muted-foreground">Premium:</label>
-                          <div className="flex items-center gap-1 font-semibold">
-                            <DollarSign className="h-3 w-3" />
-                            <span>{formatCurrency(quote.premium)}</span>
+                          <label className="text-cc-text-muted">Premium:</label>
+                          <div className="font-semibold text-cc-text-primary">
+                            <span className="cc-num font-mono">{formatCurrency(quote.premium)}</span>
                           </div>
                         </div>
                       </div>
