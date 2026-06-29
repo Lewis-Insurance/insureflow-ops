@@ -1,895 +1,249 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Calendar,
-  Clock,
-  AlertTriangle,
-  RefreshCw,
-  Download,
-  Brain,
-  Search,
-  Filter,
-  SlidersHorizontal,
-  List,
-  LayoutGrid,
-  Kanban,
-  ChevronDown,
-  Building2,
-  DollarSign,
-  TrendingUp,
-  X,
-} from 'lucide-react';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { RenewalsList } from '@/components/renewals/RenewalsList';
-import { RenewalsStats } from '@/components/renewals/RenewalsStats';
-import { RenewalPipeline } from '@/components/renewals/RenewalPipeline';
-import { BulkActionsBar } from '@/components/renewals/BulkActionsBar';
+import { Search, Repeat2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { useRenewals as usePolicyRenewals, useRenewalsStats } from '@/hooks/useRenewals';
-import {
-  useRenewals,
-  RenewalStatus,
-  RenewalPriority,
-  Renewal,
-  getStatusConfig,
-  getPriorityConfig,
-} from '@/hooks/useRenewalWorkflow';
-import { useSyncPoliciesToRenewals } from '@/hooks/useRenewalIntelligence';
-import { useToast } from '@/hooks/use-toast';
-import { useCarriers } from '@/hooks/useLookupData';
-import { formatCurrency } from '@/lib/utils';
-import { format, differenceInDays } from 'date-fns';
-import { parseLocalDate } from '@/lib/date/localDate';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { useAoMigrationSearch } from '@/hooks/useAoMigrationSearch';
+import { useAoMigrationCounts } from '@/hooks/useAoMigrationCounts';
+import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
+import { humanizeCarrier, humanizeStatus } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
-type ViewMode = 'policies' | 'workflow' | 'pipeline';
-type SortField = 'renewal_date' | 'premium' | 'risk_score' | 'days_remaining' | 'account_name';
-type SortDirection = 'asc' | 'desc';
+// Cohorts are computed server-side; clicking a tile filters the rows to it.
+// The Auto-Owners book moving off Auto-Owners to Nationwide and Progressive.
+type Cohort = 'all' | 'not_started' | 'quote_out' | 'bound_elsewhere' | 'lapsing_week';
 
-const STATUS_OPTIONS: { value: RenewalStatus; label: string }[] = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'quoted', label: 'Quoted' },
-  { value: 'renewed', label: 'Renewed' },
-  { value: 'lost', label: 'Lost' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'lapsed', label: 'Lapsed' },
-  { value: 'moved', label: 'Moved' },
-  { value: 'non_renewed', label: 'Non-Renewed' },
-];
-
-const PRIORITY_OPTIONS: { value: RenewalPriority; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high', label: 'High' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'low', label: 'Low' },
-];
-
-const RISK_LEVELS = ['critical', 'high', 'medium', 'low'] as const;
-
-// Statuses that represent active work vs completed
-// Include legacy values: 'upcoming' and 'in_progress' map to "To Work", 'completed' maps to "Completed"
-const TO_WORK_STATUSES: RenewalStatus[] = ['pending', 'contacted', 'quoted', 'upcoming', 'in_progress'];
-const COMPLETED_STATUSES: RenewalStatus[] = ['renewed', 'lost', 'cancelled', 'moved', 'non_renewed', 'lapsed', 'completed'];
-
-const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'renewal_date', label: 'Expiration Date' },
-  { value: 'days_remaining', label: 'Days Remaining' },
-  { value: 'premium', label: 'Premium' },
-  { value: 'risk_score', label: 'Risk Score' },
-  { value: 'account_name', label: 'Customer Name' },
-];
+// Dense table column template (md+). Same fields, same order, every row:
+// Client, current AO policy, target carrier, rewrite status, days to lapse, last contact.
+const COLS = 'md:grid-cols-[minmax(0,1fr)_150px_130px_104px_120px_150px]';
 
 export default function RenewalsPage() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  // View state
-  const [viewMode, setViewMode] = useState<ViewMode>('workflow');
-  const [activeTab, setActiveTab] = useState('upcoming');
-  const [workflowTab, setWorkflowTab] = useState<'to_work' | 'completed'>('to_work');
-
-  // Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<RenewalStatus[]>([]);
-  const [selectedPriorities, setSelectedPriorities] = useState<RenewalPriority[]>([]);
-  const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([]);
-  const [selectedCarriers, setSelectedCarriers] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<SortField>('renewal_date');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [cohort, setCohort] = useState<Cohort>('all');
 
-  // Selection state for bulk operations
-  const [selectedRenewalIds, setSelectedRenewalIds] = useState<string[]>([]);
+  const { renewals, loading, loadingMore, hasMore, fetchRenewals, fetchNextPage } = useAoMigrationSearch();
+  const { counts } = useAoMigrationCounts();
 
-  // Sync policies to renewals on mount
-  const syncMutation = useSyncPoliciesToRenewals();
-  const hasSynced = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didMountRef = useRef(false);
+
+  // Single server-side fetch path for search + cohort. The hook loads the first
+  // page on mount, so skip the first run here (a second concurrent fetch would
+  // race it). Search is debounced; cohort changes refetch too.
   useEffect(() => {
-    if (!hasSynced.current) {
-      hasSynced.current = true;
-      syncMutation.mutate(90);
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
     }
-  }, []);
-
-  // Data fetching - Policy-based view
-  const {
-    data: upcomingRenewals = [],
-    isLoading: loadingUpcoming,
-    refetch: refetchUpcoming,
-  } = usePolicyRenewals('upcoming');
-
-  const {
-    data: expiredPolicies = [],
-    isLoading: loadingExpired,
-    refetch: refetchExpired,
-  } = usePolicyRenewals('expired');
-
-  const { data: stats, isLoading: statsLoading } = useRenewalsStats();
-
-  // Fetch carriers for filter dropdown
-  const { data: carriers = [] } = useCarriers();
-
-  // Data fetching - Workflow-based view
-  const { data: workflowRenewals = [], isLoading: loadingWorkflow, refetch: refetchWorkflow } =
-    useRenewals({
-      status: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-      priority: selectedPriorities.length > 0 ? selectedPriorities : undefined,
-      risk_level:
-        selectedRiskLevels.length > 0
-          ? (selectedRiskLevels as ('low' | 'medium' | 'high' | 'critical')[])
-          : undefined,
-      search: searchQuery || undefined,
-      carrier: selectedCarriers.length > 0 ? selectedCarriers[0] : undefined,
-    });
-
-  // Filter and sort renewals
-  const filteredRenewals = useMemo(() => {
-    let renewals = [...workflowRenewals];
-
-    // Filter by workflow tab (to work vs completed)
-    const tabStatuses = workflowTab === 'to_work' ? TO_WORK_STATUSES : COMPLETED_STATUSES;
-    renewals = renewals.filter(r => tabStatuses.includes(r.status as RenewalStatus));
-
-    // Sort
-    renewals.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortField) {
-        case 'renewal_date':
-          comparison =
-            new Date(a.renewal_date || 0).getTime() - new Date(b.renewal_date || 0).getTime();
-          break;
-        case 'days_remaining':
-          const daysA = a.renewal_date
-            ? differenceInDays(new Date(a.renewal_date), new Date())
-            : 999;
-          const daysB = b.renewal_date
-            ? differenceInDays(new Date(b.renewal_date), new Date())
-            : 999;
-          comparison = daysA - daysB;
-          break;
-        case 'premium':
-          comparison = (a.current_premium || 0) - (b.current_premium || 0);
-          break;
-        case 'risk_score':
-          comparison = (a.risk_score || 0) - (b.risk_score || 0);
-          break;
-        case 'account_name':
-          comparison = (a.account?.name || '').localeCompare(b.account?.name || '');
-          break;
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    return renewals;
-  }, [workflowRenewals, sortField, sortDirection, workflowTab]);
-
-  // Calculate workflow stats
-  const workflowStats = useMemo(() => {
-    const byStatus: Record<string, number> = {};
-    const byPriority: Record<string, number> = {};
-    let totalPremium = 0;
-    let urgentCount = 0;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Normalize to start of day
-
-    workflowRenewals.forEach((r) => {
-      byStatus[r.status] = (byStatus[r.status] || 0) + 1;
-      if (r.priority) {
-        byPriority[r.priority] = (byPriority[r.priority] || 0) + 1;
-      }
-      totalPremium += r.current_premium || 0;
-
-      // Calculate urgent: renewals within next 5 days only (not past due)
-      if (r.renewal_date) {
-        const renewalDate = new Date(r.renewal_date);
-        renewalDate.setHours(0, 0, 0, 0);
-        const daysUntil = Math.floor((renewalDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntil >= 0 && daysUntil <= 5) {
-          urgentCount++;
-        }
-      }
-    });
-
-    return {
-      total: workflowRenewals.length,
-      byStatus,
-      byPriority,
-      totalPremium,
-      urgentCount,
-      activeCount:
-        (byStatus['pending'] || 0) +
-        (byStatus['contacted'] || 0) +
-        (byStatus['quoted'] || 0) +
-        (byStatus['upcoming'] || 0) +
-        (byStatus['in_progress'] || 0),
-      completedCount:
-        (byStatus['renewed'] || 0) +
-        (byStatus['lost'] || 0) +
-        (byStatus['cancelled'] || 0) +
-        (byStatus['moved'] || 0) +
-        (byStatus['non_renewed'] || 0) +
-        (byStatus['lapsed'] || 0) +
-        (byStatus['completed'] || 0),
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchRenewals(searchQuery, 'renewal_asc', cohort), 250);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [workflowRenewals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, cohort]);
 
-  const handleRefresh = () => {
-    // Sync policies to renewals table first, then refetch
-    syncMutation.mutate(90, {
-      onSettled: () => {
-        if (viewMode === 'policies') {
-          refetchUpcoming();
-          refetchExpired();
-        } else {
-          refetchWorkflow();
-        }
-      },
-    });
-    toast({
-      title: 'Syncing & Refreshing',
-      description: 'Syncing policies to renewals and refreshing data',
-    });
-  };
-
-  const handleExport = () => {
-    toast({
-      title: 'Export Started',
-      description: 'Renewals report will be available for download shortly',
-    });
-  };
-
-  const handlePolicySelect = (policyId: string) => {
-    navigate(`/policies/${policyId}`);
-  };
-
-  const handleRenewalSelect = (renewal: Renewal) => {
-    navigate(`/renewals/${renewal.id}/edit`);
-  };
-
-  const clearFilters = () => {
+  const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
+  const filtersActive = cohort !== 'all' || searchQuery.length > 0;
+  const clearAll = () => {
+    setCohort('all');
     setSearchQuery('');
-    setSelectedStatuses([]);
-    setSelectedPriorities([]);
-    setSelectedRiskLevels([]);
-    setSelectedCarriers([]);
   };
 
-  // Selection handlers for bulk operations
-  const toggleRenewalSelection = (renewalId: string) => {
-    setSelectedRenewalIds((prev) =>
-      prev.includes(renewalId)
-        ? prev.filter((id) => id !== renewalId)
-        : [...prev, renewalId]
-    );
-  };
-
-  const selectAllRenewals = () => {
-    setSelectedRenewalIds(filteredRenewals.map((r) => r.id));
-  };
-
-  const clearSelection = () => {
-    setSelectedRenewalIds([]);
-  };
-
-  const hasActiveFilters =
-    searchQuery ||
-    selectedStatuses.length > 0 ||
-    selectedPriorities.length > 0 ||
-    selectedRiskLevels.length > 0 ||
-    selectedCarriers.length > 0;
-
-  const isLoading =
-    viewMode === 'policies' ? loadingUpcoming || loadingExpired : loadingWorkflow;
+  const openRenewal = (id: string) => navigate(`/renewals/${id}/edit`);
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="mx-auto max-w-[1200px] space-y-6 p-6">
+        {/* Header: title + one lime primary */}
+        <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Renewals Management</h1>
-            <p className="text-muted-foreground">
-              Track and manage policy renewals through the complete workflow
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">AO Migration</h1>
+            <p className="mt-1 text-sm text-cc-text-muted">
+              Auto-Owners book moving to Nationwide and Progressive.{' '}
+              <span className="cc-num">{counts.total}</span> to rewrite.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="default" onClick={() => navigate('/renewals/intelligence')}>
-              <Brain className="h-4 w-4 mr-2" />
-              AI Intelligence
-            </Button>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
+          <Button
+            data-primary
+            onClick={() => navigate('/quotes/new')}
+            className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+          >
+            <Repeat2 className="h-4 w-4" />
+            Start rewrite
+          </Button>
+        </header>
+
+        {/* Triage strip: AO migration cohorts, counted server-side over the whole book */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <TriageTile
+            label="Not started"
+            count={counts.not_started}
+            sub="Begin rewrite"
+            tone="warning"
+            active={cohort === 'not_started'}
+            onClick={() => toggleCohort('not_started')}
+          />
+          <TriageTile
+            label="Quote out"
+            count={counts.quote_out}
+            sub="Follow up"
+            tone="info"
+            active={cohort === 'quote_out'}
+            onClick={() => toggleCohort('quote_out')}
+          />
+          <TriageTile
+            label="Bound elsewhere"
+            count={counts.bound_elsewhere}
+            sub="Confirm moved"
+            tone="success"
+            active={cohort === 'bound_elsewhere'}
+            onClick={() => toggleCohort('bound_elsewhere')}
+          />
+          <TriageTile
+            label="Lapsing this week"
+            count={counts.lapsing_week}
+            sub="Act now"
+            tone="danger"
+            active={cohort === 'lapsing_week'}
+            onClick={() => toggleCohort('lapsing_week')}
+          />
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="workflow" className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4" />
-                List View
-              </TabsTrigger>
-              <TabsTrigger value="pipeline" className="flex items-center gap-2">
-                <Kanban className="h-4 w-4" />
-                Pipeline
-              </TabsTrigger>
-              <TabsTrigger value="policies" className="flex items-center gap-2">
-                <List className="h-4 w-4" />
-                Policy View
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-0 flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cc-text-muted" />
+            <Input
+              placeholder="Search client or policy"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search renewals"
+              className="h-9 rounded-cc-md border-cc-border-interactive bg-cc-surface-raised pl-9 text-cc-text-primary placeholder:text-cc-text-muted"
+            />
+          </div>
 
-          {viewMode === 'workflow' && (
-            <div className="flex items-center gap-2">
-              <Select
-                value={`${sortField}-${sortDirection}`}
-                onValueChange={(v) => {
-                  const [field, dir] = v.split('-') as [SortField, SortDirection];
-                  setSortField(field);
-                  setSortDirection(dir);
-                }}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((option) => (
-                    <React.Fragment key={option.value}>
-                      <SelectItem value={`${option.value}-asc`}>
-                        {option.label} (Low to High)
-                      </SelectItem>
-                      <SelectItem value={`${option.value}-desc`}>
-                        {option.label} (High to Low)
-                      </SelectItem>
-                    </React.Fragment>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="inline-flex items-center gap-1 text-sm text-cc-text-secondary hover:text-cc-text-primary"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
           )}
+
+          <span className="ml-auto cc-num text-sm text-cc-text-muted">
+            {renewals.length}
+            {hasMore ? '+' : ''} shown
+          </span>
         </div>
 
-        {/* Stats Overview - Show for policies and workflow views */}
-        {viewMode === 'policies' && (
-          <RenewalsStats stats={stats} loading={statsLoading} />
-        )}
-        {viewMode === 'workflow' && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Active Renewals</p>
-                  <p className="text-3xl font-bold mt-1">{workflowStats.activeCount}</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Completed</p>
-                  <p className="text-3xl font-bold mt-1 text-green-600">
-                    {workflowStats.completedCount}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Total Premium</p>
-                  <p className="text-3xl font-bold mt-1">
-                    {formatCurrency(workflowStats.totalPremium)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Urgent</p>
-                  <p className="text-3xl font-bold mt-1 text-red-600">
-                    {workflowStats.urgentCount}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Dense, uniform list */}
+        <div className="overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface shadow-card">
+          <div className={cn('hidden gap-4 border-b border-cc-border-subtle px-4 py-2.5 md:grid', COLS)}>
+            <SectionLabel>Client</SectionLabel>
+            <SectionLabel>Current AO policy</SectionLabel>
+            <SectionLabel>Target carrier</SectionLabel>
+            <SectionLabel>Rewrite status</SectionLabel>
+            <SectionLabel>Days to lapse</SectionLabel>
+            <SectionLabel>Last contact</SectionLabel>
           </div>
-        )}
 
-        {/* Workflow View Content */}
-        {viewMode === 'workflow' && (
-          <>
-            {/* Workflow Tabs - To Work vs Completed */}
-            <Tabs value={workflowTab} onValueChange={(v) => setWorkflowTab(v as 'to_work' | 'completed')} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
-                <TabsTrigger value="to_work" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  To Work
-                  <Badge variant="secondary" className="ml-1">
-                    {workflowStats.activeCount}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Completed
-                  <Badge variant="secondary" className="ml-1">
-                    {workflowStats.completedCount}
-                  </Badge>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {/* Filters Bar */}
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Search */}
-              <div className="relative flex-1 min-w-[200px] max-w-[400px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by customer or policy..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              {/* Status Filter */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    Status
-                    {selectedStatuses.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {selectedStatuses.length}
-                      </Badge>
-                    )}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {STATUS_OPTIONS.map((option) => {
-                    const config = getStatusConfig(option.value);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={option.value}
-                        checked={selectedStatuses.includes(option.value)}
-                        onCheckedChange={(checked) => {
-                          setSelectedStatuses((prev) =>
-                            checked
-                              ? [...prev, option.value]
-                              : prev.filter((s) => s !== option.value)
-                          );
-                        }}
-                      >
-                        <span className={config.color}>{option.label}</span>
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Priority Filter */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Priority
-                    {selectedPriorities.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {selectedPriorities.length}
-                      </Badge>
-                    )}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuLabel>Filter by Priority</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {PRIORITY_OPTIONS.map((option) => {
-                    const config = getPriorityConfig(option.value);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={option.value}
-                        checked={selectedPriorities.includes(option.value)}
-                        onCheckedChange={(checked) => {
-                          setSelectedPriorities((prev) =>
-                            checked
-                              ? [...prev, option.value]
-                              : prev.filter((p) => p !== option.value)
-                          );
-                        }}
-                      >
-                        <span className={config.color}>{option.label}</span>
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Risk Level Filter */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Risk Level
-                    {selectedRiskLevels.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {selectedRiskLevels.length}
-                      </Badge>
-                    )}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuLabel>Filter by Risk</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {RISK_LEVELS.map((level) => (
-                    <DropdownMenuCheckboxItem
-                      key={level}
-                      checked={selectedRiskLevels.includes(level)}
-                      onCheckedChange={(checked) => {
-                        setSelectedRiskLevels((prev) =>
-                          checked ? [...prev, level] : prev.filter((l) => l !== level)
-                        );
-                      }}
-                    >
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Carrier Filter */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Carrier
-                    {selectedCarriers.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {selectedCarriers.length}
-                      </Badge>
-                    )}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 max-h-64 overflow-y-auto">
-                  <DropdownMenuLabel>Filter by Carrier</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {carriers.map((carrier) => (
-                    <DropdownMenuCheckboxItem
-                      key={carrier.id}
-                      checked={selectedCarriers.includes(carrier.name)}
-                      onCheckedChange={(checked) => {
-                        setSelectedCarriers((prev) =>
-                          checked
-                            ? [...prev, carrier.name]
-                            : prev.filter((c) => c !== carrier.name)
-                        );
-                      }}
-                    >
-                      {carrier.name}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Clear Filters */}
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-1" />
+          {loading ? (
+            Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+          ) : renewals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <p className="max-w-sm text-sm text-cc-text-secondary">
+                {filtersActive
+                  ? 'No Auto-Owners renewals match these filters. Clear them to see the whole migration book.'
+                  : 'The Auto-Owners migration book is clear. Nothing left to rewrite right now.'}
+              </p>
+              {filtersActive && (
+                <Button
+                  variant="outline"
+                  onClick={clearAll}
+                  className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
                   Clear filters
                 </Button>
               )}
-
-              {/* Results count */}
-              <span className="text-sm text-muted-foreground ml-auto">
-                {filteredRenewals.length} renewal{filteredRenewals.length !== 1 ? 's' : ''}
-              </span>
             </div>
-
-            {/* Workflow Renewals List */}
-            {loadingWorkflow ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-4">
-                        <Skeleton className="h-12 w-12 rounded" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-5 w-48" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                        <Skeleton className="h-8 w-24" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : filteredRenewals.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No renewals found</h3>
-                  <p className="text-sm text-muted-foreground text-center max-w-md">
-                    {hasActiveFilters
-                      ? 'Try adjusting your filters to see more results.'
-                      : 'There are no renewals in the system yet.'}
-                  </p>
-                  {hasActiveFilters && (
-                    <Button variant="outline" className="mt-4" onClick={clearFilters}>
-                      Clear all filters
-                    </Button>
+          ) : (
+            renewals.map((r) => {
+              const target = humanizeCarrier(r.moved_carrier || r.best_alternative_carrier || '');
+              const policySub = humanizeStatus(r.policy_type) || humanizeCarrier(r.current_carrier);
+              return (
+                <div
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openRenewal(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openRenewal(r.id);
+                    }
+                  }}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-between gap-4 border-b border-cc-border-subtle px-4 py-3 transition-colors duration-fast last:border-b-0 hover:bg-cc-surface-raised',
+                    'md:grid md:items-center',
+                    COLS,
                   )}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredRenewals.map((renewal) => (
-                  <RenewalCard
-                    key={renewal.id}
-                    renewal={renewal}
-                    onClick={() => handleRenewalSelect(renewal)}
-                    isSelected={selectedRenewalIds.includes(renewal.id)}
-                    onToggleSelect={toggleRenewalSelection}
-                  />
-                ))}
-              </div>
-            )}
-          </>
+                >
+                  {/* Client (carries status + countdown inline on mobile) */}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-cc-text-primary break-words">{r.customer_name}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 md:hidden">
+                      <StatusPill status={r.status} />
+                      <NextRenewal date={r.renewal_date} />
+                    </div>
+                  </div>
+
+                  {/* Current AO policy: number never truncates; sub line is type or carrier */}
+                  <div className="hidden min-w-0 md:block">
+                    <div className="cc-num whitespace-nowrap font-mono text-sm text-cc-text-secondary">{r.policy_number}</div>
+                    {policySub && <div className="truncate text-xs text-cc-text-muted">{policySub}</div>}
+                  </div>
+
+                  {/* Target carrier: name chip, never colored. "Not set" when both null. */}
+                  <div className="hidden md:block">
+                    {target ? <Chip>{target}</Chip> : <span className="text-sm text-cc-text-muted">Not set</span>}
+                  </div>
+
+                  <div className="hidden md:block">
+                    <StatusPill status={r.status} />
+                  </div>
+
+                  <div className="hidden md:block">
+                    <NextRenewal date={r.renewal_date} />
+                  </div>
+
+                  <div className="hidden md:block">
+                    <LastContact date={r.last_contact_date} />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {hasMore && !loading && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => fetchNextPage()}
+              disabled={loadingMore}
+              className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+            >
+              {loadingMore ? 'Loading' : 'Load more'}
+            </Button>
+          </div>
         )}
-
-        {/* Pipeline View Content */}
-        {viewMode === 'pipeline' && (
-          <RenewalPipeline />
-        )}
-
-        {/* Policy View Content (original) */}
-        {viewMode === 'policies' && (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upcoming" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Upcoming Renewals
-                {stats?.upcoming && (
-                  <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
-                    {stats.upcoming}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="expired" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Expired Policies
-                {stats?.expired && (
-                  <span className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded-full">
-                    {stats.expired}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="upcoming" className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                Policies expiring within the next 30 days
-              </div>
-              <RenewalsList
-                policies={upcomingRenewals}
-                type="upcoming"
-                loading={loadingUpcoming}
-                onPolicySelect={handlePolicySelect}
-              />
-            </TabsContent>
-
-            <TabsContent value="expired" className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <AlertTriangle className="h-4 w-4" />
-                Policies that have already expired and need renewal
-              </div>
-              <RenewalsList
-                policies={expiredPolicies}
-                type="expired"
-                loading={loadingExpired}
-                onPolicySelect={handlePolicySelect}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {/* Bulk Actions Bar */}
-        <BulkActionsBar
-          selectedIds={selectedRenewalIds}
-          onClearSelection={clearSelection}
-          onSelectAll={selectAllRenewals}
-          totalCount={filteredRenewals.length}
-        />
       </div>
     </AppLayout>
-  );
-}
-
-// Renewal Card Component for Workflow View
-function RenewalCard({
-  renewal,
-  onClick,
-  isSelected,
-  onToggleSelect,
-}: {
-  renewal: Renewal;
-  onClick: () => void;
-  isSelected?: boolean;
-  onToggleSelect?: (renewalId: string) => void;
-}) {
-  const daysRemaining = renewal.renewal_date
-    ? differenceInDays(new Date(renewal.renewal_date), new Date())
-    : null;
-
-  const statusConfig = getStatusConfig(renewal.status);
-  const priorityConfig = getPriorityConfig(renewal.priority);
-
-  const getDaysRemainingColor = () => {
-    if (daysRemaining === null) return '';
-    if (daysRemaining < 0) return 'text-red-600';
-    if (daysRemaining <= 7) return 'text-red-600';
-    if (daysRemaining <= 14) return 'text-orange-600';
-    if (daysRemaining <= 30) return 'text-yellow-600';
-    return 'text-green-600';
-  };
-
-  return (
-    <Card
-      className={`cursor-pointer hover:shadow-md transition-shadow ${
-        isSelected ? 'ring-2 ring-primary' : ''
-      }`}
-      onClick={onClick}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-center gap-4">
-          {/* Selection Checkbox */}
-          {onToggleSelect && (
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={() => onToggleSelect(renewal.id)}
-              onClick={(e) => e.stopPropagation()}
-              className="shrink-0"
-            />
-          )}
-
-          {/* Customer/Policy Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold truncate">
-                {renewal.account?.name || 'Unknown Customer'}
-              </h3>
-              <Badge className={`${statusConfig.bgColor} ${statusConfig.color}`}>
-                {statusConfig.label}
-              </Badge>
-              {renewal.priority && renewal.priority !== 'normal' && (
-                <Badge className={`${priorityConfig.bgColor} ${priorityConfig.color}`}>
-                  {priorityConfig.label}
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              {renewal.policy_number && (
-                <span className="flex items-center gap-1">
-                  Policy #{renewal.policy_number}
-                </span>
-              )}
-              {renewal.carrier && (
-                <span className="flex items-center gap-1">
-                  <Building2 className="h-3 w-3" />
-                  {renewal.carrier}
-                </span>
-              )}
-              {renewal.policy_type && <span>{renewal.policy_type}</span>}
-            </div>
-          </div>
-
-          {/* Premium */}
-          <div className="text-right">
-            <p className="font-semibold">
-              {renewal.current_premium ? formatCurrency(renewal.current_premium) : 'N/A'}
-            </p>
-            <p className="text-xs text-muted-foreground">Premium</p>
-          </div>
-
-          {/* Risk Score */}
-          {renewal.risk_score !== null && (
-            <div className="text-right">
-              <p
-                className={`font-semibold ${
-                  renewal.risk_score >= 70
-                    ? 'text-red-600'
-                    : renewal.risk_score >= 50
-                    ? 'text-orange-600'
-                    : 'text-green-600'
-                }`}
-              >
-                {renewal.risk_score}
-              </p>
-              <p className="text-xs text-muted-foreground">Risk</p>
-            </div>
-          )}
-
-          {/* Days Remaining */}
-          <div className="text-right min-w-[80px]">
-            <p className={`font-semibold ${getDaysRemainingColor()}`}>
-              {daysRemaining !== null
-                ? daysRemaining < 0
-                  ? `${Math.abs(daysRemaining)}d ago`
-                  : `${daysRemaining}d`
-                : 'N/A'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {renewal.renewal_date
-                ? format(parseLocalDate(renewal.renewal_date), 'MMM d')
-                : 'No date'}
-            </p>
-          </div>
-
-          {/* Action Indicator */}
-          <ChevronDown className="h-5 w-5 text-muted-foreground -rotate-90" />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
