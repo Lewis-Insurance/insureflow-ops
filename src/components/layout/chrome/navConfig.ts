@@ -120,6 +120,7 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'Issues', to: '/issues', icon: Activity },
   { label: 'Predictive Analytics', to: '/predictive-analytics', icon: TrendingUp },
   { label: 'Merge Customers', to: '/merge-customers', icon: GitMerge },
+  { label: 'Duplicate review', to: '/duplicates', icon: GitMerge },
   { label: 'Customization', to: '/customization', icon: Sliders },
   { label: 'Carriers', to: '/carriers', icon: Building2 },
   { label: 'MGAs', to: '/mgas', icon: Briefcase },

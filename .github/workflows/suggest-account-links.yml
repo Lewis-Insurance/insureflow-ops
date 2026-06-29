@@ -1,0 +1,52 @@
+# Suggest Account Links Scheduler
+#
+# Triggers the suggest-account-links edge function nightly. It proposes account
+# relationships from existing signals (shared phone/address, surname-business,
+# business-email-name, spouse name) into account_relationship_suggestions. It
+# never auto-commits; a producer confirms each link in one click.
+#
+# Required GitHub Secrets:
+# - CRON_SECRET: Secret key matching CRON_SECRET in Supabase Edge Functions
+# - SUPABASE_URL: Your Supabase project URL
+
+name: Suggest Account Links
+
+on:
+  schedule:
+    # Nightly at 07:30 UTC (after the other analytics jobs).
+    - cron: '30 7 * * *'
+
+  # Allow manual triggering.
+  workflow_dispatch:
+
+jobs:
+  trigger-suggestions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger Suggest Account Links
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          URL="${SUPABASE_URL}/functions/v1/suggest-account-links"
+          echo "Calling suggest-account-links function..."
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Suggestions generated successfully."
+          else
+            echo "::error::suggest-account-links failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
