@@ -112,10 +112,10 @@ This fence is a default-deny safety layer for the Sprint 0–4 scope, not a prod
 - The server-side one-time exact-content approval gate is installed on `email-send`, `send-sms`, `send-coi-email`, and `esign-create-request`. Other direct provider/client-effect paths named in the inventory (`canopy-servicing`, `marketing-send-governor`, `reputation-manager`, `renewal-rate-watch`, `portal-send-invitation`, and similar carrier/scheduled/marketing workflows) remain classified for follow-on gating or explicit exception before they are used for client-facing sends.
 - `canopy-servicing` is now explicitly inventoried as a carrier-mediated client-effect path: `request_id_card` and `request_declarations` can POST a payload with `delivery_method: email` and an email address to the Canopy servicing API. It is not covered by this branch's approval gate and is not production-approved by this fence without a gate or documented exception.
 - Optional external model/runtime proxies are now explicitly inventoried: `hermes-chat` can forward `body.message` to an external Hermes runtime when `FLOOR_COCKPIT_ENABLED` plus `HERMES_API_URL`/key are set and `FLOOR_HERMES_SYNTHETIC` is not true; `prism-api` can forward a raw `prompt` to `PRISM_SERVICE_URL`. Both need redaction or documented feature-flagged exceptions before any repo-wide model-boundary completeness claim.
-- Internal automation callers such as `automation-processor` and `process-quote-followups` do not mint `client_send_approval`. Current fail-closed behavior is path-specific: the email path invokes `email-send` and should fail auth/gate before provider send, while the SMS path invokes `twilio-sms` (an inbound/webhook-style function), not `send-sms`; it should fail its own webhook/auth controls rather than a `client_send_approval_required` error. Their workflow UX/queue behavior still needs follow-on cleanup before those automations are enabled.
+- Internal automation callers such as `automation-processor` and `process-quote-followups` do not mint `client_send_approval`. Current fail-closed behavior is path-specific: `automation-processor` email invokes `email-send` and should fail auth/gate before provider send, while its SMS path invokes `twilio-sms` (an inbound/webhook-style function), not `send-sms`, and should fail its own webhook/auth controls rather than a `client_send_approval_required` error. `process-quote-followups` invokes `email-send` and `send-sms` without approval and should fail auth/gate before provider/Twilio. Their workflow UX/queue behavior still needs follow-on cleanup before those automations are enabled.
 - `weekly-ceo-digest` is treated as an internal executive digest exception, not a client/carrier send surface. It appears in the staged deploy loop only as a model-boundary/redaction bundle, remains behind its existing cron-secret/idempotency controls, and was not deployed by this run.
 - Redaction coverage is for the tested regulated identifiers and storage refs listed above. It should not be described as full anonymization of every possible PII category or every unlabeled format: names, business names, street addresses, FEIN/EIN, license plates, unlabeled DLNs/account/policy numbers, and other document-specific identifiers require future expansion if the live rollout needs that guarantee.
-- Azure Document Intelligence/Form Recognizer and Google Cloud Vision OCR are separate document-processing provider boundaries. This fence redacts OCR/document text before LLM/model calls; it does not redact raw document bytes, base64 document content, or signed document URLs before an OCR provider receives them. Live-document use therefore still requires the approved OCR/provider posture or a separate disable/exception gate.
+- Azure Document Intelligence/Form Recognizer and Google Cloud Vision OCR are separate document-processing provider boundaries. Observed Vision callers include `ocr-document`, `parse-document-ocr`, `ai-document-analysis/pdf-extractor`, and `ai-document-intelligence`. This fence redacts OCR/document text before LLM/model calls; it does not redact raw document bytes, base64 document content, or signed document URLs before an OCR provider receives them. Live-document use therefore still requires the approved OCR/provider posture or a separate disable/exception gate.
 - `email-send` has no human approval-minting UI wrapper in this branch. That is intentional for the current scope: SMS, COI, and e-sign human workflows are preserved; generic email send remains fail-closed/no-working-human-path until a scoped human email composer flow is designed and wrapped.
 - `esign-create-request` consumes approval before Dropbox Sign, but server-defaulted fields injected after the gate (for example default `subject`, and absent `message`) are not themselves content-hash inputs. Treat that as a low-severity follow-on if defaults become human-meaningful external content beyond the already-hashed document/signature request fields.
 - Test coverage is representative, not exhaustive: Supabase-backed replay/wrong-human checks are concentrated on `email-send`, expired approval coverage is on `send-sms`, AI-direct-send scans the named AI surfaces and `functions.invoke('send-sms'|'email-send')`, and provider-boundary static scans cover the configured OpenAI/Anthropic/Gemini/Azure patterns rather than every optional proxy/OCR provider.
@@ -123,14 +123,14 @@ This fence is a default-deny safety layer for the Sprint 0–4 scope, not a prod
 
 ## Verification commands run
 
-Fresh verifier after final code changes:
+Fresh verifier after final code/docs changes:
 
 ```bash
 npm run test:run
 # PASS: 26 test files, 338 tests
 
 npm run build
-# PASS: Vite build completed; 5019 modules transformed
+# PASS: Vite build completed; 5016 modules transformed
 
 npm run lint -- --quiet
 # PASS: eslint exited 0
@@ -192,7 +192,7 @@ Required disclosure fixes now reflected in this handoff/inventory:
 
 - `canopy-servicing` is listed as an ungated carrier-mediated client-effect follow-on.
 - `hermes-chat` and `prism-api` are listed as optional external proxy/model-boundary follow-ons.
-- Google Cloud Vision OCR is listed alongside Azure OCR as a raw-document provider boundary outside the LLM redaction guarantee.
+- Google Cloud Vision OCR callers are listed alongside Azure OCR as raw-document provider boundaries outside the LLM redaction guarantee.
 - `redactPII(...)`, `ai-document-analysis`, automation fail-closed behavior, test coverage, `email-send` human-path intent, e-sign default content binding, and `weekly-ceo-digest` deploy-loop wording are all scoped precisely.
 
 These additions do not change deployable code and do not reopen the specific holes closed by the branch. They prevent this handoff from being read as complete repo-wide client-send/model-boundary coverage.
@@ -213,7 +213,7 @@ supabase functions deploy send-sms --project-ref lrqajzwcmdwahnjyidgv
 supabase functions deploy send-coi-email --project-ref lrqajzwcmdwahnjyidgv
 supabase functions deploy esign-create-request --project-ref lrqajzwcmdwahnjyidgv
 
-# Model-boundary redaction bundles
+# Model-boundary/internal digest bundles; `weekly-ceo-digest` remains an internal exception, not client-send approval coverage
 for fn in \
   acord-document-extractor-v2 \
   acord-document-extractor \
