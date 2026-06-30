@@ -37,22 +37,18 @@ export interface ClientSendApprovalStore {
   }): Promise<ClientSendApprovalConsumeResult>;
 }
 
+interface SupabaseFilterBuilder {
+  eq(column: string, value: string): SupabaseFilterBuilder;
+  is(column: string, value: null): SupabaseFilterBuilder;
+  gt(column: string, value: string): SupabaseFilterBuilder;
+  select(columns: string): SupabaseFilterBuilder;
+  maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+}
+
 interface SupabaseLikeClient {
   from(table: string): {
-    select(columns: string): {
-      eq(column: string, value: string): {
-        maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
-      };
-    };
-    update(values: Record<string, unknown>): {
-      eq(column: string, value: string): {
-        is(column: string, value: null): {
-          select(columns: string): {
-            maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
-          };
-        };
-      };
-    };
+    select(columns: string): SupabaseFilterBuilder;
+    update(values: Record<string, unknown>): SupabaseFilterBuilder;
   };
 }
 
@@ -238,6 +234,10 @@ export function createSupabaseClientSendApprovalStore(supabase: SupabaseLikeClie
         .from('client_send_approvals')
         .update({ consumed_at: input.nowIso })
         .eq('approval_ref', input.approvalRef)
+        .eq('surface', input.surface)
+        .eq('content_hash', input.contentHash)
+        .eq('approved_by_user_id', input.approvedByUserId)
+        .gt('expires_at', input.nowIso)
         .is('consumed_at', null)
         .select('approval_ref')
         .maybeSingle();
