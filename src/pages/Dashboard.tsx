@@ -12,6 +12,7 @@ import { AIKnowledgeSearch } from '@/components/dashboard/AIKnowledgeSearch';
 import { UpcomingTasksCard } from '@/components/dashboard/UpcomingTasksCard';
 import { CanopyStatsCard } from '@/components/canopy/CanopyStatsCard';
 import { DashboardGlobalSearch } from '@/components/dashboard/DashboardGlobalSearch';
+import { AddPaymentCard } from '@/components/dashboard/AddPaymentCard';
 
 const DashboardContent = React.memo(() => {
   const { profile, loading: authLoading } = useAuth();
@@ -46,6 +47,11 @@ const DashboardContent = React.memo(() => {
           <CanopyStatsCard />
         </ErrorBoundary>
       </div>
+
+      {/* Quick Add Payment */}
+      <ErrorBoundary level="component">
+        <AddPaymentCard />
+      </ErrorBoundary>
 
       {/* Prominent Global Search */}
       <ErrorBoundary level="component">
