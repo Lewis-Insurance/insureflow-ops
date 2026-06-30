@@ -45,13 +45,6 @@ export function QuickActionsBar({
       iconBg: 'bg-amber-500',
     },
     {
-      label: 'Add Payment',
-      icon: DollarSign,
-      onClick: onAddPayment,
-      bgColor: 'bg-green-600 hover:bg-green-700',
-      iconBg: 'bg-green-500',
-    },
-    {
       label: 'Add Policy',
       icon: Shield,
       onClick: onAddPolicy,
@@ -71,6 +64,14 @@ export function QuickActionsBar({
       onClick: onAddCallLog,
       bgColor: 'bg-purple-600 hover:bg-purple-700',
       iconBg: 'bg-purple-500',
+    },
+    {
+      // Money-green, sits right next to Log Call.
+      label: 'Add Payment',
+      icon: DollarSign,
+      onClick: onAddPayment,
+      bgColor: 'bg-emerald-700 hover:bg-emerald-800',
+      iconBg: 'bg-emerald-600',
     },
     ...(onRequestReview
       ? [

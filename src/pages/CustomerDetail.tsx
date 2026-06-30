@@ -406,6 +406,7 @@ export default function CustomerDetail() {
         open={addPaymentOpen}
         onOpenChange={setAddPaymentOpen}
         accountId={account.id}
+        customerName={account.name}
       />
       <AddDocumentModal
         open={addDocumentOpen}

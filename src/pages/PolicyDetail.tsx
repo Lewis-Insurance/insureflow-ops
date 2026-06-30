@@ -862,6 +862,7 @@ export default function PolicyDetail() {
             onOpenChange={setPaymentModalOpen}
             policyId={policy.id}
             accountId={policy.account?.id}
+            customerName={policy.account?.name}
             onSuccess={() => {
               toast({
                 title: "Payment Recorded",
