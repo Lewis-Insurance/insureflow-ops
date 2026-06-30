@@ -45,3 +45,24 @@ Starting verifier before behavior changes:
 ## [SPRINT 0 COMPLETE]
 
 The inventory/disposition table is committed before behavior changes. Starting point is green and no production deploy/write/send occurred.
+
+## [SPRINT 1 COMPLETE]
+
+Server-side send gate is implemented for `email-send` and `send-sms`:
+
+- `supabase/functions/_shared/clientSendApprovalGate.ts` computes a canonical exact-content hash for each send surface and consumes a one-time approval ref before any provider/carrier side effect.
+- `supabase/functions/email-send/index.ts` now awaits `clientSendApprovalGateResponse(...)` before Postmark/SendGrid.
+- `supabase/functions/send-sms/index.ts` now awaits `clientSendApprovalGateResponse(...)` before rate-limit/Twilio.
+- `supabase/functions/client-send-approval-create/index.ts` mints approval refs for authenticated human UI flows without sending anything.
+- `supabase/migrations/20260630040000_client_send_approvals.sql` stages the `public.client_send_approvals` table: opaque ref, surface, exact content hash, named approving user, expiry, one-time `consumed_at`.
+- `src/lib/clientSendApproval.ts`, `src/hooks/useSMSMessages.ts`, and `src/components/communications/SMSComposerModal.tsx` wrap legitimate human SMS sends with the server-minted approval marker instead of killing the composer.
+
+Proof:
+
+- No-approval payloads are rejected with `client_send_approval_required`.
+- A named-human approved send passes once.
+- Replay of the same approval ref is rejected with `client_send_approval_replayed`.
+- Tampered content is rejected with `client_send_approval_content_mismatch`.
+- The approval creation function stores only the content hash and approval metadata; it has no provider/carrier send call.
+
+No production deploy/write/send occurred. The migration and edge functions are staged on the feature branch for Brian-approved deployment only.

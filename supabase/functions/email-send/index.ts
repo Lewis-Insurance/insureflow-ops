@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
-import { floorApprovalGateResponse } from "../_shared/floorApprovalGate.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from "../_shared/clientSendApprovalGate.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +35,13 @@ serve(async (req) => {
     const authenticatedUser = authResult;
 
     const requestBody = await req.json();
-    const approvalGate = floorApprovalGateResponse('email-send', requestBody, corsHeaders);
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'email-send',
+      payload: requestBody,
+      userId: authenticatedUser.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
     if (approvalGate) return approvalGate;
 
     const { ticketId, to, subject, body, inReplyTo } = requestBody;

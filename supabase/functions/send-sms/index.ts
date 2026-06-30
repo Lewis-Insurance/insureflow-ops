@@ -10,7 +10,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, verifyResourceAccess } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
-import { floorApprovalGateResponse } from "../_shared/floorApprovalGate.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from "../_shared/clientSendApprovalGate.ts";
 
 interface SendSMSRequest {
   to_number: string;
@@ -40,9 +40,15 @@ serve(async (req) => {
     }
     const user = authResult;
 
-    // Get request body and require a Floor approval token before any send/carrier side effect.
+    // Get request body and require a server-verified named-human approval reference before any send/carrier side effect.
     const requestBody: SendSMSRequest = await req.json();
-    const approvalGate = floorApprovalGateResponse('send-sms', requestBody, corsHeaders);
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'send-sms',
+      payload: requestBody,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
     if (approvalGate) return approvalGate;
 
     // Check rate limit (10 SMS per minute per user)
