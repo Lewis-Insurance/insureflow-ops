@@ -256,7 +256,13 @@ const groupByCompany = (pmts: PremiumPayment[]): CompanyGroup[] => {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([company, list]) => ({
       company,
-      payments: list,
+      // Deterministic order within a company: customer name, then date.
+      payments: [...list].sort((a, b) => {
+        const an = (a.account?.name || a.payer_name || '').toLowerCase();
+        const bn = (b.account?.name || b.payer_name || '').toLowerCase();
+        if (an !== bn) return an.localeCompare(bn);
+        return (a.received_date || '').localeCompare(b.received_date || '');
+      }),
       subtotal: list.reduce((s, p) => s + (p.amount || 0), 0),
     }));
 };

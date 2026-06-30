@@ -4,7 +4,6 @@ import { format, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
@@ -24,9 +23,6 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Archive,
   Printer,
   Plus,
   Banknote,
@@ -42,17 +38,11 @@ import { useDaySheet } from '@/hooks/useDaySheets';
 import { usePayments } from '@/hooks/usePayments';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { RecordPaymentForm } from '@/components/payments/RecordPaymentForm';
-import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
+import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { downloadDaySheetPDF, printDaySheetPDF } from '@/components/payments/DaySheetPDF';
 import { DailyCashDialog } from '@/components/payments/DailyCashDialog';
 import { useToast } from '@/hooks/use-toast';
 import type { PremiumPayment } from '@/types/payments';
-
-const statusColors = {
-  open: 'bg-blue-100 text-blue-800',
-  closed: 'bg-amber-100 text-amber-800',
-  deposited: 'bg-green-100 text-green-800',
-};
 
 export default function DaySheetDetail() {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +59,10 @@ export default function DaySheetDetail() {
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments({
     day_sheet_id: id,
   });
+
+  // Stored day-sheet totals only count recorded payments; keep the list, PDF
+  // and cash sheet consistent with that.
+  const recordedPayments = payments.filter((p) => p.status === 'recorded');
 
   // Auto-trigger print from URL params
   useEffect(() => {
@@ -107,7 +101,7 @@ export default function DaySheetDetail() {
           check_count: daySheet.check_count || 0,
           notes: daySheet.notes || undefined,
         },
-        payments,
+        recordedPayments,
         'Lewis Insurance Agency'
       );
     } catch (error) {
@@ -139,7 +133,7 @@ export default function DaySheetDetail() {
           check_count: daySheet.check_count || 0,
           notes: daySheet.notes || undefined,
         },
-        payments,
+        recordedPayments,
         'Lewis Insurance Agency'
       );
     } catch (error) {
@@ -203,12 +197,6 @@ export default function DaySheetDetail() {
               <h1 className="text-3xl font-bold">
                 {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
               </h1>
-              <Badge className={statusColors[daySheet.status]}>
-                {daySheet.status === 'open' && <Clock className="h-3 w-3 mr-1" />}
-                {daySheet.status === 'closed' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                {daySheet.status === 'deposited' && <Archive className="h-3 w-3 mr-1" />}
-                {daySheet.status}
-              </Badge>
             </div>
             {daySheet.sheet_number && (
               <p className="text-muted-foreground font-mono">{daySheet.sheet_number}</p>
@@ -309,7 +297,7 @@ export default function DaySheetDetail() {
       </div>
 
       {/* Depositable Amount Alert */}
-      {daySheet.status === 'open' && depositableAmount > 0 && (
+      {depositableAmount > 0 && (
         <Card className="bg-amber-50 border-amber-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -340,7 +328,7 @@ export default function DaySheetDetail() {
         </CardHeader>
         <CardContent>
           <PaymentTable
-            payments={payments}
+            payments={recordedPayments}
             isLoading={isLoadingPayments}
             onViewPayment={handleViewPayment}
             onEditPayment={handleEditPayment}
@@ -365,8 +353,8 @@ export default function DaySheetDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Payment Modal */}
-      <EditPaymentModal
+      {/* Edit Payment — same single form, in edit mode */}
+      <RecordPaymentModal
         open={!!editingPayment}
         onOpenChange={(open) => !open && setEditingPayment(null)}
         payment={editingPayment}
@@ -378,7 +366,7 @@ export default function DaySheetDetail() {
         open={showDailyCashDialog}
         onOpenChange={setShowDailyCashDialog}
         sheetDate={daySheet.sheet_date}
-        payments={payments}
+        payments={recordedPayments}
       />
     </div>
     </AppLayout>
