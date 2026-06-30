@@ -184,18 +184,46 @@ npm run test:run -- \
 | Direct model provider fetches | Many Edge functions called OpenAI/Anthropic/Gemini/Azure directly | In-scope direct provider calls route through `modelBoundaryFetch(...)` or `anthropicBoundaryCreate(...)`; optional Hermes/Prism proxies and OCR providers remain disclosed follow-ons |
 | Raw PII categories | Existing redactor covered only limited fields in one function | Shared redactor covers tested standard/labeled SSN/DOB/DLN/account/VIN/full policy number/signed URLs/storage paths/raw UUIDs; it is not full anonymization |
 
-## Post-review sign-off and disclosure additions
+## Reviewer sign-off — 2026-06-30
 
-Reviewer verdict dated 2026-06-30: **ACCEPT with required disclosure additions**. Independent review reproduced the published build/test/deploy-not-run evidence and accepted the four-function approval gate plus AI-results direct-send removal for the declared Sprint 0–4 scope.
+**Reviewer / method:** Orchestrated five-unit verification — (1) build/test/deploy, (2) server send-gate, (3) no-AI-direct-send, (4) PII/model-boundary, (5) scope-honesty — with orchestrator-level source verification of every load-bearing finding (no claim accepted on a sub-agent's word alone; contested items re-read in source).
 
-Required disclosure fixes now reflected in this handoff/inventory:
+**State reviewed:** branch `feat/fence-ungated-ai-send-paths`, fence Sprints 0–4 plus docs commits `82c3651`, `8c6c058`, `2b7f3ec`, `2ea7b37`.
 
-- `canopy-servicing` is listed as an ungated carrier-mediated client-effect follow-on.
-- `hermes-chat` and `prism-api` are listed as optional external proxy/model-boundary follow-ons.
-- Google Cloud Vision OCR callers are listed alongside Azure OCR as raw-document provider boundaries outside the LLM redaction guarantee.
-- `redactPII(...)`, `ai-document-analysis`, automation fail-closed behavior, test coverage, `email-send` human-path intent, e-sign default content binding, and `weekly-ceo-digest` deploy-loop wording are all scoped precisely.
+**Disposition:** **ACCEPT** the four-function approval gate and the AI-results direct-send removal as a correct, well-tested default-deny fence for the declared Sprint 0–4 scope. Known-open items are tracked in `docs/fence-ai-send-followups.md`.
 
-These additions do not change deployable code and do not reopen the specific holes closed by the branch. They prevent this handoff from being read as complete repo-wide client-send/model-boundary coverage.
+### Reproduced at acceptance (zero material delta vs. published claims)
+
+- `npm run test:run` → 26 files / 338 tests pass; targeted safety suite → 5 files / 39 tests pass.
+- `npm run build` → pass (5019 modules in the original verifier; 5016 on the 2026-06-30 rerun — benign 3-module drift, chunk-size warnings only).
+- `npm run lint -- --quiet`, `npx tsc --noEmit`, `git diff --check` → pass.
+- Branch correct; all seven in-scope commits present (plus the docs commits above).
+- No `supabase` deploy / `db push` / `link` executed; on-disk CLI link state is stale (2026-06-26, pre-dating this session).
+- Tooling note: the repo verify path is `npm run …` (vite/vitest/eslint per `package.json`). `bun` is not configured (no bun lockfile or `packageManager` field) and is not installed in the verify environment, so `bun run …` fails fast — use the npm commands documented above.
+
+### Verified true at acceptance
+
+- The four gated functions (`email-send`, `send-sms`, `send-coi-email`, `esign-create-request`) reject before any provider/carrier side effect. Server-minted crypto-random opaque refs, content-hash binding, named-human binding, TTL, and one-time consume via a conditional `UPDATE ... WHERE consumed_at IS NULL` are implemented and tested; no bypass found within these four.
+- AI-results direct-send is removed; the Share menu is gated (disabled/toast); no AI surface in `src/` invokes a send function.
+- In-scope model providers (OpenAI/Anthropic/Gemini/Azure) under `supabase/functions/**` and `src/services/**` route through `redactPII`/`modelBoundaryFetch`/`anthropicBoundaryCreate`; the static scan guards regressions.
+
+### Known-open at acceptance — close-the-gap (fix or formally accept; NOT disclosure-only)
+
+1. **`canopy-servicing`** — `request_id_card`/`request_declarations` cause carrier email delivery to a client with no `client_send_approval` (`supabase/functions/canopy-servicing/index.ts:384` payload; Canopy POST `:250`). **Do not represent the client-send surface as "fully fenced" until this is gated or formally accepted with a logged rationale.** First task: confirm whether any AI/automation surface can invoke it (decides gate-vs-accept).
+2. **`hermes-chat` / `prism-api`** — forward the raw message/prompt to an external service guarded only by a block-list / no redaction (`supabase/functions/hermes-chat/index.ts:84` proxy, `:24` block-list; `supabase/functions/prism-api/index.ts:166`). Default posture is synthetic/off, so nothing leaks today. **`hermes-chat` redaction is a prerequisite for wiring the cockpit to the real Hermes brain; fold into the cockpit-wiring run.** The block-list only rejects a few categories and does not sanitize labeled values `redactPII` would catch — the fix is to run outbound text through the shared redactor.
+3. **Google Cloud Vision OCR** — raw document bytes reach Vision (`supabase/functions/ocr-document/index.ts:61` non-boundary `fetch`; `parse-document-ocr/index.ts:83` wraps Vision in `modelBoundaryFetch`, which no-ops for non-model URLs). Same class as the disclosed Azure OCR limitation. Fix = teach `modelBoundaryFetch` to recognize `vision.googleapis.com` or wrap `ocr-document`.
+
+### Confirm — resolved by reviewer
+
+**`email-send` has no working human path, and that is intentional — no regression.** Git evidence: zero `email-send` invokers in `src/` at the pre-fence parent `21b181a`; the only commit in all history touching an `email-send` invoke string in `src/` is the fence test's forbidden-string list (`b77d76d`); `EmailComposerModal` only ever wrote `status:'sent'` to `communication_history`. With automations failing closed, there is currently no working `email-send` path — a product decision (design a human email composer + mint wrapper, or re-enable automations with server-side minting), not a fence defect.
+
+### Security note — out of fence scope, flagged during review
+
+The git `origin` remote embeds a GitHub OAuth token (`gho_…`) in plaintext in `.git/config`. Rotate/revoke it and switch to a credential helper or SSH. Tracked as `SEC-1` in the follow-ups doc.
+
+### Deploy posture
+
+The four-function fence is a net safety win and is safe to deploy on Brian's go; none of the findings block it. Close or formally accept `canopy-servicing` before representing the client-send surface as fully fenced. Fold `hermes-chat`/`prism-api` redaction into the cockpit-wiring run. The disclosure-only wording fixes are already reflected in this handoff and `docs/fence-ai-send-inventory.md`; they change no deployable code and do not reopen any closed hole.
 
 ## Prod deploy commands staged but not run
 
