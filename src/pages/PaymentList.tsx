@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { PaymentTable } from '@/components/payments/PaymentTable';
 import { RecordPaymentForm } from '@/components/payments/RecordPaymentForm';
-import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
+import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { usePayments, useVoidPayment } from '@/hooks/usePayments';
 import { useCurrentDaySheet } from '@/hooks/useDaySheets';
 import type { PremiumPayment } from '@/types/payments';
@@ -396,8 +396,8 @@ export default function PaymentList() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Payment Modal */}
-      <EditPaymentModal
+      {/* Edit Payment — same single form, in edit mode */}
+      <RecordPaymentModal
         open={!!editingPayment}
         onOpenChange={(open) => !open && setEditingPayment(null)}
         payment={editingPayment}

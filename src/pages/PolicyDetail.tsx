@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, CreditCard, Hash, Briefcase, Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, Hash, Briefcase, Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
@@ -226,11 +226,11 @@ export default function PolicyDetail() {
               </Button>
             )}
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white"
               onClick={() => setPaymentModalOpen(true)}
             >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Make Payment
+              <DollarSign className="h-4 w-4 mr-2" />
+              Record Payment
             </Button>
             <Button variant="outline" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />

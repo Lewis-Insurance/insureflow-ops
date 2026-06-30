@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import type {
   PremiumPayment,
   PaymentFilters,
-  RecordPaymentInput,
   VoidPaymentInput,
 } from '@/types/payments';
 
@@ -128,43 +127,6 @@ export function usePaymentsByDaySheet(daySheetId: string) {
       return data as PremiumPayment[];
     },
     enabled: !!daySheetId,
-  });
-}
-
-// Record a new payment
-export function useRecordPayment() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: RecordPaymentInput) => {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-record`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session.access_token}`,
-          },
-          body: JSON.stringify(input),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to record payment');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: paymentKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['day-sheets'] });
-    },
   });
 }
 

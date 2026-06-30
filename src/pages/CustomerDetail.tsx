@@ -48,7 +48,7 @@ import {
   Plus,
   MoreHorizontal,
   Award,
-  CreditCard,
+  DollarSign,
   FileText,
   ClipboardList,
   Star,
@@ -400,6 +400,13 @@ export default function CustomerDetail() {
                 Log contact
               </Button>
               <Button
+                onClick={() => setAddPaymentOpen(true)}
+                className="gap-2 rounded-cc-md bg-emerald-700 font-semibold text-white transition-shadow duration-base ease-glide hover:bg-emerald-800"
+              >
+                <DollarSign className="h-4 w-4" />
+                Record Payment
+              </Button>
+              <Button
                 variant="outline"
                 onClick={() => setEmailComposerOpen(true)}
                 className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
@@ -441,9 +448,6 @@ export default function CustomerDetail() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setAddPolicyOpen(true)}>
                     <ClipboardList className="mr-2 h-4 w-4" /> Add policy
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setAddPaymentOpen(true)}>
-                    <CreditCard className="mr-2 h-4 w-4" /> Add payment
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setAddDocumentOpen(true)}>
                     <FileText className="mr-2 h-4 w-4" /> Add document

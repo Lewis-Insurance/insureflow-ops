@@ -108,6 +108,7 @@ export interface PremiumPayment {
   id: string;
   org_id: string;
   day_sheet_id: string | null;
+  day_sheet_date: string;
   policy_id: string | null;
   account_id: string | null;
   payment_method_id: string;
@@ -343,6 +344,7 @@ export const recordPaymentSchema = z.object({
   payer_name: z.string().max(200).optional().nullable(),
   payer_address: z.string().max(500).optional().nullable(),
   received_date: z.string({ required_error: 'Received date is required' }),
+  day_sheet_date: z.string().optional().nullable(),
   payment_source: z.enum(['in_person', 'mail', 'online', 'phone', 'lockbox']).default('in_person'),
   invoice_number: z.string().max(50).optional().nullable(),
   paid_to: z.enum(['company', 'escrow']).optional().nullable(),
@@ -350,13 +352,6 @@ export const recordPaymentSchema = z.object({
 });
 
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
-
-export const closeDaySheetSchema = z.object({
-  day_sheet_id: z.string().uuid({ message: 'Day sheet ID is required' }),
-  notes: z.string().max(1000).optional().nullable(),
-});
-
-export type CloseDaySheetInput = z.infer<typeof closeDaySheetSchema>;
 
 export const createDepositSchema = z.object({
   day_sheet_id: z.string().uuid().optional().nullable(),
