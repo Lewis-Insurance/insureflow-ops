@@ -17,6 +17,7 @@ import { useRenewals, type Renewal } from '@/hooks/useRenewalWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeCarrier, humanizeStatus } from '@/lib/format';
+import { renewalPillStatus } from '@/lib/renewals/renewalTerm';
 import { cn } from '@/lib/utils';
 
 // The general renewals worklist: EVERY policy renewal, every carrier. The
@@ -291,7 +292,10 @@ export default function RenewalsPage() {
                       {r.account?.name || 'Unknown client'}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 md:hidden">
-                      <StatusPill status={r.status} />
+                      <StatusPill
+                        status={renewalPillStatus(r.status)}
+                        override={r.status === 'renewed' ? { label: 'Renewed', tone: 'success' } : undefined}
+                      />
                       <NextRenewal date={r.renewal_date} emptyLabel="No renewal date" />
                     </div>
                   </div>
@@ -311,7 +315,7 @@ export default function RenewalsPage() {
 
                   <div className="hidden md:block">
                     <StatusPill
-                      status={r.status}
+                      status={renewalPillStatus(r.status)}
                       override={r.status === 'renewed' ? { label: 'Renewed', tone: 'success' } : undefined}
                     />
                   </div>

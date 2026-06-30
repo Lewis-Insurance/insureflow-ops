@@ -34043,6 +34043,7 @@ export type Database = {
       renewal_documents: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
           description: string | null
           document_type: string | null
           file_path: string
@@ -34055,6 +34056,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           document_type?: string | null
           file_path: string
@@ -34067,6 +34069,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           document_type?: string | null
           file_path?: string
@@ -34645,10 +34648,13 @@ export type Database = {
           moved_carrier: string | null
           moved_premium: number | null
           moved_term: string | null
+          new_effective_date: string | null
+          new_expiration_date: string | null
           non_renewal_reason: string | null
           notes: string | null
           policy_id: string | null
           policy_number: string | null
+          policy_term: string | null
           policy_type: string
           price_change_pct: number | null
           price_increase_pct: number | null
@@ -34691,10 +34697,13 @@ export type Database = {
           moved_carrier?: string | null
           moved_premium?: number | null
           moved_term?: string | null
+          new_effective_date?: string | null
+          new_expiration_date?: string | null
           non_renewal_reason?: string | null
           notes?: string | null
           policy_id?: string | null
           policy_number?: string | null
+          policy_term?: string | null
           policy_type: string
           price_change_pct?: number | null
           price_increase_pct?: number | null
@@ -34737,10 +34746,13 @@ export type Database = {
           moved_carrier?: string | null
           moved_premium?: number | null
           moved_term?: string | null
+          new_effective_date?: string | null
+          new_expiration_date?: string | null
           non_renewal_reason?: string | null
           notes?: string | null
           policy_id?: string | null
           policy_number?: string | null
+          policy_term?: string | null
           policy_type?: string
           price_change_pct?: number | null
           price_increase_pct?: number | null
