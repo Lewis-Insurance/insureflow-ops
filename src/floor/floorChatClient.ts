@@ -1,10 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { splitFloorSseBuffer } from './floorEventStream';
+import { assertFloorCockpitEnabled } from './launchControl';
 import type { FloorChatRequest, FloorChatSender } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lrqajzwcmdwahnjyidgv.supabase.co';
 
 export const sendFloorChatMessage: FloorChatSender = async (request: FloorChatRequest, emit) => {
+  assertFloorCockpitEnabled();
+
   const {
     data: { session },
   } = await supabase.auth.getSession();

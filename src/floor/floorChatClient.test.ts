@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sendFloorChatMessage } from './floorChatClient';
+import { setFloorCockpitLaunchControlOverrideForTests } from './launchControl';
 
 function streamFromText(text: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -14,9 +15,12 @@ function streamFromText(text: string): ReadableStream<Uint8Array> {
 describe('floor chat client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    setFloorCockpitLaunchControlOverrideForTests(null);
   });
 
   it('posts to the server-side hermes-chat bridge and emits parsed Floor events', async () => {
+    setFloorCockpitLaunchControlOverrideForTests(true);
+
     const sse = [
       'event: floor.tool',
       'data: {"type":"tool_progress","label":"Binding context","state":"started"}',

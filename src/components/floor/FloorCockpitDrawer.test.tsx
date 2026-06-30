@@ -14,6 +14,23 @@ const boundClientContext = {
 };
 
 describe('FloorCockpitDrawer', () => {
+  it('defaults to launch-control OFF and cannot send work', () => {
+    const sendMessage = vi.fn() as unknown as FloorChatSender;
+
+    render(
+      <FloorCockpitDrawer
+        open
+        onOpenChange={() => undefined}
+        initialContext={boundClientContext}
+        sendMessage={sendMessage}
+      />,
+    );
+
+    expect(screen.getByText(/Lewis Floor cockpit is disabled/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Message Lewis Floor/i)).not.toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
   it('renders the Lewis Floor cockpit with safe context chips', () => {
     const sendMessage = vi.fn() as unknown as FloorChatSender;
 
@@ -23,6 +40,7 @@ describe('FloorCockpitDrawer', () => {
         onOpenChange={() => undefined}
         initialContext={boundClientContext}
         sendMessage={sendMessage}
+        launchControlEnabled
       />,
     );
 
@@ -56,6 +74,7 @@ describe('FloorCockpitDrawer', () => {
         onOpenChange={() => undefined}
         initialContext={boundClientContext}
         sendMessage={sendMessage}
+        launchControlEnabled
       />,
     );
 
@@ -90,6 +109,7 @@ describe('FloorCockpitDrawer', () => {
         onOpenChange={() => undefined}
         initialContext={boundClientContext}
         sendMessage={sendMessage}
+        launchControlEnabled
       />,
     );
 
@@ -112,6 +132,7 @@ describe('FloorCockpitDrawer', () => {
         onOpenChange={() => undefined}
         initialContext={boundClientContext}
         sendMessage={sendMessage}
+        launchControlEnabled
       />,
     );
 

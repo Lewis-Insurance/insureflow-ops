@@ -54,6 +54,11 @@ function streamFromEvents(events: string[]): Response {
   );
 }
 
+function isCockpitEnabled(): boolean {
+  const value = Deno.env.get('FLOOR_COCKPIT_ENABLED') ?? '';
+  return value === 'true' || value === '1';
+}
+
 function syntheticResponse(body: FloorChatRequest): Response {
   const clientRef = body.contextRefs?.clientRef ?? 'client:practice-context';
   return streamFromEvents([
@@ -160,6 +165,13 @@ serve(async (req) => {
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'method_not_allowed' }), {
         status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!isCockpitEnabled()) {
+      return new Response(JSON.stringify({ error: 'floor_cockpit_disabled' }), {
+        status: 423,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

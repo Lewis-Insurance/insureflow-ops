@@ -20,6 +20,7 @@ import { FloatingMessenger } from '@/components/messaging/FloatingMessenger';
 import { MessengerProvider } from '@/contexts/MessengerContext';
 import { useGlobalMessageNotifications } from '@/hooks/useGlobalMessageNotifications';
 import { FloorCockpitDrawer } from '@/components/floor/FloorCockpitDrawer';
+import { isFloorCockpitEnabled } from '@/floor/launchControl';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -37,6 +38,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     context
   } = useAIAssistantContext();
   const [isFloorCockpitOpen, setIsFloorCockpitOpen] = useState(false);
+  const floorCockpitEnabled = isFloorCockpitEnabled();
 
   // Initialize global message notifications (shows toast for new messages)
   useGlobalMessageNotifications();
@@ -419,15 +421,17 @@ function AppLayoutContent({ children }: AppLayoutProps) {
               <SidebarTrigger />
               <div className="flex items-center gap-2">
                 <ThemeToggle />
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setIsFloorCockpitOpen(true)}
-                  className="gap-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden sm:inline">Lewis Floor</span>
-                </Button>
+                {floorCockpitEnabled && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setIsFloorCockpitOpen(true)}
+                    className="gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span className="hidden sm:inline">Lewis Floor</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -464,7 +468,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       />
 
       {/* Lewis Floor Cockpit: separate from legacy AI assistant and practice-safe by default. */}
-      <FloorCockpitDrawer open={isFloorCockpitOpen} onOpenChange={setIsFloorCockpitOpen} />
+      <FloorCockpitDrawer
+        open={isFloorCockpitOpen}
+        onOpenChange={setIsFloorCockpitOpen}
+        launchControlEnabled={floorCockpitEnabled}
+      />
 
       {/* Floating Team Messenger */}
       <FloatingMessenger />
