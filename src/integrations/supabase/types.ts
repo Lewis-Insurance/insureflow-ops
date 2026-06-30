@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_aliases: {
+        Row: {
+          account_id: string
+          alias: string
+          alias_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          source: string
+        }
+        Insert: {
+          account_id: string
+          alias: string
+          alias_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source?: string
+        }
+        Update: {
+          account_id?: string
+          alias?: string
+          alias_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_aliases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_aliases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_churn_risk_scores: {
         Row: {
           account_id: string
@@ -58,6 +103,20 @@ export type Database = {
           top_factors?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "account_churn_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_churn_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "account_churn_risk_scores_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -108,6 +167,171 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "account_memberships_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_relationship_suggestions: {
+        Row: {
+          confidence: number
+          created_at: string
+          created_relationship_id: string | null
+          from_account: string
+          id: string
+          reason: string | null
+          rel_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signal: string
+          status: string
+          to_account: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          created_relationship_id?: string | null
+          from_account: string
+          id?: string
+          reason?: string | null
+          rel_type: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal: string
+          status?: string
+          to_account: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          created_relationship_id?: string | null
+          from_account?: string
+          id?: string
+          reason?: string | null
+          rel_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          to_account?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_relationship_suggestions_created_relationship_id_fkey"
+            columns: ["created_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "account_relationships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationship_suggestions_from_account_fkey"
+            columns: ["from_account"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationship_suggestions_from_account_fkey"
+            columns: ["from_account"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationship_suggestions_to_account_fkey"
+            columns: ["to_account"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationship_suggestions_to_account_fkey"
+            columns: ["to_account"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_relationships: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          created_by: string | null
+          from_account: string
+          id: string
+          is_primary: boolean
+          note: string | null
+          ownership_pct: number | null
+          rel_type: string
+          role: string | null
+          source: string
+          to_account: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_account: string
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          ownership_pct?: number | null
+          rel_type: string
+          role?: string | null
+          source?: string
+          to_account: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_account?: string
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          ownership_pct?: number | null
+          rel_type?: string
+          role?: string | null
+          source?: string
+          to_account?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_relationships_from_account_fkey"
+            columns: ["from_account"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationships_from_account_fkey"
+            columns: ["from_account"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationships_to_account_fkey"
+            columns: ["to_account"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationships_to_account_fkey"
+            columns: ["to_account"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       account_tags: {
@@ -140,6 +364,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "account_tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       accounts: {
@@ -154,21 +385,37 @@ export type Database = {
           contact_id: string | null
           created_at: string
           custom: Json | null
+          date_of_birth: string | null
           deleted_at: string | null
           email: string | null
+          goes_by: string | null
+          household_id: string | null
           id: string
           import_batch_id: string | null
           lead_source_detail: string | null
+          merged_at: string | null
+          merged_into_id: string | null
           name: string
+          name_display: string | null
           notes: string | null
           owner_agent_id: string | null
           phone: string | null
+          phone_e164: string | null
+          phone_norm_status: string | null
+          phone_secondary: string | null
+          primary_entity_name: string | null
+          primary_entity_type: string | null
           search_vector: unknown
+          secondary_entity_name: string | null
+          secondary_entity_type: string | null
           source: string | null
+          spouse_date_of_birth: string | null
           spouse_name: string | null
           state: string | null
           team_id: string | null
           tin_last4: string | null
+          trust_date: string | null
+          trustee_name: string | null
           type: Database["public"]["Enums"]["account_type_v2"]
           type_old: Database["public"]["Enums"]["account_type"] | null
           updated_at: string
@@ -185,21 +432,37 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           custom?: Json | null
+          date_of_birth?: string | null
           deleted_at?: string | null
           email?: string | null
+          goes_by?: string | null
+          household_id?: string | null
           id?: string
           import_batch_id?: string | null
           lead_source_detail?: string | null
+          merged_at?: string | null
+          merged_into_id?: string | null
           name: string
+          name_display?: string | null
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
+          phone_e164?: string | null
+          phone_norm_status?: string | null
+          phone_secondary?: string | null
+          primary_entity_name?: string | null
+          primary_entity_type?: string | null
           search_vector?: unknown
+          secondary_entity_name?: string | null
+          secondary_entity_type?: string | null
           source?: string | null
+          spouse_date_of_birth?: string | null
           spouse_name?: string | null
           state?: string | null
           team_id?: string | null
           tin_last4?: string | null
+          trust_date?: string | null
+          trustee_name?: string | null
           type?: Database["public"]["Enums"]["account_type_v2"]
           type_old?: Database["public"]["Enums"]["account_type"] | null
           updated_at?: string
@@ -216,21 +479,37 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           custom?: Json | null
+          date_of_birth?: string | null
           deleted_at?: string | null
           email?: string | null
+          goes_by?: string | null
+          household_id?: string | null
           id?: string
           import_batch_id?: string | null
           lead_source_detail?: string | null
+          merged_at?: string | null
+          merged_into_id?: string | null
           name?: string
+          name_display?: string | null
           notes?: string | null
           owner_agent_id?: string | null
           phone?: string | null
+          phone_e164?: string | null
+          phone_norm_status?: string | null
+          phone_secondary?: string | null
+          primary_entity_name?: string | null
+          primary_entity_type?: string | null
           search_vector?: unknown
+          secondary_entity_name?: string | null
+          secondary_entity_type?: string | null
           source?: string | null
+          spouse_date_of_birth?: string | null
           spouse_name?: string | null
           state?: string | null
           team_id?: string | null
           tin_last4?: string | null
+          trust_date?: string | null
+          trustee_name?: string | null
           type?: Database["public"]["Enums"]["account_type_v2"]
           type_old?: Database["public"]["Enums"]["account_type"] | null
           updated_at?: string
@@ -266,10 +545,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "accounts_contact_id_fkey"
+            foreignKeyName: "accounts_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "household_rollup"
+            referencedColumns: ["household_id"]
+          },
+          {
+            foreignKeyName: "accounts_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
             referencedColumns: ["id"]
           },
           {
@@ -277,6 +577,20 @@ export type Database = {
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -712,6 +1026,7 @@ export type Database = {
           id: string
           intake_submission_id: string | null
           pdf_generated_at: string | null
+          pdf_path: string | null
           pdf_url: string | null
           row_version: number | null
           signature_request_id: string | null
@@ -738,6 +1053,7 @@ export type Database = {
           id?: string
           intake_submission_id?: string | null
           pdf_generated_at?: string | null
+          pdf_path?: string | null
           pdf_url?: string | null
           row_version?: number | null
           signature_request_id?: string | null
@@ -764,6 +1080,7 @@ export type Database = {
           id?: string
           intake_submission_id?: string | null
           pdf_generated_at?: string | null
+          pdf_path?: string | null
           pdf_url?: string | null
           row_version?: number | null
           signature_request_id?: string | null
@@ -783,6 +1100,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acord_forms_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -978,6 +1302,7 @@ export type Database = {
           id: string
           is_current: boolean | null
           license_notes: string | null
+          pdf_template_path: string | null
           pdf_template_url: string
           pdf_type: string
           repeater_configs: Json | null
@@ -1000,6 +1325,7 @@ export type Database = {
           id?: string
           is_current?: boolean | null
           license_notes?: string | null
+          pdf_template_path?: string | null
           pdf_template_url: string
           pdf_type?: string
           repeater_configs?: Json | null
@@ -1022,6 +1348,7 @@ export type Database = {
           id?: string
           is_current?: boolean | null
           license_notes?: string | null
+          pdf_template_path?: string | null
           pdf_template_url?: string
           pdf_type?: string
           repeater_configs?: Json | null
@@ -1637,6 +1964,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_conversations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ai_messages: {
@@ -1817,6 +2151,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_module_executions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -2151,20 +2492,20 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          log_type: string | null
           notes: string
           renewal_id: string
-          status: string | null
           updated_at: string
         }
         Insert: {
           contact_date: string
           contact_method: string
           created_at?: string
-          created_by: string
+          created_by?: string
           id?: string
+          log_type?: string | null
           notes: string
           renewal_id: string
-          status?: string | null
           updated_at?: string
         }
         Update: {
@@ -2173,9 +2514,9 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          log_type?: string | null
           notes?: string
           renewal_id?: string
-          status?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2195,6 +2536,70 @@ export type Database = {
           },
         ]
       }
+      ao_renewal_follow_ups: {
+        Row: {
+          completed_at: string | null
+          completion_note: string | null
+          created_at: string
+          created_by: string | null
+          follow_up_date: string
+          id: string
+          reason: string | null
+          renewal_id: string
+          status: string
+          task_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          follow_up_date: string
+          id?: string
+          reason?: string | null
+          renewal_id: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completion_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          follow_up_date?: string
+          id?: string
+          reason?: string | null
+          renewal_id?: string
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ao_renewal_follow_ups_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_quotes_comparison"
+            referencedColumns: ["renewal_id"]
+          },
+          {
+            foreignKeyName: "ao_renewal_follow_ups_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "ao_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ao_renewal_follow_ups_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ao_renewal_notes: {
         Row: {
           content: string
@@ -2207,7 +2612,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
-          created_by: string
+          created_by?: string
           id?: string
           renewal_id: string
           updated_at?: string
@@ -2249,7 +2654,7 @@ export type Database = {
           premium: number | null
           renewal_id: string
           status: string
-          term_months: number | null
+          term_months: number
           updated_at: string
         }
         Insert: {
@@ -2263,7 +2668,7 @@ export type Database = {
           premium?: number | null
           renewal_id: string
           status?: string
-          term_months?: number | null
+          term_months: number
           updated_at?: string
         }
         Update: {
@@ -2277,7 +2682,7 @@ export type Database = {
           premium?: number | null
           renewal_id?: string
           status?: string
-          term_months?: number | null
+          term_months?: number
           updated_at?: string
         }
         Relationships: [
@@ -2308,6 +2713,9 @@ export type Database = {
           current_premium: number | null
           custom_data: Json | null
           customer_name: string
+          follow_up_date: string | null
+          follow_up_reason: string | null
+          follow_up_task_id: string | null
           id: string
           last_contact_date: string | null
           losses_3yr: number | null
@@ -2339,6 +2747,9 @@ export type Database = {
           current_premium?: number | null
           custom_data?: Json | null
           customer_name: string
+          follow_up_date?: string | null
+          follow_up_reason?: string | null
+          follow_up_task_id?: string | null
           id?: string
           last_contact_date?: string | null
           losses_3yr?: number | null
@@ -2370,6 +2781,9 @@ export type Database = {
           current_premium?: number | null
           custom_data?: Json | null
           customer_name?: string
+          follow_up_date?: string | null
+          follow_up_reason?: string | null
+          follow_up_task_id?: string | null
           id?: string
           last_contact_date?: string | null
           losses_3yr?: number | null
@@ -2392,6 +2806,27 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ao_renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ao_renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ao_renewals_follow_up_task_id_fkey"
+            columns: ["follow_up_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ao_renewals_rate_watch_workspace_id_fkey"
             columns: ["rate_watch_workspace_id"]
@@ -2463,6 +2898,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -2944,7 +3386,22 @@ export type Database = {
           trigger_type?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       automation_settings: {
         Row: {
@@ -3179,6 +3636,20 @@ export type Database = {
           workflow_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "automation_workflow_executions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_workflow_executions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "automation_workflow_executions_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -3712,6 +4183,159 @@ export type Database = {
           },
         ]
       }
+      brian_action_items: {
+        Row: {
+          created_at: string
+          detail: string | null
+          due_date: string | null
+          id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          source: string
+          source_ref: string
+          source_row_id: string | null
+          source_table: string | null
+          status: string
+          telegram_chat_id: string | null
+          telegram_msg_id: number | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          due_date?: string | null
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          source: string
+          source_ref: string
+          source_row_id?: string | null
+          source_table?: string | null
+          status?: string
+          telegram_chat_id?: string | null
+          telegram_msg_id?: number | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          due_date?: string | null
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          source?: string
+          source_ref?: string
+          source_row_id?: string | null
+          source_table?: string | null
+          status?: string
+          telegram_chat_id?: string | null
+          telegram_msg_id?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
+      brian_imessage_outbox: {
+        Row: {
+          attempts: number
+          body: string
+          created_at: string
+          honor_quiet: boolean
+          id: string
+          last_error: string | null
+          priority: string
+          scheduled_for: string
+          sent_at: string | null
+          source: string
+          source_ref: string | null
+          status: string
+          to_address: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          created_at?: string
+          honor_quiet?: boolean
+          id?: string
+          last_error?: string | null
+          priority?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          source: string
+          source_ref?: string | null
+          status?: string
+          to_address: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          created_at?: string
+          honor_quiet?: boolean
+          id?: string
+          last_error?: string | null
+          priority?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+          to_address?: string
+        }
+        Relationships: []
+      }
+      brian_quiet_hours: {
+        Row: {
+          day_of_week: number
+          quiet_end: string
+          quiet_start: string
+          timezone: string
+        }
+        Insert: {
+          day_of_week: number
+          quiet_end: string
+          quiet_start: string
+          timezone?: string
+        }
+        Update: {
+          day_of_week?: number
+          quiet_end?: string
+          quiet_start?: string
+          timezone?: string
+        }
+        Relationships: []
+      }
+      brian_send_log: {
+        Row: {
+          channel: string
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json | null
+          source: string
+          source_ref: string | null
+          status: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          source: string
+          source_ref?: string | null
+          status: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       bulk_actions: {
         Row: {
           action_type: string
@@ -3967,10 +4591,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "businesses_primary_contact_id_fkey"
+            foreignKeyName: "businesses_primary_account_fkey"
             columns: ["primary_contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "businesses_primary_account_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -4033,10 +4664,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "call_sessions_contact_id_fkey"
+            foreignKeyName: "call_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -4099,6 +4744,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -5670,6 +6322,81 @@ export type Database = {
         }
         Relationships: []
       }
+      canopy_invites: {
+        Row: {
+          account_id: string
+          agency_workspace_id: string
+          batch_id: string | null
+          canopy_pull_id: string | null
+          consent_token: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          invite_expires_at: string | null
+          metadata: Json
+          phase0_enrollment_id: string | null
+          public_alias: string | null
+          public_url: string | null
+          pull_type: string
+          status: string
+          updated_at: string
+          widget_id: string | null
+        }
+        Insert: {
+          account_id: string
+          agency_workspace_id?: string
+          batch_id?: string | null
+          canopy_pull_id?: string | null
+          consent_token?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          invite_expires_at?: string | null
+          metadata?: Json
+          phase0_enrollment_id?: string | null
+          public_alias?: string | null
+          public_url?: string | null
+          pull_type?: string
+          status?: string
+          updated_at?: string
+          widget_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          agency_workspace_id?: string
+          batch_id?: string | null
+          canopy_pull_id?: string | null
+          consent_token?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          invite_expires_at?: string | null
+          metadata?: Json
+          phase0_enrollment_id?: string | null
+          public_alias?: string | null
+          public_url?: string | null
+          pull_type?: string
+          status?: string
+          updated_at?: string
+          widget_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canopy_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canopy_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canopy_loss_events: {
         Row: {
           amount_paid_cents: number | null
@@ -5846,6 +6573,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canopy_monitorings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -6498,6 +7232,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "canopy_pulls_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "canopy_pulls_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -6845,6 +7586,7 @@ export type Database = {
           match_criteria: Json | null
           orientation: string | null
           page_count: number | null
+          sample_document_path: string | null
           sample_document_thumbnail: string | null
           sample_document_url: string | null
           signature_version: number | null
@@ -6873,6 +7615,7 @@ export type Database = {
           match_criteria?: Json | null
           orientation?: string | null
           page_count?: number | null
+          sample_document_path?: string | null
           sample_document_thumbnail?: string | null
           sample_document_url?: string | null
           signature_version?: number | null
@@ -6901,6 +7644,7 @@ export type Database = {
           match_criteria?: Json | null
           orientation?: string | null
           page_count?: number | null
+          sample_document_path?: string | null
           sample_document_thumbnail?: string | null
           sample_document_url?: string | null
           signature_version?: number | null
@@ -7551,6 +8295,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "certificates_of_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "certificates_of_insurance_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
@@ -7693,6 +8444,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_context_cache_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_context_embeddings: {
@@ -7752,6 +8510,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_context_embeddings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_context_index_jobs: {
@@ -7803,6 +8568,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_context_index_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -7880,6 +8652,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_happiness_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -7963,6 +8742,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_portal_users_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_portal_users_branding_id_fkey"
             columns: ["branding_id"]
             isOneToOne: false
@@ -7970,10 +8756,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "client_portal_users_contact_id_fkey"
+            foreignKeyName: "client_portal_users_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_users_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -8151,6 +8944,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_access_tokens_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -8709,6 +9509,7 @@ export type Database = {
         Row: {
           account_id: string
           annual_revenue: number | null
+          business_type_id: string | null
           created_at: string | null
           dba_name: string | null
           employees_count: number | null
@@ -8723,6 +9524,7 @@ export type Database = {
         Insert: {
           account_id: string
           annual_revenue?: number | null
+          business_type_id?: string | null
           created_at?: string | null
           dba_name?: string | null
           employees_count?: number | null
@@ -8737,6 +9539,7 @@ export type Database = {
         Update: {
           account_id?: string
           annual_revenue?: number | null
+          business_type_id?: string | null
           created_at?: string | null
           dba_name?: string | null
           employees_count?: number | null
@@ -8757,10 +9560,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "commercial_business_accounts_primary_contact_id_fkey"
+            foreignKeyName: "commercial_business_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_business_type_id_fkey"
+            columns: ["business_type_id"]
+            isOneToOne: false
+            referencedRelation: "business_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_primary_account_fkey"
             columns: ["primary_contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_business_accounts_primary_account_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -9119,6 +9943,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "commission_reports_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "commission_reports_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -9194,6 +10025,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_structures_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -9367,10 +10205,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "communication_evidence_to_contact_id_fkey"
+            foreignKeyName: "communication_evidence_to_account_fkey"
             columns: ["to_contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_evidence_to_account_fkey"
+            columns: ["to_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -9460,6 +10305,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -9580,10 +10432,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "communication_preferences_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_preferences_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "communication_preferences_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_preferences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -9608,11 +10481,11 @@ export type Database = {
             referencedColumns: ["agency_workspace_id"]
           },
           {
-            foreignKeyName: "communication_preferences_contact_id_fkey"
-            columns: ["contact_id"]
+            foreignKeyName: "communication_preferences_household_id_fkey"
+            columns: ["household_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
+            referencedRelation: "household_rollup"
+            referencedColumns: ["household_id"]
           },
           {
             foreignKeyName: "communication_preferences_household_id_fkey"
@@ -9692,6 +10565,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -10268,6 +11148,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "comparison_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       comparison_workspaces: {
@@ -10340,6 +11227,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -10563,10 +11457,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "consent_evidence_contact_id_fkey"
+            foreignKeyName: "consent_evidence_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_evidence_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -10625,10 +11526,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "consent_ledger_contact_id_fkey"
+            foreignKeyName: "consent_ledger_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_ledger_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -10692,6 +11600,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "consents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contact_send_frequency: {
@@ -10736,10 +11651,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "contact_send_frequency_contact_id_fkey"
+            foreignKeyName: "contact_send_frequency_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_send_frequency_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -10768,10 +11690,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "contact_tags_contact_id_fkey"
+            foreignKeyName: "contact_tags_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -10927,11 +11856,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contacts_import_batch_id_fkey"
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_contacts_household"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "household_rollup"
+            referencedColumns: ["household_id"]
           },
           {
             foreignKeyName: "fk_contacts_household"
@@ -11045,6 +11988,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "coverage_gap_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "coverage_gap_analysis_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -11137,6 +12087,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "coverage_gap_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_gap_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coverage_gap_opportunities_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -11761,6 +12725,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "crm_prefill_log_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "crm_prefill_log_acord_form_id_fkey"
             columns: ["acord_form_id"]
             isOneToOne: false
@@ -11772,45 +12743,6 @@ export type Database = {
             columns: ["acord_form_id"]
             isOneToOne: false
             referencedRelation: "acord_forms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customer_identities: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          id: string
-          phone: string | null
-          profile_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          phone?: string | null
-          profile_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          phone?: string | null
-          profile_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_identities_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "producer_lead_stats"
-            referencedColumns: ["producer_id"]
-          },
-          {
-            foreignKeyName: "customer_identities_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -11959,6 +12891,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_predictions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customer_risk_scores: {
@@ -12037,6 +12976,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: true
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -12144,6 +13090,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -13124,6 +14077,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "document_analyses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "document_analyses_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
@@ -13259,6 +14219,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "document_analysis_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       document_analysis_jobs: {
@@ -13320,6 +14287,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "document_analysis_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_analysis_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "document_analysis_jobs_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -13386,7 +14367,22 @@ export type Database = {
           storage_bucket?: string | null
           storage_path?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_evidence_items: {
         Row: {
@@ -13612,6 +14608,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "document_extractions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "document_extractions_acord_form_id_fkey"
             columns: ["acord_form_id"]
             isOneToOne: false
@@ -13718,6 +14721,20 @@ export type Database = {
           tokens_used?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "document_insights_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
@@ -13901,6 +14918,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "document_processing_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       document_qa_cache: {
@@ -13943,6 +14967,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_qa_cache_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -14185,6 +15216,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "documents_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -14275,6 +15313,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_flags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -14994,6 +16039,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "extracted_home_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       extracted_policies: {
@@ -15042,6 +16094,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracted_policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -15758,6 +16817,39 @@ export type Database = {
           p50_review_time_ms?: number | null
           p95_review_time_ms?: number | null
           wrong_candidate_count?: number | null
+        }
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          allowed_roles: string[]
+          allowed_users: string[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          flag_key: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          allowed_users?: string[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          flag_key: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          allowed_users?: string[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          flag_key?: string
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -16749,17 +17841,38 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "household_accounts_head_contact_id_fkey"
-            columns: ["head_contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
+            foreignKeyName: "household_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "household_accounts_spouse_contact_id_fkey"
+            foreignKeyName: "household_accounts_head_account_fkey"
+            columns: ["head_contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_head_account_fkey"
+            columns: ["head_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_spouse_account_fkey"
             columns: ["spouse_contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "household_accounts_spouse_account_fkey"
+            columns: ["spouse_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -16767,37 +17880,76 @@ export type Database = {
       households: {
         Row: {
           address_hash: string | null
+          agency_workspace_id: string | null
           created_at: string | null
           id: string
+          is_mixed_line: boolean | null
+          linked_by: string | null
+          match_signals: string[] | null
           name: string | null
           org_id: string
+          primary_account_id: string | null
           primary_contact_id: string | null
+          tier: string | null
           updated_at: string | null
         }
         Insert: {
           address_hash?: string | null
+          agency_workspace_id?: string | null
           created_at?: string | null
           id?: string
+          is_mixed_line?: boolean | null
+          linked_by?: string | null
+          match_signals?: string[] | null
           name?: string | null
           org_id: string
+          primary_account_id?: string | null
           primary_contact_id?: string | null
+          tier?: string | null
           updated_at?: string | null
         }
         Update: {
           address_hash?: string | null
+          agency_workspace_id?: string | null
           created_at?: string | null
           id?: string
+          is_mixed_line?: boolean | null
+          linked_by?: string | null
+          match_signals?: string[] | null
           name?: string | null
           org_id?: string
+          primary_account_id?: string | null
           primary_contact_id?: string | null
+          tier?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "households_primary_contact_id_fkey"
+            foreignKeyName: "households_primary_account_id_fkey"
+            columns: ["primary_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "households_primary_account_id_fkey"
+            columns: ["primary_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "households_primary_contact_account_fkey"
             columns: ["primary_contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "households_primary_contact_account_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -17013,6 +18165,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -17596,6 +18755,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "insured_addresses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       insured_emails: {
@@ -17632,6 +18798,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -17673,6 +18846,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_phones_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -17738,6 +18918,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: true
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insured_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -17868,6 +19055,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "intake_submissions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "intake_submissions_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -17988,6 +19182,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -18479,6 +19680,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "jobs_result_session_id_fkey"
             columns: ["result_session_id"]
             isOneToOne: false
@@ -18715,6 +19923,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -19657,6 +20872,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_auto_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_auto_insurance_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -19829,6 +21051,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_commercial_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -20095,6 +21324,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_home_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_home_insurance_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -20201,6 +21437,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_life_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_life_insurance_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -20295,6 +21538,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_renters_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -20416,6 +21666,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_source_costs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_source_costs_lead_source_id_fkey"
             columns: ["lead_source_id"]
             isOneToOne: false
@@ -20494,6 +21751,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lead_sources_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       lead_umbrella_insurance: {
@@ -20569,6 +21833,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_umbrella_insurance_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -20730,6 +22001,7 @@ export type Database = {
           acknowledged_by: string | null
           address_line1: string | null
           address_line2: string | null
+          agency_workspace_id: string
           assigned_at: string | null
           assigned_to: string | null
           city: string | null
@@ -20790,6 +22062,7 @@ export type Database = {
           acknowledged_by?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          agency_workspace_id: string
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
@@ -20850,6 +22123,7 @@ export type Database = {
           acknowledged_by?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          agency_workspace_id?: string
           assigned_at?: string | null
           assigned_to?: string | null
           city?: string | null
@@ -20913,6 +22187,34 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_agency_reputation_summary"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "leads_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_agencies"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
             foreignKeyName: "leads_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
@@ -20931,6 +22233,13 @@ export type Database = {
             columns: ["converted_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_account_id_fkey"
+            columns: ["converted_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -21239,6 +22548,39 @@ export type Database = {
         }
         Relationships: []
       }
+      lob_crosswalk: {
+        Row: {
+          canonical_line: string
+          created_at: string
+          line_category: string
+          lob_code: string | null
+          needs_new_ref: boolean
+          notes: string | null
+          raw_value: string
+          updated_at: string
+        }
+        Insert: {
+          canonical_line: string
+          created_at?: string
+          line_category: string
+          lob_code?: string | null
+          needs_new_ref?: boolean
+          notes?: string | null
+          raw_value: string
+          updated_at?: string
+        }
+        Update: {
+          canonical_line?: string
+          created_at?: string
+          line_category?: string
+          lob_code?: string | null
+          needs_new_ref?: boolean
+          notes?: string | null
+          raw_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketing_automation_dlq: {
         Row: {
           context_snapshot: Json | null
@@ -21410,10 +22752,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "marketing_automation_enrollments_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_automation_enrollments_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "marketing_automation_enrollments_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_automation_enrollments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -21428,13 +22791,6 @@ export type Database = {
             columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketing_automation_enrollments_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
           {
@@ -22276,6 +23632,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "marketing_review_requests_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_review_requests_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "marketing_review_requests_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
@@ -22283,10 +23653,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "marketing_review_requests_contact_id_fkey"
-            columns: ["contact_id"]
+            foreignKeyName: "marketing_review_requests_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -22430,7 +23800,28 @@ export type Database = {
             foreignKeyName: "marketing_send_queue_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
+            referencedRelation: "household_rollup"
+            referencedColumns: ["household_id"]
+          },
+          {
+            foreignKeyName: "marketing_send_queue_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
             referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_send_queue_to_account_fkey"
+            columns: ["to_contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_send_queue_to_account_fkey"
+            columns: ["to_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -22441,10 +23832,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "marketing_send_queue_to_contact_id_fkey"
-            columns: ["to_contact_id"]
+            foreignKeyName: "marketing_send_queue_to_account_id_fkey"
+            columns: ["to_account_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -22705,10 +24096,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "marketing_survey_fatigue_contact_id_fkey"
+            foreignKeyName: "marketing_survey_fatigue_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_survey_fatigue_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -22760,6 +24158,20 @@ export type Database = {
           user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "marketing_survey_responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_survey_responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "marketing_survey_responses_survey_id_fkey"
             columns: ["survey_id"]
@@ -22836,6 +24248,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "marketing_survey_sends_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_survey_sends_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "marketing_survey_sends_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
@@ -22843,10 +24269,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "marketing_survey_sends_contact_id_fkey"
-            columns: ["contact_id"]
+            foreignKeyName: "marketing_survey_sends_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -22944,6 +24370,7 @@ export type Database = {
           merged_by: string
           merged_ids: string[]
           survivor_id: string
+          unmerged_at: string | null
         }
         Insert: {
           created_at?: string
@@ -22953,6 +24380,7 @@ export type Database = {
           merged_by: string
           merged_ids: string[]
           survivor_id: string
+          unmerged_at?: string | null
         }
         Update: {
           created_at?: string
@@ -22962,6 +24390,7 @@ export type Database = {
           merged_by?: string
           merged_ids?: string[]
           survivor_id?: string
+          unmerged_at?: string | null
         }
         Relationships: []
       }
@@ -23020,6 +24449,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -23186,6 +24622,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notes_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -23293,6 +24736,83 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_user_agencies"
             referencedColumns: ["agency_workspace_id"]
+          },
+        ]
+      }
+      notification_inbox: {
+        Row: {
+          actor_profile_id: string | null
+          archived_at: string | null
+          body: string | null
+          created_at: string
+          data: Json
+          dedupe_key: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          read_at: string | null
+          recipient_profile_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          archived_at?: string | null
+          body?: string | null
+          created_at?: string
+          data?: Json
+          dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          recipient_profile_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          archived_at?: string | null
+          body?: string | null
+          created_at?: string
+          data?: Json
+          dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          recipient_profile_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_inbox_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "notification_inbox_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_inbox_recipient_profile_id_fkey"
+            columns: ["recipient_profile_id"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "notification_inbox_recipient_profile_id_fkey"
+            columns: ["recipient_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -23697,10 +25217,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "nps_responses_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_responses_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "nps_responses_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_responses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -23729,13 +25270,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "nps_campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nps_responses_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -23801,6 +25335,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -23940,6 +25481,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "offline_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "offline_queue_acord_form_id_fkey"
             columns: ["acord_form_id"]
             isOneToOne: false
@@ -24065,6 +25613,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "opportunities_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -24119,6 +25674,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parsed_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -24336,6 +25898,128 @@ export type Database = {
           },
         ]
       }
+      phase0_campaign: {
+        Row: {
+          agency_workspace_id: string
+          coverage_gap_rule_key: string | null
+          created_at: string
+          email_template_key: string
+          id: string
+          key: string
+          name: string
+          play: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agency_workspace_id: string
+          coverage_gap_rule_key?: string | null
+          created_at?: string
+          email_template_key: string
+          id?: string
+          key: string
+          name: string
+          play: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_workspace_id?: string
+          coverage_gap_rule_key?: string | null
+          created_at?: string
+          email_template_key?: string
+          id?: string
+          key?: string
+          name?: string
+          play?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      phase0_enrollment: {
+        Row: {
+          agency_workspace_id: string
+          campaign_id: string
+          canopy_invite_id: string | null
+          canopy_link_url: string | null
+          contact_account_id: string
+          contact_email: string
+          contact_name: string | null
+          converted_at: string | null
+          converted_policy_id: string | null
+          created_at: string
+          household_id: string | null
+          household_key: string
+          id: string
+          idempotency_key: string
+          minted_at: string | null
+          play: string
+          queued_at: string | null
+          send_queue_id: string | null
+          sent_at: string | null
+          status: string
+          suppressed_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_workspace_id: string
+          campaign_id: string
+          canopy_invite_id?: string | null
+          canopy_link_url?: string | null
+          contact_account_id: string
+          contact_email: string
+          contact_name?: string | null
+          converted_at?: string | null
+          converted_policy_id?: string | null
+          created_at?: string
+          household_id?: string | null
+          household_key: string
+          id?: string
+          idempotency_key: string
+          minted_at?: string | null
+          play: string
+          queued_at?: string | null
+          send_queue_id?: string | null
+          sent_at?: string | null
+          status?: string
+          suppressed_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_workspace_id?: string
+          campaign_id?: string
+          canopy_invite_id?: string | null
+          canopy_link_url?: string | null
+          contact_account_id?: string
+          contact_email?: string
+          contact_name?: string | null
+          converted_at?: string | null
+          converted_policy_id?: string | null
+          created_at?: string
+          household_id?: string | null
+          household_key?: string
+          id?: string
+          idempotency_key?: string
+          minted_at?: string | null
+          play?: string
+          queued_at?: string | null
+          send_queue_id?: string | null
+          sent_at?: string | null
+          status?: string
+          suppressed_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase0_enrollment_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "phase0_campaign"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_verification_codes: {
         Row: {
           attempts: number | null
@@ -24436,6 +26120,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pipeline_automation_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pipeline_automation_rules_trigger_stage_id_fkey"
             columns: ["trigger_stage_id"]
             isOneToOne: false
@@ -24514,6 +26205,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_metrics_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -24658,6 +26356,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pipeline_stage_transitions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pipeline_stage_transitions_from_stage_id_fkey"
             columns: ["from_stage_id"]
             isOneToOne: false
@@ -24782,6 +26487,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pipeline_stages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pipeline_stages_task_template_id_fkey"
             columns: ["task_template_id"]
             isOneToOne: false
@@ -24823,7 +26535,10 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string | null
           issue_date: string | null
+          line_canonical: string | null
+          line_category: string | null
           line_of_business: string | null
+          line_of_business_id: string | null
           mga_id: string | null
           named_insured: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -24871,7 +26586,10 @@ export type Database = {
           insured_items?: Json | null
           insured_user_id?: string | null
           issue_date?: string | null
+          line_canonical?: string | null
+          line_category?: string | null
           line_of_business?: string | null
+          line_of_business_id?: string | null
           mga_id?: string | null
           named_insured?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -24919,7 +26637,10 @@ export type Database = {
           insured_items?: Json | null
           insured_user_id?: string | null
           issue_date?: string | null
+          line_canonical?: string | null
+          line_category?: string | null
           line_of_business?: string | null
+          line_of_business_id?: string | null
           mga_id?: string | null
           named_insured?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -24941,6 +26662,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -24969,6 +26697,13 @@ export type Database = {
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_line_of_business_id_fkey"
+            columns: ["line_of_business_id"]
+            isOneToOne: false
+            referencedRelation: "lines_of_business"
             referencedColumns: ["id"]
           },
           {
@@ -27667,6 +29402,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "policy_renewal_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_renewal_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policy_renewal_risk_scores_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -29031,7 +30780,22 @@ export type Database = {
           welcome_message?: string | null
           welcome_title?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "portal_branding_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_branding_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       portal_coverage_opportunities: {
         Row: {
@@ -29115,6 +30879,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_coverage_opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -29254,6 +31025,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_document_uploads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -29415,6 +31193,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -29667,6 +31452,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "portal_id_cards_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "portal_id_cards_branding_id_fkey"
             columns: ["branding_id"]
             isOneToOne: false
@@ -29763,6 +31555,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "portal_invitations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "portal_invitations_branding_id_fkey"
             columns: ["branding_id"]
             isOneToOne: false
@@ -29770,10 +31569,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "portal_invitations_contact_id_fkey"
+            foreignKeyName: "portal_invitations_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_invitations_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -29932,6 +31738,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_quote_requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -30098,6 +31911,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "portal_referrals_converted_to_account_id_fkey"
+            columns: ["converted_to_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "portal_referrals_converted_to_lead_id_fkey"
             columns: ["converted_to_lead_id"]
             isOneToOne: false
@@ -30116,6 +31936,13 @@ export type Database = {
             columns: ["referring_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_referrals_referring_account_id_fkey"
+            columns: ["referring_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -30302,6 +32129,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "portal_service_requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "portal_service_requests_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
@@ -30440,6 +32274,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "prediction_accuracy_tracking_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "prediction_accuracy_tracking_prediction_id_fkey"
             columns: ["prediction_id"]
             isOneToOne: false
@@ -30472,6 +32313,7 @@ export type Database = {
           nsf_at: string | null
           nsf_fee: number | null
           org_id: string | null
+          paid_to: string | null
           payer_address: string | null
           payer_name: string | null
           payment_method_id: string
@@ -30503,6 +32345,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
+          paid_to?: string | null
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id: string
@@ -30534,6 +32377,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
+          paid_to?: string | null
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id?: string
@@ -30555,6 +32399,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "premium_payments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -30731,6 +32582,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "producer_workload_stats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_recommendations: {
@@ -30803,6 +32661,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_recommendations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -31576,6 +33441,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quotes_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -31737,6 +33609,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rate_watch_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -31956,6 +33835,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "renewal_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "renewal_campaigns_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -32101,7 +33987,7 @@ export type Database = {
         Insert: {
           contact_type: string
           contacted_at?: string | null
-          contacted_by: string
+          contacted_by?: string
           direction: string
           duration_minutes?: number | null
           id?: string
@@ -32121,6 +34007,20 @@ export type Database = {
           renewal_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "renewal_contact_log_contacted_by_profiles_fkey"
+            columns: ["contacted_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "renewal_contact_log_contacted_by_profiles_fkey"
+            columns: ["contacted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "renewal_contact_log_renewal_id_fkey"
             columns: ["renewal_id"]
@@ -32160,7 +34060,7 @@ export type Database = {
           id?: string
           name: string
           renewal_id: string
-          uploaded_by: string
+          uploaded_by?: string
         }
         Update: {
           created_at?: string | null
@@ -32297,7 +34197,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string | null
-          created_by: string
+          created_by?: string
           id?: string
           renewal_id: string
           updated_at?: string | null
@@ -32311,6 +34211,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "renewal_notes_created_by_profiles_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "producer_lead_stats"
+            referencedColumns: ["producer_id"]
+          },
+          {
+            foreignKeyName: "renewal_notes_created_by_profiles_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "renewal_notes_renewal_id_fkey"
             columns: ["renewal_id"]
@@ -32349,7 +34263,7 @@ export type Database = {
           carrier: string
           coverage_summary?: string | null
           created_at?: string | null
-          created_by: string
+          created_by?: string
           document_url?: string | null
           expiration_date?: string | null
           id?: string
@@ -32545,6 +34459,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewal_risk_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -32838,6 +34759,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -33153,6 +35081,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "retention_interventions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "retention_interventions_prediction_id_fkey"
             columns: ["prediction_id"]
             isOneToOne: false
@@ -33223,6 +35158,75 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_user_agencies"
             referencedColumns: ["agency_workspace_id"]
+          },
+        ]
+      }
+      retype_candidates: {
+        Row: {
+          account_id: string
+          applied_at: string | null
+          commercial_policies: number | null
+          created_at: string
+          current_account_type: string | null
+          current_type: string | null
+          id: string
+          personal_policies: number | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signal: string
+          status: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Insert: {
+          account_id: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type: string
+          suggested_type: string
+        }
+        Update: {
+          account_id?: string
+          applied_at?: string | null
+          commercial_policies?: number | null
+          created_at?: string
+          current_account_type?: string | null
+          current_type?: string | null
+          id?: string
+          personal_policies?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signal?: string
+          status?: string
+          suggested_account_type?: string
+          suggested_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retype_candidates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -33428,10 +35432,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "review_requests_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_requests_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "review_requests_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -33454,13 +35479,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_user_agencies"
             referencedColumns: ["agency_workspace_id"]
-          },
-          {
-            foreignKeyName: "review_requests_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "review_requests_google_profile_id_fkey"
@@ -33703,10 +35721,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "reviews_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reviews_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -33729,13 +35768,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_user_agencies"
             referencedColumns: ["agency_workspace_id"]
-          },
-          {
-            foreignKeyName: "reviews_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reviews_google_profile_id_fkey"
@@ -33888,6 +35920,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scoring_weight_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -34230,6 +36269,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "service_tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "service_tickets_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
@@ -34396,10 +36442,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sms_messages_contact_id_fkey"
+            foreignKeyName: "sms_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -34604,6 +36664,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "submission_packages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "submission_packages_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -34788,6 +36855,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tags_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -35445,6 +37519,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -35589,6 +37670,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_conversations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -36109,6 +38197,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
@@ -36123,10 +38218,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tickets_contact_id_fkey"
+            foreignKeyName: "tickets_contact_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_contact_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -36334,10 +38436,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "twilio_consents_contact_id_fkey"
+            foreignKeyName: "twilio_consents_account_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twilio_consents_account_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -36698,6 +38807,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "acord_forms_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       acord_form_progress: {
@@ -36720,6 +38836,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acord_forms_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -36906,6 +39029,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_predictions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       at_risk_renewals: {
@@ -36949,6 +39079,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -37058,6 +39195,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_risk_scores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       communication_engagement_stats: {
@@ -37078,6 +39222,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
         ]
@@ -37204,6 +39355,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "document_processing_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       enrichment_usage_summary: {
@@ -37230,6 +39388,19 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      household_rollup: {
+        Row: {
+          active_policies: number | null
+          household_id: string | null
+          household_name: string | null
+          household_premium: number | null
+          is_mixed_line: boolean | null
+          line_categories: string[] | null
+          member_count: number | null
+          tier: string | null
+        }
+        Relationships: []
       }
       issue_analytics: {
         Row: {
@@ -37350,6 +39521,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "knowledge_base_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "knowledge_base_previous_version_id_fkey"
             columns: ["previous_version_id"]
             isOneToOne: false
@@ -37435,6 +39613,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -37544,6 +39729,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -37680,6 +39872,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
             referencedColumns: ["id"]
           },
           {
@@ -37858,6 +40057,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policies_carrier_id_fkey"
             columns: ["carrier_id"]
             isOneToOne: false
@@ -37963,6 +40169,21 @@ export type Database = {
         }
         Relationships: []
       }
+      v_business_type_violations: {
+        Row: {
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       v_kb_simple: {
         Row: {
           category: string | null
@@ -38026,6 +40247,46 @@ export type Database = {
           },
           {
             foreignKeyName: "nps_responses_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_agencies"
+            referencedColumns: ["agency_workspace_id"]
+          },
+        ]
+      }
+      v_phase0_crosssell_targets: {
+        Row: {
+          agency_workspace_id: string | null
+          contact_account_id: string | null
+          contact_email: string | null
+          contact_name: string | null
+          has_auto: boolean | null
+          has_dwelling: boolean | null
+          has_specialty: boolean | null
+          has_umbrella: boolean | null
+          household_id: string | null
+          household_key: string | null
+          member_accounts: number | null
+          play: string | null
+          reachable_email: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_agency_reputation_summary"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
             columns: ["agency_workspace_id"]
             isOneToOne: false
             referencedRelation: "v_user_agencies"
@@ -38211,6 +40472,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "workspaces_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workspaces_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -38242,6 +40510,15 @@ export type Database = {
       }
     }
     Functions: {
+      _do_account_merge: {
+        Args: {
+          p_apply?: boolean
+          p_losers: string[]
+          p_rule: string
+          p_survivor: string
+        }
+        Returns: Json
+      }
       add_tag_to_customer: {
         Args: {
           p_account_id: string
@@ -38251,8 +40528,42 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_membership_role_for_profile: {
+        Args: { p_profile_role: string }
+        Returns: string
+      }
+      admin_sync_user_provisioning: {
+        Args: {
+          p_actor_id?: string
+          p_agency_workspace_id?: string
+          p_profile_active?: boolean
+          p_profile_role: string
+          p_require_explicit_agency?: boolean
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      aggregate_renewal_risk_indicators: {
+        Args: never
+        Returns: {
+          updated_count: number
+        }[]
+      }
       append_coi_version: {
         Args: { p_coi_id: string; p_version_data: Json }
+        Returns: undefined
+      }
+      apply_consent_strictest_wins: {
+        Args: { p_losers: string[]; p_survivor: string }
+        Returns: Json
+      }
+      approve_retype_candidate: { Args: { p_id: string }; Returns: Json }
+      assert_active_staff_profile_provisioned_for_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      assert_mergeable: {
+        Args: { p_losers: string[]; p_survivor: string }
         Returns: undefined
       }
       assign_lead: {
@@ -38260,6 +40571,36 @@ export type Database = {
         Returns: string
       }
       auto_route_document: { Args: { p_document_id: string }; Returns: string }
+      brian_detail_aging_quotes: {
+        Args: { p_days?: number; p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_detail_at_risk: {
+        Args: { p_days_ahead?: number; p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_detail_lost_30d: {
+        Args: { p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_detail_overdue_tasks: {
+        Args: { p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_detail_untouched_renewals: {
+        Args: { p_days_ahead?: number; p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_detail_written_30d: {
+        Args: { p_workspace_id?: string }
+        Returns: Json
+      }
+      brian_invoke_edge: { Args: { p_fn: string }; Returns: Json }
+      brian_is_quiet_hours: { Args: { p_at?: string }; Returns: boolean }
+      brian_run_evening_brief: { Args: never; Returns: Json }
+      brian_run_midday_pulse: { Args: never; Returns: Json }
+      brian_run_morning_brief: { Args: never; Returns: Json }
+      brian_should_fire: { Args: { p_target_local: string }; Returns: boolean }
       calculate_ao_renewal_priority: {
         Args: { p_renewal_date: string }
         Returns: string
@@ -38295,6 +40636,16 @@ export type Database = {
       calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
       calculate_nps_category: { Args: { p_score: number }; Returns: string }
       calculate_nps_score: { Args: { p_campaign_id: string }; Returns: number }
+      calculate_renewal_risk_scores: {
+        Args: never
+        Returns: {
+          critical_count: number
+          high_count: number
+          low_count: number
+          medium_count: number
+          processed_count: number
+        }[]
+      }
       can_send_survey: {
         Args: {
           p_contact_id: string
@@ -38374,8 +40725,53 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_marketing_queue_items: {
+        Args: { p_limit?: number; p_processor_id: string }
+        Returns: {
+          attempts: number | null
+          automation_enrollment_id: string | null
+          automation_step_id: string | null
+          channel: string
+          claim_expires_at: string | null
+          claimed_at: string | null
+          classification: string
+          communication_evidence_id: string | null
+          created_at: string | null
+          from_user_id: string
+          household_dedupe_key: string | null
+          household_id: string | null
+          id: string
+          idempotency_key: string
+          last_attempt_at: string | null
+          last_error: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          org_id: string
+          preferences_version_at_queue: number | null
+          priority: number | null
+          processor_id: string | null
+          provider_message_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          source_id: string | null
+          source_type: string
+          status: string | null
+          to_account_id: string | null
+          to_contact_id: string | null
+          to_email: string | null
+          to_phone: string | null
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "marketing_send_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       cleanup_context_cache: { Args: never; Returns: number }
       cleanup_expired_ocr_cache: { Args: never; Returns: undefined }
+      compute_account_survivor: { Args: { p_ids: string[] }; Returns: string }
       compute_insured_search_vector: {
         Args: { p_account_id: string }
         Returns: unknown
@@ -38383,6 +40779,10 @@ export type Database = {
       compute_policy_retention_factors: {
         Args: { p_policy_id: string }
         Returns: Json
+      }
+      confirm_relationship_suggestion: {
+        Args: { p_role?: string; p_suggestion_id: string }
+        Returns: string
       }
       create_account_with_membership: {
         Args: { account_data: Json; owner_user_id: string }
@@ -38524,6 +40924,8 @@ export type Database = {
         }
         Returns: string
       }
+      evening_brief_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
+      execute_readonly_query: { Args: { query_text: string }; Returns: Json }
       expire_old_coverage_analyses: { Args: never; Returns: undefined }
       expire_old_predictions: { Args: never; Returns: undefined }
       find_matching_rules: {
@@ -38583,6 +40985,8 @@ export type Database = {
         Args: { p_due_date: string; p_template_task_id: string }
         Returns: string
       }
+      generate_relationship_suggestions: { Args: never; Returns: Json }
+      generate_retype_candidates: { Args: never; Returns: Json }
       generate_review_queue: {
         Args: { p_extraction_id: string }
         Returns: number
@@ -38617,13 +41021,75 @@ export type Database = {
             }
             Returns: Json
           }
+      get_account_cluster: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          account_status: string
+          account_type: string
+          active_premium: number
+          cluster_active_premium: number
+          cluster_business_count: number
+          cluster_member_count: number
+          cluster_size: number
+          cluster_total_policies: number
+          depth: number
+          goes_by: string
+          is_business: boolean
+          name: string
+          next_expiration: string
+          node_role: string
+          owner_account_id: string
+          owner_name: string
+          policies_count: number
+        }[]
+      }
       get_account_insurance_profile: {
         Args: { p_account_id: string }
         Returns: Json
       }
+      get_account_link_suggestions: {
+        Args: { p_account_id: string }
+        Returns: {
+          confidence: number
+          direction: string
+          other_account_id: string
+          other_active_premium: number
+          other_goes_by: string
+          other_name: string
+          other_policies_count: number
+          other_type: string
+          reason: string
+          rel_type: string
+          signal: string
+          suggested_label: string
+          suggestion_id: string
+        }[]
+      }
       get_account_monitoring_summary: {
         Args: { p_account_id: string }
         Returns: Json
+      }
+      get_account_relationships: {
+        Args: { p_account_id: string }
+        Returns: {
+          direction: string
+          display_label: string
+          is_primary: boolean
+          note: string
+          other_account_id: string
+          other_active_premium: number
+          other_goes_by: string
+          other_name: string
+          other_next_expiration: string
+          other_policies_count: number
+          other_status: string
+          other_type: string
+          rel_type: string
+          relationship_id: string
+          role: string
+          source: string
+        }[]
       }
       get_account_workspace_id: {
         Args: { p_account_id: string }
@@ -38672,6 +41138,16 @@ export type Database = {
           module_name: string
           module_slug: string
           success_rate: number
+        }[]
+      }
+      get_ao_migration_counts: {
+        Args: never
+        Returns: {
+          bound_elsewhere: number
+          lapsing_week: number
+          not_started: number
+          quote_out: number
+          total: number
         }[]
       }
       get_at_risk_customers: {
@@ -38771,6 +41247,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_customer_triage_counts: {
+        Args: never
+        Returns: {
+          new_30d: number
+          no_active_policy: number
+          overdue: number
+          renewals_30d: number
+          renewals_60d: number
+          total: number
+        }[]
+      }
       get_draft_with_conflicts: {
         Args: { p_acord_form_id: string }
         Returns: Json
@@ -38864,8 +41351,26 @@ export type Database = {
           version_2_value: string
         }[]
       }
+      get_lead_triage_counts: {
+        Args: never
+        Returns: {
+          hot: number
+          new_leads: number
+          qualified: number
+          quoted: number
+          total: number
+        }[]
+      }
       get_my_household_member_id: { Args: never; Returns: string }
       get_my_portal_user_id: { Args: never; Returns: string }
+      get_needs_me_today: {
+        Args: never
+        Returns: {
+          new_leads: number
+          overdue_tasks: number
+          renewals_due: number
+        }[]
+      }
       get_next_round_robin_producer: {
         Args: { p_rule_id: string }
         Returns: string
@@ -39010,6 +41515,16 @@ export type Database = {
           status: Database["public"]["Enums"]["claim_status"]
         }[]
       }
+      get_policy_triage_counts: {
+        Args: never
+        Returns: {
+          expiring_30d: number
+          lapsed: number
+          no_renewal_date: number
+          recently_bound: number
+          total: number
+        }[]
+      }
       get_portal_packet_data: {
         Args: { p_token_id?: string; p_workspace_id: string }
         Returns: Json
@@ -39058,6 +41573,16 @@ export type Database = {
         }[]
       }
       get_renewal_intelligence_summary: { Args: never; Returns: Json }
+      get_task_triage_counts: {
+        Args: never
+        Returns: {
+          completed: number
+          due_this_week: number
+          high_priority: number
+          open_total: number
+          overdue: number
+        }[]
+      }
       get_top_product_opportunities: {
         Args: { p_limit?: number; p_min_probability?: number }
         Returns: {
@@ -39090,10 +41615,9 @@ export type Database = {
           unread_count: number
         }[]
       }
-      get_unread_notification_count: {
-        Args: { p_user_id: string }
-        Returns: number
-      }
+      get_unread_notification_count:
+        | { Args: never; Returns: number }
+        | { Args: { p_user_id: string }; Returns: number }
       get_upcoming_ao_renewals: {
         Args: { days_ahead?: number }
         Returns: {
@@ -39225,7 +41749,10 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string | null
           issue_date: string | null
+          line_canonical: string | null
+          line_category: string | null
           line_of_business: string | null
+          line_of_business_id: string | null
           mga_id: string | null
           named_insured: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -39282,7 +41809,10 @@ export type Database = {
           insured_items: Json | null
           insured_user_id: string | null
           issue_date: string | null
+          line_canonical: string | null
+          line_category: string | null
           line_of_business: string | null
+          line_of_business_id: string | null
           mga_id: string | null
           named_insured: string | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -39344,12 +41874,41 @@ export type Database = {
         Returns: boolean
       }
       has_sms_consent: { Args: { target_contact_id: string }; Returns: boolean }
+      import_resolve_account: {
+        Args: {
+          p_address_line1?: string
+          p_address_line2?: string
+          p_agency_workspace_id: string
+          p_batch_id: string
+          p_city?: string
+          p_custom?: Json
+          p_dob?: string
+          p_email?: string
+          p_name: string
+          p_phone?: string
+          p_source?: string
+          p_state?: string
+          p_type: string
+          p_zip?: string
+        }
+        Returns: Json
+      }
       increment_campaign_enrollment: {
         Args: { campaign_id: string }
         Returns: undefined
       }
       increment_campaign_touchpoints: {
         Args: { campaign_id: string }
+        Returns: undefined
+      }
+      increment_contact_frequency: {
+        Args: {
+          p_channel: string
+          p_classification: string
+          p_contact_id: string
+          p_household_id: string
+          p_org_id: string
+        }
         Returns: undefined
       }
       increment_document_download: {
@@ -39481,6 +42040,31 @@ export type Database = {
           status: string
         }[]
       }
+      list_duplicate_groups_for_review: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          created_at: string
+          entity_type: string
+          group_id: string
+          match_score: number
+          member_count: number
+          members: Json
+          status: string
+        }[]
+      }
+      list_recent_merges: {
+        Args: { p_limit?: number }
+        Returns: {
+          loser_id: string
+          loser_name: string
+          merge_history_id: string
+          merged_at: string
+          reparent_total: number
+          rule: string
+          survivor_id: string
+          survivor_name: string
+        }[]
+      }
       log_document_access: {
         Args: {
           p_access_type: string
@@ -39535,6 +42119,7 @@ export type Database = {
         Returns: boolean
       }
       map_canopy_to_lead: { Args: { p_pull_id: string }; Returns: string }
+      mark_all_notifications_read: { Args: never; Returns: number }
       mark_event_delivered: {
         Args: { p_event_id: number; p_http_status?: number }
         Returns: undefined
@@ -39564,24 +42149,25 @@ export type Database = {
           similarity: number
         }[]
       }
-      merge_customers_transactional_v1: {
-        Args: {
-          p_confirmation_phrase: string
-          p_duplicate_customer_id: string
-          p_master_customer_id: string
-          p_options?: Json
-        }
+      merge_accounts_manual: {
+        Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
       }
-      merge_duplicate_records: {
-        Args: { group_id: string; merged_data?: Json; survivor_id: string }
-        Returns: Json
-      }
+      midday_pulse_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
+      morning_brief_kpis: { Args: { p_workspace_id?: string }; Returns: Json }
       move_lead_to_stage: {
         Args: { p_lead_id: string; p_new_status: string }
         Returns: boolean
       }
+      normalize_entity_name: { Args: { p: string }; Returns: string }
       normalize_phone_number: { Args: { phone_input: string }; Returns: string }
+      patrol_connection_pool_stats: { Args: never; Returns: Json }
+      patrol_data_integrity_snapshot: {
+        Args: { p_agency_workspace_id?: string }
+        Returns: Json
+      }
+      patrol_export_rls_policies: { Args: never; Returns: Json }
+      patrol_export_schema_catalog: { Args: never; Returns: Json }
       perform_soft_delete: {
         Args: { p_reason?: string; p_record_id: string; p_table_name: string }
         Returns: boolean
@@ -39589,13 +42175,6 @@ export type Database = {
       pick_enum_label: {
         Args: { candidates: string[]; enum_type: unknown }
         Returns: string
-      }
-      preview_customer_merge_v1: {
-        Args: {
-          p_duplicate_customer_id: string
-          p_master_customer_id: string
-        }
-        Returns: Json
       }
       portal_accessible_account_ids: {
         Args: never
@@ -39606,6 +42185,10 @@ export type Database = {
       portal_has_permission: {
         Args: { p_permission: string }
         Returns: boolean
+      }
+      preview_merge: {
+        Args: { p_losers: string[]; p_survivor: string }
+        Returns: Json
       }
       process_automation_rules: {
         Args: {
@@ -39694,7 +42277,24 @@ export type Database = {
         Returns: undefined
       }
       refresh_quote_rankings: { Args: never; Returns: undefined }
+      refresh_renewal_intelligence: {
+        Args: { days_ahead?: number }
+        Returns: {
+          critical_risk: number
+          high_risk: number
+          indicators_updated: number
+          low_risk: number
+          medium_risk: number
+          policies_synced: number
+          risks_calculated: number
+        }[]
+      }
       refresh_task_generation_analytics: { Args: never; Returns: undefined }
+      reject_retype_candidate: { Args: { p_id: string }; Returns: Json }
+      relgraph_merge_duplicate_group: {
+        Args: { p_group_id: string; p_survivor_id: string }
+        Returns: Json
+      }
       replay_dead_events: {
         Args: {
           p_event_type?: string
@@ -39745,6 +42345,46 @@ export type Database = {
       scan_for_duplicates: {
         Args: { entity_type?: string; similarity_threshold?: number }
         Returns: Json
+      }
+      search_accounts: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: {
+          account_id: string
+          city: string
+          email: string
+          goes_by: string
+          match_reason: string
+          name: string
+          owned_business_count: number
+          phone: string
+          policies_count: number
+          score: number
+          state: string
+          type: string
+        }[]
+      }
+      search_ao_renewals: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          best_alternative_carrier: string
+          current_carrier: string
+          current_premium: number
+          customer_name: string
+          follow_up_date: string
+          id: string
+          last_contact_date: string
+          moved_carrier: string
+          policy_number: string
+          policy_type: string
+          renewal_date: string
+          status: string
+        }[]
       }
       search_client_context: {
         Args: {
@@ -39837,6 +42477,72 @@ export type Database = {
           title: string
         }[]
       }
+      search_leads: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          company_name: string
+          converted_account_id: string
+          created_at: string
+          current_carrier: string
+          email: string
+          first_name: string
+          id: string
+          insurance_types: string[]
+          last_contact_at: string
+          last_name: string
+          lead_score: number
+          next_follow_up_date: string
+          phone: string
+          status: string
+          updated_at: string
+        }[]
+      }
+      search_policies: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          carrier: string
+          created_at: string
+          expiration_date: string
+          id: string
+          line: string
+          named_insured: string
+          policy_number: string
+          premium: number
+          status: string
+        }[]
+      }
+      search_tasks: {
+        Args: {
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+        }
+        Returns: {
+          account_id: string
+          account_name: string
+          completed_at: string
+          created_at: string
+          due_at: string
+          entity_type: string
+          id: string
+          priority: string
+          status: string
+          title: string
+        }[]
+      }
       seed_default_tags: { Args: { p_account_id: string }; Returns: undefined }
       set_user_role: {
         Args: {
@@ -39892,6 +42598,14 @@ export type Database = {
           match_confidence: number
         }[]
       }
+      sync_policies_to_renewals: {
+        Args: { days_ahead?: number }
+        Returns: {
+          new_count: number
+          synced_count: number
+          updated_count: number
+        }[]
+      }
       sync_renewals_from_policies: {
         Args: { p_days_ahead?: number }
         Returns: {
@@ -39918,6 +42632,7 @@ export type Database = {
           id: string
           last_contact_at: string
           name: string
+          next_expiration_at: string
           notes_summary: string
           org_name: string
           phone: string
@@ -39932,6 +42647,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      unmerge_account: { Args: { p_merge_history_id: string }; Returns: Json }
       update_account_secure: {
         Args: { account_data: Json; account_id: string }
         Returns: Json

@@ -73,12 +73,14 @@ UPDATE payment_methods SET display_order = 6, is_active = true, deleted_at = NUL
 
 -- ============================================================================
 -- 6. Backfill paid_to for historical payments from their (post-reclass) method
+--    Escrow instruments (cash/check, incl. Money Order/CC) -> escrow.
+--    Electronic / agency-side instruments -> company. This also covers the
+--    handful of legacy agency_bill / finance_company rows so none are orphaned.
 -- ============================================================================
 UPDATE premium_payments pp
 SET paid_to = CASE
-        WHEN pm.type IN ('credit_card', 'ach') THEN 'company'
-        WHEN pm.type IN ('cash', 'check')      THEN 'escrow'
-        ELSE NULL
+        WHEN pm.type IN ('cash', 'check') THEN 'escrow'
+        ELSE 'company'
     END
 FROM payment_methods pm
 WHERE pp.payment_method_id = pm.id
