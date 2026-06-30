@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useDaySheets, useCurrentDaySheet } from '@/hooks/useDaySheets';
 import { DaySheetSummary } from '@/components/payments/DaySheetSummary';
+import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -64,6 +65,7 @@ export default function DaySheets() {
     to: new Date(),
   });
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [goToDateOpen, setGoToDateOpen] = useState(false);
   const [selectedGoToDate, setSelectedGoToDate] = useState<Date | undefined>(undefined);
   const [searchingForDate, setSearchingForDate] = useState<string | null>(null);
@@ -160,6 +162,13 @@ export default function DaySheets() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            className="bg-emerald-800 hover:bg-emerald-900 text-white"
+            onClick={() => navigate('/payments')}
+          >
+            <Receipt className="h-4 w-4 mr-2" />
+            View Payments
+          </Button>
           {/* Go to Date - Select a specific date to view/print that day's sheet */}
           <Popover open={goToDateOpen} onOpenChange={setGoToDateOpen}>
             <PopoverTrigger asChild>
@@ -185,10 +194,6 @@ export default function DaySheets() {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" onClick={() => navigate('/payments')}>
-            <Receipt className="h-4 w-4 mr-2" />
-            View Payments
-          </Button>
         </div>
       </div>
 
@@ -202,12 +207,15 @@ export default function DaySheets() {
               <CardDescription>Manage today&apos;s day sheet</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => navigate('/payments/new')}>
+              <Button
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white"
+                onClick={() => setShowRecordPayment(true)}
+              >
                 <DollarSign className="h-4 w-4 mr-2" />
                 Record Payment
               </Button>
               <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                className="w-full bg-emerald-800 hover:bg-emerald-900 text-white"
                 onClick={() => navigate(`/day-sheets/${currentDaySheet.id}?action=print`)}
               >
                 <Printer className="h-4 w-4 mr-2" />
@@ -218,26 +226,16 @@ export default function DaySheets() {
                 className="w-full"
                 onClick={() => navigate(`/day-sheets/${currentDaySheet.id}`)}
               >
-                View Full Details
+                View Today&apos;s Day Sheet
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
-              {currentDaySheet.status === 'open' && (currentDaySheet.payment_count || 0) > 0 && (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => navigate(`/day-sheets/${currentDaySheet.id}?action=close`)}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Close Day Sheet
-                </Button>
-              )}
             </CardContent>
           </Card>
         </div>
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
@@ -253,34 +251,12 @@ export default function DaySheets() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Open</CardTitle>
-            <Clock className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium">Day Sheets</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.openSheets}</div>
-            <p className="text-xs text-muted-foreground">day sheets</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Closed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.closedSheets}</div>
-            <p className="text-xs text-muted-foreground">awaiting deposit</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Deposited</CardTitle>
-            <Archive className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.depositedSheets}</div>
-            <p className="text-xs text-muted-foreground">completed</p>
+            <div className="text-2xl font-bold">{daySheets.length}</div>
+            <p className="text-xs text-muted-foreground">in selected period</p>
           </CardContent>
         </Card>
       </div>
@@ -308,18 +284,6 @@ export default function DaySheets() {
                   {range.label}
                 </Button>
               ))}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[130px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="deposited">Deposited</SelectItem>
-                </SelectContent>
-              </Select>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -358,7 +322,6 @@ export default function DaySheets() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Sheet #</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Payments</TableHead>
                   <TableHead className="text-right">Cash</TableHead>
                   <TableHead className="text-right">Checks</TableHead>
@@ -368,7 +331,6 @@ export default function DaySheets() {
               </TableHeader>
               <TableBody>
                 {daySheets.map((sheet) => {
-                  const StatusIcon = statusIcons[sheet.status] || Clock;
                   return (
                     <TableRow
                       key={sheet.id}
@@ -380,12 +342,6 @@ export default function DaySheets() {
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {sheet.sheet_number || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[sheet.status]}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {sheet.status}
-                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">{sheet.payment_count || 0}</TableCell>
                       <TableCell className="text-right">
@@ -415,6 +371,12 @@ export default function DaySheets() {
           )}
         </CardContent>
       </Card>
+
+      {/* Record Payment popup */}
+      <RecordPaymentModal
+        open={showRecordPayment}
+        onOpenChange={setShowRecordPayment}
+      />
     </div>
     </AppLayout>
   );
