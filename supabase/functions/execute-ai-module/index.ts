@@ -9,6 +9,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
+import { redactPII } from '../_shared/floorSafety.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -259,9 +260,17 @@ serve(async (req) => {
         }
 
         if (text) {
+          const { redacted, redactions } = redactPII(text.substring(0, 80000));
+          if (redactions.length > 0) {
+            console.log('[AI Module] Redacted regulated document text before model prompt', {
+              document_id: doc.id,
+              redactions,
+            });
+          }
+
           documentContents.push({
             filename: doc.filename,
-            text: text.substring(0, 80000), // Limit to ~80k chars per doc
+            text: redacted, // Limit to ~80k chars per doc, with PII removed before model use.
           });
         } else {
           console.warn(`[OCR] No text extracted for ${doc.filename}`);
@@ -285,7 +294,7 @@ serve(async (req) => {
     if (documentContents.length > 0) {
       userPrompt += 'DOCUMENTS:\n\n';
       documentContents.forEach((doc, i) => {
-        userPrompt += `--- Document ${i + 1}: ${doc.filename} ---\n${doc.text}\n\n`;
+        userPrompt += `--- Document ${i + 1} ---\n${doc.text}\n\n`;
       });
     }
 
@@ -293,13 +302,13 @@ serve(async (req) => {
     if (additional_inputs && Object.keys(additional_inputs).length > 0) {
       userPrompt += '\nADDITIONAL INFORMATION:\n';
       for (const [key, value] of Object.entries(additional_inputs)) {
-        userPrompt += `${key}: ${value}\n`;
+        userPrompt += `${key}: ${redactPII(String(value)).redacted}\n`;
       }
     }
 
     // Add user's text input
     if (input_text) {
-      userPrompt += `\nUSER REQUEST:\n${input_text}\n`;
+      userPrompt += `\nUSER REQUEST:\n${redactPII(input_text).redacted}\n`;
     }
 
     // Add output format instruction

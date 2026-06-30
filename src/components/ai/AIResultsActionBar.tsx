@@ -38,12 +38,12 @@ import {
     Loader2,
     Building2,
     MessageSquare,
-    Phone,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTasks } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { AI_RESULTS_SMS_DISABLED_REASON, isAiResultsSmsActionEnabled } from '@/floor/legacyActionGate';
 import jsPDF from 'jspdf';
 
 interface AIResultsActionBarProps {
@@ -121,6 +121,10 @@ function isArrayOfObjects(arr: unknown[]): arr is Array<Record<string, unknown>>
     return arr.length > 0 && arr.every(item => isPlainObject(item));
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 /**
  * Extract JSON from markdown code blocks
  */
@@ -162,6 +166,7 @@ export function AIResultsActionBar({
     const [smsPhoneNumber, setSmsPhoneNumber] = useState('');
     const [smsMessage, setSmsMessage] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const aiResultsSmsEnabled = isAiResultsSmsActionEnabled();
 
     // Get the actual data to process (handle JSON in markdown)
     const getProcessedResult = (): Record<string, unknown> => {
@@ -749,11 +754,11 @@ export function AIResultsActionBar({
             });
             setShowNoteDialog(false);
             setNoteContent('');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving note:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to save note',
+                description: errorMessage(error, 'Failed to save note'),
                 variant: 'destructive',
             });
         } finally {
@@ -787,11 +792,11 @@ export function AIResultsActionBar({
             setShowTaskDialog(false);
             setTaskTitle('');
             setTaskDescription('');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating task:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to create task',
+                description: errorMessage(error, 'Failed to create task'),
                 variant: 'destructive',
             });
         } finally {
@@ -799,50 +804,14 @@ export function AIResultsActionBar({
         }
     };
 
-    // Send SMS with results
-    const handleSendSMS = async () => {
-        if (!smsPhoneNumber) {
-            toast({
-                title: 'Phone number required',
-                description: 'Please enter a phone number',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            // Create condensed SMS message (160 char limit friendly)
-            const message = smsMessage || `AI Analysis: ${title}. View full results at your portal or contact your agent for details.`;
-
-            const { data, error } = await supabase.functions.invoke('send-sms', {
-                body: {
-                    to_number: smsPhoneNumber,
-                    body: message,
-                    account_id: accountId || null,
-                },
-            });
-
-            if (error) throw error;
-            if (!data?.success) throw new Error(data?.error || 'Failed to send SMS');
-
-            toast({
-                title: 'SMS sent!',
-                description: `Message sent to ${smsPhoneNumber}`,
-            });
-            setShowSMSDialog(false);
-            setSmsPhoneNumber('');
-            setSmsMessage('');
-        } catch (error: any) {
-            console.error('Error sending SMS:', error);
-            toast({
-                title: 'Error',
-                description: error.message || 'Failed to send SMS',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsSaving(false);
-        }
+    // AI-result → SMS is intentionally disabled until exact-artifact Floor approval tokens exist.
+    const handleSendSMS = () => {
+        toast({
+            title: 'SMS gated by the Floor',
+            description: AI_RESULTS_SMS_DISABLED_REASON,
+            variant: 'destructive',
+        });
+        setShowSMSDialog(false);
     };
 
     return (
@@ -904,9 +873,24 @@ export function AIResultsActionBar({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setShowSMSDialog(true)}>
+                        <DropdownMenuItem
+                            disabled={!aiResultsSmsEnabled}
+                            onSelect={(event) => {
+                                if (!aiResultsSmsEnabled) {
+                                    event.preventDefault();
+                                    toast({
+                                        title: 'SMS gated by the Floor',
+                                        description: AI_RESULTS_SMS_DISABLED_REASON,
+                                        variant: 'destructive',
+                                    });
+                                    return;
+                                }
+
+                                setShowSMSDialog(true);
+                            }}
+                        >
                             <MessageSquare className="h-4 w-4 mr-2" />
-                            Send SMS
+                            SMS gated by Floor
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {/* TODO: Email modal */ }}>
                             <Mail className="h-4 w-4 mr-2" />
