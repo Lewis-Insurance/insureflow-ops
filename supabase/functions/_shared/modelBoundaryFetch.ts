@@ -51,3 +51,36 @@ export function redactRequestInitForModelBoundary(input: RequestInfo | URL, init
 export function modelBoundaryFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   return fetch(input, redactRequestInitForModelBoundary(input, init));
 }
+
+export interface AnthropicBoundaryContentBlock {
+  type: string;
+  text: string;
+  [key: string]: unknown;
+}
+
+export interface AnthropicBoundaryResponse {
+  content: AnthropicBoundaryContentBlock[];
+  [key: string]: unknown;
+}
+
+export async function anthropicBoundaryCreate(
+  credential: string,
+  body: Record<string, unknown>,
+): Promise<AnthropicBoundaryResponse> {
+  const response = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': credential,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = redactPII(await response.text()).redacted;
+    throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+  }
+
+  return response.json() as Promise<AnthropicBoundaryResponse>;
+}

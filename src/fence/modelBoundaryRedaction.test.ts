@@ -39,12 +39,18 @@ const nestedRawNeedles = [
 const modelProviderPatterns = [
   /api\.openai\.com\/v1\/(?:chat\/completions|embeddings)/,
   /api\.anthropic\.com\/v1\/messages/,
+  /anthropic\.messages\.create|new\s+Anthropic\s*\(/,
   /generativelanguage\.googleapis\.com\/v1beta\/models\/[^\s`'"]+:generateContent/,
-  /\/openai\/deployments\/[^\s`'"]+\/(?:chat\/completions|embeddings)|AZURE_OPENAI/,
+  /\/openai\/deployments\/[^\s`'"]+\/(?:chat\/completions|embeddings)|AZURE_OPENAI|openai\/deployments/,
 ];
 
 const rawFetchPattern = /(?<![\w.])fetch\s*\(/;
-const sharedClientProviderChokepoints = new Set(['supabase/functions/_shared/ai-client.ts']);
+const rawSdkProviderPatterns = [/anthropic\.messages\.create\s*\(/, /new\s+Anthropic\s*\(/];
+const modelBoundarySourceRoots = ['supabase/functions', 'src/services'];
+const sharedClientProviderChokepoints = new Set([
+  'supabase/functions/_shared/ai-client.ts',
+  'supabase/functions/_shared/modelBoundaryFetch.ts',
+]);
 
 function readTypeScriptFiles(dir: string): Array<{ path: string; source: string }> {
   const entries = readdirSync(dir);
@@ -142,10 +148,10 @@ describe('PII redaction at model boundaries', () => {
     expect(source).toContain('redactModelBoundaryText(inputText,');
   });
 
-  it('routes direct model-provider fetches outside the shared AI client through modelBoundaryFetch', () => {
-    const providerFiles = readTypeScriptFiles(resolve(repoRoot, 'supabase/functions')).filter(({ source }) =>
-      modelProviderPatterns.some((pattern) => pattern.test(source)),
-    );
+  it('routes direct model-provider calls outside shared chokepoints through redaction wrappers', () => {
+    const providerFiles = modelBoundarySourceRoots
+      .flatMap((root) => readTypeScriptFiles(resolve(repoRoot, root)))
+      .filter(({ source }) => modelProviderPatterns.some((pattern) => pattern.test(source)));
 
     const rawFetchOffenders = providerFiles
       .filter(({ path }) => !sharedClientProviderChokepoints.has(path))
@@ -154,11 +160,17 @@ describe('PII redaction at model boundaries', () => {
 
     const missingWrapperOffenders = providerFiles
       .filter(({ path }) => !sharedClientProviderChokepoints.has(path))
-      .filter(({ source }) => !source.includes('modelBoundaryFetch('))
+      .filter(({ source }) => !source.includes('modelBoundaryFetch(') && !source.includes('anthropicBoundaryCreate('))
+      .map(({ path }) => path);
+
+    const rawSdkOffenders = providerFiles
+      .filter(({ path }) => !sharedClientProviderChokepoints.has(path))
+      .filter(({ source }) => rawSdkProviderPatterns.some((pattern) => pattern.test(source)))
       .map(({ path }) => path);
 
     expect(rawFetchOffenders).toEqual([]);
     expect(missingWrapperOffenders).toEqual([]);
+    expect(rawSdkOffenders).toEqual([]);
   });
 
   it('keeps critical direct AI functions redacted before model calls', () => {
