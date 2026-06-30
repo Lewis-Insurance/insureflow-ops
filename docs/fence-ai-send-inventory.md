@@ -16,6 +16,7 @@ Starting verifier before behavior changes:
 | `src/components/ai/AIResultsActionBar.tsx` | AI analysis result action menu | AI/programmatic content could historically call `send-sms` directly | live AI-output-to-client path if re-enabled | **disable/gate** — no direct `send-sms`; route only through review/approval |
 | `src/hooks/useCOIGeneration.ts` → `send-coi-email` / `supabase/functions/send-coi-email/index.ts` | COI generation/send flow | client email send with attachment/artifact | may be human workflow but still client-facing | **wrap-with-approval** before prod deploy; include in send-gate contract tests/static fence |
 | `src/hooks/useSignature.ts`, `src/components/signatures/SignatureRequestModal.tsx` → `esign-create-request` | e-sign request flow | client/third-party e-sign request | irreversible external request | **gate** with named-human approval before production deploy |
+| `supabase/functions/canopy-servicing/index.ts` (`request_id_card`, `request_declarations`) | Canopy servicing action posts to carrier API with `delivery_method: email` and a client/caller email | carrier-mediated client document delivery | external client-reaching effect not covered by the current `client_send_approval` gate | **gate or explicit exception** — before production use, either add the same named-human approval gate before the Canopy POST or document a carrier-mediated exception |
 | `src/components/customers/InviteToPortalButton.tsx` → `portal-send-invitation` | staff portal invitation | legitimate human-initiated client email | external client notification | **wrap-with-approval** in follow-on if this run touches invitations; not AI-generated |
 | `automation-processor` → `email-send`, `twilio-sms` | automation workflow | programmatic send | highest-risk non-human send | **gate** — cannot invoke send without approval reference |
 | `twilio-sms`, `twilio-voice`, `phone-verification`, Twilio webhooks | telephony infrastructure / verification | mixed infrastructure, inbound, or OTP-like flows | not AI-result content; verification paths should not be broken | **keep**, except outbound client-message sends must use send-gate |
@@ -33,6 +34,9 @@ Starting verifier before behavior changes:
 | `context-indexer`, `index-document-chunks` | embedding/indexing | document chunks | embeddings are model boundary too | **redact at model boundary** |
 | extraction functions (`extract-*`, `acord-*`, `comparison-*`, `analyze-*`, `compare-insurance-options`, `generate-coi-data`, `generate-insurance-quote-doc`) | policy/document analysis flows | OCR/document or quote text | raw PII possible | **redact at shared model/client boundary**; prioritized tests on named critical functions in this run |
 | `_shared/ai-client.ts` | shared OpenAI/Anthropic/embedding client | messages/prompts | central boundary | **wrap** shared client with redaction for messages/inputs |
+| `supabase/functions/hermes-chat/index.ts` | Floor cockpit bridge when `FLOOR_COCKPIT_ENABLED` and `HERMES_API_URL`/key are set | user chat message plus opaque context refs | optional external Hermes runtime receives `body.message`; current guard is a block-list, not `redactPII` | **redact or explicit feature-flagged exception** before any model-boundary completeness claim; default/synthetic posture is not the same as redacted live proxying |
+| `supabase/functions/prism-api/index.ts` | Prism `/run` endpoint when `PRISM_SERVICE_URL` is set | user prompt | forwards the raw prompt to an external Prism service | **redact or explicit feature-flagged exception** before live use or completeness claims |
+| `supabase/functions/ocr-document/index.ts`, `supabase/functions/parse-document-ocr/index.ts` | Google Cloud Vision OCR | raw document bytes/base64 | OCR provider receives raw document content; `modelBoundaryFetch(...)` currently recognizes LLM providers, not Vision URLs | **disclose OCR/provider boundary** and require separate approved OCR posture or exception before live-document rollout |
 
 ## Sprint 0 disposition summary
 
@@ -40,7 +44,8 @@ Starting verifier before behavior changes:
 - **Wrap-with-approval:** `email-send`, `send-sms`, and other direct client-send functions where legitimate staff sends must keep working.
 - **Gate:** programmatic/automation/client-effect paths (`automation-processor`, `send-coi-email`, `esign-create-request`, marketing/proactive sends) before any production deploy.
 - **Disable/reroute:** AI result one-click client sends (`AIResultsActionBar` SMS and any AI-compose direct-send path) so AI output can only become draft/review content.
-- **Redact:** every model boundary that receives document/record/free text, using a shared PII redactor before the provider call.
+- **Redact:** every in-scope OpenAI/Anthropic/Gemini/Azure model boundary that receives document/record/free text, using a shared PII redactor before the provider call.
+- **Post-review disclosure additions:** carrier-mediated Canopy document requests, optional Hermes/Prism external proxies, and Google Cloud Vision OCR are now inventoried as follow-on gate/redact/exception decisions. They do not reopen the four named Sprint 1/Sprint 4 gates or the Sprint 2 AI-results direct-send removal, but they must be addressed before representing the fence as complete repo-wide coverage.
 
 ## [SPRINT 0 COMPLETE]
 
@@ -86,7 +91,7 @@ No production deploy/write/send occurred.
 
 ## [SPRINT 3 COMPLETE]
 
-PII redaction is enforced at the model boundary:
+PII redaction is enforced at the in-scope model boundaries:
 
 - `supabase/functions/_shared/floorSafety.ts` extends `redactPII(...)` coverage for SSN, DOB/DLN, account numbers, VINs, full policy numbers, signed storage URLs, storage paths, and raw UUIDs.
 - `supabase/functions/_shared/ai-client.ts` redacts shared chat messages and embedding inputs before Gemini/OpenAI/Anthropic/OpenAI embedding calls.
@@ -109,7 +114,7 @@ Final verification and handoff are staged:
 - `docs/fence-ai-send-verification-handoff.md` contains the reviewer handoff, acceptance proof map, before/after summary, explicit scope-boundary exceptions, and Brian-gated deploy commands.
 - `send-coi-email` and `esign-create-request` were added to the same server-side exact-content one-time approval gate during final scope review, with human UI/hook flows wrapped via `client-send-approval-create` so legitimate sends/client effects keep working.
 - Repo lint was made green by using `@storybook/react-vite` story type imports and excluding local `.claude` worktrees from eslint traversal.
-- Remaining direct provider paths such as marketing/reputation/renewal/portal-invitation workflows are not production-approved by this fence; they stay follow-on gated/classified work unless Brian explicitly approves a scoped exception.
+- Remaining client-effect/provider paths such as Canopy servicing, marketing/reputation/renewal/portal-invitation workflows, optional Hermes/Prism proxies, and OCR provider boundaries are not production-approved by this fence; they stay follow-on gated/redacted/classified work unless Brian explicitly approves a scoped exception.
 
 Final proof:
 

@@ -10,7 +10,7 @@ Production deploy status: **staged only; not executed**
 
 ## Purpose
 
-This handoff lets a reviewer verify that the InsureFlow safety fence was built to scope before any Brian-approved production deploy. The fence closes the live holes where AI/programmatic content could reach a client without named-human approval, and where raw PII could cross the model boundary.
+This handoff lets a reviewer verify that the InsureFlow safety fence was built to scope before any Brian-approved production deploy. The fence closes the named Sprint 0–4 holes: the four server-gated client-send/client-effect functions, the AI-results direct-send shortcut, and the in-scope OpenAI/Anthropic/Gemini/Azure model-provider boundaries. It is not a claim that every client-reaching path or every possible model/OCR/provider boundary in the repo is complete.
 
 ## Branch commits in scope
 
@@ -24,6 +24,8 @@ b6f51e7 Fence Sprint 1 hardening — atomic send approval gate
 c7bd038 Fence Sprint 4 — verify fence handoff
 ```
 
+Additional docs-only clarification already present on this branch: `82c3651 docs: clarify AI send fence handoff scope`.
+
 ## What to verify
 
 ### 1. Inventory and disposition exists
@@ -32,7 +34,7 @@ File:
 
 - `docs/fence-ai-send-inventory.md`
 
-Verify it classifies direct client-send/client-effect paths and AI/model paths into keep, wrap-with-approval, gate, disable/reroute, or redact.
+Verify it classifies direct client-send/client-effect paths and AI/model paths into keep, wrap-with-approval, gate, disable/reroute, or redact, including the post-review disclosure additions for Canopy servicing, optional Hermes/Prism proxies, and Google Vision OCR.
 
 ### 2. Direct client-send/client-effect functions are server-gated
 
@@ -77,9 +79,9 @@ Expected behavior:
 - `AIResultsActionBar` no longer has the legacy SMS dialog/state/handler.
 - AI result Share menu displays SMS and Email as gated by Floor.
 - Known AI UI surfaces do not call `send-sms`, `email-send`, or `createClientSendApproval(...)` directly.
-- Only human composer/client-effect surfaces invoke send functions, and they carry `client_send_approval`.
+- Human SMS/COI/e-sign client-effect surfaces covered by this branch carry `client_send_approval` where they call the gated functions.
 
-### 4. PII is redacted at model boundaries
+### 4. PII is redacted at in-scope model boundaries
 
 Critical files:
 
@@ -90,25 +92,32 @@ Critical files:
 
 Expected behavior:
 
-- `redactPII(...)` covers SSN, DOB, DLN, account number, VIN, full policy number, signed storage URLs, storage paths, and raw UUIDs.
+- `redactPII(...)` covers the tested standard/labeled forms of SSN, DOB, DLN, account number, VIN, full policy number, signed storage URLs, storage paths, and raw UUIDs. It should be read as label/format-dependent coverage, not full anonymization: DLN/account/policy patterns are strongest with labels, storage paths are limited to known prefixes, and compact 9-digit SSN matching may false-positive.
 - Shared chat/model calls redact before Gemini/OpenAI/Anthropic.
 - Shared embedding calls redact before OpenAI embeddings.
 - Direct provider `fetch(...)` calls outside shared chokepoints route through `modelBoundaryFetch(...)`.
 - Anthropic SDK-style calls route through `anthropicBoundaryCreate(...)`.
-- `ai-document-analysis` no longer interpolates raw document names into model context.
+- `ai-document-analysis` no longer interpolates raw document names into the primary `documentPaths` model context; residual filename paths still exist in context-metadata handling and OCR-failure placeholders and are follow-on disclosure items.
 - `execute-ai-module` redacts system prompts and document/input text before Azure OpenAI.
 
 Model-boundary function files changed by the fence include direct OpenAI/Anthropic/Gemini/Azure callers under `supabase/functions/*` plus `src/services/comparison/PolicySnapshotExtractor.ts`.
+
+Known exclusions from this static model-boundary scan are disclosed in §5: optional `hermes-chat`/`prism-api` external proxies and OCR-provider calls such as Google Cloud Vision.
 
 ### 5. Scope boundaries and follow-on exceptions
 
 This fence is a default-deny safety layer for the Sprint 0–4 scope, not a production launch approval. Verify these boundaries before any deployment:
 
-- The server-side one-time exact-content approval gate is installed on `email-send`, `send-sms`, `send-coi-email`, and `esign-create-request`. Other direct provider paths named in the inventory (`marketing-send-governor`, `reputation-manager`, `renewal-rate-watch`, `portal-send-invitation`, and similar scheduled/marketing workflows) remain classified for follow-on gating or explicit exception before they are used for client-facing sends.
-- Internal automation callers such as `automation-processor` and `process-quote-followups` do not mint `client_send_approval`; after Sprint 1 they should fail closed when they hit `email-send`/`send-sms` instead of sending. Their workflow UX/queue behavior still needs a follow-on cleanup before those automations are enabled.
-- `weekly-ceo-digest` is treated as an internal executive digest exception, not a client/carrier send surface, but it still remains behind its existing cron-secret/idempotency controls and is not deployed by this run.
-- Redaction coverage is for regulated identifiers and storage refs listed above. It should not be described as full anonymization of every possible PII category: names, business names, street addresses, FEIN/EIN, license plates, and other document-specific identifiers require a future expansion if the live rollout needs that guarantee.
-- Azure Document Intelligence/Form Recognizer OCR is a separate document-processing provider boundary. This fence redacts OCR/document text before LLM/model calls; it does not redact raw document bytes or signed document URLs before an OCR provider receives them. Live-document use therefore still requires the approved OCR/provider posture or a separate disable/exception gate.
+- The server-side one-time exact-content approval gate is installed on `email-send`, `send-sms`, `send-coi-email`, and `esign-create-request`. Other direct provider/client-effect paths named in the inventory (`canopy-servicing`, `marketing-send-governor`, `reputation-manager`, `renewal-rate-watch`, `portal-send-invitation`, and similar carrier/scheduled/marketing workflows) remain classified for follow-on gating or explicit exception before they are used for client-facing sends.
+- `canopy-servicing` is now explicitly inventoried as a carrier-mediated client-effect path: `request_id_card` and `request_declarations` can POST a payload with `delivery_method: email` and an email address to the Canopy servicing API. It is not covered by this branch's approval gate and is not production-approved by this fence without a gate or documented exception.
+- Optional external model/runtime proxies are now explicitly inventoried: `hermes-chat` can forward `body.message` to an external Hermes runtime when `FLOOR_COCKPIT_ENABLED` plus `HERMES_API_URL`/key are set and `FLOOR_HERMES_SYNTHETIC` is not true; `prism-api` can forward a raw `prompt` to `PRISM_SERVICE_URL`. Both need redaction or documented feature-flagged exceptions before any repo-wide model-boundary completeness claim.
+- Internal automation callers such as `automation-processor` and `process-quote-followups` do not mint `client_send_approval`. Current fail-closed behavior is path-specific: the email path invokes `email-send` and should fail auth/gate before provider send, while the SMS path invokes `twilio-sms` (an inbound/webhook-style function), not `send-sms`; it should fail its own webhook/auth controls rather than a `client_send_approval_required` error. Their workflow UX/queue behavior still needs follow-on cleanup before those automations are enabled.
+- `weekly-ceo-digest` is treated as an internal executive digest exception, not a client/carrier send surface. It appears in the staged deploy loop only as a model-boundary/redaction bundle, remains behind its existing cron-secret/idempotency controls, and was not deployed by this run.
+- Redaction coverage is for the tested regulated identifiers and storage refs listed above. It should not be described as full anonymization of every possible PII category or every unlabeled format: names, business names, street addresses, FEIN/EIN, license plates, unlabeled DLNs/account/policy numbers, and other document-specific identifiers require future expansion if the live rollout needs that guarantee.
+- Azure Document Intelligence/Form Recognizer and Google Cloud Vision OCR are separate document-processing provider boundaries. This fence redacts OCR/document text before LLM/model calls; it does not redact raw document bytes, base64 document content, or signed document URLs before an OCR provider receives them. Live-document use therefore still requires the approved OCR/provider posture or a separate disable/exception gate.
+- `email-send` has no human approval-minting UI wrapper in this branch. That is intentional for the current scope: SMS, COI, and e-sign human workflows are preserved; generic email send remains fail-closed/no-working-human-path until a scoped human email composer flow is designed and wrapped.
+- `esign-create-request` consumes approval before Dropbox Sign, but server-defaulted fields injected after the gate (for example default `subject`, and absent `message`) are not themselves content-hash inputs. Treat that as a low-severity follow-on if defaults become human-meaningful external content beyond the already-hashed document/signature request fields.
+- Test coverage is representative, not exhaustive: Supabase-backed replay/wrong-human checks are concentrated on `email-send`, expired approval coverage is on `send-sms`, AI-direct-send scans the named AI surfaces and `functions.invoke('send-sms'|'email-send')`, and provider-boundary static scans cover the configured OpenAI/Anthropic/Gemini/Azure patterns rather than every optional proxy/OCR provider.
 - Provider error-body logging remains a follow-on hardening item where providers might echo prompt/document snippets in error responses. Do not treat this branch as log-sink redaction completion.
 
 ## Verification commands run
@@ -148,16 +157,16 @@ npm run test:run -- \
 
 | Requirement | Proof |
 | --- | --- |
-| Inventory + disposition table committed | `docs/fence-ai-send-inventory.md`; Sprint 0 commit |
+| Inventory + disposition table committed | `docs/fence-ai-send-inventory.md`; Sprint 0 commit plus post-review disclosure additions |
 | No-approval client send rejected | `src/fence/sendApprovalGate.test.ts`, no-approval cases for `email-send`, `send-sms`, `send-coi-email`, `esign-create-request` |
 | Legitimate human-approved send succeeds | `src/fence/sendApprovalGate.test.ts`, named-human approval passes once |
 | Replay rejected | `src/fence/sendApprovalGate.test.ts`, in-memory and Supabase-backed replay cases |
 | Content mismatch rejected | `src/fence/sendApprovalGate.test.ts`, tampered payload cases |
 | Approval is server-side and one-time | `client_send_approvals` migration + `createSupabaseClientSendApprovalStore(...)` final update predicates |
-| Human sends preserved | wrappers in SMS, COI, and e-sign UI/hook flows mint `client-send-approval-create` before send/client effect |
+| Human sends preserved | wrappers in SMS, COI, and e-sign UI/hook flows mint `client-send-approval-create` before send/client effect; generic `email-send` intentionally has no human wrapper in this branch |
 | AI result cannot direct-send | `src/fence/noAIDirectSend.test.ts`; `AIResultsActionBar` only shows gated copy |
-| PII redacted before model calls | `src/fence/modelBoundaryRedaction.test.ts` fixture and static provider-boundary scan |
-| Direct model provider bypasses closed | `modelBoundaryFetch(...)`, `anthropicBoundaryCreate(...)`, static test over `supabase/functions` and `src/services` |
+| PII redacted before model calls | `src/fence/modelBoundaryRedaction.test.ts` fixture and static OpenAI/Anthropic/Gemini/Azure provider-boundary scan |
+| Direct model provider bypasses closed | `modelBoundaryFetch(...)`, `anthropicBoundaryCreate(...)`, static test over `supabase/functions` and `src/services` for configured provider patterns; optional Hermes/Prism/Vision boundaries are disclosed follow-ons |
 | Build/lint/tests green | final verifier commands above |
 | Deploy staged, not executed | deploy commands below; intentionally not run in this session |
 
@@ -171,8 +180,21 @@ npm run test:run -- \
 | `esign-create-request` Dropbox Sign request | Authenticated caller could create external signature request without a consumed approval marker | Requires same one-time approval gate; e-sign UI/hook flows mint marker before Dropbox Sign |
 | AI result direct SMS/email | AI results action menu exposed legacy send affordances | Legacy SMS dialog/state/handler removed; SMS/Email shown as Floor-gated only |
 | Shared AI client model calls | Shared chat/embedding helpers could send raw text to providers | Chat messages and embedding inputs pass through `redactPII(...)` before provider calls |
-| Direct model provider fetches | Many Edge functions called OpenAI/Anthropic/Gemini/Azure directly | Direct provider calls route through `modelBoundaryFetch(...)` or `anthropicBoundaryCreate(...)` and redaction tests scan for bypasses |
-| Raw PII categories | Existing redactor covered only limited fields in one function | Shared redactor covers SSN/DOB/DLN/account/VIN/full policy number/signed URLs/storage paths/raw UUIDs |
+| Direct model provider fetches | Many Edge functions called OpenAI/Anthropic/Gemini/Azure directly | In-scope direct provider calls route through `modelBoundaryFetch(...)` or `anthropicBoundaryCreate(...)`; optional Hermes/Prism proxies and OCR providers remain disclosed follow-ons |
+| Raw PII categories | Existing redactor covered only limited fields in one function | Shared redactor covers tested standard/labeled SSN/DOB/DLN/account/VIN/full policy number/signed URLs/storage paths/raw UUIDs; it is not full anonymization |
+
+## Post-review sign-off and disclosure additions
+
+Reviewer verdict dated 2026-06-30: **ACCEPT with required disclosure additions**. Independent review reproduced the published build/test/deploy-not-run evidence and accepted the four-function approval gate plus AI-results direct-send removal for the declared Sprint 0–4 scope.
+
+Required disclosure fixes now reflected in this handoff/inventory:
+
+- `canopy-servicing` is listed as an ungated carrier-mediated client-effect follow-on.
+- `hermes-chat` and `prism-api` are listed as optional external proxy/model-boundary follow-ons.
+- Google Cloud Vision OCR is listed alongside Azure OCR as a raw-document provider boundary outside the LLM redaction guarantee.
+- `redactPII(...)`, `ai-document-analysis`, automation fail-closed behavior, test coverage, `email-send` human-path intent, e-sign default content binding, and `weekly-ceo-digest` deploy-loop wording are all scoped precisely.
+
+These additions do not change deployable code and do not reopen the specific holes closed by the branch. They prevent this handoff from being read as complete repo-wide client-send/model-boundary coverage.
 
 ## Prod deploy commands staged but not run
 
@@ -242,9 +264,10 @@ The repo had unrelated dirty/untracked work before and after this fence run, inc
 ## Reviewer checklist
 
 1. Confirm branch is `feat/fence-ungated-ai-send-paths`.
-2. Confirm the fence commits listed above plus final Sprint 4 commit are present.
+2. Confirm the fence commits listed above plus final Sprint 4 commit and docs-only clarification `82c3651` are present.
 3. Run the verification commands in this handoff.
 4. Inspect `src/fence/sendApprovalGate.test.ts` for reject/accept-once/replay/content-mismatch coverage.
 5. Inspect `src/fence/noAIDirectSend.test.ts` for AI direct-send absence and allowed human send surfaces.
 6. Inspect `src/fence/modelBoundaryRedaction.test.ts` for PII fixture redaction, nested provider body redaction, direct-provider bypass scan, and critical function checks.
-7. Confirm no Supabase deploy command was run as part of this feature-branch run.
+7. Review the post-review disclosure additions for Canopy servicing, optional Hermes/Prism proxies, Google Vision OCR, label-dependent redaction, representative test coverage, and email-send human-path intent.
+8. Confirm no Supabase deploy command was run as part of this feature-branch run.
