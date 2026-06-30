@@ -127,6 +127,16 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   label="SMS"
                   to="/sms"
                 />
+                <NavItem
+                  icon={DollarSign}
+                  label="Payments"
+                  to="/payments"
+                />
+                <NavItem
+                  icon={Receipt}
+                  label="Day Sheets"
+                  to="/day-sheets"
+                />
               </NavGroup>
 
               {/* Lewi AI Group */}
@@ -228,16 +238,6 @@ function AppLayoutContent({ children }: AppLayoutProps) {
 
               {/* Accounting Group */}
               <NavGroup label="Accounting" defaultOpen={false}>
-                <NavItem
-                  icon={DollarSign}
-                  label="Payments"
-                  to="/payments"
-                />
-                <NavItem
-                  icon={Receipt}
-                  label="Day Sheets"
-                  to="/day-sheets"
-                />
                 <NavItem
                   icon={Landmark}
                   label="Bank Reconciliation"
