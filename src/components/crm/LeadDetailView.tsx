@@ -234,21 +234,21 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
   };
 
   const getLeadScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600 bg-green-50";
-    if (score >= 60) return "text-blue-600 bg-blue-50";
-    if (score >= 40) return "text-yellow-600 bg-yellow-50";
-    return "text-red-600 bg-red-50";
+    if (score >= 80) return "text-success bg-success/10";
+    if (score >= 60) return "text-info bg-info/10";
+    if (score >= 40) return "text-warning bg-warning/10";
+    return "text-destructive bg-destructive/10";
   };
 
   const getStatusColor = (status: LeadStatus) => {
     const colors: Record<LeadStatus, string> = {
-      new: "bg-blue-100 text-blue-800",
-      contacted: "bg-purple-100 text-purple-800",
-      qualified: "bg-green-100 text-green-800",
-      quoted: "bg-yellow-100 text-yellow-800",
-      won: "bg-emerald-100 text-emerald-800",
-      lost: "bg-red-100 text-red-800",
-      nurturing: "bg-orange-100 text-orange-800",
+      new: "bg-info/10 text-info",
+      contacted: "bg-info/10 text-info",
+      qualified: "bg-success/10 text-success",
+      quoted: "bg-warning/10 text-warning",
+      won: "bg-success/10 text-success",
+      lost: "bg-destructive/10 text-destructive",
+      nurturing: "bg-warning/10 text-warning",
     };
     return colors[status];
   };
@@ -572,7 +572,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                   )}
                   {lead.converted_at && (
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <CheckCircle2 className="h-4 w-4 text-success" />
                       <span className="text-muted-foreground">Converted:</span>
                       <span className="font-medium">
                         {format(new Date(lead.converted_at), "PPp")}
@@ -624,13 +624,13 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                       {(activity.old_value || activity.new_value) && (
                         <div className="flex items-center gap-2 text-xs">
                           {activity.old_value && (
-                            <span className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
+                            <span className="bg-destructive/10 text-destructive px-2 py-1 rounded">
                               {activity.old_value}
                             </span>
                           )}
                           <span className="text-muted-foreground">→</span>
                           {activity.new_value && (
-                            <span className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                            <span className="bg-success/10 text-success px-2 py-1 rounded">
                               {activity.new_value}
                             </span>
                           )}

@@ -86,7 +86,7 @@ export function QuoteComparisonTable({ quotes }: QuoteComparisonTableProps) {
                     key={quote.id}
                     className={`text-center font-bold text-lg ${
                       quote.quote_score === highestScore
-                        ? "text-green-600"
+                        ? "text-success"
                         : ""
                     }`}
                   >
@@ -105,7 +105,7 @@ export function QuoteComparisonTable({ quotes }: QuoteComparisonTableProps) {
                     key={quote.id}
                     className={`text-center ${
                       quote.premium === lowestPremium
-                        ? "text-green-600 font-bold"
+                        ? "text-success font-bold"
                         : ""
                     }`}
                   >
@@ -206,7 +206,7 @@ export function QuoteComparisonTable({ quotes }: QuoteComparisonTableProps) {
                           <TableCell key={quote.id} className="text-center">
                             {coverage?.is_included ? (
                               <div className="space-y-1">
-                                <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                                <CheckCircle2 className="h-5 w-5 text-success mx-auto" />
                                 {coverage.limit_amount && (
                                   <div className="text-xs text-muted-foreground">
                                     {coverage.limit_amount}
@@ -219,7 +219,7 @@ export function QuoteComparisonTable({ quotes }: QuoteComparisonTableProps) {
                                 )}
                               </div>
                             ) : (
-                              <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                              <XCircle className="h-5 w-5 text-destructive mx-auto" />
                             )}
                           </TableCell>
                         );

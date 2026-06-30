@@ -32,7 +32,7 @@ export function TrainingMaterialCard({ material, onView }: TrainingMaterialCardP
     <Card
       className={cn(
         'group cursor-pointer transition-all hover:shadow-lg hover:border-primary/50',
-        material.user_status === 'completed' && 'border-green-200 bg-green-50/30'
+        material.user_status === 'completed' && 'border-success/30 bg-success/10'
       )}
       onClick={() => onView(material)}
     >
@@ -47,8 +47,8 @@ export function TrainingMaterialCard({ material, onView }: TrainingMaterialCardP
           </Badge>
           <div className="flex items-center gap-1">
             {material.is_required && (
-              <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
-                <Star className="h-3 w-3 mr-1 fill-amber-500" />
+              <Badge variant="outline" className="text-xs border-warning/30 text-warning">
+                <Star className="h-3 w-3 mr-1 fill-warning" />
                 Required
               </Badge>
             )}

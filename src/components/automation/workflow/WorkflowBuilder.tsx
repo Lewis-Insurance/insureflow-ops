@@ -723,7 +723,7 @@ function StageCard({
                 </div>
               )}
               {stage.delay_value === 0 && index === 0 && (
-                <span className="text-green-600">Immediate</span>
+                <span className="text-success">Immediate</span>
               )}
               {stage.conditions && (
                 <Badge variant="secondary" className="text-xs">
@@ -763,14 +763,14 @@ function StageCard({
 
 function ActionTypeIcon({ actionType }: { actionType: string }) {
   const icons: Record<string, React.ReactNode> = {
-    send_email: <Mail className="h-4 w-4 text-blue-500" />,
-    send_sms: <MessageSquare className="h-4 w-4 text-green-500" />,
-    create_task: <CheckSquare className="h-4 w-4 text-purple-500" />,
-    webhook: <Webhook className="h-4 w-4 text-orange-500" />,
-    wait: <Clock className="h-4 w-4 text-gray-500" />,
-    update_field: <Edit className="h-4 w-4 text-yellow-500" />,
-    add_tag: <Users className="h-4 w-4 text-pink-500" />,
-    enroll_workflow: <RefreshCw className="h-4 w-4 text-cyan-500" />,
+    send_email: <Mail className="h-4 w-4 text-info" />,
+    send_sms: <MessageSquare className="h-4 w-4 text-success" />,
+    create_task: <CheckSquare className="h-4 w-4 text-info" />,
+    webhook: <Webhook className="h-4 w-4 text-warning" />,
+    wait: <Clock className="h-4 w-4 text-cc-text-muted" />,
+    update_field: <Edit className="h-4 w-4 text-warning" />,
+    add_tag: <Users className="h-4 w-4 text-info" />,
+    enroll_workflow: <RefreshCw className="h-4 w-4 text-info" />,
   };
   return icons[actionType] || <CheckSquare className="h-4 w-4" />;
 }

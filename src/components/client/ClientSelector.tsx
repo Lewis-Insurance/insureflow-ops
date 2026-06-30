@@ -84,11 +84,11 @@ export function ClientSelector({
   const getAccountIcon = (type: string | null) => {
     switch (type) {
       case 'business':
-        return <Building2 className="h-4 w-4 text-blue-500" />;
+        return <Building2 className="h-4 w-4 text-info" />;
       case 'household':
-        return <Users className="h-4 w-4 text-green-500" />;
+        return <Users className="h-4 w-4 text-success" />;
       default:
-        return <User className="h-4 w-4 text-gray-500" />;
+        return <User className="h-4 w-4 text-cc-text-muted" />;
     }
   };
 

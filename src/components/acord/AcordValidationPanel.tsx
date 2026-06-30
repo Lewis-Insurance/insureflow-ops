@@ -155,15 +155,15 @@ export function AcordValidationPanel({
 
   const getStatusIcon = () => {
     if (validationResult.errors.length > 0) {
-      return <XCircle className="h-5 w-5 text-red-500" />;
+      return <XCircle className="h-5 w-5 text-destructive" />;
     }
     if (validationResult.warnings.length > 0) {
-      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      return <AlertTriangle className="h-5 w-5 text-warning" />;
     }
     if (validationResult.completionPercentage < 100) {
-      return <Info className="h-5 w-5 text-blue-500" />;
+      return <Info className="h-5 w-5 text-info" />;
     }
-    return <CheckCircle className="h-5 w-5 text-green-500" />;
+    return <CheckCircle className="h-5 w-5 text-success" />;
   };
 
   const getStatusMessage = () => {
@@ -212,19 +212,19 @@ export function AcordValidationPanel({
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border p-3 text-center">
-            <div className="text-2xl font-bold text-red-500">
+            <div className="text-2xl font-bold text-destructive">
               {validationResult.errors.length}
             </div>
             <div className="text-xs text-muted-foreground">Errors</div>
           </div>
           <div className="rounded-lg border p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-500">
+            <div className="text-2xl font-bold text-warning">
               {validationResult.warnings.length}
             </div>
             <div className="text-xs text-muted-foreground">Warnings</div>
           </div>
           <div className="rounded-lg border p-3 text-center">
-            <div className="text-2xl font-bold text-green-500">
+            <div className="text-2xl font-bold text-success">
               {validationResult.valid ? (
                 <CheckCircle className="h-6 w-6 mx-auto" />
               ) : (
@@ -275,7 +275,7 @@ export function AcordValidationPanel({
                           </Badge>
                         )}
                         {warnings.length > 0 && (
-                          <Badge variant="outline" className="h-5 border-yellow-500 text-yellow-600">
+                          <Badge variant="outline" className="h-5 border-warning text-warning">
                             {warnings.length} warning{warnings.length > 1 ? 's' : ''}
                           </Badge>
                         )}
@@ -286,14 +286,14 @@ export function AcordValidationPanel({
                         {errors.map((error, idx) => (
                           <div
                             key={`error-${idx}`}
-                            className="flex items-start gap-2 rounded-md bg-red-50 dark:bg-red-950/20 p-2 text-sm"
+                            className="flex items-start gap-2 rounded-md bg-destructive/10 p-2 text-sm"
                           >
-                            <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                             <div className="flex-1">
                               <span className="font-mono text-xs text-muted-foreground">
                                 {error.field}
                               </span>
-                              <p className="text-red-700 dark:text-red-400">{error.message}</p>
+                              <p className="text-destructive">{error.message}</p>
                             </div>
                             {onFieldFocus && (
                               <Button
@@ -310,14 +310,14 @@ export function AcordValidationPanel({
                         {warnings.map((warning, idx) => (
                           <div
                             key={`warning-${idx}`}
-                            className="flex items-start gap-2 rounded-md bg-yellow-50 dark:bg-yellow-950/20 p-2 text-sm"
+                            className="flex items-start gap-2 rounded-md bg-warning/10 p-2 text-sm"
                           >
-                            <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                             <div className="flex-1">
                               <span className="font-mono text-xs text-muted-foreground">
                                 {warning.field}
                               </span>
-                              <p className="text-yellow-700 dark:text-yellow-400">
+                              <p className="text-warning">
                                 {warning.message}
                               </p>
                             </div>
@@ -371,13 +371,13 @@ export function AcordValidationPanel({
 
         {/* All Valid Message */}
         {validationResult.valid && validationResult.completionPercentage === 100 && (
-          <div className="flex items-center gap-3 rounded-lg bg-green-50 dark:bg-green-950/20 p-4">
-            <CheckCircle className="h-6 w-6 text-green-500" />
+          <div className="flex items-center gap-3 rounded-lg bg-success/10 p-4">
+            <CheckCircle className="h-6 w-6 text-success" />
             <div>
-              <p className="font-medium text-green-700 dark:text-green-400">
+              <p className="font-medium text-success">
                 Form is complete and valid
               </p>
-              <p className="text-sm text-green-600 dark:text-green-500">
+              <p className="text-sm text-success">
                 Ready for PDF generation and submission
               </p>
             </div>

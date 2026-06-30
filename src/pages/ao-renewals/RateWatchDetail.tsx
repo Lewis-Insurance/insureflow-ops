@@ -299,7 +299,7 @@ export default function RateWatchDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-orange-500" />
+                  <TrendingUp className="h-5 w-5 text-warning" />
                   Renewal Document
                 </CardTitle>
                 <CardDescription>
@@ -350,7 +350,7 @@ export default function RateWatchDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-green-500" />
+                  <TrendingDown className="h-5 w-5 text-success" />
                   Alternative Quotes
                 </CardTitle>
                 <CardDescription>
@@ -472,9 +472,9 @@ export default function RateWatchDetail() {
                         <span
                           className={`font-mono font-semibold flex items-center gap-1 ${
                             job.premium_change_pct > 0
-                              ? 'text-red-500'
+                              ? 'text-destructive'
                               : job.premium_change_pct < 0
-                              ? 'text-green-500'
+                              ? 'text-success'
                               : ''
                           }`}
                         >
@@ -583,10 +583,10 @@ interface DocumentRowProps {
 
 function DocumentRow({ document, onPreview, onDelete, showCarrier }: DocumentRowProps) {
   const extractionStatusConfig: Record<string, { icon: React.ElementType; color: string }> = {
-    pending: { icon: Clock, color: 'text-gray-500' },
-    processing: { icon: Loader2, color: 'text-blue-500' },
-    completed: { icon: CheckCircle2, color: 'text-green-500' },
-    failed: { icon: AlertTriangle, color: 'text-red-500' },
+    pending: { icon: Clock, color: 'text-cc-text-muted' },
+    processing: { icon: Loader2, color: 'text-info' },
+    completed: { icon: CheckCircle2, color: 'text-success' },
+    failed: { icon: AlertTriangle, color: 'text-destructive' },
   };
 
   const status = extractionStatusConfig[document.extraction_status] || extractionStatusConfig.pending;

@@ -103,14 +103,14 @@ export function CanopyStatsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-600" />
+            <Shield className="h-5 w-5 text-info" />
             Canopy Connect
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-4 bg-cc-surface-raised rounded w-3/4"></div>
+            <div className="h-4 bg-cc-surface-raised rounded w-1/2"></div>
           </div>
         </CardContent>
       </Card>
@@ -149,29 +149,29 @@ export function CanopyStatsCard() {
             icon={CheckCircle}
             label="Completed"
             value={stats?.completedPulls || 0}
-            color="text-green-600"
-            bgColor="bg-green-50"
+            color="text-success"
+            bgColor="bg-success/10"
           />
           <StatBox
             icon={Clock}
             label="Pending"
             value={stats?.pendingPulls || 0}
-            color="text-yellow-600"
-            bgColor="bg-yellow-50"
+            color="text-warning"
+            bgColor="bg-warning/10"
           />
           <StatBox
             icon={FileText}
             label="Policies"
             value={stats?.totalPolicies || 0}
-            color="text-blue-600"
-            bgColor="bg-blue-50"
+            color="text-info"
+            bgColor="bg-info/10"
           />
           <StatBox
             icon={Users}
             label="Leads Created"
             value={stats?.leadsCreated || 0}
-            color="text-purple-600"
-            bgColor="bg-purple-50"
+            color="text-info"
+            bgColor="bg-info/10"
           />
         </div>
 
@@ -204,7 +204,7 @@ export function CanopyStatsCard() {
 
         {/* Error Alert */}
         {(stats?.errorPulls || 0) > 0 && (
-          <div className="flex items-center gap-2 p-2 bg-red-50 text-red-700 rounded-lg text-sm">
+          <div className="flex items-center gap-2 p-2 bg-destructive/10 text-destructive rounded-lg text-sm">
             <AlertCircle className="h-4 w-4" />
             <span>{stats?.errorPulls} import(s) failed</span>
           </div>
@@ -262,7 +262,7 @@ export function CanopyStatsMini() {
   });
 
   if (isLoading) {
-    return <div className="h-6 w-32 bg-gray-200 rounded animate-pulse" />;
+    return <div className="h-6 w-32 bg-cc-surface-raised rounded animate-pulse" />;
   }
 
   return (
@@ -272,7 +272,7 @@ export function CanopyStatsMini() {
         {stats?.completed || 0} imports
       </Badge>
       {(stats?.pending || 0) > 0 && (
-        <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-300">
+        <Badge variant="outline" className="gap-1 text-warning border-warning/30">
           <Clock className="h-3 w-3" />
           {stats?.pending} pending
         </Badge>

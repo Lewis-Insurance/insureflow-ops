@@ -111,7 +111,7 @@ function getExpirationBadge(days: number | null) {
 
   if (days <= 30) {
     return (
-      <Badge className="flex items-center gap-1 bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+      <Badge className="flex items-center gap-1 bg-warning/15 text-warning hover:bg-warning/15">
         <Clock className="h-3 w-3" />
         {days} days left
       </Badge>
@@ -130,10 +130,10 @@ function getRiskBadge(level: string | null) {
   if (!level) return null;
 
   const colors: Record<string, string> = {
-    low: 'bg-green-100 text-green-700',
-    medium: 'bg-yellow-100 text-yellow-700',
-    high: 'bg-orange-100 text-orange-700',
-    critical: 'bg-red-100 text-red-700',
+    low: 'bg-success/15 text-success',
+    medium: 'bg-warning/15 text-warning',
+    high: 'bg-warning/15 text-warning',
+    critical: 'bg-destructive/15 text-destructive',
   };
 
   return (
@@ -408,8 +408,8 @@ export default function RenewalEditPage() {
                     <span
                       className={
                         renewal.price_change_pct > 0
-                          ? 'text-red-600 ml-1'
-                          : 'text-green-600 ml-1'
+                          ? 'text-destructive ml-1'
+                          : 'text-success ml-1'
                       }
                     >
                       ({renewal.price_change_pct > 0 ? '+' : ''}
@@ -441,12 +441,12 @@ export default function RenewalEditPage() {
                     value={renewal.risk_score}
                     className={`h-2 ${
                       renewal.risk_score >= 80
-                        ? '[&>div]:bg-red-500'
+                        ? '[&>div]:bg-destructive'
                         : renewal.risk_score >= 60
-                        ? '[&>div]:bg-orange-500'
+                        ? '[&>div]:bg-warning'
                         : renewal.risk_score >= 40
-                        ? '[&>div]:bg-yellow-500'
-                        : '[&>div]:bg-green-500'
+                        ? '[&>div]:bg-warning'
+                        : '[&>div]:bg-success'
                     }`}
                   />
                 )}
@@ -509,7 +509,7 @@ export default function RenewalEditPage() {
                 <span
                   className={`font-medium ${
                     daysUntilExpiration !== null && daysUntilExpiration <= 7
-                      ? 'text-red-600'
+                      ? 'text-destructive'
                       : ''
                   }`}
                 >
@@ -547,7 +547,7 @@ export default function RenewalEditPage() {
                   className={`font-medium ${
                     renewal.days_since_last_contact !== null &&
                     renewal.days_since_last_contact > 14
-                      ? 'text-orange-600'
+                      ? 'text-warning'
                       : ''
                   }`}
                 >
@@ -560,10 +560,10 @@ export default function RenewalEditPage() {
 
         {/* Outcome Info (if completed) */}
         {renewal.status === 'moved' && renewal.moved_carrier && (
-          <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
+          <Card className="border-info/30 bg-info/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
-                <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                <Badge className="bg-info/15 text-info">
                   Moved
                 </Badge>
                 <span className="text-sm">
@@ -581,7 +581,7 @@ export default function RenewalEditPage() {
         )}
 
         {renewal.status === 'lost' && renewal.lost_reason && (
-          <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+          <Card className="border-destructive/30 bg-destructive/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
                 <Badge variant="destructive">Lost</Badge>
@@ -594,7 +594,7 @@ export default function RenewalEditPage() {
         )}
 
         {renewal.status === 'cancelled' && renewal.cancelled_reason && (
-          <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+          <Card className="border-destructive/30 bg-destructive/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
                 <Badge variant="destructive">Cancelled</Badge>
@@ -610,10 +610,10 @@ export default function RenewalEditPage() {
         )}
 
         {renewal.status === 'lapsed' && renewal.lapsed_reason && (
-          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+          <Card className="border-warning/30 bg-warning/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
-                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Lapsed</Badge>
+                <Badge className="bg-warning/15 text-warning">Lapsed</Badge>
                 <span className="text-sm">
                   Reason: <strong>{renewal.lapsed_reason}</strong>
                   {renewal.termination_effective_date && (
@@ -626,10 +626,10 @@ export default function RenewalEditPage() {
         )}
 
         {renewal.status === 'non_renewed' && renewal.non_renewed_reason && (
-          <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800">
+          <Card className="border-warning/30 bg-warning/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
-                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Non-Renewed</Badge>
+                <Badge className="bg-warning/15 text-warning">Non-Renewed</Badge>
                 <span className="text-sm">
                   Reason: <strong>{renewal.non_renewed_reason}</strong>
                   {renewal.termination_effective_date && (
@@ -642,10 +642,10 @@ export default function RenewalEditPage() {
         )}
 
         {renewal.status === 'renewed' && renewal.completed_at && (
-          <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+          <Card className="border-success/30 bg-success/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
-                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Renewed</Badge>
+                <Badge className="bg-success/15 text-success">Renewed</Badge>
                 <span className="text-sm">
                   Completed: <strong>{format(new Date(renewal.completed_at), 'MMM d, yyyy')}</strong>
                   {renewal.renewal_premium && (

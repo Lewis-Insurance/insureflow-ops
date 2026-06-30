@@ -205,12 +205,12 @@ export default function CarrierTemplatesPage() {
 
   const getDocTypeColor = (type: string) => {
     const colors: Record<string, string> = {
-      dec_page: 'bg-blue-100 text-blue-800',
-      application: 'bg-green-100 text-green-800',
-      endorsement: 'bg-purple-100 text-purple-800',
-      certificate: 'bg-orange-100 text-orange-800',
+      dec_page: 'bg-info/10 text-info',
+      application: 'bg-success/10 text-success',
+      endorsement: 'bg-info/10 text-info',
+      certificate: 'bg-warning/10 text-warning',
     };
-    return colors[type] || 'bg-gray-100 text-gray-800';
+    return colors[type] || 'bg-cc-surface-overlay text-cc-text-secondary';
   };
 
   return (
@@ -235,8 +235,8 @@ export default function CarrierTemplatesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileImage className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-info/10 rounded-lg">
+                  <FileImage className="h-5 w-5 text-info" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{templates.length}</p>
@@ -248,8 +248,8 @@ export default function CarrierTemplatesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                <div className="p-2 bg-success/10 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -263,8 +263,8 @@ export default function CarrierTemplatesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Target className="h-5 w-5 text-purple-600" />
+                <div className="p-2 bg-info/10 rounded-lg">
+                  <Target className="h-5 w-5 text-info" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -278,8 +278,8 @@ export default function CarrierTemplatesPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-orange-600" />
+                <div className="p-2 bg-warning/10 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -355,8 +355,8 @@ export default function CarrierTemplatesPage() {
                               className="w-10 h-12 object-cover rounded border"
                             />
                           ) : (
-                            <div className="w-10 h-12 bg-gray-100 rounded border flex items-center justify-center">
-                              <FileImage className="h-5 w-5 text-gray-400" />
+                            <div className="w-10 h-12 bg-cc-surface-raised rounded border flex items-center justify-center">
+                              <FileImage className="h-5 w-5 text-cc-text-muted" />
                             </div>
                           )}
                           <div>
@@ -403,10 +403,10 @@ export default function CarrierTemplatesPage() {
                           <span
                             className={`font-medium ${
                               template.avg_extraction_confidence >= 0.9
-                                ? 'text-green-600'
+                                ? 'text-success'
                                 : template.avg_extraction_confidence >= 0.7
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
+                                ? 'text-warning'
+                                : 'text-destructive'
                             }`}
                           >
                             {Math.round(template.avg_extraction_confidence * 100)}%
@@ -418,14 +418,14 @@ export default function CarrierTemplatesPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {template.is_active ? (
-                            <Badge variant="default" className="bg-green-100 text-green-800">
+                            <Badge variant="default" className="bg-success/10 text-success">
                               Active
                             </Badge>
                           ) : (
                             <Badge variant="secondary">Inactive</Badge>
                           )}
                           {template.is_verified && (
-                            <CheckCircle className="h-4 w-4 text-blue-500" />
+                            <CheckCircle className="h-4 w-4 text-info" />
                           )}
                         </div>
                       </TableCell>
@@ -468,7 +468,7 @@ export default function CarrierTemplatesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => deleteTemplate(template.id)}
-                              className="text-red-600"
+                              className="text-destructive"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete

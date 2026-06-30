@@ -29,8 +29,8 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
       rate: calculateConversion("pending", "contacted"),
       fromCount: getStatusCount("pending"),
       toCount: getStatusCount("contacted"),
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "text-info",
+      bgColor: "bg-info/10",
     },
     {
       title: "Contacted → Quoted",
@@ -39,8 +39,8 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
       rate: calculateConversion("contacted", "quoted"),
       fromCount: getStatusCount("contacted"),
       toCount: getStatusCount("quoted"),
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-50",
+      color: "text-warning",
+      bgColor: "bg-warning/10",
     },
     {
       title: "Quoted → Renewed",
@@ -49,8 +49,8 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
       rate: calculateConversion("quoted", "renewed"),
       fromCount: getStatusCount("quoted"),
       toCount: getStatusCount("renewed"),
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      color: "text-success",
+      bgColor: "bg-success/10",
     },
   ];
 
@@ -62,9 +62,9 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
   };
 
   const getTrendIcon = (rate: number) => {
-    if (rate >= 70) return <TrendingUp className="h-4 w-4 text-green-600" />;
-    if (rate >= 40) return <Minus className="h-4 w-4 text-yellow-600" />;
-    return <TrendingDown className="h-4 w-4 text-red-600" />;
+    if (rate >= 70) return <TrendingUp className="h-4 w-4 text-success" />;
+    if (rate >= 40) return <Minus className="h-4 w-4 text-warning" />;
+    return <TrendingDown className="h-4 w-4 text-destructive" />;
   };
 
   if (isLoading) {
@@ -124,14 +124,14 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
           </div>
 
           {/* Overall Conversion */}
-          <Card className="bg-gradient-to-r from-green-50 to-blue-50">
+          <Card className="bg-cc-surface-raised">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">
                     Overall Conversion Rate
                   </p>
-                  <p className="text-4xl font-bold text-green-600">
+                  <p className="text-4xl font-bold text-success">
                     {overallConversion()}%
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
@@ -142,13 +142,13 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Lost:</span>
-                      <span className="font-medium text-red-600">
+                      <span className="font-medium text-destructive">
                         {getStatusCount("lost")} ({Math.round((getStatusCount("lost") / data.length) * 100)}%)
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Cancelled:</span>
-                      <span className="font-medium text-gray-600">
+                      <span className="font-medium text-cc-text-muted">
                         {getStatusCount("cancelled")} ({Math.round((getStatusCount("cancelled") / data.length) * 100)}%)
                       </span>
                     </div>
@@ -162,10 +162,10 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
           <div className="relative">
             <div className="flex flex-col gap-2">
               {[
-                { label: "Pending", count: getStatusCount("pending"), width: "w-full", color: "bg-blue-500" },
-                { label: "Contacted", count: getStatusCount("contacted"), width: "w-5/6", color: "bg-yellow-500" },
-                { label: "Quoted", count: getStatusCount("quoted"), width: "w-4/6", color: "bg-purple-500" },
-                { label: "Renewed", count: getStatusCount("renewed"), width: "w-3/6", color: "bg-green-500" },
+                { label: "Pending", count: getStatusCount("pending"), width: "w-full", color: "bg-info" },
+                { label: "Contacted", count: getStatusCount("contacted"), width: "w-5/6", color: "bg-warning" },
+                { label: "Quoted", count: getStatusCount("quoted"), width: "w-4/6", color: "bg-cc-accent" },
+                { label: "Renewed", count: getStatusCount("renewed"), width: "w-3/6", color: "bg-success" },
               ].map((stage) => (
                 <div key={stage.label} className="flex items-center gap-4">
                   <span className="text-sm font-medium w-24">{stage.label}</span>

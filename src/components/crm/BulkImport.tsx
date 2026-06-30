@@ -108,7 +108,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 idx < currentIdx
-                  ? 'bg-green-500 text-white'
+                  ? 'bg-success text-success-foreground'
                   : idx === currentIdx
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground'
@@ -117,7 +117,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
               {idx < currentIdx ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
             </div>
             {idx < steps.length - 1 && (
-              <div className={`w-12 h-0.5 mx-1 ${idx < currentIdx ? 'bg-green-500' : 'bg-muted'}`} />
+              <div className={`w-12 h-0.5 mx-1 ${idx < currentIdx ? 'bg-success' : 'bg-muted'}`} />
             )}
           </div>
         ))}
@@ -150,7 +150,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
             {contactsFile ? (
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-green-500" />
+                  <FileText className="w-4 h-4 text-success" />
                   <span className="text-sm font-medium">{contactsFile.name}</span>
                 </div>
                 <Button
@@ -196,7 +196,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
             {policiesFile ? (
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-green-500" />
+                  <FileText className="w-4 h-4 text-success" />
                   <span className="text-sm font-medium">{policiesFile.name}</span>
                 </div>
                 <Button
@@ -265,19 +265,19 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-green-500">{totalValid}</div>
+              <div className="text-2xl font-bold text-success">{totalValid}</div>
               <div className="text-sm text-muted-foreground">Valid Records</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-red-500">{totalInvalid}</div>
+              <div className="text-2xl font-bold text-destructive">{totalInvalid}</div>
               <div className="text-sm text-muted-foreground">Invalid Records</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-yellow-500">{totalSkipped}</div>
+              <div className="text-2xl font-bold text-warning">{totalSkipped}</div>
               <div className="text-sm text-muted-foreground">Skipped (Duplicates)</div>
             </CardContent>
           </Card>
@@ -318,7 +318,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
                           <TableCell className="font-mono text-xs">
                             {String(item.record?.master_id || 'N/A').substring(0, 20)}
                           </TableCell>
-                          <TableCell className="text-red-500 text-xs">
+                          <TableCell className="text-destructive text-xs">
                             {item.errors.join('; ')}
                           </TableCell>
                         </TableRow>
@@ -363,7 +363,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
                           <TableCell className="font-mono text-xs">
                             {String(item.record?.policy_id || 'N/A').substring(0, 20)}
                           </TableCell>
-                          <TableCell className="text-red-500 text-xs">
+                          <TableCell className="text-destructive text-xs">
                             {item.errors.join('; ')}
                           </TableCell>
                         </TableRow>
@@ -431,19 +431,19 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
 
             <div className="grid grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-green-500">{progress.accountsCreated}</div>
+                <div className="text-2xl font-bold text-success">{progress.accountsCreated}</div>
                 <div className="text-xs text-muted-foreground">Accounts</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-500">{progress.contactsCreated}</div>
+                <div className="text-2xl font-bold text-info">{progress.contactsCreated}</div>
                 <div className="text-xs text-muted-foreground">Contacts</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-purple-500">{progress.policiesCreated}</div>
+                <div className="text-2xl font-bold text-info">{progress.policiesCreated}</div>
                 <div className="text-xs text-muted-foreground">Policies</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-500">{progress.errors}</div>
+                <div className="text-2xl font-bold text-destructive">{progress.errors}</div>
                 <div className="text-xs text-muted-foreground">Errors</div>
               </div>
             </div>
@@ -463,11 +463,11 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
 
     return (
       <div className="space-y-6">
-        <Alert className={result.success ? 'border-green-500' : 'border-yellow-500'}>
+        <Alert className={result.success ? 'border-success/30' : 'border-warning/30'}>
           {result.success ? (
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <CheckCircle2 className="w-4 h-4 text-success" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-yellow-500" />
+            <AlertCircle className="w-4 h-4 text-warning" />
           )}
           <AlertTitle>
             {result.success ? 'Import Complete' : 'Import Complete with Errors'}
@@ -483,19 +483,19 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
         <div className="grid grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-6 text-center">
-              <div className="text-3xl font-bold text-green-500">{result.accountsCreated}</div>
+              <div className="text-3xl font-bold text-success">{result.accountsCreated}</div>
               <div className="text-sm text-muted-foreground">Accounts Created</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6 text-center">
-              <div className="text-3xl font-bold text-blue-500">{result.contactsCreated}</div>
+              <div className="text-3xl font-bold text-info">{result.contactsCreated}</div>
               <div className="text-sm text-muted-foreground">Contacts Created</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6 text-center">
-              <div className="text-3xl font-bold text-purple-500">{result.policiesCreated}</div>
+              <div className="text-3xl font-bold text-info">{result.policiesCreated}</div>
               <div className="text-sm text-muted-foreground">Policies Created</div>
             </CardContent>
           </Card>
@@ -504,7 +504,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
         {result.errors.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base text-red-500">Import Errors</CardTitle>
+              <CardTitle className="text-base text-destructive">Import Errors</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="max-h-48 overflow-y-auto">
@@ -521,7 +521,7 @@ export function BulkImport({ onImportComplete, className }: BulkImportProps) {
                       <TableRow key={idx}>
                         <TableCell>{err.rowNumber}</TableCell>
                         <TableCell className="font-mono text-xs">{err.sourceId}</TableCell>
-                        <TableCell className="text-red-500 text-xs">{err.error}</TableCell>
+                        <TableCell className="text-destructive text-xs">{err.error}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

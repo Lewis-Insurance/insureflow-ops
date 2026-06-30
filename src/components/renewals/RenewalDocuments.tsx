@@ -65,9 +65,9 @@ function getDocumentTypeBadge(type: DocumentType | null) {
 }
 
 function getFileIcon(fileType: string | null) {
-  if (fileType?.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
-  if (fileType?.includes('image')) return <Image className="h-5 w-5 text-blue-500" />;
-  return <File className="h-5 w-5 text-gray-500" />;
+  if (fileType?.includes('pdf')) return <FileText className="h-5 w-5 text-destructive" />;
+  if (fileType?.includes('image')) return <Image className="h-5 w-5 text-info" />;
+  return <File className="h-5 w-5 text-cc-text-muted" />;
 }
 
 function formatFileSize(bytes: number | null) {

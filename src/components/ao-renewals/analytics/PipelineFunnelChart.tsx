@@ -39,14 +39,14 @@ export function PipelineFunnelChart({ data, isLoading }: PipelineFunnelChartProp
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-blue-500",
-      contacted: "bg-yellow-500",
-      quoted: "bg-purple-500",
-      renewed: "bg-green-500",
-      lost: "bg-red-500",
-      cancelled: "bg-gray-500",
+      pending: "bg-info",
+      contacted: "bg-warning",
+      quoted: "bg-cc-accent",
+      renewed: "bg-success",
+      lost: "bg-destructive",
+      cancelled: "bg-muted-foreground",
     };
-    return colors[status] || "bg-gray-400";
+    return colors[status] || "bg-muted-foreground";
   };
 
   const getStatusLabel = (status: string) => {

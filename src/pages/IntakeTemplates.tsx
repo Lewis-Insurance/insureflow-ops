@@ -308,7 +308,7 @@ export function IntakeTemplates() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-red-600"
+                        className="text-destructive"
                         onClick={() => setDeleteConfirm(template.id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -396,7 +396,7 @@ export function IntakeTemplates() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
             >
               Delete

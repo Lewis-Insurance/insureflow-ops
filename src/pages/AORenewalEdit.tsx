@@ -58,19 +58,19 @@ import {
 import { cn } from '@/lib/utils';
 
 const STATUS_STYLES: Record<AORenewalStatus, string> = {
-  pending:   'bg-slate-500/15 text-slate-200 border-slate-400/30',
-  contacted: 'bg-sky-500/15 text-sky-200 border-sky-400/30',
-  quoted:    'bg-emerald-500/15 text-emerald-200 border-emerald-400/30',
-  renewed:   'bg-green-500/15 text-green-200 border-green-400/30',
-  moved:     'bg-blue-500/15 text-blue-200 border-blue-400/30',
-  lost:      'bg-rose-500/15 text-rose-200 border-rose-400/30',
-  cancelled: 'bg-zinc-500/15 text-zinc-200 border-zinc-400/30',
+  pending:   'bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle',
+  contacted: 'bg-info/10 text-info border-info/30',
+  quoted:    'bg-success/10 text-success border-success/30',
+  renewed:   'bg-success/10 text-success border-success/30',
+  moved:     'bg-info/10 text-info border-info/30',
+  lost:      'bg-destructive/10 text-destructive border-destructive/30',
+  cancelled: 'bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle',
 };
 
-const surfaceCard = 'border-white/10 bg-[#0b1020]/90 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur';
-const heroTile = 'rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
-const sectionTitle = 'text-base font-semibold tracking-tight text-white';
-const sectionDescription = 'text-sm text-slate-400';
+const surfaceCard = 'border-cc-border-subtle bg-cc-surface shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur';
+const heroTile = 'rounded-2xl border border-cc-border-subtle bg-cc-surface-raised p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+const sectionTitle = 'text-base font-semibold tracking-tight text-cc-text-primary';
+const sectionDescription = 'text-sm text-cc-text-muted';
 const PANEL_PREFS_KEY = 'ao-renewal-panel-prefs-v1';
 
 function loadPanelPrefs() {
@@ -568,14 +568,14 @@ export default function AORenewalEdit() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="min-h-screen bg-[#060b16] p-6 md:p-8">
+        <div className="min-h-screen bg-cc-bg p-6 md:p-8">
           <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
-            <Skeleton className="h-16 w-full rounded-3xl bg-white/5" />
+            <Skeleton className="h-16 w-full rounded-3xl bg-cc-surface-raised" />
             <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-              <Skeleton className="h-[460px] rounded-3xl bg-white/5" />
-              <Skeleton className="h-[460px] rounded-3xl bg-white/5" />
+              <Skeleton className="h-[460px] rounded-3xl bg-cc-surface-raised" />
+              <Skeleton className="h-[460px] rounded-3xl bg-cc-surface-raised" />
             </div>
-            <Skeleton className="h-[520px] rounded-3xl bg-white/5" />
+            <Skeleton className="h-[520px] rounded-3xl bg-cc-surface-raised" />
           </div>
         </div>
       </AppLayout>
@@ -585,10 +585,10 @@ export default function AORenewalEdit() {
   if (!renewal) {
     return (
       <AppLayout>
-        <div className="min-h-screen bg-[#060b16] p-6 md:p-8">
+        <div className="min-h-screen bg-cc-bg p-6 md:p-8">
           <Card className={cn(surfaceCard, 'mx-auto max-w-2xl rounded-3xl')}>
             <CardContent className="pt-6 text-center">
-              <p className="text-slate-300">Renewal not found</p>
+              <p className="text-cc-text-secondary">Renewal not found</p>
               <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">Back</Button>
             </CardContent>
           </Card>
@@ -600,36 +600,36 @@ export default function AORenewalEdit() {
   return (
     <AORenewalEditorContext.Provider value={{ registerDirtySource }}>
       <AppLayout>
-        <div className="min-h-screen bg-[#060b16] p-4 md:p-6 xl:p-8">
+        <div className="min-h-screen bg-cc-bg p-4 md:p-6 xl:p-8">
           <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-6">
 
             {/* ── Header ── */}
-            <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(76,101,255,0.25),_transparent_26%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(7,11,22,0.98))] p-5 shadow-[0_32px_120px_rgba(0,0,0,0.45)] md:p-7">
+            <div className="overflow-hidden rounded-[32px] border border-cc-border-subtle bg-cc-surface p-5 shadow-[0_32px_120px_rgba(0,0,0,0.45)] md:p-7">
               <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="space-y-5">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-cc-text-secondary">
                     <Button
                       variant="ghost"
-                      className="h-9 rounded-full border border-white/10 bg-white/5 px-4 text-slate-200 hover:bg-white/10"
+                      className="h-9 rounded-full border border-cc-border-subtle bg-cc-surface-raised px-4 text-cc-text-secondary hover:bg-cc-surface-raised"
                       onClick={handleBackNavigation}
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" />Back
                     </Button>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.22em] text-slate-400">
+                    <span className="rounded-full border border-cc-border-subtle bg-cc-surface-raised px-3 py-1 text-xs uppercase tracking-[0.22em] text-cc-text-muted">
                       AO Renewal Command Center
                     </span>
                   </div>
-                  <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                  <h1 className="text-3xl font-semibold tracking-tight text-cc-text-primary md:text-4xl">
                     {formData.customer_name || 'Edit Renewal'}
                   </h1>
                   <div className="flex flex-wrap gap-3">
                     <Badge className={cn('border px-3 py-1.5 text-sm capitalize', STATUS_STYLES[formData.status])}>
                       {formData.status}
                     </Badge>
-                    <Badge variant="outline" className="border-white/15 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
+                    <Badge variant="outline" className="border-cc-border-subtle bg-cc-surface-raised px-3 py-1.5 text-sm text-cc-text-secondary">
                       {formData.policy_number || 'No policy number'}
                     </Badge>
-                    <Badge variant="outline" className="border-white/15 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
+                    <Badge variant="outline" className="border-cc-border-subtle bg-cc-surface-raised px-3 py-1.5 text-sm text-cc-text-secondary">
                       {formData.policy_type || 'Policy type not set'}
                     </Badge>
                   </div>
@@ -638,16 +638,16 @@ export default function AORenewalEdit() {
                 <div className="flex w-full flex-col gap-3 xl:max-w-sm">
                   {/* Top status dropdown — single authoritative editor for renewal status */}
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Status</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Status</p>
                     <Select
                       value={formData.status}
                       onValueChange={(v) => handleTopStatusChange(v as AORenewalStatus)}
                       disabled={updateStatusMutation.isPending || updateMutation.isPending}
                     >
-                      <SelectTrigger className="h-12 rounded-2xl border-white/15 bg-white/8 text-base font-medium text-white hover:bg-white/12">
+                      <SelectTrigger className="h-12 rounded-2xl border-cc-border-interactive bg-cc-surface-raised text-base font-medium text-cc-text-primary hover:bg-cc-surface-overlay">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-950 text-white">
+                      <SelectContent className="bg-cc-surface text-cc-text-primary">
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="quoted">Quoted</SelectItem>
                         <SelectItem value="contacted">Contacted</SelectItem>
@@ -661,7 +661,7 @@ export default function AORenewalEdit() {
                     </Select>
                   </div>
                   <Button
-                    className="h-12 rounded-2xl bg-white text-slate-950 hover:bg-slate-100"
+                    className="h-12 rounded-2xl bg-cc-surface-raised text-cc-text-primary hover:bg-cc-surface-overlay"
                     onClick={() => setShowTaskModal(true)}
                   >
                     <CheckSquare className="mr-2 h-4 w-4" />Create Task
@@ -669,7 +669,7 @@ export default function AORenewalEdit() {
                   <Button
                     type="submit"
                     form="ao-renewal-command-form"
-                    className="h-12 rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200"
+                    className="h-12 rounded-2xl bg-cc-accent text-cc-on-accent hover:bg-cc-accent/90"
                     disabled={updateMutation.isPending}
                   >
                     {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -680,34 +680,34 @@ export default function AORenewalEdit() {
 
               {/* ── Hero Tiles ── */}
               <div className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr]">
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happens next — Follow-up</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">{commandStateLabel}</div>
-                  <p className="mt-2 text-sm text-slate-300">
+                <div className="rounded-3xl border border-cc-border-subtle bg-cc-surface-raised p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-cc-text-muted">What happens next — Follow-up</div>
+                  <div className="mt-3 text-2xl font-semibold text-cc-text-primary">{commandStateLabel}</div>
+                  <p className="mt-2 text-sm text-cc-text-secondary">
                     {followUpDraft.date
                       ? `Follow up ${formatLocalDateDisplay(followUpDraft.date)}`
                       : 'No follow-up date committed yet.'}
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Reason</div>
-                      <div className="mt-2 text-base font-semibold text-white">
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Reason</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">
                         {followUpDraft.reason || formData.follow_up_reason || 'No reason set'}
                       </div>
                     </div>
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
-                      <div className="mt-2 text-base font-semibold capitalize text-white">{formData.status}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Current Status</div>
+                      <div className="mt-2 text-base font-semibold capitalize text-cc-text-primary">{formData.status}</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">What happened last — Contact log</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">
+                <div className="rounded-3xl border border-cc-border-subtle bg-cc-surface-raised p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-cc-text-muted">What happened last — Contact log</div>
+                  <div className="mt-3 text-2xl font-semibold text-cc-text-primary">
                     {formData.last_contact_date ? formatLocalDateDisplay(formData.last_contact_date) : 'Not logged'}
                   </div>
-                  <p className="mt-2 text-sm text-slate-300">
+                  <p className="mt-2 text-sm text-cc-text-secondary">
                     {latestContact?.notes
                       ? latestContact.notes.length > 120
                         ? latestContact.notes.slice(0, 120) + '…'
@@ -716,37 +716,37 @@ export default function AORenewalEdit() {
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Renewal Window</div>
-                      <div className="mt-2 text-base font-semibold text-white">{renewalWindowLabel}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Renewal Window</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">{renewalWindowLabel}</div>
                     </div>
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Premium</div>
-                      <div className="mt-2 text-base font-semibold text-white">{formatCurrency(formData.current_premium)}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Current Premium</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">{formatCurrency(formData.current_premium)}</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Customer snapshot</div>
+                <div className="rounded-3xl border border-cc-border-subtle bg-cc-surface-raised p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-cc-text-muted">Customer snapshot</div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Policy</div>
-                      <div className="mt-2 text-base font-semibold text-white">{formData.policy_number || 'No policy number'}</div>
-                      <div className="mt-1 text-sm text-slate-400">{formData.policy_type || 'Policy type not set'}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Policy</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">{formData.policy_number || 'No policy number'}</div>
+                      <div className="mt-1 text-sm text-cc-text-muted">{formData.policy_type || 'Policy type not set'}</div>
                     </div>
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Term</div>
-                      <div className="mt-2 text-base font-semibold text-white">
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Term</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">
                         {formData.term_months ? `${formData.term_months} month term` : 'Term not set'}
                       </div>
                     </div>
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Auto-Owners Premium</div>
-                      <div className="mt-2 text-base font-semibold text-white">{formatCurrency(formData.current_premium)}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Auto-Owners Premium</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">{formatCurrency(formData.current_premium)}</div>
                     </div>
                     <div className={heroTile}>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Effective Date</div>
-                      <div className="mt-2 text-base font-semibold text-white">
+                      <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Effective Date</div>
+                      <div className="mt-2 text-base font-semibold text-cc-text-primary">
                         {formData.renewal_date ? formatLocalDateDisplay(formData.renewal_date) : 'No effective date'}
                       </div>
                     </div>
@@ -757,8 +757,8 @@ export default function AORenewalEdit() {
 
             {/* ── Unsaved changes banner ── */}
             {anyDirty && (
-              <div className="flex items-center gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+              <div className="flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
                 <span>You have unsaved changes.{dirtyChildSources.length > 0 ? ` Pending: ${dirtyChildSources.map((s) => s.label).join(', ')}.` : ''}</span>
               </div>
             )}
@@ -778,7 +778,7 @@ export default function AORenewalEdit() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="text-slate-300 hover:bg-white/5 hover:text-white"
+                        className="text-cc-text-secondary hover:bg-cc-surface-raised hover:text-cc-text-primary"
                         onClick={() => togglePanel('followUp')}
                       >
                         {panelPrefs.followUp ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -789,22 +789,22 @@ export default function AORenewalEdit() {
                     <CardContent className="space-y-4 pt-0">
                       {/* Date input + quick chips */}
                       <div className="space-y-2">
-                        <Label htmlFor="follow_up_panel_date" className="text-sm text-slate-300">Follow-Up Date</Label>
+                        <Label htmlFor="follow_up_panel_date" className="text-sm text-cc-text-secondary">Follow-Up Date</Label>
                         <Input
                           id="follow_up_panel_date"
                           type="date"
                           value={followUpDraft.date}
                           onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, date: e.target.value }))}
-                          className="h-10 rounded-2xl border-white/10 bg-white/5 text-sm text-white"
+                          className="h-10 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-sm text-cc-text-primary"
                         />
                         <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
-                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-cc-border-subtle bg-cc-surface-raised text-xs text-cc-text-secondary hover:bg-cc-surface-overlay"
                             onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 1) }))}>Tomorrow</Button>
-                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-cc-border-subtle bg-cc-surface-raised text-xs text-cc-text-secondary hover:bg-cc-surface-overlay"
                             onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 3) }))}>+3 days</Button>
-                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-cc-border-subtle bg-cc-surface-raised text-xs text-cc-text-secondary hover:bg-cc-surface-overlay"
                             onClick={() => setFollowUpDraft((prev) => ({ ...prev, date: addDaysLocalDate(todayLocalDate(), 7) }))}>+7 days</Button>
-                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-white/10 bg-white/5 text-xs text-slate-100 hover:bg-white/10"
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-cc-border-subtle bg-cc-surface-raised text-xs text-cc-text-secondary hover:bg-cc-surface-overlay"
                             onClick={() => {
                               const base = new Date();
                               const day = base.getDay();
@@ -816,7 +816,7 @@ export default function AORenewalEdit() {
 
                       {/* Reason textarea */}
                       <div className="space-y-2">
-                        <Label htmlFor="follow_up_reason_panel" className="text-sm text-slate-300">Reason</Label>
+                        <Label htmlFor="follow_up_reason_panel" className="text-sm text-cc-text-secondary">Reason</Label>
                         <Textarea
                           id="follow_up_reason_panel"
                           value={followUpDraft.reason}
@@ -824,14 +824,14 @@ export default function AORenewalEdit() {
                           rows={2}
                           onChange={(e) => setFollowUpDraft((prev) => ({ ...prev, reason: e.target.value }))}
                           placeholder="e.g. quote review, waiting on insured response"
-                          className="resize-none rounded-2xl border-white/10 bg-white/5 text-sm text-white"
+                          className="resize-none rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-sm text-cc-text-primary"
                         />
                       </div>
 
                       {/* Save / Update */}
                       <Button
                         type="button"
-                        className="h-10 w-full rounded-2xl bg-lime-300 text-slate-950 hover:bg-lime-200 disabled:opacity-40"
+                        className="h-10 w-full rounded-2xl bg-cc-accent text-cc-on-accent hover:bg-cc-accent/90 disabled:opacity-40"
                         onClick={handleConfirmFollowUp}
                         disabled={!followUpDirty || followUpSaving}
                       >
@@ -842,16 +842,16 @@ export default function AORenewalEdit() {
                       {/* Context chips — always visible */}
                       <div className="grid gap-2 sm:grid-cols-3">
                         <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Follow-Up State</div>
-                          <div className="mt-1.5 text-sm font-semibold text-white">{commandStateLabel}</div>
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Follow-Up State</div>
+                          <div className="mt-1.5 text-sm font-semibold text-cc-text-primary">{commandStateLabel}</div>
                         </div>
                         <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current Status</div>
-                          <div className="mt-1.5 text-sm font-semibold capitalize text-white">{formData.status}</div>
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Current Status</div>
+                          <div className="mt-1.5 text-sm font-semibold capitalize text-cc-text-primary">{formData.status}</div>
                         </div>
                         <div className={heroTile}>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last Contact</div>
-                          <div className="mt-1.5 text-sm font-semibold text-white">
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Last Contact</div>
+                          <div className="mt-1.5 text-sm font-semibold text-cc-text-primary">
                             {renewal.last_contact_date ? formatLocalDateDisplay(renewal.last_contact_date) : 'None logged'}
                           </div>
                         </div>
@@ -864,7 +864,7 @@ export default function AORenewalEdit() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-9 rounded-2xl border-lime-300/30 bg-lime-300/10 text-lime-200 hover:bg-lime-300/20"
+                            className="h-9 rounded-2xl border-cc-accent/30 bg-cc-accent/10 text-cc-accent hover:bg-cc-accent/20"
                             onClick={() => { setMarkDoneNote(''); setShowMarkDoneDialog(true); }}
                             disabled={markDoneMutation.isPending}
                           >
@@ -874,7 +874,7 @@ export default function AORenewalEdit() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-9 rounded-2xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                            className="h-9 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-cc-text-secondary hover:bg-cc-surface-overlay"
                             onClick={handleClearFollowUp}
                             disabled={followUpSaving}
                           >
@@ -887,14 +887,14 @@ export default function AORenewalEdit() {
                       {/* History accordion */}
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
+                        className="flex w-full items-center justify-between rounded-2xl border border-cc-border-subtle bg-cc-surface-raised px-4 py-3 text-sm text-cc-text-muted hover:bg-cc-surface-overlay hover:text-cc-text-secondary transition-colors"
                         onClick={() => setShowFollowUpHistory((v) => !v)}
                       >
                         <span className="flex items-center gap-2">
                           <History className="h-4 w-4" />
                           Follow-up history
                           {followUpHistory.length > 0 && (
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{followUpHistory.length}</span>
+                            <span className="rounded-full bg-cc-surface-overlay px-2 py-0.5 text-xs">{followUpHistory.length}</span>
                           )}
                         </span>
                         {showFollowUpHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -903,30 +903,30 @@ export default function AORenewalEdit() {
                       {showFollowUpHistory && (
                         <div className="space-y-2">
                           {followUpHistory.length === 0 ? (
-                            <p className="px-1 text-sm text-slate-500">No follow-up history yet.</p>
+                            <p className="px-1 text-sm text-cc-text-muted">No follow-up history yet.</p>
                           ) : (
                             followUpHistory.map((entry) => (
-                              <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/3 p-3 text-sm">
+                              <div key={entry.id} className="rounded-2xl border border-cc-border-subtle bg-cc-surface-raised p-3 text-sm">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-medium text-white">{formatLocalDateDisplay(entry.follow_up_date)}</span>
+                                  <span className="font-medium text-cc-text-primary">{formatLocalDateDisplay(entry.follow_up_date)}</span>
                                   <span className={cn(
                                     'rounded-full px-2 py-0.5 text-xs capitalize',
-                                    entry.status === 'pending' ? 'bg-amber-400/20 text-amber-300' :
-                                    entry.status === 'completed' ? 'bg-emerald-400/20 text-emerald-300' :
-                                    'bg-zinc-400/20 text-zinc-300',
+                                    entry.status === 'pending' ? 'bg-warning/10 text-warning' :
+                                    entry.status === 'completed' ? 'bg-success/10 text-success' :
+                                    'bg-cc-surface-overlay text-cc-text-secondary',
                                   )}>
                                     {entry.status}
                                   </span>
                                 </div>
-                                {entry.reason && <p className="mt-1 text-slate-400">{entry.reason}</p>}
+                                {entry.reason && <p className="mt-1 text-cc-text-muted">{entry.reason}</p>}
                                 {entry.completed_at && (
-                                  <p className="mt-1 text-xs text-slate-500">
+                                  <p className="mt-1 text-xs text-cc-text-muted">
                                     {entry.status === 'completed' ? 'Completed' : 'Cleared'}{' '}
                                     {formatLocalDateDisplay(entry.completed_at.slice(0, 10))}
                                   </p>
                                 )}
                                 {entry.completion_note && (
-                                  <p className="mt-1 text-xs italic text-slate-400">"{entry.completion_note}"</p>
+                                  <p className="mt-1 text-xs italic text-cc-text-muted">"{entry.completion_note}"</p>
                                 )}
                               </div>
                             ))
@@ -966,7 +966,7 @@ export default function AORenewalEdit() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="text-slate-300 hover:bg-white/5 hover:text-white"
+                        className="text-cc-text-secondary hover:bg-cc-surface-raised hover:text-cc-text-primary"
                         onClick={() => togglePanel('workspace')}
                       >
                         {panelPrefs.workspace ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -976,14 +976,14 @@ export default function AORenewalEdit() {
                   {panelPrefs.workspace && (
                     <CardContent>
                       <Tabs defaultValue="contact" className="w-full">
-                        <TabsList className="h-11 rounded-2xl bg-white/5 p-1 text-slate-400">
-                          <TabsTrigger value="contact" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">
+                        <TabsList className="h-11 rounded-2xl bg-cc-surface-raised p-1 text-cc-text-muted">
+                          <TabsTrigger value="contact" className="rounded-xl px-4 data-[state=active]:bg-cc-accent data-[state=active]:text-cc-on-accent">
                             Contact
                           </TabsTrigger>
-                          <TabsTrigger value="documents" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">
+                          <TabsTrigger value="documents" className="rounded-xl px-4 data-[state=active]:bg-cc-accent data-[state=active]:text-cc-on-accent">
                             Documents
                           </TabsTrigger>
-                          <TabsTrigger value="notes" className="rounded-xl px-4 data-[state=active]:bg-white data-[state=active]:text-slate-950">
+                          <TabsTrigger value="notes" className="rounded-xl px-4 data-[state=active]:bg-cc-accent data-[state=active]:text-cc-on-accent">
                             Notes
                           </TabsTrigger>
                         </TabsList>
@@ -1022,7 +1022,7 @@ export default function AORenewalEdit() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="text-slate-300 hover:bg-white/5 hover:text-white"
+                      className="text-cc-text-secondary hover:bg-cc-surface-raised hover:text-cc-text-primary"
                       onClick={() => togglePanel('details')}
                     >
                       {panelPrefs.details ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -1031,19 +1031,19 @@ export default function AORenewalEdit() {
                 </CardHeader>
                 {panelPrefs.details && (
                   <CardContent className="space-y-6">
-                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-3xl border border-cc-border-subtle bg-cc-surface-raised p-4">
                       <div className="grid gap-3 md:grid-cols-3">
                         <div>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Missing detail</div>
-                          <div className="mt-2 text-base font-semibold text-white">{missingDetailLabel}</div>
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Missing detail</div>
+                          <div className="mt-2 text-base font-semibold text-cc-text-primary">{missingDetailLabel}</div>
                         </div>
                         <div>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Losses</div>
-                          <div className="mt-2 text-base font-semibold text-white">{formData.losses_3yr || '0'}</div>
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Losses</div>
+                          <div className="mt-2 text-base font-semibold text-cc-text-primary">{formData.losses_3yr || '0'}</div>
                         </div>
                         <div>
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Oldest in household</div>
-                          <div className="mt-2 text-base font-semibold text-white">{formData.oldest_in_household || '—'}</div>
+                          <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Oldest in household</div>
+                          <div className="mt-2 text-base font-semibold text-cc-text-primary">{formData.oldest_in_household || '—'}</div>
                         </div>
                       </div>
                     </div>
@@ -1056,7 +1056,7 @@ export default function AORenewalEdit() {
                           value={formData.customer_name}
                           onChange={(e) => setFormData((prev) => ({ ...prev, customer_name: e.target.value }))}
                           required
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1066,7 +1066,7 @@ export default function AORenewalEdit() {
                           value={formData.policy_number}
                           onChange={(e) => setFormData((prev) => ({ ...prev, policy_number: e.target.value }))}
                           required
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1076,7 +1076,7 @@ export default function AORenewalEdit() {
                           value={formData.policy_type}
                           onChange={(e) => setFormData((prev) => ({ ...prev, policy_type: e.target.value }))}
                           placeholder="e.g. Personal Automobile"
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1087,7 +1087,7 @@ export default function AORenewalEdit() {
                           value={formData.renewal_date}
                           onChange={(e) => setFormData((prev) => ({ ...prev, renewal_date: e.target.value }))}
                           required
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1099,7 +1099,7 @@ export default function AORenewalEdit() {
                           value={formData.current_premium}
                           onChange={(e) => setFormData((prev) => ({ ...prev, current_premium: e.target.value }))}
                           placeholder="0.00"
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1110,10 +1110,10 @@ export default function AORenewalEdit() {
                             setFormData((prev) => ({ ...prev, term_months: value === 'not_set' ? '' : (value as '6' | '12') }))
                           }
                         >
-                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white">
+                          <SelectTrigger className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary">
                             <SelectValue placeholder="Select term" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-950 text-white">
+                          <SelectContent className="bg-cc-surface text-cc-text-primary">
                             <SelectItem value="not_set">Not set</SelectItem>
                             <SelectItem value="6">6 Months (Semi-Annual)</SelectItem>
                             <SelectItem value="12">12 Months (Annual)</SelectItem>
@@ -1128,10 +1128,10 @@ export default function AORenewalEdit() {
                             setFormData((prev) => ({ ...prev, assigned_to: value === 'unassigned' ? '' : value }))
                           }
                         >
-                          <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white">
+                          <SelectTrigger className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary">
                             <SelectValue placeholder="Select a user" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-950 text-white">
+                          <SelectContent className="bg-cc-surface text-cc-text-primary">
                             <SelectItem value="unassigned">Unassigned</SelectItem>
                             {profiles?.map((profile) => (
                               <SelectItem key={profile.id} value={profile.id}>
@@ -1148,7 +1148,7 @@ export default function AORenewalEdit() {
                           type="date"
                           value={formData.last_contact_date}
                           onChange={(e) => setFormData((prev) => ({ ...prev, last_contact_date: e.target.value }))}
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1159,7 +1159,7 @@ export default function AORenewalEdit() {
                           min="0"
                           value={formData.losses_3yr}
                           onChange={(e) => setFormData((prev) => ({ ...prev, losses_3yr: e.target.value }))}
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1171,27 +1171,27 @@ export default function AORenewalEdit() {
                           max="120"
                           value={formData.oldest_in_household}
                           onChange={(e) => setFormData((prev) => ({ ...prev, oldest_in_household: e.target.value }))}
-                          className="h-12 rounded-2xl border-white/10 bg-white/5 text-base text-white"
+                          className="h-12 rounded-2xl border-cc-border-subtle bg-cc-surface-raised text-base text-cc-text-primary"
                         />
                       </div>
                     </div>
 
                     {movedDetailsReady && (
-                      <div className="rounded-3xl border border-sky-400/20 bg-sky-400/10 p-5">
+                      <div className="rounded-3xl border border-info/30 bg-info/10 p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <div className="rounded-2xl bg-sky-400/15 p-3 text-sky-200">
+                            <div className="rounded-2xl bg-info/10 p-3 text-info">
                               <ArrowRightLeft className="h-5 w-5" />
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-sky-100">Moved Policy Details</div>
-                              <div className="text-sm text-sky-200/70">Captured move-away outcome for this renewal.</div>
+                              <div className="text-sm font-medium text-cc-text-primary">Moved Policy Details</div>
+                              <div className="text-sm text-cc-text-muted">Captured move-away outcome for this renewal.</div>
                             </div>
                           </div>
                           <Button
                             type="button"
                             variant="outline"
-                            className="rounded-2xl border-sky-300/20 bg-sky-300/10 text-sky-100 hover:bg-sky-300/20"
+                            className="rounded-2xl border-info/30 bg-info/10 text-info hover:bg-info/20"
                             onClick={() => setShowMovedModal(true)}
                           >
                             Edit moved details
@@ -1199,18 +1199,18 @@ export default function AORenewalEdit() {
                         </div>
                         <div className="mt-4 grid gap-4 md:grid-cols-3">
                           <div className={heroTile}>
-                            <div className="text-xs uppercase tracking-[0.18em] text-sky-200/70">Carrier</div>
-                            <div className="mt-2 text-lg font-semibold text-white">{formData.moved_carrier}</div>
+                            <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Carrier</div>
+                            <div className="mt-2 text-lg font-semibold text-cc-text-primary">{formData.moved_carrier}</div>
                           </div>
                           <div className={heroTile}>
-                            <div className="text-xs uppercase tracking-[0.18em] text-sky-200/70">Term</div>
-                            <div className="mt-2 text-lg font-semibold text-white">
+                            <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">Term</div>
+                            <div className="mt-2 text-lg font-semibold text-cc-text-primary">
                               {formData.moved_term === '6_month' ? '6 Months' : formData.moved_term === 'annual' ? 'Annual' : '—'}
                             </div>
                           </div>
                           <div className={heroTile}>
-                            <div className="text-xs uppercase tracking-[0.18em] text-sky-200/70">New Premium</div>
-                            <div className="mt-2 text-lg font-semibold text-white">{formatCurrency(formData.moved_premium)}</div>
+                            <div className="text-xs uppercase tracking-[0.18em] text-cc-text-muted">New Premium</div>
+                            <div className="mt-2 text-lg font-semibold text-cc-text-primary">{formatCurrency(formData.moved_premium)}</div>
                           </div>
                         </div>
                       </div>
@@ -1237,7 +1237,7 @@ export default function AORenewalEdit() {
               value={markDoneNote}
               onChange={(e) => setMarkDoneNote(e.target.value)}
               rows={3}
-              className="border-white/10 bg-white/5 text-white"
+              className="border-cc-border-subtle bg-cc-surface-raised text-cc-text-primary"
             />
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setShowMarkDoneDialog(false)}>Cancel</AlertDialogCancel>

@@ -144,12 +144,12 @@ export default function ModuleBuilder() {
             <Badge variant="secondary">Ready to test</Badge>
           )}
           {status === 'testing' && (
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-600">
+            <Badge variant="outline" className="bg-warning/10 text-warning">
               Testing
             </Badge>
           )}
           {status === 'published' && (
-            <Badge variant="default" className="bg-green-500">
+            <Badge variant="default" className="bg-success text-success-foreground">
               Published
             </Badge>
           )}

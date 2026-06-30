@@ -367,7 +367,7 @@ export default function AIModuleExecute() {
                   <Label>{label}</Label>
                   {documents[index] ? (
                     <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                      <FileText className="h-5 w-5 text-blue-500" />
+                      <FileText className="h-5 w-5 text-info" />
                       <span className="flex-1 truncate">{documents[index].filename}</span>
                       {documents[index].status === 'uploading' && (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -404,7 +404,7 @@ export default function AIModuleExecute() {
                   <div className="space-y-2">
                     {documents.map((doc) => (
                       <div key={doc.id} className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                        <FileText className="h-5 w-5 text-blue-500" />
+                        <FileText className="h-5 w-5 text-info" />
                         <span className="flex-1 truncate">{doc.filename}</span>
                         {doc.status === 'uploading' && (
                           <Loader2 className="h-4 w-4 animate-spin" />

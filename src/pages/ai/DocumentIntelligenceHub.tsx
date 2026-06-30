@@ -141,7 +141,7 @@ export default function DocumentIntelligenceHub() {
       );
     }
     return (
-      <Badge variant="outline" className="gap-1 text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+      <Badge variant="outline" className="gap-1 text-xs bg-warning/10 text-warning border-warning/30">
         <AlertTriangle className="h-3 w-3" />
         Unlinked
       </Badge>
@@ -274,7 +274,7 @@ export default function DocumentIntelligenceHub() {
                 key={doc.id} 
                 className={cn(
                   'hover:shadow-lg transition-all duration-200',
-                  isUnlinked(doc) && 'border-yellow-500/30'
+                  isUnlinked(doc) && 'border-warning/30'
                 )}
               >
                 <CardContent className="p-4">

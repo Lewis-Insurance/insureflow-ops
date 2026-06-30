@@ -444,7 +444,7 @@ Please analyze the above client data and answer the question thoroughly.`;
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'complete':
-        return <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Complete</Badge>;
+        return <Badge variant="default" className="bg-success text-success-foreground"><CheckCircle className="h-3 w-3 mr-1" />Complete</Badge>;
       case 'running':
         return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Running</Badge>;
       case 'pending':
@@ -820,12 +820,12 @@ Please analyze the above client data and answer the question thoroughly.`;
                     </div>
 
                     {runStatus.error && (
-                      <div className="mt-4 p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
-                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                      <div className="mt-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
+                        <div className="flex items-center gap-2 text-destructive">
                           <XCircle className="h-4 w-4" />
                           <span className="font-medium">Error</span>
                         </div>
-                        <p className="text-sm text-red-600 dark:text-red-300 mt-2">{runStatus.error}</p>
+                        <p className="text-sm text-destructive/90 mt-2">{runStatus.error}</p>
                       </div>
                     )}
                   </CardContent>
@@ -1192,14 +1192,14 @@ Please analyze the above client data and answer the question thoroughly.`;
                     )}
                     {apiKeyStatus === 'valid' && (
                       <>
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="text-green-600">API key is valid</span>
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <span className="text-success">API key is valid</span>
                       </>
                     )}
                     {apiKeyStatus === 'invalid' && apiKey && (
                       <>
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-red-600">Invalid API key format</span>
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-destructive">Invalid API key format</span>
                       </>
                     )}
                     {apiKeyStatus === 'none' && !apiKey && (
@@ -1218,7 +1218,7 @@ Please analyze the above client data and answer the question thoroughly.`;
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">API Key Status</span>
                       {apiKeyStatus === 'valid' ? (
-                        <Badge variant="default" className="bg-green-600">
+                        <Badge variant="default" className="bg-success text-success-foreground">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Configured
                         </Badge>
@@ -1243,10 +1243,10 @@ Please analyze the above client data and answer the question thoroughly.`;
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="p-4 bg-info/10 rounded-lg border border-info/30">
                   <div className="flex gap-2">
-                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                    <AlertCircle className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-info">
                       <p className="font-medium mb-1">About API Keys</p>
                       <p>
                         Your API key is stored securely and only used to authenticate with the Prism API.

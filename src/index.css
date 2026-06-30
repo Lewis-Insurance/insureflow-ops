@@ -153,7 +153,126 @@ All colors MUST be HSL.
     --cc-ease-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
     --cc-ease-snap: cubic-bezier(0.4, 0.0, 0.2, 1);
   }
-  
+
+  /* ===================================================================== */
+  /* Calm Command - LIGHT theme. Same constitution: ONE lime accent,        */
+  /* hierarchy from weight and spacing, restrained semantics. Only color     */
+  /* tokens are overridden here; radius, spacing, typography and motion      */
+  /* cascade from the dark block above (they are theme invariant).           */
+  /*                                                                         */
+  /* The neon lime (#BEF264) is unreadable as text/icon/border on white, and */
+  /* the accent is consumed that way across the app, so in light mode the    */
+  /* single lime accent deepens to lime-700 (#4D7C0F): still one lime, now    */
+  /* AA as a fill (white text) AND as text, icons, borders and focus rings.  */
+  /* Semantics deepen to their 700 shades so the 14% status pills stay AA.    */
+  /* ===================================================================== */
+  .light {
+    /* ----- shadcn/ui base ----- */
+    --background: 220 24% 95%;
+    --foreground: 215 30% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 30% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 30% 8%;
+    --primary: 86 78% 27%;            /* deep lime brand accent (lime-700) */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 92%;
+    --secondary-foreground: 218 18% 22%;
+    --muted: 220 24% 94%;
+    --muted-foreground: 218 12% 40%;
+    --accent: 220 20% 92%;            /* subtle hover surface */
+    --accent-foreground: 215 30% 12%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 18% 88%;
+    --input: 216 13% 47%;             /* interactive input border, >=3:1 on white */
+    --ring: 86 78% 27%;
+
+    /* Legacy Lewis brand + semantic aliases (deepened for light surfaces). */
+    --lewis-blue: 224 76% 48%;
+    --lewis-orange: 86 78% 27%;
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
+    --warning: 27 90% 37%;
+    --warning-foreground: 0 0% 100%;
+    --info: 224 76% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Sidebar */
+    --sidebar-background: 220 24% 97%;
+    --sidebar-foreground: 218 16% 28%;
+    --sidebar-primary: 86 78% 27%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 92%;
+    --sidebar-accent-foreground: 215 30% 12%;
+    --sidebar-border: 216 18% 88%;
+    --sidebar-ring: 86 78% 27%;
+
+    /* ===== Calm Command extended tokens (light) ===== */
+
+    /* Surfaces (page is the lowest layer; cards step up to white) */
+    --cc-bg: #EDF0F5;
+    --cc-surface: #FFFFFF;
+    --cc-surface-raised: #F4F6FA;     /* input + hover fill on white cards */
+    --cc-surface-overlay: #E8ECF3;    /* chips, badges, highest neutral fill */
+
+    /* Borders */
+    --cc-border-subtle: #E2E7EE;
+    --cc-border-strong: #CBD3DE;
+    --cc-border-interactive: #6B7484; /* inputs, ghost buttons: >=3:1 on white */
+
+    /* Text (on white: primary 17.4:1, secondary 10.2:1, muted 5.6:1) */
+    --cc-text-primary: #0E141B;
+    --cc-text-secondary: #38414E;
+    --cc-text-muted: #5A6472;
+    --cc-text-faint: #97A0AD;          /* decorative or disabled ONLY */
+
+    /* Accent (deep lime; white text on accent 5.0:1, accent text on white 5.0:1) */
+    --cc-accent: #4D7C0F;
+    --cc-accent-hover: #3F6212;        /* light mode darkens on hover */
+    --cc-accent-deep: #365314;         /* pressed state, accent border */
+    --cc-accent-muted: #5B6E2E;        /* olive, the second-rank confirm fill */
+    --cc-accent-glow: rgba(77, 124, 15, 0.16);
+    --cc-on-accent: #FFFFFF;
+
+    /* Skeleton (loading) */
+    --cc-skeleton-base: #E4E9F0;
+    --cc-skeleton-sheen: #F2F5F9;
+
+    /* Scrim (modal/drawer overlay) - slate, never pitch black on light */
+    --cc-scrim: rgba(15, 23, 42, 0.35);
+
+    /* Semantic (deepened, all >=4.5:1 on white as text) */
+    --cc-success: #15803D;
+    --cc-warning: #B45309;
+    --cc-danger: #DC2626;
+    --cc-info: #1D4ED8;
+    --cc-on-semantic: #FFFFFF;
+    --cc-danger-pill-text: #B42318;    /* darker danger text, AA on the 14% pill */
+
+    /* Links and selection */
+    --cc-link: #1D4ED8;
+    --cc-link-hover: #1E40AF;
+
+    /* Hero glow (the ONLY blue glow, top hero panel only) */
+    --cc-hero-glow: radial-gradient(60% 80% at 15% 0%, rgba(37, 99, 235, 0.08), transparent 70%);
+
+    /* Data visualization ramp (deepened for white bg, all >=3:1 as graphics) */
+    --cc-chart-1: #4D7C0F;
+    --cc-chart-2: #2563EB;
+    --cc-chart-3: #15803D;
+    --cc-chart-4: #B45309;
+    --cc-chart-5: #7C3AED;
+    --cc-chart-6: #DC2626;
+    --cc-chart-grid: #E2E7EE;
+    --cc-chart-axis: #5A6472;
+    --cc-chart-track: #E8ECF3;
+
+    /* Elevation (soft, never the heavy black of the dark theme) */
+    --cc-shadow-card: 0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.10);
+    --cc-shadow-lift: 0 8px 24px rgba(16,24,40,0.12);
+  }
+
   /* Custom utilities */
   .line-clamp-2 {
     display: -webkit-box;
@@ -168,8 +287,13 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  html {
-    color-scheme: dark; /* native form controls and scrollbars render dark */
+  /* Native form controls and scrollbars follow the active theme */
+  .dark {
+    color-scheme: dark;
+  }
+
+  .light {
+    color-scheme: light;
   }
 
   body {

@@ -36,17 +36,17 @@ interface PolicyListProps {
 function getStatusIcon(status: string) {
   switch (status?.toLowerCase()) {
     case 'active':
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
+      return <CheckCircle className="h-4 w-4 text-success" />;
     case 'expired':
-      return <XCircle className="h-4 w-4 text-red-500" />;
+      return <XCircle className="h-4 w-4 text-destructive" />;
     case 'pending':
-      return <Clock className="h-4 w-4 text-yellow-500" />;
+      return <Clock className="h-4 w-4 text-warning" />;
     case 'cancelled':
-      return <XCircle className="h-4 w-4 text-gray-500" />;
+      return <XCircle className="h-4 w-4 text-cc-text-muted" />;
     case 'suspended':
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      return <AlertTriangle className="h-4 w-4 text-warning" />;
     default:
-      return <FileText className="h-4 w-4 text-gray-500" />;
+      return <FileText className="h-4 w-4 text-cc-text-muted" />;
   }
 }
 
@@ -83,18 +83,18 @@ function isExpired(expirationDate: string): boolean {
 function getStatusBadgeClasses(status: string): string {
   switch (status?.toLowerCase()) {
     case 'active':
-      return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700';
+      return 'bg-success/10 text-success border-success/30';
     case 'expired':
-      return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700';
+      return 'bg-destructive/10 text-destructive border-destructive/30';
     case 'cancelled':
     case 'canceled':
-      return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700';
+      return 'bg-destructive/10 text-destructive border-destructive/30';
     case 'pending':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700';
+      return 'bg-warning/10 text-warning border-warning/30';
     case 'suspended':
-      return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700';
+      return 'bg-warning/10 text-warning border-warning/30';
     default:
-      return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-700';
+      return 'bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle';
   }
 }
 
@@ -221,8 +221,8 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
 
                   <TableCell>
                     <div className="space-y-1">
-                      <div className={`flex items-center gap-1 text-sm ${isExpired(policy.expiration_date) ? 'text-red-600 font-bold dark:text-red-400' : ''}`}>
-                        <Calendar className={`h-3 w-3 ${isExpired(policy.expiration_date) ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`} />
+                      <div className={`flex items-center gap-1 text-sm ${isExpired(policy.expiration_date) ? 'text-destructive font-bold' : ''}`}>
+                        <Calendar className={`h-3 w-3 ${isExpired(policy.expiration_date) ? 'text-destructive' : 'text-muted-foreground'}`} />
                         {format(parseLocalDate(policy.expiration_date), 'MMM dd, yyyy')}
                       </div>
                       {isExpired(policy.expiration_date) && (
@@ -232,7 +232,7 @@ export function PolicyList({ policies, loading, onPolicySelect }: PolicyListProp
                         </Badge>
                       )}
                       {!isExpired(policy.expiration_date) && isExpiringSoon(policy.expiration_date) && (
-                        <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                        <Badge variant="secondary" className="text-xs bg-warning/10 text-warning">
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Expires Soon
                         </Badge>

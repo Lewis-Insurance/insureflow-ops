@@ -73,9 +73,9 @@ export default function RateWatchList() {
 
   const getPremiumChangeIcon = (pct: number | null) => {
     if (pct === null) return null;
-    if (pct > 0) return <TrendingUp className="h-4 w-4 text-red-500" />;
-    if (pct < 0) return <TrendingDown className="h-4 w-4 text-green-500" />;
-    return <Minus className="h-4 w-4 text-gray-500" />;
+    if (pct > 0) return <TrendingUp className="h-4 w-4 text-destructive" />;
+    if (pct < 0) return <TrendingDown className="h-4 w-4 text-success" />;
+    return <Minus className="h-4 w-4 text-cc-text-muted" />;
   };
 
   return (
@@ -168,8 +168,8 @@ export default function RateWatchList() {
                             <div className="flex items-center gap-1">
                               {getPremiumChangeIcon(job.premium_change_pct)}
                               <span className={
-                                job.premium_change_pct > 0 ? 'text-red-600' :
-                                job.premium_change_pct < 0 ? 'text-green-600' : ''
+                                job.premium_change_pct > 0 ? 'text-destructive' :
+                                job.premium_change_pct < 0 ? 'text-success' : ''
                               }>
                                 {job.premium_change_pct > 0 ? '+' : ''}
                                 {job.premium_change_pct}%
