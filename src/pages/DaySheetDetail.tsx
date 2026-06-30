@@ -38,11 +38,10 @@ import {
   Loader2,
   FileSpreadsheet,
 } from 'lucide-react';
-import { useDaySheet, useCloseDaySheet } from '@/hooks/useDaySheets';
+import { useDaySheet } from '@/hooks/useDaySheets';
 import { usePayments } from '@/hooks/usePayments';
-import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { PaymentTable } from '@/components/payments/PaymentTable';
-import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
+import { RecordPaymentForm } from '@/components/payments/RecordPaymentForm';
 import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import { downloadDaySheetPDF, printDaySheetPDF } from '@/components/payments/DaySheetPDF';
 import { DailyCashDialog } from '@/components/payments/DailyCashDialog';
@@ -61,71 +60,29 @@ export default function DaySheetDetail() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
-  const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [showDailyCashDialog, setShowDailyCashDialog] = useState(false);
   const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
-  const [closeNotes, setCloseNotes] = useState('');
-  const [createDeposit, setCreateDeposit] = useState(true);
-  const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
   const [isPrinting, setIsPrinting] = useState(false);
 
   const { data: daySheet, isLoading: isLoadingSheet } = useDaySheet(id!);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments({
     day_sheet_id: id,
   });
-  const { data: bankAccounts = [] } = useBankAccounts();
-  const closeDaySheet = useCloseDaySheet();
 
-  // Check if we should open the close dialog or trigger print from URL params
+  // Auto-trigger print from URL params
   useEffect(() => {
     const action = searchParams.get('action');
-    if (action === 'close' && daySheet?.status === 'open') {
-      setShowCloseDialog(true);
-    } else if (action === 'print' && daySheet && payments) {
-      // Auto-trigger PDF print
+    if (action === 'print' && daySheet && payments) {
       handlePrintDaySheet();
     }
   }, [searchParams, daySheet, payments]);
-
-  // Set default bank account
-  useEffect(() => {
-    if (bankAccounts.length > 0 && !selectedBankAccount) {
-      const primary = bankAccounts.find((ba) => ba.is_primary);
-      setSelectedBankAccount(primary?.id || bankAccounts[0].id);
-    }
-  }, [bankAccounts, selectedBankAccount]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
-  };
-
-  const handleClose = async () => {
-    if (!id) return;
-
-    try {
-      await closeDaySheet.mutateAsync({
-        day_sheet_id: id,
-        notes: closeNotes || undefined,
-        create_deposit: createDeposit,
-        bank_account_id: createDeposit ? selectedBankAccount : undefined,
-      });
-      setShowCloseDialog(false);
-      toast({
-        title: 'Day Sheet Closed',
-        description: `Successfully closed with ${daySheet?.payment_count || 0} payments totaling ${formatCurrency(daySheet?.grand_total || 0)}`,
-      });
-    } catch (error) {
-      console.error('Failed to close day sheet:', error);
-      toast({
-        title: 'Failed to Close',
-        description: error instanceof Error ? error.message : 'An error occurred while closing the day sheet',
-        variant: 'destructive',
-      });
-    }
   };
 
   const handlePrintDaySheet = async () => {
@@ -279,20 +236,13 @@ export default function DaySheetDetail() {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Daily Cash
           </Button>
-          {daySheet.status === 'open' && (
-            <>
-              <Button variant="outline" onClick={() => setShowNewPaymentDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Payment
-              </Button>
-              {payments.length > 0 && (
-                <Button onClick={() => setShowCloseDialog(true)}>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Close Day Sheet
-                </Button>
-              )}
-            </>
-          )}
+          <Button
+            className="bg-emerald-700 hover:bg-emerald-800 text-white"
+            onClick={() => setShowNewPaymentDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Payment
+          </Button>
         </div>
       </div>
 
@@ -399,162 +349,17 @@ export default function DaySheetDetail() {
         </CardContent>
       </Card>
 
-      {/* Status Timeline */}
-      {(daySheet.closed_at || daySheet.opened_at) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {daySheet.opened_at && (
-                <div className="flex items-start gap-4">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Day Sheet Opened</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(daySheet.opened_at), 'MMM d, yyyy h:mm a')}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {daySheet.closed_at && (
-                <div className="flex items-start gap-4">
-                  <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Day Sheet Closed</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(daySheet.closed_at), 'MMM d, yyyy h:mm a')}
-                    </p>
-                    {daySheet.notes && (
-                      <p className="text-sm mt-1 p-2 bg-muted rounded">{daySheet.notes}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Close Day Sheet Dialog */}
-      <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Close Day Sheet</DialogTitle>
-            <DialogDescription>
-              Review the totals and close this day sheet. This will lock all payments.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Summary */}
-            <div className="p-4 bg-muted rounded-lg space-y-2">
-              <div className="flex justify-between">
-                <span>Total Payments:</span>
-                <span className="font-medium">{daySheet.payment_count || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cash:</span>
-                <span className="font-medium">{formatCurrency(daySheet.total_cash || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Checks ({daySheet.check_count || 0}):</span>
-                <span className="font-medium">{formatCurrency(daySheet.total_checks || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cards:</span>
-                <span className="font-medium">
-                  {formatCurrency(
-                    (daySheet.total_credit_cards || 0) + (daySheet.total_debit_cards || 0)
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>ACH/EFT:</span>
-                <span className="font-medium">{formatCurrency(daySheet.total_ach || 0)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2 text-lg">
-                <span className="font-semibold">Grand Total:</span>
-                <span className="font-bold">{formatCurrency(daySheet.grand_total || 0)}</span>
-              </div>
-            </div>
-
-            {/* Deposit Option */}
-            {depositableAmount > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="createDeposit"
-                    checked={createDeposit}
-                    onChange={(e) => setCreateDeposit(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="createDeposit">
-                    Create escrow deposit ({formatCurrency(depositableAmount)})
-                  </Label>
-                </div>
-
-                {createDeposit && bankAccounts.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Bank Account</Label>
-                    <Select value={selectedBankAccount} onValueChange={setSelectedBankAccount}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select bank account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {bankAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name} - {account.bank_name}
-                            {account.is_primary && ' (Primary)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label>Notes (optional)</Label>
-              <Textarea
-                value={closeNotes}
-                onChange={(e) => setCloseNotes(e.target.value)}
-                placeholder="Add any notes about this day sheet..."
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCloseDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleClose} disabled={closeDaySheet.isPending}>
-              {closeDaySheet.isPending ? 'Closing...' : 'Close Day Sheet'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* New Payment Dialog */}
       <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>
-              Add a new payment to this day sheet.
+              Search for a customer, then record their payment.
             </DialogDescription>
           </DialogHeader>
-          <PaymentEntryForm
-            daySheetId={id}
+          <RecordPaymentForm
+            onCancel={() => setShowNewPaymentDialog(false)}
             onSuccess={() => setShowNewPaymentDialog(false)}
           />
         </DialogContent>
