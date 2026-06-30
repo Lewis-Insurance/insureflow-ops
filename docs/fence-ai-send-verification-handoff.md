@@ -21,7 +21,7 @@ b77d76d Fence Sprint 2 — remove AI direct sends
 b6f51e7 Fence Sprint 1 hardening — atomic send approval gate
 2d63900 Fence Sprint 3 — redact model boundaries
 3b21823 Fence Sprint 3 follow-up — close model SDK gaps
-<final Sprint 4 commit> Fence Sprint 4 — verify fence handoff
+c7bd038 Fence Sprint 4 — verify fence handoff
 ```
 
 ## What to verify
@@ -99,6 +99,17 @@ Expected behavior:
 - `execute-ai-module` redacts system prompts and document/input text before Azure OpenAI.
 
 Model-boundary function files changed by the fence include direct OpenAI/Anthropic/Gemini/Azure callers under `supabase/functions/*` plus `src/services/comparison/PolicySnapshotExtractor.ts`.
+
+### 5. Scope boundaries and follow-on exceptions
+
+This fence is a default-deny safety layer for the Sprint 0–4 scope, not a production launch approval. Verify these boundaries before any deployment:
+
+- The server-side one-time exact-content approval gate is installed on `email-send`, `send-sms`, `send-coi-email`, and `esign-create-request`. Other direct provider paths named in the inventory (`marketing-send-governor`, `reputation-manager`, `renewal-rate-watch`, `portal-send-invitation`, and similar scheduled/marketing workflows) remain classified for follow-on gating or explicit exception before they are used for client-facing sends.
+- Internal automation callers such as `automation-processor` and `process-quote-followups` do not mint `client_send_approval`; after Sprint 1 they should fail closed when they hit `email-send`/`send-sms` instead of sending. Their workflow UX/queue behavior still needs a follow-on cleanup before those automations are enabled.
+- `weekly-ceo-digest` is treated as an internal executive digest exception, not a client/carrier send surface, but it still remains behind its existing cron-secret/idempotency controls and is not deployed by this run.
+- Redaction coverage is for regulated identifiers and storage refs listed above. It should not be described as full anonymization of every possible PII category: names, business names, street addresses, FEIN/EIN, license plates, and other document-specific identifiers require a future expansion if the live rollout needs that guarantee.
+- Azure Document Intelligence/Form Recognizer OCR is a separate document-processing provider boundary. This fence redacts OCR/document text before LLM/model calls; it does not redact raw document bytes or signed document URLs before an OCR provider receives them. Live-document use therefore still requires the approved OCR/provider posture or a separate disable/exception gate.
+- Provider error-body logging remains a follow-on hardening item where providers might echo prompt/document snippets in error responses. Do not treat this branch as log-sink redaction completion.
 
 ## Verification commands run
 

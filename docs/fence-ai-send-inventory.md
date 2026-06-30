@@ -106,9 +106,10 @@ No production deploy/write/send occurred.
 
 Final verification and handoff are staged:
 
-- `docs/fence-ai-send-verification-handoff.md` contains the reviewer handoff, acceptance proof map, before/after summary, and Brian-gated deploy commands.
+- `docs/fence-ai-send-verification-handoff.md` contains the reviewer handoff, acceptance proof map, before/after summary, explicit scope-boundary exceptions, and Brian-gated deploy commands.
 - `send-coi-email` and `esign-create-request` were added to the same server-side exact-content one-time approval gate during final scope review, with human UI/hook flows wrapped via `client-send-approval-create` so legitimate sends/client effects keep working.
 - Repo lint was made green by using `@storybook/react-vite` story type imports and excluding local `.claude` worktrees from eslint traversal.
+- Remaining direct provider paths such as marketing/reputation/renewal/portal-invitation workflows are not production-approved by this fence; they stay follow-on gated/classified work unless Brian explicitly approves a scoped exception.
 
 Final proof:
 
