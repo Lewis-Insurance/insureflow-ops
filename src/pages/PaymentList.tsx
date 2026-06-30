@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +27,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { PaymentTable } from '@/components/payments/PaymentTable';
-import { PaymentEntryForm } from '@/components/payments/PaymentEntryForm';
+import { RecordPaymentForm } from '@/components/payments/RecordPaymentForm';
 import { EditPaymentModal } from '@/components/payments/EditPaymentModal';
 import { usePayments, useVoidPayment } from '@/hooks/usePayments';
 import { useCurrentDaySheet } from '@/hooks/useDaySheets';
@@ -43,18 +42,20 @@ type DateRange = {
 export default function PaymentList() {
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+    from: new Date(),
+    to: new Date(),
   });
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PremiumPayment | null>(null);
   const [editingPayment, setEditingPayment] = useState<PremiumPayment | null>(null);
-  const [activeTab, setActiveTab] = useState('all');
 
-  const { data: payments = [], isLoading } = usePayments({
-    startDate: format(dateRange.from, 'yyyy-MM-dd'),
-    endDate: format(dateRange.to, 'yyyy-MM-dd'),
+  const { data: allPayments = [], isLoading } = usePayments({
+    date_from: format(dateRange.from, 'yyyy-MM-dd'),
+    date_to: format(dateRange.to, 'yyyy-MM-dd'),
   });
+
+  // Only ever show payments that were actually taken (no voided rows).
+  const payments = allPayments.filter((p) => p.status !== 'voided');
 
   const { data: currentDaySheet } = useCurrentDaySheet();
   const voidPayment = useVoidPayment();
@@ -105,8 +106,8 @@ export default function PaymentList() {
     if (window.confirm(`Are you sure you want to void payment ${payment.receipt_number}?`)) {
       try {
         await voidPayment.mutateAsync({
-          paymentId: payment.id,
-          reason: 'Voided by user',
+          payment_id: payment.id,
+          void_reason: 'Voided by user',
         });
       } catch (error) {
         console.error('Failed to void payment:', error);
@@ -141,7 +142,10 @@ export default function PaymentList() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/day-sheets')}>
+          <Button
+            className="bg-emerald-800 hover:bg-emerald-900 text-white"
+            onClick={() => navigate('/day-sheets')}
+          >
             <Receipt className="h-4 w-4 mr-2" />
             Day Sheets
           </Button>
@@ -280,54 +284,14 @@ export default function PaymentList() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              <TabsTrigger value="all">All Payments</TabsTrigger>
-              <TabsTrigger value="recorded">Recorded</TabsTrigger>
-              <TabsTrigger value="deposited">Deposited</TabsTrigger>
-              <TabsTrigger value="voided">Voided</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="mt-4">
-              <PaymentTable
-                payments={payments}
-                isLoading={isLoading}
-                onViewPayment={handleViewPayment}
-                onEditPayment={handleEditPayment}
-                onPrintReceipt={handlePrintReceipt}
-                onVoidPayment={handleVoidPayment}
-              />
-            </TabsContent>
-            <TabsContent value="recorded" className="mt-4">
-              <PaymentTable
-                payments={payments.filter((p) => p.status === 'recorded')}
-                isLoading={isLoading}
-                onViewPayment={handleViewPayment}
-                onEditPayment={handleEditPayment}
-                onPrintReceipt={handlePrintReceipt}
-                onVoidPayment={handleVoidPayment}
-              />
-            </TabsContent>
-            <TabsContent value="deposited" className="mt-4">
-              <PaymentTable
-                payments={payments.filter((p) => p.status === 'deposited')}
-                isLoading={isLoading}
-                onViewPayment={handleViewPayment}
-                onEditPayment={handleEditPayment}
-                onPrintReceipt={handlePrintReceipt}
-                onVoidPayment={handleVoidPayment}
-              />
-            </TabsContent>
-            <TabsContent value="voided" className="mt-4">
-              <PaymentTable
-                payments={payments.filter((p) => p.status === 'voided')}
-                isLoading={isLoading}
-                onViewPayment={handleViewPayment}
-                onEditPayment={handleEditPayment}
-                onPrintReceipt={handlePrintReceipt}
-                onVoidPayment={handleVoidPayment}
-              />
-            </TabsContent>
-          </Tabs>
+          <PaymentTable
+            payments={payments}
+            isLoading={isLoading}
+            onViewPayment={handleViewPayment}
+            onEditPayment={handleEditPayment}
+            onPrintReceipt={handlePrintReceipt}
+            onVoidPayment={handleVoidPayment}
+          />
         </CardContent>
       </Card>
 
@@ -337,10 +301,13 @@ export default function PaymentList() {
           <DialogHeader>
             <DialogTitle>Record New Payment</DialogTitle>
             <DialogDescription>
-              Enter payment details to record a new premium payment.
+              Search for a customer, then record their payment.
             </DialogDescription>
           </DialogHeader>
-          <PaymentEntryForm onSuccess={handlePaymentSuccess} />
+          <RecordPaymentForm
+            onCancel={() => setShowNewPaymentDialog(false)}
+            onSuccess={handlePaymentSuccess}
+          />
         </DialogContent>
       </Dialog>
 

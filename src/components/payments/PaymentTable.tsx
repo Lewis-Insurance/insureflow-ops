@@ -78,7 +78,6 @@ export function PaymentTable({
   onVoidPayment,
 }: PaymentTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
 
   const filteredPayments = payments.filter((payment) => {
@@ -86,14 +85,21 @@ export function PaymentTable({
       !searchTerm ||
       payment.receipt_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.payer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (payment as any).account?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.policy?.carrier?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.check_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.reference_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
     const matchesMethod = methodFilter === 'all' || payment.payment_method?.type === methodFilter;
 
-    return matchesSearch && matchesStatus && matchesMethod;
+    return matchesSearch && matchesMethod;
   });
+
+  const formatPaidTo = (paidTo: string | null | undefined) => {
+    if (paidTo === 'company') return 'Company';
+    if (paidTo === 'escrow') return 'Escrow';
+    return '-';
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -124,22 +130,9 @@ export function PaymentTable({
           />
         </div>
         <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="recorded">Recorded</SelectItem>
-              <SelectItem value="deposited">Deposited</SelectItem>
-              <SelectItem value="cleared">Cleared</SelectItem>
-              <SelectItem value="voided">Voided</SelectItem>
-              <SelectItem value="nsf">NSF</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={methodFilter} onValueChange={setMethodFilter}>
             <SelectTrigger className="w-[150px]">
+              <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Method" />
             </SelectTrigger>
             <SelectContent>
@@ -147,9 +140,7 @@ export function PaymentTable({
               <SelectItem value="cash">Cash</SelectItem>
               <SelectItem value="check">Check</SelectItem>
               <SelectItem value="credit_card">Credit Card</SelectItem>
-              <SelectItem value="debit_card">Debit Card</SelectItem>
-              <SelectItem value="ach">ACH</SelectItem>
-              <SelectItem value="agency_bill">Agency Bill</SelectItem>
+              <SelectItem value="ach">ACH/EFT</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="icon">
@@ -165,18 +156,17 @@ export function PaymentTable({
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Payer</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Method</TableHead>
-              <TableHead>Reference</TableHead>
+              <TableHead>Paid To</TableHead>
               <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredPayments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No payments found
                 </TableCell>
               </TableRow>
@@ -203,10 +193,10 @@ export function PaymentTable({
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{payment.payer_name || 'N/A'}</div>
+                        <div className="font-medium">{payment.policy?.carrier || '-'}</div>
                         {payment.policy?.policy_number && (
-                          <div className="text-sm text-muted-foreground">
-                            Policy: {payment.policy.policy_number}
+                          <div className="text-sm text-muted-foreground font-mono">
+                            {payment.policy.policy_number}
                           </div>
                         )}
                       </div>
@@ -219,22 +209,9 @@ export function PaymentTable({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {payment.check_number ? (
-                        <span className="font-mono text-sm">Check #{payment.check_number}</span>
-                      ) : payment.reference_number ? (
-                        <span className="font-mono text-sm">{payment.reference_number}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
+                    <TableCell>{formatPaidTo(payment.paid_to)}</TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(payment.amount)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[payment.status] || 'bg-gray-100 text-gray-800'}>
-                        {payment.status}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
