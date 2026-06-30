@@ -102,6 +102,7 @@ export interface DaySheetTotals {
 
 export type PaymentStatus = 'recorded' | 'deposited' | 'cleared' | 'voided' | 'nsf';
 export type PaymentSource = 'in_person' | 'mail' | 'online' | 'phone' | 'lockbox';
+export type PaidTo = 'company' | 'escrow';
 
 export interface PremiumPayment {
   id: string;
@@ -129,13 +130,14 @@ export interface PremiumPayment {
   nsf_fee: number | null;
   invoice_number: string | null;
   receipt_number: string | null;
+  paid_to: PaidTo | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
   // Joined fields
   payment_method?: PaymentMethod;
-  policy?: { policy_number: string; line_of_business: string };
+  policy?: { policy_number: string; line_of_business: string; carrier?: string | null };
   account?: { name: string };
   day_sheet?: DaySheet;
 }
@@ -343,6 +345,7 @@ export const recordPaymentSchema = z.object({
   received_date: z.string({ required_error: 'Received date is required' }),
   payment_source: z.enum(['in_person', 'mail', 'online', 'phone', 'lockbox']).default('in_person'),
   invoice_number: z.string().max(50).optional().nullable(),
+  paid_to: z.enum(['company', 'escrow']).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
