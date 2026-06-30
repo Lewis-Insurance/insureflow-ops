@@ -691,7 +691,7 @@ export default function CustomerDetail() {
       <AddNoteModal open={addNoteOpen} onOpenChange={setAddNoteOpen} accountId={account.id} onSuccess={refetchNotes} />
       <AddTaskModal open={addTaskOpen} onOpenChange={setAddTaskOpen} accountId={account.id} />
       <AddPolicyModal open={addPolicyOpen} onOpenChange={setAddPolicyOpen} accountId={account.id} />
-      <AddPaymentModal open={addPaymentOpen} onOpenChange={setAddPaymentOpen} accountId={account.id} />
+      <AddPaymentModal open={addPaymentOpen} onOpenChange={setAddPaymentOpen} accountId={account.id} customerName={account.name} />
       <AddDocumentModal open={addDocumentOpen} onOpenChange={setAddDocumentOpen} accountId={account.id} />
       <AddCallLogModal
         open={addCallLogOpen}
