@@ -57,6 +57,7 @@ Expected behavior:
 - Approval expires.
 - Approval is one-time; replay is rejected by the final atomic update predicates.
 - `email-send`, `send-sms`, `send-coi-email`, and `esign-create-request` all await `clientSendApprovalGateResponse(...)` before touching Postmark/SendGrid/Twilio/Resend/Dropbox Sign.
+- Content-hash caveat: for `esign-create-request`, server-side default `subject`/`message` are applied *after* the gate, so when the caller omits those fields the canonical content hash does not bind the exact subject/message Dropbox Sign receives (the defaults derive from the already-hashed `document_name`). Tracked as a follow-up.
 
 Human-send wrappers that keep legitimate sends working:
 
