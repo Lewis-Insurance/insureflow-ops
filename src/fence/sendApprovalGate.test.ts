@@ -13,7 +13,7 @@ import {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-type TestedSurface = 'email-send' | 'send-sms';
+type TestedSurface = 'email-send' | 'send-sms' | 'send-coi-email' | 'esign-create-request';
 
 interface SurfaceCase {
   surface: TestedSurface;
@@ -49,8 +49,34 @@ const surfaceCases: SurfaceCase[] = [
   },
   {
     surface: 'send-sms',
-    payload: { to_number: '+15551234567', body: 'Your ID card is ready for review.', account_id: 'account-ref-001', contact_id: 'contact-ref-001' },
-    tamperedPayload: { to_number: '+15551234567', body: 'Changed SMS body.', account_id: 'account-ref-001', contact_id: 'contact-ref-001' },
+    payload: { to_number: '+155****4567', body: 'Your ID card is ready for review.', account_id: 'account-ref-001', contact_id: 'contact-ref-001' },
+    tamperedPayload: { to_number: '+155****4567', body: 'Changed SMS body.', account_id: 'account-ref-001', contact_id: 'contact-ref-001' },
+  },
+  {
+    surface: 'send-coi-email',
+    payload: { to: 'holder@example.invalid', certificateNumber: 'COI-2026-0001', certificateUrl: 'https://example.invalid/coi.pdf', holderName: 'Certificate Holder' },
+    tamperedPayload: { to: 'holder@example.invalid', certificateNumber: 'COI-2026-0001', certificateUrl: 'https://example.invalid/changed.pdf', holderName: 'Certificate Holder' },
+  },
+  {
+    surface: 'esign-create-request',
+    payload: {
+      document_url: 'https://example.invalid/acord.pdf',
+      document_name: 'ACORD 25',
+      signers: [{ email: 'signer@example.invalid', name: 'Signer One', role: 'applicant', order: 1 }],
+      form_number: '25',
+      acord_form_id: 'acord-ref-001',
+      message: 'Please review and sign.',
+      expires_in_days: 14,
+    },
+    tamperedPayload: {
+      document_url: 'https://example.invalid/acord-v2.pdf',
+      document_name: 'ACORD 25',
+      signers: [{ email: 'signer@example.invalid', name: 'Signer One', role: 'applicant', order: 1 }],
+      form_number: '25',
+      acord_form_id: 'acord-ref-001',
+      message: 'Please review and sign.',
+      expires_in_days: 14,
+    },
   },
 ];
 
@@ -354,14 +380,20 @@ describe('server-verified client send approval gate', () => {
     expect(fakeSupabase.updateAttempts).toHaveLength(1);
   });
 
-  it('wires email-send and send-sms to the async server-side approval gate', () => {
-    const emailSource = readFileSync(resolve(repoRoot, 'supabase/functions/email-send/index.ts'), 'utf8');
-    const smsSource = readFileSync(resolve(repoRoot, 'supabase/functions/send-sms/index.ts'), 'utf8');
+  it('wires direct client-effect functions to the async server-side approval gate', () => {
+    const clientEffectFunctions = [
+      ['email-send', 'supabase/functions/email-send/index.ts'],
+      ['send-sms', 'supabase/functions/send-sms/index.ts'],
+      ['send-coi-email', 'supabase/functions/send-coi-email/index.ts'],
+      ['esign-create-request', 'supabase/functions/esign-create-request/index.ts'],
+    ];
 
-    expect(emailSource).toContain('clientSendApprovalGateResponse');
-    expect(emailSource).toContain('await clientSendApprovalGateResponse');
-    expect(smsSource).toContain('clientSendApprovalGateResponse');
-    expect(smsSource).toContain('await clientSendApprovalGateResponse');
+    for (const [surface, path] of clientEffectFunctions) {
+      const source = readFileSync(resolve(repoRoot, path), 'utf8');
+      expect(source, `${surface} must import the shared approval gate`).toContain('clientSendApprovalGateResponse');
+      expect(source, `${surface} must await the shared approval gate`).toContain('await clientSendApprovalGateResponse');
+      expect(source, `${surface} must use the Supabase one-time approval store`).toContain('createSupabaseClientSendApprovalStore');
+    }
   });
 
   it('defers send-sms approval consumption until after non-side-effect validation, access, and rate checks', () => {
@@ -389,9 +421,12 @@ describe('server-verified client send approval gate', () => {
     expect(migration).toContain('alter table public.client_send_approvals enable row level security');
   });
 
-  it('wraps legitimate human SMS composer flows with the server-minted approval marker', () => {
+  it('wraps legitimate human client-effect flows with the server-minted approval marker', () => {
     const hookSource = readFileSync(resolve(repoRoot, 'src/hooks/useSMSMessages.ts'), 'utf8');
     const modalSource = readFileSync(resolve(repoRoot, 'src/components/communications/SMSComposerModal.tsx'), 'utf8');
+    const coiSource = readFileSync(resolve(repoRoot, 'src/hooks/useCOIGeneration.ts'), 'utf8');
+    const signatureHookSource = readFileSync(resolve(repoRoot, 'src/hooks/useSignature.ts'), 'utf8');
+    const signatureModalSource = readFileSync(resolve(repoRoot, 'src/components/signatures/SignatureRequestModal.tsx'), 'utf8');
     const helperSource = readFileSync(resolve(repoRoot, 'src/lib/clientSendApproval.ts'), 'utf8');
 
     expect(helperSource).toContain("functions.invoke('client-send-approval-create'");
@@ -399,5 +434,11 @@ describe('server-verified client send approval gate', () => {
     expect(hookSource).toContain('client_send_approval');
     expect(modalSource).toContain("createClientSendApproval('send-sms', sendPayload)");
     expect(modalSource).toContain('client_send_approval');
+    expect(coiSource).toContain("createClientSendApproval('send-coi-email', sendPayload)");
+    expect(coiSource).toContain('client_send_approval');
+    expect(signatureHookSource).toContain("createClientSendApproval('esign-create-request', signatureRequestPayload)");
+    expect(signatureHookSource).toContain('client_send_approval');
+    expect(signatureModalSource).toContain("createClientSendApproval('esign-create-request', signatureRequestPayload)");
+    expect(signatureModalSource).toContain('client_send_approval');
   });
 });

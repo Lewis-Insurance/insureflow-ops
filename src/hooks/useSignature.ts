@@ -15,6 +15,7 @@ import {
   type SignatureConfig,
   type SignerRole,
 } from '@/lib/acord/signatureAnchors';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 
 // ============================================
 // TYPES
@@ -138,6 +139,23 @@ export function useSignature(): UseSignatureReturn {
           };
         }) || [];
 
+        const signatureRequestPayload = {
+          document_url: input.documentUrl,
+          document_name: input.documentName,
+          signers: input.signers.map(s => ({
+            email: s.email,
+            name: s.name,
+            role: s.role,
+            order: s.order,
+          })),
+          form_number: input.formNumber,
+          acord_form_id: input.acordFormId,
+          message: input.message,
+          expires_in_days: input.expirationDays || 14,
+          signature_fields: signatureFields.length > 0 ? signatureFields : undefined,
+        };
+        const clientSendApproval = await createClientSendApproval('esign-create-request', signatureRequestPayload);
+
         // Call edge function to create signature request via Dropbox Sign
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/esign-create-request`,
@@ -148,19 +166,8 @@ export function useSignature(): UseSignatureReturn {
               'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              document_url: input.documentUrl,
-              document_name: input.documentName,
-              signers: input.signers.map(s => ({
-                email: s.email,
-                name: s.name,
-                role: s.role,
-                order: s.order,
-              })),
-              form_number: input.formNumber,
-              acord_form_id: input.acordFormId,
-              message: input.message,
-              expires_in_days: input.expirationDays || 14,
-              signature_fields: signatureFields.length > 0 ? signatureFields : undefined,
+              ...signatureRequestPayload,
+              client_send_approval: clientSendApproval,
             }),
           }
         );

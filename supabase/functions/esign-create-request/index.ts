@@ -9,6 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { createLogger } from '../_shared/logger.ts';
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from '../_shared/clientSendApprovalGate.ts';
 
 const logger = createLogger('esign-create-request');
 
@@ -116,6 +117,15 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'esign-create-request',
+      payload: body,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
+    if (approvalGate) return approvalGate;
 
     // Get eSign settings from database
     const { data: settings, error: settingsError } = await supabase

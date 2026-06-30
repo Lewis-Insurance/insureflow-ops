@@ -83,3 +83,39 @@ Proof:
 - Changed-file eslint for Sprint 2 files passed.
 
 No production deploy/write/send occurred.
+
+## [SPRINT 3 COMPLETE]
+
+PII redaction is enforced at the model boundary:
+
+- `supabase/functions/_shared/floorSafety.ts` extends `redactPII(...)` coverage for SSN, DOB/DLN, account numbers, VINs, full policy numbers, signed storage URLs, storage paths, and raw UUIDs.
+- `supabase/functions/_shared/ai-client.ts` redacts shared chat messages and embedding inputs before Gemini/OpenAI/Anthropic/OpenAI embedding calls.
+- `supabase/functions/_shared/modelBoundaryFetch.ts` redacts nested JSON request bodies for direct OpenAI, Anthropic, Gemini, and Azure OpenAI provider calls.
+- Direct model-provider functions under `supabase/functions/*` and `src/services/comparison/PolicySnapshotExtractor.ts` route through `modelBoundaryFetch(...)` or `anthropicBoundaryCreate(...)`.
+- `src/fence/modelBoundaryRedaction.test.ts` proves fixture redaction, nested provider-body redaction, direct-provider bypass scanning, and critical coverage for `execute-ai-module`, `ai-brain-rag`, and `ai-document-analysis`.
+
+Proof:
+
+- Targeted fence suite passed with 39 tests after send-gate and model-boundary hardening.
+- Full `npm run test:run` passed: 26 files, 338 tests.
+- `npm run build`, `npm run lint -- --quiet`, and `npx tsc -p tsconfig.json --noEmit --pretty false` passed.
+
+No production deploy/write/send occurred.
+
+## [SPRINT 4 COMPLETE]
+
+Final verification and handoff are staged:
+
+- `docs/fence-ai-send-verification-handoff.md` contains the reviewer handoff, acceptance proof map, before/after summary, and Brian-gated deploy commands.
+- `send-coi-email` and `esign-create-request` were added to the same server-side exact-content one-time approval gate during final scope review, with human UI/hook flows wrapped via `client-send-approval-create` so legitimate sends/client effects keep working.
+- Repo lint was made green by using `@storybook/react-vite` story type imports and excluding local `.claude` worktrees from eslint traversal.
+
+Final proof:
+
+- `npm run test:run` passed: 26 files, 338 tests.
+- `npm run build` passed.
+- `npm run lint -- --quiet` passed.
+- `npx tsc -p tsconfig.json --noEmit --pretty false` passed.
+- `git diff --check` passed.
+
+Production deploy commands are documented only and intentionally not run. Brian approval remains required before applying the migration or deploying any Edge function bundle.

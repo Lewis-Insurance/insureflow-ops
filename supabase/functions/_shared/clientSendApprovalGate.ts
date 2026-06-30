@@ -139,17 +139,24 @@ function canonicalPayload(surface: ClientSendSurface, payload: unknown): Record<
   if (surface === 'send-coi-email') {
     return sortObject({
       to: normalized.to ?? normalized.recipientEmail,
-      subject: normalized.subject,
-      body: normalized.body ?? normalized.html,
-      coi_ref: normalized.coi_id ?? normalized.coiId ?? normalized.coiRef ?? null,
+      certificate_number: normalized.certificateNumber ?? normalized.certificate_number,
+      certificate_url: normalized.certificateUrl ?? normalized.certificate_url,
+      holder_name: normalized.holderName ?? normalized.holder_name,
+      coi_ref: normalized.coi_id ?? normalized.coiId ?? normalized.coiRef ?? normalized.certificateNumber ?? null,
     }) as Record<string, unknown>;
   }
   if (surface === 'esign-create-request') {
     return sortObject({
-      recipient: normalized.recipient ?? normalized.signerEmail,
+      document_url: normalized.document_url ?? normalized.documentUrl,
+      document_name: normalized.document_name ?? normalized.documentName,
+      signers: normalized.signers,
       subject: normalized.subject,
       message: normalized.message,
-      document_ref: normalized.document_id ?? normalized.documentId ?? null,
+      form_number: normalized.form_number ?? normalized.formNumber ?? null,
+      acord_form_id: normalized.acord_form_id ?? normalized.acordFormId ?? null,
+      expires_in_days: normalized.expires_in_days ?? normalized.expiresInDays ?? null,
+      use_text_tags: normalized.use_text_tags ?? normalized.useTextTags ?? null,
+      signature_fields: normalized.signature_fields ?? normalized.signatureFields ?? null,
     }) as Record<string, unknown>;
   }
   return sortObject(normalized) as Record<string, unknown>;

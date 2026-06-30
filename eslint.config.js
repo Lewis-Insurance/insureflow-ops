@@ -8,7 +8,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import noDeprecatedDomainTerms from "./eslint-rules/no-deprecated-domain-terms.js";
 
-export default tseslint.config({ ignores: ["dist", "scripts"] }, {
+export default tseslint.config({ ignores: ["dist", "scripts", ".claude"] }, {
   extends: [js.configs.recommended, ...tseslint.configs.recommended],
   files: ["**/*.{ts,tsx}"],
   languageOptions: {

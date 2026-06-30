@@ -13,6 +13,7 @@ import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.t
 import { requireAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from "../_shared/clientSendApprovalGate.ts";
 
 interface SendCOIEmailRequest {
   to: string;
@@ -239,12 +240,13 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Parse request body - NOTE: fromEmail and fromName are intentionally ignored for security
+    const requestBody: SendCOIEmailRequest = await req.json();
     const {
       to,
       certificateNumber,
       certificateUrl,
       holderName,
-    }: SendCOIEmailRequest = await req.json();
+    } = requestBody;
 
     // Validate required fields
     if (!to || !certificateNumber || !certificateUrl || !holderName) {
@@ -290,6 +292,15 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'send-coi-email',
+      payload: requestBody,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
+    if (approvalGate) return approvalGate;
 
     // Verify user has access to this certificate (if we have a certificates table)
     // TODO: Add certificate access verification when certificates table is available
