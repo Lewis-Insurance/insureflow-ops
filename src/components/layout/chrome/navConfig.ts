@@ -59,6 +59,9 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       { label: 'Leads', to: '/leads', icon: TrendingUp },
       // Contacts maps to the CRM accounts/contacts hub (no dedicated /contacts route).
       { label: 'Contacts', to: '/crm', icon: Contact },
+      // Payments (formerly the standalone "Accounting" page) + its Day Sheets shortcut.
+      { label: 'Payments', to: '/payments', icon: DollarSign },
+      { label: 'Day Sheets', to: '/day-sheets', icon: Receipt },
     ],
   },
   {
@@ -93,7 +96,6 @@ export const RAIL_GROUPS: NavGroupDef[] = [
     items: [
       { label: 'Marketing', to: '/marketing/automations', icon: Megaphone },
       { label: 'Campaigns', to: '/campaigns', icon: Send },
-      { label: 'Accounting', to: '/payments', icon: Landmark },
       { label: 'Team', to: '/team-messaging', icon: UsersRound, isNew: true },
       { label: 'Command Center', to: '/command-center', icon: Radio },
     ],
