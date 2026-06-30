@@ -32313,6 +32313,7 @@ export type Database = {
           nsf_at: string | null
           nsf_fee: number | null
           org_id: string | null
+          paid_to: string | null
           payer_address: string | null
           payer_name: string | null
           payment_method_id: string
@@ -32344,6 +32345,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
+          paid_to?: string | null
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id: string
@@ -32375,6 +32377,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
+          paid_to?: string | null
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id?: string

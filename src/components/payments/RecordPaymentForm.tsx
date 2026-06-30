@@ -278,9 +278,7 @@ export function RecordPaymentForm({
 
       // day_sheet_id is intentionally left null — the BEFORE INSERT trigger
       // links the payment to the correct day sheet based on received_date.
-      // Cast: `paid_to` is added by migration 20260630130000 and isn't in the
-      // generated types until they're regenerated.
-      const payload = {
+      const { error } = await supabase.from('premium_payments').insert({
         policy_id: formData.policy_id,
         account_id: selectedAccountId,
         payment_method_id: formData.payment_method_id,
@@ -294,9 +292,7 @@ export function RecordPaymentForm({
         notes: formData.notes || null,
         payer_name: formData.payer_name || selectedCustomerName || null,
         org_id: orgId,
-      };
-
-      const { error } = await supabase.from('premium_payments').insert(payload as any);
+      });
 
       if (error) throw error;
 
