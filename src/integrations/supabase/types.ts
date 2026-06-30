@@ -32305,6 +32305,7 @@ export type Database = {
           check_date: string | null
           check_number: string | null
           created_at: string | null
+          day_sheet_date: string
           day_sheet_id: string | null
           deleted_at: string | null
           id: string
@@ -32337,6 +32338,7 @@ export type Database = {
           check_date?: string | null
           check_number?: string | null
           created_at?: string | null
+          day_sheet_date?: string
           day_sheet_id?: string | null
           deleted_at?: string | null
           id?: string
@@ -32369,6 +32371,7 @@ export type Database = {
           check_date?: string | null
           check_number?: string | null
           created_at?: string | null
+          day_sheet_date?: string
           day_sheet_id?: string | null
           deleted_at?: string | null
           id?: string
