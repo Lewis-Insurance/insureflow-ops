@@ -43,7 +43,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useTasks } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { AI_RESULTS_SMS_DISABLED_REASON, isAiResultsSmsActionEnabled } from '@/floor/legacyActionGate';
+import {
+    AI_RESULTS_EMAIL_DISABLED_REASON,
+    AI_RESULTS_SMS_DISABLED_REASON,
+    isAiResultsSmsActionEnabled,
+} from '@/floor/legacyActionGate';
 import jsPDF from 'jspdf';
 
 interface AIResultsActionBarProps {
@@ -159,12 +163,9 @@ export function AIResultsActionBar({
     const [copied, setCopied] = useState(false);
     const [showNoteDialog, setShowNoteDialog] = useState(false);
     const [showTaskDialog, setShowTaskDialog] = useState(false);
-    const [showSMSDialog, setShowSMSDialog] = useState(false);
     const [noteContent, setNoteContent] = useState('');
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDescription, setTaskDescription] = useState('');
-    const [smsPhoneNumber, setSmsPhoneNumber] = useState('');
-    const [smsMessage, setSmsMessage] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const aiResultsSmsEnabled = isAiResultsSmsActionEnabled();
 
@@ -804,16 +805,6 @@ export function AIResultsActionBar({
         }
     };
 
-    // AI-result → SMS is intentionally disabled until exact-artifact Floor approval tokens exist.
-    const handleSendSMS = () => {
-        toast({
-            title: 'SMS gated by the Floor',
-            description: AI_RESULTS_SMS_DISABLED_REASON,
-            variant: 'destructive',
-        });
-        setShowSMSDialog(false);
-    };
-
     return (
         <>
             <div className={cn(
@@ -886,15 +877,29 @@ export function AIResultsActionBar({
                                     return;
                                 }
 
-                                setShowSMSDialog(true);
+                                toast({
+                                    title: 'SMS gated by the Floor',
+                                    description: AI_RESULTS_SMS_DISABLED_REASON,
+                                    variant: 'destructive',
+                                });
                             }}
                         >
                             <MessageSquare className="h-4 w-4 mr-2" />
                             SMS gated by Floor
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => {/* TODO: Email modal */ }}>
+                        <DropdownMenuItem
+                            disabled
+                            onSelect={(event) => {
+                                event.preventDefault();
+                                toast({
+                                    title: 'Email gated by the Floor',
+                                    description: AI_RESULTS_EMAIL_DISABLED_REASON,
+                                    variant: 'destructive',
+                                });
+                            }}
+                        >
                             <Mail className="h-4 w-4 mr-2" />
-                            Email Results
+                            Email gated by Floor
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -980,54 +985,6 @@ export function AIResultsActionBar({
                         <Button onClick={handleCreateTask} disabled={isSaving}>
                             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             Create Task
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Send SMS Dialog */}
-            <Dialog open={showSMSDialog} onOpenChange={setShowSMSDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5" />
-                            Send SMS
-                        </DialogTitle>
-                        <DialogDescription>
-                            Send a text message with a summary of this analysis
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="sms-phone">Phone Number</Label>
-                            <Input
-                                id="sms-phone"
-                                type="tel"
-                                value={smsPhoneNumber}
-                                onChange={(e) => setSmsPhoneNumber(e.target.value)}
-                                placeholder="(555) 555-5555"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="sms-message">Message (optional)</Label>
-                            <Textarea
-                                id="sms-message"
-                                value={smsMessage}
-                                onChange={(e) => setSmsMessage(e.target.value)}
-                                placeholder={`AI Analysis: ${title}. View full results at your portal or contact your agent for details.`}
-                                rows={3}
-                                maxLength={160}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {smsMessage.length}/160 characters
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowSMSDialog(false)}>Cancel</Button>
-                        <Button onClick={handleSendSMS} disabled={isSaving || !smsPhoneNumber}>
-                            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Send SMS
                         </Button>
                     </DialogFooter>
                 </DialogContent>

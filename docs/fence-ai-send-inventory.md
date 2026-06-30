@@ -66,3 +66,20 @@ Proof:
 - The approval creation function stores only the content hash and approval metadata; it has no provider/carrier send call.
 
 No production deploy/write/send occurred. The migration and edge functions are staged on the feature branch for Brian-approved deployment only.
+
+## [SPRINT 2 COMPLETE]
+
+AI-result client-send shortcuts are removed/gated:
+
+- `src/components/ai/AIResultsActionBar.tsx` no longer contains the legacy SMS dialog, SMS phone/message state, or `handleSendSMS` path.
+- The Share menu presents both SMS and Email as explicitly “gated by Floor”; no AI-result UI surface invokes `send-sms`, `email-send`, or `createClientSendApproval(...)` directly.
+- `src/floor/legacyActionGate.ts` centralizes the disabled client-send copy for AI results.
+- `src/fence/noAIDirectSend.test.ts` statically proves known AI surfaces (`AIResultsActionBar`, `AICustomerActions`, `AIQuoteAssistant`, `useAIEmailComposer`, `useEmailComposer`) cannot call client-send functions and that only human SMS composer surfaces call `send-sms`, with `client_send_approval` attached.
+
+Proof:
+
+- Targeted tests: `npm run test:run -- src/fence/noAIDirectSend.test.ts src/floor/legacySendFence.test.ts` passed.
+- TypeScript check for the sprint files passed via `npx tsc -p tsconfig.json --noEmit --pretty false`.
+- Changed-file eslint for Sprint 2 files passed.
+
+No production deploy/write/send occurred.
