@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,7 +120,7 @@ serve(async (req) => {
         console.log(`Full URL: ${analyzeUrl}`);
 
         try {
-          const analyzeResponse = await fetch(analyzeUrl, {
+          const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -160,7 +161,7 @@ serve(async (req) => {
             await sleep(2000);
             attempts++;
 
-            const resultResponse = await fetch(operationLocation, {
+            const resultResponse = await modelBoundaryFetch(operationLocation, {
               headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
             });
 
@@ -275,7 +276,7 @@ IMPORTANT INSTRUCTIONS:
 - Phone numbers may be formatted as (XXX) XXX-XXXX, XXX-XXX-XXXX, or XXX.XXX.XXXX
 - Look for the insured's mailing address in the Named Insured or Applicant section, not the agency address`;
 
-      const aiResponse = await fetch(
+      const aiResponse = await modelBoundaryFetch(
         `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
         {
           method: 'POST',

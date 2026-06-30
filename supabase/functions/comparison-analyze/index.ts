@@ -15,6 +15,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -800,7 +801,7 @@ ${coverageGaps.length > 0 ? coverageGaps.map(g => `- [${g.severity.toUpperCase()
 Generate an executive summary, key findings, and actionable recommendations.`;
 
   try {
-    const response = await fetch(url, {
+    const response = await modelBoundaryFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

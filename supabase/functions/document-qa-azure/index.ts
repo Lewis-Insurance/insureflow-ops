@@ -13,6 +13,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -25,7 +26,7 @@ async function embedQueryAzureOpenAI(query: string) {
   const cleanEndpoint = endpoint.replace(/\/$/, '');
   const url = `${cleanEndpoint}/openai/deployments/${deployment}/embeddings?api-version=2024-02-15-preview`;
 
-  const resp = await fetch(url, {
+  const resp = await modelBoundaryFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -260,7 +261,7 @@ serve(async (req) => {
         
         console.log('🔗 Calling Azure with base64 data...');
 
-        const analyzeResponse = await fetch(analyzeUrl, {
+        const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -291,7 +292,7 @@ serve(async (req) => {
               await sleep(2000);
               attempts++;
 
-              const resultResponse = await fetch(operationLocation, {
+              const resultResponse = await modelBoundaryFetch(operationLocation, {
                 headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
               });
 
@@ -474,7 +475,7 @@ Question: ${question}
 
 Please provide a clear, accurate answer based on the document content above. Reference specific page numbers when citing information.`;
 
-    const aiResponse = await fetch(
+    const aiResponse = await modelBoundaryFetch(
       `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
       {
         method: 'POST',

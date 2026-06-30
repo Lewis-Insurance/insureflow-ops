@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -366,7 +367,7 @@ TARGET ACORD FORM: ${target_form_number || 'Any'}
 ${matchedTemplate ? `MATCHED TEMPLATE: ${matchedTemplate.template_name} (${matchedTemplate.carrier_name})` : ''}
 `;
 
-      const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      const claudeResponse = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -569,7 +570,7 @@ async function runAzureModel(
 
   const analyzeUrl = `${endpoint}/formrecognizer/documentModels/${model}:analyze?api-version=2023-07-31`;
 
-  const analyzeResponse = await fetch(analyzeUrl, {
+  const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -594,7 +595,7 @@ async function runAzureModel(
     await sleep(2000);
     attempts++;
 
-    const resultResponse = await fetch(operationLocation, {
+    const resultResponse = await modelBoundaryFetch(operationLocation, {
       headers: { 'Ocp-Apim-Subscription-Key': apiKey }
     });
 

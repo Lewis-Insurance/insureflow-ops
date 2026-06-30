@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 // System prompt for the AI that helps build modules
 const MODULE_BUILDER_SYSTEM_PROMPT = `You are Lewi, an AI assistant that helps insurance agency staff create custom AI tools (called "modules"). Your job is to interview the user about what they want to build, then generate a complete module configuration.
@@ -204,7 +205,7 @@ serve(async (req) => {
             }
 
             // Call OpenAI API
-            const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            const aiResponse = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

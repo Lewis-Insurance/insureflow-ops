@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,7 +80,7 @@ serve(async (req) => {
 
     if (isPdf) {
       // Use files:annotate for PDFs
-      const visionResponse = await fetch(
+      const visionResponse = await modelBoundaryFetch(
         `https://vision.googleapis.com/v1/files:annotate?key=${GOOGLE_VISION_API_KEY}`,
         {
           method: 'POST',
@@ -118,7 +119,7 @@ serve(async (req) => {
       }
     } else {
       // Use images:annotate for images
-      const visionResponse = await fetch(
+      const visionResponse = await modelBoundaryFetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
         {
           method: 'POST',
@@ -161,7 +162,7 @@ serve(async (req) => {
     if (OPENAI_API_KEY) {
       console.log('Structuring knowledge with OpenAI...');
 
-      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      const aiResponse = await modelBoundaryFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${OPENAI_API_KEY}`,

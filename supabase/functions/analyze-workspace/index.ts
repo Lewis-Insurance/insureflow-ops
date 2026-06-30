@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,7 +172,7 @@ Provide clear findings with specific references to the documents.`;
     const cleanEndpoint = azureOpenAIEndpoint.replace(/\/$/, "");
     const azureUrl = `${cleanEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=2024-02-15-preview`;
 
-    const aiResponse = await fetch(azureUrl, {
+    const aiResponse = await modelBoundaryFetch(azureUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

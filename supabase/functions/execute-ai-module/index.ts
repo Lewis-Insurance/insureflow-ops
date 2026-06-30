@@ -10,6 +10,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
 import { redactPII } from '../_shared/floorSafety.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,7 +71,7 @@ async function extractTextWithAzure(
       const analyzeUrl = `${cleanEndpoint}/${config.path}/documentModels/${config.model}:analyze?api-version=${version}`;
 
       try {
-        const analyzeResponse = await fetch(analyzeUrl, {
+        const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -95,7 +96,7 @@ async function extractTextWithAzure(
           await sleep(2000);
           attempts++;
 
-          const resultResponse = await fetch(operationLocation, {
+          const resultResponse = await modelBoundaryFetch(operationLocation, {
             headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
           });
 
@@ -286,7 +287,7 @@ serve(async (req) => {
     }
 
     // 4. Build the prompt
-    const systemPrompt = module.system_prompt;
+    const systemPrompt = redactPII(String(module.system_prompt ?? '')).redacted;
 
     let userPrompt = '';
 
@@ -323,7 +324,7 @@ serve(async (req) => {
 
     const aiUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
 
-    const aiResponse = await fetch(aiUrl, {
+    const aiResponse = await modelBoundaryFetch(aiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

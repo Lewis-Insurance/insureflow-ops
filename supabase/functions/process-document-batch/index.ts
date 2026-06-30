@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAuth } from '../_shared/auth.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -91,7 +92,7 @@ serve(async (req) => {
               const dataUrl = `data:${fileData.type};base64,${base64}`;
 
               // Run OCR via AI
-              const ocrResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              const ocrResponse = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${OPENAI_API_KEY}`,

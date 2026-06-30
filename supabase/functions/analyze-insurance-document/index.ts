@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth, verifyResourceAccess } from '../_shared/auth.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -142,7 +143,7 @@ serve(async (req) => {
     // Submit document for analysis
     const analyzeUrl = `${AZURE_DOC_ENDPOINT}/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31`;
     
-    const submitResponse = await fetch(analyzeUrl, {
+    const submitResponse = await modelBoundaryFetch(analyzeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
@@ -171,7 +172,7 @@ serve(async (req) => {
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const resultResponse = await fetch(operationLocation, {
+      const resultResponse = await modelBoundaryFetch(operationLocation, {
         method: 'GET',
         headers: {
           'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY,
@@ -383,7 +384,7 @@ Return ONLY valid JSON with this structure:
     // Call Azure OpenAI
     const openaiUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
     
-    const openaiResponse = await fetch(openaiUrl, {
+    const openaiResponse = await modelBoundaryFetch(openaiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

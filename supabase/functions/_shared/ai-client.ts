@@ -13,6 +13,8 @@
  * - ANTHROPIC_API_KEY: For Anthropic
  */
 
+import { redactPII } from './floorSafety.ts';
+
 export type AIProvider = 'gemini' | 'openai' | 'anthropic';
 
 export interface ChatMessage {
@@ -55,6 +57,24 @@ export interface AIClientOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+}
+
+export function redactModelBoundaryText(text: string, surface: string = 'model-boundary'): string {
+  const { redacted, redactions } = redactPII(text);
+  if (redactions.length > 0) {
+    console.info('[AI boundary] Redacted regulated fields before model call', {
+      surface,
+      redactions,
+    });
+  }
+  return redacted;
+}
+
+function redactChatMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) => ({
+    ...message,
+    content: redactModelBoundaryText(message.content, `chat.${message.role}`),
+  }));
 }
 
 /**
@@ -345,16 +365,17 @@ export async function chatCompletion(
 ): Promise<AIResponse> {
   const provider = getAIProvider();
   const apiKey = getAIApiKey(provider);
+  const redactedMessages = redactChatMessages(messages);
 
   console.log(`Using AI provider: ${provider}`);
 
   switch (provider) {
     case 'gemini':
-      return callGemini(apiKey, messages, tools, options);
+      return callGemini(apiKey, redactedMessages, tools, options);
     case 'openai':
-      return callOpenAI(apiKey, messages, tools, options);
+      return callOpenAI(apiKey, redactedMessages, tools, options);
     case 'anthropic':
-      return callAnthropic(apiKey, messages, tools, options);
+      return callAnthropic(apiKey, redactedMessages, tools, options);
     default:
       throw new Error(`Unknown AI provider: ${provider}`);
   }
@@ -422,6 +443,8 @@ export async function generateEmbedding(
     throw new Error('Missing OPENAI_API_KEY environment variable (required for embeddings)');
   }
 
+  const inputText = redactModelBoundaryText(text, 'embedding.single');
+
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -430,7 +453,7 @@ export async function generateEmbedding(
     },
     body: JSON.stringify({
       model,
-      input: text,
+      input: inputText,
     }),
   });
 
@@ -457,6 +480,8 @@ export async function generateEmbeddingsBatch(
     throw new Error('Missing OPENAI_API_KEY environment variable (required for embeddings)');
   }
 
+  const redactedTexts = texts.map((inputText) => redactModelBoundaryText(inputText, 'embedding.batch'));
+
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -465,7 +490,7 @@ export async function generateEmbeddingsBatch(
     },
     body: JSON.stringify({
       model,
-      input: texts,
+      input: redactedTexts,
     }),
   });
 

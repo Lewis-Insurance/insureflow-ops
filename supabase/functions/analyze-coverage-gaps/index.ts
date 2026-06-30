@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { requireAuth, verifyResourceAccess } from '../_shared/auth.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -619,7 +620,7 @@ Provide a 3-4 sentence executive summary that:
 
 Be professional, direct, and focus on business value.`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -701,7 +702,7 @@ Create a 4-6 step action plan that:
 
 Be specific and actionable. Use clear priority markers (🚨 URGENT, ⚠️ HIGH PRIORITY, 📋 PLAN FOR).`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

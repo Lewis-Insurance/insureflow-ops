@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { extractTextFromBlob, validateExtraction } from './pdf-extractor.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getAIApiKey, getAIProvider } from '../_shared/ai-client.ts';
+import { redactPII } from '../_shared/floorSafety.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -122,6 +124,19 @@ class AIServiceError extends Error {
   }
 }
 
+type ModelMessage = Record<string, unknown> & { content?: unknown };
+
+function redactModelMessagesForAI(messages: ModelMessage[]): ModelMessage[] {
+  return messages.map((message) => {
+    if (typeof message.content !== 'string') return message;
+    const { redacted, redactions } = redactPII(message.content);
+    if (redactions.length > 0) {
+      console.info('[AI Document Analysis] Redacted regulated fields before model call', { redactions });
+    }
+    return { ...message, content: redacted };
+  });
+}
+
 // Retry helper with improved error context
 async function fetchWithRetry(
   url: string, 
@@ -132,7 +147,7 @@ async function fetchWithRetry(
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options);
+      const response = await modelBoundaryFetch(url, options);
       
       if (response.ok || (response.status >= 400 && response.status < 500)) {
         return response;
@@ -433,7 +448,7 @@ serve(async (req) => {
         }
 
         // Fetch file from Google Drive
-        const driveResponse = await fetch(
+        const driveResponse = await modelBoundaryFetch(
           `https://www.googleapis.com/drive/v3/files/${driveId}?alt=media&key=${GOOGLE_DRIVE_API_KEY}`,
           {
             method: 'GET',
@@ -818,7 +833,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
     if (contextualDocuments.length > 0) {
       const docContext = contextualDocuments
         .map((doc: any, idx: number) => {
-          const preview = doc.content ? doc.content.slice(0, 200) : '[No content]';
+          const preview = doc.content ? redactPII(String(doc.content).slice(0, 200)).redacted : '[No content]';
           console.log(`Document ${idx + 1} content preview:`, preview);
           
           // Include warnings if present
@@ -827,7 +842,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
             warningText = `\n[Extraction Warnings: ${doc.warnings.join(', ')}]`;
           }
           
-          return `Document ${idx + 1} (${doc.name}):${warningText}\n${doc.content || '[No content]'}`;
+          return `Document ${idx + 1}:${warningText}\n${doc.content || '[No content]'}`;
         })
         .join('\n\n---\n\n');
 
@@ -855,7 +870,9 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       });
     }
 
-    console.log(`Calling ${AI_PROVIDER} AI with ${messages.length} messages`);
+    const redactedMessages = redactModelMessagesForAI(messages);
+
+    console.log(`Calling ${AI_PROVIDER} AI with ${redactedMessages.length} messages`);
 
     const AI_URL = 'https://api.openai.com/v1/chat/completions';
     const headers = {
@@ -870,7 +887,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
         headers,
         body: JSON.stringify({
           model: 'gpt-5-mini',
-          messages,
+          messages: redactedMessages,
           temperature: 0.1,
           max_tokens: 4000,
           response_format: { type: "json_object" },
@@ -1083,7 +1100,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
                     role: "system", 
                     content: "Convert the following into valid JSON matching the extraction schema. Return only valid JSON." 
                   },
-                  { role: "user", content: content }
+                  { role: "user", content: redactPII(content).redacted }
                 ],
                 temperature: 0,
                 response_format: { type: "json_object" },
@@ -1136,7 +1153,7 @@ IMPORTANT: Return ONLY the JSON object for the specific insurance type - no mark
       headers,
       body: JSON.stringify({
         model: 'gpt-5-mini',
-        messages,
+        messages: redactedMessages,
         temperature: 0.3,
         max_tokens: 4000,
         stream: true,

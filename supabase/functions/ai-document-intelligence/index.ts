@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +64,7 @@ serve(async (req) => {
           base64Content = imageData.split(',')[1];
         }
 
-        const visionResponse = await fetch(
+        const visionResponse = await modelBoundaryFetch(
           `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
           {
             method: 'POST',
@@ -192,7 +193,7 @@ Return as structured JSON.`;
       messages.push({ role: 'user', content: userPrompt });
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
