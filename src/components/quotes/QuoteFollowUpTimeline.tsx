@@ -47,38 +47,38 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
       case "sent":
-        return <CheckCircle2 className="h-5 w-5 text-blue-600" />;
+        return <CheckCircle2 className="h-5 w-5 text-info" />;
       case "failed":
-        return <XCircle className="h-5 w-5 text-red-600" />;
+        return <XCircle className="h-5 w-5 text-destructive" />;
       case "cancelled":
-        return <XCircle className="h-5 w-5 text-gray-600" />;
+        return <XCircle className="h-5 w-5 text-cc-text-muted" />;
       case "pending":
-        return <Clock className="h-5 w-5 text-orange-600" />;
+        return <Clock className="h-5 w-5 text-warning" />;
       case "scheduled":
-        return <Calendar className="h-5 w-5 text-blue-600" />;
+        return <Calendar className="h-5 w-5 text-info" />;
       default:
-        return <Clock className="h-5 w-5 text-gray-600" />;
+        return <Clock className="h-5 w-5 text-cc-text-muted" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-50 border-green-200";
+        return "bg-success/10 border-success/30";
       case "sent":
-        return "bg-blue-50 border-blue-200";
+        return "bg-info/10 border-info/30";
       case "failed":
-        return "bg-red-50 border-red-200";
+        return "bg-destructive/10 border-destructive/30";
       case "cancelled":
-        return "bg-gray-50 border-gray-200";
+        return "bg-cc-surface-raised border-cc-border-subtle";
       case "pending":
-        return "bg-orange-50 border-orange-200";
+        return "bg-warning/10 border-warning/30";
       case "scheduled":
-        return "bg-blue-50 border-blue-200";
+        return "bg-info/10 border-info/30";
       default:
-        return "bg-gray-50 border-gray-200";
+        return "bg-cc-surface-raised border-cc-border-subtle";
     }
   };
 
@@ -111,7 +111,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
       <CardContent>
         {!followups || followups.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <Clock className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+            <Clock className="h-12 w-12 mx-auto mb-2 text-cc-text-muted" />
             <p>No follow-ups scheduled</p>
             <p className="text-sm">
               Follow-ups will be created automatically based on configured rules
@@ -120,7 +120,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
         ) : (
           <div className="relative space-y-4">
             {/* Timeline line */}
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
+            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-cc-border-subtle" />
 
             {followups.map((followup, index) => {
               const isScheduled = followup.status === "scheduled";
@@ -130,7 +130,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
               return (
                 <div key={followup.id} className="relative pl-12">
                   {/* Timeline node */}
-                  <div className="absolute left-3 top-3 -ml-2.5 z-10 bg-white">
+                  <div className="absolute left-3 top-3 -ml-2.5 z-10 bg-cc-surface">
                     {getStatusIcon(followup.status)}
                   </div>
 
@@ -138,7 +138,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                   <div
                     className={`p-4 border rounded-lg ${getStatusColor(
                       followup.status
-                    )} ${isOverdue ? "ring-2 ring-red-500" : ""}`}
+                    )} ${isOverdue ? "ring-2 ring-destructive" : ""}`}
                   >
                     <div className="space-y-3">
                       {/* Header */}
@@ -178,7 +178,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                       <div className="text-sm space-y-1">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className={isOverdue ? "text-red-600 font-medium" : ""}>
+                          <span className={isOverdue ? "text-destructive font-medium" : ""}>
                             {isScheduled ? "Scheduled: " : "Executed: "}
                             {format(
                               new Date(
@@ -192,7 +192,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                           {isScheduled && (
                             <span
                               className={`text-xs ${
-                                isOverdue ? "text-red-600" : "text-muted-foreground"
+                                isOverdue ? "text-destructive" : "text-muted-foreground"
                               }`}
                             >
                               ({formatDistanceToNow(new Date(followup.scheduled_at), {
@@ -203,7 +203,7 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                         </div>
 
                         {isOverdue && (
-                          <div className="flex items-center gap-2 text-red-600">
+                          <div className="flex items-center gap-2 text-destructive">
                             <AlertCircle className="h-4 w-4" />
                             <span className="font-medium">Overdue</span>
                           </div>
@@ -265,11 +265,11 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                         <div className="pt-2 border-t space-y-1">
                           <div className="flex items-center gap-2">
                             {followup.response_type === "accepted" ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 text-success" />
                             ) : followup.response_type === "rejected" ? (
-                              <XCircle className="h-4 w-4 text-red-600" />
+                              <XCircle className="h-4 w-4 text-destructive" />
                             ) : (
-                              <MessageSquare className="h-4 w-4 text-blue-600" />
+                              <MessageSquare className="h-4 w-4 text-info" />
                             )}
                             <span className="text-sm font-medium">
                               Response:{" "}
@@ -311,11 +311,11 @@ export function QuoteFollowUpTimeline({ quoteId }: QuoteFollowUpTimelineProps) {
                       {/* Error */}
                       {followup.error_message && (
                         <div className="pt-2 border-t">
-                          <div className="flex items-center gap-2 text-red-600">
+                          <div className="flex items-center gap-2 text-destructive">
                             <AlertCircle className="h-4 w-4" />
                             <span className="text-sm font-medium">Error:</span>
                           </div>
-                          <div className="text-xs text-red-600 mt-1">
+                          <div className="text-xs text-destructive mt-1">
                             {followup.error_message}
                           </div>
                         </div>

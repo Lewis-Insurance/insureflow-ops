@@ -397,7 +397,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <FileText className="w-8 h-8 mb-2 text-blue-600" />
+              <FileText className="w-8 h-8 mb-2 text-info" />
               <span>Policy Coverage</span>
             </Button>
             
@@ -415,7 +415,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <BookOpen className="w-8 h-8 mb-2 text-green-600" />
+              <BookOpen className="w-8 h-8 mb-2 text-success" />
               <span>Procedure</span>
             </Button>
             
@@ -433,7 +433,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <AlertCircle className="w-8 h-8 mb-2 text-purple-600" />
+              <AlertCircle className="w-8 h-8 mb-2 text-info" />
               <span>State Regulation</span>
             </Button>
             
@@ -451,7 +451,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <TrendingUp className="w-8 h-8 mb-2 text-orange-600" />
+              <TrendingUp className="w-8 h-8 mb-2 text-warning" />
               <span>Discount/Product</span>
             </Button>
             
@@ -469,7 +469,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <HelpCircle className="w-8 h-8 mb-2 text-pink-600" />
+              <HelpCircle className="w-8 h-8 mb-2 text-info" />
               <span>FAQ Answer</span>
             </Button>
             
@@ -487,7 +487,7 @@ const KnowledgeManager = () => {
                 setShowAddDialog(true);
               }}
             >
-              <Database className="w-8 h-8 mb-2 text-red-600" />
+              <Database className="w-8 h-8 mb-2 text-destructive" />
               <span>Claims Info</span>
             </Button>
           </div>
@@ -503,9 +503,9 @@ const KnowledgeManager = () => {
             <Card key={cat.value}>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <Icon className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+                  <Icon className="w-8 h-8 mx-auto mb-2 text-cc-text-secondary" />
                   <p className="text-2xl font-bold">{count}</p>
-                  <p className="text-xs text-gray-500">{cat.label}</p>
+                  <p className="text-xs text-cc-text-muted">{cat.label}</p>
                 </div>
               </CardContent>
             </Card>

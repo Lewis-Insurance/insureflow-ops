@@ -158,12 +158,12 @@ export default function PaymentList() {
 
       {/* Current Day Sheet Banner */}
       {currentDaySheet && currentDaySheet.status === 'open' && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-info/10 border-info/30">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Receipt className="h-5 w-5 text-blue-600" />
+                <div className="h-10 w-10 rounded-full bg-info/15 flex items-center justify-center">
+                  <Receipt className="h-5 w-5 text-info" />
                 </div>
                 <div>
                   <p className="font-medium">Today&apos;s Day Sheet is Open</p>
@@ -199,7 +199,7 @@ export default function PaymentList() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cash</CardTitle>
-            <Banknote className="h-4 w-4 text-green-600" />
+            <Banknote className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.cashTotal)}</div>
@@ -209,7 +209,7 @@ export default function PaymentList() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Checks</CardTitle>
-            <Receipt className="h-4 w-4 text-blue-600" />
+            <Receipt className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.checkTotal)}</div>
@@ -219,7 +219,7 @@ export default function PaymentList() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cards</CardTitle>
-            <CreditCard className="h-4 w-4 text-purple-600" />
+            <CreditCard className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.cardTotal)}</div>
@@ -229,7 +229,7 @@ export default function PaymentList() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">ACH/EFT</CardTitle>
-            <Building2 className="h-4 w-4 text-orange-600" />
+            <Building2 className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.achTotal)}</div>

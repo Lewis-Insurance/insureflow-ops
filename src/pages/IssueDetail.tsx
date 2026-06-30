@@ -89,15 +89,15 @@ export default function IssueDetail() {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-destructive bg-destructive/10 border-destructive/30';
       case 'high':
-        return 'text-orange-600 bg-orange-50 border-orange-200';
+        return 'text-warning bg-warning/10 border-warning/30';
       case 'medium':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-warning bg-warning/10 border-warning/30';
       case 'low':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
+        return 'text-info bg-info/10 border-info/30';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-cc-text-muted bg-cc-surface-overlay border-cc-border-subtle';
     }
   };
 
@@ -218,13 +218,13 @@ export default function IssueDetail() {
               <CardContent className="grid md:grid-cols-2 gap-4">
                 {issue.expected_behavior && (
                   <div>
-                    <Label className="text-green-600">Expected</Label>
+                    <Label className="text-success">Expected</Label>
                     <p className="mt-2 text-sm">{issue.expected_behavior}</p>
                   </div>
                 )}
                 {issue.actual_behavior && (
                   <div>
-                    <Label className="text-red-600">Actual</Label>
+                    <Label className="text-destructive">Actual</Label>
                     <p className="mt-2 text-sm">{issue.actual_behavior}</p>
                   </div>
                 )}
@@ -239,7 +239,7 @@ export default function IssueDetail() {
                 <CardTitle>Error Message</CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto text-sm">
+                <pre className="bg-cc-surface-raised text-cc-text-primary p-4 rounded-md overflow-x-auto text-sm">
                   {issue.error_message}
                 </pre>
               </CardContent>
@@ -480,17 +480,17 @@ export default function IssueDetail() {
 
           {/* Resolution */}
           {issue.resolution_notes && (
-            <Card className="border-green-200 bg-green-50">
+            <Card className="border-success/30 bg-success/10">
               <CardHeader>
-                <CardTitle className="text-green-900">
+                <CardTitle className="text-success">
                   <CheckCircle2 className="inline mr-2 h-5 w-5" />
                   Resolution
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-green-900">{issue.resolution_notes}</p>
+                <p className="text-sm text-success">{issue.resolution_notes}</p>
                 {issue.resolved_at && (
-                  <p className="text-xs text-green-700 mt-2">
+                  <p className="text-xs text-success/80 mt-2">
                     Resolved {format(new Date(issue.resolved_at), 'MMM d, yyyy')}
                   </p>
                 )}

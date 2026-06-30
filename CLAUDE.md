@@ -12,7 +12,7 @@
 
 ## Design System: Calm Command (binding for all UI)
 
-The in-app CRM follows **Calm Command** — a dark-only operations console extracted from the AO Renewal Command Center. One lime accent (`#BEF264`), hierarchy from weight and spacing, not color. The full system lives in `design-system/`:
+The in-app CRM follows **Calm Command** — a dark-first operations console (with a full light theme) extracted from the AO Renewal Command Center. One lime accent (`#BEF264`), hierarchy from weight and spacing, not color. The full system lives in `design-system/`:
 
 - `design-system/constitution.md` — the ten rules and non-negotiables (read first)
 - `design-system/surface-map.md` — page archetypes (Record Command, Index/List, Form, etc.)
@@ -22,7 +22,7 @@ The in-app CRM follows **Calm Command** — a dark-only operations console extra
 - `design-system/anti-patterns.md` — forbidden (rainbow toolbar, vanity metric wall, carrier-by-color, etc.)
 - `design-system/builder-prompt.md` — drop into a fresh agent session to build a surface
 
-Reusable primitives live in `src/components/cc/`. The app is dark-only (`class="dark"` on `<html>`, ThemeProvider `forcedTheme="dark"`, no theme toggle). Tokens are consumed via Tailwind `cc-*` classes (e.g. `bg-cc-surface`, `text-cc-text-muted`, `rounded-cc-xl`). Non-negotiables: one lime primary per surface, tabular figures, mask SSN/DOB/DLN, carriers are name chips not colors, no em or en dashes in copy.
+Reusable primitives live in `src/components/cc/`. The app defaults to dark (`class="dark"` on `<html>`, `defaultTheme="dark"`) and ships a full **light** counterpart selectable from the header theme toggle (light / dark / system). Both themes are one token set: dark tokens on `:root, .dark`, light overrides on `.light` (see `src/index.css` / `design-system/design-tokens.css`). The single lime accent deepens to lime-700 (`#4D7C0F`) in light so it stays AA as a fill and as text/icon/border on white. Tokens are consumed via Tailwind `cc-*` classes (e.g. `bg-cc-surface`, `text-cc-text-muted`, `rounded-cc-xl`). Non-negotiables: one lime primary per surface, tabular figures, mask SSN/DOB/DLN, carriers are name chips not colors, no em or en dashes in copy.
 
 ---
 
@@ -1120,6 +1120,15 @@ insureflow-ops/
 ---
 
 ## Change Log
+
+### 2026-06-30 (Light theme: working selector + full app conversion)
+- ✅ **Light mode is now a real, first-class theme** (previously the header toggle was inert because `App.tsx` wrapped everything in `forcedTheme="dark"`).
+  - `App.tsx`: removed `forcedTheme`, enabled `enableSystem` + `disableTransitionOnChange`. The existing header `ThemeToggle` (light / dark / system) now drives the theme and persists to localStorage via next-themes.
+  - `src/index.css` + `design-system/design-tokens.css`: added a full `.light` token set (mirror of the `:root, .dark` set; only color tokens overridden). `color-scheme` now follows the theme class.
+  - **Single lime accent preserved**: in light mode the accent deepens to lime-700 (`#4D7C0F`) so it stays AA as a fill (white text) AND as text/icon/border/focus on white. Semantics deepen to their 700 shades so the 14% `StatusPill` tints stay legible.
+  - `tailwind.config.ts`: added `<alpha-value>` to every `hsl(var(--x))` color so opacity modifiers work (`bg-destructive/10`, `bg-success/10`, etc.). cc-* hex tokens unchanged.
+  - **App-wide conversion**: swept 99 files that hardcoded theme-blind colors (`bg-slate-900`, `text-white`, `text-red-400`, `bg-black/80` scrims, dark hex panels) and replaced them with adaptive tokens (cc-* surfaces/text/borders + shadcn semantic tints). Build green; ~95 files changed, color-class-only edits. Intentional KEEPs: white-on-saturated-fill CTAs/badges, AI/brand gradient orbs, category-color legends, chart series, the black camera viewfinder, and the self-branded public `DocumentCollectionPortal`.
+  - Conversion guide (mapping table) used for the sweep is in the session scratchpad, not the repo.
 
 ### 2026-06-29 (Relationship Graph v2 + Merge consolidation + Importer hardening)
 - ✅ **Relationship Graph v2** (PR #13, migrations `20260629210000`–`260000`, applied to prod):

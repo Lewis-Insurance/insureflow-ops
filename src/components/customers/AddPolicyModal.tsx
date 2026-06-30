@@ -454,9 +454,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
               isDragging
                 ? 'border-primary bg-primary/5'
                 : parseStatus === 'success'
-                ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                ? 'border-success/50 bg-success/10'
                 : parseStatus === 'error'
-                ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+                ? 'border-destructive/50 bg-destructive/10'
                 : 'border-muted-foreground/25 hover:border-primary/50'
             }`}
             onDragOver={handleDragOver}
@@ -485,9 +485,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
                   <>
                     <div className="flex items-center gap-2">
                       {parseStatus === 'success' ? (
-                        <CheckCircle className="h-6 w-6 text-green-500" />
+                        <CheckCircle className="h-6 w-6 text-success" />
                       ) : parseStatus === 'error' ? (
-                        <AlertCircle className="h-6 w-6 text-red-500" />
+                        <AlertCircle className="h-6 w-6 text-destructive" />
                       ) : (
                         <FileText className="h-6 w-6 text-primary" />
                       )}
@@ -582,7 +582,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
               <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
             )}
             {needsConfirmation.line_of_business && !errors.line_of_business && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+              <p className="text-sm text-warning mt-1">
                 Couldn't auto-match the parsed line of business — please pick one.
               </p>
             )}

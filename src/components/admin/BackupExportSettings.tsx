@@ -378,8 +378,8 @@ export function BackupExportSettings() {
         <Card className="cursor-pointer hover:border-primary transition-colors" onClick={() => setShowExportDialog(true)}>
           <CardContent className="py-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
-                <Download className="h-6 w-6 text-blue-600" />
+              <div className="p-3 rounded-full bg-info/10">
+                <Download className="h-6 w-6 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold">Export Data</h3>
@@ -392,8 +392,8 @@ export function BackupExportSettings() {
         <Card className="cursor-pointer hover:border-primary transition-colors" onClick={runBackupNow}>
           <CardContent className="py-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
-                <HardDrive className="h-6 w-6 text-green-600" />
+              <div className="p-3 rounded-full bg-success/10">
+                <HardDrive className="h-6 w-6 text-success" />
               </div>
               <div>
                 <h3 className="font-semibold">Backup Now</h3>
@@ -406,34 +406,34 @@ export function BackupExportSettings() {
 
       {/* Last Backup Status */}
       {settings.last_backup_at && (
-        <Card className={settings.last_backup_status === 'success' 
-          ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20'
-          : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
+        <Card className={settings.last_backup_status === 'success'
+          ? 'border-success/30 bg-success/10'
+          : 'border-destructive/30 bg-destructive/10'
         }>
           <CardContent className="py-4">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-full ${
-                settings.last_backup_status === 'success' 
-                  ? 'bg-green-100 dark:bg-green-900/50' 
-                  : 'bg-red-100 dark:bg-red-900/50'
+                settings.last_backup_status === 'success'
+                  ? 'bg-success/10'
+                  : 'bg-destructive/10'
               }`}>
-                {settings.last_backup_status === 'success' 
-                  ? <CheckCircle2 className="h-6 w-6 text-green-600" />
-                  : <AlertCircle className="h-6 w-6 text-red-600" />
+                {settings.last_backup_status === 'success'
+                  ? <CheckCircle2 className="h-6 w-6 text-success" />
+                  : <AlertCircle className="h-6 w-6 text-destructive" />
                 }
               </div>
               <div className="flex-1">
                 <h3 className={`font-medium ${
-                  settings.last_backup_status === 'success' 
-                    ? 'text-green-900 dark:text-green-100' 
-                    : 'text-red-900 dark:text-red-100'
+                  settings.last_backup_status === 'success'
+                    ? 'text-success'
+                    : 'text-destructive'
                 }`}>
                   Last Backup: {settings.last_backup_status === 'success' ? 'Successful' : 'Failed'}
                 </h3>
                 <p className={`text-sm ${
-                  settings.last_backup_status === 'success' 
-                    ? 'text-green-700 dark:text-green-300' 
-                    : 'text-red-700 dark:text-red-300'
+                  settings.last_backup_status === 'success'
+                    ? 'text-success'
+                    : 'text-destructive'
                 }`}>
                   {new Date(settings.last_backup_at).toLocaleString()}
                 </p>
@@ -452,8 +452,8 @@ export function BackupExportSettings() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                <Clock className="h-5 w-5 text-purple-600" />
+              <div className="p-2 rounded-lg bg-info/10">
+                <Clock className="h-5 w-5 text-info" />
               </div>
               <div>
                 <CardTitle className="text-lg">Scheduled Backups</CardTitle>
@@ -615,8 +615,8 @@ export function BackupExportSettings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <History className="h-5 w-5 text-amber-600" />
+            <div className="p-2 rounded-lg bg-warning/10">
+              <History className="h-5 w-5 text-warning" />
             </div>
             <div>
               <CardTitle className="text-lg">Export History</CardTitle>
@@ -662,9 +662,9 @@ export function BackupExportSettings() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {exp.format === 'json' 
-                          ? <FileJson className="h-4 w-4 text-amber-600" />
-                          : <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                        {exp.format === 'json'
+                          ? <FileJson className="h-4 w-4 text-warning" />
+                          : <FileSpreadsheet className="h-4 w-4 text-success" />
                         }
                         <span className="text-sm">
                           {exp.tables_exported.length} tables
@@ -675,7 +675,7 @@ export function BackupExportSettings() {
                     <TableCell>{exp.file_size_mb} MB</TableCell>
                     <TableCell>
                       {exp.status === 'completed' ? (
-                        <Badge className="bg-green-600">
+                        <Badge className="bg-success text-success-foreground">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Completed
                         </Badge>
@@ -701,7 +701,7 @@ export function BackupExportSettings() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600"
+                          className="text-destructive"
                           onClick={() => deleteExportHistory(exp.id)}
                         >
                           <Trash2 className="h-4 w-4" />

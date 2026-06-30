@@ -66,15 +66,15 @@ export function SMSTimelineItem({
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'delivered':
-        return 'text-green-500';
+        return 'text-success';
       case 'sent':
       case 'queued':
-        return 'text-blue-500';
+        return 'text-info';
       case 'failed':
       case 'undelivered':
-        return 'text-red-500';
+        return 'text-destructive';
       case 'received':
-        return 'text-green-500';
+        return 'text-success';
       default:
         return 'text-muted-foreground';
     }
@@ -138,13 +138,13 @@ export function SMSTimelineItem({
     return (
       <div className={cn(
         "flex items-start space-x-3 p-3 border rounded-lg",
-        message.direction === 'inbound' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-blue-500"
+        message.direction === 'inbound' ? "border-l-4 border-l-success" : "border-l-4 border-l-info"
       )}>
         <div className="flex-shrink-0 mt-1">
           {message.direction === 'inbound' ? (
-            <MessageSquare className="h-4 w-4 text-green-500" />
+            <MessageSquare className="h-4 w-4 text-success" />
           ) : (
-            <Send className="h-4 w-4 text-blue-500" />
+            <Send className="h-4 w-4 text-info" />
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -185,14 +185,14 @@ export function SMSTimelineItem({
           <div className="flex items-start space-x-3">
             <div className={cn(
               "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-              message.direction === 'inbound' 
-                ? "bg-green-100 dark:bg-green-900" 
-                : "bg-blue-100 dark:bg-blue-900"
+              message.direction === 'inbound'
+                ? "bg-success/10"
+                : "bg-info/10"
             )}>
               {message.direction === 'inbound' ? (
-                <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <MessageSquare className="h-4 w-4 text-success" />
               ) : (
-                <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <Send className="h-4 w-4 text-info" />
               )}
             </div>
             <div className="flex-1">
@@ -229,9 +229,9 @@ export function SMSTimelineItem({
           <div 
             className={cn(
               "text-sm p-3 rounded-lg",
-              message.direction === 'inbound' 
-                ? "bg-muted/50 border-l-2 border-l-green-500" 
-                : "bg-primary/5 border-l-2 border-l-blue-500",
+              message.direction === 'inbound'
+                ? "bg-muted/50 border-l-2 border-l-success"
+                : "bg-primary/5 border-l-2 border-l-info",
               shouldMaskContent && "cursor-pointer hover:bg-muted/70"
             )}
             onClick={shouldMaskContent ? handleRevealContent : undefined}

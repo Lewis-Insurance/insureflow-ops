@@ -51,8 +51,8 @@ export const AzureDiagnostics = () => {
         {results && (
           <div className="space-y-4">
             {results.error ? (
-              <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                <p className="text-red-600 dark:text-red-400 font-semibold">Error:</p>
+              <div className="p-4 bg-destructive/10 rounded-lg">
+                <p className="text-destructive font-semibold">Error:</p>
                 <p className="text-sm mt-1">{results.error}</p>
               </div>
             ) : (
@@ -62,12 +62,12 @@ export const AzureDiagnostics = () => {
                   <h3 className="font-semibold">Environment Variables</h3>
                   {Object.entries(results.env_check || {}).map(([key, value]: [string, any]) => (
                     <div key={key} className="flex items-center gap-2">
-                      <span className={value.configured ? "text-green-600" : "text-red-600"}>
+                      <span className={value.configured ? "text-success" : "text-destructive"}>
                         {value.configured ? "✓" : "✗"}
                       </span>
                       <span className="text-sm">{key}</span>
                       {!value.configured && (
-                        <span className="text-xs text-red-600">(Missing)</span>
+                        <span className="text-xs text-destructive">(Missing)</span>
                       )}
                       {value.configured && value.value && (
                         <span className="text-xs text-muted-foreground">{value.value}</span>
@@ -82,7 +82,7 @@ export const AzureDiagnostics = () => {
                   {Object.entries(results.tests || {}).map(([key, test]: [string, any]) => (
                     <div key={key} className="p-3 rounded-lg border">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={test.success ? "text-green-600" : "text-red-600"}>
+                        <span className={test.success ? "text-success" : "text-destructive"}>
                           {test.success ? "✓" : "✗"}
                         </span>
                         <span className="font-medium">{key.replace(/_/g, ' ')}</span>
@@ -91,7 +91,7 @@ export const AzureDiagnostics = () => {
                         <p className="text-xs text-muted-foreground ml-6">Status: {test.status}</p>
                       )}
                       {test.error && (
-                        <p className="text-xs text-red-600 ml-6 mt-1">{test.error}</p>
+                        <p className="text-xs text-destructive ml-6 mt-1">{test.error}</p>
                       )}
                       {test.details && (
                         <p className="text-xs text-muted-foreground ml-6 mt-1">
@@ -105,17 +105,17 @@ export const AzureDiagnostics = () => {
                 {/* Summary */}
                 {results.summary && (
                   <div className={`p-4 rounded-lg ${
-                    results.summary.all_tests_passed 
-                      ? 'bg-green-50 dark:bg-green-950/20' 
-                      : 'bg-red-50 dark:bg-red-950/20'
+                    results.summary.all_tests_passed
+                      ? 'bg-success/10'
+                      : 'bg-destructive/10'
                   }`}>
                     <p className="font-semibold">
                       {results.summary.all_tests_passed ? (
-                        <span className="text-green-600 dark:text-green-400">
+                        <span className="text-success">
                           ✓ All Tests Passed
                         </span>
                       ) : (
-                        <span className="text-red-600 dark:text-red-400">
+                        <span className="text-destructive">
                           ✗ {results.summary.failed_tests?.length || 0} Test(s) Failed
                         </span>
                       )}
@@ -130,7 +130,7 @@ export const AzureDiagnostics = () => {
 
                 <details className="text-xs">
                   <summary className="cursor-pointer font-medium">View Raw Results</summary>
-                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded overflow-auto">
+                  <pre className="mt-2 p-2 bg-cc-surface-raised rounded overflow-auto">
                     {JSON.stringify(results, null, 2)}
                   </pre>
                 </details>

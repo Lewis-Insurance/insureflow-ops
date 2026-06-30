@@ -144,15 +144,15 @@ export function DashboardGlobalSearch() {
   const getEntityColor = (entityType: SearchResult['entity_type']) => {
     switch (entityType) {
       case 'contact':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+        return 'bg-info/10 text-info';
       case 'account':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+        return 'bg-success/10 text-success';
       case 'business':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+        return 'bg-info/10 text-info';
       case 'policy':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+        return 'bg-warning/10 text-warning';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-cc-surface-overlay text-cc-text-muted';
     }
   };
 
@@ -162,7 +162,7 @@ export function DashboardGlobalSearch() {
   return (
     <div ref={containerRef} className="relative w-full">
       {/* Main Search Container */}
-      <Card className={`border-2 transition-all duration-200 ${isFocused ? 'border-green-500 shadow-lg shadow-green-500/20' : 'border-green-500/50'}`}>
+      <Card className={`border-2 transition-all duration-200 ${isFocused ? 'border-cc-accent shadow-lg shadow-cc-accent/20' : 'border-cc-accent/50'}`}>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
             {/* Big Green Search Button */}
@@ -183,7 +183,7 @@ export function DashboardGlobalSearch() {
                 value={query}
                 onChange={handleInputChange}
                 placeholder="Search by customer name, policy number, address, email, phone..."
-                className="h-14 text-lg pl-4 pr-12 border-2 border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-green-500"
+                className="h-14 text-lg pl-4 pr-12 border-2 border-cc-border-interactive focus:border-cc-accent focus:ring-cc-accent"
                 onFocus={() => {
                   setIsFocused(true);
                   if (debouncedQuery.trim() && results.length > 0) {
@@ -196,7 +196,7 @@ export function DashboardGlobalSearch() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-cc-surface-raised"
                   onClick={handleClear}
                   type="button"
                 >
@@ -220,11 +220,11 @@ export function DashboardGlobalSearch() {
 
       {/* Search Results Dropdown */}
       {shouldShowDropdown && (
-        <Card className="absolute top-full left-0 right-0 z-50 mt-2 max-h-[500px] overflow-y-auto bg-background border-2 border-green-500/50 shadow-xl">
+        <Card className="absolute top-full left-0 right-0 z-50 mt-2 max-h-[500px] overflow-y-auto bg-background border-2 border-cc-accent/50 shadow-xl">
           <CardContent className="p-3">
             {loading && (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cc-accent"></div>
                 <span className="ml-3 text-muted-foreground">Searching...</span>
               </div>
             )}
@@ -245,7 +245,7 @@ export function DashboardGlobalSearch() {
                 {results.map((result) => (
                   <button
                     key={`${result.entity_type}-${result.id}`}
-                    className="w-full text-left p-4 rounded-lg hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors border border-transparent hover:border-green-200 dark:hover:border-green-800"
+                    className="w-full text-left p-4 rounded-lg hover:bg-cc-surface-raised transition-colors border border-transparent hover:border-cc-accent/30"
                     onClick={() => handleResultClick(result)}
                     type="button"
                   >

@@ -106,7 +106,7 @@ export function SavedViews({ onLoadView }: SavedViewsProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{view.name}</span>
                     {view.is_favorite && (
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <Star className="w-3 h-3 fill-warning text-warning" />
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
@@ -137,7 +137,7 @@ export function SavedViews({ onLoadView }: SavedViewsProps) {
                       handleToggleFavorite(view.id);
                     }}
                   >
-                    <Star className={`w-3 h-3 ${view.is_favorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                    <Star className={`w-3 h-3 ${view.is_favorite ? 'fill-warning text-warning' : ''}`} />
                   </Button>
                   <Button
                     variant="ghost"

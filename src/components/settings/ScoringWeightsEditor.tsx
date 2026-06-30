@@ -404,14 +404,14 @@ function WeightForm({
         ))}
       </div>
 
-      <div className={`p-3 rounded-lg ${validation.valid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+      <div className={`p-3 rounded-lg ${validation.valid ? 'bg-success/10 border border-success/30' : 'bg-destructive/10 border border-destructive/30'}`}>
         <div className="flex items-center gap-2">
           {validation.valid ? (
-            <Check className="h-4 w-4 text-green-600" />
+            <Check className="h-4 w-4 text-success" />
           ) : (
-            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertCircle className="h-4 w-4 text-destructive" />
           )}
-          <span className={validation.valid ? 'text-green-700' : 'text-red-700'}>
+          <span className={validation.valid ? 'text-success' : 'text-destructive'}>
             Total: {validation.total}%
             {!validation.valid && (
               <span className="ml-2">

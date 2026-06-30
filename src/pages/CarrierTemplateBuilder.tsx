@@ -675,8 +675,8 @@ export default function CarrierTemplateBuilder() {
                         key={zone.id}
                         className={`flex items-center justify-between p-2 rounded border cursor-pointer ${
                           selectedZone === zone.id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
+                            ? 'border-info/30 bg-info/10'
+                            : 'border-cc-border-subtle hover:bg-cc-surface-raised'
                         }`}
                         onClick={() => setSelectedZone(zone.id)}
                       >
@@ -695,7 +695,7 @@ export default function CarrierTemplateBuilder() {
                             handleDeleteZone(zone.id);
                           }}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     ))}
@@ -784,7 +784,7 @@ export default function CarrierTemplateBuilder() {
                 {/* Upload Area */}
                 {!documentUrl && (
                   <div
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-500 transition-colors"
+                    className="border-2 border-dashed border-cc-border-interactive rounded-lg p-12 text-center cursor-pointer hover:border-cc-accent transition-colors"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <input
@@ -795,9 +795,9 @@ export default function CarrierTemplateBuilder() {
                       className="hidden"
                     />
                     {isUploading ? (
-                      <Loader2 className="h-12 w-12 mx-auto mb-4 text-blue-500 animate-spin" />
+                      <Loader2 className="h-12 w-12 mx-auto mb-4 text-info animate-spin" />
                     ) : (
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <Upload className="h-12 w-12 mx-auto mb-4 text-cc-text-muted" />
                     )}
                     <p className="text-lg font-medium mb-2">
                       {isUploading ? 'Uploading...' : 'Upload Sample Document'}
@@ -815,7 +815,7 @@ export default function CarrierTemplateBuilder() {
                 {documentUrl && (
                   <div
                     ref={containerRef}
-                    className="border rounded-lg overflow-auto bg-gray-100"
+                    className="border rounded-lg overflow-auto bg-cc-surface-raised"
                     style={{ maxHeight: '600px' }}
                   >
                     <canvas
@@ -837,9 +837,9 @@ export default function CarrierTemplateBuilder() {
                 )}
 
                 {/* Instructions */}
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">How to use:</h4>
-                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                <div className="mt-4 p-4 bg-info/10 rounded-lg">
+                  <h4 className="font-medium text-info mb-2">How to use:</h4>
+                  <ol className="text-sm text-info space-y-1 list-decimal list-inside">
                     <li>Upload a sample document (PDF or image)</li>
                     <li>Use the rectangle tool to draw boxes around fields</li>
                     <li>Select the ACORD field each box maps to</li>

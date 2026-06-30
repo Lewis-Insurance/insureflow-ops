@@ -82,10 +82,10 @@ interface ExecutiveSummaryProps {
 }
 
 const SEVERITY_BADGES = {
-  critical: { color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', icon: AlertTriangle },
-  high: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300', icon: AlertTriangle },
-  medium: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300', icon: TrendingDown },
-  low: { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: CheckCircle2 },
+  critical: { color: 'bg-destructive/10 text-destructive', icon: AlertTriangle },
+  high: { color: 'bg-warning/10 text-warning', icon: AlertTriangle },
+  medium: { color: 'bg-warning/10 text-warning', icon: TrendingDown },
+  low: { color: 'bg-cc-surface-overlay text-cc-text-secondary', icon: CheckCircle2 },
 };
 
 export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummaryProps) {
@@ -97,7 +97,7 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
       {/* Header Card */}
       <Card className={cn(
         'border-l-4',
-        hasIssues ? 'border-l-amber-500' : 'border-l-green-500'
+        hasIssues ? 'border-l-warning' : 'border-l-success'
       )}>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -129,9 +129,9 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
         <CardContent>
           <div className="grid grid-cols-2 gap-6">
             {/* Document A */}
-            <div className="p-4 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+            <div className="p-4 rounded-lg bg-info/5 border border-info/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700">A</Badge>
+                <Badge variant="secondary" className="bg-info/10 text-info">A</Badge>
                 <span className="font-semibold">Current Policy</span>
               </div>
               <div className="space-y-1 text-sm">
@@ -146,9 +146,9 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
             </div>
             
             {/* Document B */}
-            <div className="p-4 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+            <div className="p-4 rounded-lg bg-warning/5 border border-warning/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700">B</Badge>
+                <Badge variant="secondary" className="bg-warning/10 text-warning">B</Badge>
                 <span className="font-semibold">Quote / Proposal</span>
               </div>
               <div className="space-y-1 text-sm">
@@ -169,16 +169,16 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
               <p className="text-2xl font-bold">{data.summary.totalFieldsCompared}</p>
               <p className="text-xs text-muted-foreground">Fields Compared</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-950/30">
-              <p className="text-2xl font-bold text-green-600">{data.summary.unchangedCount}</p>
+            <div className="text-center p-3 rounded-lg bg-success/10">
+              <p className="text-2xl font-bold text-success">{data.summary.unchangedCount}</p>
               <p className="text-xs text-muted-foreground">Unchanged</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-              <p className="text-2xl font-bold text-amber-600">{data.summary.highCount}</p>
+            <div className="text-center p-3 rounded-lg bg-warning/10">
+              <p className="text-2xl font-bold text-warning">{data.summary.highCount}</p>
               <p className="text-xs text-muted-foreground">High Priority</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
-              <p className="text-2xl font-bold text-red-600">{data.summary.criticalCount}</p>
+            <div className="text-center p-3 rounded-lg bg-destructive/10">
+              <p className="text-2xl font-bold text-destructive">{data.summary.criticalCount}</p>
               <p className="text-xs text-muted-foreground">Critical</p>
             </div>
           </div>
@@ -196,16 +196,16 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
           {/* Net Coverage Trend */}
           <div className={cn(
             'mt-4 p-3 rounded-lg flex items-center gap-3',
-            netChange > 0 ? 'bg-green-50 dark:bg-green-950/30' : 
-            netChange < 0 ? 'bg-red-50 dark:bg-red-950/30' : 
-            'bg-gray-50 dark:bg-gray-950/30'
+            netChange > 0 ? 'bg-success/10' :
+            netChange < 0 ? 'bg-destructive/10' :
+            'bg-cc-surface-raised'
           )}>
             {netChange > 0 ? (
-              <TrendingUp className="h-5 w-5 text-green-600" />
+              <TrendingUp className="h-5 w-5 text-success" />
             ) : netChange < 0 ? (
-              <TrendingDown className="h-5 w-5 text-red-600" />
+              <TrendingDown className="h-5 w-5 text-destructive" />
             ) : (
-              <CheckCircle2 className="h-5 w-5 text-gray-600" />
+              <CheckCircle2 className="h-5 w-5 text-cc-text-muted" />
             )}
             <span className="text-sm">
               {netChange > 0 ? (
@@ -244,7 +244,7 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               Top Changes by Severity
             </CardTitle>
           </CardHeader>
@@ -293,10 +293,10 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
 
       {/* Coverage Gaps */}
       {data.coverageGaps.length > 0 && (
-        <Card className="border-l-4 border-l-red-500">
+        <Card className="border-l-4 border-l-destructive">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Coverage Gaps Identified
             </CardTitle>
           </CardHeader>
@@ -305,7 +305,7 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
               {data.coverageGaps.map((gap, idx) => {
                 const config = SEVERITY_BADGES[gap.severity];
                 return (
-                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-red-50/50 dark:bg-red-950/20">
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-destructive/5">
                     <Badge className={config.color}>{gap.severity}</Badge>
                     <div className="flex-1">
                       <p className="font-medium text-sm">{gap.type}</p>
@@ -324,10 +324,10 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
 
       {/* Items to Verify */}
       {data.itemsToVerify && data.itemsToVerify.length > 0 && (
-        <Card className="border-l-4 border-l-amber-500">
+        <Card className="border-l-4 border-l-warning">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               Items Requiring Verification
             </CardTitle>
             <CardDescription>
@@ -338,7 +338,7 @@ export function ExecutiveSummary({ data, onExportPDF, onPrint }: ExecutiveSummar
             <ul className="space-y-2">
               {data.itemsToVerify.map((item, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="rounded border-gray-300" />
+                  <input type="checkbox" className="rounded border-cc-border-interactive" />
                   <span>{item}</span>
                 </li>
               ))}

@@ -183,10 +183,10 @@ interface TimelineNodeProps {
 
 function TimelineNode({ icon, label, type, isFirst, isLast, hasConditions }: TimelineNodeProps) {
   const bgColors = {
-    trigger: 'bg-blue-500',
+    trigger: 'bg-info',
     action: 'bg-primary',
-    goal: 'bg-green-500',
-    end: 'bg-gray-400',
+    goal: 'bg-success',
+    end: 'bg-cc-text-muted',
   };
 
   return (
@@ -235,7 +235,7 @@ function TimelineConnector({ delay, isGoal, isEnd }: TimelineConnectorProps) {
           {!isEnd && (
             <div className="w-4 h-4 flex items-center justify-center">
               {isGoal ? (
-                <Target className="h-3 w-3 text-green-500" />
+                <Target className="h-3 w-3 text-success" />
               ) : (
                 <Clock className="h-3 w-3 text-muted-foreground" />
               )}

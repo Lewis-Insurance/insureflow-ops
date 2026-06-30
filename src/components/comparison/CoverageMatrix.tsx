@@ -65,26 +65,26 @@ interface CoverageMatrixProps {
 }
 
 const STATUS_CONFIG = {
-  INCLUDED: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30', label: 'Included' },
-  EXCLUDED: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30', label: 'Excluded' },
-  NOT_FOUND: { icon: HelpCircle, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-950/30', label: 'Not Found' },
-  CONFLICT: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30', label: 'Conflict' },
+  INCLUDED: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', label: 'Included' },
+  EXCLUDED: { icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10', label: 'Excluded' },
+  NOT_FOUND: { icon: HelpCircle, color: 'text-cc-text-muted', bg: 'bg-cc-surface-raised', label: 'Not Found' },
+  CONFLICT: { icon: AlertTriangle, color: 'text-warning', bg: 'bg-warning/10', label: 'Conflict' },
 };
 
 const CONCERN_CONFIG = {
-  LOW: { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', label: 'Low' },
-  MEDIUM: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300', label: 'Medium' },
-  HIGH: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300', label: 'High' },
-  CRITICAL: { color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', label: 'Critical' },
+  LOW: { color: 'bg-cc-surface-overlay text-cc-text-secondary', label: 'Low' },
+  MEDIUM: { color: 'bg-warning/10 text-warning', label: 'Medium' },
+  HIGH: { color: 'bg-warning/10 text-warning', label: 'High' },
+  CRITICAL: { color: 'bg-destructive/10 text-destructive', label: 'Critical' },
 };
 
 const CHANGE_ICONS = {
-  unchanged: { icon: Minus, color: 'text-gray-400' },
-  added: { icon: CheckCircle2, color: 'text-green-600' },
-  removed: { icon: XCircle, color: 'text-red-600' },
-  increased: { icon: ArrowUp, color: 'text-green-600' },
-  decreased: { icon: ArrowDown, color: 'text-red-600' },
-  modified: { icon: AlertTriangle, color: 'text-amber-600' },
+  unchanged: { icon: Minus, color: 'text-cc-text-muted' },
+  added: { icon: CheckCircle2, color: 'text-success' },
+  removed: { icon: XCircle, color: 'text-destructive' },
+  increased: { icon: ArrowUp, color: 'text-success' },
+  decreased: { icon: ArrowDown, color: 'text-destructive' },
+  modified: { icon: AlertTriangle, color: 'text-warning' },
 };
 
 function StatusCell({ 
@@ -187,7 +187,7 @@ export function CoverageMatrix({
               <Badge variant="destructive">{criticalCount} Critical</Badge>
             )}
             {highCount > 0 && (
-              <Badge className="bg-orange-500">{highCount} High</Badge>
+              <Badge className="bg-warning text-warning-foreground">{highCount} High</Badge>
             )}
           </div>
         </div>
@@ -200,13 +200,13 @@ export function CoverageMatrix({
                 <th className="text-left py-3 px-4 font-semibold w-1/4">Coverage</th>
                 <th className="text-left py-3 px-4 font-semibold w-1/4">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">A</Badge>
+                    <Badge variant="secondary" className="bg-info/10 text-info">A</Badge>
                     {documentALabel}
                   </div>
                 </th>
                 <th className="text-left py-3 px-4 font-semibold w-1/4">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">B</Badge>
+                    <Badge variant="secondary" className="bg-warning/10 text-warning">B</Badge>
                     {documentBLabel}
                   </div>
                 </th>
@@ -232,8 +232,8 @@ export function CoverageMatrix({
                         key={row.coverageKey} 
                         className={cn(
                           'border-b hover:bg-muted/30 transition-colors',
-                          row.concernLevel === 'CRITICAL' && 'bg-red-50/50 dark:bg-red-950/10',
-                          row.concernLevel === 'HIGH' && 'bg-orange-50/50 dark:bg-orange-950/10'
+                          row.concernLevel === 'CRITICAL' && 'bg-destructive/5',
+                          row.concernLevel === 'HIGH' && 'bg-warning/5'
                         )}
                       >
                         <td className="py-3 px-4">
@@ -243,7 +243,7 @@ export function CoverageMatrix({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-warning" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>Requires verification</p>

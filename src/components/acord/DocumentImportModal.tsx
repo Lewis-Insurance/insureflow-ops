@@ -354,9 +354,9 @@ export function DocumentImportModal({
   };
 
   const getConfidenceBadge = (confidence: number) => {
-    if (confidence >= 0.9) return <Badge variant="default" className="bg-green-600">High</Badge>;
+    if (confidence >= 0.9) return <Badge variant="default" className="bg-success text-success-foreground">High</Badge>;
     if (confidence >= 0.7) return <Badge variant="secondary">Medium</Badge>;
-    return <Badge variant="outline" className="text-yellow-600">Low</Badge>;
+    return <Badge variant="outline" className="text-warning">Low</Badge>;
   };
 
   return (
@@ -416,7 +416,7 @@ export function DocumentImportModal({
             {selectedFile && (
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-blue-600" />
+                  <FileText className="h-8 w-8 text-info" />
                   <div>
                     <p className="font-medium">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
@@ -430,9 +430,9 @@ export function DocumentImportModal({
               </div>
             )}
 
-            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+            <div className="bg-info/10 p-4 rounded-lg">
               <h4 className="font-medium flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-blue-600" />
+                <Sparkles className="h-4 w-4 text-info" />
                 AI-Powered Multi-Model Extraction
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1">
@@ -465,10 +465,10 @@ export function DocumentImportModal({
         {status === 'error' && (
           <div className="py-8 space-y-4">
             <div className="flex items-center justify-center">
-              <AlertTriangle className="h-12 w-12 text-red-500" />
+              <AlertTriangle className="h-12 w-12 text-destructive" />
             </div>
             <div className="text-center">
-              <p className="font-medium text-red-600">Extraction Failed</p>
+              <p className="font-medium text-destructive">Extraction Failed</p>
               <p className="text-sm text-muted-foreground mt-1">{errorMessage}</p>
             </div>
             <div className="flex justify-center">
@@ -482,7 +482,7 @@ export function DocumentImportModal({
             {/* Summary Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+                <CheckCircle className="h-5 w-5 text-success" />
                 <span className="font-medium">
                   Found {extractedFields.length} fields
                 </span>
@@ -502,7 +502,7 @@ export function DocumentImportModal({
             {extractionResult && (
               <div className="flex flex-wrap gap-2 text-sm">
                 {extractionResult.matchedTemplate && (
-                  <Badge className="bg-purple-100 text-purple-800">
+                  <Badge className="bg-info/10 text-info">
                     <Target className="h-3 w-3 mr-1" />
                     Template: {extractionResult.matchedTemplate.carrier}
                   </Badge>
@@ -526,9 +526,9 @@ export function DocumentImportModal({
             )}
 
             {suggestions.length > 0 && (
-              <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
-                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Suggestions:</p>
-                <ul className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+              <div className="bg-warning/10 p-3 rounded-lg">
+                <p className="text-sm font-medium text-warning">Suggestions:</p>
+                <ul className="text-sm text-warning mt-1">
                   {suggestions.map((s, i) => <li key={i}>• {s}</li>)}
                 </ul>
               </div>
@@ -539,10 +539,10 @@ export function DocumentImportModal({
                 {/* High Confidence Tier */}
                 {getFieldsByTier('high').length > 0 && (
                   <Collapsible open={expandedTiers.high} onOpenChange={() => toggleTier('high')}>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-green-50 hover:bg-green-100">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-success/10 hover:bg-success/20">
                       <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="font-medium text-green-800">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        <span className="font-medium text-success">
                           High Confidence ({getFieldsByTier('high').length})
                         </span>
                       </div>
@@ -569,10 +569,10 @@ export function DocumentImportModal({
                 {/* Medium Confidence Tier */}
                 {getFieldsByTier('medium').length > 0 && (
                   <Collapsible open={expandedTiers.medium} onOpenChange={() => toggleTier('medium')}>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-yellow-50 hover:bg-yellow-100">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-warning/10 hover:bg-warning/20">
                       <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                        <span className="font-medium text-yellow-800">
+                        <AlertTriangle className="h-4 w-4 text-warning" />
+                        <span className="font-medium text-warning">
                           Needs Review ({getFieldsByTier('medium').length})
                         </span>
                       </div>
@@ -599,10 +599,10 @@ export function DocumentImportModal({
                 {/* Low Confidence Tier */}
                 {getFieldsByTier('low').length > 0 && (
                   <Collapsible open={expandedTiers.low} onOpenChange={() => toggleTier('low')}>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-red-50 hover:bg-red-100">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg bg-destructive/10 hover:bg-destructive/20">
                       <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium text-red-800">
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="font-medium text-destructive">
                           Low Confidence ({getFieldsByTier('low').length})
                         </span>
                       </div>

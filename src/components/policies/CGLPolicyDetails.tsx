@@ -179,12 +179,12 @@ function EvidenceIndicator({
             onClick={handleClick}
             className={`inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
               confidence >= 0.95
-                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                ? 'bg-success/10 text-success hover:bg-success/20'
                 : confidence >= 0.8
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  ? 'bg-info/10 text-info hover:bg-info/20'
                   : confidence >= 0.7
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    ? 'bg-warning/10 text-warning hover:bg-warning/20'
+                    : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
             }`}
           >
             <FileSearch className="h-3 w-3" />
@@ -265,11 +265,11 @@ export function CGLPolicyDetailsView({
             </CardDescription>
           </div>
           {cglDetails.limits?.each_occurrence && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-              <Scale className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-info/10 rounded-lg">
+              <Scale className="h-4 w-4 text-info" />
               <div>
                 <div className="text-xs text-muted-foreground">Each Occurrence</div>
-                <div className="text-lg font-bold text-blue-700">
+                <div className="text-lg font-bold text-info">
                   {formatCurrency(cglDetails.limits.each_occurrence)}
                 </div>
               </div>
@@ -443,11 +443,11 @@ function OverviewTab({ details }: { details: CGLPolicyDetails }) {
 
         {/* Claims-Made Warning */}
         {coverage_options.policy_form === 'claims_made' && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+          <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-amber-800">Claims-Made Policy</p>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-sm font-medium text-warning">Claims-Made Policy</p>
+              <p className="text-xs text-warning mt-1">
                 Coverage applies only to claims filed during the policy period for incidents
                 occurring after the retroactive date.
               </p>
@@ -502,16 +502,16 @@ function LimitsTab({ details }: { details: CGLPolicyDetails }) {
       {limits.aggregate_applies_per && (
         <>
           <Separator />
-          <div className="p-4 bg-blue-50 rounded-lg">
+          <div className="p-4 bg-info/10 rounded-lg">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-blue-700">
+              <Badge variant="outline" className="text-info">
                 Aggregate Applies Per: {limits.aggregate_applies_per.toUpperCase()}
               </Badge>
               {limits.aggregate_applies_per === 'project' && (
-                <span className="text-sm text-blue-600">(CG 25 03)</span>
+                <span className="text-sm text-info">(CG 25 03)</span>
               )}
               {limits.aggregate_applies_per === 'location' && (
-                <span className="text-sm text-blue-600">(CG 25 04)</span>
+                <span className="text-sm text-info">(CG 25 04)</span>
               )}
             </div>
           </div>
@@ -561,12 +561,12 @@ function LimitCard({
   primary?: boolean;
 }) {
   return (
-    <Card className={`p-4 ${primary ? 'bg-blue-50 border-blue-200' : ''}`}>
+    <Card className={`p-4 ${primary ? 'bg-info/10 border-info/30' : ''}`}>
       <div className="text-xs text-muted-foreground mb-1">
         {label}
         {sublabel && <span className="text-xs"> {sublabel}</span>}
       </div>
-      <div className={`text-xl font-bold ${primary ? 'text-blue-700' : ''}`}>
+      <div className={`text-xl font-bold ${primary ? 'text-info' : ''}`}>
         {formatCurrency(value)}
       </div>
     </Card>
@@ -606,18 +606,18 @@ function ProfessionalLiabilityTab({
     <>
       {/* Coverage Type & Form */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-purple-50">
+        <Card className="p-4 bg-info/10">
           <div className="text-xs text-muted-foreground mb-1">Coverage Type</div>
           <div className="font-bold flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-purple-600" />
-            <span className="text-purple-700">
+            <Briefcase className="h-4 w-4 text-info" />
+            <span className="text-info">
               {coverage.professional_type
                 ? PROFESSIONAL_LIABILITY_TYPE_LABELS[coverage.professional_type]
                 : 'E&O / Professional'}
             </span>
           </div>
         </Card>
-        <Card className={`p-4 ${coverage.policy_form === 'claims_made' ? 'bg-amber-50' : 'bg-green-50'}`}>
+        <Card className={`p-4 ${coverage.policy_form === 'claims_made' ? 'bg-warning/10' : 'bg-success/10'}`}>
           <div className="text-xs text-muted-foreground mb-1">Policy Form</div>
           <div className="font-bold">
             <Badge variant={coverage.policy_form === 'claims_made' ? 'secondary' : 'default'}>
@@ -642,25 +642,25 @@ function ProfessionalLiabilityTab({
           E&O / Professional Limits
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4 bg-blue-50">
+          <Card className="p-4 bg-info/10">
             <div className="text-xs text-muted-foreground mb-1">Per Claim Limit</div>
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {formatCurrency(coverage.per_claim_limit)}
             </div>
           </Card>
-          <Card className="p-4 bg-blue-50">
+          <Card className="p-4 bg-info/10">
             <div className="text-xs text-muted-foreground mb-1">Aggregate Limit</div>
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {formatCurrency(coverage.aggregate_limit)}
             </div>
           </Card>
-          <Card className={`p-4 ${coverage.defense_costs === 'outside_limits' ? 'bg-green-50' : 'bg-amber-50'}`}>
+          <Card className={`p-4 ${coverage.defense_costs === 'outside_limits' ? 'bg-success/10' : 'bg-warning/10'}`}>
             <div className="text-xs text-muted-foreground mb-1">Defense Costs</div>
             <div className="font-medium">
               {coverage.defense_costs === 'outside_limits' ? (
-                <span className="text-green-700">Outside Limits (Supplementary)</span>
+                <span className="text-success">Outside Limits (Supplementary)</span>
               ) : (
-                <span className="text-amber-700">Inside Limits (Eroding)</span>
+                <span className="text-warning">Inside Limits (Eroding)</span>
               )}
             </div>
           </Card>
@@ -673,16 +673,16 @@ function ProfessionalLiabilityTab({
       {coverage.policy_form === 'claims_made' && (
         <>
           <div className="space-y-4">
-            <h4 className="font-semibold flex items-center gap-2 text-amber-700">
+            <h4 className="font-semibold flex items-center gap-2 text-warning">
               <Clock className="h-4 w-4" />
               Claims-Made Specifics
             </h4>
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="p-4 bg-warning/10 border border-warning/30 rounded-lg">
               <div className="flex items-start gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-800">Claims-Made Coverage</p>
-                  <p className="text-xs text-amber-700">
+                  <p className="text-sm font-medium text-warning">Claims-Made Coverage</p>
+                  <p className="text-xs text-warning">
                     Coverage applies only to claims first made during the policy period for wrongful
                     acts occurring after the retroactive date.
                   </p>
@@ -690,15 +690,15 @@ function ProfessionalLiabilityTab({
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="p-4 border-amber-200">
+              <Card className="p-4 border-warning/30">
                 <div className="text-xs text-muted-foreground mb-1">Retroactive Date</div>
                 <div className="font-bold text-lg">
                   {coverage.full_prior_acts ? (
-                    <Badge variant="default" className="bg-green-600">Full Prior Acts</Badge>
+                    <Badge variant="default" className="bg-success text-success-foreground">Full Prior Acts</Badge>
                   ) : coverage.retroactive_date ? (
                     formatDate(coverage.retroactive_date)
                   ) : (
-                    <span className="text-amber-600">Check Policy</span>
+                    <span className="text-warning">Check Policy</span>
                   )}
                 </div>
               </Card>
@@ -727,9 +727,9 @@ function ProfessionalLiabilityTab({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {coverage.basic_erp_days && (
-                <Card className="p-4 bg-blue-50">
+                <Card className="p-4 bg-info/10">
                   <div className="text-xs text-muted-foreground mb-1">Basic ERP (Automatic)</div>
-                  <div className="text-xl font-bold text-blue-700">
+                  <div className="text-xl font-bold text-info">
                     {coverage.basic_erp_days} days
                   </div>
                   <div className="text-xs text-muted-foreground">Included at no charge</div>
@@ -739,22 +739,22 @@ function ProfessionalLiabilityTab({
                 <Card className="p-4">
                   <div className="text-xs text-muted-foreground mb-1">Supplemental ERP</div>
                   <div className="font-medium">
-                    <Badge variant="outline" className="text-green-700">
+                    <Badge variant="outline" className="text-success">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Available
                     </Badge>
                   </div>
                   {getERPDeadlineDisplay() && (
-                    <div className="text-xs text-amber-600 mt-1">
+                    <div className="text-xs text-warning mt-1">
                       Purchase by: {getERPDeadlineDisplay()}
                     </div>
                   )}
                 </Card>
               )}
               {coverage.erp_purchased && (
-                <Card className="p-4 bg-green-50">
+                <Card className="p-4 bg-success/10">
                   <div className="text-xs text-muted-foreground mb-1">ERP Purchased</div>
-                  <div className="text-xl font-bold text-green-700">
+                  <div className="text-xl font-bold text-success">
                     {coverage.erp_purchased_duration_months} months
                   </div>
                   {coverage.erp_purchased_premium && (
@@ -869,12 +869,12 @@ function ProfessionalLiabilityTab({
       {coverage.key_exclusions && coverage.key_exclusions.length > 0 && (
         <>
           <div className="space-y-4">
-            <h4 className="font-semibold flex items-center gap-2 text-red-700">
+            <h4 className="font-semibold flex items-center gap-2 text-destructive">
               <AlertCircle className="h-4 w-4" />
               Key Exclusions
             </h4>
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <ul className="list-disc list-inside space-y-1 text-sm text-red-800">
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <ul className="list-disc list-inside space-y-1 text-sm text-destructive">
                 {coverage.key_exclusions.map((exclusion, i) => (
                   <li key={i}>{exclusion}</li>
                 ))}
@@ -1127,13 +1127,13 @@ function AdditionalInsuredsTab({
           <div className="text-xs text-muted-foreground">Total Additional Insureds</div>
           <div className="text-2xl font-bold">{additionalInsureds.length}</div>
         </Card>
-        <Card className="p-4 bg-blue-50">
+        <Card className="p-4 bg-info/10">
           <div className="text-xs text-muted-foreground">Primary & Non-Contributory</div>
-          <div className="text-2xl font-bold text-blue-700">{withPNC.length}</div>
+          <div className="text-2xl font-bold text-info">{withPNC.length}</div>
         </Card>
-        <Card className="p-4 bg-green-50">
+        <Card className="p-4 bg-success/10">
           <div className="text-xs text-muted-foreground">Waiver of Subrogation</div>
-          <div className="text-2xl font-bold text-green-700">{withWOS.length}</div>
+          <div className="text-2xl font-bold text-success">{withWOS.length}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Endorsements</div>
@@ -1184,16 +1184,16 @@ function AdditionalInsuredsTab({
                   </TableCell>
                   <TableCell className="text-center">
                     {ai.primary_noncontributory ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
+                      <CheckCircle className="h-4 w-4 text-success mx-auto" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-gray-300 mx-auto" />
+                      <XCircle className="h-4 w-4 text-cc-text-faint mx-auto" />
                     )}
                   </TableCell>
                   <TableCell className="text-center">
                     {ai.waiver_of_subrogation ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
+                      <CheckCircle className="h-4 w-4 text-success mx-auto" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-gray-300 mx-auto" />
+                      <XCircle className="h-4 w-4 text-cc-text-faint mx-auto" />
                     )}
                   </TableCell>
                   <TableCell className="max-w-[150px] truncate">

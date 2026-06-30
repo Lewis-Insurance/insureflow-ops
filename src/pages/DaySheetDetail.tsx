@@ -251,7 +251,7 @@ export default function DaySheetDetail() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-green-600" />
+              <Banknote className="h-4 w-4 text-success" />
               <CardTitle className="text-sm font-medium">Cash</CardTitle>
             </div>
           </CardHeader>
@@ -263,7 +263,7 @@ export default function DaySheetDetail() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-blue-600" />
+              <Receipt className="h-4 w-4 text-info" />
               <CardTitle className="text-sm font-medium">Checks</CardTitle>
             </div>
           </CardHeader>
@@ -280,7 +280,7 @@ export default function DaySheetDetail() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-purple-600" />
+              <CreditCard className="h-4 w-4 text-info" />
               <CardTitle className="text-sm font-medium">Cards & ACH</CardTitle>
             </div>
           </CardHeader>
@@ -298,12 +298,12 @@ export default function DaySheetDetail() {
 
       {/* Depositable Amount Alert */}
       {depositableAmount > 0 && (
-        <Card className="bg-amber-50 border-amber-200">
+        <Card className="bg-warning/10 border-warning/30">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-amber-600" />
+                <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-warning" />
                 </div>
                 <div>
                   <p className="font-medium">Depositable Amount</p>
@@ -312,7 +312,7 @@ export default function DaySheetDetail() {
                   </p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-amber-700">
+              <div className="text-2xl font-bold text-warning">
                 {formatCurrency(depositableAmount)}
               </div>
             </div>

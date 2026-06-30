@@ -1,8 +1,10 @@
 /* Calm Command - Design Tokens (v2) */
 /* Lewis Insurance Agency OS (InsureFlow CRM) */
 /* Extracted from the AO Renewal Command Center, the locked standard. */
-/* Dark theme only. Single lime accent. Text tokens verified WCAG AA on --cc-bg. */
-/* The app is dark-only: tokens apply on :root and .dark so either strategy works. */
+/* Dark is the default; a full LIGHT counterpart lives in the .light block below. */
+/* Single lime accent in both themes (deepens to lime-700 on light so it reads as */
+/* text/icon/border on white). Text tokens verified WCAG AA on their base surface. */
+/* Dark tokens apply on :root and .dark so either strategy resolves dark.          */
 
 :root,
 .dark {
@@ -157,6 +159,103 @@
   --cc-dur-slower: 320ms;
   --cc-ease-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
   --cc-ease-snap: cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* ===================================================================== */
+/* LIGHT theme. Same constitution: ONE lime accent, hierarchy from weight  */
+/* and spacing, restrained semantics. Only color tokens are overridden;     */
+/* radius, spacing, typography and motion cascade from the dark block.       */
+/* The lime deepens to lime-700 (#4D7C0F) so the single accent stays AA as a */
+/* fill (white text) AND as text/icon/border/focus on white. Semantics use   */
+/* their 700 shades so the 14% status pills stay legible.                    */
+/* ===================================================================== */
+.light {
+  /* ----- shadcn/ui base ----- */
+  --background: 220 24% 95%;
+  --foreground: 215 30% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 30% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 30% 8%;
+  --primary: 86 78% 27%;            /* deep lime brand accent (lime-700) */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 20% 92%;
+  --secondary-foreground: 218 18% 22%;
+  --muted: 220 24% 94%;
+  --muted-foreground: 218 12% 40%;
+  --accent: 220 20% 92%;            /* subtle hover surface */
+  --accent-foreground: 215 30% 12%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 18% 88%;
+  --input: 216 13% 47%;             /* interactive input border, >=3:1 on white */
+  --ring: 86 78% 27%;
+
+  /* ===== Calm Command extended tokens (light) ===== */
+
+  /* Surfaces (page is the lowest layer; cards step up to white) */
+  --cc-bg: #EDF0F5;
+  --cc-surface: #FFFFFF;
+  --cc-surface-raised: #F4F6FA;
+  --cc-surface-overlay: #E8ECF3;
+
+  /* Borders */
+  --cc-border-subtle: #E2E7EE;
+  --cc-border-strong: #CBD3DE;
+  --cc-border-interactive: #6B7484;
+
+  /* Text (on white: primary 17.4:1, secondary 10.2:1, muted 5.6:1) */
+  --cc-text-primary: #0E141B;
+  --cc-text-secondary: #38414E;
+  --cc-text-muted: #5A6472;
+  --cc-text-faint: #97A0AD;
+
+  /* Accent (deep lime; white-on-accent 5.0:1, accent-on-white 5.0:1) */
+  --cc-accent: #4D7C0F;
+  --cc-accent-hover: #3F6212;
+  --cc-accent-deep: #365314;
+  --cc-accent-muted: #5B6E2E;
+  --cc-accent-glow: rgba(77, 124, 15, 0.16);
+  --cc-on-accent: #FFFFFF;
+
+  /* Disabled / skeleton */
+  --cc-skeleton-base: #E4E9F0;
+  --cc-skeleton-sheen: #F2F5F9;
+
+  /* Scrim */
+  --cc-scrim: rgba(15, 23, 42, 0.35);
+
+  /* Semantic (deepened, all >=4.5:1 on white as text) */
+  --cc-success: #15803D;
+  --cc-warning: #B45309;
+  --cc-danger: #DC2626;
+  --cc-info: #1D4ED8;
+  --cc-on-semantic: #FFFFFF;
+  --cc-danger-pill-text: #B42318;
+
+  /* Links */
+  --cc-link: #1D4ED8;
+  --cc-link-hover: #1E40AF;
+
+  /* Hero glow */
+  --cc-hero-glow: radial-gradient(60% 80% at 15% 0%, rgba(37, 99, 235, 0.08), transparent 70%);
+
+  /* Data visualization ramp (deepened for white bg) */
+  --cc-chart-1: #4D7C0F;
+  --cc-chart-2: #2563EB;
+  --cc-chart-3: #15803D;
+  --cc-chart-4: #B45309;
+  --cc-chart-5: #7C3AED;
+  --cc-chart-6: #DC2626;
+  --cc-chart-grid: #E2E7EE;
+  --cc-chart-axis: #5A6472;
+  --cc-chart-track: #E8ECF3;
+
+  /* Elevation (soft) */
+  --cc-shadow-card: 0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.10);
+  --cc-shadow-lift: 0 8px 24px rgba(16,24,40,0.12);
+
+  color-scheme: light;
 }
 
 /* All numeric data uses tabular, lining figures */

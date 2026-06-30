@@ -373,7 +373,7 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5 text-green-600" />
+            <UserCheck className="h-5 w-5 text-success" />
             Convert Lead to Customer
           </DialogTitle>
         </DialogHeader>
@@ -385,7 +385,7 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
               <div
                 className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium shrink-0 ${
                   idx < currentStepIndex
-                    ? 'bg-green-600 text-white'
+                    ? 'bg-success text-success-foreground'
                     : idx === currentStepIndex
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground'
@@ -400,7 +400,7 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
               {idx < steps.length - 1 && (
                 <div
                   className={`h-0.5 flex-1 mx-2 ${
-                    idx < currentStepIndex ? 'bg-green-600' : 'bg-muted'
+                    idx < currentStepIndex ? 'bg-success' : 'bg-muted'
                   }`}
                 />
               )}
@@ -632,9 +632,9 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                   isDragging
                     ? 'border-primary bg-primary/5'
                     : parseStatus === 'success'
-                    ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                    ? 'border-success/50 bg-success/10'
                     : parseStatus === 'error'
-                    ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+                    ? 'border-destructive/50 bg-destructive/10'
                     : 'border-muted-foreground/25 hover:border-primary/50'
                 }`}
                 onDragOver={handleDragOver}
@@ -666,9 +666,9 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                       <>
                         <div className="flex items-center gap-3">
                           {parseStatus === 'success' ? (
-                            <CheckCircle className="h-10 w-10 text-green-500" />
+                            <CheckCircle className="h-10 w-10 text-success" />
                           ) : parseStatus === 'error' ? (
-                            <AlertCircle className="h-10 w-10 text-red-500" />
+                            <AlertCircle className="h-10 w-10 text-destructive" />
                           ) : (
                             <FileText className="h-10 w-10 text-primary" />
                           )}
@@ -1052,9 +1052,9 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                 </Card>
 
                 {/* Lead Status Update */}
-                <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
+                <Card className="bg-success/10 border-success/30">
                   <CardContent className="py-4">
-                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-success">
                       <CheckCircle className="h-5 w-5" />
                       <span className="font-medium">
                         Lead status will be set to "Won"
@@ -1087,7 +1087,7 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
             <Button
               onClick={handleConvert}
               disabled={isConverting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-success hover:bg-success/90 text-success-foreground"
             >
               {isConverting ? (
                 <>

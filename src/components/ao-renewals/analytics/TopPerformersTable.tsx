@@ -60,12 +60,12 @@ export function TopPerformersTable({ data, isLoading, limit = 20 }: TopPerformer
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-blue-500",
-      contacted: "bg-yellow-500",
-      quoted: "bg-purple-500",
-      renewed: "bg-green-500",
-      lost: "bg-red-500",
-      cancelled: "bg-gray-500",
+      pending: "bg-info text-info-foreground",
+      contacted: "bg-warning text-warning-foreground",
+      quoted: "bg-cc-accent text-cc-on-accent",
+      renewed: "bg-success text-success-foreground",
+      lost: "bg-destructive text-destructive-foreground",
+      cancelled: "bg-muted-foreground text-background",
     };
 
     return (
@@ -111,7 +111,7 @@ export function TopPerformersTable({ data, isLoading, limit = 20 }: TopPerformer
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
+            <Trophy className="h-5 w-5 text-warning" />
             Top Performers
           </CardTitle>
           <CardDescription>Highest value renewal opportunities</CardDescription>
@@ -132,7 +132,7 @@ export function TopPerformersTable({ data, isLoading, limit = 20 }: TopPerformer
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
+          <Trophy className="h-5 w-5 text-warning" />
           Top {limit} Highest Value Renewals
         </CardTitle>
         <CardDescription>
@@ -175,7 +175,7 @@ export function TopPerformersTable({ data, isLoading, limit = 20 }: TopPerformer
                     <TableCell className="font-medium">{renewal.customer_name}</TableCell>
                     <TableCell className="font-mono text-sm">{renewal.policy_number}</TableCell>
                     <TableCell className="text-sm">{renewal.policy_type}</TableCell>
-                    <TableCell className="font-bold text-green-600">
+                    <TableCell className="font-bold text-success">
                       {formatCurrency(renewal.current_premium)}
                     </TableCell>
                     <TableCell>

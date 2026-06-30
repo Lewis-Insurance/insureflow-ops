@@ -358,7 +358,7 @@ export function AORenewalContactLog({ renewalId, renewal }: AORenewalContactLogP
                 onClick={handleLogAndComplete}
                 disabled={!notes.trim() || !contactDate || addLogMutation.isPending || completing}
                 size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-success hover:bg-success/90 text-success-foreground"
               >
                 {completing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

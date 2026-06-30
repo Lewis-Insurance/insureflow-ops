@@ -151,8 +151,8 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <ErrorBoundary level="app" resetOnPropsChange>
-    {/* Calm Command is dark-only: force .dark, no theme toggle (design-system/constitution.md). */}
-    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
+    {/* Calm Command defaults to dark; light theme is a full brand counterpart (design-system/constitution.md). */}
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <NavigationGuardProvider>

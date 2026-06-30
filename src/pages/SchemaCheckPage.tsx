@@ -145,25 +145,25 @@ export default function SchemaCheckPage() {
         </div>
 
         {/* Status Banner */}
-        <Card className={isReady ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950' : 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950'}>
+        <Card className={isReady ? 'border-success/30 bg-success/10' : 'border-warning/30 bg-warning/10'}>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               {isReady ? (
                 <>
-                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  <CheckCircle className="h-8 w-8 text-success" />
                   <div>
-                    <p className="font-semibold text-green-900 dark:text-green-100">✅ Schema Ready!</p>
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                    <p className="font-semibold text-success">✅ Schema Ready!</p>
+                    <p className="text-sm text-success/90">
                       All tables and fields exist. You can use the renewal risk features.
                     </p>
                   </div>
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                  <AlertCircle className="h-8 w-8 text-warning" />
                   <div>
-                    <p className="font-semibold text-orange-900 dark:text-orange-100">⚠️ Missing Schema</p>
-                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                    <p className="font-semibold text-warning">⚠️ Missing Schema</p>
+                    <p className="text-sm text-warning/90">
                       Some tables or fields from your SQL migration aren't showing up. Try refreshing or check Supabase SQL editor.
                     </p>
                   </div>
@@ -183,9 +183,9 @@ export default function SchemaCheckPage() {
               <div key={table} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   {result.exists ? (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-success" />
                   ) : (
-                    <XCircle className="h-5 w-5 text-red-600" />
+                    <XCircle className="h-5 w-5 text-destructive" />
                   )}
                   <div>
                     <div className="font-medium">{table}</div>
@@ -195,7 +195,7 @@ export default function SchemaCheckPage() {
                       </div>
                     )}
                     {result.error && (
-                      <div className="text-xs text-red-600">{result.error}</div>
+                      <div className="text-xs text-destructive">{result.error}</div>
                     )}
                   </div>
                 </div>
@@ -216,18 +216,18 @@ export default function SchemaCheckPage() {
             <CardContent>
               {missingRiskFields.length > 0 ? (
                 <div className="space-y-3">
-                  <p className="text-sm text-orange-600">
+                  <p className="text-sm text-warning">
                     ⚠️ Missing {missingRiskFields.length} required fields
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {Object.entries(riskFieldsCheck).map(([field, exists]) => (
                       <div key={field} className="flex items-center gap-2">
                         {exists ? (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <CheckCircle className="h-4 w-4 text-success" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-red-600" />
+                          <XCircle className="h-4 w-4 text-destructive" />
                         )}
-                        <span className={`text-sm ${exists ? '' : 'text-red-600'}`}>
+                        <span className={`text-sm ${exists ? '' : 'text-destructive'}`}>
                           {field}
                         </span>
                       </div>
@@ -235,7 +235,7 @@ export default function SchemaCheckPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-success">
                   ✅ All risk fields present
                 </p>
               )}
@@ -245,9 +245,9 @@ export default function SchemaCheckPage() {
 
         {/* Success Next Steps */}
         {isReady && (
-          <Card className="border-green-200 dark:border-green-900">
+          <Card className="border-success/30">
             <CardHeader>
-              <CardTitle className="text-green-900 dark:text-green-100">🎉 Ready to Build!</CardTitle>
+              <CardTitle className="text-success">🎉 Ready to Build!</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">

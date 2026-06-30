@@ -179,7 +179,7 @@ export function AgentProgressVisualization({
   if (status === 'idle') return null;
 
   return (
-    <Card className="overflow-hidden border-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <Card className="overflow-hidden border-0 bg-cc-surface">
       <CardContent className="p-6">
         {/* Header with status */}
         <div className="flex items-center justify-between mb-6">
@@ -201,14 +201,14 @@ export function AgentProgressVisualization({
               )}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">
-                {status === 'running' || status === 'pending' 
-                  ? 'Multi-Agent Reasoning in Progress' 
-                  : status === 'complete' 
+              <h3 className="text-lg font-semibold text-cc-text-primary">
+                {status === 'running' || status === 'pending'
+                  ? 'Multi-Agent Reasoning in Progress'
+                  : status === 'complete'
                     ? 'Analysis Complete'
                     : 'Analysis Failed'}
               </h3>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-cc-text-muted">
                 {getDepthLabel()} • {status === 'running' || status === 'pending' ? formatTime(elapsedTime) : 'Finished'}
               </p>
             </div>
@@ -216,10 +216,10 @@ export function AgentProgressVisualization({
           
           {(status === 'running' || status === 'pending') && (
             <div className="text-right">
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-cc-text-primary">
                 {Math.round(overallProgress)}%
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-cc-text-muted">
                 Cycle {Math.min(cyclesCompleted + 1, totalCycles)} of {totalCycles}
               </div>
             </div>
@@ -227,7 +227,7 @@ export function AgentProgressVisualization({
         </div>
 
         {/* Progress bar */}
-        <div className="relative h-2 bg-slate-700 rounded-full overflow-hidden mb-8">
+        <div className="relative h-2 bg-cc-surface-overlay rounded-full overflow-hidden mb-8">
           <div 
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 ease-out"
             style={{ width: `${overallProgress}%` }}
@@ -253,11 +253,11 @@ export function AgentProgressVisualization({
                 key={agent.id}
                 className={cn(
                   "relative p-4 rounded-xl border transition-all duration-500",
-                  isActive 
+                  isActive
                     ? `${agent.bgColor} ${agent.borderColor} scale-105 shadow-lg`
                     : isCompleted
-                      ? "bg-slate-800/50 border-slate-700"
-                      : "bg-slate-800/30 border-slate-700/50"
+                      ? "bg-cc-surface-raised border-cc-border-subtle"
+                      : "bg-cc-surface-raised/50 border-cc-border-subtle"
                 )}
               >
                 {/* Active glow effect */}
@@ -272,31 +272,31 @@ export function AgentProgressVisualization({
                   {/* Icon */}
                   <div className={cn(
                     "w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-all duration-300",
-                    isActive 
-                      ? `bg-gradient-to-br ${agent.color}` 
+                    isActive
+                      ? `bg-gradient-to-br ${agent.color}`
                       : isCompleted
-                        ? "bg-slate-700"
-                        : "bg-slate-700/50"
+                        ? "bg-cc-surface-overlay"
+                        : "bg-cc-surface-overlay/50"
                   )}>
                     {isActive ? (
                       <Loader2 className="h-5 w-5 text-white animate-spin" />
                     ) : isCompleted ? (
-                      <CheckCircle className="h-5 w-5 text-emerald-400" />
+                      <CheckCircle className="h-5 w-5 text-success" />
                     ) : (
-                      <Icon className="h-5 w-5 text-slate-500" />
+                      <Icon className="h-5 w-5 text-cc-text-muted" />
                     )}
                   </div>
 
                   {/* Agent info */}
                   <h4 className={cn(
                     "font-semibold text-sm mb-1 transition-colors duration-300",
-                    isActive ? agent.activeColor : isCompleted ? "text-slate-300" : "text-slate-500"
+                    isActive ? agent.activeColor : isCompleted ? "text-cc-text-secondary" : "text-cc-text-muted"
                   )}>
                     {agent.name}
                   </h4>
                   <p className={cn(
                     "text-xs transition-colors duration-300",
-                    isActive ? "text-slate-300" : "text-slate-600"
+                    isActive ? "text-cc-text-secondary" : "text-cc-text-muted"
                   )}>
                     {agent.role}
                   </p>
@@ -308,14 +308,14 @@ export function AgentProgressVisualization({
 
         {/* Current thinking message */}
         {(status === 'running' || status === 'pending') && (
-          <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+          <div className="mt-6 p-4 bg-cc-surface-raised rounded-xl border border-cc-border-subtle">
             <div className="flex items-center gap-3">
               <div className="flex space-x-1">
                 <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <p className="text-sm text-slate-300 animate-fade-in">
+              <p className="text-sm text-cc-text-secondary animate-fade-in">
                 {thinkingMessage}
               </p>
             </div>
@@ -330,11 +330,11 @@ export function AgentProgressVisualization({
                 key={i}
                 className={cn(
                   "w-3 h-3 rounded-full transition-all duration-300",
-                  i < cyclesCompleted 
-                    ? "bg-emerald-500" 
+                  i < cyclesCompleted
+                    ? "bg-success"
                     : i === cyclesCompleted && (status === 'running' || status === 'pending')
-                      ? "bg-blue-500 animate-pulse"
-                      : "bg-slate-700"
+                      ? "bg-info animate-pulse"
+                      : "bg-cc-surface-overlay"
                 )}
               />
             ))}
