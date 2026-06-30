@@ -67,6 +67,9 @@ verify_jwt = true
 [functions.ai-assistant-chat]
 verify_jwt = true
 
+[functions.hermes-chat]
+verify_jwt = true
+
 [functions.parse-pdf-knowledge]
 verify_jwt = true
 
