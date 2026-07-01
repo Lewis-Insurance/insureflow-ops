@@ -76,7 +76,11 @@ supabase functions deploy email-inbound-lite floor-action floor-release-held-sen
 
 ## Next: Phase 3 (First Light)
 
-Per roadmap — **G4 still required** before any real client send. Phase 3 prep can proceed in parallel with dev soak.
+Planning started: [`THE-FLOOR-PHASE-3-PLAN.md`](./THE-FLOOR-PHASE-3-PLAN.md) | tracker: [`THE-FLOOR-PHASE-3-STATUS.md`](./THE-FLOOR-PHASE-3-STATUS.md)
+
+1. Brian decisions: Play 4 owner, send surface, G2 timing
+2. Slice 1: ID card asset pipeline on dev
+3. G4 sign-off after Play 4 dev soak (allowlist → client)
 
 ---
 
