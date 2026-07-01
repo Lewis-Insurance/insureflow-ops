@@ -33,7 +33,7 @@ export interface StageClientSendDeps {
     approverId: string,
     policyNumber: string,
   ) => Promise<void> | void;
-  assertExternalRecipientAllowed: (recipient: string) => Promise<void> | void;
+  assertExternalRecipientAllowed: (recipient: string, workRequestId: string) => Promise<void> | void;
   updateApproval: (
     approvalId: string,
     patch: Partial<FloorClientSendApproval>,
@@ -167,7 +167,7 @@ export async function stageClientSend(
     }
   }
 
-  await deps.assertExternalRecipientAllowed(args.send_spec.recipient);
+  await deps.assertExternalRecipientAllowed(args.send_spec.recipient, args.work_request_id);
 
   const storedPayload = wrapPayloadWithSurface(surface, payload);
   const holdUntil = new Date(deps.now().getTime() + CLIENT_SEND_UNDO_HOLD_SECONDS * 1000);

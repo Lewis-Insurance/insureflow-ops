@@ -28,6 +28,7 @@ export interface FloorInitialContext {
   documentRefs?: string[];
   workItemRef?: string;
   label?: string;
+  displayTitle?: string;
   chips: FloorContextChip[];
 }
 

@@ -2,7 +2,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildStubInternalPackage } from '../_shared/floor/floorAction.ts';
+import { buildIdCardIntakePackage } from '../_shared/floor/buildIdCardIntakePackage.ts';
 import { resolveCoiIntakePackage } from '../_shared/floor/plays/coiIssueInbound.ts';
+import { ID_CARD_PLAY_ID } from '../_shared/floor/plays/idCardIssueInbound.ts';
+import {
+  createSupabaseBuildIdCardIntakePackageDb,
+} from '../_shared/floor/supabaseIdCardAssetDb.ts';
 import {
   buildEmailIdempotencyKey,
   classifyInboundAttachments,
@@ -183,7 +188,8 @@ async function createFloorWorkRequest(params: {
   const clientRef = params.resolveResult.top?.account_id ?? null;
   const clientOpaqueRef = clientRef ? `account:${clientRef.replace(/-/g, '')}` : null;
   const allowlistRaw = Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST');
-  const tier3Package =
+  const modesRaw = Deno.env.get('FLOOR_PLAY_ALLOWLIST_MODES');
+  let tier3Package =
     params.action === 'coi.issue'
     && clientRef
     && clientOpaqueRef
@@ -198,6 +204,33 @@ async function createFloorWorkRequest(params: {
           authorizedRep: Deno.env.get('FLOOR_AUTHORIZED_REP') ?? undefined,
         })
       : null;
+
+  let idCardFailureSummary: string | null = null;
+  if (
+    params.action === ID_CARD_PLAY_ID
+    && clientRef
+    && params.workRequestStatus === 'awaiting_approval'
+  ) {
+    const built = await buildIdCardIntakePackage(
+      {
+        agencyWorkspaceId: params.agencyWorkspaceId,
+        accountId: clientRef,
+        allowlistRaw,
+        modesRaw,
+        playId: play_id,
+        playVersion: play_version,
+      },
+      createSupabaseBuildIdCardIntakePackageDb(sb),
+    );
+
+    if (built.ok && built.tier3) {
+      tier3Package = { tier3: true, row: built.package };
+    } else if (!built.ok) {
+      idCardFailureSummary = built.message;
+    } else {
+      idCardFailureSummary = 'FLOOR_INTERNAL_SEND_ALLOWLIST or client email required for Tier-3 ID card package.';
+    }
+  }
 
   const requestBody = {
     messageId: params.messageId || null,
@@ -280,8 +313,10 @@ async function createFloorWorkRequest(params: {
       playId: play_id,
       playVersion: play_version,
       clientRef: clientOpaqueRef,
-      headline: 'COI intake — internal triage',
-      summary: `Inbound COI request from ${params.senderIdentity}. Internal review only — no client send attempted.`,
+      headline: params.action === ID_CARD_PLAY_ID ? 'ID card intake — internal triage' : 'COI intake — internal triage',
+      summary: params.action === ID_CARD_PLAY_ID
+        ? (idCardFailureSummary ?? `Inbound ID card request from ${params.senderIdentity}. Internal review only — no client send attempted.`)
+        : `Inbound COI request from ${params.senderIdentity}. Internal review only — no client send attempted.`,
     });
 
     const { data: decisionPackage, error: packageError } = await sb

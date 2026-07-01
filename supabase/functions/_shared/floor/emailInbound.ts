@@ -55,8 +55,16 @@ export function buildInboundMessageFromPayload(
         ? body['X-Forwarded-From']
         : null;
 
+  const subject =
+    typeof body.subject === 'string'
+      ? body.subject
+      : typeof body.Subject === 'string'
+        ? body.Subject
+        : undefined;
+
   return {
     from: String(body.from ?? ''),
+    subject,
     forwardedFrom,
     attachments,
     ...auth,

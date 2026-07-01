@@ -1,7 +1,4 @@
-/**
- * The Floor spine modules for Supabase edge functions.
- * Canonical tested source: src/floor/spine/ (vitest). Keep in sync on changes.
- */
+export * from './assertPolicyInForceForSend.ts';
 export * from './constants.ts';
 export * from './types.ts';
 export * from './coverageDiff.ts';
@@ -11,9 +8,18 @@ export * from './stageClientSend.ts';
 export * from './internalSendAllowlist.ts';
 export * from './approveClientSendStaging.ts';
 export * from './mintFloorFenceApproval.ts';
-export * from './hermesBridgeContract.ts';
+export * from './plays/carrierReconciliation.ts';
+export * from './plays/coverageGapRoundout.ts';
+export * from './plays/openItemNudge.ts';
+export * from './plays/nonpayCancelWatch.ts';
+export * from './plays/suspenseSweep.ts';
+export * from './plays/coiIssueInbound.ts';
+export * from './plays/idCardIssueInbound.ts';
+export * from './pickInForceAutoPolicy.ts';
+export * from './resolveIdCardAsset.ts';
+export * from './buildIdCardIntakePackage.ts';
 export * from './emailInbound.ts';
-export * from './floorAction.ts';
 export * from './internalPlayCards.ts';
 export * from './persistInternalPlayCards.ts';
 export * from './runInternalPlays.ts';
+export * from './fixtures/golden.ts';

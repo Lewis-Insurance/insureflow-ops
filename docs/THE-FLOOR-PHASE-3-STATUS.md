@@ -4,9 +4,9 @@
 **Goal:** Play 4 ID card — first real client send (G4-gated)  
 **Plan:** [`THE-FLOOR-PHASE-3-PLAN.md`](./THE-FLOOR-PHASE-3-PLAN.md)  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-01 (Slices 1–4 shipped; dev soak green through Fence)
+**Last updated:** 2026-07-01 (G4 signed; client-mode release guards shipped)
 
-**Status:** 🟡 **DEV SOAK GREEN (allowlist)** — orchestration + Fence proven; provider step still `failed_delivery` until `RESEND_API_KEY` restored.
+**Status:** 🟢 **G4 SIGNED** — Play 4 flipped to client email on dev via `FLOOR_PLAY_ALLOWLIST_MODES`. Provider delivery still pending real `RESEND_API_KEY`.
 
 ---
 
@@ -16,7 +16,7 @@
 - [x] Approve sends under owner name with in-force gate (dev allowlist soak)
 - [ ] Same-day cancellation blocks send (unit tests green; live test pending)
 - [x] Zero wrong-recipient sends (allowlist guard + R7 payload.to match)
-- [ ] G4 signed; Play 4 allowlist flipped to client
+- [x] G4 signed; Play 4 allowlist flipped to client (dev)
 
 ---
 
@@ -29,7 +29,7 @@
 | 2 | Play 4 `id.card.issue` module + in-force | ✅ `idCardIssueInbound.ts` + tests |
 | 3 | Send surface: new `send-id-card-email` + chokepoint generalization | ✅ deployed + Fence surface migration |
 | 4 | CRM button intake (`floor-action` + `id.card.issue`) | ✅ deployed; owner = Landen |
-| 5 | G4 live client send | ⬜ blocked on G4 sign-off |
+| 5 | G4 live client send | ✅ signed 2026-07-01 — [`THE-FLOOR-PHASE-3-G4-SIGNOFF.md`](./THE-FLOOR-PHASE-3-G4-SIGNOFF.md) |
 
 ---
 
@@ -58,7 +58,7 @@ Script: [`scripts/phase3-dev-soak.sh`](../scripts/phase3-dev-soak.sh)
 | Play 4 owner: Tori vs Landen | ✅ **Landen** (2026-07-01) |
 | Send surface: extend COI vs `send-id-card-email` | ✅ **New `send-id-card-email`** (2026-07-01) |
 | G2 bucket-privacy timing | ✅ Resolved — `portal-documents` already private w/ signed URLs |
-| G4 First Light sign-off | ⏳ open (after provider step green) |
+| G4 First Light sign-off | ✅ **Signed 2026-07-01** — [`THE-FLOOR-PHASE-3-G4-SIGNOFF.md`](./THE-FLOOR-PHASE-3-G4-SIGNOFF.md) |
 | G1 prod migrations | ⏳ open |
 
 ---

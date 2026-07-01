@@ -12,18 +12,23 @@ import {
 } from './resolveIdCardAsset.ts';
 import type { PolicyInForceRow } from './types.ts';
 
-export interface BuildIdCardIntakePackageDb extends ResolveIdCardAssetDb {
-  loadAccount(accountId: string, agencyWorkspaceId: string): Promise<{ id: string; name: string | null } | null>;
-  loadPoliciesInForce(accountId: string, agencyWorkspaceId: string): Promise<PolicyInForceRow[]>;
-}
-
 export interface BuildIdCardIntakePackageArgs {
   agencyWorkspaceId: string;
   accountId: string;
   allowlistRaw: string | undefined | null;
+  modesRaw?: string | undefined | null;
+  accountEmail?: string | null;
   preferredPolicyId?: string | null;
   playId?: string;
   playVersion?: string;
+}
+
+export interface BuildIdCardIntakePackageDb extends ResolveIdCardAssetDb {
+  loadAccount(
+    accountId: string,
+    agencyWorkspaceId: string,
+  ): Promise<{ id: string; name: string | null; email: string | null } | null>;
+  loadPoliciesInForce(accountId: string, agencyWorkspaceId: string): Promise<PolicyInForceRow[]>;
 }
 
 export type BuildIdCardIntakePackageResult =
@@ -86,6 +91,7 @@ export async function buildIdCardIntakePackage(
     playVersion: args.playVersion ?? ID_CARD_PLAY_VERSION,
     clientAccountId: args.accountId,
     accountName: account.name?.trim() || 'Insured',
+    accountEmail: args.accountEmail ?? account.email,
     policyNumber: policy.policy_number,
     idCardUrl: asset.signedUrl,
     documentRef: {
@@ -93,6 +99,7 @@ export async function buildIdCardIntakePackage(
       signedUrl: asset.signedUrl,
     },
     allowlistRaw: args.allowlistRaw,
+    modesRaw: args.modesRaw,
   });
 
   if (!resolved) {

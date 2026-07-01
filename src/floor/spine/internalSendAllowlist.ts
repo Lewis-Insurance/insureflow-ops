@@ -50,3 +50,41 @@ export function pickInternalTestRecipient(allowlistRaw: string | undefined | nul
   if (allowlist.size === 0) return null;
   return [...allowlist].sort()[0];
 }
+
+export type PlayAllowlistMode = 'internal' | 'client';
+
+/** Parse per-play send modes: "id.card.issue=internal,coi.issue=client". */
+export function parsePlayAllowlistModes(raw: string | undefined | null): Map<string, PlayAllowlistMode> {
+  const modes = new Map<string, PlayAllowlistMode>();
+  if (!raw?.trim()) return modes;
+
+  for (const entry of raw.split(',')) {
+    const trimmed = entry.trim();
+    if (!trimmed.includes('=')) continue;
+    const [playId, modeRaw] = trimmed.split('=').map((part) => part.trim().toLowerCase());
+    if (!playId) continue;
+    if (modeRaw === 'client' || modeRaw === 'internal') {
+      modes.set(playId, modeRaw);
+    }
+  }
+
+  return modes;
+}
+
+export function resolveTier3Recipient(args: {
+  playId: string;
+  accountEmail?: string | null;
+  allowlistRaw: string | undefined | null;
+  modesRaw?: string | undefined | null;
+}): string | null {
+  const modes = parsePlayAllowlistModes(args.modesRaw);
+  const mode = modes.get(args.playId) ?? 'internal';
+
+  if (mode === 'client') {
+    const email = args.accountEmail?.trim();
+    if (!email?.includes('@')) return null;
+    return normalizeRecipientEmail(email);
+  }
+
+  return pickInternalTestRecipient(args.allowlistRaw);
+}

@@ -1,5 +1,6 @@
 import { FLOOR_EMAIL_PLAY_VERSION } from '../emailInbound.ts';
-import { pickInternalTestRecipient } from '../internalSendAllowlist.ts';
+import { pickInternalTestRecipient, resolveTier3Recipient } from '../internalSendAllowlist.ts';
+import { playAllowlistMode } from '../floorRecipientGuards.ts';
 import type {
   DecisionField,
   DecisionPackage,
@@ -22,12 +23,13 @@ export interface BuildTier3IdCardPackageArgs {
   clientAccountId: string;
   accountName: string;
   policyNumber: string;
-  internalTestRecipient: string;
+  tier3Recipient: string;
   idCardUrl: string;
   documentRef?: DocumentRef | null;
   fields?: DecisionField[];
   risk?: RiskLevel;
   authorizedRep?: string;
+  clientMode?: boolean;
 }
 
 export type IdCardInboundPackageRow = Omit<DecisionPackage, 'id' | 'work_request_id' | 'created_at'>;
@@ -57,26 +59,30 @@ export function buildTier3IdCardSendSpec(args: {
   };
 }
 
-/** Tier-3 ID card package — Approve stages held send to allowlist only (pre-G4). */
+/** Tier-3 ID card package — Approve stages held send (internal allowlist or G4 client email). */
 export function buildTier3IdCardPackage(args: BuildTier3IdCardPackageArgs): IdCardInboundPackageRow {
   const playId = args.playId ?? ID_CARD_PLAY_ID;
   const playVersion = args.playVersion ?? ID_CARD_PLAY_VERSION;
   const authorizedRep = args.authorizedRep ?? ID_CARD_AUTHORIZED_REP;
   const risk = args.risk ?? 'green';
+  const clientMode = args.clientMode === true;
 
   return {
     play_id: playId,
     play_version: playVersion,
-    headline: 'ID card ready — one-tap approve (internal test send)',
-    summary:
-      `In-force auto policy ${args.policyNumber} for ${args.accountName}. Approve sends to the internal test recipient only — not the client on file.`,
+    headline: clientMode
+      ? 'ID card ready — approve to send to client on file'
+      : 'ID card ready — one-tap approve (internal test send)',
+    summary: clientMode
+      ? `In-force auto policy ${args.policyNumber} for ${args.accountName}. Approve sends to the account email on file under ${authorizedRep}.`
+      : `In-force auto policy ${args.policyNumber} for ${args.accountName}. Approve sends to the internal test recipient only — not the client on file.`,
     risk,
     client_ref: args.clientAccountId,
     document_ref: args.documentRef ?? null,
     fields: args.fields ?? [],
     diff: null,
     send_spec: buildTier3IdCardSendSpec({
-      internalTestRecipient: args.internalTestRecipient,
+      internalTestRecipient: args.tier3Recipient,
       authorizedRep,
       insuredName: args.accountName,
       policyNumber: args.policyNumber,
@@ -94,6 +100,8 @@ export interface ResolveIdCardIntakePackageArgs {
   idCardUrl: string;
   documentRef?: DocumentRef | null;
   allowlistRaw: string | undefined | null;
+  accountEmail?: string | null;
+  modesRaw?: string | undefined | null;
   authorizedRep?: string;
 }
 
@@ -106,8 +114,15 @@ export interface ResolvedIdCardIntakePackage {
 export function resolveIdCardIntakePackage(
   args: ResolveIdCardIntakePackageArgs,
 ): ResolvedIdCardIntakePackage | null {
-  const internalTestRecipient = pickInternalTestRecipient(args.allowlistRaw);
-  if (!internalTestRecipient) return null;
+  const tier3Recipient = resolveTier3Recipient({
+    playId: args.playId,
+    accountEmail: args.accountEmail,
+    allowlistRaw: args.allowlistRaw,
+    modesRaw: args.modesRaw,
+  });
+  if (!tier3Recipient) return null;
+
+  const clientMode = playAllowlistMode(args.playId, args.modesRaw) === 'client';
 
   return {
     tier3: true,
@@ -117,10 +132,11 @@ export function resolveIdCardIntakePackage(
       clientAccountId: args.clientAccountId,
       accountName: args.accountName,
       policyNumber: args.policyNumber,
-      internalTestRecipient,
+      tier3Recipient,
       idCardUrl: args.idCardUrl,
       documentRef: args.documentRef,
       authorizedRep: args.authorizedRep,
+      clientMode,
     }),
   };
 }

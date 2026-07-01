@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFloorPendingPackages } from '@/hooks/useFloorPendingPackages';
+import type { FloorPendingPackage } from '@/hooks/useFloorPendingPackages';
 import { validateFloorMessageForModel } from '@/floor/floorSafety';
 import { sendFloorChatMessage } from '@/floor/floorChatClient';
 import { invokeFloorAction, type FloorActionResponse } from '@/floor/floorActionClient';
@@ -56,6 +58,7 @@ export function FloorCockpitDrawer({
   launchControlEnabled = isFloorCockpitEnabled(),
 }: FloorCockpitDrawerProps) {
   const context = initialContext ?? PRACTICE_FLOOR_CONTEXT;
+  const { data: pendingPackages = [] } = useFloorPendingPackages(agencyWorkspaceId);
   const [input, setInput] = useState('');
   const [isWorking, setIsWorking] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -69,6 +72,21 @@ export function FloorCockpitDrawer({
   const [toolProgress, setToolProgress] = useState<ToolProgressItem[]>([]);
   const [packagePreview, setPackagePreview] = useState<FloorDecisionPackagePreview | null>(null);
   const [feedbackState, setFeedbackState] = useState<'idle' | 'working' | 'done'>('idle');
+
+  function applyPendingPackagePreview(pkg: FloorPendingPackage) {
+    setPackagePreview({
+      packageRef: pkg.packageRef,
+      revision: 1,
+      workRequestRef: pkg.workRequestRef,
+      workRequestId: pkg.workRequestId,
+      playId: pkg.playId,
+      title: pkg.headline,
+      summary: pkg.headline,
+      risk: pkg.risk,
+      actions: ['approve', 'edit', 'kill'],
+    });
+    setFeedbackState('idle');
+  }
 
   function applyActionPreview(result: FloorActionResponse) {
     if (result.preview) {
@@ -227,7 +245,7 @@ export function FloorCockpitDrawer({
               <Sparkles className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <SheetTitle>Lewis Floor</SheetTitle>
+              <SheetTitle>{context.displayTitle ?? context.label ?? 'Lewis Floor'}</SheetTitle>
               <SheetDescription>InsureFlow agent cockpit • practice-safe bridge</SheetDescription>
             </div>
           </div>
@@ -256,6 +274,31 @@ export function FloorCockpitDrawer({
                 Hidden state uses opaque refs only. Approvals and sends stay behind Floor gates.
               </p>
             </div>
+
+            {pendingPackages.length > 0 && (
+              <div className="border-b bg-background px-6 py-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pending approval
+                </p>
+                <div className="space-y-2">
+                  {pendingPackages.map((pkg) => (
+                    <button
+                      key={pkg.packageId}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/50"
+                      onClick={() => applyPendingPackagePreview(pkg)}
+                    >
+                      <span className="truncate pr-2">{pkg.headline}</span>
+                      <Badge
+                        variant={pkg.risk === 'red' ? 'destructive' : pkg.risk === 'yellow' ? 'secondary' : 'outline'}
+                      >
+                        {pkg.risk}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <ScrollArea className="flex-1 px-6 py-4">
               <div className="space-y-3">

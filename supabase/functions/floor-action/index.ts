@@ -16,6 +16,8 @@ import {
   createSupabaseBuildIdCardIntakePackageDb,
   resolvePlay4OwnerId,
 } from '../_shared/floor/supabaseIdCardAssetDb.ts';
+import { createSupabasePolicyInForceGuard } from '../_shared/floor/supabasePolicyInForceGuard.ts';
+import { createSupabaseFloorRecipientGuards } from '../_shared/floor/supabaseFloorRecipientGuards.ts';
 import type { FloorClientSendApproval, SendSpec } from '../_shared/floor/types.ts';
 
 const corsHeaders = {
@@ -114,6 +116,7 @@ serve(async (req) => {
             agencyWorkspaceId: parsed.agency_workspace_id,
             accountId: clientAccountId,
             allowlistRaw: Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST'),
+            modesRaw: Deno.env.get('FLOOR_PLAY_ALLOWLIST_MODES'),
             preferredPolicyId: policyIdFromRef,
             playId: parsed.play_id,
             playVersion: parsed.play_version,
@@ -131,8 +134,9 @@ serve(async (req) => {
         if (!built.tier3) {
           return jsonResponse(
             {
-              error: 'allowlist_required',
-              message: 'FLOOR_INTERNAL_SEND_ALLOWLIST must be set for Tier-3 id.card.issue packages.',
+              error: 'tier3_unavailable',
+              message:
+                'Tier-3 id.card.issue requires FLOOR_INTERNAL_SEND_ALLOWLIST (internal mode) or account email on file (client mode via FLOOR_PLAY_ALLOWLIST_MODES).',
             },
             422,
           );
@@ -344,12 +348,12 @@ serve(async (req) => {
 
     let sendStaging: Record<string, unknown> | null = null;
     if (parsed.verb === 'approve') {
+      const recipientGuards = createSupabaseFloorRecipientGuards(supabase);
       try {
         const staged = await maybeStageClientSendOnApprove({
           workRequestId,
           approverId: user.id,
           sendSpec: decisionPackage.send_spec as SendSpec | null,
-          allowlistRaw: Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST'),
           db: {
             async findFloorSendApproval(workRequestId) {
               const { data } = await supabase
@@ -381,6 +385,9 @@ serve(async (req) => {
           },
           stageDeps: {
             now: () => new Date(),
+            assertRecipientOnFile: recipientGuards.assertRecipientOnFile,
+            assertPolicyInForce: createSupabasePolicyInForceGuard(supabase),
+            assertExternalRecipientAllowed: recipientGuards.assertExternalRecipientAllowedForWorkRequest,
             invokeTier3EmailSend: async () => ({ success: false }),
             logEmail: async () => {},
           },

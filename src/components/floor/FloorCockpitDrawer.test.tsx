@@ -1,6 +1,37 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FloorCockpitDrawer, type FloorChatSender } from './FloorCockpitDrawer';
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          in: vi.fn(() => ({
+            order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        })),
+      })),
+    })),
+  },
+}));
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+function TestWrapper({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={createTestQueryClient()}>{children}</QueryClientProvider>;
+}
+
+function renderDrawer(ui: React.ReactElement) {
+  return render(ui, { wrapper: TestWrapper });
+}
 
 const boundClientContext = {
   sessionRef: 'chat:practice-session',
@@ -17,7 +48,7 @@ describe('FloorCockpitDrawer', () => {
   it('defaults to launch-control OFF and cannot send work', () => {
     const sendMessage = vi.fn() as unknown as FloorChatSender;
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -34,7 +65,7 @@ describe('FloorCockpitDrawer', () => {
   it('renders the Lewis Floor cockpit with safe context chips', () => {
     const sendMessage = vi.fn() as unknown as FloorChatSender;
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -44,7 +75,7 @@ describe('FloorCockpitDrawer', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: /Lewis Floor/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Johnson Household/i })).toBeInTheDocument();
     expect(screen.getByText(/Context/i)).toBeInTheDocument();
     expect(screen.getByText('Client: Johnson Household')).toBeInTheDocument();
     expect(screen.getByText('Policy: Progressive Auto • policy ****1234')).toBeInTheDocument();
@@ -68,7 +99,7 @@ describe('FloorCockpitDrawer', () => {
       emit({ type: 'done', messageRef: 'msg:assistant-001' });
     };
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -103,7 +134,7 @@ describe('FloorCockpitDrawer', () => {
   it('blocks unsafe regulated input before it can reach the sender', async () => {
     const sendMessage = vi.fn() as unknown as FloorChatSender;
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -126,7 +157,7 @@ describe('FloorCockpitDrawer', () => {
   it('blocks raw UUIDs and signed document URLs before submission', async () => {
     const sendMessage = vi.fn() as unknown as FloorChatSender;
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -176,7 +207,7 @@ describe('FloorCockpitDrawer', () => {
     const workspaceId = '11111111-1111-4111-8111-111111111111';
     const actorId = '22222222-2222-4222-8222-222222222222';
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}
@@ -223,7 +254,7 @@ describe('FloorCockpitDrawer', () => {
       });
     };
 
-    render(
+    renderDrawer(
       <FloorCockpitDrawer
         open
         onOpenChange={() => undefined}

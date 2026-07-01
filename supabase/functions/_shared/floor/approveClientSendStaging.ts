@@ -1,7 +1,5 @@
 import {
-  createInternalRecipientGuard,
   isTier3SendSpec,
-  parseInternalSendAllowlist,
 } from './internalSendAllowlist.ts';
 import { stageClientSend, type StageClientSendDeps } from './stageClientSend.ts';
 import type { FloorClientSendApproval, SendSpec } from './types.ts';
@@ -26,12 +24,8 @@ export interface MaybeStageClientSendOnApproveArgs {
   workRequestId: string;
   approverId: string;
   sendSpec: SendSpec | null | undefined;
-  allowlistRaw: string | undefined | null;
   db: ApproveClientSendStagingDb;
-  stageDeps: Omit<
-    StageClientSendDeps,
-    'readApproval' | 'updateApproval' | 'assertRecipientOnFile' | 'assertCertificateAccess'
-  >;
+  stageDeps: Omit<StageClientSendDeps, 'readApproval' | 'updateApproval'>;
 }
 
 export type StageClientSendOnApproveResult =
@@ -51,9 +45,6 @@ export async function maybeStageClientSendOnApprove(
     return { staged: false, reason: 'already_staged' };
   }
 
-  const allowlist = parseInternalSendAllowlist(args.allowlistRaw);
-  const guard = createInternalRecipientGuard(allowlist);
-
   const approval = await args.db.insertFloorSendApproval({
     work_request_id: args.workRequestId,
     approver_id: args.approverId,
@@ -71,9 +62,6 @@ export async function maybeStageClientSendOnApprove(
       current = await args.db.updateFloorSendApproval(approvalId, patch);
       return current;
     },
-    assertRecipientOnFile: async () => {},
-    assertCertificateAccess: async () => {},
-    assertExternalRecipientAllowed: guard,
   };
 
   await stageClientSend(

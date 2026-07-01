@@ -120,13 +120,19 @@ export function createSupabaseBuildIdCardIntakePackageDb(
     async loadAccount(accountId, agencyWorkspaceId) {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name')
+        .select('id, name, email')
         .eq('id', accountId)
         .eq('agency_workspace_id', agencyWorkspaceId)
         .is('deleted_at', null)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data ? { id: data.id as string, name: (data.name as string | null) ?? null } : null;
+      return data
+        ? {
+          id: data.id as string,
+          name: (data.name as string | null) ?? null,
+          email: (data.email as string | null) ?? null,
+        }
+        : null;
     },
 
     async loadPoliciesInForce(accountId, agencyWorkspaceId) {

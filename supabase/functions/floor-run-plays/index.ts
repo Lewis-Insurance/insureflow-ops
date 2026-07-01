@@ -107,6 +107,9 @@ serve(async (req) => {
 
     const play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 10;
     const play3Limit = typeof body.play3_limit === 'number' ? body.play3_limit : 10;
+    const play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
+    const play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
+    const play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
     const dryRun = body.dry_run === true;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -128,6 +131,22 @@ serve(async (req) => {
       .in('status', ['pending', 'in_progress']);
 
     if (taskError) throw new ValidationError(taskError.message);
+
+    const { data: gapRows, error: gapError } = await supabase
+      .from('coverage_gap_opportunities')
+      .select('id, account_id, severity, recommended_next_step, rationale')
+      .eq('agency_workspace_id', agencyWorkspaceId)
+      .eq('status', 'new');
+
+    if (gapError) throw new ValidationError(gapError.message);
+
+    const { data: quoteRows, error: quoteError } = await supabase
+      .from('quotes')
+      .select('id, account_id, status, line_of_business, premium, updated_at, accounts!inner(agency_workspace_id)')
+      .eq('accounts.agency_workspace_id', agencyWorkspaceId)
+      .in('status', ['open', 'draft']);
+
+    if (quoteError) throw new ValidationError(quoteError.message);
 
     const accountIds = [
       ...new Set(
@@ -161,31 +180,46 @@ serve(async (req) => {
       account_id: (row.account_id as string | null) ?? null,
       premium_hint: null,
     }));
+    const coverageGapOpportunities = (gapRows ?? []).map((row) => ({
+      id: row.id as string,
+      account_id: row.account_id as string,
+      severity: row.severity as 'low' | 'medium' | 'high',
+      recommended_next_step: (row.recommended_next_step as string | null) ?? null,
+      rationale: (row.rationale as { rule_key?: string; trigger_reason?: string }) ?? {},
+    }));
+    const openQuotes = (quoteRows ?? []).map((row) => ({
+      id: row.id as string,
+      account_id: (row.account_id as string | null) ?? null,
+      status: row.status as string,
+      line_of_business: (row.line_of_business as string | null) ?? null,
+      premium: (row.premium as number | null) ?? null,
+      updated_at: (row.updated_at as string | null) ?? null,
+    }));
+
+    const playInput = {
+      agency_workspace_id: agencyWorkspaceId,
+      policies,
+      tasks,
+      coverageGapOpportunities,
+      openQuotes,
+      play1Limit,
+      play3Limit,
+      play4Limit,
+      play5Limit,
+      play6Limit,
+      ownerByAccountId,
+    };
 
     if (dryRun) {
       const { planInternalPlays } = await import('../_shared/floor/runInternalPlays.ts');
-      const planned = planInternalPlays({
-        agency_workspace_id: agencyWorkspaceId,
-        policies,
-        tasks,
-        play1Limit,
-        play3Limit,
-        ownerByAccountId,
-      });
+      const planned = planInternalPlays(playInput);
       return new Response(
         JSON.stringify({ ok: true, dry_run: true, planned: planned.plans.length, play1_summary: planned.play1_summary }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const result = await runInternalPlays(supabasePlayCardsDb(supabase), {
-      agency_workspace_id: agencyWorkspaceId,
-      policies,
-      tasks,
-      play1Limit,
-      play3Limit,
-      ownerByAccountId,
-    });
+    const result = await runInternalPlays(supabasePlayCardsDb(supabase), playInput);
 
     logger.info('Floor plays completed', {
       agencyWorkspaceId,

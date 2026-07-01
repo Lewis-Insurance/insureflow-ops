@@ -150,6 +150,7 @@ export interface FloorClientSendApproval {
 
 export interface InboundMessage {
   from: string;
+  subject?: string;
   spf: 'pass' | 'fail' | 'neutral' | 'none';
   dkim: 'pass' | 'fail' | 'none';
   dmarc: 'pass' | 'fail' | 'none';

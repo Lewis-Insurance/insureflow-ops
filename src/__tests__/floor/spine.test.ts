@@ -37,6 +37,15 @@ import {
   resolveIdCardIntakePackage,
   pickInForceAutoPolicy,
   assertInForceForTier3Send,
+  assertPolicyInForceForSend,
+  parsePlayAllowlistModes,
+  resolveTier3Recipient,
+  runCoverageGapRoundoutPlay,
+  runOpenItemNudgePlay,
+  detectNonpayCancelCandidates,
+  planCoverageGapRoundoutCards,
+  planOpenItemNudgeCards,
+  planNonpayCancelWatchCards,
   wrapPayloadWithSurface,
   type AccountRecord,
   type FloorClientSendApproval,
@@ -62,6 +71,28 @@ describe('Floor spine — mailSkillRouter', () => {
       classifyDocument: () => 'coi',
     });
     expect(decision).toEqual({ route: 'fall_through', reason: 'auth_failed' });
+  });
+
+  it('routes ID card subject lines without COI attachment', async () => {
+    const decision = await mailSkillRouter(
+      {
+        from: 'contractor@aceconstruction.com',
+        subject: '[FLOOR:ID-CARD] Auto ID card please',
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        attachments: [],
+      },
+      {
+        allowedSender: () => true,
+        classifyDocument: () => 'unknown',
+      },
+    );
+    expect(decision).toEqual({
+      route: 'work_request',
+      action: 'id.card.issue',
+      sender_identity: 'contractor@aceconstruction.com',
+    });
   });
 });
 
@@ -448,6 +479,63 @@ describe('Floor plays — internal card pipeline', () => {
     expect(planned.plans.every((p) => p.idempotency_key.includes('2026-07-01'))).toBe(true);
   });
 
+  it('Phase 4 play planners return expected play_ids', () => {
+    const gapSummary = runCoverageGapRoundoutPlay([
+      {
+        id: 'gap-1',
+        account_id: 'a1',
+        severity: 'high',
+        recommended_next_step: 'Quote umbrella',
+        rationale: { trigger_reason: 'Missing umbrella' },
+      },
+    ]);
+    const play4 = planCoverageGapRoundoutCards(
+      [
+        {
+          id: 'gap-1',
+          account_id: 'a1',
+          severity: 'high',
+          recommended_next_step: 'Quote umbrella',
+          rationale: { trigger_reason: 'Missing umbrella' },
+        },
+      ],
+      gapSummary,
+      { dayKey: '2026-07-01' },
+    );
+    expect(play4[0]?.play_id).toBe('coverage.gap.roundout');
+
+    const openItems = runOpenItemNudgePlay(
+      [
+        {
+          id: 'q1',
+          account_id: 'a1',
+          status: 'open',
+          line_of_business: 'Auto',
+          premium: 1200,
+          updated_at: '2026-06-20T00:00:00Z',
+        },
+      ],
+      [],
+    );
+    const play5 = planOpenItemNudgeCards(openItems, { dayKey: '2026-07-01' });
+    expect(play5[0]?.play_id).toBe('open.item.nudge');
+
+    const nonpay = detectNonpayCancelCandidates([
+      {
+        policy_id: 'p1',
+        account_id: 'a1',
+        policy_number: 'PN1',
+        in_force: true,
+        premium: null,
+        cgl_details: null,
+        bap_details: { payment_status: 'nonpay_pending' },
+        evaluated_at: '2026-07-01T00:00:00Z',
+      },
+    ]);
+    const play6 = planNonpayCancelWatchCards(nonpay, { dayKey: '2026-07-01' });
+    expect(play6[0]?.play_id).toBe('nonpay.cancel.watch');
+  });
+
   it('persists internal play cards with idempotency', async () => {
     const inserted: string[] = [];
     const db = {
@@ -508,6 +596,28 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
     await expect(guard('brian@lewisinsurance.ai')).resolves.toBeUndefined();
   });
 
+  it('resolveTier3Recipient uses internal allowlist by default', () => {
+    expect(
+      resolveTier3Recipient({
+        playId: 'id.card.issue',
+        allowlistRaw: 'brian@lewisinsurance.ai,ops@lewisinsurance.ai',
+      }),
+    ).toBe('brian@lewisinsurance.ai');
+  });
+
+  it('resolveTier3Recipient uses account email in client mode', () => {
+    const modes = 'id.card.issue=client';
+    expect(
+      resolveTier3Recipient({
+        playId: 'id.card.issue',
+        accountEmail: 'Client@Example.com',
+        allowlistRaw: 'brian@lewisinsurance.ai',
+        modesRaw: modes,
+      }),
+    ).toBe('client@example.com');
+    expect(parsePlayAllowlistModes(modes).get('id.card.issue')).toBe('client');
+  });
+
   it('stages tier-3 approve into held state without invoking send', async () => {
     const sendSpec = {
       channel: 'email' as const,
@@ -526,7 +636,6 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       workRequestId: 'wr-tier3',
       approverId: 'user-1',
       sendSpec,
-      allowlistRaw: 'brian@lewisinsurance.ai',
       db: {
         findFloorSendApproval: async () => null,
         insertFloorSendApproval: async (row) => ({
@@ -554,6 +663,8 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
+        assertRecipientOnFile: async () => {},
+        assertExternalRecipientAllowed: async () => {},
         invokeTier3EmailSend,
         logEmail: async () => {},
       },
@@ -648,7 +759,6 @@ describe('Floor plays — Tier-3 COI inbound', () => {
       workRequestId: 'wr-coi-inbound',
       approverId: 'user-1',
       sendSpec: resolved!.row.send_spec,
-      allowlistRaw: goldenTier3CoiInboundAllowlist,
       db: {
         findFloorSendApproval: async () => null,
         insertFloorSendApproval: async (row) => ({
@@ -676,6 +786,8 @@ describe('Floor plays — Tier-3 COI inbound', () => {
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
+        assertRecipientOnFile: async () => {},
+        assertExternalRecipientAllowed: async () => {},
         invokeTier3EmailSend,
         logEmail: async () => {},
       },
@@ -719,12 +831,32 @@ describe('Floor plays — Tier-3 ID card issue', () => {
     expect(() => assertInForceForTier3Send(false, 'p-lapsed')).toThrow(/not in force/);
   });
 
+  it('assertPolicyInForceForSend blocks lapsed policy numbers', async () => {
+    await expect(
+      assertPolicyInForceForSend(
+        {
+          findPolicyInForceByNumber: async () => ({ in_force: false }),
+        },
+        'LAP-123',
+      ),
+    ).rejects.toThrow(/not in force/);
+
+    await expect(
+      assertPolicyInForceForSend(
+        {
+          findPolicyInForceByNumber: async () => ({ in_force: true }),
+        },
+        'AUTO-123',
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it('builds Tier-3 ID card package with send-id-card-email surface', () => {
     const row = buildTier3IdCardPackage({
       clientAccountId: goldenTier3IdCardInboundAccountId,
       accountName: goldenSendIdCardEmailPayload.insuredName,
       policyNumber: goldenSendIdCardEmailPayload.policyNumber,
-      internalTestRecipient: goldenTier3IdCardInboundAllowlist,
+      tier3Recipient: goldenTier3IdCardInboundAllowlist,
       idCardUrl: goldenSendIdCardEmailPayload.idCardUrl,
     });
 
@@ -751,7 +883,6 @@ describe('Floor plays — Tier-3 ID card issue', () => {
       workRequestId: 'wr-id-card',
       approverId: 'user-1',
       sendSpec: resolved!.row.send_spec,
-      allowlistRaw: goldenTier3IdCardInboundAllowlist,
       db: {
         findFloorSendApproval: async () => null,
         insertFloorSendApproval: async (row) => ({
@@ -779,6 +910,8 @@ describe('Floor plays — Tier-3 ID card issue', () => {
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
+        assertRecipientOnFile: async () => {},
+        assertExternalRecipientAllowed: async () => {},
         invokeTier3EmailSend,
         logEmail: async () => {},
       },

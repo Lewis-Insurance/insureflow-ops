@@ -161,6 +161,14 @@ function canonicalPayload(surface: ClientSendSurface, payload: unknown): Record<
       insured_name: normalized.insuredName ?? normalized.insured_name,
     }) as Record<string, unknown>;
   }
+  if (surface === 'canopy-servicing-email') {
+    return sortObject({
+      action_type: normalized.action_type,
+      policy_id: normalized.policy_id ?? null,
+      email: normalized.email,
+      delivery_method: normalized.delivery_method ?? 'email',
+    }) as Record<string, unknown>;
+  }
   if (surface === 'esign-create-request') {
     return sortObject({
       document_url: normalized.document_url ?? normalized.documentUrl,

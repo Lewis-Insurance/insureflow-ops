@@ -1,3 +1,4 @@
+export * from './assertPolicyInForceForSend.ts';
 export * from './constants.ts';
 export * from './types.ts';
 export * from './coverageDiff.ts';
@@ -8,6 +9,9 @@ export * from './internalSendAllowlist.ts';
 export * from './approveClientSendStaging.ts';
 export * from './mintFloorFenceApproval.ts';
 export * from './plays/carrierReconciliation.ts';
+export * from './plays/coverageGapRoundout.ts';
+export * from './plays/openItemNudge.ts';
+export * from './plays/nonpayCancelWatch.ts';
 export * from './plays/suspenseSweep.ts';
 export * from './plays/coiIssueInbound.ts';
 export * from './plays/idCardIssueInbound.ts';

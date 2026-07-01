@@ -28,6 +28,7 @@ export function buildFloorCockpitInitialContext(params: {
   return {
     sessionRef: buildFloorSessionRef(params.agentBinding.agent_id),
     label: params.agentBinding.human_name,
+    displayTitle: displayName,
     chips: [
       { label: 'Agent', value: displayName },
       { label: 'Role', value: params.agentBinding.role },

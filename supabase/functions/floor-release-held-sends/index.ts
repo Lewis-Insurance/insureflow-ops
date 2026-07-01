@@ -5,16 +5,14 @@ import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
 import {
-  createInternalRecipientGuard,
-  parseInternalSendAllowlist,
-} from '../_shared/floor/internalSendAllowlist.ts';
-import {
   readSendSurfaceFromStoredPayload,
   releaseHeldClientSend,
   stripFloorSendMetadata,
   type StageClientSendDeps,
   type StoredSendPayload,
 } from '../_shared/floor/stageClientSend.ts';
+import { createSupabasePolicyInForceGuard } from '../_shared/floor/supabasePolicyInForceGuard.ts';
+import { createSupabaseFloorRecipientGuards } from '../_shared/floor/supabaseFloorRecipientGuards.ts';
 import type { FloorClientSendApproval, Tier3EmailSurface } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-release-held-sends');
@@ -107,8 +105,8 @@ serve(async (req) => {
 
     if (heldError) throw new ValidationError(heldError.message);
 
-    const allowlist = parseInternalSendAllowlist(Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST'));
-    const guard = createInternalRecipientGuard(allowlist);
+    const policyInForceGuard = createSupabasePolicyInForceGuard(supabase);
+    const recipientGuards = createSupabaseFloorRecipientGuards(supabase);
     const approvals = (heldRows ?? []).map((row) => mapApprovalRow(row as Record<string, unknown>));
 
     const results: Array<Record<string, unknown>> = [];
@@ -139,10 +137,10 @@ serve(async (req) => {
           current = mapApprovalRow(data as Record<string, unknown>);
           return current;
         },
-        assertRecipientOnFile: async () => {},
+        assertRecipientOnFile: recipientGuards.assertRecipientOnFile,
         assertCertificateAccess: async () => {},
-        assertPolicyInForce: async () => {},
-        assertExternalRecipientAllowed: guard,
+        assertPolicyInForce: policyInForceGuard,
+        assertExternalRecipientAllowed: recipientGuards.assertExternalRecipientAllowedForWorkRequest,
         mintFloorFenceApproval: {
           hashPayload: (surface, payload) => hashClientSendPayload(surface, payload),
           insertClientSendApproval: async (row) => {
