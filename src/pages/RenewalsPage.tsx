@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { differenceInCalendarDays } from 'date-fns';
-import { Search, Brain, X } from 'lucide-react';
+import { Search, Brain, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,8 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useRenewals, type Renewal } from '@/hooks/useRenewalWorkflow';
+import { useRenewals, useReopenRenewal, type Renewal } from '@/hooks/useRenewalWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeCarrier, humanizeStatus } from '@/lib/format';
@@ -25,6 +28,8 @@ import { cn } from '@/lib/utils';
 // Cohorts segment the open book by what needs attention; clicking a tile filters
 // the rows to it. Counts are computed over the whole book, not the filtered view.
 type Cohort = 'all' | 'overdue' | 'due_week' | 'high_risk' | 'quoted';
+// View scope: the working (open) book, the closed outcomes (reopenable), or everything.
+type Scope = 'open' | 'closed' | 'all';
 
 // Statuses that mean the renewal is still being worked (not a terminal outcome).
 const OPEN_STATUSES = new Set(['pending', 'contacted', 'quoted', 'upcoming', 'in_progress']);
@@ -55,6 +60,9 @@ export default function RenewalsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [cohort, setCohort] = useState<Cohort>('all');
   const [carrier, setCarrier] = useState<string>('all');
+  const [scope, setScope] = useState<Scope>('open');
+  const [reopenTarget, setReopenTarget] = useState<Renewal | null>(null);
+  const reopen = useReopenRenewal();
 
   // Pull the whole book once (all carriers, ordered by renewal date). Cohort,
   // carrier and search are applied client-side so the tile counts stay accurate
@@ -100,6 +108,8 @@ export default function RenewalsPage() {
   const rows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const filtered = renewals.filter((r) => {
+      if (scope === 'open' && !isOpen(r)) return false;
+      if (scope === 'closed' && isOpen(r)) return false;
       if (cohort !== 'all' && !COHORT_PREDICATE[cohort](r)) return false;
       if (carrier !== 'all' && r.carrier !== carrier) return false;
       if (q) {
@@ -120,14 +130,27 @@ export default function RenewalsPage() {
       const bt = b.renewal_date ? new Date(b.renewal_date).getTime() : Infinity;
       return at - bt;
     });
-  }, [renewals, cohort, carrier, searchQuery]);
+  }, [renewals, cohort, carrier, searchQuery, scope]);
 
-  const toggleCohort = (c: Exclude<Cohort, 'all'>) => setCohort((cur) => (cur === c ? 'all' : c));
-  const filtersActive = cohort !== 'all' || carrier !== 'all' || searchQuery.length > 0;
+  // Cohort tiles are open-book views, so picking one snaps scope back to Open. Switching to the
+  // Closed view clears any cohort so an open-only predicate can't zero out the closed list.
+  const toggleCohort = (c: Exclude<Cohort, 'all'>) =>
+    setCohort((cur) => {
+      const next = cur === c ? 'all' : c;
+      if (next !== 'all') setScope('open');
+      return next;
+    });
+  const changeScope = (s: Scope) => {
+    setScope(s);
+    if (s === 'closed') setCohort('all');
+  };
+  const filtersActive =
+    cohort !== 'all' || carrier !== 'all' || searchQuery.length > 0 || scope !== 'open';
   const clearAll = () => {
     setCohort('all');
     setCarrier('all');
     setSearchQuery('');
+    setScope('open');
   };
 
   const openRenewal = (id: string) => navigate(`/renewals/${id}/edit`);
@@ -217,6 +240,20 @@ export default function RenewalsPage() {
                   {c.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={scope} onValueChange={(v) => changeScope(v as Scope)}>
+            <SelectTrigger
+              aria-label="Filter by status"
+              className="h-9 w-auto min-w-[150px] gap-2 rounded-cc-md border-cc-border-interactive bg-cc-surface-raised text-cc-text-primary"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Open renewals</SelectItem>
+              <SelectItem value="closed">Closed renewals</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
             </SelectContent>
           </Select>
 
@@ -325,13 +362,64 @@ export default function RenewalsPage() {
                   </div>
 
                   <div className="hidden md:block">
-                    <LastContact date={r.last_contact_date} />
+                    {isOpen(r) ? (
+                      <LastContact date={r.last_contact_date} />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReopenTarget(r);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-cc-md border border-cc-border-interactive bg-transparent px-2.5 py-1.5 text-sm text-cc-text-primary transition-colors hover:bg-cc-surface-overlay"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reopen
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
         </div>
+
+        {/* Reopen confirmation. Copy adapts: did-not-renew reactivates the policy; moved/renewed
+            reopen the renewal only (their policy record was already changed by the outcome). */}
+        <Dialog open={!!reopenTarget} onOpenChange={(o) => { if (!o) setReopenTarget(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reopen this renewal?</DialogTitle>
+              <DialogDescription>
+                {reopenTarget?.account?.name ? `${reopenTarget.account.name} — ` : ''}
+                {reopenTarget && ['lost', 'cancelled', 'non_renewed', 'lapsed'].includes(reopenTarget.status)
+                  ? `This renewal was marked ${humanizeStatus(reopenTarget.status)}. Reopening returns it to your working queue and reactivates the policy.`
+                  : `This renewal was marked ${humanizeStatus(reopenTarget?.status || '')}. Reopening returns it to your working queue. The policy record was already updated by that outcome and will not be changed automatically.`}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setReopenTarget(null)}
+                className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              >
+                Cancel
+              </Button>
+              <Button
+                data-primary
+                disabled={reopen.isPending}
+                onClick={() => {
+                  if (!reopenTarget) return;
+                  reopen.mutate({ renewalId: reopenTarget.id }, { onSuccess: () => setReopenTarget(null) });
+                }}
+                className="gap-2 rounded-cc-md bg-cc-accent text-cc-on-accent hover:bg-cc-accent-hover"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {reopen.isPending ? 'Reopening...' : 'Reopen renewal'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

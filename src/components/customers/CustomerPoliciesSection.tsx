@@ -54,13 +54,15 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
 
-  // Split policies into active and inactive
-  const activePolicies = policies.filter(policy =>
-    ['active', 'bound', 'pending'].includes(policy.status?.toLowerCase() || 'active')
-  );
-  const inactivePolicies = policies.filter(policy =>
-    ['cancelled', 'lapsed', 'expired', 'inactive'].includes(policy.status?.toLowerCase() || '')
-  );
+  // Split policies into active and inactive. Active is the explicit live set; inactive is
+  // EVERYTHING else (catch-all) so a terminal status the list doesn't enumerate (e.g. a
+  // renewal marked 'lost' or 'non_renewed') can never fall through both filters and vanish
+  // from the customer record. A null status defaults to active (unchanged prior behavior).
+  const ACTIVE_STATUSES = ['active', 'bound', 'pending'];
+  const isActivePolicy = (policy: PolicyWithAccount) =>
+    ACTIVE_STATUSES.includes(policy.status?.toLowerCase() || 'active');
+  const activePolicies = policies.filter(isActivePolicy);
+  const inactivePolicies = policies.filter((policy) => !isActivePolicy(policy));
 
   const isLoading = policiesLoading || quotesLoading;
 

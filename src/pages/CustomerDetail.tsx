@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useChromeAction } from '@/components/layout/chrome/chromeActions';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -181,7 +181,15 @@ export default function CustomerDetail() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('contact');
+  // Open on the tab named by ?tab= (e.g. deep-linked from a renewal's "already added" prompt),
+  // falling back to Contact. Read once on mount so in-app tab clicks aren't overridden.
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get('tab');
+    return t && ['contact', 'policies', 'relationships', 'documents', 'notes', 'activity'].includes(t)
+      ? t
+      : 'contact';
+  });
 
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
