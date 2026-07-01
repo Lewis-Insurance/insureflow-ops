@@ -8,8 +8,14 @@ import {
   createInternalRecipientGuard,
   parseInternalSendAllowlist,
 } from '../_shared/floor/internalSendAllowlist.ts';
-import { releaseHeldClientSend, type StageClientSendDeps } from '../_shared/floor/stageClientSend.ts';
-import type { FloorClientSendApproval, SendCOIEmailRequest } from '../_shared/floor/types.ts';
+import {
+  readSendSurfaceFromStoredPayload,
+  releaseHeldClientSend,
+  stripFloorSendMetadata,
+  type StageClientSendDeps,
+  type StoredSendPayload,
+} from '../_shared/floor/stageClientSend.ts';
+import type { FloorClientSendApproval, Tier3EmailSurface } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-release-held-sends');
 
@@ -37,9 +43,13 @@ function mapApprovalRow(row: Record<string, unknown>): FloorClientSendApproval {
     hold_until: (row.hold_until as string | null) ?? null,
     recipient: row.recipient as string,
     recipient_basis: row.recipient_basis as FloorClientSendApproval['recipient_basis'],
-    send_payload: row.send_payload as SendCOIEmailRequest,
+    send_payload: row.send_payload as StoredSendPayload,
     created_at: row.created_at as string,
   };
+}
+
+function tier3FunctionPath(surface: Tier3EmailSurface): string {
+  return surface === 'send-id-card-email' ? 'send-id-card-email' : 'send-coi-email';
 }
 
 serve(async (req) => {
@@ -131,48 +141,72 @@ serve(async (req) => {
         },
         assertRecipientOnFile: async () => {},
         assertCertificateAccess: async () => {},
+        assertPolicyInForce: async () => {},
         assertExternalRecipientAllowed: guard,
         mintFloorFenceApproval: {
-          hashPayload: (payload) => hashClientSendPayload('send-coi-email', payload),
+          hashPayload: (surface, payload) => hashClientSendPayload(surface, payload),
           insertClientSendApproval: async (row) => {
             const { error } = await supabase.from('client_send_approvals').insert(row);
             if (error) throw new Error(error.message);
           },
         },
-        invokeSendCOIEmail: async (payload) => {
-          const response = await fetch(`${supabaseUrl}/functions/v1/send-coi-email`, {
+        invokeTier3EmailSend: async (surface, payload) => {
+          const body = stripFloorSendMetadata(payload);
+          const marked = payload.client_send_approval
+            ? payload
+            : body;
+          const requestPayload = payload.client_send_approval ? payload : body;
+
+          const response = await fetch(`${supabaseUrl}/functions/v1/${tier3FunctionPath(surface)}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${anonKey}`,
               ...(cronSecret ? { 'X-Cron-Secret': cronSecret } : {}),
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(requestPayload),
           });
-          const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+          const responseBody = await response.json().catch(() => ({})) as Record<string, unknown>;
           if (!response.ok) {
-            logger.error('send-coi-email failed', {
+            logger.error(`${surface} failed`, {
               approvalId: seed.id,
               status: response.status,
-              body,
+              body: responseBody,
             });
             return { success: false };
           }
           return {
-            success: body.success === true,
-            messageId: typeof body.messageId === 'string'
-              ? body.messageId
-              : typeof body.id === 'string'
-                ? body.id
+            success: responseBody.success === true,
+            messageId: typeof responseBody.messageId === 'string'
+              ? responseBody.messageId
+              : typeof responseBody.id === 'string'
+                ? responseBody.id
                 : undefined,
           };
         },
-        logEmail: async () => {},
+        logEmail: async ({ workRequestId, messageId, success, surface }) => {
+          const { error } = await supabase.from('email_log').insert({
+            type: surface === 'send-id-card-email' ? 'id_card' : 'coi',
+            to_email: current.recipient,
+            subject: surface === 'send-id-card-email' ? 'Floor ID card release' : 'Floor COI release',
+            sent_by: current.approver_id,
+            resend_id: messageId ?? null,
+            metadata: {
+              work_request_id: workRequestId,
+              surface,
+              success,
+            },
+          });
+          if (error) {
+            logger.error('email_log insert failed', { approvalId: seed.id, message: error.message });
+          }
+        },
       };
 
       try {
+        const surface = readSendSurfaceFromStoredPayload(seed.send_payload as StoredSendPayload);
         const released = await releaseHeldClientSend(seed.id, deps);
-        results.push({ approval_id: seed.id, ...released });
+        results.push({ approval_id: seed.id, surface, ...released });
       } catch (error) {
         logger.error('releaseHeldClientSend failed', {
           approvalId: seed.id,

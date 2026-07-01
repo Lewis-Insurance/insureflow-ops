@@ -1,4 +1,4 @@
-import type { SendCOIEmailRequest } from './types.ts';
+import type { SendCOIEmailRequest, SendIdCardEmailRequest, Tier3EmailPayload, Tier3EmailSurface } from './types.ts';
 
 export const FLOOR_ACTION_TOKEN_PREFIX = 'floor_action:';
 
@@ -15,10 +15,10 @@ export function isFloorActionApprovalRef(approvalRef: string): boolean {
 }
 
 export interface MintFloorFenceApprovalDeps {
-  hashPayload: (payload: SendCOIEmailRequest) => Promise<string>;
+  hashPayload: (surface: Tier3EmailSurface, payload: Tier3EmailPayload) => Promise<string>;
   insertClientSendApproval: (row: {
     approval_ref: string;
-    surface: 'send-coi-email';
+    surface: Tier3EmailSurface;
     content_hash: string;
     approved_by_user_id: string;
     expires_at: string;
@@ -27,9 +27,9 @@ export interface MintFloorFenceApprovalDeps {
   expiresInMinutes?: number;
 }
 
-export interface MintedFloorFenceApproval {
+export interface MintedFloorFenceApproval<TPayload extends Tier3EmailPayload> {
   approvalRef: string;
-  markedPayload: SendCOIEmailRequest & {
+  markedPayload: TPayload & {
     client_send_approval: {
       approval_ref: string;
       approved_by_human_id: string;
@@ -37,21 +37,22 @@ export interface MintedFloorFenceApproval {
   };
 }
 
-/** Sole producer of valid floor_action: markers for COI sends (releaseHeldClientSend only). */
-export async function mintFloorFenceApprovalForCoi(
-  payload: SendCOIEmailRequest,
+/** Sole producer of valid floor_action: markers for Tier-3 email sends (releaseHeldClientSend only). */
+export async function mintFloorFenceApprovalForSurface<TPayload extends Tier3EmailPayload>(
+  surface: Tier3EmailSurface,
+  payload: TPayload,
   approverId: string,
   deps: MintFloorFenceApprovalDeps,
-): Promise<MintedFloorFenceApproval> {
+): Promise<MintedFloorFenceApproval<TPayload>> {
   const approvalRef = mintFloorActionToken();
-  const contentHash = await deps.hashPayload(payload);
+  const contentHash = await deps.hashPayload(surface, payload);
   const now = deps.now?.() ?? new Date();
   const expiresMinutes = deps.expiresInMinutes ?? 15;
   const expiresAt = new Date(now.getTime() + expiresMinutes * 60 * 1000).toISOString();
 
   await deps.insertClientSendApproval({
     approval_ref: approvalRef,
-    surface: 'send-coi-email',
+    surface,
     content_hash: contentHash,
     approved_by_user_id: approverId,
     expires_at: expiresAt,
@@ -67,4 +68,22 @@ export async function mintFloorFenceApprovalForCoi(
       },
     },
   };
+}
+
+/** @deprecated Use mintFloorFenceApprovalForSurface('send-coi-email', ...) */
+export async function mintFloorFenceApprovalForCoi(
+  payload: SendCOIEmailRequest,
+  approverId: string,
+  deps: MintFloorFenceApprovalDeps,
+): Promise<MintedFloorFenceApproval<SendCOIEmailRequest>> {
+  return mintFloorFenceApprovalForSurface('send-coi-email', payload, approverId, deps);
+}
+
+/** @deprecated Use mintFloorFenceApprovalForSurface('send-id-card-email', ...) */
+export async function mintFloorFenceApprovalForIdCard(
+  payload: SendIdCardEmailRequest,
+  approverId: string,
+  deps: MintFloorFenceApprovalDeps,
+): Promise<MintedFloorFenceApproval<SendIdCardEmailRequest>> {
+  return mintFloorFenceApprovalForSurface('send-id-card-email', payload, approverId, deps);
 }

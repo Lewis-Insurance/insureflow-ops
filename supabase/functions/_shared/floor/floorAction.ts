@@ -1,4 +1,5 @@
-import type { FeedbackVerb, RiskLevel } from './types.ts';
+import type { FeedbackVerb, RiskLevel } from './spine/types';
+import type { FloorDecisionPackagePreview } from './types';
 
 export const FLOOR_OPAQUE_REF_PATTERN =
   /^(account|policy|document|work_item|work_request|package):[A-Za-z0-9][A-Za-z0-9:_-]{2,80}$/;
@@ -38,19 +39,6 @@ export interface FloorActionValidationError {
   status: number;
   error: string;
   message: string;
-}
-
-export interface FloorDecisionPackagePreview {
-  packageRef: string;
-  revision: number;
-  workRequestId?: string;
-  playId?: string;
-  playVersion?: string;
-  title: string;
-  summary: string;
-  risk?: RiskLevel;
-  clientRef?: string;
-  actions: Array<'approve' | 'edit' | 'kill'>;
 }
 
 export function containsRawUuid(value: unknown): boolean {
@@ -279,6 +267,7 @@ export function buildStubInternalPackage(params: {
     diff: null,
     send_spec: {
       channel: 'email' as const,
+      send_surface: 'send-coi-email' as const,
       recipient: '[INTERNAL_ONLY]',
       recipient_basis: 'account_of_record' as const,
       authorized_rep_of_record: '[INTERNAL_ONLY]',

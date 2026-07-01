@@ -1,14 +1,21 @@
 import { CLIENT_SEND_UNDO_HOLD_SECONDS } from './constants.ts';
-import { mintFloorFenceApprovalForCoi, type MintFloorFenceApprovalDeps } from './mintFloorFenceApproval.ts';
+import {
+  mintFloorFenceApprovalForSurface,
+  type MintFloorFenceApprovalDeps,
+} from './mintFloorFenceApproval.ts';
 import {
   FloorAuthorizationError,
+  FLOOR_SEND_SURFACE_KEY,
   type FloorClientSendApproval,
   type RecipientBasis,
   type SendCOIEmailRequest,
+  type SendIdCardEmailRequest,
   type SendSpec,
+  type Tier3EmailPayload,
+  type Tier3EmailSurface,
 } from './types.ts';
 
-export type CoiSendPayload = SendCOIEmailRequest & Record<string, unknown>;
+export type StoredSendPayload = Tier3EmailPayload & Record<string, unknown>;
 
 export interface StageClientSendDeps {
   now: () => Date;
@@ -18,16 +25,23 @@ export interface StageClientSendDeps {
     basis: RecipientBasis,
     workRequestId: string,
   ) => Promise<void> | void;
-  assertCertificateAccess: (
+  assertCertificateAccess?: (
     approverId: string,
     certificateNumber: string,
+  ) => Promise<void> | void;
+  assertPolicyInForce?: (
+    approverId: string,
+    policyNumber: string,
   ) => Promise<void> | void;
   assertExternalRecipientAllowed: (recipient: string) => Promise<void> | void;
   updateApproval: (
     approvalId: string,
     patch: Partial<FloorClientSendApproval>,
   ) => Promise<FloorClientSendApproval>;
-  invokeSendCOIEmail: (payload: CoiSendPayload) => Promise<{
+  invokeTier3EmailSend: (
+    surface: Tier3EmailSurface,
+    payload: StoredSendPayload,
+  ) => Promise<{
     success: boolean;
     messageId?: string;
   }>;
@@ -35,8 +49,8 @@ export interface StageClientSendDeps {
     workRequestId: string;
     messageId?: string;
     success: boolean;
+    surface: Tier3EmailSurface;
   }) => Promise<void>;
-  /** When set, releaseHeldClientSend mints a Fence floor_action: token before invoking send-coi-email. */
   mintFloorFenceApproval?: MintFloorFenceApprovalDeps;
 }
 
@@ -51,8 +65,28 @@ export type StageClientSendResult = {
   messageId?: string;
 };
 
-function assertSendSpecPayloadMatches(sendSpec: SendSpec): SendCOIEmailRequest {
-  const payload = sendSpec.payload;
+export function readSendSurfaceFromStoredPayload(payload: StoredSendPayload): Tier3EmailSurface {
+  const surface = payload[FLOOR_SEND_SURFACE_KEY];
+  return surface === 'send-id-card-email' ? 'send-id-card-email' : 'send-coi-email';
+}
+
+export function wrapPayloadWithSurface(
+  surface: Tier3EmailSurface,
+  payload: Tier3EmailPayload,
+): StoredSendPayload {
+  return {
+    [FLOOR_SEND_SURFACE_KEY]: surface,
+    ...payload,
+  };
+}
+
+export function stripFloorSendMetadata(payload: StoredSendPayload): Tier3EmailPayload {
+  const { [FLOOR_SEND_SURFACE_KEY]: _surface, ...rest } = payload;
+  return rest as Tier3EmailPayload;
+}
+
+function assertCoiPayloadMatches(sendSpec: SendSpec): SendCOIEmailRequest {
+  const payload = sendSpec.payload as SendCOIEmailRequest;
   if (
     !payload
     || typeof payload.to !== 'string'
@@ -72,9 +106,36 @@ function assertSendSpecPayloadMatches(sendSpec: SendSpec): SendCOIEmailRequest {
   return payload;
 }
 
+function assertIdCardPayloadMatches(sendSpec: SendSpec): SendIdCardEmailRequest {
+  const payload = sendSpec.payload as SendIdCardEmailRequest;
+  if (
+    !payload
+    || typeof payload.to !== 'string'
+    || typeof payload.policyNumber !== 'string'
+    || typeof payload.idCardUrl !== 'string'
+    || typeof payload.insuredName !== 'string'
+  ) {
+    throw new Error('Floor: send_spec.payload must match SendIdCardEmailRequest');
+  }
+
+  if (payload.to !== sendSpec.recipient) {
+    throw new FloorAuthorizationError(
+      'R7: send_spec.payload.to must match on-file recipient, never body-supplied override',
+    );
+  }
+
+  return payload;
+}
+
+function assertSendSpecPayloadMatches(sendSpec: SendSpec): Tier3EmailPayload {
+  if (sendSpec.send_surface === 'send-id-card-email') {
+    return assertIdCardPayloadMatches(sendSpec);
+  }
+  return assertCoiPayloadMatches(sendSpec);
+}
+
 /**
  * The ONLY function that should call the mail provider for Floor Tier 3 sends.
- * Wraps send-coi-email request shape exactly.
  */
 export async function stageClientSend(
   args: StageClientSendArgs,
@@ -86,23 +147,36 @@ export async function stageClientSend(
   }
 
   const payload = assertSendSpecPayloadMatches(args.send_spec);
+  const surface = args.send_spec.send_surface;
 
   await deps.assertRecipientOnFile(
     args.send_spec.recipient,
     args.send_spec.recipient_basis,
     args.work_request_id,
   );
-  await deps.assertCertificateAccess(approval.approver_id, payload.certificateNumber);
+
+  if (surface === 'send-id-card-email') {
+    const idPayload = payload as SendIdCardEmailRequest;
+    if (deps.assertPolicyInForce) {
+      await deps.assertPolicyInForce(approval.approver_id, idPayload.policyNumber);
+    }
+  } else {
+    const coiPayload = payload as SendCOIEmailRequest;
+    if (deps.assertCertificateAccess) {
+      await deps.assertCertificateAccess(approval.approver_id, coiPayload.certificateNumber);
+    }
+  }
+
   await deps.assertExternalRecipientAllowed(args.send_spec.recipient);
 
+  const storedPayload = wrapPayloadWithSurface(surface, payload);
   const holdUntil = new Date(deps.now().getTime() + CLIENT_SEND_UNDO_HOLD_SECONDS * 1000);
   await deps.updateApproval(args.approval_id, {
     status: 'held',
     hold_until: holdUntil.toISOString(),
-    send_payload: payload,
+    send_payload: storedPayload,
   });
 
-  // Undo window: send fires only via releaseHeldClientSend after hold_until.
   return { status: 'held' };
 }
 
@@ -119,22 +193,30 @@ export async function releaseHeldClientSend(
     return { status: 'held' };
   }
 
-  const payload = approval.send_payload;
-  let sendPayload: CoiSendPayload = payload;
+  const storedPayload = approval.send_payload as StoredSendPayload;
+  const surface = readSendSurfaceFromStoredPayload(storedPayload);
+  const payload = stripFloorSendMetadata(storedPayload);
+  let sendPayload: StoredSendPayload = storedPayload;
 
   if (deps.mintFloorFenceApproval) {
-    const minted = await mintFloorFenceApprovalForCoi(payload, approval.approver_id, deps.mintFloorFenceApproval);
-    sendPayload = minted.markedPayload;
+    const minted = await mintFloorFenceApprovalForSurface(
+      surface,
+      payload,
+      approval.approver_id,
+      deps.mintFloorFenceApproval,
+    );
+    sendPayload = wrapPayloadWithSurface(surface, minted.markedPayload);
     await deps.updateApproval(approvalId, {
       send_payload: sendPayload,
     });
   }
 
-  const result = await deps.invokeSendCOIEmail(sendPayload);
+  const result = await deps.invokeTier3EmailSend(surface, sendPayload);
   await deps.logEmail({
     workRequestId: approval.work_request_id,
     messageId: result.messageId,
     success: result.success,
+    surface,
   });
 
   await deps.updateApproval(approvalId, {
@@ -146,3 +228,6 @@ export async function releaseHeldClientSend(
     ? { status: 'sent', messageId: result.messageId }
     : { status: 'failed_delivery' };
 }
+
+/** @deprecated Use invokeTier3EmailSend */
+export type CoiSendPayload = SendCOIEmailRequest & Record<string, unknown>;

@@ -43,6 +43,7 @@ export function buildTier3CoiInboundSendSpec(args: {
 }): SendSpec {
   return {
     channel: 'email',
+    send_surface: 'send-coi-email',
     recipient: args.internalTestRecipient,
     recipient_basis: 'approved_holder',
     authorized_rep_of_record: args.authorizedRep,

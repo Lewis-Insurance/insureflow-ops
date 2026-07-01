@@ -267,6 +267,7 @@ export function buildStubInternalPackage(params: {
     diff: null,
     send_spec: {
       channel: 'email' as const,
+      send_surface: 'send-coi-email' as const,
       recipient: '[INTERNAL_ONLY]',
       recipient_basis: 'account_of_record' as const,
       authorized_rep_of_record: '[INTERNAL_ONLY]',

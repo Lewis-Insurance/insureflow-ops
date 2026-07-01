@@ -30,6 +30,8 @@ export type RecipientBasis = 'account_of_record' | 'approved_holder';
 
 export type AutonomyTier = 1 | 2 | 3 | 4;
 
+export type Tier3EmailSurface = 'send-coi-email' | 'send-id-card-email';
+
 /** Exact send-coi-email/index.ts shape — do not change. */
 export interface SendCOIEmailRequest {
   to: string;
@@ -37,6 +39,19 @@ export interface SendCOIEmailRequest {
   certificateUrl: string;
   holderName: string;
 }
+
+/** Exact send-id-card-email/index.ts shape — do not change. */
+export interface SendIdCardEmailRequest {
+  to: string;
+  policyNumber: string;
+  idCardUrl: string;
+  insuredName: string;
+}
+
+export type Tier3EmailPayload = SendCOIEmailRequest | SendIdCardEmailRequest;
+
+/** Stored inside floor_client_send_approvals.send_payload to route release. */
+export const FLOOR_SEND_SURFACE_KEY = '_floor_send_surface';
 
 export interface DocumentRef {
   label: string;
@@ -65,10 +80,11 @@ export interface CoverageDiff {
 
 export interface SendSpec {
   channel: 'email';
+  send_surface: Tier3EmailSurface;
   recipient: string;
   recipient_basis: RecipientBasis;
   authorized_rep_of_record: string;
-  payload: SendCOIEmailRequest;
+  payload: Tier3EmailPayload;
 }
 
 export interface DecisionPackage {
@@ -127,7 +143,7 @@ export interface FloorClientSendApproval {
   hold_until: string | null;
   recipient: string;
   recipient_basis: RecipientBasis;
-  send_payload: SendCOIEmailRequest;
+  send_payload: Tier3EmailPayload & Record<string, unknown>;
   message_id?: string | null;
   created_at: string;
 }
@@ -181,11 +197,27 @@ export interface PolicyInForceRow {
   policy_id: string;
   account_id: string | null;
   policy_number: string;
+  line_of_business?: string | null;
+  carrier?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
   in_force: boolean;
   premium: number | null;
   cgl_details: Record<string, unknown> | null;
   bap_details: Record<string, unknown> | null;
   evaluated_at: string;
+}
+
+export interface PortalIdCardRow {
+  id: string;
+  account_id: string;
+  policy_id: string;
+  card_image_path: string | null;
+  card_pdf_path: string | null;
+  card_data: Record<string, unknown>;
+  data_as_of: string;
+  source_document_id: string | null;
+  is_active: boolean;
 }
 
 export interface SuspenseTaskRow {

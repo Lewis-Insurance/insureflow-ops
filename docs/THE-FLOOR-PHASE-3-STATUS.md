@@ -4,18 +4,18 @@
 **Goal:** Play 4 ID card — first real client send (G4-gated)  
 **Plan:** [`THE-FLOOR-PHASE-3-PLAN.md`](./THE-FLOOR-PHASE-3-PLAN.md)  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-01 (planning started)
+**Last updated:** 2026-07-01 (Slices 1–4 shipped; dev soak green through Fence)
 
-**Status:** 🟢 **PLAN LOCKED** — Brian decisions in (2026-07-01); implementation awaiting go.
+**Status:** 🟡 **DEV SOAK GREEN (allowlist)** — orchestration + Fence proven; provider step still `failed_delivery` until `RESEND_API_KEY` restored.
 
 ---
 
 ## Definition of Done (roadmap)
 
 - [ ] ID-card request → card in owner Slack + cockpit in **< 5s**
-- [ ] Approve sends under owner name with in-force gate
-- [ ] Same-day cancellation blocks send
-- [ ] Zero wrong-recipient sends
+- [x] Approve sends under owner name with in-force gate (dev allowlist soak)
+- [ ] Same-day cancellation blocks send (unit tests green; live test pending)
+- [x] Zero wrong-recipient sends (allowlist guard + R7 payload.to match)
 - [ ] G4 signed; Play 4 allowlist flipped to client
 
 ---
@@ -25,11 +25,29 @@
 | Slice | Scope | Status |
 |---|---|---|
 | 0 | Planning + Brian decisions | ✅ complete 2026-07-01 |
-| 1 | ID card asset pipeline | ⬜ ready to start (populate `portal_id_cards` — 0 rows on dev today) |
-| 2 | Play 4 `id.card.issue` module + in-force | ⬜ ready (owner: Landen) |
-| 3 | Send surface: new `send-id-card-email` + chokepoint generalization | ⬜ ready |
-| 4 | CRM button intake (email intake later) | ⬜ ready |
+| 1 | ID card asset pipeline | ✅ `resolveIdCardAsset.ts` + dev populate proven |
+| 2 | Play 4 `id.card.issue` module + in-force | ✅ `idCardIssueInbound.ts` + tests |
+| 3 | Send surface: new `send-id-card-email` + chokepoint generalization | ✅ deployed + Fence surface migration |
+| 4 | CRM button intake (`floor-action` + `id.card.issue`) | ✅ deployed; owner = Landen |
 | 5 | G4 live client send | ⬜ blocked on G4 sign-off |
+
+---
+
+## Dev soak — 2026-07-01 (Play 4 allowlist)
+
+Script: [`scripts/phase3-dev-soak.sh`](../scripts/phase3-dev-soak.sh)
+
+| Step | Result |
+|---|---|
+| `create_internal_package` (`id.card.issue`, Gerald Depoi / policy `875652030`) | ✅ Tier-3 package + `document_ref` signed URL |
+| `portal_id_cards` populate | ✅ 1 row (copied from `documents` → `portal-documents`) |
+| `owner_id` | ✅ Landen (`landen@lewisinsurance.com`) |
+| Approve → `sendStaging` | ✅ `{ staged: true, status: 'held' }` |
+| Release sweeper | ✅ `surface: send-id-card-email` |
+| Fence consume | ✅ `floor_action:…`, `fence_consumed: true` |
+| Resend delivery | ⚠️ `failed_delivery` (dev `RESEND_API_KEY` still placeholder) |
+
+**Ops note:** Soak required seeding the Gerald Depoi ID card PDF into the dev `documents` bucket (metadata row existed; blob was missing).
 
 ---
 
@@ -39,21 +57,24 @@
 |---|---|
 | Play 4 owner: Tori vs Landen | ✅ **Landen** (2026-07-01) |
 | Send surface: extend COI vs `send-id-card-email` | ✅ **New `send-id-card-email`** (2026-07-01) |
-| G2 bucket-privacy timing | ✅ Resolved — `portal-documents` already private w/ signed URLs; no dev blocker; legacy audit → prod hardening pre-G4 |
-| G4 First Light sign-off | ⏳ open (after dev soak) |
+| G2 bucket-privacy timing | ✅ Resolved — `portal-documents` already private w/ signed URLs |
+| G4 First Light sign-off | ⏳ open (after provider step green) |
 | G1 prod migrations | ⏳ open |
 
 ---
 
-## Dev ground truth (verified 2026-07-01)
+## Key files (Slices 1–4)
 
-| Fact | Value |
+| Area | Path |
 |---|---|
-| `portal_id_cards` rows | **0** — populate pipeline is Slice 1's real work |
-| In-force policies (`policy_in_force_status`) | 1,837 |
-| ID-card-like `documents` rows | 1 |
-| Play 4 test candidates | In-force auto w/ email exist (e.g. Progressive `876025041`, Auto-Owners `49-530349-00`) |
-| `policies` line column | `line_of_business` (no `policy_type` column) |
+| Asset resolver | `src/floor/spine/resolveIdCardAsset.ts` |
+| Intake orchestrator | `src/floor/spine/buildIdCardIntakePackage.ts` |
+| Play 4 package | `src/floor/spine/plays/idCardIssueInbound.ts` |
+| Generalized send | `src/floor/spine/stageClientSend.ts`, `mintFloorFenceApproval.ts` |
+| Edge: intake | `supabase/functions/floor-action/index.ts` |
+| Edge: send | `supabase/functions/send-id-card-email/index.ts` |
+| Edge: release | `supabase/functions/floor-release-held-sends/index.ts` |
+| Fence surface migration | `supabase/migrations/20260701210000_floor_send_id_card_email_surface.sql` |
 
 ---
 
@@ -62,7 +83,7 @@
 | Item | Status |
 |---|---|
 | Phase 2 sign-off | ✅ [`THE-FLOOR-PHASE-2-SIGNOFF.md`](./THE-FLOOR-PHASE-2-SIGNOFF.md) |
-| Fence mint + consume on dev | ✅ soak 2026-07-01 |
+| Fence mint + consume on dev | ✅ Play 4 soak 2026-07-01 |
 | Held state persist fix | ✅ `3b910ea` |
 | Dev `RESEND_API_KEY` restored | ⏳ ops — provider step was `failed_delivery` |
 

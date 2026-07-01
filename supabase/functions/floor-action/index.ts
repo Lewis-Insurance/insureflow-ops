@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAgencyAuth, requireAgencyMembership } from '../_shared/agency-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { maybeStageClientSendOnApprove } from '../_shared/floor/approveClientSendStaging.ts';
+import { buildIdCardIntakePackage } from '../_shared/floor/buildIdCardIntakePackage.ts';
 import {
   buildPackagePreview,
   buildStubInternalPackage,
@@ -10,6 +11,11 @@ import {
   validateFeedbackActor,
   validateFloorActionBody,
 } from '../_shared/floor/floorAction.ts';
+import { ID_CARD_PLAY_ID } from '../_shared/floor/plays/idCardIssueInbound.ts';
+import {
+  createSupabaseBuildIdCardIntakePackageDb,
+  resolvePlay4OwnerId,
+} from '../_shared/floor/supabaseIdCardAssetDb.ts';
 import type { FloorClientSendApproval, SendSpec } from '../_shared/floor/types.ts';
 
 const corsHeaders = {
@@ -95,13 +101,66 @@ serve(async (req) => {
         );
       }
 
-      const stub = buildStubInternalPackage({
-        playId: parsed.play_id,
-        playVersion: parsed.play_version,
-        clientRef: parsed.clientRef,
-        headline: parsed.headline,
-        summary: parsed.summary,
-      });
+      const policyIdFromRef = parsed.policyRef ? parseUuidFromOpaqueRef(parsed.policyRef) : null;
+
+      let packageRow;
+      let ownerId = user.id;
+      let requestPhase = 0;
+
+      if (parsed.play_id === ID_CARD_PLAY_ID) {
+        ownerId = resolvePlay4OwnerId();
+        const built = await buildIdCardIntakePackage(
+          {
+            agencyWorkspaceId: parsed.agency_workspace_id,
+            accountId: clientAccountId,
+            allowlistRaw: Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST'),
+            preferredPolicyId: policyIdFromRef,
+            playId: parsed.play_id,
+            playVersion: parsed.play_version,
+          },
+          createSupabaseBuildIdCardIntakePackageDb(supabase),
+        );
+
+        if (!built.ok) {
+          return jsonResponse(
+            { error: built.error, message: built.message },
+            built.error === 'account_not_found' ? 404 : 422,
+          );
+        }
+
+        if (!built.tier3) {
+          return jsonResponse(
+            {
+              error: 'allowlist_required',
+              message: 'FLOOR_INTERNAL_SEND_ALLOWLIST must be set for Tier-3 id.card.issue packages.',
+            },
+            422,
+          );
+        }
+
+        packageRow = built.package;
+        requestPhase = 3;
+      } else {
+        const stub = buildStubInternalPackage({
+          playId: parsed.play_id,
+          playVersion: parsed.play_version,
+          clientRef: parsed.clientRef,
+          headline: parsed.headline,
+          summary: parsed.summary,
+        });
+        packageRow = {
+          play_id: stub.play_id,
+          play_version: stub.play_version,
+          headline: stub.headline,
+          summary: stub.summary,
+          risk: stub.risk,
+          client_ref: clientAccountId,
+          document_ref: stub.document_ref,
+          fields: stub.fields,
+          diff: stub.diff,
+          send_spec: stub.send_spec,
+        };
+      }
 
       const { data: workRequest, error: workRequestError } = await supabase
         .from('automation_work_requests')
@@ -112,14 +171,14 @@ serve(async (req) => {
           play_version: parsed.play_version,
           source: parsed.source ?? 'crm_button',
           client_ref: clientAccountId,
-          owner_id: user.id,
+          owner_id: ownerId,
           status: 'awaiting_approval',
           idempotency_key: parsed.idempotency_key,
           request_body: {
             clientRef: parsed.clientRef,
             policyRef: parsed.policyRef ?? null,
-            phase: 0,
-            internal_only: true,
+            phase: requestPhase,
+            internal_only: requestPhase !== 3,
           },
         })
         .select('id')
@@ -168,16 +227,16 @@ serve(async (req) => {
         .from('decision_packages')
         .insert({
           work_request_id: workRequest.id,
-          play_id: stub.play_id,
-          play_version: stub.play_version,
-          headline: stub.headline,
-          summary: stub.summary,
-          risk: stub.risk,
+          play_id: packageRow.play_id,
+          play_version: packageRow.play_version,
+          headline: packageRow.headline,
+          summary: packageRow.summary,
+          risk: packageRow.risk,
           client_ref: clientAccountId,
-          document_ref: stub.document_ref,
-          fields: stub.fields,
-          diff: stub.diff,
-          send_spec: stub.send_spec,
+          document_ref: packageRow.document_ref,
+          fields: packageRow.fields,
+          diff: packageRow.diff,
+          send_spec: packageRow.send_spec,
         })
         .select('id, work_request_id, play_id, play_version, headline, summary, risk')
         .single();
@@ -196,7 +255,7 @@ serve(async (req) => {
         from_state: 'received',
         to_state: 'awaiting_approval',
         actor_id: user.id,
-        reason: 'phase0_internal_package_created',
+        reason: requestPhase === 3 ? 'phase3_id_card_package_created' : 'phase0_internal_package_created',
       });
 
       return jsonResponse({
@@ -322,7 +381,7 @@ serve(async (req) => {
           },
           stageDeps: {
             now: () => new Date(),
-            invokeSendCOIEmail: async () => ({ success: false }),
+            invokeTier3EmailSend: async () => ({ success: false }),
             logEmail: async () => {},
           },
         });

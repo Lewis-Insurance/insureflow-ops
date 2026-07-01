@@ -153,6 +153,14 @@ function canonicalPayload(surface: ClientSendSurface, payload: unknown): Record<
       coi_ref: normalized.coi_id ?? normalized.coiId ?? normalized.coiRef ?? normalized.certificateNumber ?? null,
     }) as Record<string, unknown>;
   }
+  if (surface === 'send-id-card-email') {
+    return sortObject({
+      to: normalized.to ?? normalized.recipientEmail,
+      policy_number: normalized.policyNumber ?? normalized.policy_number,
+      id_card_url: normalized.idCardUrl ?? normalized.id_card_url,
+      insured_name: normalized.insuredName ?? normalized.insured_name,
+    }) as Record<string, unknown>;
+  }
   if (surface === 'esign-create-request') {
     return sortObject({
       document_url: normalized.document_url ?? normalized.documentUrl,

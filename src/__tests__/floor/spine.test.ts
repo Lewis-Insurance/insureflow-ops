@@ -10,8 +10,11 @@ import {
   goldenRouterAllowlistedCoi,
   goldenRouterAuthFail,
   goldenSendCOIEmailPayload,
+  goldenSendIdCardEmailPayload,
   goldenTier3CoiInboundAllowlist,
   goldenTier3CoiInboundAccountId,
+  goldenTier3IdCardInboundAllowlist,
+  goldenTier3IdCardInboundAccountId,
   mailSkillRouter,
   releaseHeldClientSend,
   resolveAccount,
@@ -30,6 +33,11 @@ import {
   parseInternalSendAllowlist,
   buildTier3CoiInboundPackage,
   resolveCoiIntakePackage,
+  buildTier3IdCardPackage,
+  resolveIdCardIntakePackage,
+  pickInForceAutoPolicy,
+  assertInForceForTier3Send,
+  wrapPayloadWithSurface,
   type AccountRecord,
   type FloorClientSendApproval,
   type ResolveAccountStore,
@@ -247,6 +255,7 @@ describe('Floor spine — stageClientSend', () => {
         approval_id: 'appr-1',
         send_spec: {
           channel: 'email',
+          send_surface: 'send-coi-email',
           recipient: goldenSendCOIEmailPayload.to,
           recipient_basis: 'approved_holder',
           authorized_rep_of_record: 'Tori Hill',
@@ -260,7 +269,7 @@ describe('Floor spine — stageClientSend', () => {
         assertCertificateAccess: async () => {},
         assertExternalRecipientAllowed: async () => {},
         updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
-        invokeSendCOIEmail: send,
+        invokeTier3EmailSend: send,
         logEmail: async () => {},
       },
     );
@@ -278,7 +287,7 @@ describe('Floor spine — stageClientSend', () => {
       hold_until: '2026-06-30T11:59:00Z',
       recipient: goldenSendCOIEmailPayload.to,
       recipient_basis: 'approved_holder',
-      send_payload: goldenSendCOIEmailPayload,
+      send_payload: wrapPayloadWithSurface('send-coi-email', goldenSendCOIEmailPayload),
       created_at: new Date().toISOString(),
     };
 
@@ -290,12 +299,12 @@ describe('Floor spine — stageClientSend', () => {
       assertCertificateAccess: async () => {},
       assertExternalRecipientAllowed: async () => {},
       updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
-      invokeSendCOIEmail: send,
+      invokeTier3EmailSend: send,
       logEmail: async () => {},
     });
 
     expect(result).toEqual({ status: 'sent', messageId: 'msg-1' });
-    expect(send).toHaveBeenCalledWith(goldenSendCOIEmailPayload);
+    expect(send).toHaveBeenCalledWith('send-coi-email', expect.objectContaining(goldenSendCOIEmailPayload));
   });
 
   it('mints floor_action token and attaches Fence marker on release', async () => {
@@ -307,7 +316,7 @@ describe('Floor spine — stageClientSend', () => {
       hold_until: '2026-06-30T11:59:00Z',
       recipient: goldenSendCOIEmailPayload.to,
       recipient_basis: 'approved_holder',
-      send_payload: goldenSendCOIEmailPayload,
+      send_payload: wrapPayloadWithSurface('send-coi-email', goldenSendCOIEmailPayload),
       created_at: new Date().toISOString(),
     };
 
@@ -321,19 +330,20 @@ describe('Floor spine — stageClientSend', () => {
       assertExternalRecipientAllowed: async () => {},
       updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
       mintFloorFenceApproval: {
-        hashPayload: async () => 'sha256:fixturehash',
+        hashPayload: async (_surface, _payload) => 'sha256:fixturehash',
         insertClientSendApproval: async (row) => {
           inserted.push(row);
         },
       },
-      invokeSendCOIEmail: send,
+      invokeTier3EmailSend: send,
       logEmail: async () => {},
     });
 
     expect(inserted).toHaveLength(1);
     expect(inserted[0]?.approval_ref).toMatch(/^floor_action:[a-f0-9]{32}$/);
+    expect(inserted[0]?.surface).toBe('send-coi-email');
     expect(send).toHaveBeenCalledTimes(1);
-    const markedPayload = send.mock.calls[0]?.[0] as Record<string, unknown>;
+    const markedPayload = send.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(markedPayload.client_send_approval).toMatchObject({
       approval_ref: inserted[0]?.approval_ref,
       approved_by_human_id: 'user-1',
@@ -483,6 +493,7 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
     expect(
       isTier3SendSpec({
         channel: 'email',
+        send_surface: 'send-coi-email',
         recipient: '[INTERNAL_ONLY]',
         recipient_basis: 'account_of_record',
         authorized_rep_of_record: 'Tori Hill',
@@ -500,6 +511,7 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
   it('stages tier-3 approve into held state without invoking send', async () => {
     const sendSpec = {
       channel: 'email' as const,
+      send_surface: 'send-coi-email' as const,
       recipient: 'brian@lewisinsurance.ai',
       recipient_basis: 'approved_holder' as const,
       authorized_rep_of_record: 'Tori Hill',
@@ -509,7 +521,7 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       },
     };
 
-    const invokeSendCOIEmail = vi.fn();
+    const invokeTier3EmailSend = vi.fn();
     const result = await maybeStageClientSendOnApprove({
       workRequestId: 'wr-tier3',
       approverId: 'user-1',
@@ -542,13 +554,13 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
-        invokeSendCOIEmail,
+        invokeTier3EmailSend,
         logEmail: async () => {},
       },
     });
 
     expect(result).toEqual({ staged: true, status: 'held', approvalId: 'appr-tier3' });
-    expect(invokeSendCOIEmail).not.toHaveBeenCalled();
+    expect(invokeTier3EmailSend).not.toHaveBeenCalled();
   });
 
   it('skips staging for Phase 1 internal-only packages', async () => {
@@ -557,6 +569,7 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       approverId: 'user-1',
       sendSpec: {
         channel: 'email',
+        send_surface: 'send-coi-email',
         recipient: '[INTERNAL_ONLY]',
         recipient_basis: 'account_of_record',
         authorized_rep_of_record: '[INTERNAL_ONLY]',
@@ -574,7 +587,7 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
       },
       stageDeps: {
         now: () => new Date(),
-        invokeSendCOIEmail: async () => ({ success: false }),
+        invokeTier3EmailSend: async () => ({ success: false }),
         logEmail: async () => {},
       },
     });
@@ -630,7 +643,7 @@ describe('Floor plays — Tier-3 COI inbound', () => {
     });
     expect(resolved?.tier3).toBe(true);
 
-    const invokeSendCOIEmail = vi.fn();
+    const invokeTier3EmailSend = vi.fn();
     const staged = await maybeStageClientSendOnApprove({
       workRequestId: 'wr-coi-inbound',
       approverId: 'user-1',
@@ -663,12 +676,144 @@ describe('Floor plays — Tier-3 COI inbound', () => {
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
-        invokeSendCOIEmail,
+        invokeTier3EmailSend,
         logEmail: async () => {},
       },
     });
 
     expect(staged).toEqual({ staged: true, status: 'held', approvalId: 'appr-coi-inbound' });
-    expect(invokeSendCOIEmail).not.toHaveBeenCalled();
+    expect(invokeTier3EmailSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('Floor plays — Tier-3 ID card issue', () => {
+  it('pickInForceAutoPolicy prefers explicit policy and auto line', () => {
+    const picked = pickInForceAutoPolicy([
+      {
+        policy_id: 'p-home',
+        account_id: 'a1',
+        policy_number: 'HOME-1',
+        line_of_business: 'Home',
+        in_force: true,
+        premium: null,
+        cgl_details: null,
+        bap_details: null,
+        evaluated_at: '2026-07-01T00:00:00Z',
+      },
+      {
+        policy_id: 'p-auto',
+        account_id: 'a1',
+        policy_number: 'AUTO-1',
+        line_of_business: 'Auto',
+        in_force: true,
+        premium: null,
+        cgl_details: null,
+        bap_details: null,
+        evaluated_at: '2026-07-01T00:00:00Z',
+      },
+    ], 'p-auto');
+    expect(picked?.policy_id).toBe('p-auto');
+  });
+
+  it('assertInForceForTier3Send blocks lapsed policies', () => {
+    expect(() => assertInForceForTier3Send(false, 'p-lapsed')).toThrow(/not in force/);
+  });
+
+  it('builds Tier-3 ID card package with send-id-card-email surface', () => {
+    const row = buildTier3IdCardPackage({
+      clientAccountId: goldenTier3IdCardInboundAccountId,
+      accountName: goldenSendIdCardEmailPayload.insuredName,
+      policyNumber: goldenSendIdCardEmailPayload.policyNumber,
+      internalTestRecipient: goldenTier3IdCardInboundAllowlist,
+      idCardUrl: goldenSendIdCardEmailPayload.idCardUrl,
+    });
+
+    expect(row.play_id).toBe('id.card.issue');
+    expect(row.send_spec.send_surface).toBe('send-id-card-email');
+    expect(isTier3SendSpec(row.send_spec)).toBe(true);
+    expect(row.send_spec.payload).toMatchObject(goldenSendIdCardEmailPayload);
+  });
+
+  it('resolveIdCardIntakePackage produces package that stages on approve', async () => {
+    const resolved = resolveIdCardIntakePackage({
+      playId: 'id.card.issue',
+      playVersion: '1.0.0',
+      clientAccountId: goldenTier3IdCardInboundAccountId,
+      accountName: goldenSendIdCardEmailPayload.insuredName,
+      policyNumber: goldenSendIdCardEmailPayload.policyNumber,
+      idCardUrl: goldenSendIdCardEmailPayload.idCardUrl,
+      allowlistRaw: goldenTier3IdCardInboundAllowlist,
+    });
+    expect(resolved?.tier3).toBe(true);
+
+    const invokeTier3EmailSend = vi.fn();
+    const staged = await maybeStageClientSendOnApprove({
+      workRequestId: 'wr-id-card',
+      approverId: 'user-1',
+      sendSpec: resolved!.row.send_spec,
+      allowlistRaw: goldenTier3IdCardInboundAllowlist,
+      db: {
+        findFloorSendApproval: async () => null,
+        insertFloorSendApproval: async (row) => ({
+          id: 'appr-id-card',
+          work_request_id: row.work_request_id,
+          approver_id: row.approver_id,
+          status: 'approved',
+          hold_until: null,
+          recipient: row.recipient,
+          recipient_basis: row.recipient_basis,
+          send_payload: row.send_payload,
+          created_at: new Date().toISOString(),
+        }),
+        updateFloorSendApproval: async (_id, patch) => ({
+          id: 'appr-id-card',
+          work_request_id: 'wr-id-card',
+          approver_id: 'user-1',
+          status: (patch.status as 'held') ?? 'held',
+          hold_until: (patch.hold_until as string) ?? null,
+          recipient: goldenTier3IdCardInboundAllowlist,
+          recipient_basis: 'account_of_record',
+          send_payload: resolved!.row.send_spec.payload,
+          created_at: new Date().toISOString(),
+        }),
+      },
+      stageDeps: {
+        now: () => new Date('2026-07-01T12:00:00Z'),
+        invokeTier3EmailSend,
+        logEmail: async () => {},
+      },
+    });
+
+    expect(staged).toEqual({ staged: true, status: 'held', approvalId: 'appr-id-card' });
+    expect(invokeTier3EmailSend).not.toHaveBeenCalled();
+  });
+
+  it('releaseHeldClientSend routes ID card surface to send-id-card-email', async () => {
+    const approval: FloorClientSendApproval = {
+      id: 'appr-id-card-release',
+      work_request_id: 'wr-id-card-release',
+      approver_id: 'user-1',
+      status: 'held',
+      hold_until: '2026-06-30T11:59:00Z',
+      recipient: goldenSendIdCardEmailPayload.to,
+      recipient_basis: 'account_of_record',
+      send_payload: wrapPayloadWithSurface('send-id-card-email', goldenSendIdCardEmailPayload),
+      created_at: new Date().toISOString(),
+    };
+
+    const send = vi.fn().mockResolvedValue({ success: true, messageId: 'msg-id-card-1' });
+    const result = await releaseHeldClientSend('appr-id-card-release', {
+      now: () => new Date('2026-06-30T12:00:00Z'),
+      readApproval: async () => approval,
+      assertRecipientOnFile: async () => {},
+      assertPolicyInForce: async () => {},
+      assertExternalRecipientAllowed: async () => {},
+      updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
+      invokeTier3EmailSend: send,
+      logEmail: async () => {},
+    });
+
+    expect(result).toEqual({ status: 'sent', messageId: 'msg-id-card-1' });
+    expect(send).toHaveBeenCalledWith('send-id-card-email', expect.objectContaining(goldenSendIdCardEmailPayload));
   });
 });

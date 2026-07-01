@@ -51,3 +51,14 @@ export const goldenSendCOIEmailPayload = {
 export const goldenTier3CoiInboundAllowlist = 'brian@lewisinsurance.ai';
 
 export const goldenTier3CoiInboundAccountId = 'a1b2c3d4-e5f6-4789-a012-3456789abcde';
+
+export const goldenSendIdCardEmailPayload = {
+  to: 'brian@lewisinsurance.ai',
+  policyNumber: '867507454',
+  idCardUrl: 'https://example.com/signed/id-card.pdf',
+  insuredName: 'William Spence',
+} as const;
+
+export const goldenTier3IdCardInboundAllowlist = 'brian@lewisinsurance.ai';
+
+export const goldenTier3IdCardInboundAccountId = 'e8a8fa65-6b12-4c63-94b2-974c24255f67';
