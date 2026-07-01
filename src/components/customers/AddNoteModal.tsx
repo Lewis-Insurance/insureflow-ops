@@ -38,8 +38,9 @@ export function AddNoteModal({ open, onOpenChange, accountId, policyId, onSucces
       const { error } = await supabase.from('customer_notes').insert({
         customer_id: accountId,
         note_text: body.trim(),
-        created_by: user.id
-      });
+        created_by: user.id,
+        policy_id: policyId ?? null,
+      } as any);
 
       if (error) {
         toast({
@@ -59,6 +60,7 @@ export function AddNoteModal({ open, onOpenChange, accountId, policyId, onSucces
       queryClient.invalidateQueries({ queryKey: ['notes', accountId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
       queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['account-notes', accountId] });
       if (policyId) {
         queryClient.invalidateQueries({ queryKey: ['policy-notes', policyId] });
         queryClient.invalidateQueries({ queryKey: ['policy', policyId] });

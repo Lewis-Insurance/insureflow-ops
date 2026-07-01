@@ -7,6 +7,7 @@ import { UpdateRenewalWidget } from '@/components/renewals/UpdateRenewalWidget';
 import { RenewalPolicyInfoPanel } from '@/components/renewals/RenewalPolicyInfoPanel';
 import { RenewalQuotesPanel } from '@/components/renewals/RenewalQuotesPanel';
 import { RenewalContactPanel } from '@/components/renewals/RenewalContactPanel';
+import { NotesPanel } from '@/components/notes/NotesPanel';
 
 /**
  * Renewal detail — three regions only: Top Bar (identity), Hero (Update Renewal), and the
@@ -44,6 +45,9 @@ export default function RenewalEditPage() {
                 <RenewalPolicyInfoPanel renewal={renewal} />
                 <RenewalQuotesPanel renewal={renewal} />
                 <RenewalContactPanel renewal={renewal} />
+                {renewal.account_id && (
+                  <NotesPanel accountId={renewal.account_id} renewalId={renewal.id} title="Notes" />
+                )}
               </div>
             </div>
           </>
