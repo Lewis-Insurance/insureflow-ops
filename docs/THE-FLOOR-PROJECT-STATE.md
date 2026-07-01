@@ -190,7 +190,11 @@ A full build-handoff package was produced and downloaded (zip: `lewis-the-floor.
 
 ## 11. Phase 1 — definition of done
 
-**Landen → Kelli remarket, end to end, on real data, through a card.** That means: Landen hands a renewal to Kelli; her agent does the legwork and presents a finished decision card; SmartRide is audited (R1); any trailer is kept off the auto policy (R2); the client send is gated and logged (R7); and the resolution writes a candidate playbook to the vault `/candidates`. When that runs on live data through a Slack card, Phase 1 is done.
+**Authoritative sequencing:** `docs/THE-FLOOR-UNIFIED-ROADMAP.md`.
+
+Phase 1 is **The Invisible Win**: internal, reversible decision cards on Slack and the cockpit. No send path exists anywhere. Plays 1 (carrier-download reconciliation) and 3 (suspense sweep) land here. Approve / Edit / Kill work and log FeedbackEvents. An internal card lands in under 5s under the correct human's name.
+
+The **Landen to Kelli remarket** is **not** Phase 1. It lands in **unified roadmap Phase 5 (No Handoff)**. See ADR 003 (`docs/adr/003-floor-remarket-phase-placement.md`). When that runs end to end on live data through a card, Kelli-owned, with a candidate playbook written to `/lewis-vault/candidates`, Phase 5 remarket DoD is met.
 
 ---
 

@@ -148,4 +148,103 @@ describe('FloorCockpitDrawer', () => {
     expect(screen.getByText(/opaque context refs/i)).toBeInTheDocument();
     expect(sendMessage).not.toHaveBeenCalled();
   });
+
+  it('calls floor-action feedback when Approve is clicked on a persisted package', async () => {
+    const invokeAction = vi.fn().mockResolvedValue({
+      ok: true,
+      verb: 'approve',
+      preview: {
+        packageRef: 'package:renewal-review-001',
+        revision: 1,
+        workRequestRef: 'work_request:bbbbbbbbbbbb4bbb8bbbbbbbbbbbbbbb',
+        title: 'Renewal review ready',
+        summary: 'Approved internally.',
+        actions: ['approve', 'edit', 'kill'],
+      },
+    });
+    const sendMessage: FloorChatSender = async (_request, emit) => {
+      emit({
+        type: 'package',
+        packageRef: 'package:renewal-review-001',
+        revision: 1,
+        workRequestRef: 'work_request:bbbbbbbbbbbb4bbb8bbbbbbbbbbbbbbb',
+        title: 'Renewal review ready',
+        summary: 'Review the rate change and approve, edit, or kill the prepared package.',
+        actions: ['approve', 'edit', 'kill'],
+      });
+    };
+    const workspaceId = '11111111-1111-4111-8111-111111111111';
+    const actorId = '22222222-2222-4222-8222-222222222222';
+
+    render(
+      <FloorCockpitDrawer
+        open
+        onOpenChange={() => undefined}
+        initialContext={boundClientContext}
+        agencyWorkspaceId={workspaceId}
+        actorId={actorId}
+        sendMessage={sendMessage}
+        invokeAction={invokeAction}
+        launchControlEnabled
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Message Lewis Floor/i), {
+      target: { value: 'Prep the renewal review.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send to Lewis Floor/i }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Approve$/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /^Approve$/i }));
+
+    await waitFor(() =>
+      expect(invokeAction).toHaveBeenCalledWith({
+        action: 'feedback',
+        agency_workspace_id: workspaceId,
+        workRequestRef: 'work_request:bbbbbbbbbbbb4bbb8bbbbbbbbbbbbbbb',
+        packageRef: 'package:renewal-review-001',
+        verb: 'approve',
+        actor_id: actorId,
+      }),
+    );
+    expect(await screen.findByText(/Approve recorded/i)).toBeInTheDocument();
+  });
+
+  it('blocks feedback on chat-only packages without a work request ref', async () => {
+    const invokeAction = vi.fn();
+    const sendMessage: FloorChatSender = async (_request, emit) => {
+      emit({
+        type: 'package',
+        packageRef: 'package:practice-floor-cockpit-001',
+        revision: 1,
+        title: 'Practice decision package ready',
+        summary: 'Synthetic package only.',
+        actions: ['approve', 'edit', 'kill'],
+      });
+    };
+
+    render(
+      <FloorCockpitDrawer
+        open
+        onOpenChange={() => undefined}
+        initialContext={boundClientContext}
+        agencyWorkspaceId="11111111-1111-4111-8111-111111111111"
+        actorId="22222222-2222-4222-8222-222222222222"
+        sendMessage={sendMessage}
+        invokeAction={invokeAction}
+        launchControlEnabled
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Message Lewis Floor/i), {
+      target: { value: 'Show practice package.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send to Lewis Floor/i }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Approve$/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /^Approve$/i }));
+
+    expect(await screen.findByText(/not linked to a persisted work request/i)).toBeInTheDocument();
+    expect(invokeAction).not.toHaveBeenCalled();
+  });
 });

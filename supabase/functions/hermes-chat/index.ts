@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { redactPII } from '../_shared/floorSafety.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,7 +81,12 @@ function syntheticResponse(body: FloorChatRequest): Response {
   ]);
 }
 
-async function hermesProxyResponse(body: FloorChatRequest, hermesUrl: string, hermesKey: string): Promise<Response> {
+async function hermesProxyResponse(
+  body: FloorChatRequest,
+  redactedMessage: string,
+  hermesUrl: string,
+  hermesKey: string,
+): Promise<Response> {
   const upstream = await fetch(`${hermesUrl.replace(/\/$/, '')}/v1/responses`, {
     method: 'POST',
     headers: {
@@ -90,7 +96,7 @@ async function hermesProxyResponse(body: FloorChatRequest, hermesUrl: string, he
     body: JSON.stringify({
       model: Deno.env.get('HERMES_MODEL_NAME') ?? 'hermes-agent',
       conversation: body.sessionRef,
-      input: body.message,
+      input: redactedMessage,
       instructions:
         'You are Lewis Floor inside InsureFlow. Use only safe servicing summaries and opaque refs. Never send to clients, carriers, or third parties. Prepare work and require named-human approval for external actions.',
       store: true,
@@ -191,10 +197,12 @@ serve(async (req) => {
       });
     }
 
+    const { redacted: redactedMessage } = redactPII(body.message);
+
     const hermesUrl = Deno.env.get('HERMES_API_URL');
     const hermesKey = Deno.env.get('HERMES_API_KEY') ?? Deno.env.get('API_SERVER_KEY');
     if (hermesUrl && hermesKey && Deno.env.get('FLOOR_HERMES_SYNTHETIC') !== 'true') {
-      return await hermesProxyResponse(body, hermesUrl, hermesKey);
+      return await hermesProxyResponse(body, redactedMessage, hermesUrl, hermesKey);
     }
 
     return syntheticResponse(body);

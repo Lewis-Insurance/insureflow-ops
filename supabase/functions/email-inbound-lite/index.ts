@@ -1,6 +1,16 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildStubInternalPackage } from '../_shared/floor/floorAction.ts';
+import {
+  buildEmailIdempotencyKey,
+  classifyInboundAttachments,
+  evaluateFloorEmailIntake,
+  isFloorEmailIntakeEnabled,
+  playMetadataForAction,
+  senderEmailFromInbound,
+} from '../_shared/floor/emailInbound.ts';
+import type { InboundMessage, ResolveResult } from '../_shared/floor/types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,11 +45,50 @@ async function jsonOrForm(req: Request) {
 
 async function ensureProfileByEmail(email: string) {
   const lower = email.toLowerCase();
-  const { data: idMap } = await sb.from('customer_identities').select('profile_id').eq('email', lower).maybeSingle();
-  if (idMap?.profile_id) return idMap.profile_id;
-  const { data: prof } = await sb.from('profiles').insert({ email: lower, role: 'customer', full_name: lower.split('@')[0] }).select('id').single();
-  if (prof?.id) await sb.from('customer_identities').insert({ profile_id: prof.id, email: lower });
-  return prof?.id || null;
+
+  const { data: existingProfile } = await sb
+    .from('profiles')
+    .select('id')
+    .ilike('email', lower)
+    .maybeSingle();
+  if (existingProfile?.id) return existingProfile.id;
+
+  const { data: accountMatch } = await sb
+    .from('accounts')
+    .select('id')
+    .ilike('email', lower)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  const { data: insuredMatch } = await sb
+    .from('insured_emails')
+    .select('account_id')
+    .ilike('email', lower)
+    .maybeSingle();
+
+  if (accountMatch?.id || insuredMatch?.account_id) {
+    const { data: prof, error } = await sb
+      .from('profiles')
+      .insert({ email: lower, role: 'customer', full_name: lower.split('@')[0] })
+      .select('id')
+      .single();
+    if (error && String(error.message || '').includes('duplicate')) {
+      const { data: retry } = await sb.from('profiles').select('id').ilike('email', lower).maybeSingle();
+      return retry?.id ?? null;
+    }
+    return prof?.id ?? null;
+  }
+
+  const { data: prof, error } = await sb
+    .from('profiles')
+    .insert({ email: lower, role: 'customer', full_name: lower.split('@')[0] })
+    .select('id')
+    .single();
+  if (error && String(error.message || '').includes('duplicate')) {
+    const { data: retry } = await sb.from('profiles').select('id').ilike('email', lower).maybeSingle();
+    return retry?.id ?? null;
+  }
+  return prof?.id ?? null;
 }
 
 async function allowedSender(email: string) {
@@ -49,6 +98,316 @@ async function allowedSender(email: string) {
   if (exact) return true;
   const { data: dom } = await sb.from('inbound_allowlist').select('id').eq('channel','email').eq('value', domain).maybeSingle();
   return !!dom;
+}
+
+async function resolveAgencyWorkspaceId(senderEmail: string): Promise<string | null> {
+  const fromEnv = Deno.env.get('FLOOR_INBOUND_AGENCY_WORKSPACE_ID')?.trim();
+  if (fromEnv) return fromEnv;
+
+  const lower = senderEmail.toLowerCase();
+  const { data: accountRow } = await sb
+    .from('accounts')
+    .select('agency_workspace_id')
+    .ilike('email', lower)
+    .is('deleted_at', null)
+    .not('agency_workspace_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  if (accountRow?.agency_workspace_id) return accountRow.agency_workspace_id;
+
+  const { data: insuredRow } = await sb
+    .from('insured_emails')
+    .select('account_id, accounts!inner(agency_workspace_id)')
+    .ilike('email', lower)
+    .limit(1)
+    .maybeSingle();
+
+  const workspaceId = (insuredRow as { accounts?: { agency_workspace_id?: string } } | null)?.accounts?.agency_workspace_id;
+  return workspaceId ?? null;
+}
+
+async function resolveAccountViaRpc(agencyWorkspaceId: string, senderEmail: string): Promise<ResolveResult> {
+  const { data, error } = await sb.rpc('resolve_account', {
+    p_agency_workspace_id: agencyWorkspaceId,
+    p_email: senderEmail,
+    p_phone: null,
+    p_name: null,
+  });
+
+  if (error) {
+    console.error('resolve_account RPC failed', error);
+    return { candidates: [], top: null };
+  }
+
+  const payload = (data ?? { candidates: [], top: null }) as ResolveResult;
+  return {
+    candidates: Array.isArray(payload.candidates) ? payload.candidates : [],
+    top: payload.top ?? null,
+  };
+}
+
+function routerAttachmentMetadata(
+  bodyAttachments: any[],
+  storedAttachments: Array<{ name?: string; type?: string }>,
+): InboundMessage['attachments'] {
+  const fromBody = Array.isArray(bodyAttachments)
+    ? bodyAttachments.map((attachment) => ({
+        contentType: String(attachment.type ?? attachment.contentType ?? 'application/octet-stream'),
+        filename: String(attachment.name ?? attachment.filename ?? 'attachment'),
+      }))
+    : [];
+
+  const fromStored = storedAttachments.map((attachment) => ({
+    contentType: String(attachment.type ?? 'application/octet-stream'),
+    filename: String(attachment.name ?? 'attachment'),
+  }));
+
+  return [...fromBody, ...fromStored];
+}
+
+async function createFloorWorkRequest(params: {
+  agencyWorkspaceId: string;
+  action: string;
+  senderIdentity: string;
+  messageId: string;
+  subject: string;
+  from: string;
+  to: string;
+  resolveResult: ResolveResult;
+  workRequestStatus: string;
+  attachmentMetadata: InboundMessage['attachments'];
+}) {
+  const { play_id, play_version } = playMetadataForAction(params.action);
+  const idempotencyKey = buildEmailIdempotencyKey(params.messageId);
+  const clientRef = params.resolveResult.top?.account_id ?? null;
+  const clientOpaqueRef = clientRef ? `account:${clientRef.replace(/-/g, '')}` : null;
+
+  const requestBody = {
+    messageId: params.messageId || null,
+    subject: params.subject,
+    from: params.from,
+    to: params.to,
+    attachment_count: params.attachmentMetadata?.length ?? 0,
+    candidates: params.resolveResult.candidates,
+    phase: 1,
+    internal_only: true,
+  };
+
+  const { data: existing, error: existingError } = await sb
+    .from('automation_work_requests')
+    .select('id, decision_package_id, status')
+    .eq('action', params.action)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing?.id) {
+    return {
+      workRequestId: existing.id,
+      idempotent: true,
+      status: existing.status,
+      decisionPackageId: existing.decision_package_id,
+    };
+  }
+
+  const { data: workRequest, error: workRequestError } = await sb
+    .from('automation_work_requests')
+    .insert({
+      agency_workspace_id: params.agencyWorkspaceId,
+      action: params.action,
+      play_id,
+      play_version,
+      source: 'email',
+      sender_identity: params.senderIdentity,
+      client_ref: clientRef,
+      resolution_confidence: params.resolveResult.top?.confidence ?? null,
+      status: params.workRequestStatus,
+      idempotency_key: idempotencyKey,
+      request_body: requestBody,
+    })
+    .select('id')
+    .single();
+
+  if (workRequestError) {
+    if (workRequestError.code === '23505') {
+      const { data: raced } = await sb
+        .from('automation_work_requests')
+        .select('id, decision_package_id, status')
+        .eq('action', params.action)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      if (raced?.id) {
+        return {
+          workRequestId: raced.id,
+          idempotent: true,
+          status: raced.status,
+          decisionPackageId: raced.decision_package_id,
+        };
+      }
+    }
+    throw workRequestError;
+  }
+
+  await sb.from('automation_work_request_events').insert({
+    work_request_id: workRequest.id,
+    from_state: null,
+    to_state: params.workRequestStatus,
+    reason: 'email_intake_created',
+  });
+
+  let decisionPackageId: string | null = null;
+
+  if (clientRef && clientOpaqueRef && params.workRequestStatus === 'awaiting_approval') {
+    const stub = buildStubInternalPackage({
+      playId: play_id,
+      playVersion: play_version,
+      clientRef: clientOpaqueRef,
+      headline: 'COI intake — internal triage',
+      summary: `Inbound COI request from ${params.senderIdentity}. Internal review only — no client send attempted.`,
+    });
+
+    const { data: decisionPackage, error: packageError } = await sb
+      .from('decision_packages')
+      .insert({
+        work_request_id: workRequest.id,
+        play_id: stub.play_id,
+        play_version: stub.play_version,
+        headline: stub.headline,
+        summary: stub.summary,
+        risk: stub.risk,
+        client_ref: clientRef,
+        document_ref: stub.document_ref,
+        fields: stub.fields,
+        diff: stub.diff,
+        send_spec: stub.send_spec,
+      })
+      .select('id')
+      .single();
+
+    if (packageError) throw packageError;
+
+    decisionPackageId = decisionPackage.id;
+    await sb
+      .from('automation_work_requests')
+      .update({ decision_package_id: decisionPackageId, status: 'awaiting_approval' })
+      .eq('id', workRequest.id);
+
+    await sb.from('automation_work_request_events').insert({
+      work_request_id: workRequest.id,
+      from_state: params.workRequestStatus,
+      to_state: 'awaiting_approval',
+      reason: 'internal_decision_package_created',
+    });
+  }
+
+  return {
+    workRequestId: workRequest.id,
+    idempotent: false,
+    status: decisionPackageId ? 'awaiting_approval' : params.workRequestStatus,
+    decisionPackageId,
+  };
+}
+
+async function processHelpdeskTicket(params: {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  messageId: string;
+  inReplyTo: string;
+  body: Record<string, any>;
+  req: Request;
+}) {
+  const { from, to, subject, text, html, messageId, inReplyTo, body, req } = params;
+
+  if (messageId) {
+    const { data: dup } = await sb.from('ticket_messages').select('id').eq('email_message_id', messageId).limit(1);
+    if (dup && dup.length) {
+      return new Response(JSON.stringify({ success: true, ticketId: null, duplicate: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  let ticketId: string | null = null;
+  if (inReplyTo) {
+    const { data: parent } = await sb.from('ticket_messages').select('ticket_id').eq('email_message_id', inReplyTo).maybeSingle();
+    ticketId = parent?.ticket_id ?? null;
+  }
+
+  const requesterId = await ensureProfileByEmail(from);
+
+  if (!ticketId) {
+    const { data: recent } = await sb.rpc('find_recent_ticket_by_sender', { p_sender: from });
+    ticketId = recent?.id ?? null;
+  }
+
+  if (!ticketId) {
+    const { data: t, error: terr } = await sb.from('tickets').insert({
+      title: subject || `Email from ${from}`,
+      status: 'open',
+      priority: 'normal',
+      channel: 'email',
+      requester_id: requesterId,
+    }).select('id').single();
+    if (terr) throw terr;
+    ticketId = t?.id ?? null;
+  }
+
+  const content = html?.trim() || text?.trim() || '(no content)';
+  const recipients = to ? [to] : [];
+
+  let attachments: any[] = [];
+  if (Array.isArray(body.attachments)) {
+    for (const a of body.attachments) {
+      const b64 = String(a.contentBase64 || '');
+      if (!b64) continue;
+      try {
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const key = `email/${crypto.randomUUID()}-${a.name || 'file'}`;
+        const url = await putAndSign(key, bytes, a.type || 'application/octet-stream');
+        attachments.push({ name: a.name, type: a.type, size: bytes.byteLength, url, expiresIn: 3600 });
+      } catch (e) {
+        console.error('Failed to process attachment:', e);
+      }
+    }
+  }
+
+  const ct = req.headers.get('content-type') || '';
+  if (ct.includes('multipart/form-data')) {
+    const form = await req.formData();
+    const files = [...form.entries()].filter(([k,v]) => v instanceof File) as [string, File][];
+    for (const [name, file] of files) {
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        const key = `email/${crypto.randomUUID()}-${file.name || name}`;
+        const url = await putAndSign(key, buf, file.type || 'application/octet-stream');
+        attachments.push({ name: file.name || name, type: file.type, size: buf.byteLength, url, expiresIn: 3600 });
+      } catch (e) {
+        console.error('Failed to process attachment:', e);
+      }
+    }
+  }
+
+  const { error: merr } = await sb.from('ticket_messages').insert({
+    ticket_id: ticketId,
+    author_id: requesterId,
+    author_type: 'customer',
+    message_type: 'email',
+    content,
+    is_internal: false,
+    email_message_id: messageId || null,
+    email_in_reply_to: inReplyTo || null,
+    external_sender: from,
+    external_recipients: recipients,
+    attachments,
+  });
+  if (merr) throw merr;
+
+  return new Response(JSON.stringify({ success: true, ticketId }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
 serve(async (req) => {
@@ -74,90 +433,62 @@ serve(async (req) => {
       return new Response('Not allowed', { status: 403, headers: corsHeaders });
     }
 
-    if (messageId) {
-      const { data: dup } = await sb.from('ticket_messages').select('id').eq('email_message_id', messageId).limit(1);
-      if (dup && dup.length) return new Response(JSON.stringify({ success: true, ticketId: null, duplicate: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-    }
+    const attachmentMetadata = routerAttachmentMetadata(body.attachments ?? [], []);
 
-    let ticketId: string | null = null;
-    if (inReplyTo) {
-      const { data: parent } = await sb.from('ticket_messages').select('ticket_id').eq('email_message_id', inReplyTo).maybeSingle();
-      ticketId = parent?.ticket_id ?? null;
-    }
+    if (isFloorEmailIntakeEnabled(Deno.env.toObject())) {
+      const senderEmail = senderEmailFromInbound(body);
+      const agencyWorkspaceId = await resolveAgencyWorkspaceId(senderEmail);
 
-    const requesterId = await ensureProfileByEmail(from);
+      if (agencyWorkspaceId) {
+        const resolveResult = await resolveAccountViaRpc(agencyWorkspaceId, senderEmail);
+        const floorDecision = await evaluateFloorEmailIntake({
+          body,
+          attachments: attachmentMetadata,
+          resolveResult,
+          routerDeps: {
+            allowedSender,
+            classifyDocument: classifyInboundAttachments,
+          },
+        });
 
-    if (!ticketId) {
-      const { data: recent } = await sb.rpc('find_recent_ticket_by_sender', { p_sender: from });
-      ticketId = recent?.id ?? null;
-    }
+        if (floorDecision.handled && floorDecision.action && floorDecision.workRequestStatus) {
+          const floorResult = await createFloorWorkRequest({
+            agencyWorkspaceId,
+            action: floorDecision.action,
+            senderIdentity: floorDecision.senderIdentity ?? senderEmail,
+            messageId,
+            subject,
+            from,
+            to,
+            resolveResult,
+            workRequestStatus: floorDecision.workRequestStatus,
+            attachmentMetadata,
+          });
 
-    if (!ticketId) {
-      const { data: t, error: terr } = await sb.from('tickets').insert({
-        title: subject || `Email from ${from}`,
-        status: 'open',
-        priority: 'normal',
-        channel: 'email',
-        requester_id: requesterId,
-      }).select('id').single();
-      if (terr) throw terr;
-      ticketId = t?.id ?? null;
-    }
-
-    const content = html?.trim() || text?.trim() || '(no content)';
-    const recipients = to ? [to] : [];
-
-    // Parse attachments
-    let attachments: any[] = [];
-    // JSON with base64 items: { attachments: [{ name, type, contentBase64 }] }
-    if (Array.isArray(body.attachments)) {
-      for (const a of body.attachments) {
-        const b64 = String(a.contentBase64 || '');
-        if (!b64) continue;
-        try {
-          const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-          const key = `email/${crypto.randomUUID()}-${a.name || 'file'}`;
-          const url = await putAndSign(key, bytes, a.type || 'application/octet-stream');
-          attachments.push({ name: a.name, type: a.type, size: bytes.byteLength, url, expiresIn: 3600 });
-        } catch (e) {
-          console.error('Failed to process attachment:', e);
-        }
-      }
-    }
-    
-    // Multipart form: iterate File entries
-    const ct = req.headers.get('content-type') || '';
-    if (ct.includes('multipart/form-data')) {
-      const form = await req.formData();
-      const files = [...form.entries()].filter(([k,v]) => v instanceof File) as [string, File][];
-      for (const [name, file] of files) {
-        try {
-          const buf = new Uint8Array(await file.arrayBuffer());
-          const key = `email/${crypto.randomUUID()}-${file.name || name}`;
-          const url = await putAndSign(key, buf, file.type || 'application/octet-stream');
-          attachments.push({ name: file.name || name, type: file.type, size: buf.byteLength, url, expiresIn: 3600 });
-        } catch (e) {
-          console.error('Failed to process attachment:', e);
+          return new Response(JSON.stringify({
+            success: true,
+            floor: true,
+            workRequestId: floorResult.workRequestId,
+            idempotent: floorResult.idempotent,
+            status: floorResult.status,
+            decisionPackageId: floorResult.decisionPackageId,
+            route: floorDecision.route,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
     }
 
-    const { error: merr } = await sb.from('ticket_messages').insert({
-      ticket_id: ticketId,
-      author_id: requesterId,
-      author_type: 'customer',
-      message_type: 'email',
-      content,
-      is_internal: false,
-      email_message_id: messageId || null,
-      email_in_reply_to: inReplyTo || null,
-      external_sender: from,
-      external_recipients: recipients,
-      attachments,
+    return await processHelpdeskTicket({
+      from,
+      to,
+      subject,
+      text,
+      html,
+      messageId,
+      inReplyTo,
+      body,
+      req,
     });
-    if (merr) throw merr;
-
-    return new Response(JSON.stringify({ success: true, ticketId }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('email-inbound-lite error', e);
     return new Response(JSON.stringify({ error: String((e as Error).message || e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

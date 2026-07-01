@@ -70,6 +70,12 @@ verify_jwt = true
 [functions.hermes-chat]
 verify_jwt = true
 
+[functions.floor-action]
+verify_jwt = true
+
+[functions.floor-run-plays]
+verify_jwt = false
+
 [functions.parse-pdf-knowledge]
 verify_jwt = true
 

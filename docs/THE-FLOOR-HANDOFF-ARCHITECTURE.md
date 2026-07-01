@@ -23,6 +23,12 @@ Rule for the whole doc: every table and column named here is real and grounded i
 
 ---
 
+## 1.1 Unified roadmap and locked decisions
+
+Build sequencing and four settled architecture decisions live in [`docs/THE-FLOOR-UNIFIED-ROADMAP.md`](./THE-FLOOR-UNIFIED-ROADMAP.md) (Phases 0 through 6) and the ADRs in [`docs/adr/`](./adr/): layered Fence + Floor R7 gates ([001](./adr/001-floor-r7-layered-approval-gates.md)), `public.*` canonical / `hermes.*` delivery projection ([002](./adr/002-floor-public-canonical-schema.md)), Landen to Kelli remarket in Phase 5 not Phase 1 ([003](./adr/003-floor-remarket-phase-placement.md)), and consolidate on `hermes-chat` ([004](./adr/004-floor-hermes-chat-bridge.md)). Do not reopen these without Brian. When this handoff doc and the unified roadmap disagree on sequencing, the unified roadmap wins.
+
+---
+
 ## 2. The end goal (the vision)
 
 It's Tuesday morning. Kelli opens Slack. Three decision cards are already waiting, built overnight before she asked for anything. One is a certificate of insurance a contractor needs by noon. Her agent already resolved the client, pulled the policy, filled the ACORD 25, diffed the holder's demand against the actual forms, and found it clean. She reads it in ten seconds. She taps Approve. It sends, under her name, with a short undo hold in case she flinched. The cert that used to eat twenty minutes cost her one tap.

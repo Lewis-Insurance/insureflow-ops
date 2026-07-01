@@ -21,6 +21,9 @@ import { MessengerProvider } from '@/contexts/MessengerContext';
 import { useGlobalMessageNotifications } from '@/hooks/useGlobalMessageNotifications';
 import { FloorCockpitDrawer } from '@/components/floor/FloorCockpitDrawer';
 import { isFloorCockpitEnabled } from '@/floor/launchControl';
+import { buildFloorCockpitInitialContext } from '@/floor/floorCockpitContext';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
+import { useFloorAgentBinding } from '@/hooks/useFloorAgentBinding';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,6 +42,14 @@ function AppLayoutContent({ children }: AppLayoutProps) {
   } = useAIAssistantContext();
   const [isFloorCockpitOpen, setIsFloorCockpitOpen] = useState(false);
   const floorCockpitEnabled = isFloorCockpitEnabled();
+  const { activeAgency } = useActiveAgency();
+  const { data: floorAgentBinding } = useFloorAgentBinding();
+  const floorInitialContext = floorCockpitEnabled
+    ? buildFloorCockpitInitialContext({
+        agentBinding: floorAgentBinding,
+        agencyName: activeAgency?.agency?.name ?? null,
+      })
+    : null;
 
   // Initialize global message notifications (shows toast for new messages)
   useGlobalMessageNotifications();
@@ -471,6 +482,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       <FloorCockpitDrawer
         open={isFloorCockpitOpen}
         onOpenChange={setIsFloorCockpitOpen}
+        initialContext={floorInitialContext}
+        agencyWorkspaceId={activeAgency?.agency_workspace_id ?? null}
+        actorId={user?.id ?? null}
         launchControlEnabled={floorCockpitEnabled}
       />
 

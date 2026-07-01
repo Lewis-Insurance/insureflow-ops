@@ -8,7 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { validateFloorMessageForModel } from '@/floor/floorSafety';
 import { sendFloorChatMessage } from '@/floor/floorChatClient';
+import { invokeFloorAction, type FloorActionResponse } from '@/floor/floorActionClient';
+import { PRACTICE_FLOOR_CONTEXT, resolveWorkRequestRef } from '@/floor/floorCockpitContext';
 import { isFloorCockpitEnabled } from '@/floor/launchControl';
+import type { FeedbackVerb } from '@/floor/spine/types';
 import type { FloorChatSender, FloorDecisionPackagePreview, FloorInitialContext } from '@/floor/types';
 
 interface ChatMessage {
@@ -25,23 +28,18 @@ interface ToolProgressItem {
 
 export type { FloorChatSender } from '@/floor/types';
 
+export type FloorActionInvoker = typeof invokeFloorAction;
+
 interface FloorCockpitDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialContext?: FloorInitialContext | null;
+  agencyWorkspaceId?: string | null;
+  actorId?: string | null;
   sendMessage?: FloorChatSender;
+  invokeAction?: FloorActionInvoker;
   launchControlEnabled?: boolean;
 }
-
-const defaultContext: FloorInitialContext = {
-  sessionRef: 'chat:practice-floor-cockpit',
-  clientRef: 'client:practice-context',
-  label: 'Practice mode',
-  chips: [
-    { label: 'Mode', value: 'Practice / no live sends' },
-    { label: 'Surface', value: 'InsureFlow cockpit' },
-  ],
-};
 
 function newId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -51,10 +49,13 @@ export function FloorCockpitDrawer({
   open,
   onOpenChange,
   initialContext,
+  agencyWorkspaceId,
+  actorId,
   sendMessage = sendFloorChatMessage,
+  invokeAction = invokeFloorAction,
   launchControlEnabled = isFloorCockpitEnabled(),
 }: FloorCockpitDrawerProps) {
-  const context = initialContext ?? defaultContext;
+  const context = initialContext ?? PRACTICE_FLOOR_CONTEXT;
   const [input, setInput] = useState('');
   const [isWorking, setIsWorking] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -67,6 +68,66 @@ export function FloorCockpitDrawer({
   ]);
   const [toolProgress, setToolProgress] = useState<ToolProgressItem[]>([]);
   const [packagePreview, setPackagePreview] = useState<FloorDecisionPackagePreview | null>(null);
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'working' | 'done'>('idle');
+
+  function applyActionPreview(result: FloorActionResponse) {
+    if (result.preview) {
+      setPackagePreview(result.preview);
+    }
+  }
+
+  async function handleFeedback(verb: FeedbackVerb) {
+    if (!packagePreview || isWorking || feedbackState === 'working') return;
+
+    const workRequestRef = resolveWorkRequestRef(packagePreview);
+    if (!agencyWorkspaceId || !actorId || !workRequestRef) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content:
+            'This package is not linked to a persisted work request yet. Chat-only practice packages cannot be approved until a live internal package exists.',
+        },
+      ]);
+      return;
+    }
+
+    setFeedbackState('working');
+    try {
+      const result = await invokeAction({
+        action: 'feedback',
+        agency_workspace_id: agencyWorkspaceId,
+        workRequestRef,
+        packageRef: packagePreview.packageRef,
+        verb,
+        actor_id: actorId,
+        kill_reason: verb === 'kill' ? 'cockpit_kill' : undefined,
+      });
+      applyActionPreview(result);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content: `${verb.charAt(0).toUpperCase()}${verb.slice(1)} recorded. No client or carrier send was attempted.`,
+        },
+      ]);
+      setFeedbackState('done');
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content: `Floor action failed safely: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ]);
+      setFeedbackState('idle');
+    } finally {
+      setFeedbackState('idle');
+    }
+  }
 
   async function handleSend() {
     const message = input.trim();
@@ -119,10 +180,13 @@ export function FloorCockpitDrawer({
             setPackagePreview({
               packageRef: event.packageRef,
               revision: event.revision,
+              workRequestRef: event.workRequestRef,
+              workRequestId: event.workRequestId,
               title: event.title,
               summary: event.summary,
               actions: event.actions,
             });
+            setFeedbackState('idle');
           }
 
           if (event.type === 'error') {
@@ -240,15 +304,33 @@ export function FloorCockpitDrawer({
                     <CardContent className="space-y-4">
                       <p className="text-sm">{packagePreview.summary}</p>
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="default" type="button">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('approve')}
+                        >
                           <CheckCircle2 className="mr-1 h-4 w-4" aria-hidden="true" />
                           Approve
                         </Button>
-                        <Button size="sm" variant="secondary" type="button">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('edit')}
+                        >
                           <Edit3 className="mr-1 h-4 w-4" aria-hidden="true" />
                           Edit
                         </Button>
-                        <Button size="sm" variant="destructive" type="button">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('kill')}
+                        >
                           <XCircle className="mr-1 h-4 w-4" aria-hidden="true" />
                           Kill
                         </Button>

@@ -34,6 +34,18 @@ export function parseFloorSseBlock(block: string): FloorStreamEvent | null {
         type: 'package',
         packageRef: String(payload.packageRef ?? payload.package_ref ?? ''),
         revision: Number(payload.revision ?? 1),
+        workRequestRef:
+          typeof payload.workRequestRef === 'string'
+            ? payload.workRequestRef
+            : typeof payload.work_request_ref === 'string'
+              ? payload.work_request_ref
+              : undefined,
+        workRequestId:
+          typeof payload.workRequestId === 'string'
+            ? payload.workRequestId
+            : typeof payload.work_request_id === 'string'
+              ? payload.work_request_id
+              : undefined,
         title: String(payload.title ?? 'Decision package ready'),
         summary: String(payload.summary ?? 'Review the prepared package.'),
         actions: ['approve', 'edit', 'kill'],
