@@ -23,7 +23,8 @@ export default function CustomersPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCustomerAdded = () => {
-    fetchCustomers(searchQuery); // Refresh the customer list
+    setSearchQuery('');
+    fetchCustomers('');
   };
 
   // Debounced search - waits 300ms after user stops typing

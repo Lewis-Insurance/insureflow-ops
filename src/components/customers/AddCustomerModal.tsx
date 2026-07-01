@@ -10,6 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
+import { useAccountMemberships } from '@/hooks/useAccountMemberships';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { normalizePolicyType, getPolicyTypeLabel } from '@/lib/policyTypes';
 import { detectEntityFromName, parseCompoundInsuredName, type EntityType } from '@/lib/insuredNames';
@@ -178,7 +180,15 @@ const initialPolicyData: PolicyData = {
   status: 'active',
 };
 
+function mapCustomerTypeToAccountType(
+  type: 'household' | 'commercial_business'
+): 'individual' | 'business' {
+  return type === 'commercial_business' ? 'business' : 'individual';
+}
+
 export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerModalProps) {
+  const { activeAgency } = useActiveAgency();
+  const { createOwnerMembership } = useAccountMemberships();
   const [formData, setFormData] = useState({
     name: '',
     spouse_name: '',
@@ -521,11 +531,33 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
     setLoading(true);
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast({
+          title: 'Authentication required',
+          description: 'You must be signed in to add a customer.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const agencyWorkspaceId = activeAgency?.agency_workspace_id;
+      if (!agencyWorkspaceId) {
+        toast({
+          title: 'No agency workspace',
+          description: 'Select or join an agency workspace before adding customers.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Create customer
       const customerData = {
         name: formData.name.trim() || null,
         spouse_name: formData.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         type: formData.type,
+        account_type: mapCustomerTypeToAccountType(formData.type),
+        agency_workspace_id: agencyWorkspaceId,
         account_status: formData.account_status,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
@@ -561,8 +593,17 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         return;
       }
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const membershipCreated = await createOwnerMembership(newCustomer.id, user.id);
+      if (!membershipCreated) {
+        await supabase.from('accounts').delete().eq('id', newCustomer.id);
+        toast({
+          title: 'Error creating customer',
+          description: 'Failed to link the customer to your account. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       let createdPolicyId: string | null = null;
 
       // Create policy if enabled and has required data

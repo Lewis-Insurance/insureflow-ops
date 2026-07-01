@@ -15,6 +15,15 @@ const MIN_PASSWORD_LENGTH = Number(import.meta.env.VITE_MIN_PW_LEN ?? 12);
    TODO(brand): replace with the vectorized official logo (full-color + reversed). */
 function IFLogo({ variant, sm }: { variant: 'color' | 'reversed'; sm?: boolean }) {
   const waves = variant === 'reversed' ? '#FFFFFF' : '#143A5E';
+  const [failed, setFailed] = useState(false);
+  // Prefer the official asset if present in /public/brand; else show the vector stand-in.
+  if (!failed) {
+    return (
+      <span className={`if-logo${sm ? ' sm' : ''}`}>
+        <img className="if-logoimg" src={`/brand/insureflow-logo-${variant}.png`} alt="InsureFlow" onError={() => setFailed(true)} />
+      </span>
+    );
+  }
   return (
     <span className={`if-logo${sm ? ' sm' : ''}`}>
       <svg className="if-emblem" viewBox="0 0 64 64" aria-hidden="true" fill="none">

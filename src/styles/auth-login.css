@@ -52,6 +52,8 @@
 .if-logo{display:flex; align-items:center; gap:12px}
 .if-logo .if-emblem{width:44px; height:44px; flex:none}
 .if-logo.sm .if-emblem{width:34px; height:34px}
+.if-logoimg{height:44px; width:auto; display:block}
+.if-logo.sm .if-logoimg{height:34px}
 .if-wordmark{display:flex; align-items:baseline; line-height:1}
 .if-wordmark b{font-weight:800; font-size:25px; letter-spacing:-.01em}
 .if-logo.sm .if-wordmark b{font-size:21px}

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
+import { useAccountMemberships } from '@/hooks/useAccountMemberships';
 
 export interface UnifiedCustomer {
   id: string;
@@ -31,6 +33,8 @@ export function useUnifiedCustomers() {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { activeAgency } = useActiveAgency();
+  const { createOwnerMembership } = useAccountMemberships();
 
   const fetchCustomers = async (searchQuery = '', sort = 'updated_at_desc') => {
     try {
@@ -87,6 +91,19 @@ export function useUnifiedCustomers() {
     status?: string;
   }) => {
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Authentication required');
+      }
+
+      const agencyWorkspaceId = activeAgency?.agency_workspace_id;
+      if (!agencyWorkspaceId) {
+        throw new Error('No active agency workspace');
+      }
+
+      const accountType = customerData.type === 'business' ? 'business' : 'individual';
+      const accountTypeV2 = customerData.type === 'business' ? 'commercial_business' : 'household';
+
       const { data, error } = await supabase
         .from('accounts')
         .insert([{
@@ -95,13 +112,21 @@ export function useUnifiedCustomers() {
           phone: customerData.phone,
           city: customerData.city,
           state: customerData.state,
-          type: (customerData.type === 'business' ? 'commercial_business' : 'household'),
+          type: accountTypeV2,
+          account_type: accountType,
+          agency_workspace_id: agencyWorkspaceId,
           account_status: (customerData.status || 'lead')
         }])
         .select()
         .single();
 
       if (error) throw error;
+
+      const membershipCreated = await createOwnerMembership(data.id, user.id);
+      if (!membershipCreated) {
+        await supabase.from('accounts').delete().eq('id', data.id);
+        throw new Error('Failed to create account membership');
+      }
 
       toast({
         title: "Customer created",

@@ -1,0 +1,32 @@
+# Lewis Insurance Agency OS - Build Rules (Lovable)
+
+Design system: Calm Command. Standard: the AO Renewal Command Center.
+
+The binding spec is design-system/. Read it in order before any build and treat constitution.md as law: constitution.md, visual-direction.md, surface-map.md, component-rules.md, design-tokens.css, tailwind.theme.ts, tailwind.config.ts, globals.css, anti-patterns.md, acceptance-checklist.md.
+
+Lovable: paste design-system/ into project knowledge. Apply design-tokens.css then globals.css to the global stylesheet and merge tailwind.config.ts before generating screens.
+
+## The spirit
+
+Calm Command is a dark operations console. One lime accent on a near-black base. Calm, dense, decisive. Tell a producer what to do with an account in the next ten seconds.
+
+## Build setup
+
+- Dark-only: darkMode "class", class="dark" on <html>, no theme toggle.
+- Apply design-tokens.css then globals.css; merge tailwind.config.ts (it registers tailwindcss-animate).
+- Load Inter and Geist Mono. Brand radii use cc-*; shadcn rounded-lg/md/sm stay on --radius.
+
+## Hard rules (full set in constitution.md; these are non-negotiable)
+
+- The constitution is law. If the system does not cover a decision, pause and ask. Do not improvise.
+- No color, font, motion, radius, or component outside the system. Multiple hues only in charts, via --cc-chart-*.
+- One lime primary per surface. Lime only on that action and the focus ring.
+- Record surfaces lead with past, present, future. Renewal surfaces show the countdown and last-contact recency, banded and labeled.
+- No bare empty states or spinners.
+- Real Lewis Insurance logo only. Never fabricate a brand asset; if one is missing, stop and ask.
+- Mask SSN, DOB, DLN in fields, tables, and document previews. Carriers are name chips, not colors. Specialty lines never sit on an auto policy. No em or en dashes. Numbers tabular.
+- Pass acceptance-checklist.md before declaring done.
+
+## Never ship
+
+Rainbow toolbar. Vanity counters. Stacked empty boxes. Sparse rows. Color as the only signal. Bare spinner or "No data." Truncated identifiers. Navy and orange Tide palette. Carrier-by-color. Specialty lines on auto. A past-dated next action shown as done. PII in clear text.

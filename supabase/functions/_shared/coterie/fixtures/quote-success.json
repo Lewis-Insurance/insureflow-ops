@@ -1,0 +1,75 @@
+{
+  "quote": {
+    "premium": 1284.0,
+    "monthlyPremium": 107.0,
+    "totalYearlyFees": 36.0,
+    "totalYearlyOwed": 1320.0,
+    "isEstimate": true,
+    "externalId": "mock-ext-3f9a1c20-bop-gl",
+    "quotes": [
+      {
+        "quoteId": "mock-quote-bop-001",
+        "applicationId": "mock-app-001",
+        "policyType": "BOP",
+        "premium": 864.0,
+        "expirationDate": "2027-06-30",
+        "insuranceCarrier": "Coterie Insurance",
+        "lineItems": [
+          {
+            "description": "Business Personal Property",
+            "amount": 412.0,
+            "lineItemType": "Coverage",
+            "premiumType": "Annual"
+          },
+          {
+            "description": "General Liability (within BOP)",
+            "amount": 452.0,
+            "lineItemType": "Coverage",
+            "premiumType": "Annual"
+          }
+        ],
+        "fees": [
+          {
+            "description": "Policy Fee",
+            "amount": 24.0,
+            "frequency": "Annual",
+            "feeType": "PolicyFee"
+          }
+        ]
+      },
+      {
+        "quoteId": "mock-quote-gl-001",
+        "applicationId": "mock-app-002",
+        "policyType": "GL",
+        "premium": 420.0,
+        "expirationDate": "2027-06-30",
+        "insuranceCarrier": "Coterie Insurance",
+        "lineItems": [
+          {
+            "description": "General Liability Occurrence",
+            "amount": 420.0,
+            "lineItemType": "Coverage",
+            "premiumType": "Annual"
+          }
+        ],
+        "fees": [
+          {
+            "description": "Policy Fee",
+            "amount": 12.0,
+            "frequency": "Annual",
+            "feeType": "PolicyFee"
+          }
+        ]
+      }
+    ],
+    "quoteProposalUrl": "https://dashboard-sandbox.coterieinsurance.com/proposals/mock-ext-3f9a1c20-bop-gl",
+    "applicationUrl": "https://dashboard-sandbox.coterieinsurance.com/applications/mock-app-001",
+    "stateNoticeText": "This is a MOCK quote generated from local fixtures for development only. No coverage is bound and no carrier was contacted."
+  },
+  "underwritingInformation": {
+    "underwritingId": "mock-uw-success-001",
+    "declinations": []
+  },
+  "warnings": [],
+  "isSuccess": true
+}

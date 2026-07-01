@@ -1,0 +1,7 @@
+{
+  "isSuccess": false,
+  "errors": [
+    "E0001: BPP Limit is invalid for a GL policy",
+    "E0002: annualPayroll must be greater than or equal to 1000"
+  ]
+}

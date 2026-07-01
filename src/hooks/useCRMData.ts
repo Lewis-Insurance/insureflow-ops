@@ -52,9 +52,16 @@ export function useCRMData() {
       console.debug('fetchAccounts filters ->', filters);
 
       if (filters?.type && filters.type !== 'all') {
-        // UI says 'household' | 'business' ; DB stores 'individual' | 'business'
-        const dbType = filters.type === 'household' ? 'individual' : 'business';
-        query = query.eq('account_type', dbType);
+        // Match both legacy `type` and newer `account_type` columns
+        if (filters.type === 'household' || filters.type === 'individual') {
+          query = query.or(
+            'account_type.eq.individual,type.eq.household,type.eq.individual,type.eq.personal'
+          );
+        } else {
+          query = query.or(
+            'account_type.eq.business,type.eq.commercial_business,type.eq.business,type.eq.commercial,type.eq.corporate'
+          );
+        }
       }
 
       if (filters?.state) {

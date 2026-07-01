@@ -162,3 +162,6 @@ verify_jwt = true
 
 [functions.canopy-servicing]
 verify_jwt = true
+
+[functions.coterie-quote]
+verify_jwt = true
