@@ -6,16 +6,16 @@
 **Dev branch:** `klnygbbmognbslgobmzc`  
 **Last updated:** 2026-07-01 (G4 signed; client-mode release guards shipped)
 
-**Status:** 🟢 **G4 SIGNED** — Play 4 flipped to client email on dev via `FLOOR_PLAY_ALLOWLIST_MODES`. Provider delivery still pending real `RESEND_API_KEY`.
+**Status:** 🟢 **SLICE 6 DEV SOAK GREEN** — G4 client recipient verified; cancel-block live tests pass; Fence consume ✅. Provider step `failed_delivery` until dev `RESEND_API_KEY` matches prod (copy from Supabase dashboard).
 
 ---
 
 ## Definition of Done (roadmap)
 
 - [ ] ID-card request → card in owner Slack + cockpit in **< 5s**
-- [x] Approve sends under owner name with in-force gate (dev allowlist soak)
-- [ ] Same-day cancellation blocks send (unit tests green; live test pending)
-- [x] Zero wrong-recipient sends (allowlist guard + R7 payload.to match)
+- [x] Approve sends under owner name with in-force gate (dev **client** email `gdepoi346@gmail.com`)
+- [x] Same-day cancellation blocks send (live tests B + C in g4 soak)
+- [x] Zero wrong-recipient sends (G4 recipient guard + account match)
 - [x] G4 signed; Play 4 allowlist flipped to client (dev)
 
 ---
@@ -29,11 +29,27 @@
 | 2 | Play 4 `id.card.issue` module + in-force | ✅ `idCardIssueInbound.ts` + tests |
 | 3 | Send surface: new `send-id-card-email` + chokepoint generalization | ✅ deployed + Fence surface migration |
 | 4 | CRM button intake (`floor-action` + `id.card.issue`) | ✅ deployed; owner = Landen |
-| 5 | G4 live client send | ✅ signed 2026-07-01 — [`THE-FLOOR-PHASE-3-G4-SIGNOFF.md`](./THE-FLOOR-PHASE-3-G4-SIGNOFF.md) |
+| 5 | G4 live client send | ✅ signed + dev soak 2026-07-01 ([`scripts/phase3-g4-soak.sh`](../scripts/phase3-g4-soak.sh)) |
+| 6 | G4 validation soak | ✅ client email + cancel-block + Slack queue; ⚠️ Resend key |
 
 ---
 
-## Dev soak — 2026-07-01 (Play 4 allowlist)
+## Dev soak — Slice 6 G4 validation (2026-07-01)
+
+Script: [`scripts/phase3-g4-soak.sh`](../scripts/phase3-g4-soak.sh)
+
+| Part | Result |
+|---|---|
+| A — Happy path | ✅ recipient `gdepoi346@gmail.com`; Slack queue ready; Approve → held → Fence consumed |
+| A — Resend | ⚠️ `failed_delivery` (dev key is placeholder; prod hash differs) |
+| B — Cancel before approve | ✅ `send_staging_failed` / not in force |
+| C — Cancel during hold | ✅ release blocked at in-force re-check |
+
+**Ops:** Copy prod `RESEND_API_KEY` to dev in Supabase Dashboard → Edge Functions → Secrets, then re-run Part A only.
+
+---
+
+## Dev soak — 2026-07-01 (Play 4 allowlist, pre-G4)
 
 Script: [`scripts/phase3-dev-soak.sh`](../scripts/phase3-dev-soak.sh)
 

@@ -4,7 +4,7 @@ import {
   isStubInternalSendSpec,
   normalizeRecipientEmail,
   parseInternalSendAllowlist,
-  parseInternalSendAllowlist as parseAllowlist,
+  parsePlayAllowlistModes,
   type PlayAllowlistMode,
 } from './internalSendAllowlist.ts';
 import { FloorAuthorizationError } from './types.ts';
@@ -23,7 +23,7 @@ export function createTier3ExternalRecipientGuard(args: {
   modesRaw: string | undefined | null;
   resolvePlayId: (workRequestId: string) => Promise<string | null>;
 }) {
-  const internalGuard = createInternalRecipientGuard(parseAllowlist(args.allowlistRaw));
+  const internalGuard = createInternalRecipientGuard(parseInternalSendAllowlist(args.allowlistRaw));
 
   return async (recipient: string, workRequestId: string): Promise<void> => {
     const playId = await args.resolvePlayId(workRequestId);

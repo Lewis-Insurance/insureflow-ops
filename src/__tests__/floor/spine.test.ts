@@ -921,6 +921,35 @@ describe('Floor plays — Tier-3 ID card issue', () => {
     expect(invokeTier3EmailSend).not.toHaveBeenCalled();
   });
 
+  it('releaseHeldClientSend blocks ID card when policy lapses during hold', async () => {
+    const approval: FloorClientSendApproval = {
+      id: 'appr-id-card-lapsed',
+      work_request_id: 'wr-id-card-lapsed',
+      approver_id: 'user-1',
+      status: 'held',
+      hold_until: '2026-06-30T11:59:00Z',
+      recipient: goldenSendIdCardEmailPayload.to,
+      recipient_basis: 'account_of_record',
+      send_payload: wrapPayloadWithSurface('send-id-card-email', goldenSendIdCardEmailPayload),
+      created_at: new Date().toISOString(),
+    };
+
+    await expect(
+      releaseHeldClientSend('appr-id-card-lapsed', {
+        now: () => new Date('2026-06-30T12:00:00Z'),
+        readApproval: async () => approval,
+        assertRecipientOnFile: async () => {},
+        assertPolicyInForce: async () => {
+          throw new Error('R7: policy AUTO-123 is not in force; send blocked');
+        },
+        assertExternalRecipientAllowed: async () => {},
+        updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
+        invokeTier3EmailSend: vi.fn(),
+        logEmail: async () => {},
+      }),
+    ).rejects.toThrow(/not in force/);
+  });
+
   it('releaseHeldClientSend routes ID card surface to send-id-card-email', async () => {
     const approval: FloorClientSendApproval = {
       id: 'appr-id-card-release',

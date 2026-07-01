@@ -198,6 +198,26 @@ export async function releaseHeldClientSend(
   const payload = stripFloorSendMetadata(storedPayload);
   let sendPayload: StoredSendPayload = storedPayload;
 
+  await deps.assertRecipientOnFile(
+    approval.recipient,
+    approval.recipient_basis,
+    approval.work_request_id,
+  );
+
+  if (surface === 'send-id-card-email') {
+    const idPayload = payload as SendIdCardEmailRequest;
+    if (deps.assertPolicyInForce) {
+      await deps.assertPolicyInForce(approval.approver_id, idPayload.policyNumber);
+    }
+  } else {
+    const coiPayload = payload as SendCOIEmailRequest;
+    if (deps.assertCertificateAccess) {
+      await deps.assertCertificateAccess(approval.approver_id, coiPayload.certificateNumber);
+    }
+  }
+
+  await deps.assertExternalRecipientAllowed(approval.recipient, approval.work_request_id);
+
   if (deps.mintFloorFenceApproval) {
     const minted = await mintFloorFenceApprovalForSurface(
       surface,

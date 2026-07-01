@@ -423,6 +423,10 @@ serve(async (req) => {
       }),
     });
   } catch (error) {
-    return createErrorResponse(error, corsHeaders);
+    const err = error instanceof Error ? error : new Error(String(error));
+    const response = createErrorResponse(err);
+    const headers = new Headers(response.headers);
+    Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value));
+    return new Response(response.body, { status: response.status, headers });
   }
 });

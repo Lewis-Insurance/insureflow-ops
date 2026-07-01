@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 3 dev soak — Play 4 id.card.issue end-to-end (allowlist only)
+# Phase 3 dev soak — Play 4 id.card.issue (legacy; use phase3-g4-soak.sh for G4 validation)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
