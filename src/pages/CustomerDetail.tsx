@@ -56,6 +56,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Link2,
+  GitMerge,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -477,6 +478,9 @@ export default function CustomerDetail() {
                   <DropdownMenuItem onSelect={() => navigate(`/customers/${account.id}/edit`)}>
                     Edit customer
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => navigate(`/merge-customers?masterId=${account.id}`)}>
+                    <GitMerge className="mr-2 h-4 w-4" /> Merge customers
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -624,7 +628,7 @@ export default function CustomerDetail() {
               </TabsContent>
 
               <TabsContent value="policies" className="mt-4 space-y-4">
-                <CustomerPoliciesSection accountId={account.id} />
+                <CustomerPoliciesSection accountId={account.id} customerName={account.name} />
                 <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
               </TabsContent>
 
@@ -675,7 +679,13 @@ export default function CustomerDetail() {
       {/* Modals */}
       <AddNoteModal open={addNoteOpen} onOpenChange={setAddNoteOpen} accountId={account.id} onSuccess={refetchNotes} />
       <AddTaskModal open={addTaskOpen} onOpenChange={setAddTaskOpen} accountId={account.id} />
-      <AddPolicyModal open={addPolicyOpen} onOpenChange={setAddPolicyOpen} accountId={account.id} />
+      <AddPolicyModal
+        open={addPolicyOpen}
+        onOpenChange={setAddPolicyOpen}
+        accountId={account.id}
+        enableDuplicateMerge
+        currentCustomerName={account.name}
+      />
       <AddPaymentModal open={addPaymentOpen} onOpenChange={setAddPaymentOpen} accountId={account.id} customerName={account.name} />
       <AddDocumentModal open={addDocumentOpen} onOpenChange={setAddDocumentOpen} accountId={account.id} />
       <AddCallLogModal

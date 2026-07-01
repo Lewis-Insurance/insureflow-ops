@@ -26,6 +26,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface CustomerPoliciesSectionProps {
   accountId: string;
+  /** Enables the duplicate-policy compare/merge dialog on the customer record. */
+  customerName?: string;
 }
 
 // A coverage value can be null, an empty object, or a populated object. Never
@@ -37,7 +39,7 @@ function hasCoverage(coverage: unknown): boolean {
   return true;
 }
 
-export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionProps) {
+export function CustomerPoliciesSection({ accountId, customerName }: CustomerPoliciesSectionProps) {
   const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies();
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
@@ -530,6 +532,8 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
         onOpenChange={setAddPolicyOpen}
         accountId={accountId}
         onSuccess={refetch}
+        enableDuplicateMerge
+        currentCustomerName={customerName}
       />
       <AddQuoteModal
         open={addQuoteOpen}
