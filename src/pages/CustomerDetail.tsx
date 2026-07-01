@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useChromeAction } from '@/components/layout/chrome/chromeActions';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -29,16 +28,14 @@ import { AICustomerActions } from '@/components/customers/AICustomerActions';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
-import { StatusPill, Chip, SectionLabel, maskTaxId } from '@/components/cc';
+import { StatusPill, Chip, SectionLabel } from '@/components/cc';
 import { CustomerRelationshipsSection } from '@/components/relationships/CustomerRelationshipsSection';
 import { ClusterHub } from '@/components/relationships/ClusterHub';
 import { GoesByEditor } from '@/components/relationships/GoesByEditor';
 import {
   useAccountRelationships,
   useAccountCluster,
-  useHouseholdSummary,
   displayWithGoesBy,
-  formatPremium,
 } from '@/hooks/useRelationshipGraph';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -53,13 +50,9 @@ import {
   FileText,
   ClipboardList,
   Star,
-  AlertTriangle,
   CheckCircle2,
-  Link2,
   GitMerge,
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 
 interface Account {
@@ -107,6 +100,10 @@ interface Task {
 
 const STATUS_OPTIONS = ['active', 'lead', 'prospect', 'inactive'];
 
+// Sections are now always-visible panels (no tabs). A legacy ?tab= deep link
+// (e.g. a renewal's "already added" prompt) scrolls to the matching section.
+const SECTION_IDS = ['contact', 'policies', 'relationships', 'documents', 'notes', 'activity'];
+
 // Error boundary so a failing Document Collection never blanks the record.
 class ErrorBoundaryWrapper extends React.Component<
   { children: React.ReactNode },
@@ -136,17 +133,7 @@ class ErrorBoundaryWrapper extends React.Component<
   }
 }
 
-/** A nested data tile inside a hero card (component-rules.md cards and nested tiles). */
-function HeroCard({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-4">
-      <SectionLabel>{label}</SectionLabel>
-      <div className="text-sm text-cc-text-secondary">{children}</div>
-    </div>
-  );
-}
-
-/** Left-column state tile that routes to the workspace tab where the work lives. */
+/** Compact state tile that scrolls to the workspace section where the work lives. */
 function StateTile({
   label,
   value,
@@ -183,15 +170,7 @@ export default function CustomerDetail() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  // Open on the tab named by ?tab= (e.g. deep-linked from a renewal's "already added" prompt),
-  // falling back to Contact. Read once on mount so in-app tab clicks aren't overridden.
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => {
-    const t = searchParams.get('tab');
-    return t && ['contact', 'policies', 'relationships', 'documents', 'notes', 'activity'].includes(t)
-      ? t
-      : 'contact';
-  });
 
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
@@ -206,15 +185,9 @@ export default function CustomerDetail() {
   useChromeAction('log-contact', useCallback(() => setAddCallLogOpen(true), []));
   useChromeAction('compose-email', useCallback(() => setEmailComposerOpen(true), []));
 
-  const refetchTasks = async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('account_id', id)
-      .order('created_at', { ascending: false });
-    setTasks(data || []);
-  };
+  const scrollToSection = useCallback((sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const refetchNotes = async () => {
     if (!id) return;
@@ -269,6 +242,19 @@ export default function CustomerDetail() {
     fetchData();
   }, [id, toast]);
 
+  // Honor a legacy ?tab= deep link by scrolling to that section once loaded.
+  useEffect(() => {
+    if (loading || !account) return;
+    const t = searchParams.get('tab');
+    if (t && SECTION_IDS.includes(t)) {
+      requestAnimationFrame(() =>
+        document.getElementById(t)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      );
+    }
+    // Run once after the account resolves; the param is read fresh above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, account?.id]);
+
   const updateStatus = async (next: string) => {
     if (!account) return;
     const prev = account.account_status;
@@ -288,18 +274,15 @@ export default function CustomerDetail() {
     refetch: refetchRelationships,
   } = useAccountRelationships(account?.id);
   const { cluster, rollup, loading: clusterLoading } = useAccountCluster(account?.id);
-  const householdSummary = useHouseholdSummary(account?.household_id);
 
   if (loading) {
     return (
       <AppLayout>
         <div className="mx-auto max-w-[1200px] space-y-4 p-6">
           <div className="h-6 w-40 animate-pulse rounded-cc-md bg-cc-skeleton-base" />
-          <div className="h-48 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="h-64 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
-            <div className="h-64 animate-pulse rounded-cc-xl bg-cc-skeleton-base lg:col-span-2" />
-          </div>
+          <div className="h-32 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
+          <div className="h-64 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
+          <div className="h-64 animate-pulse rounded-cc-xl bg-cc-skeleton-base" />
         </div>
       </AppLayout>
     );
@@ -330,29 +313,11 @@ export default function CustomerDetail() {
   const location = [account.city, account.state].filter(Boolean).join(', ');
   const openTasks = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
   const overdueTasks = openTasks.filter((t) => t.due_at && new Date(t.due_at) < new Date());
-  const nextTask = [...openTasks]
-    .filter((t) => t.due_at)
-    .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())[0];
-  const nextTaskOverdue = nextTask?.due_at ? new Date(nextTask.due_at) < new Date() : false;
-  const lastNote = notes[0];
-
-  // Cross-sell roll-up: a $157 personal-auto record becomes a commercial conversation.
-  const ownsEdge = relationships.find((r) => r.direction === 'outgoing' && r.rel_type === 'owns');
-  let crossSell: string | null = null;
-  if (ownsEdge) {
-    crossSell = `Owner of ${ownsEdge.other_name} · ${ownsEdge.other_policies_count} polic${
-      ownsEdge.other_policies_count === 1 ? 'y' : 'ies'
-    } · ${formatPremium(ownsEdge.other_active_premium)}`;
-  } else if (householdSummary && householdSummary.member_count > 1) {
-    crossSell = `Household: ${householdSummary.member_count} members · ${householdSummary.active_policies} policies · ${formatPremium(
-      householdSummary.household_premium,
-    )}`;
-  }
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1200px] space-y-6 p-6">
-        {/* ===================== Hero ===================== */}
+        {/* ===================== Top bar: identity + actions ===================== */}
         <section
           className="relative overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card sm:p-6"
           style={{ backgroundImage: 'var(--cc-hero-glow)' }}
@@ -380,8 +345,7 @@ export default function CustomerDetail() {
                 {displayWithGoesBy(account.name, account.goes_by)}
               </h1>
               {/* Spouse / other named insureds on THIS account, listed under the
-                  primary at ~half size. Only the account's own named insureds —
-                  not linked accounts (those live on the Relationships tab). */}
+                  primary at ~half size. Only the account's own named insureds. */}
               {[account.spouse_name].filter((n) => n && n.trim()).map((n) => (
                 <p key={n} className="mt-0.5 text-sm font-medium text-cc-text-secondary break-words sm:text-base">
                   {n}
@@ -485,195 +449,101 @@ export default function CustomerDetail() {
               </DropdownMenu>
             </div>
           </div>
+        </section>
 
-          {/* Past, present, future */}
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <HeroCard label="What happened last">
-              {lastNote ? (
-                <div className="space-y-1">
-                  <p className="line-clamp-2 text-cc-text-primary">{lastNote.body}</p>
-                  <p className="cc-num text-xs text-cc-text-muted">
-                    {formatDistanceToNow(new Date(lastNote.created_at), { addSuffix: true })}
-                  </p>
-                </div>
-              ) : (
-                <span className="text-cc-text-muted">No activity logged yet.</span>
-              )}
-            </HeroCard>
-
-            <HeroCard label="Snapshot">
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                <dt className="text-cc-text-muted">Open tasks</dt>
-                <dd className="cc-num text-right text-cc-text-primary">{openTasks.length}</dd>
-                <dt className="text-cc-text-muted">Location</dt>
-                <dd className="truncate text-right text-cc-text-primary">{location || 'Not set'}</dd>
-                {account.tin_last4 && (
-                  <>
-                    <dt className="text-cc-text-muted">Tax ID</dt>
-                    <dd className="cc-num text-right text-cc-text-primary">{maskTaxId(account.tin_last4)}</dd>
-                  </>
-                )}
-              </dl>
-              {crossSell && (
-                <button
-                  type="button"
-                  onClick={() => setTab('relationships')}
-                  className="mt-2 flex w-full items-center gap-1.5 border-t border-cc-border-subtle pt-2 text-left text-cc-text-primary hover:text-cc-accent"
-                >
-                  <Link2 className="h-3.5 w-3.5 shrink-0 text-cc-accent" />
-                  <span className="truncate">{crossSell}</span>
-                </button>
-              )}
-            </HeroCard>
-
-            <HeroCard label="What happens next">
-              {nextTask ? (
-                <div className="space-y-1">
-                  <p className="text-cc-text-primary">{nextTask.title}</p>
-                  <p
-                    className="cc-num inline-flex items-center gap-1.5 text-xs"
-                    style={{ color: nextTaskOverdue ? 'var(--cc-danger-pill-text)' : 'var(--cc-text-muted)' }}
-                  >
-                    {nextTaskOverdue ? (
-                      <>
-                        <AlertTriangle className="h-3 w-3" /> Overdue, due {format(new Date(nextTask.due_at!), 'MMM d')}
-                      </>
-                    ) : (
-                      <>Due {format(new Date(nextTask.due_at!), 'MMM d, yyyy')}</>
-                    )}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <span className="text-cc-text-muted">No next step set.</span>
-                  <button
-                    onClick={() => setAddCallLogOpen(true)}
-                    className="block text-cc-link hover:text-cc-link-hover"
-                  >
-                    Log a contact
-                  </button>
-                </div>
-              )}
-            </HeroCard>
+        {/* ===================== Customer information (was the Contact tab) ===================== */}
+        <section id="contact" className="scroll-mt-20 space-y-4">
+          <CustomerContactInfo account={account} onSendEmail={() => setEmailComposerOpen(true)} />
+          <AICustomerActions accountId={account.id} accountName={account.name} />
+          <div className="flex justify-start">
+            <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
           </div>
         </section>
 
-        {/* ===================== Body: command panel + workspace ===================== */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Command panel */}
-          <aside className="space-y-4 lg:col-span-1">
-            {/* Quick actions: all secondary. The one lime primary lives in the hero (Rule 9). */}
-            <div className="space-y-2 rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
-              <SectionLabel>Quick actions</SectionLabel>
+        {/* ===================== Policies ===================== */}
+        <section id="policies" className="scroll-mt-20 space-y-4">
+          <CustomerPoliciesSection accountId={account.id} customerName={account.name} />
+          <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
+        </section>
+
+        {/* ===================== Documents ===================== */}
+        <section id="documents" className="scroll-mt-20 space-y-4">
+          <ErrorBoundaryWrapper>
+            <DocumentCollectionBoard accountId={account.id} />
+          </ErrorBoundaryWrapper>
+          <CustomerDocumentsSection accountId={account.id} />
+        </section>
+
+        {/* ===================== Notes & tasks ===================== */}
+        <section id="notes" className="scroll-mt-20 space-y-4">
+          <NotesPanel accountId={account.id} onChange={refetchNotes} />
+          <CustomerTasksSection accountId={account.id} />
+        </section>
+
+        {/* ===================== Relationships (lower priority) ===================== */}
+        <section id="relationships" className="scroll-mt-20 space-y-4">
+          <ClusterHub accountId={account.id} cluster={cluster} rollup={rollup} loading={clusterLoading} />
+          <CustomerRelationshipsSection
+            accountId={account.id}
+            accountName={account.name}
+            householdId={account.household_id}
+            spouseName={account.spouse_name}
+            relationships={relationships}
+            loading={relationshipsLoading}
+            onRelationshipsChange={refetchRelationships}
+          />
+        </section>
+
+        {/* ===================== Activity (lower priority) ===================== */}
+        <section id="activity" className="scroll-mt-20">
+          <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
+            <div className="mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-cc-text-muted" />
+              <SectionLabel>Activity</SectionLabel>
+            </div>
+            <CommunicationHistory accountId={account.id} />
+          </div>
+        </section>
+
+        {/* ===================== Quick actions + counters (out of the way, full width) ===================== */}
+        <section className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
+          <SectionLabel>Quick actions</SectionLabel>
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setEmailComposerOpen(true)}
-                className="w-full justify-start gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
               >
                 <Mail className="h-4 w-4" />
                 Compose email
               </Button>
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={() => setAddTaskOpen(true)}
-                className="w-full justify-start gap-2 rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
+                className="gap-2 rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
               >
                 <ClipboardList className="h-4 w-4" />
                 Schedule follow up
               </Button>
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={() => setAddNoteOpen(true)}
-                className="w-full justify-start gap-2 rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
+                className="gap-2 rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
               >
                 <Plus className="h-4 w-4" />
                 Add note
               </Button>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <StateTile label="Open tasks" value={openTasks.length} onClick={() => setTab('notes')} />
-              <StateTile label="Overdue" value={overdueTasks.length} danger onClick={() => setTab('notes')} />
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[18rem]">
+              <StateTile label="Open tasks" value={openTasks.length} onClick={() => scrollToSection('notes')} />
+              <StateTile label="Overdue" value={overdueTasks.length} danger onClick={() => scrollToSection('notes')} />
             </div>
-          </aside>
-
-          {/* Workspace: tabs collapse the long stack into one surface */}
-          <div className="lg:col-span-2">
-            <Tabs value={tab} onValueChange={setTab}>
-              <TabsList className="flex h-auto w-full justify-start gap-1 rounded-cc-md border border-cc-border-subtle bg-cc-surface p-1">
-                {[
-                  ['contact', 'Contact'],
-                  ['policies', 'Policies'],
-                  ['relationships', 'Relationships'],
-                  ['documents', 'Documents'],
-                  ['notes', 'Notes & tasks'],
-                  ['activity', 'Activity'],
-                ].map(([v, label]) => (
-                  <TabsTrigger
-                    key={v}
-                    value={v}
-                    className="rounded-[10px] px-3 py-1.5 text-sm text-cc-text-muted data-[state=active]:bg-cc-surface-overlay data-[state=active]:text-cc-text-primary"
-                  >
-                    {label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              <TabsContent value="contact" className="mt-4 space-y-4">
-                <CustomerContactInfo account={account} onSendEmail={() => setEmailComposerOpen(true)} />
-                <AICustomerActions accountId={account.id} accountName={account.name} />
-                <div className="flex justify-start">
-                  <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="policies" className="mt-4 space-y-4">
-                <CustomerPoliciesSection accountId={account.id} customerName={account.name} />
-                <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
-              </TabsContent>
-
-              <TabsContent value="relationships" className="mt-4 space-y-4">
-                <ClusterHub
-                  accountId={account.id}
-                  cluster={cluster}
-                  rollup={rollup}
-                  loading={clusterLoading}
-                />
-                <CustomerRelationshipsSection
-                  accountId={account.id}
-                  accountName={account.name}
-                  householdId={account.household_id}
-                  spouseName={account.spouse_name}
-                  relationships={relationships}
-                  loading={relationshipsLoading}
-                  onRelationshipsChange={refetchRelationships}
-                />
-              </TabsContent>
-
-              <TabsContent value="documents" className="mt-4 space-y-4">
-                <ErrorBoundaryWrapper>
-                  <DocumentCollectionBoard accountId={account.id} />
-                </ErrorBoundaryWrapper>
-                <CustomerDocumentsSection accountId={account.id} />
-              </TabsContent>
-
-              <TabsContent value="notes" className="mt-4 space-y-4">
-                <NotesPanel accountId={account.id} onChange={refetchNotes} />
-                <CustomerTasksSection accountId={account.id} />
-              </TabsContent>
-
-              <TabsContent value="activity" className="mt-4">
-                <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
-                  <div className="mb-3 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-cc-text-muted" />
-                    <SectionLabel>Activity</SectionLabel>
-                  </div>
-                  <CommunicationHistory accountId={account.id} />
-                </div>
-              </TabsContent>
-            </Tabs>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Modals */}

@@ -120,30 +120,17 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
     );
   }
 
-  // Renders a single policy card. The whole card is the clickable affordance to
-  // open the policy. Per-card actions are ghost ("View policy") + a three-dot
-  // overflow only. No per-card lime fill: the surface shows many cards and the
-  // one lime fill on this tab is the section-level "New policy" button.
+  // Renders a single policy card. The card is intentionally NOT clickable so the
+  // text (policy number, dates) stays selectable for copy/paste. Navigation is an
+  // explicit "View full policy" button. Per-card actions are that button + a
+  // three-dot overflow only. No per-card lime fill: the surface shows many cards
+  // and the one lime fill on this tab is the section-level "New policy" button.
   const renderPolicyCard = (policy: PolicyWithAccount, variant: 'active' | 'inactive') => {
     const openPolicy = () => navigate(`/policies/${policy.id}`);
-    const stop = (e: React.MouseEvent) => e.stopPropagation();
     const isActive = variant === 'active';
 
     return (
-      <AccentSpine
-        key={policy.id}
-        active={isActive}
-        role="button"
-        tabIndex={0}
-        onClick={openPolicy}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            openPolicy();
-          }
-        }}
-        className="cursor-pointer p-4 hover:bg-cc-surface-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-offset-2"
-      >
+      <AccentSpine key={policy.id} active={isActive} className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Policy Basic Info */}
           <div className="md:col-span-2">
@@ -209,8 +196,8 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
           </div>
         </div>
 
-        {/* Actions: one ghost "View policy" + a three-dot overflow. No per-card lime. */}
-        <div className="mt-3 pt-3 border-t border-cc-border-subtle flex flex-wrap items-center gap-2" onClick={stop}>
+        {/* Actions: an explicit "View full policy" + a three-dot overflow. No per-card lime. */}
+        <div className="mt-3 pt-3 border-t border-cc-border-subtle flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -218,7 +205,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
             className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
           >
             <Eye className="h-4 w-4" />
-            View policy
+            View full policy
           </Button>
 
           <DropdownMenu>
