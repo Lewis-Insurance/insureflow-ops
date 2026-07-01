@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildStubInternalPackage } from '../_shared/floor/floorAction.ts';
+import { resolveCoiIntakePackage } from '../_shared/floor/plays/coiIssueInbound.ts';
 import {
   buildEmailIdempotencyKey,
   classifyInboundAttachments,
@@ -181,6 +182,22 @@ async function createFloorWorkRequest(params: {
   const idempotencyKey = buildEmailIdempotencyKey(params.messageId);
   const clientRef = params.resolveResult.top?.account_id ?? null;
   const clientOpaqueRef = clientRef ? `account:${clientRef.replace(/-/g, '')}` : null;
+  const allowlistRaw = Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST');
+  const tier3Package =
+    params.action === 'coi.issue'
+    && clientRef
+    && clientOpaqueRef
+    && params.workRequestStatus === 'awaiting_approval'
+      ? resolveCoiIntakePackage({
+          playId: play_id,
+          playVersion: play_version,
+          clientAccountId: clientRef,
+          clientOpaqueRef,
+          senderIdentity: params.senderIdentity,
+          allowlistRaw,
+          authorizedRep: Deno.env.get('FLOOR_AUTHORIZED_REP') ?? undefined,
+        })
+      : null;
 
   const requestBody = {
     messageId: params.messageId || null,
@@ -189,8 +206,9 @@ async function createFloorWorkRequest(params: {
     to: params.to,
     attachment_count: params.attachmentMetadata?.length ?? 0,
     candidates: params.resolveResult.candidates,
-    phase: 1,
-    internal_only: true,
+    phase: tier3Package ? 2 : 1,
+    tier3_internal_test: Boolean(tier3Package),
+    internal_only: !tier3Package,
   };
 
   const { data: existing, error: existingError } = await sb
@@ -258,7 +276,7 @@ async function createFloorWorkRequest(params: {
   let decisionPackageId: string | null = null;
 
   if (clientRef && clientOpaqueRef && params.workRequestStatus === 'awaiting_approval') {
-    const stub = buildStubInternalPackage({
+    const packageRow = tier3Package?.row ?? buildStubInternalPackage({
       playId: play_id,
       playVersion: play_version,
       clientRef: clientOpaqueRef,
@@ -270,16 +288,16 @@ async function createFloorWorkRequest(params: {
       .from('decision_packages')
       .insert({
         work_request_id: workRequest.id,
-        play_id: stub.play_id,
-        play_version: stub.play_version,
-        headline: stub.headline,
-        summary: stub.summary,
-        risk: stub.risk,
+        play_id: packageRow.play_id,
+        play_version: packageRow.play_version,
+        headline: packageRow.headline,
+        summary: packageRow.summary,
+        risk: packageRow.risk,
         client_ref: clientRef,
-        document_ref: stub.document_ref,
-        fields: stub.fields,
-        diff: stub.diff,
-        send_spec: stub.send_spec,
+        document_ref: packageRow.document_ref,
+        fields: packageRow.fields,
+        diff: packageRow.diff,
+        send_spec: packageRow.send_spec,
       })
       .select('id')
       .single();
@@ -305,6 +323,7 @@ async function createFloorWorkRequest(params: {
     idempotent: false,
     status: decisionPackageId ? 'awaiting_approval' : params.workRequestStatus,
     decisionPackageId,
+    tier3: Boolean(tier3Package),
   };
 }
 
@@ -472,6 +491,7 @@ serve(async (req) => {
             idempotent: floorResult.idempotent,
             status: floorResult.status,
             decisionPackageId: floorResult.decisionPackageId,
+            tier3: floorResult.tier3 ?? false,
             route: floorDecision.route,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }

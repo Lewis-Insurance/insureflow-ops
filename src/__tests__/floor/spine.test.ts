@@ -10,6 +10,8 @@ import {
   goldenRouterAllowlistedCoi,
   goldenRouterAuthFail,
   goldenSendCOIEmailPayload,
+  goldenTier3CoiInboundAllowlist,
+  goldenTier3CoiInboundAccountId,
   mailSkillRouter,
   releaseHeldClientSend,
   resolveAccount,
@@ -26,6 +28,8 @@ import {
   isStubInternalSendSpec,
   isTier3SendSpec,
   parseInternalSendAllowlist,
+  buildTier3CoiInboundPackage,
+  resolveCoiIntakePackage,
   type AccountRecord,
   type FloorClientSendApproval,
   type ResolveAccountStore,
@@ -568,5 +572,78 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
     const token = mintFloorActionToken();
     expect(isFloorActionApprovalRef(token)).toBe(true);
     expect(token).toMatch(/^floor_action:[a-f0-9]{32}$/);
+  });
+});
+
+describe('Floor plays — Tier-3 COI inbound', () => {
+  it('builds Tier-3 package with allowlist recipient matching payload.to', () => {
+    const row = buildTier3CoiInboundPackage({
+      clientAccountId: goldenTier3CoiInboundAccountId,
+      senderIdentity: 'contractor@aceconstruction.com',
+      internalTestRecipient: goldenTier3CoiInboundAllowlist,
+      holderName: goldenSendCOIEmailPayload.holderName,
+      certificateNumber: goldenSendCOIEmailPayload.certificateNumber,
+      certificateUrl: goldenSendCOIEmailPayload.certificateUrl,
+    });
+
+    expect(isTier3SendSpec(row.send_spec)).toBe(true);
+    expect(row.send_spec.recipient).toBe(goldenTier3CoiInboundAllowlist);
+    expect(row.send_spec.payload.to).toBe(goldenTier3CoiInboundAllowlist);
+    expect(row.play_id).toBe('coi.issue');
+  });
+
+  it('resolveCoiIntakePackage returns null when allowlist is empty', () => {
+    expect(
+      resolveCoiIntakePackage({
+        playId: 'coi.issue',
+        playVersion: '1.0.0',
+        clientAccountId: goldenTier3CoiInboundAccountId,
+        clientOpaqueRef: `account:${goldenTier3CoiInboundAccountId.replace(/-/g, '')}`,
+        senderIdentity: 'contractor@aceconstruction.com',
+        allowlistRaw: '',
+      }),
+    ).toBeNull();
+  });
+
+  it('resolveCoiIntakePackage produces package that stages on approve', async () => {
+    const resolved = resolveCoiIntakePackage({
+      playId: 'coi.issue',
+      playVersion: '1.0.0',
+      clientAccountId: goldenTier3CoiInboundAccountId,
+      clientOpaqueRef: `account:${goldenTier3CoiInboundAccountId.replace(/-/g, '')}`,
+      senderIdentity: 'contractor@aceconstruction.com',
+      allowlistRaw: goldenTier3CoiInboundAllowlist,
+    });
+    expect(resolved?.tier3).toBe(true);
+
+    const invokeSendCOIEmail = vi.fn();
+    const staged = await maybeStageClientSendOnApprove({
+      workRequestId: 'wr-coi-inbound',
+      approverId: 'user-1',
+      sendSpec: resolved!.row.send_spec,
+      allowlistRaw: goldenTier3CoiInboundAllowlist,
+      db: {
+        findFloorSendApproval: async () => null,
+        insertFloorSendApproval: async (row) => ({
+          id: 'appr-coi-inbound',
+          work_request_id: row.work_request_id,
+          approver_id: row.approver_id,
+          status: 'approved',
+          hold_until: null,
+          recipient: row.recipient,
+          recipient_basis: row.recipient_basis,
+          send_payload: row.send_payload,
+          created_at: new Date().toISOString(),
+        }),
+      },
+      stageDeps: {
+        now: () => new Date('2026-07-01T12:00:00Z'),
+        invokeSendCOIEmail,
+        logEmail: async () => {},
+      },
+    });
+
+    expect(staged).toEqual({ staged: true, status: 'held', approvalId: 'appr-coi-inbound' });
+    expect(invokeSendCOIEmail).not.toHaveBeenCalled();
   });
 });

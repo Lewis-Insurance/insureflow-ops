@@ -47,3 +47,7 @@ export const goldenSendCOIEmailPayload = {
   certificateUrl: 'https://example.com/signed/coi.pdf',
   holderName: 'Ace Construction LLC',
 } as const;
+
+export const goldenTier3CoiInboundAllowlist = 'brian@lewisinsurance.ai';
+
+export const goldenTier3CoiInboundAccountId = 'a1b2c3d4-e5f6-4789-a012-3456789abcde';

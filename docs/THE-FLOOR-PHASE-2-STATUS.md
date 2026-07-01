@@ -3,7 +3,7 @@
 **Phase:** 2 — The Send Seam (internal-recipient locked)  
 **Goal:** R7 send path end-to-end with hard internal allowlist; no real client sends until G4.  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-01 (Slice 2 Fence mint path)
+**Last updated:** 2026-07-01 (Slice 3 Tier-3 COI inbound play)
 
 ---
 
@@ -15,49 +15,43 @@
 - [x] `releaseHeldClientSend` mints `floor_action:` → Fence `client_send_approvals`
 - [x] Fence service-release consume path (no live user JWT required for `floor_action:`)
 - [x] `send-coi-email` accepts cron-authenticated Floor release (`X-Cron-Secret` + marker)
-- [ ] Tier-3 COI inbound play produces real package with internal test recipient
+- [x] Tier-3 COI inbound play produces package with internal test recipient
 - [ ] First internal test send verified on dev (Brian sign-off)
 
 ---
 
-## Slice 1 — Allowlist + stage on approve (shipped)
+## Slice 3 — Tier-3 COI inbound (shipped in code)
 
-See commit `62df9d6`.
+**When:** `coi.issue` email intake + resolved account + `FLOOR_INTERNAL_SEND_ALLOWLIST` set
 
----
+**Behavior**
+- `email-inbound-lite` calls `resolveCoiIntakePackage` instead of stub
+- `decision_packages.send_spec.recipient` = first allowlist address (not `[INTERNAL_ONLY]`)
+- `request_body`: `{ phase: 2, tier3_internal_test: true, internal_only: false }`
+- Response includes `tier3: true`
+- Without allowlist → falls back to Phase 1 stub (no send seam)
 
-## Slice 2 — Fence mint path (shipped in code)
+**Modules**
+- `src/floor/spine/plays/coiIssueInbound.ts`
+- `pickInternalTestRecipient` in `internalSendAllowlist.ts`
 
-**Flow**
-1. Human Approve on Tier-3 package → `maybeStageClientSendOnApprove` → `floor_client_send_approvals.status=held`
-2. After 30s, `floor-release-held-sends` (requires `FLOOR_CLIENT_SEND_ENABLED=true`)
-3. `releaseHeldClientSend` → `mintFloorFenceApprovalForCoi` → inserts `client_send_approvals` with `floor_action:{hex}`
-4. Sweeper POSTs `send-coi-email` with marker + `X-Cron-Secret`
-5. Fence consumes one-time approval; Resend sends to allowlist address only
-
-**Key modules**
-- `src/floor/spine/mintFloorFenceApproval.ts`
-- `supabase/functions/_shared/clientSendApprovalGate.ts` — `floor_action:` session bypass
-- `supabase/functions/send-coi-email/index.ts` — cron Floor release auth path
-
-**Dev enable (Brian-gated)**
+**Dev deploy**
 ```bash
-supabase secrets set --project-ref klnygbbmognbslgobmzc \
-  FLOOR_CLIENT_SEND_ENABLED=true \
-  FLOOR_INTERNAL_SEND_ALLOWLIST=brian@lewisinsurance.ai
-
-supabase functions deploy floor-release-held-sends send-coi-email floor-action --project-ref klnygbbmognbslgobmzc
+./scripts/g0-dev-enable-floor-flags.sh
+supabase functions deploy email-inbound-lite floor-action floor-release-held-sends send-coi-email --project-ref klnygbbmognbslgobmzc
 ```
 
-**Tests:** spine mint-on-release + Fence `floor_action` consume without session match
+**Soak test**
+1. POST allowlisted COI-shaped inbound (SPF/DKIM/DMARC pass + coi filename)
+2. Confirm package `send_spec.recipient` = allowlist email
+3. Approve in Slack/cockpit → `floor_client_send_approvals.status=held`
+4. `FLOOR_CLIENT_SEND_ENABLED=true` → run release sweeper → email to allowlist only
 
 ---
 
-## Next slice (Phase 2)
+## Slice 2 — Fence mint path
 
-1. Tier-3 COI inbound play → internal test recipient package
-2. Dev soak: approve → hold → release → email lands on allowlist only
-3. Brian first internal test send sign-off (G4 prep)
+See commit `51f323a`.
 
 ---
 

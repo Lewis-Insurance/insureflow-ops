@@ -9,6 +9,7 @@ export * from './approveClientSendStaging.ts';
 export * from './mintFloorFenceApproval.ts';
 export * from './plays/carrierReconciliation.ts';
 export * from './plays/suspenseSweep.ts';
+export * from './plays/coiIssueInbound.ts';
 export * from './emailInbound.ts';
 export * from './internalPlayCards.ts';
 export * from './persistInternalPlayCards.ts';

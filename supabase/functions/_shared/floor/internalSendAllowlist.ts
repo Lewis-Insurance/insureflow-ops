@@ -43,3 +43,10 @@ export function createInternalRecipientGuard(allowlist: Set<string>) {
     }
   };
 }
+
+/** First allowlist entry (sorted) for deterministic dev/test sends. */
+export function pickInternalTestRecipient(allowlistRaw: string | undefined | null): string | null {
+  const allowlist = parseInternalSendAllowlist(allowlistRaw);
+  if (allowlist.size === 0) return null;
+  return [...allowlist].sort()[0];
+}
