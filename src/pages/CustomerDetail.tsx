@@ -17,6 +17,7 @@ import { CustomerPoliciesSection } from '@/components/customers/CustomerPolicies
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
+import { NotesPanel } from '@/components/notes/NotesPanel';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { AddPolicyModal } from '@/components/customers/AddPolicyModal';
 import { AddPaymentModal } from '@/components/customers/AddPaymentModal';
@@ -212,6 +213,7 @@ export default function CustomerDetail() {
       .from('customer_notes')
       .select('*')
       .eq('customer_id', id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     setNotes((data || []).map((n) => ({ id: n.id, body: n.note_text, created_at: n.created_at, author_id: n.created_by })));
   };
@@ -239,6 +241,7 @@ export default function CustomerDetail() {
           .from('customer_notes')
           .select('*')
           .eq('customer_id', id)
+          .is('deleted_at', null)
           .order('created_at', { ascending: false });
         setNotes((notesData || []).map((n) => ({ id: n.id, body: n.note_text, created_at: n.created_at, author_id: n.created_by })));
 
@@ -643,37 +646,7 @@ export default function CustomerDetail() {
               </TabsContent>
 
               <TabsContent value="notes" className="mt-4 space-y-4">
-                <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
-                  <div className="mb-3 flex items-center justify-between">
-                    <SectionLabel>Notes</SectionLabel>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAddNoteOpen(true)}
-                      className="gap-1.5 text-cc-text-secondary hover:text-cc-text-primary"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add note
-                    </Button>
-                  </div>
-                  {notes.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-cc-text-muted">
-                      No notes yet. Capture what matters about this account.
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-cc-border-subtle">
-                      {notes.map((note) => (
-                        <li key={note.id} className="py-3 first:pt-0 last:pb-0">
-                          <p className="text-sm text-cc-text-primary">{note.body}</p>
-                          <p className="cc-num mt-1 text-xs text-cc-text-muted">
-                            {format(new Date(note.created_at), 'MMM d, yyyy')} ({' '}
-                            {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })} )
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <NotesPanel accountId={account.id} onChange={refetchNotes} />
                 <CustomerTasksSection accountId={account.id} />
               </TabsContent>
 
