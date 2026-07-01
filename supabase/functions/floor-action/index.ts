@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { requireAgencyAuth, requireAgencyMembership } from '../_shared/agency-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
+import { maybeStageClientSendOnApprove } from '../_shared/floor/approveClientSendStaging.ts';
 import {
   buildPackagePreview,
   buildStubInternalPackage,
@@ -9,6 +10,7 @@ import {
   validateFeedbackActor,
   validateFloorActionBody,
 } from '../_shared/floor/floorAction.ts';
+import type { FloorClientSendApproval, SendSpec } from '../_shared/floor/types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -244,7 +246,7 @@ serve(async (req) => {
 
     const { data: decisionPackage, error: packageError } = await supabase
       .from('decision_packages')
-      .select('id, work_request_id, play_id, play_version, headline, summary, risk, client_ref')
+      .select('id, work_request_id, play_id, play_version, headline, summary, risk, client_ref, send_spec')
       .eq('id', packageId)
       .eq('work_request_id', workRequestId)
       .maybeSingle();
@@ -281,12 +283,58 @@ serve(async (req) => {
       reason: `feedback_${parsed.verb}`,
     });
 
+    let sendStaging: Record<string, unknown> | null = null;
+    if (parsed.verb === 'approve') {
+      try {
+        const staged = await maybeStageClientSendOnApprove({
+          workRequestId,
+          approverId: user.id,
+          sendSpec: decisionPackage.send_spec as SendSpec | null,
+          allowlistRaw: Deno.env.get('FLOOR_INTERNAL_SEND_ALLOWLIST'),
+          db: {
+            async findFloorSendApproval(workRequestId) {
+              const { data } = await supabase
+                .from('floor_client_send_approvals')
+                .select('*')
+                .eq('work_request_id', workRequestId)
+                .maybeSingle();
+              return data ? (data as FloorClientSendApproval) : null;
+            },
+            async insertFloorSendApproval(row) {
+              const { data, error } = await supabase
+                .from('floor_client_send_approvals')
+                .insert(row)
+                .select('*')
+                .single();
+              if (error) throw new ValidationError(error.message);
+              return data as FloorClientSendApproval;
+            },
+          },
+          stageDeps: {
+            now: () => new Date(),
+            invokeSendCOIEmail: async () => ({ success: false }),
+            logEmail: async () => {},
+          },
+        });
+        sendStaging = staged as Record<string, unknown>;
+      } catch (stagingError) {
+        return jsonResponse(
+          {
+            error: 'send_staging_failed',
+            message: stagingError instanceof Error ? stagingError.message : String(stagingError),
+          },
+          422,
+        );
+      }
+    }
+
     return jsonResponse({
       ok: true,
       feedbackEventId: feedbackEvent.id,
       verb: feedbackEvent.verb,
       workRequestRef: parsed.workRequestRef,
       packageRef: parsed.packageRef,
+      sendStaging,
       preview: buildPackagePreview({
         packageId: decisionPackage.id,
         workRequestId: decisionPackage.work_request_id,

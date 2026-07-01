@@ -37,11 +37,12 @@ echo "  FLOOR_INBOUND_AGENCY_WORKSPACE_ID=${WORKSPACE_ID}"
 supabase secrets set \
   --project-ref "${DEV_REF}" \
   FLOOR_COCKPIT_ENABLED=true \
-  "FLOOR_INBOUND_AGENCY_WORKSPACE_ID=${WORKSPACE_ID}"
+  "FLOOR_INBOUND_AGENCY_WORKSPACE_ID=${WORKSPACE_ID}" \
+  "FLOOR_INTERNAL_SEND_ALLOWLIST=brian@lewisinsurance.ai"
 
 echo ""
 echo "Done. Deploy functions if needed:"
-echo "  supabase functions deploy floor-action floor-run-plays hermes-chat email-inbound-lite --project-ref ${DEV_REF}"
+echo "  supabase functions deploy floor-action floor-run-plays floor-release-held-sends hermes-chat email-inbound-lite --project-ref ${DEV_REF}"
 echo ""
 echo "Run plays (requires CRON_SECRET in header):"
 echo "  curl -X POST \"https://${DEV_REF}.supabase.co/functions/v1/floor-run-plays\" \\"

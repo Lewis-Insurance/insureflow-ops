@@ -19,6 +19,11 @@ import {
   persistInternalPlayCards,
   shouldForceIdentityPick,
   stageClientSend,
+  maybeStageClientSendOnApprove,
+  createInternalRecipientGuard,
+  isStubInternalSendSpec,
+  isTier3SendSpec,
+  parseInternalSendAllowlist,
   type AccountRecord,
   type FloorClientSendApproval,
   type ResolveAccountStore,
@@ -421,5 +426,97 @@ describe('Floor plays — internal card pipeline', () => {
     expect(db.insertWorkRequest).toHaveBeenCalled();
     inserted.push(...result.package_refs);
     expect(inserted.length).toBe(1);
+  });
+});
+
+describe('Floor spine — internal send allowlist (Phase 2)', () => {
+  it('treats Phase 1 stub recipient as non-tier-3', () => {
+    expect(isStubInternalSendSpec('[INTERNAL_ONLY]')).toBe(true);
+    expect(
+      isTier3SendSpec({
+        channel: 'email',
+        recipient: '[INTERNAL_ONLY]',
+        recipient_basis: 'account_of_record',
+        authorized_rep_of_record: 'Tori Hill',
+        payload: goldenSendCOIEmailPayload,
+      }),
+    ).toBe(false);
+  });
+
+  it('blocks recipients outside the internal allowlist', async () => {
+    const guard = createInternalRecipientGuard(parseInternalSendAllowlist('brian@lewisinsurance.ai'));
+    await expect(guard('client@example.invalid')).rejects.toThrow(/not on the internal send allowlist/);
+    await expect(guard('brian@lewisinsurance.ai')).resolves.toBeUndefined();
+  });
+
+  it('stages tier-3 approve into held state without invoking send', async () => {
+    const sendSpec = {
+      channel: 'email' as const,
+      recipient: 'brian@lewisinsurance.ai',
+      recipient_basis: 'approved_holder' as const,
+      authorized_rep_of_record: 'Tori Hill',
+      payload: {
+        ...goldenSendCOIEmailPayload,
+        to: 'brian@lewisinsurance.ai',
+      },
+    };
+
+    const invokeSendCOIEmail = vi.fn();
+    const result = await maybeStageClientSendOnApprove({
+      workRequestId: 'wr-tier3',
+      approverId: 'user-1',
+      sendSpec,
+      allowlistRaw: 'brian@lewisinsurance.ai',
+      db: {
+        findFloorSendApproval: async () => null,
+        insertFloorSendApproval: async (row) => ({
+          id: 'appr-tier3',
+          work_request_id: row.work_request_id,
+          approver_id: row.approver_id,
+          status: 'approved',
+          hold_until: null,
+          recipient: row.recipient,
+          recipient_basis: row.recipient_basis,
+          send_payload: row.send_payload,
+          created_at: new Date().toISOString(),
+        }),
+      },
+      stageDeps: {
+        now: () => new Date('2026-07-01T12:00:00Z'),
+        invokeSendCOIEmail,
+        logEmail: async () => {},
+      },
+    });
+
+    expect(result).toEqual({ staged: true, status: 'held', approvalId: 'appr-tier3' });
+    expect(invokeSendCOIEmail).not.toHaveBeenCalled();
+  });
+
+  it('skips staging for Phase 1 internal-only packages', async () => {
+    const result = await maybeStageClientSendOnApprove({
+      workRequestId: 'wr-internal',
+      approverId: 'user-1',
+      sendSpec: {
+        channel: 'email',
+        recipient: '[INTERNAL_ONLY]',
+        recipient_basis: 'account_of_record',
+        authorized_rep_of_record: '[INTERNAL_ONLY]',
+        payload: goldenSendCOIEmailPayload,
+      },
+      allowlistRaw: 'brian@lewisinsurance.ai',
+      db: {
+        findFloorSendApproval: async () => null,
+        insertFloorSendApproval: async () => {
+          throw new Error('should not insert');
+        },
+      },
+      stageDeps: {
+        now: () => new Date(),
+        invokeSendCOIEmail: async () => ({ success: false }),
+        logEmail: async () => {},
+      },
+    });
+
+    expect(result).toEqual({ staged: false, reason: 'internal_only' });
   });
 });
