@@ -2,16 +2,8 @@ import { Link } from 'react-router-dom';
 import { Chip, SectionLabel } from '@/components/cc';
 import { humanizeCarrier, humanizeLine } from '@/lib/format';
 import { termLabel, normalizePolicyTerm } from '@/lib/renewals/renewalTerm';
+import { formatMoney as money, formatShortDate as shortDate } from '@/lib/renewals/format';
 import type { Renewal } from '@/hooks/useRenewalWorkflow';
-
-function money(amount: number | null | undefined): string {
-  if (amount == null) return '--';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-}
-function shortDate(d: string | null | undefined): string {
-  if (!d) return '--';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (

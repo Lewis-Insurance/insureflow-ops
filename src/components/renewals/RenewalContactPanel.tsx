@@ -3,12 +3,8 @@ import { ExternalLink } from 'lucide-react';
 import { SectionLabel } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
 import { useCommunicationHistory } from '@/hooks/useEmailComposer';
+import { formatShortDate as shortDate } from '@/lib/renewals/format';
 import type { Renewal } from '@/hooks/useRenewalWorkflow';
-
-function shortDate(d: string | null | undefined): string {
-  if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 /**
  * Recent contact for this renewal, read from the shared account-level

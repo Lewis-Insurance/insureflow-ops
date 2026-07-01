@@ -3,12 +3,8 @@ import { ExternalLink } from 'lucide-react';
 import { Chip, SectionLabel, StatusPill } from '@/components/cc';
 import { humanizeCarrier, humanizeLine } from '@/lib/format';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
+import { formatMoney as money } from '@/lib/renewals/format';
 import type { Renewal } from '@/hooks/useRenewalWorkflow';
-
-function money(amount: number | null | undefined): string {
-  if (amount == null) return '--';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-}
 
 /**
  * Relevant quotes for this renewal, read from the shared account-level `quotes` store

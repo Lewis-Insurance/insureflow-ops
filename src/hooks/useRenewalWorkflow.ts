@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { logger } from '@/lib/logger';
 import { useAuth } from './useAuth';
 import {
-  policyTermToMovedTerm,
   mapLostReason,
   type PolicyTerm,
   type LostReasonCategory,
@@ -1417,81 +1416,26 @@ export function useMarkMoved() {
         policy_term, effective_date, expiration_date, notes,
       } = params;
 
-      // Carry durable fields from the old policy onto the new one.
-      const { data: oldPolicy, error: fetchError } = await supabase
-        .from('policies')
-        .select('line_of_business, billing_frequency, billing_method')
-        .eq('id', policyId)
-        .single();
-      if (fetchError) throw new Error(`Could not load policy: ${fetchError.message}`);
+      // Atomic + idempotent: the new policy INSERT, old policy -> inactive, renewal -> moved,
+      // and the audit note all run in one transaction inside renewal_mark_moved, so a failed or
+      // retried commit can never leave two active policies or duplicate the new policy.
+      const { data: newPolicyId, error } = await (supabase as any).rpc('renewal_mark_moved', {
+        p_renewal_id: renewalId,
+        p_policy_id: policyId,
+        p_account_id: accountId,
+        p_carrier: carrier,
+        p_policy_number: policy_number,
+        p_premium: premium,
+        p_policy_term: policy_term,
+        p_effective_date: effective_date,
+        p_expiration_date: expiration_date,
+        p_notes: notes ?? null,
+      });
+      if (error) throw new Error(error.message || 'Failed to record move');
 
-      // Best-effort carrier name -> id resolution (carrier text is the source of truth).
-      let carrierId: string | null = null;
-      try {
-        const { data: c } = await supabase
-          .from('carriers')
-          .select('id')
-          .ilike('name', carrier)
-          .limit(1)
-          .maybeSingle();
-        carrierId = c?.id ?? null;
-      } catch {
-        /* leave carrier_id null; carrier name is stored regardless */
-      }
-
-      const { data: auth } = await supabase.auth.getUser();
-
-      // 1. Create the new (moved-to) policy.
-      const { data: newPolicy, error: insertError } = await supabase
-        .from('policies')
-        .insert({
-          account_id: accountId,
-          insured_user_id: auth?.user?.id ?? null,
-          policy_number,
-          carrier,
-          carrier_id: carrierId,
-          line_of_business: oldPolicy?.line_of_business ?? null,
-          premium,
-          effective_date,
-          expiration_date,
-          billing_frequency: oldPolicy?.billing_frequency ?? null,
-          billing_method: oldPolicy?.billing_method ?? null,
-          policy_term,
-          status: 'active',
-        })
-        .select('id')
-        .single();
-      if (insertError) throw new Error(`New policy creation failed: ${insertError.message}`);
-
-      // 2. Deactivate the old policy (status only; its data is preserved).
-      const { error: oldError } = await supabase
-        .from('policies')
-        .update({ status: 'inactive' })
-        .eq('id', policyId);
-      if (oldError) throw new Error(`Old policy update failed: ${oldError.message}`);
-
-      // 3. Close the renewal as 'moved' with the moved-to details.
-      const movedUpdate: Record<string, any> = {
-        status: 'moved',
-        moved_carrier: carrier,
-        moved_premium: premium,
-        moved_term: policyTermToMovedTerm(policy_term),
-        renewal_premium: premium,
-        policy_term,
-        new_effective_date: effective_date,
-        new_expiration_date: expiration_date,
-        termination_effective_date: effective_date,
-      };
-      const { error: renewalError } = await supabase
-        .from('renewals')
-        .update(movedUpdate)
-        .eq('id', renewalId);
-      if (renewalError) throw new Error(`Renewal update failed: ${renewalError.message}`);
-
-      await appendCustomerNote(accountId, notes ? `Moved to ${carrier}: ${notes}` : `Policy moved to ${carrier}`);
       await bestEffortRetention(policyId);
 
-      return { renewalId, policyId, newPolicyId: newPolicy?.id };
+      return { renewalId, policyId, newPolicyId: newPolicyId as string };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });

@@ -32,6 +32,7 @@ import {
   type LostReasonCategory,
 } from '@/lib/renewals/renewalTerm';
 import { useCarriers } from '@/hooks/useLookupData';
+import { formatMoney as formatCurrency } from '@/lib/renewals/format';
 
 type Outcome = 'renewed' | 'moved' | 'lost';
 
@@ -42,11 +43,6 @@ const TERMINAL = new Set([
 function toNumber(v: string): number {
   const n = parseFloat(v.replace(/[^0-9.\-]/g, ''));
   return Number.isFinite(n) ? n : NaN;
-}
-
-function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null || Number.isNaN(amount)) return '--';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
 interface Props {
