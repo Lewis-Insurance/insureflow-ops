@@ -78,11 +78,11 @@ npm run materialize:home-snapshots
 
 ---
 
-## Next (Phase 2)
+## Next (Phase 3)
 
-1. Fence `floor_action:` mint + release sweeper live send to allowlist only
-2. Tier-3 COI inbound play
-3. Brian first internal test send sign-off
+1. Dev soak with `FLOOR_CLIENT_SEND_ENABLED=true` (Brian signed off — see [`THE-FLOOR-PHASE-2-SIGNOFF.md`](./THE-FLOOR-PHASE-2-SIGNOFF.md))
+2. Phase 3 First Light prep
+3. G4 when ready: first live client send (allowlist flip per play)
 
 ---
 

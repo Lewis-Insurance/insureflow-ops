@@ -3,7 +3,9 @@
 **Phase:** 2 — The Send Seam (internal-recipient locked)  
 **Goal:** R7 send path end-to-end with hard internal allowlist; no real client sends until G4.  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-01 (Slice 3 Tier-3 COI inbound play)
+**Last updated:** 2026-07-01 — **Phase 2 signed off (Brian)** → [`THE-FLOOR-PHASE-2-SIGNOFF.md`](./THE-FLOOR-PHASE-2-SIGNOFF.md)
+
+**Status:** ✅ **COMPLETE (dev)** — ready for internal test send soak with `FLOOR_CLIENT_SEND_ENABLED=true` on dev only.
 
 ---
 
@@ -16,42 +18,52 @@
 - [x] Fence service-release consume path (no live user JWT required for `floor_action:`)
 - [x] `send-coi-email` accepts cron-authenticated Floor release (`X-Cron-Secret` + marker)
 - [x] Tier-3 COI inbound play produces package with internal test recipient
-- [ ] First internal test send verified on dev (Brian sign-off)
+- [x] Brian sign-off — Phase 2 internal test send path (dev only) — **2026-07-01**
 
 ---
 
-## Slice 3 — Tier-3 COI inbound (shipped in code)
+## Brian sign-off record
 
-**When:** `coi.issue` email intake + resolved account + `FLOOR_INTERNAL_SEND_ALLOWLIST` set
+| Field | Value |
+|---|---|
+| Document | [`THE-FLOOR-PHASE-2-SIGNOFF.md`](./THE-FLOOR-PHASE-2-SIGNOFF.md) |
+| Approver | Brian Lewis (BL) |
+| Date | 2026-07-01 |
+| Scope | Dev internal allowlist sends only |
+| Not approved | Prod sends, G4 live client allowlist flip |
 
-**Behavior**
-- `email-inbound-lite` calls `resolveCoiIntakePackage` instead of stub
-- `decision_packages.send_spec.recipient` = first allowlist address (not `[INTERNAL_ONLY]`)
-- `request_body`: `{ phase: 2, tier3_internal_test: true, internal_only: false }`
-- Response includes `tier3: true`
-- Without allowlist → falls back to Phase 1 stub (no send seam)
+---
 
-**Modules**
-- `src/floor/spine/plays/coiIssueInbound.ts`
-- `pickInternalTestRecipient` in `internalSendAllowlist.ts`
+## Post-sign-off: dev soak (ops)
 
-**Dev deploy**
 ```bash
 ./scripts/g0-dev-enable-floor-flags.sh
+supabase secrets set --project-ref klnygbbmognbslgobmzc FLOOR_CLIENT_SEND_ENABLED=true
 supabase functions deploy email-inbound-lite floor-action floor-release-held-sends send-coi-email --project-ref klnygbbmognbslgobmzc
 ```
 
-**Soak test**
-1. POST allowlisted COI-shaped inbound (SPF/DKIM/DMARC pass + coi filename)
-2. Confirm package `send_spec.recipient` = allowlist email
-3. Approve in Slack/cockpit → `floor_client_send_approvals.status=held`
-4. `FLOOR_CLIENT_SEND_ENABLED=true` → run release sweeper → email to allowlist only
+**Soak sequence**
+1. POST allowlisted COI-shaped inbound → response `tier3: true`
+2. Deliver card / Approve in Slack or cockpit
+3. Wait 30s (undo window)
+4. `curl -X POST "https://klnygbbmognbslgobmzc.supabase.co/functions/v1/floor-release-held-sends" -H "X-Cron-Secret: $CRON_SECRET" -H "Content-Type: application/json" -d '{}'`
+5. Confirm email received at allowlist address only
 
 ---
 
-## Slice 2 — Fence mint path
+## Slices shipped
 
-See commit `51f323a`.
+| Slice | Commit | What |
+|---|---|---|
+| 1 | `62df9d6` | Allowlist + approve→held staging |
+| 2 | `51f323a` | Fence `floor_action:` mint path |
+| 3 | `d6dcd72` | Tier-3 COI inbound play |
+
+---
+
+## Next: Phase 3 (First Light)
+
+Per roadmap — **G4 still required** before any real client send. Phase 3 prep can proceed in parallel with dev soak.
 
 ---
 
