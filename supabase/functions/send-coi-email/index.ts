@@ -13,7 +13,8 @@ import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.t
 import { requireAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
-import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from "../_shared/clientSendApprovalGate.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore, isFloorActionApprovalRef, readClientSendApprovalMarker } from "../_shared/clientSendApprovalGate.ts";
+import { verifyCronSecret } from "../_shared/cron-auth.ts";
 
 interface SendCOIEmailRequest {
   to: string;
@@ -215,12 +216,24 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Require authentication
-    const authResult = await requireAuth(req, supabase, corsHeaders);
-    if (authResult instanceof Response) {
-      return authResult; // Returns 401 if auth failed
+    const requestBody: SendCOIEmailRequest & Record<string, unknown> = await req.json();
+    const floorReleaseMarker = readClientSendApprovalMarker(requestBody);
+    const isFloorServiceRelease =
+      verifyCronSecret(req) === null
+      && Boolean(req.headers.get('X-Cron-Secret'))
+      && Boolean(floorReleaseMarker)
+      && isFloorActionApprovalRef(floorReleaseMarker!.approval_ref);
+
+    let user: { id: string; email?: string };
+    if (isFloorServiceRelease) {
+      user = { id: floorReleaseMarker!.approved_by_human_id };
+    } else {
+      const authResult = await requireAuth(req, supabase, corsHeaders);
+      if (authResult instanceof Response) {
+        return authResult;
+      }
+      user = authResult;
     }
-    const user = authResult;
 
     // Check rate limit (20 emails per minute per user)
     const rateLimitResult = await checkRateLimit(
@@ -240,7 +253,6 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Parse request body - NOTE: fromEmail and fromName are intentionally ignored for security
-    const requestBody: SendCOIEmailRequest = await req.json();
     const {
       to,
       certificateNumber,

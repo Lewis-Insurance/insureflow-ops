@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { hashClientSendPayload } from '../_shared/clientSendApprovalGate.ts';
 import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
@@ -8,7 +9,7 @@ import {
   parseInternalSendAllowlist,
 } from '../_shared/floor/internalSendAllowlist.ts';
 import { releaseHeldClientSend, type StageClientSendDeps } from '../_shared/floor/stageClientSend.ts';
-import type { FloorClientSendApproval } from '../_shared/floor/types.ts';
+import type { FloorClientSendApproval, SendCOIEmailRequest } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-release-held-sends');
 
@@ -36,7 +37,7 @@ function mapApprovalRow(row: Record<string, unknown>): FloorClientSendApproval {
     hold_until: (row.hold_until as string | null) ?? null,
     recipient: row.recipient as string,
     recipient_basis: row.recipient_basis as FloorClientSendApproval['recipient_basis'],
-    send_payload: row.send_payload as FloorClientSendApproval['send_payload'],
+    send_payload: row.send_payload as SendCOIEmailRequest,
     created_at: row.created_at as string,
   };
 }
@@ -75,7 +76,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !supabaseServiceKey) {
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    if (!supabaseUrl || !supabaseServiceKey || !anonKey) {
       throw new ValidationError('Server configuration error');
     }
 
@@ -129,16 +132,39 @@ serve(async (req) => {
         assertRecipientOnFile: async () => {},
         assertCertificateAccess: async () => {},
         assertExternalRecipientAllowed: guard,
+        mintFloorFenceApproval: {
+          hashPayload: (payload) => hashClientSendPayload('send-coi-email', payload),
+          insertClientSendApproval: async (row) => {
+            const { error } = await supabase.from('client_send_approvals').insert(row);
+            if (error) throw new Error(error.message);
+          },
+        },
         invokeSendCOIEmail: async (payload) => {
-          const { data, error } = await supabase.functions.invoke('send-coi-email', { body: payload });
-          if (error) {
-            logger.error('send-coi-email invoke failed', { error: error.message, approvalId: seed.id });
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-coi-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${anonKey}`,
+              ...(cronSecret ? { 'X-Cron-Secret': cronSecret } : {}),
+            },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+          if (!response.ok) {
+            logger.error('send-coi-email failed', {
+              approvalId: seed.id,
+              status: response.status,
+              body,
+            });
             return { success: false };
           }
-          const body = data as Record<string, unknown> | null;
           return {
-            success: body?.success === true,
-            messageId: typeof body?.messageId === 'string' ? body.messageId : undefined,
+            success: body.success === true,
+            messageId: typeof body.messageId === 'string'
+              ? body.messageId
+              : typeof body.id === 'string'
+                ? body.id
+                : undefined,
           };
         },
         logEmail: async () => {},

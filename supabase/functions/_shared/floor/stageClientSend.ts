@@ -1,4 +1,5 @@
 import { CLIENT_SEND_UNDO_HOLD_SECONDS } from './constants.ts';
+import { mintFloorFenceApprovalForCoi, type MintFloorFenceApprovalDeps } from './mintFloorFenceApproval.ts';
 import {
   FloorAuthorizationError,
   type FloorClientSendApproval,
@@ -6,6 +7,8 @@ import {
   type SendCOIEmailRequest,
   type SendSpec,
 } from './types.ts';
+
+export type CoiSendPayload = SendCOIEmailRequest & Record<string, unknown>;
 
 export interface StageClientSendDeps {
   now: () => Date;
@@ -24,7 +27,7 @@ export interface StageClientSendDeps {
     approvalId: string,
     patch: Partial<FloorClientSendApproval>,
   ) => Promise<FloorClientSendApproval>;
-  invokeSendCOIEmail: (payload: SendCOIEmailRequest) => Promise<{
+  invokeSendCOIEmail: (payload: CoiSendPayload) => Promise<{
     success: boolean;
     messageId?: string;
   }>;
@@ -33,6 +36,8 @@ export interface StageClientSendDeps {
     messageId?: string;
     success: boolean;
   }) => Promise<void>;
+  /** When set, releaseHeldClientSend mints a Fence floor_action: token before invoking send-coi-email. */
+  mintFloorFenceApproval?: MintFloorFenceApprovalDeps;
 }
 
 export interface StageClientSendArgs {
@@ -115,7 +120,17 @@ export async function releaseHeldClientSend(
   }
 
   const payload = approval.send_payload;
-  const result = await deps.invokeSendCOIEmail(payload);
+  let sendPayload: CoiSendPayload = payload;
+
+  if (deps.mintFloorFenceApproval) {
+    const minted = await mintFloorFenceApprovalForCoi(payload, approval.approver_id, deps.mintFloorFenceApproval);
+    sendPayload = minted.markedPayload;
+    await deps.updateApproval(approvalId, {
+      send_payload: sendPayload,
+    });
+  }
+
+  const result = await deps.invokeSendCOIEmail(sendPayload);
   await deps.logEmail({
     workRequestId: approval.work_request_id,
     messageId: result.messageId,

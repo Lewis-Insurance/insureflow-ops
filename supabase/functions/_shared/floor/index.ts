@@ -10,6 +10,7 @@ export * from './resolveAccount.ts';
 export * from './stageClientSend.ts';
 export * from './internalSendAllowlist.ts';
 export * from './approveClientSendStaging.ts';
+export * from './mintFloorFenceApproval.ts';
 export * from './hermesBridgeContract.ts';
 export * from './emailInbound.ts';
 export * from './floorAction.ts';

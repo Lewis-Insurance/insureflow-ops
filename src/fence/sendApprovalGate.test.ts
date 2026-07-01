@@ -8,6 +8,7 @@ import {
   createPendingClientSendApproval,
   createSupabaseClientSendApprovalStore,
   hashClientSendPayload,
+  isFloorActionApprovalRef,
   type PendingClientSendApproval,
 } from '../../supabase/functions/_shared/clientSendApprovalGate.ts';
 
@@ -440,5 +441,33 @@ describe('server-verified client send approval gate', () => {
     expect(signatureHookSource).toContain('client_send_approval');
     expect(signatureModalSource).toContain("createClientSendApproval('esign-create-request', signatureRequestPayload)");
     expect(signatureModalSource).toContain('client_send_approval');
+  });
+
+  it('consumes floor_action approvals without a live user session (Floor service release path)', async () => {
+    const coiCase = surfaceCases.find((entry) => entry.surface === 'send-coi-email');
+    if (!coiCase) throw new Error('missing send-coi-email surface case');
+
+    const approvalRef = 'floor_action:abcdef0123456789abcdef0123456789';
+    expect(isFloorActionApprovalRef(approvalRef)).toBe(true);
+
+    const approval = await createPendingClientSendApproval({
+      surface: 'send-coi-email',
+      payload: coiCase.payload,
+      approvedByUserId: 'approver-human-001',
+      approvalRef,
+      expiresAtIso: '2026-06-30T12:15:00.000Z',
+    });
+
+    const store = createInMemoryClientSendApprovalStore([approval]);
+    const approvedPayload = payloadWithApproval(coiCase.payload, approval, 'approver-human-001');
+
+    await expect(clientSendApprovalGateResponse({
+      surface: 'send-coi-email',
+      payload: approvedPayload,
+      userId: 'service-role-not-human',
+      approvalStore: store,
+      corsHeaders: {},
+      nowIso: '2026-06-30T12:00:00.000Z',
+    })).resolves.toBeNull();
   });
 });

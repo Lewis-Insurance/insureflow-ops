@@ -54,6 +54,10 @@ interface SupabaseLikeClient {
 
 const APPROVAL_REF_PATTERN = /^(?:sendapproval|floor_action)[:_][A-Za-z0-9_-]{12,}$/;
 
+export function isFloorActionApprovalRef(approvalRef: string): boolean {
+  return approvalRef.startsWith('floor_action:');
+}
+
 function normalizeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -84,6 +88,10 @@ function approvalMarkerFromPayload(payload: unknown): ClientSendApprovalMarker |
 
   if (!approvalRef || !approvedByHumanId) return null;
   return { approval_ref: approvalRef, approved_by_human_id: approvedByHumanId };
+}
+
+export function readClientSendApprovalMarker(payload: unknown): ClientSendApprovalMarker | null {
+  return approvalMarkerFromPayload(payload);
 }
 
 function sortObject(value: unknown): unknown {
@@ -199,7 +207,11 @@ export function createInMemoryClientSendApprovalStore(seed: PendingClientSendApp
       if (approval.expiresAtIso && new Date(approval.expiresAtIso).getTime() <= new Date(input.nowIso).getTime()) {
         return { ok: false, error: 'client_send_approval_expired' };
       }
-      if (approval.approvedByUserId !== input.approvedByUserId || approval.approvedByUserId !== input.userId) {
+      const floorAction = isFloorActionApprovalRef(input.approvalRef);
+      if (!floorAction && (approval.approvedByUserId !== input.approvedByUserId || approval.approvedByUserId !== input.userId)) {
+        return { ok: false, error: 'client_send_approval_wrong_human' };
+      }
+      if (floorAction && approval.approvedByUserId !== input.approvedByUserId) {
         return { ok: false, error: 'client_send_approval_wrong_human' };
       }
       if (approval.contentHash !== input.contentHash) return { ok: false, error: 'client_send_approval_content_mismatch' };
@@ -230,7 +242,12 @@ export function createSupabaseClientSendApprovalStore(supabase: SupabaseLikeClie
       if (expiresAt && new Date(expiresAt).getTime() <= new Date(input.nowIso).getTime()) {
         return { ok: false, error: 'client_send_approval_expired' };
       }
-      if (rowString(lookup.data, 'approved_by_user_id') !== input.approvedByUserId || input.approvedByUserId !== input.userId) {
+      const approvedByUserId = rowString(lookup.data, 'approved_by_user_id');
+      const floorAction = isFloorActionApprovalRef(input.approvalRef);
+      if (!floorAction && (approvedByUserId !== input.approvedByUserId || input.approvedByUserId !== input.userId)) {
+        return { ok: false, error: 'client_send_approval_wrong_human' };
+      }
+      if (floorAction && approvedByUserId !== input.approvedByUserId) {
         return { ok: false, error: 'client_send_approval_wrong_human' };
       }
       if (rowString(lookup.data, 'content_hash') !== input.contentHash) {

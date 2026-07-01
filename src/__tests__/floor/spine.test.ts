@@ -19,6 +19,8 @@ import {
   persistInternalPlayCards,
   shouldForceIdentityPick,
   stageClientSend,
+  mintFloorActionToken,
+  isFloorActionApprovalRef,
   maybeStageClientSendOnApprove,
   createInternalRecipientGuard,
   isStubInternalSendSpec,
@@ -291,6 +293,48 @@ describe('Floor spine — stageClientSend', () => {
     expect(result).toEqual({ status: 'sent', messageId: 'msg-1' });
     expect(send).toHaveBeenCalledWith(goldenSendCOIEmailPayload);
   });
+
+  it('mints floor_action token and attaches Fence marker on release', async () => {
+    const approval: FloorClientSendApproval = {
+      id: 'appr-1',
+      work_request_id: 'wr-1',
+      approver_id: 'user-1',
+      status: 'held',
+      hold_until: '2026-06-30T11:59:00Z',
+      recipient: goldenSendCOIEmailPayload.to,
+      recipient_basis: 'approved_holder',
+      send_payload: goldenSendCOIEmailPayload,
+      created_at: new Date().toISOString(),
+    };
+
+    const inserted: Array<Record<string, unknown>> = [];
+    const send = vi.fn().mockResolvedValue({ success: true, messageId: 'msg-floor-1' });
+    await releaseHeldClientSend('appr-1', {
+      now: () => new Date('2026-06-30T12:00:00Z'),
+      readApproval: async () => approval,
+      assertRecipientOnFile: async () => {},
+      assertCertificateAccess: async () => {},
+      assertExternalRecipientAllowed: async () => {},
+      updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
+      mintFloorFenceApproval: {
+        hashPayload: async () => 'sha256:fixturehash',
+        insertClientSendApproval: async (row) => {
+          inserted.push(row);
+        },
+      },
+      invokeSendCOIEmail: send,
+      logEmail: async () => {},
+    });
+
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]?.approval_ref).toMatch(/^floor_action:[a-f0-9]{32}$/);
+    expect(send).toHaveBeenCalledTimes(1);
+    const markedPayload = send.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(markedPayload.client_send_approval).toMatchObject({
+      approval_ref: inserted[0]?.approval_ref,
+      approved_by_human_id: 'user-1',
+    });
+  });
 });
 
 describe('Floor plays — stubs', () => {
@@ -518,5 +562,11 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
     });
 
     expect(result).toEqual({ staged: false, reason: 'internal_only' });
+  });
+
+  it('mints opaque floor_action tokens', () => {
+    const token = mintFloorActionToken();
+    expect(isFloorActionApprovalRef(token)).toBe(true);
+    expect(token).toMatch(/^floor_action:[a-f0-9]{32}$/);
   });
 });

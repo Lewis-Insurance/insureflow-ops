@@ -3,7 +3,7 @@
 **Phase:** 2 — The Send Seam (internal-recipient locked)  
 **Goal:** R7 send path end-to-end with hard internal allowlist; no real client sends until G4.  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-01 (Slice 1 foundation)
+**Last updated:** 2026-07-01 (Slice 2 Fence mint path)
 
 ---
 
@@ -12,44 +12,52 @@
 - [x] `FLOOR_INTERNAL_SEND_ALLOWLIST` guard in `stageClientSend`
 - [x] Approve on Tier-3 package → `floor_client_send_approvals` held (30s undo window)
 - [x] `floor-release-held-sends` sweeper (CRON; gated `FLOOR_CLIENT_SEND_ENABLED`)
-- [ ] Fence `floor_action:` mint + service-role consume path on `send-coi-email`
+- [x] `releaseHeldClientSend` mints `floor_action:` → Fence `client_send_approvals`
+- [x] Fence service-release consume path (no live user JWT required for `floor_action:`)
+- [x] `send-coi-email` accepts cron-authenticated Floor release (`X-Cron-Secret` + marker)
 - [ ] Tier-3 COI inbound play produces real package with internal test recipient
 - [ ] First internal test send verified on dev (Brian sign-off)
 
 ---
 
-## Slice 1 — Allowlist + stage on approve (shipped in code)
+## Slice 1 — Allowlist + stage on approve (shipped)
 
-**Modules**
-- `src/floor/spine/internalSendAllowlist.ts` — parse allowlist, stub vs tier-3 detection
-- `src/floor/spine/approveClientSendStaging.ts` — `maybeStageClientSendOnApprove`
-- Edge mirror: `supabase/functions/_shared/floor/*`
+See commit `62df9d6`.
 
-**Edge functions**
-- `floor-action` — on `feedback.approve`, stages held send when `send_spec.recipient !== [INTERNAL_ONLY]`
-- `floor-release-held-sends` — releases expired holds when `FLOOR_CLIENT_SEND_ENABLED=true`
+---
 
-**Safety defaults**
-- Phase 1 play cards still use `[INTERNAL_ONLY]` → approve does **not** stage a send
-- Empty allowlist blocks all tier-3 sends
-- `FLOOR_CLIENT_SEND_ENABLED` defaults off → sweeper no-ops
+## Slice 2 — Fence mint path (shipped in code)
 
-**Dev secrets (via `scripts/g0-dev-enable-floor-flags.sh`)**
+**Flow**
+1. Human Approve on Tier-3 package → `maybeStageClientSendOnApprove` → `floor_client_send_approvals.status=held`
+2. After 30s, `floor-release-held-sends` (requires `FLOOR_CLIENT_SEND_ENABLED=true`)
+3. `releaseHeldClientSend` → `mintFloorFenceApprovalForCoi` → inserts `client_send_approvals` with `floor_action:{hex}`
+4. Sweeper POSTs `send-coi-email` with marker + `X-Cron-Secret`
+5. Fence consumes one-time approval; Resend sends to allowlist address only
+
+**Key modules**
+- `src/floor/spine/mintFloorFenceApproval.ts`
+- `supabase/functions/_shared/clientSendApprovalGate.ts` — `floor_action:` session bypass
+- `supabase/functions/send-coi-email/index.ts` — cron Floor release auth path
+
+**Dev enable (Brian-gated)**
+```bash
+supabase secrets set --project-ref klnygbbmognbslgobmzc \
+  FLOOR_CLIENT_SEND_ENABLED=true \
+  FLOOR_INTERNAL_SEND_ALLOWLIST=brian@lewisinsurance.ai
+
+supabase functions deploy floor-release-held-sends send-coi-email floor-action --project-ref klnygbbmognbslgobmzc
 ```
-FLOOR_INTERNAL_SEND_ALLOWLIST=brian@lewisinsurance.ai
-# FLOOR_CLIENT_SEND_ENABLED=true   # only after Fence mint path
-```
 
-**Tests:** spine allowlist + staging tests in `src/__tests__/floor/spine.test.ts`
+**Tests:** spine mint-on-release + Fence `floor_action` consume without session match
 
 ---
 
 ## Next slice (Phase 2)
 
-1. Mint `floor_action:` token in `releaseHeldClientSend` + insert Fence `client_send_approvals` row
-2. Service-role consume path in `clientSendApprovalGate` (no live user JWT)
-3. COI Tier-3 play on inbound allowlisted sender → internal test recipient only
-4. Dev soak: approve → 30s hold → release → email to allowlist address only
+1. Tier-3 COI inbound play → internal test recipient package
+2. Dev soak: approve → hold → release → email lands on allowlist only
+3. Brian first internal test send sign-off (G4 prep)
 
 ---
 
