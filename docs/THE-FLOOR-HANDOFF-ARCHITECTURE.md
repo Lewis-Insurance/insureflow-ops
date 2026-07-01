@@ -382,6 +382,8 @@ Never model judgment. Every one of these is code that runs before a human sees t
 
 **Coverage diff, core to v1.** Diff the holder's demanded additional-insured status, waiver of subrogation, and limits against the actual policy forms. Flag red on short or not-backed. The structured limits live in `policies.cgl_details.limits` JSONB (keys: `each_occurrence`, `general_aggregate`, `products_completed_ops_aggregate`, etc., confirmed against `extract-cgl-policy`), `policy_bap_coverages` (auto: `limit_amount`, `bi_per_person`, `bi_per_accident`, `pd_per_accident`; the ACORD 25 Combined Single Limit box maps to `limit_amount` + `limit_type`), `policy_cgl_additional_insureds.waiver_of_subrogation` / `.primary_noncontributory`, and `policy_cgl_endorsements.form_number`. Join `certificates_of_insurance.policy_id -> policies.id` (nullable; some COIs have no linked policy, those fall through).
 
+**In-force at issuance, always.** Every client-facing Tier 3 send (ID card, COI, EOI, proof) passes a live in-force plus limits diff against current policy status at the moment of issuance, read from the reconciliation view (`policy_in_force_status`, spine D in section 8). "Unchanged template" is never the safety check. A policy cancelled for non-pay this morning must block the send even if the paper is identical to last month's. Certifying coverage that no longer exists is the single most common way safe-looking paper becomes an E&O loss. This applies to ID cards exactly as it applies to certs.
+
 **Read-only-locked fields.** The Edit verb LOCKS additional-insured, waiver-of-subrogation, and limits fields. They're policy-derived. Changing them means changing the policy, and issuing a cert that claims coverage the policy doesn't back is the number-one agency E&O mistake. `DecisionField.locked = true` is enforced in the card handler, not suggested.
 
 Note a real gap: `certificates_of_insurance` has NO `waiver_of_subrogation` and NO `primary_noncontributory` column. The COI generator UI holds a `waiver_of_subrogation` checkbox that's silently dropped on save (never in the `createCOI` payload). v1 reads these from `policy_cgl_additional_insureds` for the diff and displays them locked; wiring them onto the cert is its own migration, flagged in section 9.
@@ -394,107 +396,77 @@ Note a real gap: `certificates_of_insurance` has NO `waiver_of_subrogation` and 
 
 ## 7. Roadmap: v1 to moonshot
 
-### Phase 1: coi.issue, reactive (this spec)
+### Phase 1: the spine, and the first plays
 
-**Scope.** One play. Reactive only. On existing rails. Repeat certificate holders whose demand the diff can verify against an active policy. Everything else falls through to today's generic-ticket behavior, unchanged.
+**Scope.** Build the shared spine once, then ship the first plays on it. The spine: the WorkRequest / DecisionPackage / FeedbackEvent contract, the `stage_client_send()` chokepoint (closes R7 for every client-facing send, not just certs), `resolve-account`, carrier-download reconciliation into a live in-force status view, `redactPII` before any model call, and the Slack DecisionCard with a held undo. The first plays, in order: (1) carrier-download reconciliation, the in-force spine everything safe depends on; (2) activity logging, transcribe and summarize interactions into the AMS and auto-file the low-risk ones; (3) the suspense and follow-up sweep, severity-ranked nudges to a named owner; (4) ID card / proof-of-insurance one-tap, the first client-facing send, gated on a live in-force plus limits diff. Internal and invisible first, one safe client-facing send last.
 
-**Unlocks.** The chokepoint (R7 closed), resolve-account, the auth-gated router, PII-by-reference, and the first real DecisionCard with a held undo. Proves the whole pipeline end to end on one narrow, safe play.
+**Unlocks.** The invisible tax (data entry, chasing, dropped follow-ups) starts dropping day one. The E&O defense file assembles itself as a byproduct. The chokepoint closes R7 for all sends. ID cards prove the client-facing pipeline end to end on the highest-volume, lowest-risk personal-lines send. COI is deliberately not here. It's a commercial play, under two percent of the book, and it lands in Phase 4.
 
-**Acceptance gate.** The Definition of Done in section 8. A repeat holder emails, a card appears in under five seconds, Landen taps Approve, the cert sends under his name with an undo hold, and a FeedbackEvent logs. Zero wrong-client sends, zero over-granted certs.
+**Acceptance gate.** Reconciliation keeps in-force status current daily. Activity logging runs only behind a Florida two-party consent announcement and post-redaction (section 9), and auto-files low-risk notes. The suspense sweep surfaces the right overdue item to the right owner. An ID-card request produces a card in under five seconds and can send only when the in-force diff passes. Zero sends against a lapsed policy.
 
-### Phase 2: identity graph and more plays
+### Phase 2: the rest of the safe plays, and voice intake
 
-**Scope.** Build the identity graph out fully (all five ladder rungs, reverse-domain column, shared `normalize_phone`, `ensureProfileByEmail` rewritten). Harden DecisionPackage. Add two or three more one-tap plays: ID cards, endorsement REQUEST, evidence of insurance. Add multi-channel intake: Slack-forward adapter and the CRM "Hand to bot" button, both normalizing to WorkRequest.
+**Scope.** Add the next safe plays: non-pay and cancellation detection off the carrier download with the Florida statutory day-count clock (detect Tier 1, save gated); open-file and open-quote follow-up nudges; endorsement REQUEST capture and track-to-confirmation (capture safe, submit human); producer licensing/CE and carrier-appointment expiration alerts (a near-free cron guarding a catastrophic risk); the coverage-gap round-out list (the `run-coverage-gap-detection` engine already exists). Add voice/telephony intake with recording, transcription, and AMS write-back, plus the CRM "Hand to bot" button, all normalizing to WorkRequest.
 
-**Unlocks.** The intake bus stops being email-only. The play library proves it generalizes past certs. Identity resolution is trustworthy enough to lower the human-pick rate.
+**Unlocks.** Intake stops being email-only and meets the phone, where the work actually is. The highest-severity miss in the book, a client going uncovered on non-pay, gets caught. The play library proves it generalizes past a single send.
 
-**Acceptance gate.** Three plays live at one-tap. A Slack-forward and a CRM button each produce a correct card. resolve-account auto-clears above the confidence bar on a measured majority of repeat clients, and forces a human pick below it every time.
+**Acceptance gate.** Non-pay detection fires off the download with the correct Florida day-count clock and a gated save. A phone call funnels into a WorkRequest through the same intake. A licensing or appointment lapse alerts before it expires.
 
-### Phase 3: proactive heartbeat and the registry
+### Phase 3: proactive heartbeat, remarket, retention
 
-**Scope.** Turn on the nightly book-scan heartbeat that pushes finished cards before anyone asks (same pipeline, cron trigger, `source='heartbeat'`). Build the certificate-holder registry: record every holder ever told a policy was active. Batch cancellation-correction: a policy cancels, the registry drafts a correction card per affected holder. Stand up the feedback-to-play compile pipeline: every Edit/Kill FeedbackEvent feeds a weekly job that drafts a play patch, a human merges the PR, golden fixtures gate CI.
+**Scope.** Turn on the nightly book-scan heartbeat that pushes finished cards before anyone asks (same pipeline, cron trigger, `source='heartbeat'`). Remarket and renewal packets split by line, auto first (mostly mechanical, the producer only picks the carrier), HO lower (closed Florida market, often one column). Retention and renewal-risk save lists (the `run-retention-scoring` engine exists). Stand up the feedback-to-play compile pipeline: every Edit/Kill FeedbackEvent feeds a weekly job that drafts a play patch, a human merges the PR, golden fixtures gate CI. This is where the existing project-state Phase 1 DoD (Landen to Kelli remarket through a card) actually lands.
 
-**Unlocks.** No-handoff. The card is done before the ask. The registry turns the industry's worst latent liability into a Lewis service. The office starts improving its own plays from corrections.
+**Unlocks.** No-handoff. The card is done before the ask. The office starts improving its own plays from real corrections.
 
-**Acceptance gate.** Tuesday-morning cards land unprompted and get approved. A test cancellation produces a correct correction card for every affected holder and none for unaffected ones. One play patch ships through the compile pipeline with fixtures green.
+**Acceptance gate.** Tuesday-morning cards land unprompted and get approved. An auto remarket packet assembles with the producer only picking the carrier. One play patch ships through the compile pipeline with fixtures green.
 
-### Phase 4: full autonomy ramp and shared floor
+### Phase 4: commercial COI, claims, full autonomy, shared floor
 
-**Scope.** Ramp the earned-autonomy ladder across plays and humans. Voice intake. Cross-sell detection (the red-flag remarket surfaced from routine certs). The shared-floor channel mirroring every pending client-facing send, risk-colored, for the second-opinion layer.
+**Scope.** Commercial COI as the right home for the original idea: a certificate-holder registry, expiration tracking, and one-tap reissue behind the same in-force diff, plus batch cancellation-correction (a policy cancels, the registry drafts a correction card per affected holder), knowing it optimizes under two percent of accounts. FNOL structured intake, which needs a claims data model built first (there's no claims table today). Cross-sell detection, the red-flag remarket surfaced from a routine cert or gap. The full earned-autonomy ramp across plays and humans. The shared-floor channel mirroring every pending client-facing send, risk-colored, for the second-opinion layer weighted toward the new hires.
 
-**Unlocks.** The full vision. Kelli's clout on remarkets. The six catching each other's bad cards. "Since 1981" at machine speed.
+**Unlocks.** The commercial book covered. The registry turns the industry's worst latent liability into a Lewis service. Kelli's clout on remarkets. The six catching each other's bad cards. "Since 1981" at machine speed.
 
-**Acceptance gate.** A red-flag cert produces a remarket card a producer acts on. The shared floor surfaces a bad card that a peer catches before send. Autonomy promotions are earning through, logged, and demoting correctly on stale snapshots.
+**Acceptance gate.** A commercial COI reissues behind a passing in-force diff. A test cancellation produces a correct correction card for every affected holder and none for unaffected ones. A red-flag cert produces a remarket card a producer acts on. The shared floor surfaces a bad card that a peer catches before send. Autonomy promotions earn through, log, and demote correctly on stale snapshots.
 
 ---
 
-## 8. V1 spec: coi.issue, in build order
+## 8. V1 spec: the spine and the first plays, in build order
 
-One play. Reactive. On existing rails. Seven steps, in order. Each builds on the last.
+V1 is the shared spine plus the first four plays. Build the spine once. Every play rides it. Internal and invisible first, one client-facing send last. COI is not here, it's the commercial variant in Phase 4.
 
-**Tight scope.** Repeat certificate holders whose demand the coverage diff can verify against an active policy. Everything else, new holders, unlinked policies (`certificates_of_insurance.policy_id IS NULL`), auth failures, non-COI docs, falls through to today's generic-ticket path unchanged.
+**The safety rule that governs every client-facing send.** A Tier 3 send (ID card now, COI later) issues only behind a live in-force plus limits diff against current policy status at the moment of issuance. "Unchanged template" is never the check. A policy cancelled for non-pay this morning blocks the send even if the paper is identical to last month's. Certifying coverage that doesn't exist is a textbook E&O loss. This rule is why reconciliation (Spine D) is built before any client-facing play.
 
-**Adoption.** COI is a CSR / service task. The v1 hinge is whoever runs certs, and that's **Landen**, not Kelli. This ties to the existing Phase 1 DoD (project state section 11: Landen to Kelli remarket through a card). Kelli's clout arrives later, on the red-flag remarket in Phase 4.
+### The spine (build once)
 
-### Step 1: close the R7 hole
+**Spine A: the contract tables.** `automation_work_requests`, `decision_packages`, `feedback_events`, `client_send_approvals`. The typed WorkRequest, DecisionPackage, and FeedbackEvent from section 4, as migrations. Every play and channel speaks these. Acceptance: a WorkRequest can be created, moved through its states, and linked to a DecisionPackage and a FeedbackEvent.
 
-**Build.** `stage_client_send()` as the single chokepoint (section 4.4). Route `send-coi-email` through it. Finish the certificate-access TODO (`send-coi-email/index.ts:294-296`). Add the external-recipient check.
+**Spine B: the send chokepoint.** `stage_client_send()` as the single path to the mail provider (section 4.4). Route `send-coi-email` through it, finish the certificate-access TODO (`send-coi-email/index.ts:294-296`), add the external-recipient check. This closes R7 for every client-facing send, ID cards included, not just certs. Files: new `stage_client_send` (edge function or shared module), wrapped `send-coi-email` (signature unchanged), `client_send_approvals` migration, `src/hooks/useCOIGeneration.ts` repointed. Acceptance: no code path reaches Resend except through the chokepoint; a send with no valid approval row throws `AuthorizationError`; `email_log` insert is awaited.
 
-**Files.** New `stage_client_send` (edge function or shared module). `supabase/functions/send-coi-email/index.ts` (wrapped, not rewritten; signature unchanged). New `client_send_approvals` table migration. `src/hooks/useCOIGeneration.ts` (repoint `generateAndEmailCOI` to call the chokepoint).
+**Spine C: resolve-account.** The identity ladder (section 4.6): email-exact, alias, reverse-domain, pg_trgm fuzzy, phone. Forwarded-envelope aware, ranked candidates with confidence. Fix `ensureProfileByEmail` to resolve, not blindly create. Files: new `resolve-account` RPC (SECURITY DEFINER, staff-gated, advisory-lock, modeled on `import_resolve_account`), migration for `accounts.email_domain` + GIN trgm index + shared `normalize_phone()`, `email-inbound-lite` rewrite with concurrency protection on `profiles.email`. Acceptance: a repeat client resolves to the right `accounts.id` above the bar; an ambiguous sender returns ranked candidates and forces a human pick; no duplicate-profile creation when the email already exists on `accounts` or `insured_emails`. Precondition: pg_trgm confirmed on `lrqajzwcmdwahnjyidgv`, or a `CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions` migration shipped first (section 9).
 
-**Acceptance.** No code path reaches Resend except through `stage_client_send()`. A send with no valid approval row throws `AuthorizationError`. The certificate-access check rejects an approver not entitled to the cert. `email_log` insert is awaited, not fire-and-forget.
+**Spine D: carrier-download reconciliation and the in-force view.** Process the carrier download into a live policy status and limits view that every Tier 3 diff reads. This is Play 1 and the safety spine at once. Files: the download-processing path, a queryable `policy_in_force_status` view keyed to `policies`. Acceptance: in-force status and current limits are correct and dated within the last cycle for every active policy; a policy cancelled in the latest download reads as not-in-force.
 
-### Step 2: resolve-account
+**Spine E: redact before any model call.** Run `redactPII` (reuse from `process-document-tasks`) before any extractor or summarizer. PII by reference; rehydrate real values only inside the chokepoint after approval. This rule covers call transcripts too, not just documents (section 9 blocker). Acceptance: no model call receives raw PII, spoken or written; DecisionPackages carry reference tokens; real values appear only in the `stage_client_send()` payload post-approval.
 
-**Build.** The identity ladder (section 4.6): email-exact, alias, reverse-domain, pg_trgm fuzzy, phone. Forwarded-envelope aware. Ranked candidates with confidence. Fix `ensureProfileByEmail` to resolve, not blindly create.
+**Spine F: the DecisionCard.** Render the card in Slack against the existing `ChannelAdapter`. Sub-five-second ack. Held undo on send. Log a FeedbackEvent on approve / edit / kill. Files: `SlackAdapter`, the card handler (writes `client_send_approvals`, a distinct path from the reader), `feedback_events` migration, undo-hold wiring. Acceptance: a card appears in under five seconds; Approve fires the chokepoint with a hold; Kill during the hold cancels the send; every verb logs; documents show as signed-URL buttons, no bucket path leaked.
 
-**Files.** New `resolve-account` RPC (SECURITY DEFINER, staff-gated, advisory-lock, modeled on `import_resolve_account`). New migration: `accounts.email_domain` (or on-the-fly extraction), GIN trgm index if not present, shared `normalize_phone()`. `supabase/functions/email-inbound-lite/index.ts` (`ensureProfileByEmail` rewrite + concurrency protection on `profiles.email`).
+### The first plays (each rides the spine)
 
-**Acceptance.** A repeat client's inbound email resolves to the right `accounts.id` above the confidence bar. An ambiguous sender returns ranked candidates and forces a human pick, never auto-proceeds. `ensureProfileByEmail` no longer creates a duplicate profile when the email already exists on `accounts` or `insured_emails`. **Precondition:** pg_trgm confirmed installed on `lrqajzwcmdwahnjyidgv`, or a `CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions` migration shipped first.
+**Play 1: Carrier-download reconciliation (Tier 1, internal).** Spine D above. Keeps in-force status and limits current for every downstream diff, cancel clock, and non-pay catch. Nothing safe ships without it, so it's first.
 
-### Step 3: gate the allowlist on auth
+**Play 2: Activity logging (Tier 1-2, internal).** Transcribe and summarize calls and emails into the AMS, auto-file low-risk notes, and surface only coverage-or-dollar-signal notes for a one-tap file. Biggest single time tax and the number-one E&O defense. TWO HARD BLOCKERS, both mandatory before build (section 9): a Florida two-party consent announcement on any recorded call, and `redactPII` on the transcript before any summarization. Acceptance: with consent and redaction in place, low-risk interactions auto-file and only signal notes surface for a human.
 
-**Build.** Require SPF/DKIM/DMARC pass as a precondition to any allowlist match in the router.
+**Play 3: Suspense and follow-up sweep (Tier 1-2, internal).** Scan open tasks and diaries, rank by dollar, coverage, and deadline, and nudge the named owner. Solves "did anyone do X," the failure behind lost revenue, E&O, and client churn at once. Runs on the existing tasks table. Acceptance: the right overdue item reaches the right owner, severity-ranked, with no alert-fatigue firehose.
 
-**Files.** `supabase/functions/email-inbound-lite/index.ts` (`allowedSender` gated behind auth verdict). Router shim (step 5) consumes the verdict.
-
-**Acceptance.** A forged From that passes the allowlist string but fails DMARC routes to `fall_through`, never to a WorkRequest. A legit allowlisted sender that passes auth proceeds.
-
-### Step 4: redact before extract
-
-**Build.** Run `redactPII` before the extractor. Fill the ACORD 25 by reference. Rehydrate real values only inside the chokepoint after approval.
-
-**Files.** Reuse `redactPII` from `process-document-tasks`. The extractor path feeding COI data. `generate-coi-data` if it's in the loop (note it's currently NOT wired into the send path; a human form step sits between them, so bridge or bypass explicitly).
-
-**Acceptance.** No model call receives raw PII. The DecisionPackage carries reference tokens. Real values appear only in the `stage_client_send()` payload post-approval. ACORD 25 fills correctly by reference.
-
-### Step 5: the router shim
-
-**Build.** A `classify-document` = `'coi'` result from an allowlisted, auth-passing sender creates a WorkRequest with `action='coi.issue'` instead of a generic ticket.
-
-**Files.** New `MailSkillRouter` (deterministic, section 4.5). `email-inbound-lite` intake path. New `automation_work_requests` table + `automation_work_request_events` migration.
-
-**Acceptance.** An in-scope COI email produces a WorkRequest with `action='coi.issue'`. Everything else produces today's generic ticket, unchanged. The router never reads the body.
-
-### Step 6: the coi.issue play
-
-**Build.** The play (section 4.3): resolve client, snapshot the policy, fill the ACORD 25, run the coverage diff (flag red, lock fields), park `awaiting_approval` with a DecisionPackage.
-
-**Files.** New `plays/coi.issue.ts` with Zod `required_inputs`, `capability_scope` (`can_send: false`), golden fixtures. Reads `accounts`, `policies`, `policy_cgl_additional_insureds`, `policy_cgl_endorsements`, `policy_bap_coverages`, `certificates_of_insurance`. New `decision_packages` table migration.
-
-**Acceptance.** For a repeat holder with an active linked policy, the play emits a DecisionPackage with a correct fill and a coverage diff. A short or not-backed demand flags red. Locked fields are marked `locked: true`. A COI with `policy_id IS NULL` falls through. Golden fixtures pass in CI.
-
-### Step 7: render the card, ack, hold, log
-
-**Build.** Render the DecisionCard in Slack. Sub-five-second ack. Held undo on send. Log a FeedbackEvent on approve / edit / kill.
-
-**Files.** `SlackAdapter` (against the existing `ChannelAdapter` interface). The card handler (writes `client_send_approvals`, distinct path from the one that reads it). New `feedback_events` table migration. `stage_client_send()` undo-hold wiring.
-
-**Acceptance.** A card appears in Slack in under five seconds. Approve fires `stage_client_send()`, which holds for the undo window, then sends. Kill during the hold cancels the send. Every verb writes a FeedbackEvent. The document shows as a signed-URL button, no bucket path leaked.
+**Play 4: ID card / proof-of-insurance one-tap (Tier 3, client-facing).** The first client-facing send and the true personal-lines analog to COI: highest-volume "give me paper" request in a 98%-personal book. Resolve the account (Spine C), pull the in-force policy (Spine D), render the ID card or proof, and park a DecisionPackage. Issues only when the in-force diff passes; a lapsed or mismatched policy blocks the send and routes to a human. Reuses the chokepoint, the card, and the undo hold. Acceptance: an ID-card request produces a card in under five seconds; Approve sends behind a passing in-force diff; zero sends against a lapsed policy.
 
 ### Definition of Done
 
-A repeat certificate holder emails a demand from an allowlisted, DMARC-passing address. The router creates a `coi.issue` WorkRequest. resolve-account clears the client above the confidence bar. The play snapshots the active linked policy, fills the ACORD 25 by reference, diffs coverage, and parks a DecisionPackage. A card lands in Landen's Slack in under five seconds. Landen taps Approve. `stage_client_send()` reads his approval row, holds for the undo window, then sends the cert under his name as authorized rep of record. Delivery state tracks to `delivered`. A FeedbackEvent logs. Zero wrong-client sends. Zero over-granted certs. Everything out of scope fell through to today's behavior, untouched.
+Reconciliation keeps in-force status fresh daily. Activity logging runs only behind a consent announcement and post-redaction, and auto-files low-risk notes. The suspense sweep surfaces the right overdue item to the right owner, severity-ranked. An ID-card request resolves the client, checks the policy in force, and lands a card in a human's Slack in under five seconds; Approve sends under their name with an undo hold, and a policy cancelled that morning blocks the send. Every client-facing send in the building now goes through one chokepoint a named human must approve. A FeedbackEvent logs on every verb. The invisible tax is measurably lower and nothing left the building without a name on it.
+
+### Adoption
+
+The internal plays (reconciliation, logging, suspense) help everyone immediately, are invisible, and carry zero client risk, so they earn trust before anything client-facing ships. ID cards is the first client-facing win, owned by whoever runs service (Tori or Landen). COI moves to Phase 4 as the commercial variant. The existing project-state Phase 1 DoD (Landen to Kelli remarket through a card) lands in Phase 3. Kelli's clout arrives on the red-flag remarket in Phase 4.
 
 ---
 
@@ -504,7 +476,10 @@ A repeat certificate holder emails a demand from an allowlisted, DMARC-passing a
 2. **Waiver / PNC on the cert.** `certificates_of_insurance` has no `waiver_of_subrogation` or `primary_noncontributory` column, and the UI checkbox is silently dropped. v1 reads these from `policy_cgl_additional_insureds` for the diff. Do you want a migration to persist them on the cert row itself in v1, or defer that to Phase 2?
 3. **The confidence bar.** What's the auto-proceed threshold for resolve-account? Above it the play runs; below it the card forces a human pick. Pick a number to start (I'd default high, say 0.9, and loosen with data).
 4. **The undo window.** How long is the server-side hold on a client send? Long enough to catch a flinch, short enough that the cert still feels instant. Thirty seconds? Sixty?
-5. **Landen as v1 owner.** Confirmed that Landen runs certs and owns v1 approvals, with the Phase 1 DoD (Landen to Kelli remarket) as the tie-in? If Tori is picking up certs, the v1 owner changes.
+5. **The first client-facing owner.** ID cards is the first client-facing play. Who owns those approvals, Tori or Landen? (COI and remarket owners come later, in Phase 4 and Phase 3.)
+6. **Florida two-party consent (§934.03).** Activity logging (Play 2) can't auto-transcribe client calls without an all-party consent announcement. Florida is all-party-consent; silent transcription is a criminal wiretap issue, not just an E&O one. Decide the mechanism (IVR announcement, opening script) before Play 2 is built.
+7. **PII on call transcripts.** `redactPII` must run on transcripts before any summarization, same rule as documents, because SSNs, DOBs, and card numbers get read aloud. Confirm the existing redaction path catches spoken PII, or extend it, before Play 2.
+8. **No claims table.** FNOL intake (Phase 4) has no home in the schema today. Building it needs a claims data model first. Confirm scope when we get there.
 
 ---
 
@@ -513,3 +488,5 @@ A repeat certificate holder emails a demand from an allowlisted, DMARC-passing a
 **Time from a client's request to a correct, approved, delivered document, at zero handoff cost, with zero wrong-client and zero over-granted certs.**
 
 World-class is that number at machine speed, with a human name on every send. Everything in this doc exists to drive it down without ever letting the second half slip.
+
+And pick every next play by one test: does it grind down the invisible tax (logging, chasing, follow-up) or prove coverage that's in force right now? If yes, build it. If it's a flashy client send that does neither, it waits.
