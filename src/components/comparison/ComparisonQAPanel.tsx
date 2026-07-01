@@ -123,9 +123,9 @@ export function ComparisonQAPanel({
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600';
-    if (confidence >= 0.6) return 'text-amber-600';
-    return 'text-red-600';
+    if (confidence >= 0.8) return 'text-success';
+    if (confidence >= 0.6) return 'text-warning';
+    return 'text-destructive';
   };
 
   const getConfidenceLabel = (confidence: number) => {
@@ -216,9 +216,9 @@ export function ComparisonQAPanel({
                                 variant="outline" 
                                 className={cn(
                                   'flex-shrink-0',
-                                  citation.docRole === 'A' 
-                                    ? 'border-blue-300 text-blue-600' 
-                                    : 'border-amber-300 text-amber-600'
+                                  citation.docRole === 'A'
+                                    ? 'border-info/30 text-info'
+                                    : 'border-warning/30 text-warning'
                                 )}
                               >
                                 Doc {citation.docRole}
@@ -248,8 +248,8 @@ export function ComparisonQAPanel({
                       
                       {/* Unknown/uncertain info */}
                       {message.response.ifUnknown && (
-                        <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/30 text-xs">
-                          <p className="font-medium text-amber-700 dark:text-amber-300">
+                        <div className="p-2 rounded bg-warning/10 text-xs">
+                          <p className="font-medium text-warning">
                             ⚠️ {message.response.ifUnknown.missingInfo}
                           </p>
                           <p className="text-muted-foreground mt-1">

@@ -539,8 +539,8 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
 
           {/* Cancellation Info - Show if there's a scheduled cancellation */}
           {formData.cancelled_at && (
-            <div className="border border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 rounded-md p-4 space-y-3">
-              <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+            <div className="border border-warning/30 bg-warning/10 rounded-md p-4 space-y-3">
+              <div className="flex items-center gap-2 text-warning">
                 <CalendarIcon className="h-4 w-4" />
                 <span className="font-medium">Scheduled Cancellation</span>
               </div>

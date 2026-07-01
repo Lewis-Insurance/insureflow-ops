@@ -55,9 +55,9 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
   });
 
   const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) return <Image className="h-8 w-8 text-blue-500" />;
-    if (file.type === 'application/pdf') return <FileText className="h-8 w-8 text-red-500" />;
-    return <File className="h-8 w-8 text-gray-500" />;
+    if (file.type.startsWith('image/')) return <Image className="h-8 w-8 text-info" />;
+    if (file.type === 'application/pdf') return <FileText className="h-8 w-8 text-destructive" />;
+    return <File className="h-8 w-8 text-cc-text-muted" />;
   };
 
   async function handleUpload() {
@@ -146,7 +146,7 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileUp className="h-5 w-5 text-cyan-600" />
+            <FileUp className="h-5 w-5 text-info" />
             Upload Document
           </DialogTitle>
         </DialogHeader>
@@ -156,8 +156,8 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
             {...getRootProps()}
             className={`
               border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-              ${isDragActive ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950' : 'border-gray-300 hover:border-cyan-400'}
-              ${file ? 'bg-gray-50 dark:bg-gray-900' : ''}
+              ${isDragActive ? 'border-info bg-info/10' : 'border-cc-border-interactive hover:border-info/60'}
+              ${file ? 'bg-cc-surface-raised' : ''}
             `}
           >
             <input {...getInputProps()} />
@@ -229,7 +229,7 @@ export function AddDocumentModal({ open, onOpenChange, accountId, onSuccess }: A
             <Button
               onClick={handleUpload}
               disabled={loading || !file}
-              className="bg-cyan-600 hover:bg-cyan-700"
+              className="bg-info text-info-foreground hover:bg-info/90"
             >
               {loading ? 'Uploading...' : 'Upload'}
             </Button>

@@ -116,7 +116,7 @@ export default function AgencyDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               ${(metrics.mtd.revenue / 1000).toFixed(1)}k
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -131,7 +131,7 @@ export default function AgencyDashboard() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-info">
               {metrics.mtd.conversionRate.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -146,7 +146,7 @@ export default function AgencyDashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-info">
               {totalActiveLeads}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -218,7 +218,7 @@ export default function AgencyDashboard() {
                         ${(producer.revenue / 1000).toFixed(1)}k
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={producer.conversion_rate > 20 ? 'text-green-600 font-semibold' : ''}>
+                        <span className={producer.conversion_rate > 20 ? 'text-success font-semibold' : ''}>
                           {producer.conversion_rate}%
                         </span>
                       </TableCell>

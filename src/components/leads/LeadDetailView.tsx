@@ -198,20 +198,20 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
 
   const getStatusColor = (status: string) => {
     const colors = {
-      new: 'bg-blue-100 text-blue-800',
-      contacted: 'bg-yellow-100 text-yellow-800',
-      qualified: 'bg-purple-100 text-purple-800',
-      quoted: 'bg-orange-100 text-orange-800',
-      won: 'bg-green-100 text-green-800',
-      lost: 'bg-red-100 text-red-800',
+      new: 'bg-info/10 text-info',
+      contacted: 'bg-warning/10 text-warning',
+      qualified: 'bg-info/10 text-info',
+      quoted: 'bg-warning/10 text-warning',
+      won: 'bg-success/10 text-success',
+      lost: 'bg-destructive/10 text-destructive',
       nurturing: 'bg-muted text-muted-foreground',
     };
     return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
+    if (score >= 80) return 'text-success';
+    if (score >= 60) return 'text-warning';
     return 'text-muted-foreground';
   };
 
@@ -250,7 +250,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                       size="icon"
                       onClick={() => setShowDeleteDialog(true)}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </>
                 ) : (
@@ -434,7 +434,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                         </div>
                       </div>
                       <Button
-                        className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
+                        className="w-full bg-success hover:bg-success/90 text-success-foreground text-lg py-6"
                         onClick={() => {
                           onOpenChange(false);
                           navigate(`/leads/${leadId}`);
@@ -499,12 +499,12 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                               <div
                                 className={`h-2 rounded-full ${
                                   quote.quote_score >= 85
-                                    ? 'bg-green-500'
+                                    ? 'bg-success'
                                     : quote.quote_score >= 70
-                                    ? 'bg-blue-500'
+                                    ? 'bg-info'
                                     : quote.quote_score >= 55
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
+                                    ? 'bg-warning'
+                                    : 'bg-destructive'
                                 }`}
                                 style={{ width: `${quote.quote_score}%` }}
                               />
@@ -821,7 +821,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               {deleteLead.isPending ? "Deleting..." : "Delete Lead"}
             </AlertDialogAction>

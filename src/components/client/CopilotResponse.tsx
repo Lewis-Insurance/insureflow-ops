@@ -115,14 +115,14 @@ interface ExecutiveSummaryProps {
 }
 
 function ExecutiveSummary({ summary, confidence }: ExecutiveSummaryProps) {
-  const confidenceColor = confidence >= 0.8 ? 'text-green-600' : confidence >= 0.6 ? 'text-amber-600' : 'text-red-600';
-  
+  const confidenceColor = confidence >= 0.8 ? 'text-success' : confidence >= 0.6 ? 'text-warning' : 'text-destructive';
+
   return (
-    <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20">
+    <Card className="border-l-4 border-l-info bg-gradient-to-r from-info/5 to-transparent">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Target className="h-5 w-5 text-blue-600" />
+            <Target className="h-5 w-5 text-info" />
             Executive Summary
           </CardTitle>
           <TooltipProvider>
@@ -163,10 +163,10 @@ function RiskFlagsSection({ riskFlags }: RiskFlagsSectionProps) {
   const hasCritical = sortedFlags.some(f => f.severity === 'critical');
 
   return (
-    <Card className={hasCritical ? 'border-red-500 bg-red-50/30 dark:bg-red-950/10' : ''}>
+    <Card className={hasCritical ? 'border-destructive bg-destructive/5' : ''}>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-600" />
+          <Shield className="h-5 w-5 text-destructive" />
           Risk Flags
           {hasCritical && (
             <Badge variant="destructive" className="animate-pulse">Action Required</Badge>
@@ -186,10 +186,10 @@ function RiskFlagCard({ flag }: { flag: RiskFlag }) {
   const [isOpen, setIsOpen] = useState(flag.severity === 'critical');
   
   const severityConfig = {
-    critical: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200' },
-    high: { icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200' },
-    medium: { icon: Info, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-200' },
-    low: { icon: Info, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200' },
+    critical: { icon: AlertTriangle, color: 'text-destructive', bg: 'bg-destructive/10', border: 'border-destructive/30' },
+    high: { icon: AlertCircle, color: 'text-warning', bg: 'bg-warning/10', border: 'border-warning/30' },
+    medium: { icon: Info, color: 'text-warning', bg: 'bg-warning/10', border: 'border-warning/30' },
+    low: { icon: Info, color: 'text-info', bg: 'bg-info/10', border: 'border-info/30' },
   };
 
   const config = severityConfig[flag.severity];
@@ -246,7 +246,7 @@ function KeyFindingsSection({ findings }: KeyFindingsSectionProps) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-amber-500" />
+          <Lightbulb className="h-5 w-5 text-warning" />
           Key Findings
         </CardTitle>
       </CardHeader>
@@ -263,10 +263,10 @@ function FindingCard({ finding }: { finding: KeyFinding }) {
   const [isOpen, setIsOpen] = useState(false);
   
   const severityBadge = {
-    critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    critical: 'bg-destructive/10 text-destructive',
+    high: 'bg-warning/10 text-warning',
+    medium: 'bg-warning/10 text-warning',
+    low: 'bg-info/10 text-info',
   };
 
   return (
@@ -315,7 +315,7 @@ function RecommendationsSection({ recommendations }: RecommendationsSectionProps
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-green-600" />
+          <TrendingUp className="h-5 w-5 text-success" />
           Recommendations
         </CardTitle>
       </CardHeader>
@@ -332,7 +332,7 @@ function RecommendationCard({ recommendation, index }: { recommendation: Recomme
   const [isOpen, setIsOpen] = useState(index < 2);
 
   const priorityLabel = { 1: 'High Priority', 2: 'Medium Priority', 3: 'Lower Priority' };
-  const priorityColor = { 1: 'text-red-600', 2: 'text-amber-600', 3: 'text-blue-600' };
+  const priorityColor = { 1: 'text-destructive', 2: 'text-warning', 3: 'text-info' };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -391,10 +391,10 @@ function ActionItemsSection({ actionItems, onCreateTask }: ActionItemsSectionPro
   const sorted = [...actionItems].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
   return (
-    <Card className="border-l-4 border-l-purple-500">
+    <Card className="border-l-4 border-l-info">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <ClipboardList className="h-5 w-5 text-purple-600" />
+          <ClipboardList className="h-5 w-5 text-info" />
           Action Items
         </CardTitle>
         <CardDescription>
@@ -412,10 +412,10 @@ function ActionItemsSection({ actionItems, onCreateTask }: ActionItemsSectionPro
 
 function ActionItemCard({ item, onCreateTask }: { item: ActionItem; onCreateTask?: (item: ActionItem) => void }) {
   const priorityConfig = {
-    urgent: { label: 'Urgent', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
-    high: { label: 'High', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-    medium: { label: 'Medium', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
-    low: { label: 'Low', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+    urgent: { label: 'Urgent', color: 'bg-destructive/10 text-destructive' },
+    high: { label: 'High', color: 'bg-warning/10 text-warning' },
+    medium: { label: 'Medium', color: 'bg-warning/10 text-warning' },
+    low: { label: 'Low', color: 'bg-info/10 text-info' },
   };
 
   const config = priorityConfig[item.priority];
@@ -464,13 +464,13 @@ function CoverageGapsSection({ gaps }: CoverageGapsSectionProps) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-orange-600" />
+          <AlertCircle className="h-5 w-5 text-warning" />
           Coverage Gaps Identified
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {gaps.map((gap) => (
-          <div key={gap.id} className="p-3 rounded-lg border bg-orange-50/50 dark:bg-orange-950/20">
+          <div key={gap.id} className="p-3 rounded-lg border bg-warning/5">
             <div className="flex items-start justify-between gap-2">
               <div className="font-medium">{gap.gap_type}</div>
               <Badge variant="outline" className="capitalize">{gap.priority} priority</Badge>
@@ -481,7 +481,7 @@ function CoverageGapsSection({ gaps }: CoverageGapsSectionProps) {
               {gap.estimated_premium && (
                 <div><span className="text-muted-foreground">Est. Premium: </span>{gap.estimated_premium}</div>
               )}
-              <div className="text-orange-700 dark:text-orange-400">
+              <div className="text-warning">
                 <span className="font-medium">Risk: </span>{gap.risk_if_unaddressed}
               </div>
             </div>
@@ -502,10 +502,10 @@ interface CrossSellSectionProps {
 
 function CrossSellSection({ opportunities }: CrossSellSectionProps) {
   return (
-    <Card className="border-l-4 border-l-green-500">
+    <Card className="border-l-4 border-l-success">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-green-600" />
+          <TrendingUp className="h-5 w-5 text-success" />
           Cross-Sell Opportunities
         </CardTitle>
       </CardHeader>
@@ -522,9 +522,9 @@ function CrossSellCard({ opportunity }: { opportunity: CrossSellOpportunity }) {
   const [isOpen, setIsOpen] = useState(opportunity.likelihood === 'high');
 
   const likelihoodColor = {
-    high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    high: 'bg-success/10 text-success',
+    medium: 'bg-warning/10 text-warning',
+    low: 'bg-info/10 text-info',
   };
 
   return (
@@ -591,7 +591,7 @@ function CitationsSection({ citations }: CitationsSectionProps) {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
+                <FileText className="h-5 w-5 text-info" />
                 Sources & Citations ({citations.length})
               </CardTitle>
               {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -640,7 +640,7 @@ function CitationCard({ citation }: { citation: Citation }) {
               {citation.snippet.length > 100 && (
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="text-xs text-blue-600 hover:underline mt-1"
+                  className="text-xs text-cc-link hover:text-cc-link-hover hover:underline mt-1"
                 >
                   {isExpanded ? 'Show less' : 'Show more'}
                 </button>
@@ -679,7 +679,7 @@ function CitationBadge({ citation }: CitationBadgeProps) {
         <TooltipTrigger asChild>
           <button
             onClick={() => navigate(citation.deep_link)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-info/10 text-info hover:bg-info/20 transition-colors"
           >
             <SourceIcon type={citation.source_type} className="h-3 w-3" />
             {citation.source_label}

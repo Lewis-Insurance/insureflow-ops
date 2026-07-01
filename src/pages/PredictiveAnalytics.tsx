@@ -153,13 +153,13 @@ export default function PredictiveAnalytics() {
 
         {/* Database Error State */}
         {hasDbError && (
-          <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <Card className="border-warning/30 bg-warning/10">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
-                <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-amber-800 dark:text-amber-200">Database Setup Required</h3>
-                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  <h3 className="font-semibold text-warning">Database Setup Required</h3>
+                  <p className="text-sm text-warning/90 mt-1">
                     The predictive analytics tables may not be set up yet. Click "Analyze All Customers" to initialize risk scoring,
                     or run the predictive analytics migration in Supabase.
                   </p>
@@ -444,9 +444,9 @@ export default function PredictiveAnalytics() {
                             {intervention.customer_retained !== null && (
                               <div className="flex items-center gap-2">
                                 {intervention.customer_retained ? (
-                                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                                  <CheckCircle2 className="h-6 w-6 text-success" />
                                 ) : (
-                                  <XCircle className="h-6 w-6 text-red-500" />
+                                  <XCircle className="h-6 w-6 text-destructive" />
                                 )}
                               </div>
                             )}

@@ -379,7 +379,7 @@ export default function PolicyDetail() {
                 {policy.total_premium && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Total Premium</label>
-                    <div className="flex items-center gap-1 text-lg font-semibold text-green-600">
+                    <div className="flex items-center gap-1 text-lg font-semibold text-success">
                       <DollarSign className="h-4 w-4" />
                       <span>{formatCurrency(policy.total_premium)}</span>
                     </div>

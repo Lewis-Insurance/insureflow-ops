@@ -149,10 +149,10 @@ export function LeadListView() {
         cell: ({ row }) => {
           const score = row.getValue('lead_score') as number;
           const getScoreColor = (s: number) => {
-            if (s >= 80) return 'bg-green-500 text-white';
-            if (s >= 60) return 'bg-blue-500 text-white';
-            if (s >= 40) return 'bg-amber-500 text-white';
-            return 'bg-red-500 text-white';
+            if (s >= 80) return 'bg-success text-success-foreground';
+            if (s >= 60) return 'bg-info text-info-foreground';
+            if (s >= 40) return 'bg-warning text-warning-foreground';
+            return 'bg-destructive text-destructive-foreground';
           };
           return (
             <Badge className={cn('font-semibold', getScoreColor(score))}>

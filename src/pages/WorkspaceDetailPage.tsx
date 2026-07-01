@@ -17,13 +17,13 @@ export default function WorkspaceDetailPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "processing":
-        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+        return <Loader2 className="h-5 w-5 animate-spin text-info" />;
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
       case "failed":
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-destructive" />;
       default:
-        return <Clock className="h-5 w-5 text-gray-500" />;
+        return <Clock className="h-5 w-5 text-cc-text-muted" />;
     }
   };
 

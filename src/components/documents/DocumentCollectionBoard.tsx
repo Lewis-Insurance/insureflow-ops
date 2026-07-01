@@ -62,22 +62,22 @@ import { formatDistanceToNow } from 'date-fns';
 function getStatusMeta(status: string): { color: string; bg: string; icon: React.ElementType; label: string } {
   switch (status) {
     case 'requested':
-      return { color: 'text-blue-600', bg: 'bg-blue-50', icon: Send, label: 'Requested' };
+      return { color: 'text-info', bg: 'bg-info/10', icon: Send, label: 'Requested' };
     case 'uploaded':
-      return { color: 'text-amber-600', bg: 'bg-amber-50', icon: Upload, label: 'Uploaded' };
+      return { color: 'text-warning', bg: 'bg-warning/10', icon: Upload, label: 'Uploaded' };
     case 'processing':
-      return { color: 'text-purple-600', bg: 'bg-purple-50', icon: Loader2, label: 'Processing' };
+      return { color: 'text-info', bg: 'bg-info/10', icon: Loader2, label: 'Processing' };
     case 'needs_review':
-      return { color: 'text-orange-600', bg: 'bg-orange-50', icon: Eye, label: 'Needs Review' };
+      return { color: 'text-warning', bg: 'bg-warning/10', icon: Eye, label: 'Needs Review' };
     case 'accepted':
-      return { color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2, label: 'Accepted' };
+      return { color: 'text-success', bg: 'bg-success/10', icon: CheckCircle2, label: 'Accepted' };
     case 'rejected':
-      return { color: 'text-red-600', bg: 'bg-red-50', icon: XCircle, label: 'Rejected' };
+      return { color: 'text-destructive', bg: 'bg-destructive/10', icon: XCircle, label: 'Rejected' };
     case 'expired':
-      return { color: 'text-gray-400', bg: 'bg-gray-100', icon: AlertTriangle, label: 'Expired' };
+      return { color: 'text-cc-text-muted', bg: 'bg-cc-surface-raised', icon: AlertTriangle, label: 'Expired' };
     case 'not_requested':
     default:
-      return { color: 'text-gray-500', bg: 'bg-gray-50', icon: Clock, label: 'Not Requested' };
+      return { color: 'text-cc-text-muted', bg: 'bg-cc-surface-raised', icon: Clock, label: 'Not Requested' };
   }
 }
 
@@ -114,7 +114,7 @@ export function DocumentCollectionBoard({ accountId, policyId }: DocumentCollect
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Inbox className="h-5 w-5 text-blue-600" />
+            <Inbox className="h-5 w-5 text-info" />
             <CardTitle className="text-lg">Document Collection</CardTitle>
           </div>
           <Button onClick={() => setCreateModalOpen(true)} size="sm">
@@ -259,13 +259,13 @@ function PacketDetail({ packet, onSelectRequirement }: PacketDetailProps) {
           
           <div className="flex items-center gap-3 text-sm">
             {statusSummary.pending_review_count > 0 && (
-              <div className="flex items-center gap-1 text-orange-600">
+              <div className="flex items-center gap-1 text-warning">
                 <Eye className="h-4 w-4" />
                 <span>{statusSummary.pending_review_count} to review</span>
               </div>
             )}
             {statusSummary.rejected_count > 0 && (
-              <div className="flex items-center gap-1 text-red-600">
+              <div className="flex items-center gap-1 text-destructive">
                 <XCircle className="h-4 w-4" />
                 <span>{statusSummary.rejected_count} rejected</span>
               </div>
@@ -341,20 +341,20 @@ function RequirementTile({ requirement, onClick }: RequirementTileProps) {
       onClick={onClick}
       className={`
         relative p-4 rounded-lg border-2 cursor-pointer transition-all
-        hover:shadow-md hover:border-blue-300
+        hover:shadow-md hover:border-cc-border-interactive
         ${status.bg} border-transparent
       `}
     >
       {/* Required indicator */}
       {requirement.is_required && (
         <div className="absolute top-2 right-2">
-          <span className="text-xs text-red-500 font-medium">Required</span>
+          <span className="text-xs text-destructive font-medium">Required</span>
         </div>
       )}
 
       {/* Icon and Label */}
       <div className="flex items-start gap-3 mb-3">
-        <div className={`p-2 rounded-lg bg-white shadow-sm ${status.color}`}>
+        <div className={`p-2 rounded-lg bg-cc-surface shadow-sm ${status.color}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">

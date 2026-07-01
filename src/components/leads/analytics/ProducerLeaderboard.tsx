@@ -100,7 +100,7 @@ export function ProducerLeaderboard({ dateRange }: { dateRange?: { start: string
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="flex items-center gap-1 text-sm font-medium">
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3 text-success" />
                     <span>{producer.won} Won</span>
                   </div>
                   <p className="text-xs text-muted-foreground">

@@ -423,7 +423,7 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
             ))
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
+              <CheckCircle className="w-12 h-12 mx-auto mb-4 text-success" />
               <p className="font-medium">No claims on record</p>
               <p className="text-sm">Clean claims history</p>
             </div>
@@ -438,7 +438,7 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
             ))
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <Download className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <Download className="w-12 h-12 mx-auto mb-4 text-cc-text-faint" />
               <p className="font-medium">No documents available</p>
               <p className="text-sm mt-1">Documents like ID cards and declarations pages depend on the carrier.</p>
               <p className="text-xs mt-2 text-muted-foreground/70">Not all carriers provide documents through Canopy Connect.</p>
@@ -485,7 +485,7 @@ export function CanopyDataDisplay({ pullId, leadId, showHeader = true }: CanopyD
                     When changes are detected, you'll see them in the <strong>Changes</strong> tab
                     and can review what's different from the previous snapshot.
                   </p>
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700">
+                  <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-warning">
                     <p className="font-medium">Billing Note</p>
                     <p className="text-xs mt-1">
                       Each monitoring refresh is billed as a Canopy Pull. Use monitoring for
@@ -564,10 +564,10 @@ function PolicyCard({ policy }: { policy: any }) {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'active': return 'bg-green-500';
-      case 'expired': return 'bg-red-500';
-      case 'cancelled': return 'bg-gray-500';
-      default: return 'bg-blue-500';
+      case 'active': return 'bg-success text-success-foreground';
+      case 'expired': return 'bg-destructive text-destructive-foreground';
+      case 'cancelled': return 'bg-cc-surface-overlay text-cc-text-secondary';
+      default: return 'bg-info text-info-foreground';
     }
   };
 
@@ -708,7 +708,7 @@ function DriverCard({ driver }: { driver: any }) {
             <div>
               <CardTitle className="text-lg">
                 {driver.first_name} {driver.last_name}
-                {driver.is_primary && <Badge className="ml-2 bg-blue-500">Primary</Badge>}
+                {driver.is_primary && <Badge className="ml-2 bg-info text-info-foreground">Primary</Badge>}
               </CardTitle>
               <CardDescription>
                 {driver.relation_to_insured || 'Insured'} • {calculateAge(driver.date_of_birth)} years old
@@ -743,7 +743,7 @@ function DriverCard({ driver }: { driver: any }) {
             <div className="space-y-3">
               {hasViolations && (
                 <div>
-                  <p className="text-sm font-medium text-amber-600 mb-2 flex items-center gap-1">
+                  <p className="text-sm font-medium text-warning mb-2 flex items-center gap-1">
                     <AlertTriangle className="w-4 h-4" /> Violations ({driver.violations.length})
                   </p>
                   <div className="space-y-1">
@@ -758,7 +758,7 @@ function DriverCard({ driver }: { driver: any }) {
               )}
               {hasAccidents && (
                 <div>
-                  <p className="text-sm font-medium text-red-600 mb-2 flex items-center gap-1">
+                  <p className="text-sm font-medium text-destructive mb-2 flex items-center gap-1">
                     <XCircle className="w-4 h-4" /> Accidents ({driver.accidents.length})
                   </p>
                   <div className="space-y-1">
@@ -777,7 +777,7 @@ function DriverCard({ driver }: { driver: any }) {
         )}
 
         {!hasViolations && !hasAccidents && (
-          <div className="flex items-center gap-2 text-sm text-green-600">
+          <div className="flex items-center gap-2 text-sm text-success">
             <CheckCircle className="w-4 h-4" />
             Clean driving record
           </div>
@@ -868,7 +868,7 @@ function ClaimCard({ claim }: { claim: any }) {
   const getStatusBadge = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'open': return <Badge variant="destructive">Open</Badge>;
-      case 'closed': return <Badge className="bg-green-500">Closed</Badge>;
+      case 'closed': return <Badge className="bg-success text-success-foreground">Closed</Badge>;
       case 'pending': return <Badge variant="secondary">Pending</Badge>;
       case 'denied': return <Badge variant="outline">Denied</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
@@ -1029,8 +1029,8 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
       <CardContent className="py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`p-2 rounded-lg ${isStoredLocally ? 'bg-green-100' : 'bg-amber-100'}`}>
-              <FileText className={`w-5 h-5 ${isStoredLocally ? 'text-green-600' : 'text-amber-600'}`} />
+            <div className={`p-2 rounded-lg ${isStoredLocally ? 'bg-success/10' : 'bg-warning/10'}`}>
+              <FileText className={`w-5 h-5 ${isStoredLocally ? 'text-success' : 'text-warning'}`} />
             </div>
             <div>
               <p className="font-medium">{getDocumentTypeLabel(document.document_type)}</p>
@@ -1058,14 +1058,14 @@ function DocumentCard({ document, canopyPullId }: { document: any; canopyPullId?
           </div>
         </div>
         {isStoredLocally && (
-          <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+          <div className="mt-2 flex items-center gap-1 text-xs text-success">
             <CheckCircle className="w-3 h-3" />
             Saved to your files
           </div>
         )}
         {!isStoredLocally && (
           <div className="mt-2 text-xs text-muted-foreground">
-            <p className="text-amber-600 flex items-center gap-1">
+            <p className="text-warning flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
               View documents in Canopy dashboard
             </p>
@@ -1099,7 +1099,7 @@ function DataItem({
         {Icon && <Icon className="w-3 h-3" />}
         {label}
       </p>
-      <p className={`text-sm font-medium ${highlight ? 'text-amber-600' : ''}`}>
+      <p className={`text-sm font-medium ${highlight ? 'text-warning' : ''}`}>
         {value}
       </p>
       {subValue && <p className="text-xs text-muted-foreground capitalize">{subValue}</p>}

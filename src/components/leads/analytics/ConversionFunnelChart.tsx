@@ -41,7 +41,7 @@ export function ConversionFunnelChart({ dateRange }: { dateRange?: { start: stri
                     {stage.count} leads ({stage.percentage.toFixed(1)}%)
                   </span>
                   {index > 0 && stage.dropoff > 0 && (
-                    <span className="text-red-600 text-xs flex items-center gap-1">
+                    <span className="text-destructive text-xs flex items-center gap-1">
                       <TrendingDown className="h-3 w-3" />
                       -{stage.dropoff}
                     </span>
@@ -79,7 +79,7 @@ export function ConversionFunnelChart({ dateRange }: { dateRange?: { start: stri
             <p className="text-xs text-muted-foreground">Converted</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-success">
               {funnelData?.[funnelData.length - 1]?.percentage.toFixed(1) || 0}%
             </p>
             <p className="text-xs text-muted-foreground">Win Rate</p>

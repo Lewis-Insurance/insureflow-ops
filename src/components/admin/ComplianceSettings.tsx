@@ -184,19 +184,19 @@ export function ComplianceSettings() {
   return (
     <div className="space-y-6">
       {/* Compliance Overview */}
-      <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+      <Card className="border-success/30 bg-success/10">
         <CardContent className="py-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
-              <Shield className="h-6 w-6 text-green-600" />
+            <div className="p-3 rounded-full bg-success/10">
+              <Shield className="h-6 w-6 text-success" />
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-green-900 dark:text-green-100">Compliance Status</h3>
-              <p className="text-sm text-green-700 dark:text-green-300">
+              <h3 className="font-medium text-success">Compliance Status</h3>
+              <p className="text-sm text-success">
                 All compliance features are properly configured
               </p>
             </div>
-            <Badge className="bg-green-600">
+            <Badge className="bg-success text-success-foreground">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Compliant
             </Badge>
@@ -209,8 +209,8 @@ export function ComplianceSettings() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Database className="h-5 w-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-info/10">
+                <Database className="h-5 w-5 text-info" />
               </div>
               <div>
                 <CardTitle className="text-lg">Data Retention Policy</CardTitle>
@@ -337,8 +337,8 @@ export function ComplianceSettings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-              <Eye className="h-5 w-5 text-purple-600" />
+            <div className="p-2 rounded-lg bg-info/10">
+              <Eye className="h-5 w-5 text-info" />
             </div>
             <div>
               <CardTitle className="text-lg">Audit Logging</CardTitle>
@@ -377,8 +377,8 @@ export function ComplianceSettings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-              <Lock className="h-5 w-5 text-green-600" />
+            <div className="p-2 rounded-lg bg-success/10">
+              <Lock className="h-5 w-5 text-success" />
             </div>
             <div>
               <CardTitle className="text-lg">Privacy & Data Rights</CardTitle>
@@ -414,8 +414,8 @@ export function ComplianceSettings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <Scale className="h-5 w-5 text-amber-600" />
+            <div className="p-2 rounded-lg bg-warning/10">
+              <Scale className="h-5 w-5 text-warning" />
             </div>
             <div>
               <CardTitle className="text-lg">E&O Documentation Requirements</CardTitle>
@@ -471,10 +471,10 @@ export function ComplianceSettings() {
       </Card>
 
       {/* Warning */}
-      <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+      <div className="p-4 bg-warning/10 rounded-lg border border-warning/30">
         <div className="flex gap-2">
-          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-900 dark:text-amber-100">
+          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-warning">
             <p className="font-medium mb-1">Important Notice</p>
             <p>
               Compliance settings affect data handling across your entire organization.

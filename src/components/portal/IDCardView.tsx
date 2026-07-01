@@ -163,7 +163,7 @@ function IDCardItem({
       <CardContent className="space-y-4">
         {/* Card Image */}
         {imageUrl ? (
-          <div className="bg-gray-100 rounded-lg p-2">
+          <div className="bg-cc-surface-raised rounded-lg p-2">
             <img
               src={imageUrl}
               alt={`${card_data.carrier_name} ID Card`}
@@ -239,7 +239,7 @@ function IDCardItem({
           {card_data.claims_phone && (
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              <a href={`tel:${card_data.claims_phone}`} className="text-blue-600 hover:underline">
+              <a href={`tel:${card_data.claims_phone}`} className="text-cc-link hover:text-cc-link-hover hover:underline">
                 {card_data.claims_phone}
               </a>
             </div>

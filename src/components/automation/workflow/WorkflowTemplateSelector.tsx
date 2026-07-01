@@ -51,15 +51,15 @@ const TEMPLATE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const TEMPLATE_COLORS: Record<string, string> = {
-  birthday: 'bg-pink-500',
-  renewal: 'bg-blue-500',
-  welcome: 'bg-green-500',
-  referral: 'bg-purple-500',
-  review: 'bg-yellow-500',
-  turning_65: 'bg-orange-500',
-  cross_sell: 'bg-cyan-500',
-  lost_deal: 'bg-red-500',
-  client_pulse: 'bg-indigo-500',
+  birthday: 'bg-info',
+  renewal: 'bg-info',
+  welcome: 'bg-success',
+  referral: 'bg-info',
+  review: 'bg-warning',
+  turning_65: 'bg-warning',
+  cross_sell: 'bg-info',
+  lost_deal: 'bg-destructive',
+  client_pulse: 'bg-info',
 };
 
 export function WorkflowTemplateSelector({
@@ -159,7 +159,7 @@ interface TemplateCardProps {
 
 function TemplateCard({ template, onSelect }: TemplateCardProps) {
   const icon = TEMPLATE_ICONS[template.workflow_type] || <FileText className="h-6 w-6" />;
-  const bgColor = TEMPLATE_COLORS[template.workflow_type] || 'bg-gray-500';
+  const bgColor = TEMPLATE_COLORS[template.workflow_type] || 'bg-cc-text-muted';
   const stageCount = Array.isArray(template.default_stages)
     ? template.default_stages.length
     : 0;

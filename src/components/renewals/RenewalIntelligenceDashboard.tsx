@@ -63,10 +63,10 @@ export default function RenewalIntelligenceDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Critical Risk</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{summary?.critical_risk || 0}</div>
+            <div className="text-2xl font-bold text-destructive">{summary?.critical_risk || 0}</div>
             <p className="text-xs text-muted-foreground">
               Requires immediate attention
             </p>
@@ -160,34 +160,34 @@ export default function RenewalIntelligenceDashboard() {
 
           {/* Progress bar visualization */}
           {summary && summary.total_renewals > 0 && (
-            <div className="w-full h-8 bg-gray-200 rounded-lg overflow-hidden flex">
+            <div className="w-full h-8 bg-cc-surface-raised rounded-lg overflow-hidden flex">
               {summary.critical_risk > 0 && (
-                <div 
-                  className="bg-red-500 flex items-center justify-center text-white text-xs font-medium"
+                <div
+                  className="bg-destructive flex items-center justify-center text-white text-xs font-medium"
                   style={{ width: `${(summary.critical_risk / summary.total_renewals * 100)}%` }}
                 >
                   {summary.critical_risk}
                 </div>
               )}
               {summary.high_risk > 0 && (
-                <div 
-                  className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
+                <div
+                  className="bg-warning flex items-center justify-center text-white text-xs font-medium"
                   style={{ width: `${(summary.high_risk / summary.total_renewals * 100)}%` }}
                 >
                   {summary.high_risk}
                 </div>
               )}
               {summary.medium_risk > 0 && (
-                <div 
-                  className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
+                <div
+                  className="bg-warning flex items-center justify-center text-white text-xs font-medium"
                   style={{ width: `${(summary.medium_risk / summary.total_renewals * 100)}%` }}
                 >
                   {summary.medium_risk}
                 </div>
               )}
               {summary.low_risk > 0 && (
-                <div 
-                  className="bg-green-500 flex items-center justify-center text-white text-xs font-medium"
+                <div
+                  className="bg-success flex items-center justify-center text-white text-xs font-medium"
                   style={{ width: `${(summary.low_risk / summary.total_renewals * 100)}%` }}
                 >
                   {summary.low_risk}

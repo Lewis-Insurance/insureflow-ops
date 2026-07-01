@@ -86,8 +86,8 @@ export function TrainingMaterialViewer({
                   {material.difficulty}
                 </Badge>
                 {material.is_required && (
-                  <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
-                    <Star className="h-3 w-3 mr-1 fill-amber-500" />
+                  <Badge variant="outline" className="text-xs border-warning/30 text-warning">
+                    <Star className="h-3 w-3 mr-1 fill-warning" />
                     Required
                   </Badge>
                 )}
@@ -123,7 +123,7 @@ export function TrainingMaterialViewer({
                 </Button>
               )}
               {material.user_status === 'completed' && (
-                <Badge variant="secondary" className="bg-green-100 text-green-800 gap-1">
+                <Badge variant="secondary" className="bg-success/10 text-success gap-1">
                   <CheckCircle2 className="h-4 w-4" />
                   Completed
                 </Badge>

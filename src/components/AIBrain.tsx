@@ -347,7 +347,7 @@ const InsuranceAIBrain = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
+            <Sparkles className="w-5 h-5 mr-2 text-info" />
             AI-Powered Knowledge Search
           </CardTitle>
           <CardDescription>
@@ -388,7 +388,7 @@ const InsuranceAIBrain = () => {
             <div className="mt-4 p-4 bg-muted rounded-lg space-y-4">
               <div>
                 <h4 className="font-semibold mb-2 flex items-center">
-                  <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                  <Sparkles className="w-4 h-4 mr-2 text-info" />
                   Quick Answer:
                 </h4>
                 <p className="text-foreground">{searchResults.shortAnswer}</p>
@@ -452,10 +452,10 @@ const InsuranceAIBrain = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Entries</p>
+                <p className="text-sm text-cc-text-muted">Total Entries</p>
                 <p className="text-2xl font-bold">{stats.totalEntries}</p>
               </div>
-              <Database className="w-8 h-8 text-gray-400" />
+              <Database className="w-8 h-8 text-cc-text-muted" />
             </div>
           </CardContent>
         </Card>
@@ -464,10 +464,10 @@ const InsuranceAIBrain = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Categories</p>
+                <p className="text-sm text-cc-text-muted">Categories</p>
                 <p className="text-2xl font-bold">{stats.categories}</p>
               </div>
-              <Brain className="w-8 h-8 text-gray-400" />
+              <Brain className="w-8 h-8 text-cc-text-muted" />
             </div>
           </CardContent>
         </Card>
@@ -476,10 +476,10 @@ const InsuranceAIBrain = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">AI Ready</p>
+                <p className="text-sm text-cc-text-muted">AI Ready</p>
                 <p className="text-2xl font-bold">95%</p>
               </div>
-              <Shield className="w-8 h-8 text-green-500" />
+              <Shield className="w-8 h-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -488,10 +488,10 @@ const InsuranceAIBrain = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Response Time</p>
+                <p className="text-sm text-cc-text-muted">Response Time</p>
                 <p className="text-2xl font-bold">1.2s</p>
               </div>
-              <Zap className="w-8 h-8 text-yellow-500" />
+              <Zap className="w-8 h-8 text-warning" />
             </div>
           </CardContent>
         </Card>
@@ -523,10 +523,10 @@ const InsuranceAIBrain = () => {
             <TabsContent value="knowledge" className="space-y-4">
               {kbLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                  <Loader2 className="w-8 h-8 animate-spin text-cc-text-muted" />
                 </div>
               ) : categories.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-cc-text-muted">
                   <p>No knowledge entries found</p>
                 </div>
               ) : (
@@ -542,11 +542,11 @@ const InsuranceAIBrain = () => {
                   {categories.map(category => (
                     <TabsContent key={category} value={category} className="space-y-2">
                       {categorizedEntries[category].map(entry => (
-                        <div key={entry.id} className="p-4 border rounded-lg hover:bg-gray-50">
+                        <div key={entry.id} className="p-4 border rounded-lg hover:bg-cc-surface-raised">
                           <div className="flex items-start justify-between">
                             <div>
                               <h4 className="font-semibold">{entry.title}</h4>
-                              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                              <p className="text-sm text-cc-text-secondary mt-1 line-clamp-2">
                                 {entry.content}
                               </p>
                               <div className="flex items-center space-x-2 mt-2">
@@ -560,10 +560,10 @@ const InsuranceAIBrain = () => {
                             <Badge variant="secondary">{entry.category}</Badge>
                           </div>
                           <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-cc-text-muted">
                               Source: {entry.source || 'Manual Entry'}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-cc-text-muted">
                               Updated: {new Date(entry.updated_at).toLocaleDateString()}
                             </span>
                           </div>

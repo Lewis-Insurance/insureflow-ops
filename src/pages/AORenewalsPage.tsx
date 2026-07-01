@@ -100,22 +100,22 @@ function RenewalUrgencyBadge({ renewal }: { renewal: AORenewal }) {
   const days = differenceFromTodayInLocalDays(extractLocalDate(renewal.renewal_date));
   if (days === null) return null;
   if (days < 0) return <Badge variant="destructive" className="text-xs font-semibold">OVERDUE</Badge>;
-  if (days === 0) return <Badge className="bg-amber-600 hover:bg-amber-600 text-xs">Today</Badge>;
-  if (days === 1) return <Badge className="bg-amber-500 hover:bg-amber-500 text-xs">Tomorrow</Badge>;
-  if (days <= 7) return <Badge className="bg-amber-400 hover:bg-amber-400 text-amber-950 text-xs">{days}d</Badge>;
+  if (days === 0) return <Badge className="bg-warning hover:bg-warning text-warning-foreground text-xs">Today</Badge>;
+  if (days === 1) return <Badge className="bg-warning hover:bg-warning text-warning-foreground text-xs">Tomorrow</Badge>;
+  if (days <= 7) return <Badge className="bg-warning/80 hover:bg-warning/80 text-warning-foreground text-xs">{days}d</Badge>;
   if (days <= 14) return <Badge variant="outline" className="text-xs">{days}d</Badge>;
   return <span className="text-xs text-muted-foreground">{days}d</span>;
 }
 
 const getStatusBadge = (status: AORenewalStatus) => {
   const config: Record<AORenewalStatus, { label: string; className: string }> = {
-    pending:   { label: "Pending",   className: "bg-slate-100 text-slate-700 border-slate-200" },
-    contacted: { label: "Contacted", className: "bg-blue-100 text-blue-700 border-blue-200" },
-    quoted:    { label: "Quoted",    className: "bg-amber-100 text-amber-800 border-amber-200" },
-    renewed:   { label: "Retained",  className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    moved:     { label: "Moved",     className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
-    lost:      { label: "Lost",      className: "bg-rose-100 text-rose-700 border-rose-200" },
-    cancelled: { label: "Cancelled", className: "bg-zinc-100 text-zinc-700 border-zinc-200" },
+    pending:   { label: "Pending",   className: "bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle" },
+    contacted: { label: "Contacted", className: "bg-info/10 text-info border-info/30" },
+    quoted:    { label: "Quoted",    className: "bg-warning/10 text-warning border-warning/30" },
+    renewed:   { label: "Retained",  className: "bg-success/10 text-success border-success/30" },
+    moved:     { label: "Moved",     className: "bg-info/10 text-info border-info/30" },
+    lost:      { label: "Lost",      className: "bg-destructive/10 text-destructive border-destructive/30" },
+    cancelled: { label: "Cancelled", className: "bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle" },
   };
   return <Badge variant="outline" className={config[status].className}>{config[status].label}</Badge>;
 };
@@ -433,7 +433,7 @@ export default function AORenewalsPage() {
             size="sm"
             onClick={() => setHideClosed((v) => !v)}
             className={hideClosed
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+              ? "bg-success hover:bg-success/90 text-success-foreground border-success"
               : ""}
             variant={hideClosed ? "default" : "outline"}
           >
@@ -606,18 +606,18 @@ export default function AORenewalsPage() {
                         {/* Attention badge */}
                         <TableCell>
                           {(renewal.status === "moved" || renewal.status === "lost" || renewal.status === "cancelled" || renewal.status === "renewed") ? (
-                            <div className="flex items-center gap-1.5 text-emerald-500" title="Handled — off your plate">
+                            <div className="flex items-center gap-1.5 text-success" title="Handled — off your plate">
                               <CheckCircle className="h-4 w-4" />
-                              <span className="text-xs capitalize text-emerald-600">{renewal.status}</span>
+                              <span className="text-xs capitalize text-success">{renewal.status}</span>
                             </div>
                           ) : renewal.status === "pending" ? (
-                            <Badge className="bg-slate-700 hover:bg-slate-700">No contact yet</Badge>
+                            <Badge className="bg-cc-surface-overlay text-cc-text-secondary hover:bg-cc-surface-overlay">No contact yet</Badge>
                           ) : renewal.status === "contacted" ? (
-                            <Badge className="bg-blue-600 hover:bg-blue-600">Quote needed</Badge>
+                            <Badge className="bg-info hover:bg-info text-info-foreground">Quote needed</Badge>
                           ) : metrics.isFollowUpOverdue || metrics.staleReason ? (
                             <Badge variant="destructive">Follow up overdue</Badge>
                           ) : metrics.isCriticalWindow ? (
-                            <Badge className="bg-orange-600 hover:bg-orange-600">Inside 5 days</Badge>
+                            <Badge className="bg-warning hover:bg-warning text-warning-foreground">Inside 5 days</Badge>
                           ) : (
                             <Badge variant="outline">On track</Badge>
                           )}

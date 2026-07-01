@@ -58,13 +58,13 @@ export function CustomerTasksSection({ accountId }: CustomerTasksSectionProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+        return <Badge className="bg-success/10 text-success">Completed</Badge>;
       case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>;
+        return <Badge className="bg-info/10 text-info">In Progress</Badge>;
       case 'cancelled':
-        return <Badge className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+        return <Badge className="bg-cc-surface-overlay text-cc-text-muted">Cancelled</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+        return <Badge className="bg-warning/10 text-warning">Pending</Badge>;
     }
   };
 
@@ -141,7 +141,7 @@ export function CustomerTasksSection({ accountId }: CustomerTasksSectionProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="ml-2 shrink-0 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400"
+                      className="ml-2 shrink-0 hover:bg-success/10 hover:text-success"
                       onClick={(e) => handleQuickComplete(e, task)}
                       title="Mark Complete"
                     >

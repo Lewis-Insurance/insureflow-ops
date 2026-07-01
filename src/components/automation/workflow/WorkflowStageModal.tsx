@@ -54,14 +54,14 @@ interface WorkflowStageModalProps {
 }
 
 const ACTION_TYPES = [
-  { value: 'send_email', label: 'Send Email', icon: Mail, color: 'text-blue-500' },
-  { value: 'send_sms', label: 'Send SMS', icon: MessageSquare, color: 'text-green-500' },
-  { value: 'create_task', label: 'Create Task', icon: CheckSquare, color: 'text-purple-500' },
-  { value: 'webhook', label: 'Call Webhook', icon: Webhook, color: 'text-orange-500' },
-  { value: 'wait', label: 'Wait/Delay Only', icon: Clock, color: 'text-gray-500' },
-  { value: 'update_field', label: 'Update Field', icon: Edit, color: 'text-yellow-500' },
-  { value: 'add_tag', label: 'Add Tag', icon: Users, color: 'text-pink-500' },
-  { value: 'remove_tag', label: 'Remove Tag', icon: Users, color: 'text-red-500' },
+  { value: 'send_email', label: 'Send Email', icon: Mail, color: 'text-info' },
+  { value: 'send_sms', label: 'Send SMS', icon: MessageSquare, color: 'text-success' },
+  { value: 'create_task', label: 'Create Task', icon: CheckSquare, color: 'text-info' },
+  { value: 'webhook', label: 'Call Webhook', icon: Webhook, color: 'text-warning' },
+  { value: 'wait', label: 'Wait/Delay Only', icon: Clock, color: 'text-cc-text-muted' },
+  { value: 'update_field', label: 'Update Field', icon: Edit, color: 'text-warning' },
+  { value: 'add_tag', label: 'Add Tag', icon: Users, color: 'text-info' },
+  { value: 'remove_tag', label: 'Remove Tag', icon: Users, color: 'text-destructive' },
 ];
 
 const DELAY_UNITS = [
@@ -269,7 +269,7 @@ export function WorkflowStageModal({ open, onOpenChange, stage, onSave }: Workfl
             </div>
 
             {delayValue === 0 && (
-              <p className="text-sm text-green-600">
+              <p className="text-sm text-success">
                 This action will execute immediately after the trigger/previous stage.
               </p>
             )}
