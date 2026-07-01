@@ -6,7 +6,7 @@
 **Dev branch:** `klnygbbmognbslgobmzc`  
 **Last updated:** 2026-07-01 (planning started)
 
-**Status:** 🟡 **PLANNING** — implementation not started.
+**Status:** 🟢 **PLAN LOCKED** — Brian decisions in (2026-07-01); implementation awaiting go.
 
 ---
 
@@ -24,24 +24,36 @@
 
 | Slice | Scope | Status |
 |---|---|---|
-| 0 | Planning + Brian decisions | 🟡 in progress |
-| 1 | ID card asset pipeline (G2) | ⬜ not started |
-| 2 | Play 4 `id.card.issue` module + in-force | ⬜ not started |
-| 3 | Send surface + chokepoint generalization | ⬜ not started |
-| 4 | CRM / email intake | ⬜ not started |
-| 5 | G4 live client send | ⬜ blocked on G4 |
+| 0 | Planning + Brian decisions | ✅ complete 2026-07-01 |
+| 1 | ID card asset pipeline | ⬜ ready to start (populate `portal_id_cards` — 0 rows on dev today) |
+| 2 | Play 4 `id.card.issue` module + in-force | ⬜ ready (owner: Landen) |
+| 3 | Send surface: new `send-id-card-email` + chokepoint generalization | ⬜ ready |
+| 4 | CRM button intake (email intake later) | ⬜ ready |
+| 5 | G4 live client send | ⬜ blocked on G4 sign-off |
 
 ---
 
-## Brian decisions (open)
+## Brian decisions
 
 | Decision | Status |
 |---|---|
-| Play 4 owner: Tori vs Landen | ⏳ open |
-| Send surface: extend COI vs `send-id-card-email` | ⏳ open (plan recommends new function) |
-| G2 bucket-privacy timing | ⏳ open |
+| Play 4 owner: Tori vs Landen | ✅ **Landen** (2026-07-01) |
+| Send surface: extend COI vs `send-id-card-email` | ✅ **New `send-id-card-email`** (2026-07-01) |
+| G2 bucket-privacy timing | ✅ Resolved — `portal-documents` already private w/ signed URLs; no dev blocker; legacy audit → prod hardening pre-G4 |
 | G4 First Light sign-off | ⏳ open (after dev soak) |
 | G1 prod migrations | ⏳ open |
+
+---
+
+## Dev ground truth (verified 2026-07-01)
+
+| Fact | Value |
+|---|---|
+| `portal_id_cards` rows | **0** — populate pipeline is Slice 1's real work |
+| In-force policies (`policy_in_force_status`) | 1,837 |
+| ID-card-like `documents` rows | 1 |
+| Play 4 test candidates | In-force auto w/ email exist (e.g. Progressive `876025041`, Auto-Owners `49-530349-00`) |
+| `policies` line column | `line_of_business` (no `policy_type` column) |
 
 ---
 

@@ -64,14 +64,22 @@ flowchart LR
 | Gate | What | Blocks | Status |
 |---|---|---|---|
 | **G1** | Prod migration apply (Spine A + D + Floor) | Prod persistence | ⏳ after dev Phase 3 soak |
-| **G2** | Bucket-privacy flip; signed-URL readiness for doc buttons in cards | Real ID card preview URLs in Slack/cockpit | ⏳ Brian decision |
+| **G2** | Bucket-privacy flip; signed-URL readiness for doc buttons in cards | Real ID card preview URLs in Slack/cockpit | ✅ **Resolved 2026-07-01** — no flip needed for Phase 3 dev; see decision below |
 | **G4** | First live client send; **per-play** allowlist flip (`id.card.issue` first) | Removing internal-only guard for Play 4 | ⏳ separate one-page sign-off |
-| **Owner** | Tori vs Landen as default Play 4 approver | `owner_id` on WorkRequest / routing | ⏳ handoff §9.5 |
+| **Owner** | Tori vs Landen as default Play 4 approver | `owner_id` on WorkRequest / routing | ✅ **Landen** (Brian, 2026-07-01) |
 
 **Already decided (do not re-litigate):**
 - Resolve confidence bar: **0.9** (`RESOLVE_ACCOUNT_AUTO_THRESHOLD`)
 - Undo hold: **30s** (`CLIENT_SEND_UNDO_HOLD_SECONDS`)
 - Two-gate R7: Floor + Fence (ADR 001)
+
+### Brian decisions — 2026-07-01
+
+| # | Decision | Answer |
+|---|---|---|
+| 1 | Play 4 owner | **Landen** — `owner_id` on all `id.card.issue` WorkRequests; Slack cards route to his agent binding |
+| 2 | Send surface | **New `send-id-card-email`** edge function (clean Fence surface; COI and ID card templates stay separate); generalize `stageClientSend` / `mintFloorFenceApproval` with a surface parameter |
+| 3 | G2 timing | **No bucket flip required for Phase 3 dev.** Rationale: `portal-documents` is *already a private bucket* served exclusively through short-lived signed URLs (`get-id-card-image` pattern, 900s TTL). That IS the world-class posture — nothing public to flip. The original G2 concern (public buckets used by doc buttons) applies to legacy buckets, not this path. Phase 3 uses `portal-documents` signed URLs from day one; G2 legacy-bucket audit moves to **prod hardening before G4**, not a Phase 3 dev blocker |
 
 ---
 
@@ -125,23 +133,30 @@ At package build **and** at `stageClientSend`:
 ### Slice 0 — Planning + decisions (this doc)
 
 - [x] Phase 3 plan
-- [ ] Brian: Play 4 owner (Tori / Landen)
-- [ ] Brian: G2 timing for doc preview URLs
-- [ ] Brian: send surface choice (extend COI email vs new `send-id-card-email`)
+- [x] Brian: Play 4 owner → **Landen** (2026-07-01)
+- [x] Brian: G2 timing → **resolved, no dev blocker** (signed-URL private bucket already in place; see decisions table)
+- [x] Brian: send surface choice → **new `send-id-card-email`** (2026-07-01)
 - [ ] Restore dev `RESEND_API_KEY`; re-run Phase 2 release to green provider step
 
-### Slice 1 — ID card asset pipeline (G2-sensitive)
+### Slice 1 — ID card asset pipeline
 
 **Goal:** Staff can resolve `portal_id_cards` row + signed URL for a policy; no client send yet.
 
+**Dev ground truth (verified 2026-07-01):**
+- `portal_id_cards`: **0 rows** — table exists, no writer anywhere in the codebase
+- `policy_in_force_status`: **1,837 in-force policies** on dev
+- `documents` with ID-card-like type/name: **1 row** — carrier PDFs are not flowing in as ID cards
+- In-force auto policies with account email exist (e.g. Progressive `876025041` / Pamela Dixon) — good Play 4 test candidates
+
+**Implication:** the populate pipeline is the real work of this slice; do not assume Canopy assets exist. v1 populate order: (a) `documents` rows typed as ID card where present, (b) Canopy fetch for policies that have connections, (c) generated proof-of-insurance PDF as fallback (policy facts from `policies` row — this also guarantees data freshness matches `data_as_of`).
+
 | Task | Notes |
 |---|---|
-| Populate `portal_id_cards` from Canopy fetch or `documents` where type = id_card | Today: table exists, **no writer** |
-| Reuse `get-id-card-image` signed URL pattern (900s) | Service role; portal bucket |
-| Staff-only preview in cockpit package `document_ref` | No bucket path in card text |
-| Prove G2 readiness checklist | Link to portal signed-URL audit |
+| Populate `portal_id_cards` (writer function or script) | Priority order above; set `data_as_of` + `source_document_id` provenance |
+| Reuse `get-id-card-image` signed URL pattern (900s) | Service role; `portal-documents` private bucket (G2 resolved — already private) |
+| Staff-only preview in cockpit package `document_ref` | No bucket path in card text; signed URL only |
 
-**Done when:** Given policy X on dev, query returns active card path + signed URL loads in browser.
+**Done when:** Given an in-force auto policy on dev, query returns active card path + signed URL loads in browser.
 
 ### Slice 2 — Play 4 core module
 
@@ -161,18 +176,14 @@ At package build **and** at `stageClientSend`:
 
 **Goal:** Release path can deliver ID card email, not only COI template.
 
-| Option | Tradeoff |
-|---|---|
-| **A — Extend `send-coi-email`** | Minimal Fence surface; awkward naming |
-| **B — New `send-id-card-email`** | Clean; requires `stageClientSend` + `mintFloorFenceApproval` surface param |
-
-**Recommend B** for clarity; keep COI and ID card templates separate.
+**Decision (Brian, 2026-07-01): Option B — new `send-id-card-email`.** COI and ID card templates stay separate; the Fence gets a clean per-surface registration.
 
 | Task | Notes |
 |---|---|
-| New fenced edge function | HTML: link to signed ID card URL |
-| Generalize `invokeSendCOIEmail` → `invokeTier3EmailSend(surface, payload)` | `stageClientSend.ts` |
-| `mintFloorFenceApprovalFor*` per surface | `mintFloorFenceApproval.ts` |
+| New fenced edge function `send-id-card-email` | HTML: link to signed ID card URL; fixed sender like COI; register surface in `clientSendApprovalGate` `canonicalPayload` |
+| Generalize `invokeSendCOIEmail` → `invokeTier3EmailSend(surface, payload)` | `stageClientSend.ts` (+ `_shared/floor` mirror) |
+| `mintFloorFenceApprovalFor*` per surface | `mintFloorFenceApproval.ts` — surface param instead of hardcoded `'send-coi-email'` |
+| `floor-release-held-sends` routes by surface | Held row needs a surface column or derives from play_id |
 | `email_log` insert awaited | Phase 2 DoD carryover |
 
 **Done when:** Dev soak: Play 4 approve → hold → release → email to **allowlist** with ID card link.
@@ -217,15 +228,15 @@ At package build **and** at `stageClientSend`:
 
 ---
 
-## Open decisions for Brian (pick to unblock slices)
+## Decisions — resolved vs open
 
-| # | Question | Recommendation | Unblocks |
-|---|---|---|---|
-| 1 | **Play 4 owner:** Tori or Landen? | Tori (service desk volume) — confirm | Slice 4 routing, agent bindings |
-| 2 | **Send surface:** extend COI vs new function? | New `send-id-card-email` | Slice 3 |
-| 3 | **G2:** when to flip bucket privacy for card previews? | Before Slice 4 Slack doc buttons | Slice 1 exit |
-| 4 | **Email intake for ID requests?** | CRM button first; email in Slice 4b | Slice 4 scope |
-| 5 | **G4 timing:** dev client send first or prod after G1? | Dev client send first, then G1+prod | Slice 5 |
+| # | Question | Status |
+|---|---|---|
+| 1 | **Play 4 owner** | ✅ **Landen** (Brian, 2026-07-01) |
+| 2 | **Send surface** | ✅ **New `send-id-card-email`** (Brian, 2026-07-01) |
+| 3 | **G2 bucket privacy** | ✅ Resolved — `portal-documents` already private + signed URLs; no dev blocker. Legacy-bucket audit → prod hardening before G4 |
+| 4 | **Email intake for ID requests?** | ⏳ Open — plan default: CRM button first (Slice 4), email intake second (needs metadata-router ADR) |
+| 5 | **G4 timing:** dev client send first or prod after G1? | ⏳ Open — plan default: dev client send first, then G1 + prod |
 
 ---
 
@@ -272,6 +283,7 @@ Slice 1 (assets + G2 proof)
 
 ## Next action (orchestrator)
 
-1. Brian answers **owner + send surface + G2 timing** (five minutes).
-2. Implement **Slice 1** (ID card populate + signed URL proof on dev).
-3. Track progress in [`THE-FLOOR-PHASE-3-STATUS.md`](./THE-FLOOR-PHASE-3-STATUS.md).
+1. ~~Brian answers owner + send surface + G2 timing~~ ✅ done 2026-07-01 (Landen / new function / no dev blocker)
+2. Restore dev `RESEND_API_KEY` (ops, one line) — provider step still red from Phase 2 soak
+3. Implement **Slice 1** (ID card populate + signed URL proof on dev) — **awaiting go**
+4. Track progress in [`THE-FLOOR-PHASE-3-STATUS.md`](./THE-FLOOR-PHASE-3-STATUS.md)
