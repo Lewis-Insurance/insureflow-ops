@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,9 +7,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { SectionLabel } from '@/components/cc';
 import {
-  ArrowRightLeft, CheckCircle2, FileUp, Save, Trash2, XCircle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { SectionLabel, DateField } from '@/components/cc';
+import {
+  ArrowRightLeft, Check, CheckCircle2, FileUp, Loader2, Trash2, XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -49,6 +53,26 @@ interface Props {
   renewal: Renewal;
 }
 
+/** Quiet autosave state for the editor header: Saving -> Saved, or Unsaved while dirty. */
+function AutosaveStatus({ pending, dirty, savedAt }: { pending: boolean; dirty: boolean; savedAt: number | null }) {
+  if (pending) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-cc-text-muted">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...
+      </span>
+    );
+  }
+  if (dirty) return <span className="text-xs text-cc-text-muted">Unsaved changes</span>;
+  if (savedAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-cc-text-muted">
+        <Check className="h-3.5 w-3.5 text-cc-success" /> Saved
+      </span>
+    );
+  }
+  return null;
+}
+
 /**
  * Hero "Update Renewal" widget — the always-on inline editor.
  *
@@ -60,6 +84,7 @@ interface Props {
 export function UpdateRenewalWidget({ renewal }: Props) {
   const isTerminal = TERMINAL.has(renewal.status);
   const canCommit = !!renewal.policy_id;
+  const navigate = useNavigate();
 
   const saveDraft = useSaveRenewalDraft();
   const markRenewed = useMarkRenewed();
@@ -93,6 +118,8 @@ export function UpdateRenewalWidget({ renewal }: Props) {
   const [lostReason, setLostReason] = useState('');
   const [terminationDate, setTerminationDate] = useState(renewal.expiration_date || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Set when a Move hits an existing policy number: carries the owner account for the deep link.
+  const [dupModal, setDupModal] = useState<{ accountId: string } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<'dec_page' | 'application'>('dec_page');
@@ -114,6 +141,52 @@ export function UpdateRenewalWidget({ renewal }: Props) {
     const derived = deriveExpiration(effectiveDate, next);
     if (derived) setExpirationDate(derived);
   }
+
+  // ---- autosave (replaces the manual Save button) --------------------------------------
+  // Persist the working draft to the RENEWAL row (never the policy) shortly after the agent
+  // stops editing. Seeds silently on mount and never runs on a terminal renewal. A terminal
+  // commit (Renewed/Moved/Lost) sets committingRef so an in-flight debounce can't overwrite
+  // the just-committed status.
+  const committingRef = useRef(false);
+  const lastSavedRef = useRef<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const draftSnapshot = JSON.stringify({
+    workingStatus, policyNumber, premium, term, effectiveDate, expirationDate,
+  });
+  useEffect(() => {
+    if (isTerminal) return;
+    if (lastSavedRef.current === null) {
+      lastSavedRef.current = draftSnapshot; // seed from the loaded renewal; don't save on mount
+      return;
+    }
+    if (draftSnapshot === lastSavedRef.current) return;
+    const pending = draftSnapshot;
+    const t = setTimeout(() => {
+      if (committingRef.current) return;
+      saveDraft.mutate(
+        {
+          renewalId: renewal.id,
+          status: workingStatus === 'quoted' ? 'quoted' : 'upcoming',
+          policy_number: policyNumber || null,
+          renewal_premium: Number.isNaN(premiumNum) ? null : premiumNum,
+          policy_term: term,
+          new_effective_date: effectiveDate || null,
+          new_expiration_date: expirationDate || null,
+          silent: true,
+        },
+        {
+          onSuccess: () => {
+            lastSavedRef.current = pending;
+            setLastSavedAt(Date.now());
+          },
+        },
+      );
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSnapshot, isTerminal]);
+
+  const isDirty = lastSavedRef.current !== null && draftSnapshot !== lastSavedRef.current;
 
   function validateDraft(): boolean {
     const result = renewalDraftSchema.safeParse({
@@ -137,20 +210,9 @@ export function UpdateRenewalWidget({ renewal }: Props) {
   }
 
   // ---- actions ----
-  function handleSave() {
-    saveDraft.mutate({
-      renewalId: renewal.id,
-      status: workingStatus === 'quoted' ? 'quoted' : 'upcoming',
-      policy_number: policyNumber || null,
-      renewal_premium: Number.isNaN(premiumNum) ? null : premiumNum,
-      policy_term: term,
-      new_effective_date: effectiveDate || null,
-      new_expiration_date: expirationDate || null,
-    });
-  }
-
   function handleRenewed() {
     if (!validateDraft() || !renewal.policy_id) return;
+    committingRef.current = true;
     markRenewed.mutate({
       renewalId: renewal.id,
       policyId: renewal.policy_id,
@@ -160,7 +222,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       policy_term: term,
       effective_date: effectiveDate,
       expiration_date: expirationDate,
-    });
+    }, { onError: () => { committingRef.current = false; } });
   }
 
   function handleMoved() {
@@ -169,17 +231,28 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       setErrors((e) => ({ ...e, movedCarrier: 'New carrier is required' }));
       return;
     }
-    markMoved.mutate({
-      renewalId: renewal.id,
-      policyId: renewal.policy_id,
-      accountId: renewal.account_id,
-      carrier: movedCarrier.trim(),
-      policy_number: policyNumber.trim(),
-      premium: premiumNum,
-      policy_term: term,
-      effective_date: effectiveDate,
-      expiration_date: expirationDate,
-    });
+    committingRef.current = true;
+    markMoved.mutate(
+      {
+        renewalId: renewal.id,
+        policyId: renewal.policy_id,
+        accountId: renewal.account_id,
+        carrier: movedCarrier.trim(),
+        policy_number: policyNumber.trim(),
+        premium: premiumNum,
+        policy_term: term,
+        effective_date: effectiveDate,
+        expiration_date: expirationDate,
+      },
+      {
+        onError: (err: any) => {
+          committingRef.current = false;
+          if (err?.code === 'DUPLICATE_POLICY') {
+            setDupModal({ accountId: err.existingAccountId || renewal.account_id });
+          }
+        },
+      },
+    );
   }
 
   function handleLost() {
@@ -188,6 +261,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       return;
     }
     if (!renewal.policy_id) return;
+    committingRef.current = true;
     markLost.mutate({
       renewalId: renewal.id,
       policyId: renewal.policy_id,
@@ -195,7 +269,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       category: lostCategory,
       reason: lostReason.trim(),
       terminationDate: terminationDate || undefined,
-    });
+    }, { onError: () => { committingRef.current = false; } });
   }
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -239,6 +313,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
     <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-6 shadow-card">
       <div className="flex items-center justify-between">
         <SectionLabel>Update Renewal</SectionLabel>
+        <AutosaveStatus pending={saveDraft.isPending} dirty={isDirty} savedAt={lastSavedAt} />
       </div>
 
       {/* Working status (Pending / Quoted) */}
@@ -321,22 +396,26 @@ export function UpdateRenewalWidget({ renewal }: Props) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="r-effective" className="text-cc-text-muted">Effective</Label>
-            <Input
+            <DateField
               id="r-effective"
-              type="date"
               value={effectiveDate}
-              onChange={(e) => applyEffective(e.target.value)}
-              className={cn(inputCls, 'mt-1.5 cc-num', errors.effective_date && errCls)}
+              onChange={applyEffective}
+              aria-label="Effective date"
+              aria-invalid={!!errors.effective_date}
+              containerClassName="mt-1.5"
+              className={cn(inputCls, 'cc-num', errors.effective_date && errCls)}
             />
           </div>
           <div>
             <Label htmlFor="r-expiration" className="text-cc-text-muted">Expiration</Label>
-            <Input
+            <DateField
               id="r-expiration"
-              type="date"
               value={expirationDate}
-              onChange={(e) => setExpirationDate(e.target.value)}
-              className={cn(inputCls, 'mt-1.5 cc-num', errors.expiration_date && errCls)}
+              onChange={setExpirationDate}
+              aria-label="Expiration date"
+              aria-invalid={!!errors.expiration_date}
+              containerClassName="mt-1.5"
+              className={cn(inputCls, 'cc-num', errors.expiration_date && errCls)}
             />
             {errors.expiration_date && <p className="mt-1 text-xs text-cc-danger">{errors.expiration_date}</p>}
           </div>
@@ -385,20 +464,6 @@ export function UpdateRenewalWidget({ renewal }: Props) {
             ))}
           </ul>
         )}
-      </div>
-
-      {/* Working save (secondary — no lime) */}
-      <div className="mt-5 flex justify-end border-t border-cc-border-subtle pt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleSave}
-          disabled={saveDraft.isPending}
-          className="gap-2 rounded-cc-md"
-        >
-          <Save className="h-4 w-4" />
-          {saveDraft.isPending ? 'Saving...' : 'Save'}
-        </Button>
       </div>
 
       {/* Outcome (terminal commit) */}
@@ -476,12 +541,13 @@ export function UpdateRenewalWidget({ renewal }: Props) {
             </div>
             <div>
               <Label htmlFor="r-termination" className="text-cc-text-muted">Effective date</Label>
-              <Input
+              <DateField
                 id="r-termination"
-                type="date"
                 value={terminationDate}
-                onChange={(e) => setTerminationDate(e.target.value)}
-                className={cn(inputCls, 'mt-1.5 cc-num')}
+                onChange={setTerminationDate}
+                aria-label="Termination effective date"
+                containerClassName="mt-1.5"
+                className={cn(inputCls, 'cc-num')}
               />
             </div>
             <div className="sm:col-span-2">
@@ -517,6 +583,40 @@ export function UpdateRenewalWidget({ renewal }: Props) {
           </div>
         )}
       </div>
+
+      <Dialog open={!!dupModal} onOpenChange={(o) => { if (!o) setDupModal(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Policy already added</DialogTitle>
+            <DialogDescription>
+              The new policy you are trying to add is already added for this customer. Open the
+              customer's Policies to review it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDupModal(null)}
+              className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              data-primary
+              onClick={() => {
+                const id = dupModal?.accountId;
+                setDupModal(null);
+                if (id) navigate(`/customers/${id}?tab=policies`);
+              }}
+              className="gap-2 rounded-cc-md bg-cc-accent text-cc-on-accent hover:bg-cc-accent-hover"
+            >
+              View in Policies
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,7 @@
 export { AccentSpine } from './AccentSpine';
 export { StatusPill } from './StatusPill';
 export { Chip } from './Chip';
+export { DateField } from './DateField';
 export { SectionLabel } from './SectionLabel';
 export { Skeleton, SkeletonRow } from './Skeleton';
 export { LastContact } from './LastContact';

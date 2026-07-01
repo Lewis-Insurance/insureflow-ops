@@ -1283,8 +1283,10 @@ export function useSaveRenewalDraft() {
       policy_term?: PolicyTerm | null;
       new_effective_date?: string | null;
       new_expiration_date?: string | null;
+      /** Autosave path: skip the success toast (an inline "Saved" indicator carries it). */
+      silent?: boolean;
     }) => {
-      const { renewalId, ...rest } = params;
+      const { renewalId, silent: _silent, ...rest } = params;
       const update: Record<string, any> = {};
       for (const [k, v] of Object.entries(rest)) {
         if (v !== undefined) update[k] = v;
@@ -1300,10 +1302,10 @@ export function useSaveRenewalDraft() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['renewal', data.id] });
       queryClient.invalidateQueries({ queryKey: ['renewals'] });
-      toast.success('Renewal saved');
+      if (!variables.silent) toast.success('Renewal saved');
     },
     onError: (error) => {
       logger.error('[useSaveRenewalDraft] Error:', error);
@@ -1431,7 +1433,21 @@ export function useMarkMoved() {
         p_expiration_date: expiration_date,
         p_notes: notes ?? null,
       });
-      if (error) throw new Error(error.message || 'Failed to record move');
+      if (error) {
+        // The RPC raises a human MESSAGE with the owner account id in DETAIL
+        // ('DUPLICATE_POLICY_NUMBER=<uuid>'); a raw 23505 is the fallback. Any of these becomes a
+        // typed error the widget turns into the friendly "already added" prompt with a deep link.
+        const msg = error.message || '';
+        const blob = `${msg} ${(error as any).details || ''}`;
+        const dup = /DUPLICATE_POLICY_NUMBER=([0-9a-fA-F-]*)/.exec(blob);
+        if (dup || (error as any).code === '23505' || /already added/i.test(msg)) {
+          const dupErr: any = new Error(msg || 'This policy is already added for this customer.');
+          dupErr.code = 'DUPLICATE_POLICY';
+          dupErr.existingAccountId = dup?.[1] || null;
+          throw dupErr;
+        }
+        throw new Error(msg || 'Failed to record move');
+      }
 
       await bestEffortRetention(policyId);
 
@@ -1447,7 +1463,8 @@ export function useMarkMoved() {
       queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
       toast.success('Policy moved — new policy created');
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      if (error?.code === 'DUPLICATE_POLICY') return; // widget shows a friendly modal instead
       logger.error('[useMarkMoved] Error:', error);
       toast.error(error.message || 'Failed to record move');
     },
@@ -1523,6 +1540,36 @@ export function useMarkLost() {
     onError: (error: Error) => {
       logger.error('[useMarkLost] Error:', error);
       toast.error(error.message || 'Failed to update renewal');
+    },
+  });
+}
+
+/**
+ * Reopen a closed renewal (from the Renewals page "Closed" view). Returns it to the working
+ * queue as 'upcoming' and, for the did-not-renew family (lost/cancelled/non_renewed/lapsed),
+ * reactivates the policy. Moved/renewed reopen the renewal only. See the renewal_reopen RPC.
+ */
+export function useReopenRenewal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { renewalId: string }) => {
+      const { error } = await (supabase as any).rpc('renewal_reopen', {
+        p_renewal_id: params.renewalId,
+      });
+      if (error) throw new Error(error.message || 'Failed to reopen renewal');
+      return params;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
+      toast.success('Renewal reopened');
+    },
+    onError: (error: Error) => {
+      logger.error('[useReopenRenewal] Error:', error);
+      toast.error(error.message || 'Failed to reopen renewal');
     },
   });
 }
