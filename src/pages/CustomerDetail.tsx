@@ -24,7 +24,7 @@ import { AddDocumentModal } from '@/components/customers/AddDocumentModal';
 import { AddCallLogModal } from '@/components/customers/AddCallLogModal';
 import { InviteToPortalButton } from '@/components/customers/InviteToPortalButton';
 import { ReviewRequestModal } from '@/components/customers/ReviewRequestModal';
-import { AICustomerActions } from '@/components/customers/AICustomerActions';
+import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
@@ -382,6 +382,13 @@ export default function CustomerDetail() {
                 <DollarSign className="h-4 w-4" />
                 Record Payment
               </Button>
+              <DocumentAnalysisButton
+                accountId={account.id}
+                documentName={`Customer: ${account.name}`}
+                variant="outline"
+                size="default"
+                className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              />
               <Button
                 variant="outline"
                 onClick={() => setEmailComposerOpen(true)}
@@ -454,7 +461,6 @@ export default function CustomerDetail() {
         {/* ===================== Customer information (was the Contact tab) ===================== */}
         <section id="contact" className="scroll-mt-20 space-y-4">
           <CustomerContactInfo account={account} onSendEmail={() => setEmailComposerOpen(true)} />
-          <AICustomerActions accountId={account.id} accountName={account.name} />
           <div className="flex justify-start">
             <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
           </div>

@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { useDocumentAnalysisTaskGeneration } from '@/hooks/useAutoTaskGeneration';
 
 interface DocumentAnalysisButtonProps {
@@ -15,6 +16,7 @@ interface DocumentAnalysisButtonProps {
   size?: 'default' | 'sm' | 'lg' | 'icon';
   maxDocs?: number;
   promptOverride?: string;
+  className?: string;
 }
 
 export function DocumentAnalysisButton({
@@ -25,6 +27,7 @@ export function DocumentAnalysisButton({
   size = 'sm',
   maxDocs = 5,
   promptOverride,
+  className,
 }: DocumentAnalysisButtonProps) {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -149,7 +152,7 @@ export function DocumentAnalysisButton({
         size={size}
         onClick={analyzeDocument}
         disabled={isAnalyzing}
-        className="gap-2"
+        className={cn('gap-2', className)}
         aria-label="AI Analyze"
       >
         {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
