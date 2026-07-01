@@ -528,6 +528,17 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
           send_payload: row.send_payload,
           created_at: new Date().toISOString(),
         }),
+        updateFloorSendApproval: async (_id, patch) => ({
+          id: 'appr-tier3',
+          work_request_id: 'wr-tier3',
+          approver_id: 'user-1',
+          status: (patch.status as 'held') ?? 'held',
+          hold_until: (patch.hold_until as string) ?? null,
+          recipient: goldenSendCOIEmailPayload.to,
+          recipient_basis: 'approved_holder',
+          send_payload: goldenSendCOIEmailPayload,
+          created_at: new Date().toISOString(),
+        }),
       },
       stageDeps: {
         now: () => new Date('2026-07-01T12:00:00Z'),
@@ -556,6 +567,9 @@ describe('Floor spine — internal send allowlist (Phase 2)', () => {
         findFloorSendApproval: async () => null,
         insertFloorSendApproval: async () => {
           throw new Error('should not insert');
+        },
+        updateFloorSendApproval: async () => {
+          throw new Error('should not update');
         },
       },
       stageDeps: {
@@ -633,6 +647,17 @@ describe('Floor plays — Tier-3 COI inbound', () => {
           recipient: row.recipient,
           recipient_basis: row.recipient_basis,
           send_payload: row.send_payload,
+          created_at: new Date().toISOString(),
+        }),
+        updateFloorSendApproval: async (_id, patch) => ({
+          id: 'appr-coi-inbound',
+          work_request_id: 'wr-coi-inbound',
+          approver_id: 'user-1',
+          status: (patch.status as 'held') ?? 'held',
+          hold_until: (patch.hold_until as string) ?? null,
+          recipient: goldenTier3CoiInboundAllowlist,
+          recipient_basis: 'approved_holder',
+          send_payload: resolved!.row.send_spec.payload,
           created_at: new Date().toISOString(),
         }),
       },

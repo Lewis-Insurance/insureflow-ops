@@ -16,6 +16,10 @@ export interface ApproveClientSendStagingDb {
     recipient_basis: SendSpec['recipient_basis'];
     send_payload: SendSpec['payload'];
   }): Promise<FloorClientSendApproval>;
+  updateFloorSendApproval(
+    approvalId: string,
+    patch: Partial<FloorClientSendApproval>,
+  ): Promise<FloorClientSendApproval>;
 }
 
 export interface MaybeStageClientSendOnApproveArgs {
@@ -63,8 +67,8 @@ export async function maybeStageClientSendOnApprove(
   const deps: StageClientSendDeps = {
     ...args.stageDeps,
     readApproval: async (approvalId) => (approvalId === current.id ? current : null),
-    updateApproval: async (_approvalId, patch) => {
-      current = { ...current, ...patch };
+    updateApproval: async (approvalId, patch) => {
+      current = await args.db.updateFloorSendApproval(approvalId, patch);
       return current;
     },
     assertRecipientOnFile: async () => {},

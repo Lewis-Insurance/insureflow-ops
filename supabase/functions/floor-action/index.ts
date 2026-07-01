@@ -309,6 +309,16 @@ serve(async (req) => {
               if (error) throw new ValidationError(error.message);
               return data as FloorClientSendApproval;
             },
+            async updateFloorSendApproval(approvalId, patch) {
+              const { data, error } = await supabase
+                .from('floor_client_send_approvals')
+                .update(patch)
+                .eq('id', approvalId)
+                .select('*')
+                .single();
+              if (error) throw new ValidationError(error.message);
+              return data as FloorClientSendApproval;
+            },
           },
           stageDeps: {
             now: () => new Date(),

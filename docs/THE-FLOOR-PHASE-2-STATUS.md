@@ -49,6 +49,19 @@ supabase functions deploy email-inbound-lite floor-action floor-release-held-sen
 4. `curl -X POST "https://klnygbbmognbslgobmzc.supabase.co/functions/v1/floor-release-held-sends" -H "X-Cron-Secret: $CRON_SECRET" -H "Content-Type: application/json" -d '{}'`
 5. Confirm email received at allowlist address only
 
+### Dev soak result — 2026-07-01
+
+| Step | Result |
+|---|---|
+| COI inbound (`ray@plumbingconcepts.net`) | ✅ `tier3: true`, recipient `brian@lewisinsurance.ai` |
+| Approve (`floor-action`) | ✅ `sendStaging.status=held` |
+| Held row in DB | ✅ after `updateFloorSendApproval` fix |
+| Release sweeper | ✅ processed 1 |
+| Fence mint | ✅ `floor_action:65fd507b…` inserted + **consumed** |
+| Resend delivery | ⚠️ `failed_delivery` — dev `RESEND_API_KEY` must be restored in Supabase secrets |
+
+**Bug fixed during soak:** `floor-action` now persists `held` + `hold_until` via `updateFloorSendApproval` (was in-memory only).
+
 ---
 
 ## Slices shipped
