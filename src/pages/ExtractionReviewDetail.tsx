@@ -782,7 +782,7 @@ export default function ExtractionReviewDetail() {
                             }}
                           >
                             {isHighlighted && (
-                              <div className="absolute -top-6 left-0 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap">
+                              <div className="absolute -top-6 left-0 bg-yellow-500 text-yellow-950 text-xs px-2 py-0.5 rounded whitespace-nowrap">
                                 <Target className="h-3 w-3 inline mr-1" />
                                 {evid.snippet_text.substring(0, 30)}...
                               </div>
@@ -793,7 +793,7 @@ export default function ExtractionReviewDetail() {
 
                     {/* Highlight indicator */}
                     {highlightedEvidence && highlightedEvidence.page_index === currentPage - 1 && (
-                      <div className="absolute top-2 right-2 bg-yellow-100 border border-yellow-300 rounded px-2 py-1 text-xs flex items-center gap-1">
+                      <div className="absolute top-2 right-2 bg-yellow-100 border border-yellow-300 text-yellow-900 rounded px-2 py-1 text-xs flex items-center gap-1">
                         <Crosshair className="h-3 w-3 text-yellow-600" />
                         <span>Source highlighted</span>
                         <Button

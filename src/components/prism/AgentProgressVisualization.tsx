@@ -28,7 +28,7 @@ const AGENTS = [
     color: 'from-blue-500 to-cyan-400',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30',
-    activeColor: 'text-blue-400',
+    activeColor: 'text-blue-600 dark:text-blue-400',
     thinkingMessages: [
       'Analyzing problem structure...',
       'Identifying key components...',
@@ -44,7 +44,7 @@ const AGENTS = [
     color: 'from-amber-500 to-yellow-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
-    activeColor: 'text-amber-400',
+    activeColor: 'text-amber-600 dark:text-amber-400',
     thinkingMessages: [
       'Exploring unconventional angles...',
       'Generating creative alternatives...',
@@ -60,7 +60,7 @@ const AGENTS = [
     color: 'from-emerald-500 to-green-400',
     bgColor: 'bg-emerald-500/10',
     borderColor: 'border-emerald-500/30',
-    activeColor: 'text-emerald-400',
+    activeColor: 'text-emerald-600 dark:text-emerald-400',
     thinkingMessages: [
       'Validating logical consistency...',
       'Testing hypotheses...',
@@ -76,7 +76,7 @@ const AGENTS = [
     color: 'from-purple-500 to-violet-400',
     bgColor: 'bg-purple-500/10',
     borderColor: 'border-purple-500/30',
-    activeColor: 'text-purple-400',
+    activeColor: 'text-purple-600 dark:text-purple-400',
     thinkingMessages: [
       'Reviewing analysis quality...',
       'Ensuring completeness...',
