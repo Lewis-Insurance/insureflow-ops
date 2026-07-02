@@ -35,7 +35,10 @@ export interface RunInternalPlaysInput {
   play5Limit?: number;
   play6Limit?: number;
   defaultOwnerId?: string | null;
+  gapRoundoutOwnerId?: string | null;
   ownerByAccountId?: Record<string, string | null | undefined>;
+  /** When set, only persist cards for these play_ids. */
+  playIds?: string[];
 }
 
 export interface RunInternalPlaysPlan {
@@ -76,7 +79,7 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
   const play4Cards = planCoverageGapRoundoutCards(gapOpportunities, play4Summary, {
     dayKey,
     limit: input.play4Limit ?? 5,
-    defaultOwnerId: input.defaultOwnerId ?? null,
+    defaultOwnerId: input.gapRoundoutOwnerId ?? input.defaultOwnerId ?? null,
     ownerByAccountId: input.ownerByAccountId,
   });
   const play5Cards = planOpenItemNudgeCards(play5Items, {
@@ -89,13 +92,19 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
     defaultOwnerId: input.defaultOwnerId ?? null,
   });
 
+  let plans = [...play1Cards, ...play3Cards, ...play4Cards, ...play5Cards, ...play6Cards];
+  if (input.playIds?.length) {
+    const allowed = new Set(input.playIds);
+    plans = plans.filter((plan) => allowed.has(plan.play_id));
+  }
+
   return {
     play1_summary: play1Summary,
     play3_count: play3Items.length,
     play4_summary: play4Summary,
     play5_summary: play5Summary,
     play6_summary: play6Summary,
-    plans: [...play1Cards, ...play3Cards, ...play4Cards, ...play5Cards, ...play6Cards],
+    plans,
   };
 }
 

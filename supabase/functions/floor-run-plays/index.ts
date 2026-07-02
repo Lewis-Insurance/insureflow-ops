@@ -4,6 +4,7 @@ import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
 import { runInternalPlays, type PlayCardsDb } from '../_shared/floor/runInternalPlays.ts';
+import { resolveGapRoundoutOwnerId } from '../_shared/floor/floorOwners.ts';
 import type { PolicyInForceRow, SuspenseTaskRow } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-run-plays');
@@ -23,6 +24,27 @@ function resolveAgencyWorkspaceId(body: Record<string, unknown>): string | null 
   if (fromBody) return fromBody;
   const fromEnv = Deno.env.get('FLOOR_INBOUND_AGENCY_WORKSPACE_ID')?.trim() ?? '';
   return fromEnv || null;
+}
+
+const ACCOUNT_OWNER_BATCH = 150;
+
+async function loadOwnerByAccountId(
+  supabase: ReturnType<typeof createClient>,
+  accountIds: string[],
+): Promise<Record<string, string | null>> {
+  const ownerByAccountId: Record<string, string | null> = {};
+  for (let offset = 0; offset < accountIds.length; offset += ACCOUNT_OWNER_BATCH) {
+    const chunk = accountIds.slice(offset, offset + ACCOUNT_OWNER_BATCH);
+    const { data: accountRows, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, owner_agent_id')
+      .in('id', chunk);
+    if (accountError) throw new ValidationError(`accounts: ${accountError.message}`);
+    for (const row of accountRows ?? []) {
+      ownerByAccountId[row.id as string] = (row.owner_agent_id as string | null) ?? null;
+    }
+  }
+  return ownerByAccountId;
 }
 
 function supabasePlayCardsDb(supabase: ReturnType<typeof createClient>): PlayCardsDb {
@@ -105,69 +127,91 @@ serve(async (req) => {
       );
     }
 
-    const play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 10;
-    const play3Limit = typeof body.play3_limit === 'number' ? body.play3_limit : 10;
-    const play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
-    const play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
-    const play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
+    let play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 10;
+    let play3Limit = typeof body.play3_limit === 'number' ? body.play3_limit : 10;
+    let play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
+    let play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
+    let play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
     const dryRun = body.dry_run === true;
+
+    if (body.play4_only === true) {
+      play1Limit = 0;
+      play3Limit = 0;
+      play5Limit = 0;
+      play6Limit = 0;
+    }
+
+    const playIds = Array.isArray(body.play_ids)
+      ? body.play_ids.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
+      : body.play4_only === true
+        ? ['coverage.gap.roundout']
+        : undefined;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: policyRows, error: policyError } = await supabase
-      .from('policy_in_force_status')
-      .select('policy_id, account_id, policy_number, in_force, premium, cgl_details, bap_details, evaluated_at')
-      .eq('agency_workspace_id', agencyWorkspaceId);
+    const needPolicies = play1Limit > 0 || play6Limit > 0;
+    const needTasks = play3Limit > 0 || play5Limit > 0;
+    const needQuotes = play5Limit > 0;
+    const needGaps = play4Limit > 0;
 
-    if (policyError) throw new ValidationError(policyError.message);
+    let policyRows: Record<string, unknown>[] | null = null;
+    if (needPolicies) {
+      const { data, error: policyError } = await supabase
+        .from('policy_in_force_status')
+        .select('policy_id, account_id, policy_number, in_force, premium, cgl_details, bap_details, evaluated_at')
+        .eq('agency_workspace_id', agencyWorkspaceId);
+      if (policyError) throw new ValidationError(`policy_in_force_status: ${policyError.message}`);
+      policyRows = data;
+    }
 
-    const { data: taskRows, error: taskError } = await supabase
-      .from('tasks')
-      .select('id, title, assignee_id, due_at, priority, status, account_id, accounts!inner(agency_workspace_id)')
-      .eq('accounts.agency_workspace_id', agencyWorkspaceId)
-      .is('deleted_at', null)
-      .in('status', ['pending', 'in_progress']);
+    let taskRows: Record<string, unknown>[] | null = null;
+    if (needTasks) {
+      const { data, error: taskError } = await supabase
+        .from('tasks')
+        .select('id, title, assignee_id, due_at, priority, status, account_id, accounts!inner(agency_workspace_id)')
+        .eq('accounts.agency_workspace_id', agencyWorkspaceId)
+        .is('deleted_at', null)
+        .in('status', ['pending', 'in_progress']);
+      if (taskError) throw new ValidationError(`tasks: ${taskError.message}`);
+      taskRows = data;
+    }
 
-    if (taskError) throw new ValidationError(taskError.message);
+    let gapRows: Record<string, unknown>[] | null = null;
+    if (needGaps) {
+      const { data, error: gapError } = await supabase
+        .from('coverage_gap_opportunities')
+        .select('id, account_id, severity, recommended_next_step, rationale')
+        .eq('agency_workspace_id', agencyWorkspaceId)
+        .eq('status', 'new');
+      if (gapError) throw new ValidationError(`coverage_gap_opportunities: ${gapError.message}`);
+      gapRows = data;
+    }
 
-    const { data: gapRows, error: gapError } = await supabase
-      .from('coverage_gap_opportunities')
-      .select('id, account_id, severity, recommended_next_step, rationale')
-      .eq('agency_workspace_id', agencyWorkspaceId)
-      .eq('status', 'new');
-
-    if (gapError) throw new ValidationError(gapError.message);
-
-    const { data: quoteRows, error: quoteError } = await supabase
-      .from('quotes')
-      .select('id, account_id, status, line_of_business, premium, updated_at, accounts!inner(agency_workspace_id)')
-      .eq('accounts.agency_workspace_id', agencyWorkspaceId)
-      .in('status', ['open', 'draft']);
-
-    if (quoteError) throw new ValidationError(quoteError.message);
+    let quoteRows: Record<string, unknown>[] | null = null;
+    if (needQuotes) {
+      const { data, error: quoteError } = await supabase
+        .from('quotes')
+        .select('id, account_id, status, line_of_business, premium, updated_at, accounts!inner(agency_workspace_id)')
+        .eq('accounts.agency_workspace_id', agencyWorkspaceId)
+        .eq('status', 'open');
+      if (quoteError) throw new ValidationError(`quotes: ${quoteError.message}`);
+      quoteRows = data;
+    }
 
     const accountIds = [
       ...new Set(
         [
           ...(policyRows ?? []).map((row) => row.account_id as string | null),
           ...(taskRows ?? []).map((row) => row.account_id as string | null),
+          ...(gapRows ?? []).map((row) => row.account_id as string | null),
+          ...(quoteRows ?? []).map((row) => row.account_id as string | null),
         ].filter((id): id is string => Boolean(id)),
       ),
     ];
 
-    const ownerByAccountId: Record<string, string | null> = {};
-    if (accountIds.length > 0) {
-      const { data: accountRows, error: accountError } = await supabase
-        .from('accounts')
-        .select('id, owner_agent_id')
-        .in('id', accountIds);
-      if (accountError) throw new ValidationError(accountError.message);
-      for (const row of accountRows ?? []) {
-        ownerByAccountId[row.id as string] = (row.owner_agent_id as string | null) ?? null;
-      }
-    }
+    const ownerByAccountId = accountIds.length > 0 ? await loadOwnerByAccountId(supabase, accountIds) : {};
 
     const policies = (policyRows ?? []) as PolicyInForceRow[];
     const tasks: SuspenseTaskRow[] = (taskRows ?? []).map((row) => ({
@@ -207,14 +251,26 @@ serve(async (req) => {
       play4Limit,
       play5Limit,
       play6Limit,
+      gapRoundoutOwnerId: resolveGapRoundoutOwnerId(),
       ownerByAccountId,
+      playIds,
     };
 
     if (dryRun) {
       const { planInternalPlays } = await import('../_shared/floor/runInternalPlays.ts');
       const planned = planInternalPlays(playInput);
+      const gapPlans = planned.plans.filter((plan) => plan.play_id === 'coverage.gap.roundout');
       return new Response(
-        JSON.stringify({ ok: true, dry_run: true, planned: planned.plans.length, play1_summary: planned.play1_summary }),
+        JSON.stringify({
+          ok: true,
+          dry_run: true,
+          planned: planned.plans.length,
+          play4_planned: gapPlans.length,
+          play1_summary: planned.play1_summary,
+          play4_summary: planned.play4_summary,
+          play5_summary: planned.play5_summary,
+          play6_summary: planned.play6_summary,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -232,6 +288,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    return createErrorResponse(error, corsHeaders);
+    const err = error instanceof Error ? error : new Error(String(error));
+    const response = createErrorResponse(err);
+    const headers = new Headers(response.headers);
+    Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value));
+    return new Response(response.body, { status: response.status, headers });
   }
 });

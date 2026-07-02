@@ -25,7 +25,7 @@ export interface OpenItemNudgePlayResult {
   item_count: number;
 }
 
-const OPEN_QUOTE_STATUSES = new Set(['open', 'draft']);
+const OPEN_QUOTE_STATUSES = new Set(['open']);
 
 /** Play 5 scaffold: nudge open quotes and non-suspense tasks (distinct from suspense.sweep). */
 export function runOpenItemNudgePlay(
