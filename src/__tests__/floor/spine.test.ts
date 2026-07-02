@@ -594,6 +594,31 @@ describe('Floor plays — internal card pipeline', () => {
     expect(planned.plans[0]?.owner_id).toBe('kelli-owner-id');
   });
 
+  it('planInternalPlays play_ids filter keeps only nonpay.cancel.watch with Letitia default', () => {
+    const planned = planInternalPlays({
+      agency_workspace_id: '00000000-0000-4000-8000-000000000001',
+      dayKey: '2026-07-01',
+      policies: [
+        {
+          policy_id: 'p-nonpay',
+          account_id: 'a1',
+          policy_number: 'PN-NP',
+          in_force: true,
+          premium: 900,
+          cgl_details: null,
+          bap_details: { payment_status: 'nonpay_pending' },
+          evaluated_at: '2026-07-01T00:00:00Z',
+        },
+      ],
+      tasks: [],
+      play6Limit: 5,
+      playIds: ['nonpay.cancel.watch'],
+      nonpayWatchOwnerId: 'letitia-owner-id',
+    });
+    expect(planned.plans.every((plan) => plan.play_id === 'nonpay.cancel.watch')).toBe(true);
+    expect(planned.plans[0]?.owner_id).toBe('letitia-owner-id');
+  });
+
   it('persists internal play cards with idempotency', async () => {
     const inserted: string[] = [];
     const db = {

@@ -1,0 +1,67 @@
+name: Floor Nonpay Cancel Watch (Dev)
+
+on:
+  schedule:
+    # After open item nudge cron (8 AM UTC); dev-only Floor play cards
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview floor-run-plays without persisting cards'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  FLOOR_DEV_SUPABASE_URL: https://klnygbbmognbslgobmzc.supabase.co
+  FLOOR_AGENCY_WORKSPACE_ID: f1f07037-3032-45f8-93ca-72c0f47e4fbb
+
+jobs:
+  floor-run-plays-dev:
+    name: Floor run plays — nonpay cancel watch (dev)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run floor-run-plays (play6 only)
+        id: plays
+        env:
+          SERVICE_KEY: ${{ secrets.FLOOR_DEV_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.FLOOR_DEV_CRON_SECRET }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ -z "$SERVICE_KEY" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set FLOOR_DEV_SERVICE_ROLE_KEY and FLOOR_DEV_CRON_SECRET repository secrets"
+            exit 1
+          fi
+
+          BODY=$(python3 -c "import json; print(json.dumps({'dry_run': '$DRY_RUN' == 'true', 'play6_only': True, 'play6_limit': 10, 'agency_workspace_id': '${FLOOR_AGENCY_WORKSPACE_ID}'}))")
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${FLOOR_DEV_SUPABASE_URL}/functions/v1/floor-run-plays" \
+            -H "Authorization: Bearer ${SERVICE_KEY}" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY_OUT=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY_OUT"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::floor-run-plays failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "result<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY_OUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "## Floor nonpay cancel watch (dev)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.plays.outputs.result }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -89,12 +89,50 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ---
 
-## Upcoming slices (not started)
+---
 
-| Slice | Play | Notes |
-|-------|------|-------|
-| 3 | `nonpay.cancel.watch` | FL day-count fork (Brian) |
-| 4+ | Endorsement capture, licensing alerts, SMS intake | Roadmap Phase 4 |
+## Slice 3 — `nonpay.cancel.watch` (Tier 2 internal watch cards)
+
+**Goal:** In-force policies with non-pay/cancel signals in `bap_details` → internal watch cards → cockpit + Slack queue.
+
+| Item | Status |
+|------|--------|
+| Play scaffold (`nonpayCancelWatch.ts`, `planNonpayCancelWatchCards`) | ✅ Phase 3 |
+| `floor-run-plays` reads `policy_in_force_status` for Play 6 | ✅ |
+| Letitia default owner (`FLOOR_NONPAY_WATCH_OWNER_ID`) | ✅ Slice 3 |
+| `play6_only` + scoped owner lookup (candidate accounts only) | ✅ Slice 3 |
+| GitHub Action `.github/workflows/floor-nonpay-watch-cron.yml` (dev) | ✅ Slice 3 |
+| Soak script `scripts/phase4-nonpay-watch-soak.sh` | ✅ Slice 3 |
+
+**Brian gate (not blocking dev soak):** FL statutory day-count clock for production save-gating — detection uses spine `bap_details` hints only until counsel confirms counts.
+
+**Chain (dev):**
+
+1. Carrier spine: `policy_in_force_status` with `bap_details.payment_status` / billing hints
+2. `floor-run-plays` with `play6_only: true`
+3. Mac Mini / Hermes: Slack delivery queue
+
+**Run soak locally:**
+
+```bash
+chmod +x scripts/phase4-nonpay-watch-soak.sh
+./scripts/phase4-nonpay-watch-soak.sh
+```
+
+**Deploy (dev):**
+
+```bash
+supabase secrets set --project-ref klnygbbmognbslgobmzc \
+  FLOOR_NONPAY_WATCH_OWNER_ID=d20dd72e-5dc6-4004-8729-842ea9c16b88
+
+supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
+```
+
+---
+
+## Phase 4 complete (dev spine)
+
+Slices 1–3 wire the three Phase 4 internal plays on dev. Remaining Phase 4 items (endorsement capture, licensing alerts, SMS intake) are separate roadmap tracks.
 
 ---
 
@@ -107,7 +145,15 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ---
 
-**Last updated:** 2026-07-02 (Slice 2)
+**Last updated:** 2026-07-02 (Slice 3)
+
+### Slice 3 soak (dev)
+
+```text
+Part A dry_run: play6_planned>=1 ✅
+Part B live: created>=1 ✅
+Part C replay: idempotent>=1 ✅
+```
 
 ### Slice 2 soak (dev)
 

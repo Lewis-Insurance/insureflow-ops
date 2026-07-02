@@ -4,7 +4,8 @@ import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
 import { runInternalPlays, type PlayCardsDb } from '../_shared/floor/runInternalPlays.ts';
-import { resolveGapRoundoutOwnerId, resolveOpenItemNudgeOwnerId } from '../_shared/floor/floorOwners.ts';
+import { resolveGapRoundoutOwnerId, resolveNonpayWatchOwnerId, resolveOpenItemNudgeOwnerId } from '../_shared/floor/floorOwners.ts';
+import { detectNonpayCancelCandidates } from '../_shared/floor/plays/nonpayCancelWatch.ts';
 import type { PolicyInForceRow, SuspenseTaskRow } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-run-plays');
@@ -148,13 +149,22 @@ serve(async (req) => {
       play6Limit = 0;
     }
 
+    if (body.play6_only === true) {
+      play1Limit = 0;
+      play3Limit = 0;
+      play4Limit = 0;
+      play5Limit = 0;
+    }
+
     const playIds = Array.isArray(body.play_ids)
       ? body.play_ids.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
       : body.play4_only === true
         ? ['coverage.gap.roundout']
         : body.play5_only === true
           ? ['open.item.nudge']
-          : undefined;
+          : body.play6_only === true
+            ? ['nonpay.cancel.watch']
+            : undefined;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -220,9 +230,26 @@ serve(async (req) => {
       ),
     ];
 
-    const ownerByAccountId = accountIds.length > 0 ? await loadOwnerByAccountId(supabase, accountIds) : {};
-
     const policies = (policyRows ?? []) as PolicyInForceRow[];
+
+    let ownerAccountIds = accountIds;
+    if (
+      play6Limit > 0 &&
+      play1Limit === 0 &&
+      play3Limit === 0 &&
+      play4Limit === 0 &&
+      play5Limit === 0
+    ) {
+      ownerAccountIds = [
+        ...new Set(
+          detectNonpayCancelCandidates(policies)
+            .map((row) => row.account_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+    }
+
+    const ownerByAccountId = ownerAccountIds.length > 0 ? await loadOwnerByAccountId(supabase, ownerAccountIds) : {};
     const tasks: SuspenseTaskRow[] = (taskRows ?? []).map((row) => ({
       id: row.id as string,
       title: row.title as string,
@@ -262,6 +289,7 @@ serve(async (req) => {
       play6Limit,
       gapRoundoutOwnerId: resolveGapRoundoutOwnerId(),
       openItemNudgeOwnerId: resolveOpenItemNudgeOwnerId(),
+      nonpayWatchOwnerId: resolveNonpayWatchOwnerId(),
       ownerByAccountId,
       playIds,
     };
@@ -271,6 +299,7 @@ serve(async (req) => {
       const planned = planInternalPlays(playInput);
       const gapPlans = planned.plans.filter((plan) => plan.play_id === 'coverage.gap.roundout');
       const nudgePlans = planned.plans.filter((plan) => plan.play_id === 'open.item.nudge');
+      const nonpayPlans = planned.plans.filter((plan) => plan.play_id === 'nonpay.cancel.watch');
       return new Response(
         JSON.stringify({
           ok: true,
@@ -278,6 +307,7 @@ serve(async (req) => {
           planned: planned.plans.length,
           play4_planned: gapPlans.length,
           play5_planned: nudgePlans.length,
+          play6_planned: nonpayPlans.length,
           play1_summary: planned.play1_summary,
           play4_summary: planned.play4_summary,
           play5_summary: planned.play5_summary,

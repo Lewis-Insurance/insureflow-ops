@@ -15,3 +15,8 @@ export function resolveGapRoundoutOwnerId(): string {
 export function resolveOpenItemNudgeOwnerId(): string {
   return readEnv('FLOOR_OPEN_ITEM_NUDGE_OWNER_ID') ?? KELLI_DEV_OWNER_ID;
 }
+
+/** Dev default non-pay watch owner — Letitia Lewis on dev. Override with FLOOR_NONPAY_WATCH_OWNER_ID. */
+export function resolveNonpayWatchOwnerId(): string {
+  return readEnv('FLOOR_NONPAY_WATCH_OWNER_ID') ?? 'd20dd72e-5dc6-4004-8729-842ea9c16b88';
+}

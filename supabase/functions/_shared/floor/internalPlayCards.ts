@@ -142,7 +142,12 @@ export function planOpenItemNudgeCards(
 /** Play 6: watchlist cards for non-pay cancel candidates. */
 export function planNonpayCancelWatchCards(
   candidates: NonpayCancelCandidate[],
-  opts: { dayKey: string; limit?: number; defaultOwnerId?: string | null },
+  opts: {
+    dayKey: string;
+    limit?: number;
+    defaultOwnerId?: string | null;
+    ownerByAccountId?: Record<string, string | null | undefined>;
+  },
 ): InternalPlayCardPlan[] {
   const limit = opts.limit ?? 5;
 
@@ -151,7 +156,7 @@ export function planNonpayCancelWatchCards(
     play_version: '1.0.0',
     idempotency_key: `play6:nonpay.cancel.watch:${row.policy_id}:${opts.dayKey}`,
     client_account_id: row.account_id!,
-    owner_id: opts.defaultOwnerId ?? null,
+    owner_id: opts.ownerByAccountId?.[row.account_id!] ?? opts.defaultOwnerId ?? null,
     headline: 'Non-pay cancel watch',
     summary: `${row.reason}. Policy ${policyOpaqueRef(row.policy_id)}. Internal watch only.`,
     risk: 'red' as RiskLevel,
