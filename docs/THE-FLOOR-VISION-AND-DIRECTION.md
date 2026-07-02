@@ -1,8 +1,9 @@
 # The Floor: Vision and Direction
 
 **Prepared:** 2026-07-01  
+**Last updated:** 2026-07-02 (status claims aligned to build state through Phase 5 Slice 2)  
 **Canonical path:** `docs/THE-FLOOR-VISION-AND-DIRECTION.md`  
-**Operational plan:** [`docs/THE-FLOOR-UNIFIED-ROADMAP.md`](./THE-FLOOR-UNIFIED-ROADMAP.md) (aligned 2026-07-01)  
+**Operational plan:** [`docs/THE-FLOOR-UNIFIED-ROADMAP.md`](./THE-FLOOR-UNIFIED-ROADMAP.md) (the roadmap sequences the build; this doc is the direction)  
 **Discipline:** every existence claim below is grounded in the canonical doc stack. Anything unbuilt is labeled PROPOSED. Locked decisions are not reopened; anything that touches one says "would require Brian."
 
 ---
@@ -21,15 +22,17 @@ Finished means: any client request, by email, phone, text, or before they ask vi
 
 ### Horizon 1: First Light (now through Phase 3, the proof)
 
-Where the build actually is (Phase 3 status, 2026-07-01): Phases 0-2 are done on dev with signed one-pagers. The Slack canonical seam shipped in Phase 1 (Slack now renders `public.decision_packages` rows and writes `public.feedback_events`, 6/6 DMs on dev soak). Phase 3 slices 1-4 are shipped: the Play 4 `id.card.issue` module, the ID card asset pipeline, the new fenced `send-id-card-email` surface, CRM intake through `floor-action`. The full chain (CRM button, Tier-3 package, Approve, 30s hold, release, Fence consume) is soak-green on dev; the provider step reads `failed_delivery` only because the dev `RESEND_API_KEY` is a placeholder. G4 is unsigned. Landen owns Play 4.
+Where the build actually is (Phase 3 status + G4 sign-off, 2026-07-01): Phases 0-2 are done on dev with signed one-pagers. The Slack canonical seam shipped in Phase 1 (Slack now renders `public.decision_packages` rows and writes `public.feedback_events`, 6/6 DMs on dev soak). Phase 3 slices 1-6 are shipped: the Play 4 `id.card.issue` module, the ID card asset pipeline, the new fenced `send-id-card-email` surface, CRM intake through `floor-action`, and the G4 validation soak. **G4 is signed** (2026-07-01, [`THE-FLOOR-PHASE-3-G4-SIGNOFF.md`](./THE-FLOOR-PHASE-3-G4-SIGNOFF.md)): the Play 4 allowlist is flipped to client on dev, per-play (`FLOOR_PLAY_ALLOWLIST_MODES`), COI and everything else stay internal. The G4 soak verified the real account-email recipient, cancel-before-approve blocked at staging, cancel-during-hold blocked at the release in-force re-check, and Fence consume. The provider step still reads `failed_delivery` until the dev `RESEND_API_KEY` matches prod: the first delivered client send is one ops line away. Prod stays dark behind G1. Landen owns Play 4.
 
-What this horizon proves: a client request becomes a named, gated, undoable send in seconds, on the highest-volume, lowest-risk paper in a 98 percent personal-lines book. Everything after is breadth and proactivity on rails already proven.
+What this horizon proves, and has now proven on dev: a client request becomes a named, gated, undoable send in seconds, on the highest-volume, lowest-risk paper in a 98 percent personal-lines book. Everything after is breadth and proactivity on rails already proven.
 
 ### Horizon 2: The office that starts first (Phases 4-5)
 
 Phase 4 fills the safe book: non-pay and cancellation detection off the carrier download with the Florida statutory day-count clock, open-file and open-quote nudges, endorsement REQUEST capture, licensing and appointment expiry alerts, coverage-gap round-out (the engine already exists in the CRM), voice intake behind the FL sec 934.03 consent gate. Phase 5 inverts the direction of work: the nightly heartbeat pushes finished cards before anyone asks, remarket and renewal packets assemble as Tier 4 drafts, retention lists ride the existing scoring engine, and the compile-from-corrections pipeline turns FeedbackEvents into weekly play patches a human merges. The Landen to Kelli remarket lands here (ADR 003), Kelli-owned, writing a candidate playbook to the vault.
 
 The felt change: the morning tray replaces the inbox. Work is done before the office opens. The invisible tax (logging, chasing, follow-up) measurably collapses, and the office starts improving its own plays from its own corrections.
+
+Where the build already reaches into this horizon (2026-07-02, dev): Phase 4 slices 1-3 shipped three internal Tier-2 card plays on scheduled crons (`coverage.gap.roundout`, `open.item.nudge`, `nonpay.cancel.watch`), and Phase 5 slices 1-2 shipped the nightly `heartbeat.book.scan` fan-out (`source='heartbeat'`, all internal plays, capped per play) and `retention.save.list`. Still ahead in this horizon: morning tray DM batching (Phase 5 Slice 3), `remarket.packet.auto` (Slice 4), `play.patch.compile` (Slice 5), endorsement capture, licensing alerts, voice, and SMS intake.
 
 ### Horizon 3: The institution (Phase 6)
 
@@ -51,14 +54,14 @@ The governing pillar: within ten seconds of looking, a human knows what their ag
 
 **Parity without duplicated cognition.** One endpoint (`floor-action`), one package row, two renderers. Neither surface computes risk, diff, or tier; they display what the play wrote. One canonical row means a card cannot be decided twice by design (ADR 002); the Slack-side revision stale-guard enforces this today, and full cross-surface invalidation rides the projection sync. The warning stands: the cockpit must never become a third approval track.
 
-**The morning tray, concretely (PROPOSED choreography; tray blocks exist as code, the scheduler and heartbeat are Phase 5).** Overnight, heartbeat-built packages land as awaiting_approval. At office open, each agent posts one tray DM, ordered: (1) time-critical client-facing items, (2) Tier-3 one-taps ready to sign, (3) Tier-2 work already done with undo windows, (4) FYI reads. Between tray and close, only two things ping: a `failed_delivery` on a client-facing send, and an in-force demotion on a card already opened. Never pings: Tier-1 completions, metrics, anything about a colleague's throughput.
+**The morning tray, concretely (PROPOSED choreography; tray blocks exist as code; the heartbeat fan-out is live on dev, tray DM batching is Phase 5 Slice 3).** Overnight, heartbeat-built packages land as awaiting_approval. At office open, each agent posts one tray DM, ordered: (1) time-critical client-facing items, (2) Tier-3 one-taps ready to sign, (3) Tier-2 work already done with undo windows, (4) FYI reads. Between tray and close, only two things ping: a `failed_delivery` on a client-facing send, and an in-force demotion on a card already opened. Never pings: Tier-1 completions, metrics, anything about a colleague's throughput.
 
 **Six humans, six distinct agents (persona work is PROPOSED except where cited):**
 
 | Person | What their agent should feel like |
 |---|---|
 | Brian | The orchestrator who is never an approver. Per the Operating Authority his surface is outcome digests and an audit trail, never permission requests. PROPOSED: a weekly Floor outcome digest riding the existing weekly-ceo-digest rail. |
-| Letitia | Same spine, money lens. PROPOSED: her tray leads with non-pay detections (Phase 4) and payment discrepancies, as an owner-and-play filter over the same rows, never a separate pipeline. |
+| Letitia | Same spine, money lens. Partially real: the build made her the shipped default owner of `nonpay.cancel.watch` cards (Phase 4 Slice 3, dev). PROPOSED remainder: her tray leads with all money-adjacent cards including payment discrepancies, as an owner-and-play filter over the same rows, never a separate pipeline. |
 | Landen | Play 4 owner (Brian, 2026-07-01) and vault curator, working toward his FL 2-20. Every ID card sends under his name. PROPOSED: his cards render an expanded "why" panel (lint rule cited, in-force diff shown, one plain-language coverage note) so each approval doubles as license study. |
 | Kelli | The adoption hinge. Her surface already says "Kelli's Agent." It must always read as a junior assistant who did the legwork, never a system that grades her. PROPOSED: card summaries phrase agent work as labor performed ("pulled the dec page, verified in force, drafted the email"), never as scores or recommendation strength. |
 | Jacob | Two weeks in. Cards render lint results inline today; the shared floor (Phase 6) is built for exactly him. PROPOSED: until Phase 6, mirror his Tier-3 cards into #floor by default. Note: this pulls Phase 6 shared-floor scope forward; reversible and internal, so OA-eligible, but it belongs in Brian's periodic review batch. |
@@ -72,14 +75,14 @@ The test for each: could a competitor copy it by buying software, or does copyin
 
 | # | Moat | Becomes real | Status today |
 |---|---|---|---|
-| 1 | In-force gate at issuance | Phase 3 | Built and dev-soaked on the pass path; live same-day-cancellation block test pending; G4 unsigned |
+| 1 | In-force gate at issuance | Phase 3 | Built; G4 signed 2026-07-01; live cancel-block tests green on dev (before approve and during hold); delivery pending the dev Resend key; prod behind G1 |
 | 2 | Self-assembling E&O defense file | Phases 2-3 | Chain proven on dev through Fence consume; tier-change log joins in Phase 6 |
-| 3 | Compile-from-corrections plus the vault | Phase 5 | FeedbackEvents log on dev (prod is G1-gated); the compiler is a promise |
+| 3 | Compile-from-corrections plus the vault | Phase 5 | FeedbackEvents log on dev (prod is G1-gated); heartbeat fan-out live on dev; the compiler (`play.patch.compile`) is Slice 5, still a promise |
 | 4 | Certificate-holder registry | Phase 6 | Promise only |
 | 5 | Shared-floor second opinion | Phase 6 | Promise only |
 | 6 | Client-thread compounding memory | Phases 1-5 | Ring 0 and the identity graph live in the CRM; decision-card surfaces shipped on dev; thread UX is a promise |
 
-**1. The in-force gate.** Every Tier-3 send reads `policy_in_force_status` at approval time; "unchanged template" is never the check. A generic AI email tool drafts faster; it cannot decline to certify, because it has no live in-force view and no chokepoint wired to it. Copying this means rebuilding carrier-download reconciliation, the view, and the Fence, in that order. It deletes the textbook E&O loss (certifying dead coverage) on every dev-soak ID card today and on every client ID card the moment G4 signs, and on every COI later.
+**1. The in-force gate.** Every Tier-3 send reads `policy_in_force_status` at approval time; "unchanged template" is never the check. A generic AI email tool drafts faster; it cannot decline to certify, because it has no live in-force view and no chokepoint wired to it. Copying this means rebuilding carrier-download reconciliation, the view, and the Fence, in that order. It deletes the textbook E&O loss (certifying dead coverage) on every ID card the Floor issues today on dev, on every prod ID card the moment G1 applies, and on every COI later. The G4 validation soak proved it live twice: a policy cancelled before Approve never stages, and one cancelled during the hold blocks at the release re-check.
 
 **2. The E&O defense file.** Every send leaves a chain no one had to remember to write: the decision package, the named approval row with the 30 second hold, the work-request state trail, FeedbackEvents on every verb, the Fence's content-hashed one-time consume, and, once the Phase 6 ramp lands, logged tier changes. Uncopyable because the trail is a byproduct of the only path a send can take, not a compliance module staff must fill in.
 
@@ -95,19 +98,19 @@ The test for each: could a competitor copy it by buying software, or does copyin
 
 ## 5. Play and agent catalog, Phases 4-6
 
-Every play rides the one spine and emits a DecisionPackage, never sends: `capability_scope.can_send` is structurally false. Play IDs follow the shipped dotted convention (`id.card.issue`, `coi.issue` exist); all other IDs, tiers, and owner assignments below are PROPOSED labels on documented plays. Owners are default approval owners, never client scoping (R6: all staff see all clients).
+Every play rides the one spine and emits a DecisionPackage, never sends: `capability_scope.can_send` is structurally false. Play IDs follow the shipped dotted convention. Since this catalog was first drafted (2026-07-01), five of its proposed IDs became shipped dev code within a day: `coverage.gap.roundout`, `open.item.nudge`, `nonpay.cancel.watch` (Phase 4 slices 1-3), `heartbeat.book.scan`, and `retention.save.list` (Phase 5 slices 1-2). Rows below are marked SHIPPED where that happened; everything else remains a PROPOSED label on a documented play. Owners are default approval owners, never client scoping (R6: all staff see all clients).
 
 ### Phase 4: The Safe Book
 
-| Play | play_id (PROPOSED) | Tier | Owner | Rides / reuses |
+| Play | play_id | Tier | Owner | Rides / reuses |
 |---|---|---|---|---|
-| Non-pay / cancellation detection, FL statutory day-count clock | `nonpay.cancel.watch` | 1 detect, 2 card, save gated | Tori | Carrier-download reconciliation cycle (Spine D); Canopy monitoring; renewals system |
-| Open-file / open-quote nudges | `open.item.nudge` | 2 | Named file owner; Kelli default on personal-lines quotes | Suspense-sweep machinery; tasks, quotes, renewals |
-| Endorsement REQUEST capture, track to confirmation | `endorsement.request.capture` | 2 capture, 3 client acknowledgment; carrier submit stays human (roadmap: "submit is human") | Tori | resolveAccount, intake bus; chokepoint for the acknowledgment only |
-| Producer licensing / CE and appointment expiry | `license.appointment.watch` | 1, plain cron | Letitia | The "near-free cron guarding a catastrophic risk" |
-| Coverage-gap round-out | `coverage.gap.roundout` | 2 list card; any outreach draft is Tier 4 | Kelli | `run-coverage-gap-detection` (exists) |
+| Non-pay / cancellation detection, FL statutory day-count clock | `nonpay.cancel.watch` SHIPPED (dev, Phase 4 Slice 3) | 1 detect, 2 card, save gated | Letitia (shipped default) | `policy_in_force_status` with `bap_details` payment hints; Canopy monitoring; renewals system |
+| Open-file / open-quote nudges | `open.item.nudge` SHIPPED (dev, Phase 4 Slice 2) | 2 | Task assignee preferred; Kelli default (shipped) | Open quotes + pending tasks; suspense-sweep machinery |
+| Endorsement REQUEST capture, track to confirmation | `endorsement.request.capture` (PROPOSED) | 2 capture, 3 client acknowledgment; carrier submit stays human (roadmap: "submit is human") | Tori | resolveAccount, intake bus; chokepoint for the acknowledgment only |
+| Producer licensing / CE and appointment expiry | `license.appointment.watch` (PROPOSED) | 1, plain cron | Letitia | The "near-free cron guarding a catastrophic risk" |
+| Coverage-gap round-out | `coverage.gap.roundout` SHIPPED (dev, Phase 4 Slice 1) | 2 list card; any outreach draft is Tier 4 | Kelli (shipped default) | `run-coverage-gap-detection` (exists) |
 
-Notes held to the docs: the day counts will come from the Florida statute and be encoded as deterministic code alongside the R1-R9 lint, never model judgment (PROPOSED, Brian item: have counsel confirm the exact day counts before build). The Phase 5 heartbeat later absorbs these detectors; in Phase 4 they run off the reconciliation cycle and plain crons. The gap round-out runs the lint before any card renders: R2 never flags trailers or RVs as auto gaps, R4 defines bundle as Progressive Auto plus any Florida HO carrier, R5 keeps closed-market Florida property out of the framing. Voice and the CRM Hand-to-bot button are intake adapters, not plays; recording stays off the critical path until the FL sec 934.03 consent mechanism and transcript redaction clear Brian's gate. PROPOSED ordering: the Hand-to-bot button lands ahead of recorded-call transcription, since it carries no consent burden.
+Notes held to the docs: shipped non-pay detection reads `bap_details` payment hints only; the FL statutory day-count clock for production save-gating stays a tracked Brian fork (counsel confirms the counts before it gates anything), encoded as deterministic code alongside the R1-R9 lint, never model judgment. The Phase 5 heartbeat now absorbs the shipped detectors into its nightly fan-out; their individual dev crons remain for focused testing. The gap round-out runs the lint before any card renders: R2 never flags trailers or RVs as auto gaps, R4 defines bundle as Progressive Auto plus any Florida HO carrier, R5 keeps closed-market Florida property out of the framing. Voice and the CRM Hand-to-bot button are intake adapters, not plays; recording stays off the critical path until the FL sec 934.03 consent mechanism and transcript redaction clear Brian's gate. PROPOSED ordering: the Hand-to-bot button lands ahead of recorded-call transcription, since it carries no consent burden.
 
 Two PROPOSED Phase 4 additions, both passing the play-selection test:
 
@@ -116,12 +119,12 @@ Two PROPOSED Phase 4 additions, both passing the play-selection test:
 
 ### Phase 5: No Handoff
 
-| Play | play_id (PROPOSED) | Tier | Owner | Rides / reuses |
+| Play | play_id | Tier | Owner | Rides / reuses |
 |---|---|---|---|---|
-| Nightly heartbeat book scan | `heartbeat.book.scan` | 1; fans cards to named owners, `source='heartbeat'` | n/a (fan-out) | The whole pipeline plus cron; all Phase 4 detectors |
-| Remarket / renewal packets by line (auto first, HO lower) | `remarket.packet.auto`, `remarket.packet.home` | 4 draft-only | Kelli | resolveAccount, in-force view, coverage diff; `calculate-renewal-risk`, renewals system, ACORD generation |
-| Retention / save lists | `retention.save.list` | 2 | Kelli | `run-retention-scoring` (exists), rendered as ranked save cards |
-| Compile-from-corrections | `play.patch.compile` | 1; output is a PR a human merges, fixtures gate CI | Landen (vault curator) | FeedbackEvent stream, golden fixtures |
+| Nightly heartbeat book scan | `heartbeat.book.scan` SHIPPED (dev, Phase 5 Slice 1; nightly cron, capped per play) | 1; fans cards to named owners, `source='heartbeat'` | n/a (fan-out) | The whole pipeline plus cron; all shipped internal plays |
+| Remarket / renewal packets by line (auto first, HO lower) | `remarket.packet.auto`, `remarket.packet.home` (Phase 5 Slice 4, not started) | 4 draft-only | Kelli | resolveAccount, in-force view, coverage diff; `calculate-renewal-risk`, renewals system, ACORD generation |
+| Retention / save lists | `retention.save.list` SHIPPED (dev, Phase 5 Slice 2) | 2 | Kelli (shipped default) | `run-retention-scoring` engine (not yet deployed on dev; soak seeds scores), rendered as ranked save cards |
+| Compile-from-corrections | `play.patch.compile` (Phase 5 Slice 5, not started) | 1; output is a PR a human merges, fixtures gate CI | Landen (vault curator) | FeedbackEvent stream, golden fixtures |
 
 R1 rides the remarket packets: any Nationwide auto packet carries the SmartRide audit flag. The Landen to Kelli remarket lands here per ADR 003, writing a candidate playbook to the vault.
 
@@ -156,13 +159,13 @@ The CRM future-features list carries "Producer Leaderboards." Reject it for The 
 
 ### The Kelli hinge
 
-The Floor succeeds or fails on one person. Each specific way trust breaks for a 22-year veteran is answered by built, dev-proven architecture (prod apply is G1, first live send is G4, both open Brian gates):
+The Floor succeeds or fails on one person. Each specific way trust breaks for a 22-year veteran is answered by built, dev-proven architecture (G4 signed for Play 4 on dev; prod apply remains behind G1):
 
 | What breaks trust | What the architecture does about it |
 |---|---|
 | A wrong document goes out under her name | Nothing sends without her named approval row, enforced twice (Floor orchestration plus Fence one-time consume, ADR 001). 30 second undo with a working Kill. Recipient is always the account of record or an approved holder on file, never a body-supplied address; for ID cards, account of record only. Below 0.9 resolve confidence, the card forces a human pick. |
 | The system looks like surveillance | No per-person stats, no scoreboards (mechanism 5). R6: all staff see all clients. #wins is outcomes only. |
-| Alert fatigue | The morning tray (delivered with the Phase 5 heartbeat) batches decisions once. Today, Play 3's shipped acceptance gate already enforces severity-ranked, no alert-fatigue firehose. |
+| Alert fatigue | The morning tray batches decisions once; the heartbeat fan-out that will feed it is live on dev, and tray DM batching is Phase 5 Slice 3. Today, Play 3's shipped acceptance gate already enforces severity-ranked, no alert-fatigue firehose. |
 | Corrected by a machine in front of peers | The DM is the work surface; channels are visibility only. Her Edit becomes the package and logs a FeedbackEvent from day one; in Phase 5 the compile pipeline turns those edits into play patches. The machine learns from her, never the reverse. |
 | Replacement anxiety | Coverage confirmation, binding, cancellation, and advice are never delegated at any tier. Her clout is the payload of the red-flag remarket. The shared floor is weighted to new hires: peer help, not veteran policing. |
 
@@ -183,21 +186,22 @@ Something will still go wrong, and the first incident decides adoption. Shipped,
 | Risk | Mitigation | Status |
 |---|---|---|
 | Wrong-client send | 0.9 bar with forced human pick; identity graph ladder; `ensureProfileByEmail` fix confirmed present | Built; dev |
-| Certifying dead coverage | In-force gate at build and at stage; reconciliation view | Built; pass path dev-soaked; live cancellation block test pending |
+| Certifying dead coverage | In-force gate at build, at stage, and re-checked at release; reconciliation view | Built; live cancel-block tests green on dev (before approve and during hold, G4 validation soak) |
 | Prompt injection | Metadata-only routing; no extracted field becomes an instruction; auth verdict precedes allowlist | Designed into router; email intake not yet live-wired |
 | Hallucinated limits | Model decides, code executes; AI/WOS/limits fields policy-derived and locked against Edit; deterministic coverage diff | Contract-level; enforced in card handler per spec |
 | PII to a model (R9) | `redactPII` before live Hermes upstream (FU-2 closed per G0) | Closed on the bridge |
-| Premature client contact | No send path existed in Phase 1; internal allowlist in Phase 2; G4 one-line flip per play | Enforced; G4 unsigned |
+| Premature client contact | No send path existed in Phase 1; internal allowlist in Phase 2; G4 per-play allowlist flip | Enforced; G4 signed for Play 4 on dev only; every other play internal; prod behind G1 |
 | Mac Mini failure | The Mini is a renderer, not the truth: canonical rows, send path, and audit trail live in Supabase; launchd single instance | Structural |
 
 ### Open gaps (tracked, not hidden)
 
-1. **FU-1 is still open.** `canopy-servicing` remains an ungated carrier send. Folding it under the Fence is named Phase 2 backbone work and a before-G4 item in the Phase 3 risk register. It should be closed before any G4 conversation.
+1. **FU-1: CLOSED.** `canopy-servicing`'s email path was fenced as a G4 precondition (G4 sign-off, 2026-07-01). Kept here because it was this doc's top gap when drafted; it is now a checked box, which is how the gap list is supposed to work.
 2. **Legacy prod send paths.** The G0 sign-off itself flags that legacy UI paths can still reach `email-send` / `send-sms` in prod without a Fence token; the Fence prod deploy is a pull-forward candidate ahead of G1.
-3. **Dev provider step.** `RESEND_API_KEY` placeholder keeps the last soak step at `failed_delivery`. One ops line.
+3. **Dev provider step.** The dev `RESEND_API_KEY` is still a placeholder, so the G4 soak's happy path ends at `failed_delivery`. Copy the prod key into dev secrets and re-run Part A: the first delivered client send is that one ops line away.
 4. **Tori is 5/6.** Her binding placeholder blocks the "all six humans" claim of Phase 1's DoD spirit.
 5. **G3 clock.** Slack trial ends around July 25; billing is a business gate decoupled from build, and the audit trail lives in Supabase either way.
 6. **R1-R5 lint placement.** The full R1-R9 lint lives in the Mac Mini package; on the CRM side only R7 and R9 are deterministic code today. Any CRM-produced card that depends on R1-R5 framing needs that lint wired where the card is built.
+7. **Dev data seeding caveats.** `run-retention-scoring` is not deployed on dev (the retention soak seeds scores), and gap detection analyzed zero accounts on its first dev run (the soak seeds an opportunity row). Fine for spine proof; the play content is only as real as those engines once they run on live data.
 
 ### Failure modes the docs do not name (PROPOSED analysis)
 
@@ -222,7 +226,7 @@ Delivery integrity rides alongside: every send resolves to delivered or `failed_
 
 ### Three mornings (the 10x test)
 
-**Kelli's Tuesday, Phase 5 realized (future machinery).** The heartbeat ran the book overnight. Her tray holds six cards, batched once. Three are Tier 1-2, already done: reconciliation confirmations, suspense items filed. One is a Tier-3 endorsement acknowledgment, one tap, 30 second hold, sent under her name. (The day's ID card request went to Landen's tray; Play 4 is his. PROPOSED, Brian decision: broaden the Play 4 approver set by Phase 5.) One is a Tier-4 auto remarket packet, fully assembled, carrier choice left to her because that choice is the licensed act. The last is why she matters: a renewal where the diff flags a limit the client outgrew. She edits two fields, the FeedbackEvent logs her judgment, and she calls a client she has known for years. Twenty-two years of clout land on the one card that needed a human. Tray cleared before 8:30. Handoffs: zero.
+**Kelli's Tuesday, Phase 5 realized (partially live: the heartbeat fan-out runs nightly on dev; tray batching, remarket packets, and the compile pipeline are still future).** The heartbeat ran the book overnight. Her tray holds six cards, batched once. Three are Tier 1-2, already done: reconciliation confirmations, suspense items filed. One is a Tier-3 endorsement acknowledgment, one tap, 30 second hold, sent under her name. (The day's ID card request went to Landen's tray; Play 4 is his. PROPOSED, Brian decision: broaden the Play 4 approver set by Phase 5.) One is a Tier-4 auto remarket packet, fully assembled, carrier choice left to her because that choice is the licensed act. The last is why she matters: a renewal where the diff flags a limit the client outgrew. She edits two fields, the FeedbackEvent logs her judgment, and she calls a client she has known for years. Twenty-two years of clout land on the one card that needed a human. Tray cleared before 8:30. Handoffs: zero.
 
 **The 6am cancellation, Phase 6 realized (future machinery on a built spine).** The carrier download processes; `policy_in_force_status` (built, dev) flips one commercial policy to not-in-force. The holder registry remembers every holder ever told this policy was active and drafts one correction card per affected holder, none for unaffected ones. Any pending COI reissue on that policy is already structurally dead: the in-force diff runs at approval time, so Approve cannot stage it. By 7:30 the correction cards sit risk-red in the owner's tray. By 8:00 a named producer has approved each one, and the insured got a call before a certificate lie could meet a claim. The industry's worst latent liability, handled before coffee.
 
@@ -234,7 +238,7 @@ Delivery integrity rides alongside: every send resolves to delivered or `failed_
 
 Each rides the existing spine unchanged: one WorkRequest pipeline, one package row, one action endpoint, Floor plus Fence for anything that sends. None creates a new approval track.
 
-**1. SMS intake: "text us for your ID card."** A Twilio inbound webhook normalizes a client text into a WorkRequest and routes it to Play 4, following the Phase 1 email intake pattern (normalize, resolve, route). The rails are closer than they look: `inbound_allowlist` already models `channel='sms'`, the resolve ladder's phone rung makes the sending number the identity key, the 0.9 bar still forces a human pick on ambiguity, and `send-sms` already sits under the Fence. Delivery goes to the email of record via the `send-id-card-email` surface (deployed on dev, Fence consume proven). Note the email ID-card route itself is still an open Phase 3 decision, so the SMS and email ID routes would land together in Phase 4. Why: the one metric starts at the client's request, and in a 98 percent personal-lines book that request starts on a phone. New decisions it forces: an `'sms'` value on the WorkRequest source enum, and, only if replies go back over SMS rather than email of record, an outbound texting consent posture, which is Brian's call. Boundary: intake only, never conversation; coverage questions fall through to a human.
+**1. SMS intake: "text us for your ID card."** Status: adopted. The Phase 4 status doc now carries SMS intake as a named roadmap track; the decisions below still stand. A Twilio inbound webhook normalizes a client text into a WorkRequest and routes it to Play 4, following the Phase 1 email intake pattern (normalize, resolve, route). The rails are closer than they look: `inbound_allowlist` already models `channel='sms'`, the resolve ladder's phone rung makes the sending number the identity key, the 0.9 bar still forces a human pick on ambiguity, and `send-sms` already sits under the Fence. Delivery goes to the email of record via the `send-id-card-email` surface (deployed on dev, Fence consume proven). Note the email ID-card route itself is still an open Phase 3 decision, so the SMS and email ID routes would land together in Phase 4. Why: the one metric starts at the client's request, and in a 98 percent personal-lines book that request starts on a phone. New decisions it forces: an `'sms'` value on the WorkRequest source enum, and, only if replies go back over SMS rather than email of record, an outbound texting consent posture, which is Brian's call. Boundary: intake only, never conversation; coverage questions fall through to a human.
 
 **2. The E&O Defense File as a one-click export.** The handoff says the defense file "assembles itself as a byproduct." Make it a first-class artifact: per client or per incident, deterministic code (no model call) compiles the work-request transition trail, the named approval row, the Fence consume record, the package's persisted risk and diff verdict, every FeedbackEvent, and tier-change history once the Phase 6 ramp lands, into one signed-URL packet. Persisting the stage-time in-force result is the single small new write this needs. Why: sends will go out under producers' names, Landen first on Play 4; handing them the file that defends that name is the cheapest trust purchase available. Slots after Phase 3. Brian decides: who can mint an export, its retention, and how a PII-bearing legal artifact is classed, since R9 governs prompts, chat, and logs, and a legal export is a genuinely new category.
 
@@ -250,6 +254,8 @@ Each rides the existing spine unchanged: one WorkRequest pipeline, one package r
 
 ## 9. Open questions for Brian (genuine forks only)
 
+Status 2026-07-02: questions 1 and 3 are now carried as named "Brian forks" in the Phase 4 and Phase 5 status docs, alongside the FL non-pay day counts and sec 934.03 voice consent. They stay here in full because this is where the framing lives.
+
 1. **Does The Floor ever address third parties?** `lienholder.proof.send` needs `SendSpec.recipient_basis` widened beyond `account_of_record` and `approved_holder` to a vetted lienholder-of-record. Approve that basis or the play family does not exist. This is the single structural decision gating most third-party paper.
 2. **Ratify the never-automate list.** PROPOSED standing client-contact policy: non-pay and cancellation warnings, claim outcomes, and any death, divorce, or estate-triggered outreach stay human-composed forever; the agent assembles facts, the producer writes the words. One-line yes or no before it is written into the play specs.
 3. **The staleness ceiling.** When `policy_in_force_status` freshness exceeds a ceiling (reconciliation stall), should Tier-3 sends hard-block exactly like not-in-force, and what is the ceiling? This decides whether the office can pause itself.
@@ -258,4 +264,4 @@ Each rides the existing spine unchanged: one WorkRequest pipeline, one package r
 
 ---
 
-*Grounding note: drafted from the canonical stack listed at top; 40 adversarial-verification findings were applied before delivery, including two material corrections: the Slack fixture-to-live seam is already shipped per Phase 1 status (the roadmap section 3.1 fixture description is the pre-build snapshot), and `canopy-servicing` FU-1 remains an OPEN ungated carrier send that should close before G4.*
+*Grounding note: drafted 2026-07-01 from the canonical stack listed at top; 40 adversarial-verification findings were applied before delivery. Aligned 2026-07-02 to the build state that overtook the draft within a day: G4 signed (dev client mode for Play 4 only), FU-1 closed as a G4 precondition, live cancel-block tests green, and five of this catalog's proposed play IDs shipped as dev code (`coverage.gap.roundout`, `open.item.nudge`, `nonpay.cancel.watch`, `heartbeat.book.scan`, `retention.save.list`). Where this doc and the phase status docs disagree on current state, the status docs win; where they disagree on direction, this doc wins.*
