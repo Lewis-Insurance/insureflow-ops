@@ -452,7 +452,7 @@ export default function CustomerDetail() {
 
         {/* ===================== Notes & tasks ===================== */}
         <section id="notes" className="scroll-mt-20 space-y-4">
-          <NotesPanel accountId={account.id} onChange={refetchNotes} />
+          <NotesPanel accountId={account.id} />
           <CustomerTasksSection accountId={account.id} tasksApi={tasksApi} />
         </section>
 

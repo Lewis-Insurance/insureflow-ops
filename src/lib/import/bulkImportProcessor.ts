@@ -13,8 +13,6 @@ import { resolveCarriers } from './carrierResolver';
 const BATCH_SIZE = 100;
 // Rows in flight at once during contact resolution (per browser tab).
 const IMPORT_CONCURRENCY = 8;
-// Abort the import after this many consecutive row failures (dead connection).
-const CONSECUTIVE_FAILURE_LIMIT = 25;
 
 /** Run task thunks with at most `limit` in flight; resolves when all settle. */
 async function runWithConcurrency(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
@@ -137,7 +135,6 @@ export async function processContacts(
   let accountsCreated = 0;
   let accountsMatched = 0;
   let contactsCreated = 0;
-  let consecutiveFailures = 0;
 
   const totalBatches = Math.ceil(contacts.length / BATCH_SIZE);
 
@@ -163,6 +160,11 @@ export async function processContacts(
     // Rows run with bounded concurrency: one awaited RPC per row made a
     // 10-15k-row book import ~10-15k sequential round trips (tens of minutes).
     // Order does not matter (results land in a map keyed by master_id).
+    // Per-batch tallies drive the circuit breaker (below) - an order-independent
+    // signal, unlike a "consecutive failures" counter which under concurrency
+    // reflects completion order rather than CSV row order.
+    let batchSuccesses = 0;
+    let batchFailures = 0;
     const processRow = async (contact: ContactImportRecord, rowNumber: number) => {
       try {
         // Resolve-or-create instead of a blind insert. import_resolve_account
@@ -227,10 +229,10 @@ export async function processContacts(
             contactsCreated++;
           }
         }
-        consecutiveFailures = 0;
+        batchSuccesses++;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        consecutiveFailures++;
+        batchFailures++;
         errors.push({
           rowNumber,
           sourceId: contact.master_id,
@@ -244,13 +246,16 @@ export async function processContacts(
       IMPORT_CONCURRENCY
     );
 
-    // Circuit breaker: a dead connection/expired session would otherwise burn
-    // through every remaining row generating thousands of identical errors.
-    if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+    // Circuit breaker: a dead connection/expired session makes an ENTIRE batch
+    // fail. Requiring zero successes (not a consecutive-failure count) keeps
+    // this order-independent under concurrency and immune to a cluster of
+    // legitimately-invalid rows, which will always sit alongside some
+    // successes. A full BATCH_SIZE with no success is the dead-connection tell.
+    if (batchSuccesses === 0 && batchFailures > 0) {
       errors.push({
         rowNumber: end,
         sourceId: '(batch)',
-        error: `Aborted: ${consecutiveFailures} consecutive rows failed - check the connection/session and re-run the import.`,
+        error: `Aborted: all ${batchFailures} rows in this batch failed - check the connection/session and re-run the import.`,
       });
       break;
     }
