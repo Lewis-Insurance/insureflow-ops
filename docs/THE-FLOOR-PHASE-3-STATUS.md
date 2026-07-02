@@ -7,7 +7,7 @@
 **Dev branch:** `klnygbbmognbslgobmzc`  
 **Last updated:** 2026-07-02 (Slices 7–11)
 
-**Status:** 🟢 **DEV CLOSE-OUT COMPLETE** (Slices 0–8 code); Slice 9 ops (Resend key); Slice 11 prod gated.
+**Status:** 🟢 **DEV CLOSE-OUT COMPLETE** (Slices 0–8 code); Slice 9 ops (Resend key) **ON HOLD — no client sends yet (Landen, 2026-07-02)**; Slice 11 prod gated.
 
 ---
 
@@ -21,7 +21,7 @@
 - [x] G4 signed; Play 4 allowlist flipped to client (dev)
 - [x] Extended `feedback_events` verbs (approve/edit/kill + release/send/card_created)
 - [x] Release sweeper cron (GitHub Action every 2 min)
-- [ ] Resend delivery green on dev (Slice 9 ops — copy prod `RESEND_API_KEY`)
+- [ ] Resend delivery green on dev (Slice 9 ops — copy prod `RESEND_API_KEY`) — **HELD: do not restore the key until Landen gives the go; not looking to send to a customer yet (2026-07-02)**
 - [ ] Prod First Light (Slice 11 — G1 + prod G4)
 
 ---
@@ -39,7 +39,7 @@
 | 6 | G4 validation soak | ✅ ⚠️ Resend key |
 | 7 | Kill-during-hold + release sweeper cron + stuck alarm | ✅ code + soak |
 | 8 | Audit verbs + intake latency + await `email_log` | ✅ code |
-| 9 | Provider green (Resend) | ⏳ ops |
+| 9 | Provider green (Resend) | ⏸️ **HELD** (Landen 2026-07-02: no client sends yet) |
 | 10 | Doc reconciliation | ✅ |
 | 11 | Prod First Light gate doc | ✅ gated |
 
@@ -80,7 +80,7 @@ Part C kill: floor_client_send_approvals.status=killed ✅
 Part D sweeper: provider_send_blocked=yes ✅
 ```
 
-Copy prod `RESEND_API_KEY` to dev → re-run `scripts/phase3-g4-soak.sh` Part A.  
+**HELD (Landen, 2026-07-02): do not run this step.** With the release sweeper on a 2-minute cron, a real key plus one Approve delivers to a real client automatically after the hold. The placeholder key IS the current no-client-contact guarantee. When Landen gives the go: copy prod `RESEND_API_KEY` to dev → re-run `scripts/phase3-g4-soak.sh` Part A.  
 Guide: [`scripts/phase3-restore-resend-key.md`](../scripts/phase3-restore-resend-key.md)
 
 ---
