@@ -40,7 +40,9 @@ function hasCoverage(coverage: unknown): boolean {
 }
 
 export function CustomerPoliciesSection({ accountId, customerName }: CustomerPoliciesSectionProps) {
-  const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies();
+  // Server-side scoped to this account: the unfiltered hook paginates the entire
+  // policies book (1000-row pages with 3 joins) on every customer record open.
+  const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies({ accountId });
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);

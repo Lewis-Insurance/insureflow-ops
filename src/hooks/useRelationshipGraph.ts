@@ -1,7 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+
+/**
+ * A merge (or un-merge) reparents rows across every account-keyed table. With the
+ * app-wide 5-minute staleTime, stale caches make the survivor render WITHOUT the
+ * merged-in policies - reading as "the merge failed" and inviting a re-run or a
+ * re-keyed policy. Call after every successful merge/unmerge.
+ */
+export function invalidateAccountDataCaches(queryClient: QueryClient) {
+  for (const key of [
+    'policies',
+    'unified-customers',
+    'payments',
+    'documents',
+    'account-notes',
+    'tasks',
+    'quotes',
+    'renewals',
+    'communication-history',
+  ]) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
 
 /**
  * Data layer for the account relationship graph (account_relationships +
@@ -438,6 +461,7 @@ export interface DuplicateGroup {
 }
 
 export function useDuplicateGroups() {
+  const queryClient = useQueryClient();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -477,10 +501,11 @@ export function useDuplicateGroups() {
         return false;
       }
       toast({ title: 'Records merged', description: 'History preserved with a same-as link.' });
+      invalidateAccountDataCaches(queryClient);
       await refetch();
       return true;
     },
-    [refetch],
+    [refetch, queryClient],
   );
 
   const linkInstead = useCallback(
@@ -492,10 +517,21 @@ export function useDuplicateGroups() {
         note: 'Linked from duplicate review (not a merge)',
       });
       if (!ok) return false;
-      await supabase
+      // If this update fails the group stays in the queue and a second "Link
+      // instead" click would hit the unique edge index with a raw DB error -
+      // surface it instead of discarding it.
+      const { error: groupError } = await supabase
         .from('duplicate_groups')
         .update({ status: 'linked', reviewed_at: new Date().toISOString() })
         .eq('id', groupId);
+      if (groupError) {
+        toast({
+          title: 'Linked, but the group could not be marked reviewed',
+          description: groupError.message,
+          variant: 'destructive',
+        });
+        return false;
+      }
       await refetch();
       return true;
     },

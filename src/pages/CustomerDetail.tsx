@@ -200,6 +200,13 @@ export default function CustomerDetail() {
     setNotes((data || []).map((n) => ({ id: n.id, body: n.note_text, created_at: n.created_at, author_id: n.created_by })));
   };
 
+  /** Refresh just the account row (e.g. after a contact-info edit) instead of reloading the page. */
+  const refetchAccount = async () => {
+    if (!id) return;
+    const { data } = await supabase.from('accounts').select('*').eq('id', id).maybeSingle();
+    if (data) setAccount(data);
+  };
+
   useEffect(() => {
     if (!id) return;
     const fetchData = async () => {
@@ -460,7 +467,11 @@ export default function CustomerDetail() {
 
         {/* ===================== Customer information (was the Contact tab) ===================== */}
         <section id="contact" className="scroll-mt-20 space-y-4">
-          <CustomerContactInfo account={account} onSendEmail={() => setEmailComposerOpen(true)} />
+          <CustomerContactInfo
+            account={account}
+            onSendEmail={() => setEmailComposerOpen(true)}
+            onAccountUpdated={refetchAccount}
+          />
           <div className="flex justify-start">
             <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
           </div>

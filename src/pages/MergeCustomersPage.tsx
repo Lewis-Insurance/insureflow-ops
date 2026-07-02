@@ -6,7 +6,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { SectionLabel } from '@/components/cc';
 import { CustomerMergeSelector } from '@/components/customers/CustomerMergeSelector';
 import { MergePreviewDrawer, type MergeMember } from '@/components/relationships/MergePreviewDrawer';
-import { mergeAccountsManual } from '@/hooks/useRelationshipGraph';
+import { useQueryClient } from '@tanstack/react-query';
+import { mergeAccountsManual, invalidateAccountDataCaches } from '@/hooks/useRelationshipGraph';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 
@@ -17,6 +18,7 @@ import { logger } from '@/lib/logger';
  */
 export default function MergeCustomersPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const initial1 = searchParams.get('masterId') ?? searchParams.get('masterCustomerId');
   const initial2 = searchParams.get('duplicateId') ?? searchParams.get('duplicateCustomerId');
@@ -121,6 +123,9 @@ export default function MergeCustomersPage() {
         onConfirm={async (survivorId, loserIds) => {
           const ok = await mergeAccountsManual(survivorId, loserIds);
           if (ok) {
+            // The survivor record must show the merged-in policies immediately;
+            // stale caches read as "the merge failed" and invite a re-run.
+            invalidateAccountDataCaches(queryClient);
             setSelectedId1(null);
             setSelectedId2(null);
             navigate(`/customers/${survivorId}`);
