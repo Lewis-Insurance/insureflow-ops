@@ -67,6 +67,7 @@ DECLARE
   v_to_state text;
   v_feedback_id uuid;
   v_event_type text;
+  v_send_spec jsonb;
 BEGIN
   IF to_regclass('public.decision_packages') IS NULL THEN
     RAISE EXCEPTION 'canonical_tables_missing' USING ERRCODE = '42P01';
@@ -134,6 +135,41 @@ BEGIN
     SET status = 'killed'
     WHERE work_request_id = v_work_request_id
       AND status IN ('approved', 'held');
+  END IF;
+
+  -- Slack / Mac Mini approve of a Tier-3 external send must enter the held-send
+  -- pipeline, exactly like the CRM floor-action path. Without a held
+  -- floor_client_send_approvals row the floor-release-held-sends sweeper has
+  -- nothing to release, so a "gated" approval would look approved but the client
+  -- email would never be sent. The sweeper re-runs every recipient/policy guard
+  -- at release time, so staging the held row here (guards deferred) is safe.
+  -- Gate on the authoritative decision_packages.send_spec, matching the CRM
+  -- path's isTier3SendSpec() (real, non-stub recipient).
+  IF p_verb = 'approve' THEN
+    SELECT cp.send_spec INTO v_send_spec
+    FROM public.decision_packages cp
+    WHERE cp.id = v_package_id;
+
+    IF v_send_spec IS NOT NULL
+       AND coalesce(v_send_spec->>'recipient', '') NOT IN ('', '[INTERNAL_ONLY]')
+       AND coalesce(v_send_spec->>'send_surface', '') IN ('send-coi-email', 'send-id-card-email')
+       AND coalesce(v_send_spec->>'recipient_basis', '') IN ('account_of_record', 'approved_holder')
+    THEN
+      INSERT INTO public.floor_client_send_approvals (
+        work_request_id, approver_id, status, hold_until,
+        recipient, recipient_basis, send_payload
+      ) VALUES (
+        v_work_request_id,
+        v_actor_id,
+        'held',
+        now() + make_interval(secs => 30),  -- CLIENT_SEND_UNDO_HOLD_SECONDS
+        v_send_spec->>'recipient',
+        v_send_spec->>'recipient_basis',
+        jsonb_build_object('_floor_send_surface', v_send_spec->>'send_surface')
+          || coalesce(v_send_spec->'payload', '{}'::jsonb)
+      )
+      ON CONFLICT (work_request_id) DO NOTHING;
+    END IF;
   END IF;
 
   INSERT INTO public.automation_work_request_events (

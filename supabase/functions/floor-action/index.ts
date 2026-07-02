@@ -338,41 +338,12 @@ serve(async (req) => {
       return jsonResponse({ error: 'package_not_found', message: 'Decision package not found for work request.' }, 404);
     }
 
-    const { data: feedbackEvent, error: feedbackError } = await supabase
-      .from('feedback_events')
-      .insert({
-        work_request_id: workRequestId,
-        play_id: workRequest.play_id ?? decisionPackage.play_id,
-        play_version: workRequest.play_version ?? decisionPackage.play_version,
-        verb: parsed.verb,
-        actor_id: user.id,
-        field_edits: parsed.field_edits ?? null,
-        kill_reason: parsed.kill_reason ?? null,
-      })
-      .select('id, verb, created_at')
-      .single();
-
-    if (feedbackError) {
-      throw new ValidationError(feedbackError.message);
-    }
-
-    const nextStatus = parsed.verb === 'kill' ? 'killed' : parsed.verb === 'approve' ? 'approved' : 'awaiting_approval';
-    await supabase.from('automation_work_requests').update({ status: nextStatus }).eq('id', workRequestId);
-    if (parsed.verb === 'kill') {
-      await supabase
-        .from('floor_client_send_approvals')
-        .update({ status: 'killed' })
-        .eq('work_request_id', workRequestId)
-        .in('status', ['approved', 'held']);
-    }
-    await supabase.from('automation_work_request_events').insert({
-      work_request_id: workRequestId,
-      from_state: workRequest.status,
-      to_state: nextStatus,
-      actor_id: user.id,
-      reason: `feedback_${parsed.verb}`,
-    });
-
+    // Approve of a Tier-3 external send must STAGE the held send before any
+    // state transition or audit write. If a recipient/policy guard rejects the
+    // send we return 422 with the work request still awaiting_approval and no
+    // approve artifacts written — never a terminal-looking 'approved' with no
+    // held send. Internal-only packages (no Tier-3 send_spec) stage nothing and
+    // fall through to a normal approval.
     let sendStaging: Record<string, unknown> | null = null;
     if (parsed.verb === 'approve') {
       const recipientGuards = createSupabaseFloorRecipientGuards(supabase);
@@ -421,6 +392,14 @@ serve(async (req) => {
         });
         sendStaging = staged as Record<string, unknown>;
       } catch (stagingError) {
+        // Roll back any pre-hold approval row we just created so a retry can
+        // re-stage cleanly (the sweeper only releases rows already in 'held',
+        // so a stray 'approved' row would otherwise wedge the send forever).
+        await supabase
+          .from('floor_client_send_approvals')
+          .delete()
+          .eq('work_request_id', workRequestId)
+          .eq('status', 'approved');
         return jsonResponse(
           {
             error: 'send_staging_failed',
@@ -430,6 +409,41 @@ serve(async (req) => {
         );
       }
     }
+
+    const { data: feedbackEvent, error: feedbackError } = await supabase
+      .from('feedback_events')
+      .insert({
+        work_request_id: workRequestId,
+        play_id: workRequest.play_id ?? decisionPackage.play_id,
+        play_version: workRequest.play_version ?? decisionPackage.play_version,
+        verb: parsed.verb,
+        actor_id: user.id,
+        field_edits: parsed.field_edits ?? null,
+        kill_reason: parsed.kill_reason ?? null,
+      })
+      .select('id, verb, created_at')
+      .single();
+
+    if (feedbackError) {
+      throw new ValidationError(feedbackError.message);
+    }
+
+    const nextStatus = parsed.verb === 'kill' ? 'killed' : parsed.verb === 'approve' ? 'approved' : 'awaiting_approval';
+    await supabase.from('automation_work_requests').update({ status: nextStatus }).eq('id', workRequestId);
+    if (parsed.verb === 'kill') {
+      await supabase
+        .from('floor_client_send_approvals')
+        .update({ status: 'killed' })
+        .eq('work_request_id', workRequestId)
+        .in('status', ['approved', 'held']);
+    }
+    await supabase.from('automation_work_request_events').insert({
+      work_request_id: workRequestId,
+      from_state: workRequest.status,
+      to_state: nextStatus,
+      actor_id: user.id,
+      reason: `feedback_${parsed.verb}`,
+    });
 
     return jsonResponse({
       ok: true,

@@ -1,5 +1,4 @@
-import type { FeedbackVerb, RiskLevel } from './spine/types';
-import type { FloorDecisionPackagePreview } from './types';
+import type { FeedbackVerb, FloorDecisionPackagePreview, RiskLevel } from './types.ts';
 
 export const FLOOR_OPAQUE_REF_PATTERN =
   /^(account|policy|document|work_item|work_request|package):[A-Za-z0-9][A-Za-z0-9:_-]{2,80}$/;

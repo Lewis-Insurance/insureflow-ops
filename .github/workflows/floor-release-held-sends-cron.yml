@@ -2,8 +2,12 @@ name: Floor Release Held Sends (Dev)
 
 on:
   schedule:
-    # Release held client sends after 30s undo window (every 2 minutes)
-    - cron: '*/2 * * * *'
+    # Release held client sends after the 30s undo window. GitHub Actions
+    # enforces a 5-minute minimum on scheduled workflows (finer intervals are
+    # silently coalesced), so */5 is the fastest honored cadence. A send can
+    # therefore sit held up to ~5 min past its hold_until; trigger the
+    # workflow_dispatch below (or a real scheduler) if faster release is needed.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 env:

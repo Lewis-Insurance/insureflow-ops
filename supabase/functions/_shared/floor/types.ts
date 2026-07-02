@@ -103,6 +103,26 @@ export interface DecisionPackage {
   created_at: string;
 }
 
+/** Slack/Telegram card preview — a view of DecisionPackage, not a second source of truth. */
+export interface FloorDecisionPackagePreview {
+  packageRef: string;
+  revision: number;
+  workRequestRef?: string;
+  workRequestId?: string;
+  playId?: string;
+  playVersion?: string;
+  title: string;
+  summary: string;
+  risk?: RiskLevel;
+  clientRef?: string;
+  documentRef?: DocumentRef | null;
+  fields?: DecisionField[];
+  diff?: CoverageDiff | null;
+  sendSpec?: SendSpec | null;
+  authorizedRepOfRecord?: string;
+  actions: Array<'approve' | 'edit' | 'kill'>;
+}
+
 export interface WorkRequest {
   id: string;
   agency_workspace_id: string;

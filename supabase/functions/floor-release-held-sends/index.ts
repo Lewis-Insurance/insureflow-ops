@@ -127,7 +127,7 @@ serve(async (req) => {
 
     const { data: heldRows, error: heldError } = await supabase
       .from('floor_client_send_approvals')
-      .select('*, automation_work_requests!inner(id, status, play_id, play_version)')
+      .select('*, automation_work_requests!inner(id, status, play_id, play_version, agency_workspace_id)')
       .eq('status', 'held')
       .lte('hold_until', nowIso)
       .neq('automation_work_requests.status', 'killed')
@@ -144,18 +144,20 @@ serve(async (req) => {
         status?: string;
         play_id?: string;
         play_version?: string;
+        agency_workspace_id?: string;
       } | null;
       return {
         approval: mapped,
         workRequestStatus: wr?.status ?? null,
         playId: wr?.play_id ?? 'unknown',
         playVersion: wr?.play_version ?? '0.0.0',
+        agencyWorkspaceId: wr?.agency_workspace_id ?? null,
       };
     });
 
     const results: Array<Record<string, unknown>> = [];
 
-    for (const { approval: seed, playId, playVersion } of approvals) {
+    for (const { approval: seed, playId, playVersion, agencyWorkspaceId } of approvals) {
       let current = seed;
       const deps: StageClientSendDeps = {
         now: () => new Date(),
@@ -244,6 +246,7 @@ serve(async (req) => {
             to_email: current.recipient,
             subject: surface === 'send-id-card-email' ? 'Floor ID card release' : 'Floor COI release',
             sent_by: current.approver_id,
+            agency_workspace_id: agencyWorkspaceId,
             resend_id: messageId ?? null,
             metadata: {
               work_request_id: workRequestId,
