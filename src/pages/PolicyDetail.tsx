@@ -207,7 +207,7 @@ export default function PolicyDetail() {
             {policy.account && (
               <Button
                 variant="outline"
-                onClick={() => navigate(`/coi-generator?accountId=${policy.account!.id}&policyId=${policyId}`)}
+                onClick={() => navigate(`/certificates?accountId=${policy.account!.id}&policyId=${policyId}`)}
               >
                 <Award className="h-4 w-4 mr-2" />
                 New Certificate
@@ -499,7 +499,7 @@ export default function PolicyDetail() {
                     <Button
                       variant="outline"
                       className="w-full justify-start"
-                      onClick={() => navigate(`/coi-generator?accountId=${policy.account!.id}&policyId=${policyId}`)}
+                      onClick={() => navigate(`/certificates?accountId=${policy.account!.id}&policyId=${policyId}`)}
                     >
                       <Award className="h-4 w-4 mr-2" />
                       Generate Certificate

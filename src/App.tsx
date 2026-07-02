@@ -56,7 +56,7 @@ const CustomerSuccessPage = lazyWithRetry(() => import("./pages/CustomerSuccessP
 const RetentionPage = lazyWithRetry(() => import("./pages/RetentionPage"));
 const FinancialPage = lazyWithRetry(() => import("./pages/FinancialPage"));
 const AIInsightsPage = lazyWithRetry(() => import("./pages/AIInsightsPage"));
-const COIGenerator = lazyWithRetry(() => import("./pages/COIGenerator"));
+const Certificates = lazyWithRetry(() => import("./pages/Certificates"));
 const AcordTemplates = lazyWithRetry(() => import("./pages/AcordTemplates"));
 const IntakeTemplates = lazyWithRetry(() => import("./pages/IntakeTemplates"));
 const IntakeBuilder = lazyWithRetry(() => import("./pages/IntakeBuilder"));
@@ -687,11 +687,13 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/coi-generator"
+                  path="/certificates"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <COIGenerator />
-                    </ErrorBoundary>
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <Certificates />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
