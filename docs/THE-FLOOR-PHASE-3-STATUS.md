@@ -5,9 +5,9 @@
 **Plan:** [`THE-FLOOR-PHASE-3-PLAN.md`](./THE-FLOOR-PHASE-3-PLAN.md)  
 **Prod track:** [`THE-FLOOR-PHASE-3-PROD-FIRST-LIGHT.md`](./THE-FLOOR-PHASE-3-PROD-FIRST-LIGHT.md)  
 **Dev branch:** `klnygbbmognbslgobmzc`  
-**Last updated:** 2026-07-02 (Slices 7–11)
+**Last updated:** 2026-07-02 (Slices 7–11 + Codex review close-out)
 
-**Status:** 🟢 **DEV CLOSE-OUT COMPLETE** (Slices 0–8 code); Slice 9 ops (Resend key) **ON HOLD — no client sends yet (Landen, 2026-07-02)**; Slice 11 prod gated.
+**Status:** 🟢 **DEV CLOSE-OUT COMPLETE** (Slices 0–8 code) and Codex review fixes are live on dev + committed to `main` (`efae3a5`); Slice 9 ops (Resend key) **ON HOLD — no client sends yet (Landen, 2026-07-02)**; Slice 11 prod gated.
 
 ---
 
@@ -20,7 +20,7 @@
 - [x] Zero wrong-recipient sends (G4 recipient guard + account match)
 - [x] G4 signed; Play 4 allowlist flipped to client (dev)
 - [x] Extended `feedback_events` verbs (approve/edit/kill + release/send/card_created)
-- [x] Release sweeper cron (GitHub Action every 2 min)
+- [x] Release sweeper cron (GitHub Action every 5 min)
 - [ ] Resend delivery green on dev (Slice 9 ops — copy prod `RESEND_API_KEY`) — **HELD: do not restore the key until Landen gives the go; not looking to send to a customer yet (2026-07-02)**
 - [ ] Prod First Light (Slice 11 — G1 + prod G4)
 
@@ -45,6 +45,24 @@
 
 ---
 
+## Codex review close-out (live on dev, 2026-07-02)
+
+Commit `efae3a5` closed the PR #26 review fixes in source, and the dev branch was then updated through the Supabase MCP/deploy path. Post-deploy proof was re-confirmed after redeploys:
+
+| Fix | Live proof |
+|---|---|
+| Floor edge imports resolve | `floor-action` v25 deployed; content check confirms `./types.ts` plus `FloorDecisionPackagePreview` |
+| Slack approve stages a held send | `floor_apply_feedback` on dev re-verified with `faf_staging_live: true` |
+| CRM path stages before transition + rolls back on failure | `floor-action` v25 content check confirms staging-before-transition and rollback guard |
+| `email_log` workspace-scoped RLS + sweeper workspace population | Dev migration verified with `email_log_scoped_policy_live: true`; `floor-release-held-sends` v13 content check confirms `agency_workspace_id: agencyWorkspaceId` |
+| Release sweeper cadence | GitHub Action on `main` uses `*/5` |
+
+Deployment notes: `floor-action` advanced from 24 to 25 and `floor-release-held-sends` advanced from 12 to 13 on dev. `verify_jwt: true` remains preserved on both. Only the changed files were swapped; unchanged function files were passed back byte-identical. Review items 2 and 7 were false positives and intentionally left unchanged.
+
+Remaining deliberate/optional items: Slice 9 client-send HOLD stays until Landen gives the go; prod `email_log` coupling only matters if those senders promote; low-priority NULL-workspace `email_log` rows from the two direct senders can be cleaned separately.
+
+---
+
 ## Slice 7 — kill-during-hold (2026-07-02)
 
 | Item | Status |
@@ -52,7 +70,7 @@
 | Kill verb → `floor_client_send_approvals.status = killed` | ✅ `floor-action` + `floor_apply_feedback` migration |
 | `releaseHeldClientSend` skips `killed` | ✅ |
 | Sweeper excludes killed work requests | ✅ join filter + `assertWorkRequestNotKilled` |
-| GitHub Action `floor-release-held-sends-cron.yml` | ✅ every 2 min |
+| GitHub Action `floor-release-held-sends-cron.yml` | ✅ every 5 min |
 | Stuck hold alarm (`hold_until + 10m`) | ✅ in sweeper response |
 | Soak | `scripts/phase3-slice7-kill-hold-soak.sh` |
 
@@ -80,7 +98,7 @@ Part C kill: floor_client_send_approvals.status=killed ✅
 Part D sweeper: provider_send_blocked=yes ✅
 ```
 
-**HELD (Landen, 2026-07-02): do not run this step.** With the release sweeper on a 2-minute cron, a real key plus one Approve delivers to a real client automatically after the hold. The placeholder key IS the current no-client-contact guarantee. When Landen gives the go: copy prod `RESEND_API_KEY` to dev → re-run `scripts/phase3-g4-soak.sh` Part A.  
+**HELD (Landen, 2026-07-02): do not run this step.** With the release sweeper on a 5-minute cron, a real key plus one Approve delivers to a real client automatically after the hold. The placeholder key IS the current no-client-contact guarantee. When Landen gives the go: copy prod `RESEND_API_KEY` to dev → re-run `scripts/phase3-g4-soak.sh` Part A.
 Guide: [`scripts/phase3-restore-resend-key.md`](../scripts/phase3-restore-resend-key.md)
 
 ---
