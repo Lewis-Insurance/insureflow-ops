@@ -44,6 +44,9 @@ import {
   runCoverageGapRoundoutPlay,
   runOpenItemNudgePlay,
   detectNonpayCancelCandidates,
+  intakeToPackageLatencyMs,
+  isKillableSendApprovalStatus,
+  meetsFloorIntakeSla,
   planCoverageGapRoundoutCards,
   planOpenItemNudgeCards,
   planNonpayCancelWatchCards,
@@ -1153,5 +1156,45 @@ describe('Floor plays — Tier-3 ID card issue', () => {
 
     expect(result).toEqual({ status: 'sent', messageId: 'msg-id-card-1' });
     expect(send).toHaveBeenCalledWith('send-id-card-email', expect.objectContaining(goldenSendIdCardEmailPayload));
+  });
+
+  it('releaseHeldClientSend skips killed approval without invoking provider', async () => {
+    const approval: FloorClientSendApproval = {
+      id: 'appr-killed',
+      work_request_id: 'wr-killed',
+      approver_id: 'user-1',
+      status: 'killed',
+      hold_until: '2026-06-30T11:59:00Z',
+      recipient: goldenSendIdCardEmailPayload.to,
+      recipient_basis: 'account_of_record',
+      send_payload: wrapPayloadWithSurface('send-id-card-email', goldenSendIdCardEmailPayload),
+      created_at: new Date().toISOString(),
+    };
+
+    const send = vi.fn();
+    const result = await releaseHeldClientSend('appr-killed', {
+      now: () => new Date('2026-06-30T12:00:00Z'),
+      readApproval: async () => approval,
+      assertRecipientOnFile: async () => {},
+      assertPolicyInForce: async () => {},
+      assertExternalRecipientAllowed: async () => {},
+      updateApproval: async (_id, patch) => ({ ...approval, ...patch }),
+      invokeTier3EmailSend: send,
+      logEmail: async () => {},
+    });
+
+    expect(result).toEqual({ status: 'skipped_killed' });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('isKillableSendApprovalStatus covers approved and held only', () => {
+    expect(isKillableSendApprovalStatus('held')).toBe(true);
+    expect(isKillableSendApprovalStatus('approved')).toBe(true);
+    expect(isKillableSendApprovalStatus('sent')).toBe(false);
+  });
+
+  it('meetsFloorIntakeSla enforces 5s package build target', () => {
+    expect(meetsFloorIntakeSla(intakeToPackageLatencyMs('2026-07-01T12:00:00.000Z', '2026-07-01T12:00:04.500Z'))).toBe(true);
+    expect(meetsFloorIntakeSla(intakeToPackageLatencyMs('2026-07-01T12:00:00.000Z', '2026-07-01T12:00:06.000Z'))).toBe(false);
   });
 });

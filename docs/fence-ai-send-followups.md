@@ -9,20 +9,17 @@ Source: orchestrated five-unit review of `docs/fence-ai-send-verification-handof
 - **CONFIRM** — decision/clarification.
 - **SEC / ENV** — security or tooling items found during review.
 
-**Deploy posture:** the four-function fence is safe to deploy on Brian's go; none of these block it. `canopy-servicing` (FU-1) must be closed or formally accepted before the client-send surface is represented as "fully fenced."
+**Deploy posture:** the four-function fence is safe to deploy on Brian's go. **FU-1 closed 2026-07-02** — `canopy-servicing` email delivery gated via `clientSendApprovalGate` (`surface: canopy-servicing-email`). Prod deploy of fenced functions remains G1-gated.
 
 ---
 
 ## CLOSE-THE-GAP
 
-### FU-1 — Gate or formally accept `canopy-servicing` carrier-mediated client send · status: OPEN
+### FU-1 — Gate or formally accept `canopy-servicing` carrier-mediated client send · status: **CLOSED** (2026-07-02)
 
-- **Finding:** `request_id_card` / `request_declarations` POST `{ delivery_method: 'email', email }` to the Canopy servicing API, causing the carrier to email documents to a client — with no `client_send_approval`.
-- **Evidence:** `supabase/functions/canopy-servicing/index.ts:384` (payload), `:250` (Canopy POST).
-- **Task 0 (decides fix vs. accept):** confirm whether any AI/automation surface can invoke `canopy-servicing`, or only a human-initiated UI action.
-- **Option A — fix:** mint + consume a `client_send_approval` (canonical content = action_type + policy id + delivery email) before the Canopy POST, consistent with the other four functions; add reject/accept-once/replay tests.
-- **Option B — accept:** commit a dated, logged carrier-mediated exception in `docs/fence-ai-send-inventory.md`, with the Task-0 reachability finding as rationale.
-- **Acceptance:** inventory updated; either a gate + tests merged, or an exception rationale committed. **Blocks any "client-send fully fenced" representation.**
+- **Resolution (Option A):** `clientSendApprovalGateResponse` before Canopy email delivery for `request_id_card` / `request_declarations`.
+- **Evidence:** `supabase/functions/canopy-servicing/index.ts` (~L230–268); G4 sign-off [`THE-FLOOR-PHASE-3-G4-SIGNOFF.md`](./THE-FLOOR-PHASE-3-G4-SIGNOFF.md).
+- **Remaining:** deploy fenced `canopy-servicing` to **prod** with G1 migrations.
 
 ### FU-2 — Redact (or flag-gate) `hermes-chat` + `prism-api` model proxies · status: OPEN · ELEVATED (cockpit prerequisite)
 

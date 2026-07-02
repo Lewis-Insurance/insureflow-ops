@@ -1,3 +1,4 @@
+import { shouldSkipReleaseForApprovalStatus } from './cancelHeldSendOnKill.ts';
 import { CLIENT_SEND_UNDO_HOLD_SECONDS } from './constants.ts';
 import {
   mintFloorFenceApprovalForSurface,
@@ -34,6 +35,7 @@ export interface StageClientSendDeps {
     policyNumber: string,
   ) => Promise<void> | void;
   assertExternalRecipientAllowed: (recipient: string, workRequestId: string) => Promise<void> | void;
+  assertWorkRequestNotKilled?: (workRequestId: string) => Promise<void> | void;
   updateApproval: (
     approvalId: string,
     patch: Partial<FloorClientSendApproval>,
@@ -61,7 +63,7 @@ export interface StageClientSendArgs {
 }
 
 export type StageClientSendResult = {
-  status: 'held' | 'sent' | 'delivered' | 'failed_delivery';
+  status: 'held' | 'sent' | 'delivered' | 'failed_delivery' | 'skipped_killed';
   messageId?: string;
 };
 
@@ -186,8 +188,17 @@ export async function releaseHeldClientSend(
   deps: StageClientSendDeps,
 ): Promise<StageClientSendResult> {
   const approval = await deps.readApproval(approvalId);
-  if (!approval || approval.status !== 'held') {
+  if (!approval) {
+    throw new FloorAuthorizationError('Floor: approval not found');
+  }
+  if (shouldSkipReleaseForApprovalStatus(approval.status)) {
+    return { status: 'skipped_killed' };
+  }
+  if (approval.status !== 'held') {
     throw new FloorAuthorizationError('Floor: approval not in held state');
+  }
+  if (deps.assertWorkRequestNotKilled) {
+    await deps.assertWorkRequestNotKilled(approval.work_request_id);
   }
   if (approval.hold_until && new Date(approval.hold_until) > deps.now()) {
     return { status: 'held' };

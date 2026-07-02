@@ -261,6 +261,8 @@ async function createFloorWorkRequest(params: {
     };
   }
 
+  const intakeAt = new Date().toISOString();
+
   const { data: workRequest, error: workRequestError } = await sb
     .from('automation_work_requests')
     .insert({
@@ -274,6 +276,7 @@ async function createFloorWorkRequest(params: {
       resolution_confidence: params.resolveResult.top?.confidence ?? null,
       status: params.workRequestStatus,
       idempotency_key: idempotencyKey,
+      intake_at: intakeAt,
       request_body: requestBody,
     })
     .select('id')
@@ -340,9 +343,14 @@ async function createFloorWorkRequest(params: {
     if (packageError) throw packageError;
 
     decisionPackageId = decisionPackage.id;
+    const packageAt = new Date().toISOString();
     await sb
       .from('automation_work_requests')
-      .update({ decision_package_id: decisionPackageId, status: 'awaiting_approval' })
+      .update({
+        decision_package_id: decisionPackageId,
+        status: 'awaiting_approval',
+        first_package_at: packageAt,
+      })
       .eq('id', workRequest.id);
 
     await sb.from('automation_work_request_events').insert({

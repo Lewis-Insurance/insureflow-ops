@@ -349,8 +349,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.info(`COI email sent successfully: ${result.id}`);
 
-    // Log email send to database for audit trail
-    await supabase
+    const { error: emailLogError } = await supabase
       .from('email_log')
       .insert({
         type: 'coi',
@@ -360,10 +359,18 @@ const handler = async (req: Request): Promise<Response> => {
         sent_by: user.id,
         resend_id: result.id,
         metadata: { certificateNumber, holderName },
-      })
-      .then(({ error }) => {
-        if (error) console.error('Failed to log email:', error);
       });
+
+    if (emailLogError) {
+      console.error('Failed to log email:', emailLogError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'email_log_insert_failed' }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
+    }
 
     return new Response(
       JSON.stringify({

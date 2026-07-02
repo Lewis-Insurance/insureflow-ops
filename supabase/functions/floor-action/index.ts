@@ -166,6 +166,8 @@ serve(async (req) => {
         };
       }
 
+      const intakeAt = new Date().toISOString();
+
       const { data: workRequest, error: workRequestError } = await supabase
         .from('automation_work_requests')
         .insert({
@@ -178,6 +180,7 @@ serve(async (req) => {
           owner_id: ownerId,
           status: 'awaiting_approval',
           idempotency_key: parsed.idempotency_key,
+          intake_at: intakeAt,
           request_body: {
             clientRef: parsed.clientRef,
             policyRef: parsed.policyRef ?? null,
@@ -249,10 +252,23 @@ serve(async (req) => {
         throw new ValidationError(packageError.message);
       }
 
+      const packageAt = new Date().toISOString();
       await supabase
         .from('automation_work_requests')
-        .update({ decision_package_id: decisionPackage.id, status: 'awaiting_approval' })
+        .update({
+          decision_package_id: decisionPackage.id,
+          status: 'awaiting_approval',
+          first_package_at: packageAt,
+        })
         .eq('id', workRequest.id);
+
+      await supabase.from('feedback_events').insert({
+        work_request_id: workRequest.id,
+        play_id: decisionPackage.play_id,
+        play_version: decisionPackage.play_version,
+        verb: 'card_created',
+        actor_id: user.id,
+      });
 
       await supabase.from('automation_work_request_events').insert({
         work_request_id: workRequest.id,
@@ -262,10 +278,14 @@ serve(async (req) => {
         reason: requestPhase === 3 ? 'phase3_id_card_package_created' : 'phase0_internal_package_created',
       });
 
+      const intakeLatencyMs = Date.parse(packageAt) - Date.parse(intakeAt);
+
       return jsonResponse({
         ok: true,
         workRequestRef: `work_request:${workRequest.id.replace(/-/g, '')}`,
         packageRef: `package:${decisionPackage.id.replace(/-/g, '')}`,
+        intake_latency_ms: intakeLatencyMs,
+        intake_sla_met: intakeLatencyMs >= 0 && intakeLatencyMs <= 5000,
         preview: buildPackagePreview({
           packageId: decisionPackage.id,
           workRequestId: decisionPackage.work_request_id,
@@ -338,6 +358,13 @@ serve(async (req) => {
 
     const nextStatus = parsed.verb === 'kill' ? 'killed' : parsed.verb === 'approve' ? 'approved' : 'awaiting_approval';
     await supabase.from('automation_work_requests').update({ status: nextStatus }).eq('id', workRequestId);
+    if (parsed.verb === 'kill') {
+      await supabase
+        .from('floor_client_send_approvals')
+        .update({ status: 'killed' })
+        .eq('work_request_id', workRequestId)
+        .in('status', ['approved', 'held']);
+    }
     await supabase.from('automation_work_request_events').insert({
       work_request_id: workRequestId,
       from_state: workRequest.status,
