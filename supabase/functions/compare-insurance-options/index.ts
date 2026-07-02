@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -176,7 +177,7 @@ Provide a comprehensive comparison including:
 
 Return your analysis as a structured JSON object.`;
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,

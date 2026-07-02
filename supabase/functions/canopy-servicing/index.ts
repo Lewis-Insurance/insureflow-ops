@@ -7,6 +7,11 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyAuth } from "../_shared/auth.ts";
+import {
+  clientSendApprovalGateResponse,
+  createSupabaseClientSendApprovalStore,
+} from "../_shared/clientSendApprovalGate.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { ValidationError, createErrorResponse, getCorsHeaders, handleCors } from "../_shared/error-handler.ts";
 
@@ -109,7 +114,8 @@ serve(async (req) => {
           canopyClientSecret,
           canopyTeamId,
           body,
-          corsHeaders
+          corsHeaders,
+          req,
         );
 
       case 'status':
@@ -172,7 +178,8 @@ async function submitServicingAction(
   clientSecret: string,
   teamId: string,
   request: ServicingRequest,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  req: Request,
 ) {
   // Get the pull record
   let pull;
@@ -219,6 +226,47 @@ async function submitServicingAction(
     actionType: request.action_type,
     policyId
   });
+
+  const deliveryMethod = String(request.action_data?.delivery_method ?? 'email');
+  const deliveryEmail = typeof request.action_data?.email === 'string'
+    ? request.action_data.email.trim()
+    : '';
+  const emailDeliveryAction =
+    request.action_type === 'request_id_card' || request.action_type === 'request_declarations';
+
+  if (emailDeliveryAction && deliveryMethod === 'email' && deliveryEmail) {
+    const { user, error: authError } = await verifyAuth(req, supabase);
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'authentication_required',
+          message: 'JWT authentication is required for email servicing requests.',
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const canonicalPayload = {
+      action_type: request.action_type,
+      policy_id: policyId ?? null,
+      email: deliveryEmail,
+      delivery_method: deliveryMethod,
+      client_send_approval: request.action_data?.client_send_approval,
+    };
+
+    const gateResponse = await clientSendApprovalGateResponse({
+      surface: 'canopy-servicing-email',
+      payload: canonicalPayload,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
+
+    if (gateResponse) {
+      return gateResponse;
+    }
+  }
 
   // Create servicing action record
   const { data: actionRecord, error: insertError } = await supabase

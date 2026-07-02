@@ -1,5 +1,9 @@
 # InsureFlow Ops - Complete Context Documentation
 
+> **ORCHESTRATOR MODE (every session):** Read [`ORCHESTRATOR.md`](./ORCHESTRATOR.md) first. You are the orchestrator — you do not do the work, you direct it. Decompose → delegate to subagents → gather input before decisions → review to world-class standard → integrate. Hard rules: no unreviewed work, no "good enough," no dangling threads. See also [`AGENTS.md`](./AGENTS.md) and [`.cursor/rules/orchestrator.mdc`](./.cursor/rules/orchestrator.mdc).
+
+---
+
 ## Project Overview
 
 **Project Name:** InsureFlow Ops

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -394,6 +394,7 @@ export type Database = {
           import_batch_id: string | null
           lead_source_detail: string | null
           merged_at: string | null
+          merged_by: string | null
           merged_into_id: string | null
           name: string
           name_display: string | null
@@ -441,6 +442,7 @@ export type Database = {
           import_batch_id?: string | null
           lead_source_detail?: string | null
           merged_at?: string | null
+          merged_by?: string | null
           merged_into_id?: string | null
           name: string
           name_display?: string | null
@@ -488,6 +490,7 @@ export type Database = {
           import_batch_id?: string | null
           lead_source_detail?: string | null
           merged_at?: string | null
+          merged_by?: string | null
           merged_into_id?: string | null
           name?: string
           name_display?: string | null
@@ -2206,6 +2209,13 @@ export type Database = {
             foreignKeyName: "ai_module_executions_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "ai_module_executions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -3546,6 +3556,150 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "automation_workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_work_request_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_state: string | null
+          id: number
+          reason: string | null
+          to_state: string
+          work_request_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_state?: string | null
+          id?: number
+          reason?: string | null
+          to_state: string
+          work_request_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_state?: string | null
+          id?: number
+          reason?: string | null
+          to_state?: string
+          work_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_work_request_events_work_request_id_fkey"
+            columns: ["work_request_id"]
+            isOneToOne: false
+            referencedRelation: "automation_work_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_work_requests: {
+        Row: {
+          action: string
+          agency_workspace_id: string
+          automation_request_id: string | null
+          client_ref: string | null
+          created_at: string
+          decision_package_id: string | null
+          id: string
+          idempotency_key: string
+          owner_id: string | null
+          play_id: string | null
+          play_version: string | null
+          request_body: Json
+          resolution_confidence: number | null
+          sender_identity: string | null
+          source: string
+          source_event_id: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          agency_workspace_id: string
+          automation_request_id?: string | null
+          client_ref?: string | null
+          created_at?: string
+          decision_package_id?: string | null
+          id?: string
+          idempotency_key: string
+          owner_id?: string | null
+          play_id?: string | null
+          play_version?: string | null
+          request_body?: Json
+          resolution_confidence?: number | null
+          sender_identity?: string | null
+          source: string
+          source_event_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          agency_workspace_id?: string
+          automation_request_id?: string | null
+          client_ref?: string | null
+          created_at?: string
+          decision_package_id?: string | null
+          id?: string
+          idempotency_key?: string
+          owner_id?: string | null
+          play_id?: string | null
+          play_version?: string | null
+          request_body?: Json
+          resolution_confidence?: number | null
+          sender_identity?: string | null
+          source?: string
+          source_event_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_work_requests_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_work_requests_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_agency_reputation_summary"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "automation_work_requests_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_agencies"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "automation_work_requests_automation_request_id_fkey"
+            columns: ["automation_request_id"]
+            isOneToOne: false
+            referencedRelation: "automation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_work_requests_client_ref_fkey"
+            columns: ["client_ref"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_work_requests_decision_package_fk"
+            columns: ["decision_package_id"]
+            isOneToOne: false
+            referencedRelation: "decision_packages"
             referencedColumns: ["id"]
           },
         ]
@@ -7565,6 +7719,109 @@ export type Database = {
         }
         Relationships: []
       }
+      carrier_approval_gates: {
+        Row: {
+          account_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          assigned_to: string | null
+          audit_trail: Json
+          created_at: string
+          denial_reason: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          requested_by: string | null
+          risk_flags: Json
+          status: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to?: string | null
+          audit_trail?: Json
+          created_at?: string
+          denial_reason?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          requested_by?: string | null
+          risk_flags?: Json
+          status?: string
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to?: string | null
+          audit_trail?: Json
+          created_at?: string
+          denial_reason?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          requested_by?: string | null
+          risk_flags?: Json
+          status?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_approval_gates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carrier_audit_events: {
+        Row: {
+          account_id: string | null
+          actor: string | null
+          created_at: string
+          detail: Json
+          entity_id: string | null
+          entity_type: string | null
+          event_type: string
+          id: string
+        }
+        Insert: {
+          account_id?: string | null
+          actor?: string | null
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type: string
+          id?: string
+        }
+        Update: {
+          account_id?: string | null
+          actor?: string | null
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_audit_events_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       carrier_document_templates: {
         Row: {
           anchor_labels: Json | null
@@ -8312,6 +8569,13 @@ export type Database = {
             foreignKeyName: "certificates_of_insurance_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "certificates_of_insurance_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -8395,6 +8659,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "claims_policy_id_fkey"
@@ -8784,6 +9055,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      client_send_approvals: {
+        Row: {
+          approval_ref: string
+          approved_by_email: string | null
+          approved_by_user_id: string
+          consumed_at: string | null
+          content_hash: string
+          created_at: string
+          expires_at: string
+          id: number
+          surface: string
+        }
+        Insert: {
+          approval_ref: string
+          approved_by_email?: string | null
+          approved_by_user_id: string
+          consumed_at?: string | null
+          content_hash: string
+          created_at?: string
+          expires_at?: string
+          id?: number
+          surface: string
+        }
+        Update: {
+          approval_ref?: string
+          approved_by_email?: string | null
+          approved_by_user_id?: string
+          consumed_at?: string | null
+          content_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: number
+          surface?: string
+        }
+        Relationships: []
       }
       coi_audit_log: {
         Row: {
@@ -9651,6 +9958,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_crime_details_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: true
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "commercial_crime_details_policy_id_fkey"
@@ -11275,6 +11589,13 @@ export type Database = {
             foreignKeyName: "workspaces_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "workspaces_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -11884,6 +12205,167 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      coterie_quote_sessions: {
+        Row: {
+          account_id: string
+          agency_workspace_id: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          idempotency_key: string | null
+          intake_json: Json
+          normalized_request: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          agency_workspace_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          intake_json: Json
+          normalized_request?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          agency_workspace_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          intake_json?: Json
+          normalized_request?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coterie_quote_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coterie_quote_sessions_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coterie_quote_sessions_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_agency_reputation_summary"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "coterie_quote_sessions_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_agencies"
+            referencedColumns: ["agency_workspace_id"]
+          },
+        ]
+      }
+      coterie_quotes: {
+        Row: {
+          account_id: string
+          carrier: string
+          created_at: string
+          decision: string
+          deleted_at: string | null
+          external_id: string | null
+          id: string
+          line_quotes: Json
+          monthly_premium: number | null
+          premium: number | null
+          proposal_url: string | null
+          raw_response: Json | null
+          session_id: string
+        }
+        Insert: {
+          account_id: string
+          carrier?: string
+          created_at?: string
+          decision?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          line_quotes?: Json
+          monthly_premium?: number | null
+          premium?: number | null
+          proposal_url?: string | null
+          raw_response?: Json | null
+          session_id: string
+        }
+        Update: {
+          account_id?: string
+          carrier?: string
+          created_at?: string
+          decision?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          line_quotes?: Json
+          monthly_premium?: number | null
+          premium?: number | null
+          proposal_url?: string | null
+          raw_response?: Json | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coterie_quotes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coterie_quotes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "coterie_quote_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coterie_webhook_log: {
+        Row: {
+          auth_valid: boolean | null
+          created_at: string
+          event_type: string | null
+          headers: Json | null
+          id: string
+          payload: Json | null
+        }
+        Insert: {
+          auth_valid?: boolean | null
+          created_at?: string
+          event_type?: string | null
+          headers?: Json | null
+          id?: string
+          payload?: Json | null
+        }
+        Update: {
+          auth_valid?: boolean | null
+          created_at?: string
+          event_type?: string | null
+          headers?: Json | null
+          id?: string
+          payload?: Json | null
+        }
+        Relationships: []
       }
       coverage_gap_analysis: {
         Row: {
@@ -13467,6 +13949,13 @@ export type Database = {
             foreignKeyName: "cyber_liability_details_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: true
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "cyber_liability_details_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: true
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -13731,6 +14220,69 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      decision_packages: {
+        Row: {
+          client_ref: string
+          created_at: string
+          diff: Json | null
+          document_ref: Json | null
+          fields: Json
+          headline: string
+          id: string
+          play_id: string
+          play_version: string
+          risk: string
+          send_spec: Json
+          summary: string
+          work_request_id: string
+        }
+        Insert: {
+          client_ref: string
+          created_at?: string
+          diff?: Json | null
+          document_ref?: Json | null
+          fields?: Json
+          headline: string
+          id?: string
+          play_id: string
+          play_version: string
+          risk: string
+          send_spec: Json
+          summary: string
+          work_request_id: string
+        }
+        Update: {
+          client_ref?: string
+          created_at?: string
+          diff?: Json | null
+          document_ref?: Json | null
+          fields?: Json
+          headline?: string
+          id?: string
+          play_id?: string
+          play_version?: string
+          risk?: string
+          send_spec?: Json
+          summary?: string
+          work_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_packages_client_ref_fkey"
+            columns: ["client_ref"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_packages_work_request_id_fkey"
+            columns: ["work_request_id"]
+            isOneToOne: false
+            referencedRelation: "automation_work_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deletion_audit_log: {
         Row: {
@@ -14089,6 +14641,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_analyses_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "document_analyses_policy_id_fkey"
@@ -15247,6 +15806,13 @@ export type Database = {
             foreignKeyName: "documents_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -15292,6 +15858,10 @@ export type Database = {
           flagged_by: string
           id: string
           reason: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
         }
         Insert: {
           account_id: string
@@ -15299,6 +15869,10 @@ export type Database = {
           flagged_by: string
           id?: string
           reason?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
         }
         Update: {
           account_id?: string
@@ -15306,6 +15880,10 @@ export type Database = {
           flagged_by?: string
           id?: string
           reason?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
         }
         Relationships: [
           {
@@ -15364,6 +15942,57 @@ export type Database = {
             columns: ["rule_id"]
             isOneToOne: false
             referencedRelation: "duplicate_detection_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duplicate_pair_reviews: {
+        Row: {
+          created_at: string
+          customer_a_id: string
+          customer_b_id: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_a_id: string
+          customer_b_id: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_a_id?: string
+          customer_b_id?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_pair_reviews_customer_a_id_fkey"
+            columns: ["customer_a_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_pair_reviews_customer_b_id_fkey"
+            columns: ["customer_b_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -16853,6 +17482,50 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_events: {
+        Row: {
+          actor_id: string
+          created_at: string
+          field_edits: Json | null
+          id: string
+          kill_reason: string | null
+          play_id: string
+          play_version: string
+          verb: string
+          work_request_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          field_edits?: Json | null
+          id?: string
+          kill_reason?: string | null
+          play_id: string
+          play_version: string
+          verb: string
+          work_request_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          field_edits?: Json | null
+          id?: string
+          kill_reason?: string | null
+          play_id?: string
+          play_version?: string
+          verb?: string
+          work_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_events_work_request_id_fkey"
+            columns: ["work_request_id"]
+            isOneToOne: false
+            referencedRelation: "automation_work_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_candidates: {
         Row: {
           acord_field_name: string
@@ -17020,6 +17693,53 @@ export type Database = {
             columns: ["superseded_by"]
             isOneToOne: false
             referencedRelation: "field_output_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      floor_client_send_approvals: {
+        Row: {
+          approver_id: string
+          created_at: string
+          hold_until: string | null
+          id: string
+          message_id: string | null
+          recipient: string
+          recipient_basis: string
+          send_payload: Json
+          status: string
+          work_request_id: string
+        }
+        Insert: {
+          approver_id: string
+          created_at?: string
+          hold_until?: string | null
+          id?: string
+          message_id?: string | null
+          recipient: string
+          recipient_basis: string
+          send_payload?: Json
+          status?: string
+          work_request_id: string
+        }
+        Update: {
+          approver_id?: string
+          created_at?: string
+          hold_until?: string | null
+          id?: string
+          message_id?: string | null
+          recipient?: string
+          recipient_basis?: string
+          send_payload?: Json
+          status?: string
+          work_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_client_send_approvals_work_request_id_fkey"
+            columns: ["work_request_id"]
+            isOneToOne: true
+            referencedRelation: "automation_work_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -18453,6 +19173,13 @@ export type Database = {
             foreignKeyName: "inland_marine_details_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: true
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "inland_marine_details_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: true
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -19197,6 +19924,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "invoices_policy_id_fkey"
@@ -22846,6 +23580,13 @@ export type Database = {
             foreignKeyName: "marketing_automation_enrollments_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "marketing_automation_enrollments_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -24286,6 +25027,13 @@ export type Database = {
             foreignKeyName: "marketing_survey_sends_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "marketing_survey_sends_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -24641,6 +25389,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "notes_policy_id_fkey"
@@ -26800,6 +27555,13 @@ export type Database = {
             foreignKeyName: "policy_bap_coverages_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_bap_coverages_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -26876,6 +27638,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_bap_drivers_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_bap_drivers_policy_id_fkey"
@@ -26962,6 +27731,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_bap_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_bap_evidence_catalog_policy_id_fkey"
@@ -27083,6 +27859,13 @@ export type Database = {
             foreignKeyName: "policy_bap_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_bap_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27156,6 +27939,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_bap_interests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_bap_interests_policy_id_fkey"
@@ -27269,6 +28059,13 @@ export type Database = {
             foreignKeyName: "policy_bap_vehicles_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_bap_vehicles_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27365,6 +28162,13 @@ export type Database = {
             foreignKeyName: "policy_cgl_additional_insureds_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_additional_insureds_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27435,6 +28239,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_additional_interests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_cgl_additional_interests_policy_id_fkey"
@@ -27521,6 +28332,13 @@ export type Database = {
             foreignKeyName: "policy_cgl_classifications_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_classifications_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27585,6 +28403,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_endorsements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_cgl_endorsements_policy_id_fkey"
@@ -27677,6 +28502,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_cgl_evidence_catalog_policy_id_fkey"
@@ -27810,6 +28642,13 @@ export type Database = {
             foreignKeyName: "policy_cgl_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27900,6 +28739,13 @@ export type Database = {
             foreignKeyName: "policy_cgl_locations_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_cgl_locations_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -27967,6 +28813,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_data_provenance_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_data_provenance_policy_id_fkey"
@@ -28180,6 +29033,13 @@ export type Database = {
             foreignKeyName: "policy_eo_details_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: true
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_eo_details_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: true
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -28250,6 +29110,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_eo_endorsements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_eo_endorsements_policy_id_fkey"
@@ -28344,6 +29211,13 @@ export type Database = {
             foreignKeyName: "policy_eo_evidence_catalog_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_eo_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -28408,6 +29282,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_eo_exclusions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_eo_exclusions_policy_id_fkey"
@@ -28526,6 +29407,13 @@ export type Database = {
             foreignKeyName: "policy_eo_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_eo_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -28590,6 +29478,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_eo_prior_acts_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_eo_prior_acts_policy_id_fkey"
@@ -28686,6 +29581,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_building_coverages_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_building_coverages_policy_id_fkey"
@@ -28814,6 +29716,13 @@ export type Database = {
             foreignKeyName: "policy_property_buildings_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_property_buildings_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -28881,6 +29790,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_deductibles_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_deductibles_policy_id_fkey"
@@ -28959,6 +29875,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_endorsements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_endorsements_policy_id_fkey"
@@ -29051,6 +29974,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_evidence_catalog_policy_id_fkey"
@@ -29184,6 +30114,13 @@ export type Database = {
             foreignKeyName: "policy_property_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_property_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -29257,6 +30194,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_interests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_interests_policy_id_fkey"
@@ -29344,6 +30288,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_property_locations_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_property_locations_policy_id_fkey"
@@ -29656,6 +30607,13 @@ export type Database = {
             foreignKeyName: "policy_umbrella_additional_insureds_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_additional_insureds_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -29729,6 +30687,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_endorsements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_umbrella_endorsements_policy_id_fkey"
@@ -29821,6 +30786,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_umbrella_evidence_catalog_policy_id_fkey"
@@ -29954,6 +30926,13 @@ export type Database = {
             foreignKeyName: "policy_umbrella_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -30021,6 +31000,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_requirements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: true
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_umbrella_requirements_policy_id_fkey"
@@ -30134,6 +31120,13 @@ export type Database = {
             foreignKeyName: "policy_umbrella_underlying_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_umbrella_underlying_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -30207,6 +31200,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_wc_classifications_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_wc_classifications_policy_id_fkey"
@@ -30301,6 +31301,13 @@ export type Database = {
             foreignKeyName: "policy_wc_evidence_catalog_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_wc_evidence_catalog_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -30362,6 +31369,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_wc_experience_mods_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_wc_experience_mods_policy_id_fkey"
@@ -30492,6 +31506,13 @@ export type Database = {
             foreignKeyName: "policy_wc_extraction_jobs_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_wc_extraction_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -30564,6 +31585,13 @@ export type Database = {
             foreignKeyName: "policy_wc_officers_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "policy_wc_officers_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -30619,6 +31647,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_wc_states_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "policy_wc_states_policy_id_fkey"
@@ -30906,6 +31941,13 @@ export type Database = {
             foreignKeyName: "portal_coverage_opportunities_converted_policy_id_fkey"
             columns: ["converted_policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "portal_coverage_opportunities_converted_policy_id_fkey"
+            columns: ["converted_policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -31066,6 +32108,13 @@ export type Database = {
             foreignKeyName: "portal_document_uploads_declared_policy_id_fkey"
             columns: ["declared_policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "portal_document_uploads_declared_policy_id_fkey"
+            columns: ["declared_policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -31089,6 +32138,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_document_uploads_target_policy_id_fkey"
+            columns: ["target_policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "portal_document_uploads_target_policy_id_fkey"
@@ -31215,6 +32271,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "portal_documents_policy_id_fkey"
@@ -31471,6 +32534,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_id_cards_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "portal_id_cards_policy_id_fkey"
@@ -31788,6 +32858,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_quote_requests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "portal_quote_requests_policy_id_fkey"
@@ -32188,6 +33265,13 @@ export type Database = {
             foreignKeyName: "portal_service_requests_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "portal_service_requests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -32431,6 +33515,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "premium_payments_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "premium_payments_policy_id_fkey"
@@ -34808,6 +35899,13 @@ export type Database = {
             foreignKeyName: "renewals_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "renewals_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -36322,6 +37420,13 @@ export type Database = {
             foreignKeyName: "service_tickets_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "service_tickets_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -37560,6 +38665,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "tasks_policy_id_fkey"
@@ -39128,6 +40240,13 @@ export type Database = {
             foreignKeyName: "renewals_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "renewals_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -39679,6 +40798,59 @@ export type Database = {
         }
         Relationships: []
       }
+      policy_in_force_status: {
+        Row: {
+          account_id: string | null
+          agency_workspace_id: string | null
+          bap_details: Json | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          carrier: string | null
+          cgl_details: Json | null
+          coverage: Json | null
+          effective_date: string | null
+          evaluated_at: string | null
+          expiration_date: string | null
+          in_force: boolean | null
+          line_of_business: string | null
+          policy_id: string | null
+          policy_number: string | null
+          policy_status: string | null
+          policy_updated_at: string | null
+          premium: number | null
+          property_details: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_agency_reputation_summary"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "accounts_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_agencies"
+            referencedColumns: ["agency_workspace_id"]
+          },
+          {
+            foreignKeyName: "policies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       predictive_analytics_dashboard: {
         Row: {
           actual_churns: number | null
@@ -39902,6 +41074,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "policies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
           },
           {
             foreignKeyName: "documents_policy_id_fkey"
@@ -40518,6 +41697,13 @@ export type Database = {
             foreignKeyName: "workspaces_policy_id_fkey"
             columns: ["policy_id"]
             isOneToOne: false
+            referencedRelation: "policy_in_force_status"
+            referencedColumns: ["policy_id"]
+          },
+          {
+            foreignKeyName: "workspaces_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
             referencedRelation: "v_active_policies"
             referencedColumns: ["id"]
           },
@@ -40525,6 +41711,18 @@ export type Database = {
       }
     }
     Functions: {
+      _customer_merge_column_exists: {
+        Args: { p_column_name: string; p_table_name: string }
+        Returns: boolean
+      }
+      _customer_merge_table_exists: {
+        Args: { p_table_name: string }
+        Returns: boolean
+      }
+      _customer_merge_user_can_access_account: {
+        Args: { p_account_id: string }
+        Returns: boolean
+      }
       _do_account_merge: {
         Args: {
           p_apply?: boolean
@@ -40983,6 +42181,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      floor_normalize_phone: { Args: { p_phone: string }; Returns: string }
       generate_backup_codes: { Args: never; Returns: string[] }
       generate_coi_number: { Args: never; Returns: string }
       generate_collection_token: {
@@ -42201,6 +43400,10 @@ export type Database = {
         Args: { p_permission: string }
         Returns: boolean
       }
+      preview_customer_merge_v1: {
+        Args: { p_duplicate_customer_id: string; p_master_customer_id: string }
+        Returns: Json
+      }
       preview_merge: {
         Args: { p_losers: string[]; p_survivor: string }
         Returns: Json
@@ -42319,6 +43522,15 @@ export type Database = {
         Returns: number
       }
       rescore_leads: { Args: { lead_ids?: string[] }; Returns: Json }
+      resolve_account: {
+        Args: {
+          p_agency_workspace_id: string
+          p_email?: string
+          p_name?: string
+          p_phone?: string
+        }
+        Returns: Json
+      }
       resolve_global_conflict: {
         Args: {
           p_conflict_id: string

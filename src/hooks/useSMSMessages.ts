@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 
 export interface SMSMessage {
   id: string;
@@ -214,9 +215,11 @@ export const useSendSMS = () => {
       account_id?: string;
       contact_id?: string;
     }) => {
-      // Call the send-sms edge function
+      const client_send_approval = await createClientSendApproval('send-sms', payload);
+
+      // Call the send-sms edge function with the one-time named-human approval marker.
       const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: payload,
+        body: { ...payload, client_send_approval },
       });
 
       if (error) throw error;

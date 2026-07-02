@@ -13,6 +13,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -343,7 +344,7 @@ async function callAzureDocumentIntelligence(fileData: Blob): Promise<any> {
   // Start analysis
   const analyzeUrl = `${endpoint}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-07-31`;
 
-  const startResponse = await fetch(analyzeUrl, {
+  const startResponse = await modelBoundaryFetch(analyzeUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/pdf',
@@ -371,7 +372,7 @@ async function callAzureDocumentIntelligence(fileData: Blob): Promise<any> {
     await new Promise(r => setTimeout(r, 2000));
     attempts++;
 
-    const resultResponse = await fetch(operationLocation, {
+    const resultResponse = await modelBoundaryFetch(operationLocation, {
       headers: { 'Ocp-Apim-Subscription-Key': apiKey },
     });
 
@@ -717,7 +718,7 @@ ${evidenceList.join('\n')}
 ## TASK
 Return a JSON PolicySnapshot. Reference evidence_ids for each extracted field.`;
 
-  const response = await fetch(url, {
+  const response = await modelBoundaryFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

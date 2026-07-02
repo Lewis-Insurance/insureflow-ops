@@ -13,6 +13,8 @@ import { validateEnvVars, configErrorResponse } from '../_shared/env-validator.t
 import { requireAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore, isFloorActionApprovalRef, readClientSendApprovalMarker } from "../_shared/clientSendApprovalGate.ts";
+import { verifyCronSecret } from "../_shared/cron-auth.ts";
 
 interface SendCOIEmailRequest {
   to: string;
@@ -214,12 +216,24 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Require authentication
-    const authResult = await requireAuth(req, supabase, corsHeaders);
-    if (authResult instanceof Response) {
-      return authResult; // Returns 401 if auth failed
+    const requestBody: SendCOIEmailRequest & Record<string, unknown> = await req.json();
+    const floorReleaseMarker = readClientSendApprovalMarker(requestBody);
+    const isFloorServiceRelease =
+      verifyCronSecret(req) === null
+      && Boolean(req.headers.get('X-Cron-Secret'))
+      && Boolean(floorReleaseMarker)
+      && isFloorActionApprovalRef(floorReleaseMarker!.approval_ref);
+
+    let user: { id: string; email?: string };
+    if (isFloorServiceRelease) {
+      user = { id: floorReleaseMarker!.approved_by_human_id };
+    } else {
+      const authResult = await requireAuth(req, supabase, corsHeaders);
+      if (authResult instanceof Response) {
+        return authResult;
+      }
+      user = authResult;
     }
-    const user = authResult;
 
     // Check rate limit (20 emails per minute per user)
     const rateLimitResult = await checkRateLimit(
@@ -244,7 +258,7 @@ const handler = async (req: Request): Promise<Response> => {
       certificateNumber,
       certificateUrl,
       holderName,
-    }: SendCOIEmailRequest = await req.json();
+    } = requestBody;
 
     // Validate required fields
     if (!to || !certificateNumber || !certificateUrl || !holderName) {
@@ -291,6 +305,15 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'send-coi-email',
+      payload: requestBody,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
+    if (approvalGate) return approvalGate;
+
     // Verify user has access to this certificate (if we have a certificates table)
     // TODO: Add certificate access verification when certificates table is available
 
@@ -326,8 +349,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.info(`COI email sent successfully: ${result.id}`);
 
-    // Log email send to database for audit trail
-    await supabase
+    const { error: emailLogError } = await supabase
       .from('email_log')
       .insert({
         type: 'coi',
@@ -337,10 +359,18 @@ const handler = async (req: Request): Promise<Response> => {
         sent_by: user.id,
         resend_id: result.id,
         metadata: { certificateNumber, holderName },
-      })
-      .then(({ error }) => {
-        if (error) console.error('Failed to log email:', error);
       });
+
+    if (emailLogError) {
+      console.error('Failed to log email:', emailLogError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'email_log_insert_failed' }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
+    }
 
     return new Response(
       JSON.stringify({

@@ -18,6 +18,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 // Configuration - 768 dim to match existing knowledge_base.embedding
 const CHUNK_SIZE = 1500;
@@ -114,7 +115,7 @@ serve(async (req) => {
     
     // Try to download from URL or storage
     if (documentUrl.startsWith('http')) {
-      const response = await fetch(documentUrl);
+      const response = await modelBoundaryFetch(documentUrl);
       if (!response.ok) throw new Error(`Failed to fetch document: ${response.status}`);
       documentBytes = new Uint8Array(await response.arrayBuffer());
     } else {
@@ -141,7 +142,7 @@ serve(async (req) => {
     // Start Azure analysis
     const analyzeUrl = `${AZURE_DOC_ENDPOINT}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31&pages=1-`;
     
-    const analyzeResponse = await fetch(analyzeUrl, {
+    const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ serve(async (req) => {
     while (Date.now() - pollStart < pollTimeout) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-      const statusResponse = await fetch(operationLocation, {
+      const statusResponse = await modelBoundaryFetch(operationLocation, {
         headers: { 'Ocp-Apim-Subscription-Key': AZURE_DOC_KEY },
       });
 
@@ -348,7 +349,7 @@ serve(async (req) => {
         const texts = batch.map(c => c.chunk_text.slice(0, 8000));
 
         try {
-          const embResponse = await fetch(embeddingUrl, {
+          const embResponse = await modelBoundaryFetch(embeddingUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

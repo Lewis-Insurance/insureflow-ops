@@ -11,6 +11,8 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
+import { redactPII } from '../../../supabase/functions/_shared/floorSafety.ts';
+import { modelBoundaryFetch } from '../../../supabase/functions/_shared/modelBoundaryFetch.ts';
 import {
   PolicySnapshot,
   SnapshotField,
@@ -279,7 +281,7 @@ export class PolicySnapshotExtractor {
       response_format: { type: 'json_object' },
     };
 
-    const response = await fetch(url, {
+    const response = await modelBoundaryFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -289,7 +291,7 @@ export class PolicySnapshotExtractor {
     });
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = redactPII(await response.text()).redacted;
       throw new Error(`Azure OpenAI API error: ${response.status} ${error}`);
     }
 

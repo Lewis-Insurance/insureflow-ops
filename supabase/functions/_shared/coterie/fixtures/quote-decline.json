@@ -1,0 +1,18 @@
+{
+  "underwritingInformation": {
+    "underwritingId": "mock-uw-decline-001",
+    "declinations": [
+      {
+        "policyType": "BOP",
+        "declination": [
+          "The submitted industry classification falls outside of the carrier's appetite.",
+          "Prior loss history exceeds program thresholds for this class of business."
+        ]
+      }
+    ]
+  },
+  "isSuccess": false,
+  "errors": [
+    "E0000: This request can not be accommodated due to underwriting results."
+  ]
+}

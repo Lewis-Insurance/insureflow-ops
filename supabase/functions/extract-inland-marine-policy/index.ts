@@ -10,7 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
+import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
@@ -454,7 +454,6 @@ serve(async (req) => {
       return authResult;
     }
 
-    const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
     const body: RequestBody = await req.json();
     const {
@@ -516,7 +515,7 @@ serve(async (req) => {
     console.log(`[extract-im-policy] Calling Claude for extraction...`);
 
     const llmStartTime = Date.now();
-    const response = await anthropic.messages.create({
+    const response = await anthropicBoundaryCreate(anthropicApiKey, {
       model: "claude-sonnet-4-20250514",
       max_tokens: 8000,
       system: IM_EXTRACTION_SYSTEM_PROMPT,

@@ -1,0 +1,59 @@
+/* Calm Command - global stylesheet */
+/* Import AFTER design-tokens.css. The app is dark-only (html class="dark"). */
+/* Fonts via @fontsource (npm i @fontsource/inter @fontsource/geist-mono) */
+/* or swap these imports for next/font if on Next.js. */
+
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* shadcn border default reads from the token */
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark; /* native form controls and scrollbars render dark */
+  }
+
+  body {
+    background-color: var(--cc-bg);
+    color: var(--cc-text-primary);
+    font-family: var(--cc-font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  code,
+  kbd,
+  pre,
+  .font-mono {
+    font-family: var(--cc-font-mono);
+  }
+
+  /* Rule 5: visible focus on every interactive element, never removed. */
+  /* Default controls: 2px lime ring, 2px offset against the dark page. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--cc-focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* The lime primary button: add a dark inner ring so the focus state */
+  /* never reads lime-on-lime. Apply .btn-primary or [data-primary]. */
+  .btn-primary:focus-visible,
+  [data-primary]:focus-visible {
+    outline: 2px solid var(--cc-focus-ring);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--cc-focus-inner);
+  }
+}
+
+/* prefers-reduced-motion is handled in design-tokens.css, do not duplicate here */

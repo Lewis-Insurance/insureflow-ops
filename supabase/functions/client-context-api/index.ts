@@ -14,6 +14,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 // Token budget configuration
 const MAX_CONTEXT_TOKENS = 100000;
@@ -529,7 +530,7 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await modelBoundaryFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -691,7 +692,7 @@ async function callPrismAPI(prompt: string): Promise<any> {
     throw new Error('Prism API not configured');
   }
 
-  const response = await fetch(`${PRISM_SERVICE_URL}/run`, {
+  const response = await modelBoundaryFetch(`${PRISM_SERVICE_URL}/run`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${PRISM_SYSTEM_API_KEY}`,

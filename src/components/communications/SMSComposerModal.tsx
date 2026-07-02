@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 import { MessageSquare, Send, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -66,13 +67,16 @@ export function SMSComposerModal({
         return;
       }
 
-      // Call the send-sms edge function
+      const sendPayload = {
+        to_number: phone.trim(),
+        body: message.trim(),
+        account_id: accountId,
+      };
+      const client_send_approval = await createClientSendApproval('send-sms', sendPayload);
+
+      // Call the send-sms edge function with the one-time named-human approval marker.
       const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: {
-          to: phone.trim(),
-          message: message.trim(),
-          accountId,
-        },
+        body: { ...sendPayload, client_send_approval },
       });
 
       if (error) throw error;
@@ -87,7 +91,7 @@ export function SMSComposerModal({
         subject: `SMS to ${phone}`,
         content: message.trim(),
         status: 'sent',
-        external_id: data?.messageSid || null,
+        external_id: data?.message_sid || null,
         metadata: {
           to: phone.trim(),
           segments,

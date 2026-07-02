@@ -10,6 +10,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, verifyResourceAccess } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from "../_shared/rate-limit.ts";
+import { clientSendApprovalGateResponse, createSupabaseClientSendApprovalStore } from "../_shared/clientSendApprovalGate.ts";
 
 interface SendSMSRequest {
   to_number: string;
@@ -39,20 +40,9 @@ serve(async (req) => {
     }
     const user = authResult;
 
-    // Check rate limit (10 SMS per minute per user)
-    const rateLimitResult = await checkRateLimit(
-      supabase,
-      'send-sms',
-      user.id,
-      RATE_LIMITS.sms
-    );
-
-    if (!rateLimitResult.allowed) {
-      return rateLimitExceededResponse(rateLimitResult, corsHeaders);
-    }
-
-    // Get request body
-    const { to_number, body, account_id, contact_id }: SendSMSRequest = await req.json();
+    // Get request body and run all non-send validations before consuming one-time approval.
+    const requestBody: SendSMSRequest = await req.json();
+    const { to_number, body, account_id, contact_id } = requestBody;
 
     // Validate required fields
     if (!to_number || !body) {
@@ -70,6 +60,20 @@ serve(async (req) => {
       );
     }
 
+    // Format and validate recipient phone number before consuming approval.
+    let formattedTo = to_number.replace(/\D/g, "");
+    if (!formattedTo.startsWith("1") && formattedTo.length === 10) {
+      formattedTo = "1" + formattedTo;
+    }
+    formattedTo = "+" + formattedTo;
+
+    if (!/^\+1\d{10}$/.test(formattedTo)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid phone number format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // If account_id is provided, verify user has access to it
     if (account_id) {
       const hasAccess = await verifyResourceAccess(supabase, user.id, 'account', account_id);
@@ -80,6 +84,28 @@ serve(async (req) => {
         );
       }
     }
+
+    // Check rate limit (10 SMS per minute per user)
+    const rateLimitResult = await checkRateLimit(
+      supabase,
+      'send-sms',
+      user.id,
+      RATE_LIMITS.sms
+    );
+
+    if (!rateLimitResult.allowed) {
+      return rateLimitExceededResponse(rateLimitResult, corsHeaders);
+    }
+
+    // Require a server-verified named-human approval after validations, before any send/carrier side effect.
+    const approvalGate = await clientSendApprovalGateResponse({
+      surface: 'send-sms',
+      payload: requestBody,
+      userId: user.id,
+      approvalStore: createSupabaseClientSendApprovalStore(supabase),
+      corsHeaders,
+    });
+    if (approvalGate) return approvalGate;
 
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -94,26 +120,12 @@ serve(async (req) => {
       );
     }
 
-    // Format phone numbers
-    let formattedTo = to_number.replace(/\D/g, "");
-    if (!formattedTo.startsWith("1") && formattedTo.length === 10) {
-      formattedTo = "1" + formattedTo;
-    }
-    formattedTo = "+" + formattedTo;
-
+    // Format sender phone number
     let formattedFrom = twilioPhone.replace(/\D/g, "");
     if (!formattedFrom.startsWith("1")) {
       formattedFrom = "1" + formattedFrom;
     }
     formattedFrom = "+" + formattedFrom;
-
-    // Validate phone number format
-    if (!/^\+1\d{10}$/.test(formattedTo)) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid phone number format" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     console.info(`Sending SMS from ${formattedFrom} to ${formattedTo} (user: ${user.id})`);
 

@@ -15,6 +15,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -142,7 +143,7 @@ async function runOCR(
     try {
       const analyzeUrl = `${endpoint}/formrecognizer/documentModels/${model}:analyze?api-version=2023-07-31`;
 
-      const response = await fetch(analyzeUrl, {
+      const response = await modelBoundaryFetch(analyzeUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +162,7 @@ async function runOCR(
       for (let i = 0; i < 60; i++) {
         await new Promise(r => setTimeout(r, 2000));
 
-        const pollResponse = await fetch(operationLocation, {
+        const pollResponse = await modelBoundaryFetch(operationLocation, {
           headers: { 'Ocp-Apim-Subscription-Key': apiKey },
         });
 
@@ -561,7 +562,7 @@ async function callLLMMapper(
     })),
   }));
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

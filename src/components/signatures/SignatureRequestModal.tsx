@@ -35,6 +35,7 @@ import {
   getRequiredSigners,
   type SignerRole,
 } from '@/lib/acord/signatureAnchors';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 
 interface Signer {
   role: SignerRole;
@@ -184,6 +185,23 @@ export function SignatureRequestModal({
         };
       }) || [];
 
+      const signatureRequestPayload = {
+        document_url: documentUrl,
+        document_name: documentName,
+        signers: signers.map(s => ({
+          email: s.email,
+          name: s.name,
+          role: s.role,
+          order: s.order,
+        })),
+        form_number: formNumber,
+        acord_form_id: acordFormId,
+        message: message || undefined,
+        expires_in_days: expirationDays,
+        signature_fields: signatureFields.length > 0 ? signatureFields : undefined,
+      };
+      const clientSendApproval = await createClientSendApproval('esign-create-request', signatureRequestPayload);
+
       // Call edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/esign-create-request`,
@@ -194,19 +212,8 @@ export function SignatureRequestModal({
             'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            document_url: documentUrl,
-            document_name: documentName,
-            signers: signers.map(s => ({
-              email: s.email,
-              name: s.name,
-              role: s.role,
-              order: s.order,
-            })),
-            form_number: formNumber,
-            acord_form_id: acordFormId,
-            message: message || undefined,
-            expires_in_days: expirationDays,
-            signature_fields: signatureFields.length > 0 ? signatureFields : undefined,
+            ...signatureRequestPayload,
+            client_send_approval: clientSendApproval,
           }),
         }
       );

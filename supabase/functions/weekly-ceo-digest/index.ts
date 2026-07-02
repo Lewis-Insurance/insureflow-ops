@@ -22,6 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createLogger } from '../_shared/logger.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 import {
   AppError,
   ValidationError,
@@ -278,7 +279,7 @@ Remember: Output ONLY valid JSON matching the schema. Do not include any text ou
         const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
         if (!apiKey) throw new AppError('ANTHROPIC_API_KEY not configured', 500);
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -330,7 +331,7 @@ Remember: Output ONLY valid JSON matching the schema. Do not include any text ou
         const apiKey = Deno.env.get('OPENAI_API_KEY');
         if (!apiKey) throw new AppError('OPENAI_API_KEY not configured', 500);
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await modelBoundaryFetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -603,7 +604,7 @@ async function sendEmail(
 
   if (provider === 'sendgrid') {
     // SendGrid API
-    response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    response = await modelBoundaryFetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -641,7 +642,7 @@ async function sendEmail(
 
   } else if (provider === 'resend') {
     // Resend API
-    response = await fetch('https://api.resend.com/emails', {
+    response = await modelBoundaryFetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -669,7 +670,7 @@ async function sendEmail(
     let allSuccess = true;
 
     for (const recipient of to) {
-      response = await fetch('https://api.postmarkapp.com/email', {
+      response = await modelBoundaryFetch('https://api.postmarkapp.com/email', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',

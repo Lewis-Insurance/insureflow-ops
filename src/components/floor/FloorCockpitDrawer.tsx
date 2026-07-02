@@ -1,0 +1,413 @@
+import { useState } from 'react';
+import { Bot, CheckCircle2, Edit3, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFloorPendingPackages } from '@/hooks/useFloorPendingPackages';
+import type { FloorPendingPackage } from '@/hooks/useFloorPendingPackages';
+import { validateFloorMessageForModel } from '@/floor/floorSafety';
+import { sendFloorChatMessage } from '@/floor/floorChatClient';
+import { invokeFloorAction, type FloorActionResponse } from '@/floor/floorActionClient';
+import { PRACTICE_FLOOR_CONTEXT, resolveWorkRequestRef } from '@/floor/floorCockpitContext';
+import { isFloorCockpitEnabled } from '@/floor/launchControl';
+import type { FeedbackVerb } from '@/floor/spine/types';
+import type { FloorChatSender, FloorDecisionPackagePreview, FloorInitialContext } from '@/floor/types';
+
+interface ChatMessage {
+  id: string;
+  role: 'human' | 'agent' | 'system';
+  content: string;
+}
+
+interface ToolProgressItem {
+  id: string;
+  label: string;
+  state: 'started' | 'done' | 'failed';
+}
+
+export type { FloorChatSender } from '@/floor/types';
+
+export type FloorActionInvoker = typeof invokeFloorAction;
+
+interface FloorCockpitDrawerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialContext?: FloorInitialContext | null;
+  agencyWorkspaceId?: string | null;
+  actorId?: string | null;
+  sendMessage?: FloorChatSender;
+  invokeAction?: FloorActionInvoker;
+  launchControlEnabled?: boolean;
+}
+
+function newId(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+export function FloorCockpitDrawer({
+  open,
+  onOpenChange,
+  initialContext,
+  agencyWorkspaceId,
+  actorId,
+  sendMessage = sendFloorChatMessage,
+  invokeAction = invokeFloorAction,
+  launchControlEnabled = isFloorCockpitEnabled(),
+}: FloorCockpitDrawerProps) {
+  const context = initialContext ?? PRACTICE_FLOOR_CONTEXT;
+  const { data: pendingPackages = [] } = useFloorPendingPackages(agencyWorkspaceId);
+  const [input, setInput] = useState('');
+  const [isWorking, setIsWorking] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'floor-welcome',
+      role: 'agent',
+      content:
+        'I am Lewis Floor inside InsureFlow. I can prepare work, show evidence, and create decisions — no client or carrier send happens without named-human approval.',
+    },
+  ]);
+  const [toolProgress, setToolProgress] = useState<ToolProgressItem[]>([]);
+  const [packagePreview, setPackagePreview] = useState<FloorDecisionPackagePreview | null>(null);
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'working' | 'done'>('idle');
+
+  function applyPendingPackagePreview(pkg: FloorPendingPackage) {
+    setPackagePreview({
+      packageRef: pkg.packageRef,
+      revision: 1,
+      workRequestRef: pkg.workRequestRef,
+      workRequestId: pkg.workRequestId,
+      playId: pkg.playId,
+      title: pkg.headline,
+      summary: pkg.headline,
+      risk: pkg.risk,
+      actions: ['approve', 'edit', 'kill'],
+    });
+    setFeedbackState('idle');
+  }
+
+  function applyActionPreview(result: FloorActionResponse) {
+    if (result.preview) {
+      setPackagePreview(result.preview);
+    }
+  }
+
+  async function handleFeedback(verb: FeedbackVerb) {
+    if (!packagePreview || isWorking || feedbackState === 'working') return;
+
+    const workRequestRef = resolveWorkRequestRef(packagePreview);
+    if (!agencyWorkspaceId || !actorId || !workRequestRef) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content:
+            'This package is not linked to a persisted work request yet. Chat-only practice packages cannot be approved until a live internal package exists.',
+        },
+      ]);
+      return;
+    }
+
+    setFeedbackState('working');
+    try {
+      const result = await invokeAction({
+        action: 'feedback',
+        agency_workspace_id: agencyWorkspaceId,
+        workRequestRef,
+        packageRef: packagePreview.packageRef,
+        verb,
+        actor_id: actorId,
+        kill_reason: verb === 'kill' ? 'cockpit_kill' : undefined,
+      });
+      applyActionPreview(result);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content: `${verb.charAt(0).toUpperCase()}${verb.slice(1)} recorded. No client or carrier send was attempted.`,
+        },
+      ]);
+      setFeedbackState('done');
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId('system'),
+          role: 'system',
+          content: `Floor action failed safely: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ]);
+      setFeedbackState('idle');
+    } finally {
+      setFeedbackState('idle');
+    }
+  }
+
+  async function handleSend() {
+    const message = input.trim();
+    if (!message || isWorking || !launchControlEnabled) return;
+
+    const safety = validateFloorMessageForModel(message);
+    if (!safety.ok) {
+      setMessages((prev) => [
+        ...prev,
+        { id: newId('blocked'), role: 'system', content: safety.reason ?? 'Blocked before model.' },
+      ]);
+      return;
+    }
+
+    setInput('');
+    setIsWorking(true);
+    setPackagePreview(null);
+    setToolProgress([]);
+    setMessages((prev) => [...prev, { id: newId('human'), role: 'human', content: message }]);
+
+    const assistantMessageId = newId('agent');
+    setMessages((prev) => [...prev, { id: assistantMessageId, role: 'agent', content: '' }]);
+
+    try {
+      await sendMessage(
+        {
+          sessionRef: context.sessionRef,
+          message,
+          contextRefs: {
+            clientRef: context.clientRef,
+            policyRef: context.policyRef,
+            documentRefs: context.documentRefs,
+            workItemRef: context.workItemRef,
+          },
+        },
+        (event) => {
+          if (event.type === 'tool') {
+            setToolProgress((prev) => [...prev, { id: newId('tool'), label: event.label, state: event.state }]);
+          }
+
+          if (event.type === 'delta') {
+            setMessages((prev) =>
+              prev.map((entry) =>
+                entry.id === assistantMessageId ? { ...entry, content: `${entry.content}${event.delta}` } : entry,
+              ),
+            );
+          }
+
+          if (event.type === 'package') {
+            setPackagePreview({
+              packageRef: event.packageRef,
+              revision: event.revision,
+              workRequestRef: event.workRequestRef,
+              workRequestId: event.workRequestId,
+              title: event.title,
+              summary: event.summary,
+              actions: event.actions,
+            });
+            setFeedbackState('idle');
+          }
+
+          if (event.type === 'error') {
+            setMessages((prev) =>
+              prev.map((entry) =>
+                entry.id === assistantMessageId
+                  ? { ...entry, content: `Lewis Floor stopped safely: ${event.message}` }
+                  : entry,
+              ),
+            );
+          }
+        },
+      );
+    } catch (error) {
+      setMessages((prev) =>
+        prev.map((entry) =>
+          entry.id === assistantMessageId
+            ? {
+                ...entry,
+                content: `Lewis Floor is unavailable, and no external action was taken. ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              }
+            : entry,
+        ),
+      );
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-[440px] flex-col p-0 sm:w-[560px]">
+        <SheetHeader className="border-b px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-primary/10 p-2 text-primary">
+              <Sparkles className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <SheetTitle>{context.displayTitle ?? context.label ?? 'Lewis Floor'}</SheetTitle>
+              <SheetDescription>InsureFlow agent cockpit • practice-safe bridge</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+
+        {!launchControlEnabled ? (
+          <div className="flex flex-1 flex-col justify-center gap-3 px-6 text-sm text-muted-foreground">
+            <p className="text-base font-medium text-foreground">Lewis Floor cockpit is disabled by launch control.</p>
+            <p>The prototype surface defaults to no-effect until explicitly enabled for a synthetic/internal-only run.</p>
+          </div>
+        ) : (
+          <>
+            <div className="border-b bg-muted/30 px-6 py-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                Context
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {context.chips.map((chip) => (
+                  <Badge key={`${chip.label}:${chip.value}`} variant="secondary" className="max-w-full truncate">
+                    {`${chip.label}: ${chip.value}`}
+                  </Badge>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Hidden state uses opaque refs only. Approvals and sends stay behind Floor gates.
+              </p>
+            </div>
+
+            {pendingPackages.length > 0 && (
+              <div className="border-b bg-background px-6 py-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pending approval
+                </p>
+                <div className="space-y-2">
+                  {pendingPackages.map((pkg) => (
+                    <button
+                      key={pkg.packageId}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/50"
+                      onClick={() => applyPendingPackagePreview(pkg)}
+                    >
+                      <span className="truncate pr-2">{pkg.headline}</span>
+                      <Badge
+                        variant={pkg.risk === 'red' ? 'destructive' : pkg.risk === 'yellow' ? 'secondary' : 'outline'}
+                      >
+                        {pkg.risk}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <ScrollArea className="flex-1 px-6 py-4">
+              <div className="space-y-3">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={
+                      message.role === 'human'
+                        ? 'ml-8 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground'
+                        : message.role === 'system'
+                          ? 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900'
+                          : 'mr-8 rounded-lg border bg-card px-3 py-2 text-sm'
+                    }
+                  >
+                    {message.content || (message.role === 'agent' && isWorking ? 'Working…' : '')}
+                  </div>
+                ))}
+
+                {toolProgress.length > 0 && (
+                  <Card>
+                    <CardHeader className="py-3">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <Bot className="h-4 w-4" aria-hidden="true" />
+                        Tool progress
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pt-0">
+                      {toolProgress.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                          {item.label}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {packagePreview && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">{packagePreview.title}</CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {packagePreview.packageRef} • revision {packagePreview.revision}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm">{packagePreview.summary}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('approve')}
+                        >
+                          <CheckCircle2 className="mr-1 h-4 w-4" aria-hidden="true" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('edit')}
+                        >
+                          <Edit3 className="mr-1 h-4 w-4" aria-hidden="true" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          type="button"
+                          disabled={isWorking || feedbackState === 'working'}
+                          onClick={() => handleFeedback('kill')}
+                        >
+                          <XCircle className="mr-1 h-4 w-4" aria-hidden="true" />
+                          Kill
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        External send remains disabled in this slice. A named human must approve the exact artifact before any future send/log path can appear.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ScrollArea>
+
+            <div className="border-t p-4">
+              <label htmlFor="floor-cockpit-message" className="mb-2 block text-sm font-medium">
+                Message Lewis Floor
+              </label>
+              <Textarea
+                id="floor-cockpit-message"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="Ask my agent to prepare the work…"
+                className="min-h-24"
+              />
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">No SSN/DOB/DLN, raw UUIDs, or signed URLs.</p>
+                <Button type="button" onClick={handleSend} disabled={isWorking || !input.trim()}>
+                  Send to Lewis Floor
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

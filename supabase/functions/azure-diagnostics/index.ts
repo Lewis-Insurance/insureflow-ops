@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,7 +62,7 @@ serve(async (req) => {
     if (envVars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT && envVars.AZURE_DOCUMENT_INTELLIGENCE_KEY) {
       try {
         const endpoint = envVars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT.replace(/\/$/, '');
-        const response = await fetch(`${endpoint}/documentintelligence/documentModels?api-version=2024-02-29-preview`, {
+        const response = await modelBoundaryFetch(`${endpoint}/documentintelligence/documentModels?api-version=2024-02-29-preview`, {
           method: 'GET',
           headers: {
             'Ocp-Apim-Subscription-Key': envVars.AZURE_DOCUMENT_INTELLIGENCE_KEY,
@@ -92,7 +93,7 @@ serve(async (req) => {
         const endpoint = envVars.AZURE_OPENAI_ENDPOINT.replace(/\/$/, '');
         const deploymentName = envVars.AZURE_OPENAI_DEPLOYMENT_NAME;
         
-        const response = await fetch(
+        const response = await modelBoundaryFetch(
           `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2024-02-15-preview`,
           {
             method: 'POST',

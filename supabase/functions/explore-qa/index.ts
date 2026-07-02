@@ -18,6 +18,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 interface QARequest {
   extraction_id?: string; // Filter by specific document extraction
@@ -166,7 +167,7 @@ serve(async (req) => {
     let questionEmbedding: number[] | null = null;
 
     try {
-      const embResponse = await fetch(embeddingUrl, {
+      const embResponse = await modelBoundaryFetch(embeddingUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -316,7 +317,7 @@ ${conversationContext}
 
 Provide your answer in the required JSON format. Remember to cite evidence IDs for every factual claim.`;
 
-    const chatResponse = await fetch(chatUrl, {
+    const chatResponse = await modelBoundaryFetch(chatUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

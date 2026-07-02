@@ -20,6 +20,8 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CRMPageSkeleton } from '@/components/ui/skeleton-components';
 import { SectionLabel } from '@/components/cc';
 import { logger } from '@/lib/logger';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { usePermissions } from '@/hooks/usePermissions';
 import { SearchResult } from '@/hooks/useGlobalSearch';
 import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
@@ -135,23 +137,6 @@ const CRMContent = memo(() => {
 
     try {
       switch (action_type) {
-        case 'assign_owner': {
-          const ownerId = parameters?.owner_id;
-          if (!ownerId) {
-            toast({ title: 'Error', description: 'Please select an owner', variant: 'destructive' });
-            return;
-          }
-          const { error } = await supabase
-            .from('accounts')
-            .update({ assigned_to: ownerId as string, updated_at: new Date().toISOString() })
-            .in('id', entity_ids);
-
-          if (error) throw error;
-          toast({ title: 'Success', description: `Assigned ${entity_ids.length} accounts to new owner` });
-          fetchAccounts();
-          break;
-        }
-
         case 'add_tags': {
           const tagsStr = parameters?.tags;
           if (!tagsStr) {
@@ -160,21 +145,24 @@ const CRMContent = memo(() => {
           }
           const newTags = String(tagsStr).split(',').map(t => t.trim()).filter(Boolean);
 
-          // Update each account's tags
+          // Tags live on insured_profiles (the field wired to the Customers list and
+          // global search), keyed 1:1 to the account via insured_profiles.account_id.
           for (const accountId of entity_ids) {
-            const { data: account } = await supabase
-              .from('accounts')
+            const { data: profile } = await supabase
+              .from('insured_profiles')
               .select('tags')
-              .eq('id', accountId)
-              .single();
+              .eq('account_id', accountId)
+              .maybeSingle();
 
-            const existingTags = (account?.tags as string[]) || [];
+            if (!profile) continue;
+
+            const existingTags = profile.tags || [];
             const mergedTags = [...new Set([...existingTags, ...newTags])];
 
             await supabase
-              .from('accounts')
-              .update({ tags: mergedTags, updated_at: new Date().toISOString() })
-              .eq('id', accountId);
+              .from('insured_profiles')
+              .update({ tags: mergedTags })
+              .eq('account_id', accountId);
           }
 
           toast({ title: 'Success', description: `Added tags to ${entity_ids.length} accounts` });

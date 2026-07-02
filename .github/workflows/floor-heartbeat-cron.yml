@@ -1,0 +1,108 @@
+name: Floor Heartbeat Book Scan (Dev)
+
+on:
+  schedule:
+    # Nightly book scan — absorbs Phase 4 play detectors (6 AM UTC)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview heartbeat without persisting cards'
+        required: false
+        type: boolean
+        default: false
+      skip_gap_detection:
+        description: 'Skip run-coverage-gap-detection before heartbeat'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  FLOOR_DEV_SUPABASE_URL: https://klnygbbmognbslgobmzc.supabase.co
+  FLOOR_AGENCY_WORKSPACE_ID: f1f07037-3032-45f8-93ca-72c0f47e4fbb
+
+jobs:
+  gap-detection-dev:
+    name: Coverage gap detection (dev, pre-heartbeat)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.skip_gap_detection != 'true'
+
+    steps:
+      - name: Run coverage gap detection on dev
+        env:
+          SERVICE_KEY: ${{ secrets.FLOOR_DEV_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.FLOOR_DEV_CRON_SECRET }}
+        run: |
+          if [ -z "$SERVICE_KEY" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set FLOOR_DEV_SERVICE_ROLE_KEY and FLOOR_DEV_CRON_SECRET repository secrets"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${FLOOR_DEV_SUPABASE_URL}/functions/v1/run-coverage-gap-detection?agency_workspace_id=${FLOOR_AGENCY_WORKSPACE_ID}&create_tasks=false" \
+            -H "Authorization: Bearer ${SERVICE_KEY}" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then exit 1; fi
+
+  heartbeat-dev:
+    name: Floor heartbeat book scan (dev)
+    runs-on: ubuntu-latest
+    needs: gap-detection-dev
+    if: always() && (needs.gap-detection-dev.result == 'success' || needs.gap-detection-dev.result == 'skipped')
+
+    steps:
+      - name: Run floor-run-plays heartbeat
+        id: heartbeat
+        env:
+          SERVICE_KEY: ${{ secrets.FLOOR_DEV_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.FLOOR_DEV_CRON_SECRET }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ -z "$SERVICE_KEY" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set FLOOR_DEV_SERVICE_ROLE_KEY and FLOOR_DEV_CRON_SECRET repository secrets"
+            exit 1
+          fi
+
+          BODY=$(python3 -c "import json; print(json.dumps({
+            'dry_run': '$DRY_RUN' == 'true',
+            'heartbeat': True,
+            'agency_workspace_id': '${FLOOR_AGENCY_WORKSPACE_ID}',
+            'play1_limit': 5,
+            'play3_limit': 10,
+            'play4_limit': 5,
+            'play5_limit': 5,
+            'play6_limit': 5,
+            'play7_limit': 5,
+          }))")
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "${FLOOR_DEV_SUPABASE_URL}/functions/v1/floor-run-plays" \
+            -H "Authorization: Bearer ${SERVICE_KEY}" \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY_OUT=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY_OUT"
+          if [ "$HTTP_CODE" -ge 400 ]; then exit 1; fi
+
+          echo "result<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY_OUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "## Floor heartbeat book scan (dev)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.heartbeat.outputs.result }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { createErrorResponse } from "../_shared/error-handler.ts";
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const logger = createLogger("ai-task-generator");
 
@@ -343,7 +344,7 @@ Provide:
 2. Specific action recommendations (bullet points)
 3. Key considerations or risks`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await modelBoundaryFetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

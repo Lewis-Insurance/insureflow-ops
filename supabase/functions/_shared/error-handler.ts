@@ -100,6 +100,8 @@ export function createErrorResponse(
     statusCode = 404;
     code = 'NOT_FOUND';
     message = error.message;
+  } else if (error.message) {
+    message = error.message;
   }
 
   const body: ErrorResponse = {

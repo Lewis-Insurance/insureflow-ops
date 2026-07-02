@@ -4,6 +4,13 @@
   functions = "netlify/functions"
   publish = "dist"
 
+# Phase 1 staff soak: Lewis Floor cockpit on preview/branch deploys only (production stays off).
+[context.deploy-preview.environment]
+  VITE_LEWIS_FLOOR_COCKPIT_ENABLED = "true"
+
+[context.branch-deploy.environment]
+  VITE_LEWIS_FLOOR_COCKPIT_ENABLED = "true"
+
   ## Redirect for Single Page Applications
 [[redirects]]
   from = "/*"

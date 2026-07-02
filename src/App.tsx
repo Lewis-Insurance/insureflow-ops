@@ -107,6 +107,7 @@ const LewisAIHub = lazyWithRetry(() => import("./pages/ai/LewisAIHub"));
 const AIModuleExecute = lazyWithRetry(() => import("./pages/ai/AIModuleExecute"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const CanopyImportPage = lazyWithRetry(() => import("./pages/CanopyImportPage"));
+const CoterieQuotesPage = lazyWithRetry(() => import("./pages/CoterieQuotesPage"));
 const CEODigestSettings = lazyWithRetry(() => import("./pages/CEODigestSettings"));
 const CEODigestHistory = lazyWithRetry(() => import("./pages/CEODigestHistory"));
 const ReputationSettings = lazyWithRetry(() => import("./pages/ReputationSettings"));
@@ -239,6 +240,16 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <CanopyImportPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/coterie-quotes"
+                  element={
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <CoterieQuotesPage />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

@@ -10,6 +10,7 @@ import { retry } from '@/lib/utils/retry';
 import { COIQueue } from '@/lib/utils/queue';
 import { validateCOIData, validateRecipientEmail } from '@/lib/validators/coi';
 import { logger } from '@/lib/logger';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 
 enum COIErrorType {
   VALIDATION = 'VALIDATION',
@@ -599,13 +600,19 @@ export function useCOIGeneration() {
         throw new Error('Failed to generate COI');
       }
 
-      // Step 2: Send email via edge function
+      // Step 2: Send email via edge function with a one-time named-human approval marker
+      const sendPayload = {
+        to: emailValidation.sanitized,
+        certificateNumber: coiData.certificate_number,
+        certificateUrl: publicUrl,
+        holderName: coiData.certificate_holder_name,
+      };
+      const clientSendApproval = await createClientSendApproval('send-coi-email', sendPayload);
+
       const { data, error } = await supabase.functions.invoke('send-coi-email', {
         body: {
-          to: emailValidation.sanitized,
-          certificateNumber: coiData.certificate_number,
-          certificateUrl: publicUrl,
-          holderName: coiData.certificate_holder_name,
+          ...sendPayload,
+          client_send_approval: clientSendApproval,
         },
       });
 

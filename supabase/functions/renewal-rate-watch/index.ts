@@ -18,6 +18,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 interface RateWatchRequest {
   action: 'process_documents' | 'compute_comparison' | 'generate_report' | 'generate_email' | 'send_email' | 'full_pipeline';
@@ -356,7 +357,7 @@ Return BundleSnapshot JSON only.`;
 
       const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
       
-      const chatResponse = await fetch(chatUrl, {
+      const chatResponse = await modelBoundaryFetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -660,7 +661,7 @@ Return JSON only.`;
 
       const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
       
-      const chatResponse = await fetch(chatUrl, {
+      const chatResponse = await modelBoundaryFetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1042,7 +1043,7 @@ Return JSON only.`;
 
       const chatUrl = `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`;
       
-      const chatResponse = await fetch(chatUrl, {
+      const chatResponse = await modelBoundaryFetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1319,7 +1320,7 @@ async function sendRenewalEmail(supabase: any, workspaceId: string, userId: stri
     let response: Response;
 
     if (EMAIL_PROVIDER === 'postmark') {
-      response = await fetch('https://api.postmarkapp.com/email', {
+      response = await modelBoundaryFetch('https://api.postmarkapp.com/email', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -1341,7 +1342,7 @@ async function sendRenewalEmail(supabase: any, workspaceId: string, userId: stri
         }),
       });
     } else if (EMAIL_PROVIDER === 'sendgrid') {
-      response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      response = await modelBoundaryFetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${EMAIL_API_KEY}`,

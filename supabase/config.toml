@@ -67,6 +67,15 @@ verify_jwt = true
 [functions.ai-assistant-chat]
 verify_jwt = true
 
+[functions.hermes-chat]
+verify_jwt = true
+
+[functions.floor-action]
+verify_jwt = true
+
+[functions.floor-run-plays]
+verify_jwt = false
+
 [functions.parse-pdf-knowledge]
 verify_jwt = true
 
@@ -158,4 +167,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.canopy-servicing]
+verify_jwt = true
+
+[functions.coterie-quote]
 verify_jwt = true

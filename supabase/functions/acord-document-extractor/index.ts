@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -143,7 +144,7 @@ serve(async (req) => {
     const analyzeUrl = `${cleanEndpoint}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-07-31`;
 
     console.log('Calling Azure DI prebuilt-document model...');
-    const analyzeResponse = await fetch(analyzeUrl, {
+    const analyzeResponse = await modelBoundaryFetch(analyzeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -169,7 +170,7 @@ serve(async (req) => {
       await sleep(2000);
       attempts++;
 
-      const resultResponse = await fetch(operationLocation, {
+      const resultResponse = await modelBoundaryFetch(operationLocation, {
         headers: { 'Ocp-Apim-Subscription-Key': AZURE_API_KEY }
       });
 
@@ -296,7 +297,7 @@ ${fullText.substring(0, 20000)}
 TARGET ACORD FORM: ${target_form_number || 'Any (125, 126, 127, 130, 140)'}
 `;
 
-    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    const claudeResponse = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

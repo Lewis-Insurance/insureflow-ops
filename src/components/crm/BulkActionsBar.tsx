@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { CheckSquare, UserCheck, Tag, FileText, X, Loader2 } from 'lucide-react';
+import { CheckSquare, Tag, FileText, X, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { Account, BulkAction } from '@/types/crm';
@@ -39,7 +39,7 @@ export function BulkActionsBar({
 
   // Fetch team members when dialog opens
   useEffect(() => {
-    if (isDialogOpen && (selectedAction === 'assign_owner' || selectedAction === 'create_tasks')) {
+    if (isDialogOpen && selectedAction === 'create_tasks') {
       fetchTeamMembers();
     }
   }, [isDialogOpen, selectedAction]);
@@ -104,31 +104,6 @@ export function BulkActionsBar({
 
   const renderActionForm = () => {
     switch (selectedAction) {
-      case 'assign_owner':
-        return (
-          <div>
-            <Label htmlFor="owner">Assign to Owner</Label>
-            <Select onValueChange={(value) => setActionParams({ ...actionParams, owner_id: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder={loadingMembers ? "Loading..." : "Select owner..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingMembers ? (
-                  <SelectItem value="" disabled>Loading team members...</SelectItem>
-                ) : teamMembers.length === 0 ? (
-                  <SelectItem value="" disabled>No team members found</SelectItem>
-                ) : (
-                  teamMembers.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {getDisplayName(member)}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-
       case 'add_tags':
         return (
           <div>
@@ -230,7 +205,6 @@ export function BulkActionsBar({
 
   const getActionTitle = () => {
     switch (selectedAction) {
-      case 'assign_owner': return 'Assign Owner';
       case 'add_tags': return 'Add Tags';
       case 'create_tasks': return 'Create Tasks';
       case 'export': return 'Export Data';
@@ -255,15 +229,6 @@ export function BulkActionsBar({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleActionSelect('assign_owner')}
-          >
-            <UserCheck className="h-4 w-4 mr-2" />
-            Assign Owner
-          </Button>
-          
           <Button
             variant="outline"
             size="sm"

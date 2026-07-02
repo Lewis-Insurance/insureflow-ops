@@ -14,6 +14,7 @@ import { DocumentsList } from '@/components/documents/DocumentsList';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
 import { Brain, FileText, Inbox } from 'lucide-react';
+import { FloorIdCardRequestButton } from '@/components/floor/FloorIdCardRequestButton';
 
 function normalizeTypeForRPC(v: any) {
   const out: any = { ...v };
@@ -130,8 +131,14 @@ export default function AccountDetail() {
 
           <TabsContent value="overview">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle>Account Information</CardTitle>
+                {account.agency_workspace_id ? (
+                  <FloorIdCardRequestButton
+                    accountId={accountId}
+                    agencyWorkspaceId={account.agency_workspace_id}
+                  />
+                ) : null}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

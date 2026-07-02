@@ -38,12 +38,16 @@ import {
     Loader2,
     Building2,
     MessageSquare,
-    Phone,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTasks } from '@/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import {
+    AI_RESULTS_EMAIL_DISABLED_REASON,
+    AI_RESULTS_SMS_DISABLED_REASON,
+    isAiResultsSmsActionEnabled,
+} from '@/floor/legacyActionGate';
 import jsPDF from 'jspdf';
 
 interface AIResultsActionBarProps {
@@ -121,6 +125,10 @@ function isArrayOfObjects(arr: unknown[]): arr is Array<Record<string, unknown>>
     return arr.length > 0 && arr.every(item => isPlainObject(item));
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 /**
  * Extract JSON from markdown code blocks
  */
@@ -155,13 +163,11 @@ export function AIResultsActionBar({
     const [copied, setCopied] = useState(false);
     const [showNoteDialog, setShowNoteDialog] = useState(false);
     const [showTaskDialog, setShowTaskDialog] = useState(false);
-    const [showSMSDialog, setShowSMSDialog] = useState(false);
     const [noteContent, setNoteContent] = useState('');
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDescription, setTaskDescription] = useState('');
-    const [smsPhoneNumber, setSmsPhoneNumber] = useState('');
-    const [smsMessage, setSmsMessage] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const aiResultsSmsEnabled = isAiResultsSmsActionEnabled();
 
     // Get the actual data to process (handle JSON in markdown)
     const getProcessedResult = (): Record<string, unknown> => {
@@ -749,11 +755,11 @@ export function AIResultsActionBar({
             });
             setShowNoteDialog(false);
             setNoteContent('');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving note:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to save note',
+                description: errorMessage(error, 'Failed to save note'),
                 variant: 'destructive',
             });
         } finally {
@@ -787,57 +793,11 @@ export function AIResultsActionBar({
             setShowTaskDialog(false);
             setTaskTitle('');
             setTaskDescription('');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating task:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to create task',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    // Send SMS with results
-    const handleSendSMS = async () => {
-        if (!smsPhoneNumber) {
-            toast({
-                title: 'Phone number required',
-                description: 'Please enter a phone number',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            // Create condensed SMS message (160 char limit friendly)
-            const message = smsMessage || `AI Analysis: ${title}. View full results at your portal or contact your agent for details.`;
-
-            const { data, error } = await supabase.functions.invoke('send-sms', {
-                body: {
-                    to_number: smsPhoneNumber,
-                    body: message,
-                    account_id: accountId || null,
-                },
-            });
-
-            if (error) throw error;
-            if (!data?.success) throw new Error(data?.error || 'Failed to send SMS');
-
-            toast({
-                title: 'SMS sent!',
-                description: `Message sent to ${smsPhoneNumber}`,
-            });
-            setShowSMSDialog(false);
-            setSmsPhoneNumber('');
-            setSmsMessage('');
-        } catch (error: any) {
-            console.error('Error sending SMS:', error);
-            toast({
-                title: 'Error',
-                description: error.message || 'Failed to send SMS',
+                description: errorMessage(error, 'Failed to create task'),
                 variant: 'destructive',
             });
         } finally {
@@ -904,13 +864,42 @@ export function AIResultsActionBar({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setShowSMSDialog(true)}>
+                        <DropdownMenuItem
+                            disabled={!aiResultsSmsEnabled}
+                            onSelect={(event) => {
+                                if (!aiResultsSmsEnabled) {
+                                    event.preventDefault();
+                                    toast({
+                                        title: 'SMS gated by the Floor',
+                                        description: AI_RESULTS_SMS_DISABLED_REASON,
+                                        variant: 'destructive',
+                                    });
+                                    return;
+                                }
+
+                                toast({
+                                    title: 'SMS gated by the Floor',
+                                    description: AI_RESULTS_SMS_DISABLED_REASON,
+                                    variant: 'destructive',
+                                });
+                            }}
+                        >
                             <MessageSquare className="h-4 w-4 mr-2" />
-                            Send SMS
+                            SMS gated by Floor
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => {/* TODO: Email modal */ }}>
+                        <DropdownMenuItem
+                            disabled
+                            onSelect={(event) => {
+                                event.preventDefault();
+                                toast({
+                                    title: 'Email gated by the Floor',
+                                    description: AI_RESULTS_EMAIL_DISABLED_REASON,
+                                    variant: 'destructive',
+                                });
+                            }}
+                        >
                             <Mail className="h-4 w-4 mr-2" />
-                            Email Results
+                            Email gated by Floor
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -996,54 +985,6 @@ export function AIResultsActionBar({
                         <Button onClick={handleCreateTask} disabled={isSaving}>
                             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             Create Task
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Send SMS Dialog */}
-            <Dialog open={showSMSDialog} onOpenChange={setShowSMSDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5" />
-                            Send SMS
-                        </DialogTitle>
-                        <DialogDescription>
-                            Send a text message with a summary of this analysis
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="sms-phone">Phone Number</Label>
-                            <Input
-                                id="sms-phone"
-                                type="tel"
-                                value={smsPhoneNumber}
-                                onChange={(e) => setSmsPhoneNumber(e.target.value)}
-                                placeholder="(555) 555-5555"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="sms-message">Message (optional)</Label>
-                            <Textarea
-                                id="sms-message"
-                                value={smsMessage}
-                                onChange={(e) => setSmsMessage(e.target.value)}
-                                placeholder={`AI Analysis: ${title}. View full results at your portal or contact your agent for details.`}
-                                rows={3}
-                                maxLength={160}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {smsMessage.length}/160 characters
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowSMSDialog(false)}>Cancel</Button>
-                        <Button onClick={handleSendSMS} disabled={isSaving || !smsPhoneNumber}>
-                            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Send SMS
                         </Button>
                     </DialogFooter>
                 </DialogContent>
