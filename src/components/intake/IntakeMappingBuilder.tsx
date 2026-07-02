@@ -338,7 +338,7 @@ export function IntakeMappingBuilder({
                   <div
                     key={question.id}
                     className={`rounded-lg border p-3 cursor-pointer transition-colors hover:bg-muted/50 ${
-                      mapped ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : ''
+                      mapped ? 'border-success/40 bg-success/10' : ''
                     }`}
                     onClick={() => openMappingEditor(question)}
                   >
@@ -363,7 +363,7 @@ export function IntakeMappingBuilder({
                         {mapped && (
                           <Tooltip>
                             <TooltipTrigger>
-                              <Check className="h-4 w-4 text-green-500" />
+                              <Check className="h-4 w-4 text-success" />
                             </TooltipTrigger>
                             <TooltipContent>Mapped to ACORD {selectedFormNumber}</TooltipContent>
                           </Tooltip>
@@ -452,7 +452,7 @@ export function IntakeMappingBuilder({
                             key={field.fieldName}
                             className={`rounded-lg border p-3 ${
                               mapping
-                                ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                                ? 'border-success/40 bg-success/10'
                                 : ''
                             }`}
                           >
@@ -467,7 +467,7 @@ export function IntakeMappingBuilder({
                                 {field.required && (
                                   <Badge
                                     variant="outline"
-                                    className="text-xs mt-1 border-orange-500 text-orange-600"
+                                    className="text-xs mt-1 border-warning/40 text-warning"
                                   >
                                     Required
                                   </Badge>
@@ -580,7 +580,7 @@ export function IntakeMappingBuilder({
                         className="h-6 w-6"
                         onClick={() => handleDeleteMapping(mapping.id)}
                       >
-                        <Trash2 className="h-3 w-3 text-red-500" />
+                        <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>
                   </div>
@@ -699,12 +699,12 @@ export function IntakeMappingBuilder({
                 )}
 
               {/* Preview */}
-              <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-950/20">
-                <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-400">
+              <div className="rounded-lg border border-info/30 p-4 bg-info/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-info">
                   <HelpCircle className="h-4 w-4" />
                   Mapping Preview
                 </div>
-                <div className="mt-2 text-sm text-blue-600 dark:text-blue-300">
+                <div className="mt-2 text-sm text-info">
                   <span className="font-medium">{editorState.selectedQuestion.label}</span>
                   <ArrowRight className="inline h-3 w-3 mx-2" />
                   <span className="font-mono">

@@ -29,7 +29,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
     <div className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-blue-500" />
+          <Shield className="h-4 w-4 text-info" />
           <span className="font-medium">Carrier</span>
         </div>
         <p className="text-lg">{data.carrier_name || 'N/A'}</p>
@@ -37,7 +37,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-blue-500" />
+          <FileText className="h-4 w-4 text-info" />
           <span className="font-medium">Policy Number</span>
         </div>
         <p className="text-lg font-mono">{data.policy_number || 'N/A'}</p>
@@ -45,7 +45,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-500" />
+          <Calendar className="h-4 w-4 text-info" />
           <span className="font-medium">Effective Date</span>
         </div>
         <p>{data.effective_date || 'N/A'}</p>
@@ -53,7 +53,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-amber-500" />
+          <Calendar className="h-4 w-4 text-warning" />
           <span className="font-medium">Expiration Date</span>
         </div>
         <p>{data.expiration_date || 'N/A'}</p>
@@ -61,7 +61,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-green-500" />
+          <DollarSign className="h-4 w-4 text-success" />
           <span className="font-medium">Total Premium</span>
         </div>
         <p className="text-lg font-semibold">
@@ -71,7 +71,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-purple-500" />
+          <Calendar className="h-4 w-4 text-info" />
           <span className="font-medium">Payment Frequency</span>
         </div>
         <p className="capitalize">{data.payment_frequency || 'N/A'}</p>
@@ -105,7 +105,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
     <div className="space-y-4">
       <div>
         <h4 className="font-medium mb-2 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-yellow-500" />
+          <Sparkles className="h-4 w-4 text-warning" />
           Executive Summary
         </h4>
         <p className="text-muted-foreground">{summary.executive_summary}</p>
@@ -117,7 +117,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
           <ul className="space-y-2">
             {summary.key_points.map((point: string, idx: number) => (
               <li key={idx} className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 mt-1 text-green-500 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 mt-1 text-success flex-shrink-0" />
                 <span className="text-sm">{point}</span>
               </li>
             ))}
@@ -128,13 +128,13 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
       {summary.action_items && summary.action_items.length > 0 && (
         <div>
           <h4 className="font-medium mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             Action Items
           </h4>
           <ul className="space-y-2">
             {summary.action_items.map((item: string, idx: number) => (
-              <li key={idx} className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950/20 rounded">
-                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{idx + 1}.</span>
+              <li key={idx} className="flex items-start gap-2 p-2 bg-warning/10 rounded">
+                <span className="text-sm font-medium text-warning">{idx + 1}.</span>
                 <span className="text-sm">{item}</span>
               </li>
             ))}
@@ -145,12 +145,12 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
       {summary.risk_flags && summary.risk_flags.length > 0 && (
         <div>
           <h4 className="font-medium mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <AlertTriangle className="h-4 w-4 text-destructive" />
             Risk Flags
           </h4>
           <ul className="space-y-1">
             {summary.risk_flags.map((flag: string, idx: number) => (
-              <li key={idx} className="text-sm text-red-600 dark:text-red-400">• {flag}</li>
+              <li key={idx} className="text-sm text-destructive">• {flag}</li>
             ))}
           </ul>
         </div>
@@ -216,8 +216,8 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
       )}
 
       {classification.requires_action && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900">
-          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+        <div className="p-3 bg-warning/10 rounded-lg border border-warning/30">
+          <p className="text-sm font-medium text-warning">
             ⚠️ This document requires immediate action
           </p>
         </div>
@@ -252,7 +252,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
                 <h5 className="text-sm font-medium mb-1">Coverage Gaps</h5>
                 <ul className="space-y-1">
                   {insights.coverage_adequacy.gaps.map((gap: string, idx: number) => (
-                    <li key={idx} className="text-sm text-red-600 dark:text-red-400">• {gap}</li>
+                    <li key={idx} className="text-sm text-destructive">• {gap}</li>
                   ))}
                 </ul>
               </div>
@@ -294,7 +294,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
             {insights.cost_analysis.potential_savings && (
               <div>
                 <p className="text-sm text-muted-foreground">Potential Savings</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-2xl font-bold text-success">
                   ${insights.cost_analysis.potential_savings.toLocaleString()}
                 </p>
               </div>
@@ -380,7 +380,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
                 <h5 className="text-sm font-medium mb-1">Mitigation Strategies</h5>
                 <ul className="space-y-1">
                   {insights.risk_assessment.mitigation_strategies.map((strategy: string, idx: number) => (
-                    <li key={idx} className="text-sm text-green-600 dark:text-green-400">• {strategy}</li>
+                    <li key={idx} className="text-sm text-success">• {strategy}</li>
                   ))}
                 </ul>
               </div>
@@ -423,7 +423,7 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
                     <ul className="space-y-1">
                       {trigger.recommended_actions.map((action: string, actionIdx: number) => (
                         <li key={actionIdx} className="text-sm flex items-start gap-2">
-                          <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 mt-0.5 text-success" />
                           <span>{action}</span>
                         </li>
                       ))}
@@ -448,15 +448,15 @@ export const DocumentAnalysisResults: React.FC<DocumentAnalysisResultsProps> = (
       )}
 
       {workflow.manual_review_required && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900">
+        <div className="p-4 bg-warning/10 rounded-lg border border-warning/30">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-700 dark:text-amber-400">
+              <p className="font-medium text-warning">
                 Manual Review Required
               </p>
               {workflow.manual_review_reason && (
-                <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">
+                <p className="text-sm text-warning mt-1">
                   {workflow.manual_review_reason}
                 </p>
               )}

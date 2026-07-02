@@ -326,10 +326,10 @@ export function CameraCapture({ open, onOpenChange, onCapture }: CameraCapturePr
   }, [isFrontCamera, open, isStreaming, capturedImage, cameraError, startCamera]);
 
   const getQualityLabel = (score: number) => {
-    if (score >= QUALITY_THRESHOLDS.excellent) return { label: 'Excellent', color: 'bg-green-500' };
-    if (score >= QUALITY_THRESHOLDS.good) return { label: 'Good', color: 'bg-blue-500' };
-    if (score >= QUALITY_THRESHOLDS.acceptable) return { label: 'Acceptable', color: 'bg-yellow-500' };
-    return { label: 'Poor', color: 'bg-red-500' };
+    if (score >= QUALITY_THRESHOLDS.excellent) return { label: 'Excellent', color: 'bg-success' };
+    if (score >= QUALITY_THRESHOLDS.good) return { label: 'Good', color: 'bg-info' };
+    if (score >= QUALITY_THRESHOLDS.acceptable) return { label: 'Acceptable', color: 'bg-warning' };
+    return { label: 'Poor', color: 'bg-destructive' };
   };
 
   const getQualityGuidance = (metrics: Partial<QualityMetrics>) => {
@@ -469,7 +469,7 @@ export function CameraCapture({ open, onOpenChange, onCapture }: CameraCapturePr
 
         {/* Quality assessment results */}
         {qualityMetrics && (
-          <div className="p-4 bg-gray-50 border-t">
+          <div className="p-4 bg-cc-surface-raised border-t border-cc-border-subtle">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium">Image Quality Assessment</h4>
               <Badge className={getQualityLabel(qualityMetrics.overall).color}>
@@ -486,20 +486,20 @@ export function CameraCapture({ open, onOpenChange, onCapture }: CameraCapturePr
                 { label: 'Coverage', value: qualityMetrics.coverage, icon: ZoomIn },
               ].map(({ label, value, icon: Icon }) => (
                 <div key={label} className="text-center">
-                  <Icon className="h-4 w-4 mx-auto text-gray-500 mb-1" />
-                  <div className="text-xs text-gray-600">{label}</div>
+                  <Icon className="h-4 w-4 mx-auto text-cc-text-muted mb-1" />
+                  <div className="text-xs text-cc-text-muted">{label}</div>
                   <div className="font-medium">{value}%</div>
                 </div>
               ))}
             </div>
 
             {qualityMetrics.overall < QUALITY_THRESHOLDS.acceptable && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                  <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-yellow-800">Image quality is low</p>
-                    <p className="text-yellow-700">
+                    <p className="font-medium text-warning">Image quality is low</p>
+                    <p className="text-warning">
                       This may result in poor extraction accuracy. Consider retaking the photo.
                     </p>
                   </div>
@@ -510,7 +510,7 @@ export function CameraCapture({ open, onOpenChange, onCapture }: CameraCapturePr
         )}
 
         {/* Controls */}
-        <div className="p-4 border-t bg-white">
+        <div className="p-4 border-t border-cc-border-subtle bg-cc-surface">
           {!capturedImage ? (
             <div className="flex items-center justify-between">
               <div className="flex gap-2">

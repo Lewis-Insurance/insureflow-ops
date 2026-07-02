@@ -64,19 +64,19 @@ const CATEGORY_LABELS: Record<ComparisonCategory, string> = {
 };
 
 const SEVERITY_CONFIG: Record<Severity, { color: string; bgColor: string; icon: typeof AlertTriangle }> = {
-  critical: { color: "text-red-700", bgColor: "bg-red-100", icon: AlertTriangle },
-  high: { color: "text-orange-700", bgColor: "bg-orange-100", icon: AlertTriangle },
-  medium: { color: "text-yellow-700", bgColor: "bg-yellow-100", icon: HelpCircle },
-  low: { color: "text-green-700", bgColor: "bg-green-100", icon: CheckCircle },
+  critical: { color: "text-destructive", bgColor: "bg-destructive/10", icon: AlertTriangle },
+  high: { color: "text-warning", bgColor: "bg-warning/10", icon: AlertTriangle },
+  medium: { color: "text-warning", bgColor: "bg-warning/10", icon: HelpCircle },
+  low: { color: "text-success", bgColor: "bg-success/10", icon: CheckCircle },
 };
 
 const CHANGE_TYPE_CONFIG: Record<ChangeType, { icon: typeof ArrowUp; label: string; color: string }> = {
-  unchanged: { icon: Minus, label: "Unchanged", color: "text-gray-500" },
-  increased: { icon: ArrowUp, label: "Increased", color: "text-green-600" },
-  decreased: { icon: ArrowDown, label: "Decreased", color: "text-red-600" },
-  added: { icon: Plus, label: "Added", color: "text-blue-600" },
-  removed: { icon: Minus, label: "Removed", color: "text-red-600" },
-  modified: { icon: HelpCircle, label: "Modified", color: "text-yellow-600" },
+  unchanged: { icon: Minus, label: "Unchanged", color: "text-cc-text-muted" },
+  increased: { icon: ArrowUp, label: "Increased", color: "text-success" },
+  decreased: { icon: ArrowDown, label: "Decreased", color: "text-destructive" },
+  added: { icon: Plus, label: "Added", color: "text-info" },
+  removed: { icon: Minus, label: "Removed", color: "text-destructive" },
+  modified: { icon: HelpCircle, label: "Modified", color: "text-warning" },
 };
 
 export function ComparisonResultsView({ workspaceId }: ComparisonResultsViewProps) {
@@ -163,20 +163,20 @@ export function ComparisonResultsView({ workspaceId }: ComparisonResultsViewProp
 
           {/* Executive Summary */}
           {result.executive_summary && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
-              <h4 className="font-medium text-blue-900 mb-2">Executive Summary</h4>
-              <p className="text-sm text-blue-800">{result.executive_summary}</p>
+            <div className="p-4 bg-info/10 border border-info/30 rounded-lg mb-6">
+              <h4 className="font-medium text-info mb-2">Executive Summary</h4>
+              <p className="text-sm text-info">{result.executive_summary}</p>
             </div>
           )}
 
           {/* Document Mismatches Warning */}
           {result.docMismatches && result.docMismatches.length > 0 && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6">
-              <h4 className="font-medium text-amber-900 flex items-center gap-2 mb-2">
+            <div className="p-4 bg-warning/10 border border-warning/30 rounded-lg mb-6">
+              <h4 className="font-medium text-warning flex items-center gap-2 mb-2">
                 <AlertTriangle className="w-4 h-4" />
                 Document Mismatches
               </h4>
-              <ul className="text-sm text-amber-800 space-y-1">
+              <ul className="text-sm text-warning space-y-1">
                 {result.docMismatches.map((m: any, i: number) => (
                   <li key={i}>
                     <strong>{m.type}:</strong> {m.description}
@@ -236,10 +236,10 @@ export function ComparisonResultsView({ workspaceId }: ComparisonResultsViewProp
               {result.recommendations.map((rec: string, i: number) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm"
+                  className="flex items-start gap-2 p-3 bg-success/10 border border-success/30 rounded-lg text-sm"
                 >
-                  <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-green-800">{rec}</span>
+                  <CheckCircle className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                  <span className="text-success">{rec}</span>
                 </li>
               ))}
             </ul>
@@ -261,16 +261,16 @@ export function ComparisonResultsView({ workspaceId }: ComparisonResultsViewProp
               {result.coverageGaps.map((gap: any, i: number) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm"
+                  className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm"
                 >
-                  <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
                   <div>
-                    <span className="font-medium text-orange-800">
+                    <span className="font-medium text-warning">
                       {gap.coverageType}
                     </span>
-                    <span className="text-orange-700"> missing in Document {gap.missingIn}</span>
+                    <span className="text-warning"> missing in Document {gap.missingIn}</span>
                     {gap.description && (
-                      <p className="text-xs text-orange-600 mt-1">{gap.description}</p>
+                      <p className="text-xs text-warning mt-1">{gap.description}</p>
                     )}
                   </div>
                 </li>
@@ -362,7 +362,7 @@ function DifferenceRow({ difference }: { difference: ComparisonDifference }) {
             <span className="text-xs text-muted-foreground block">Document A</span>
             <span
               className={`font-mono text-xs ${
-                difference.changeType === "removed" ? "line-through text-red-600" : ""
+                difference.changeType === "removed" ? "line-through text-destructive" : ""
               }`}
             >
               {difference.leftValueRaw || <span className="text-muted-foreground italic">Not found</span>}
@@ -375,7 +375,7 @@ function DifferenceRow({ difference }: { difference: ComparisonDifference }) {
             <span className="text-xs text-muted-foreground block">Document B</span>
             <span
               className={`font-mono text-xs ${
-                difference.changeType === "added" ? "text-blue-600 font-medium" : ""
+                difference.changeType === "added" ? "text-info font-medium" : ""
               }`}
             >
               {difference.rightValueRaw || <span className="text-muted-foreground italic">Not found</span>}

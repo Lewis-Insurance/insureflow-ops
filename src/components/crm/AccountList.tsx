@@ -9,6 +9,7 @@ import { Building2, Users, Phone, Mail, MapPin, MoreVertical, Edit, Trash2, Eye 
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
+import { humanizeEnum } from '@/lib/format';
 import type { Account } from '@/types/crm';
 
 interface AccountListProps {
@@ -121,12 +122,12 @@ export function AccountList({
                      <div>
                        <CardTitle className="text-lg line-clamp-1">{account.name}</CardTitle>
                        <div className="flex items-center gap-2">
-                         <Badge variant="outline" className="text-xs capitalize">
-                           {displayType}
+                         <Badge variant="outline" className="text-xs">
+                           {humanizeEnum(displayType)}
                          </Badge>
                         {account.source && (
                           <Badge variant="outline" className="text-xs">
-                            {account.source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {humanizeEnum(account.source)}
                           </Badge>
                         )}
                       </div>

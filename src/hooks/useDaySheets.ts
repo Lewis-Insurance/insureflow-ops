@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { DaySheet, DaySheetFilters, CloseDaySheetInput } from '@/types/payments';
+import type { DaySheet, DaySheetFilters } from '@/types/payments';
 
 // Query keys
 export const daySheetKeys = {
@@ -97,75 +97,6 @@ export function useCurrentDaySheet() {
 
       if (error) throw error;
       return data as DaySheet | null;
-    },
-  });
-}
-
-// Close a day sheet
-export function useCloseDaySheet() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: CloseDaySheetInput & { create_deposit?: boolean; bank_account_id?: string }) => {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/day-sheet-close`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session.access_token}`,
-          },
-          body: JSON.stringify(input),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to close day sheet');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.detail(variables.day_sheet_id) });
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.current() });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['escrow-deposits'] });
-    },
-  });
-}
-
-// Reopen a day sheet (admin only)
-export function useReopenDaySheet() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (daySheetId: string) => {
-      const { data, error } = await supabase
-        .from('day_sheets')
-        .update({
-          status: 'open',
-          closed_at: null,
-          closed_by: null,
-        })
-        .eq('id', daySheetId)
-        .eq('status', 'closed') // Can only reopen closed sheets, not deposited
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (_, daySheetId) => {
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.detail(daySheetId) });
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: daySheetKeys.current() });
     },
   });
 }

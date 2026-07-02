@@ -2388,6 +2388,7 @@ async function handleAccountCanopyComplete(
         title: `Canopy share received — quote cross-sell for ${account?.name ?? 'client'}`,
         description: 'Client shared their current policy via Canopy Connect. Review the verified data and build a bundle/cross-sell quote.',
         account_id: accountId,
+        agency_workspace_id: account?.agency_workspace_id ?? null,
         entity_type: 'account',
         entity_id: accountId,
         assignee_agent_id: account?.owner_agent_id ?? null,

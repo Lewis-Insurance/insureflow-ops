@@ -352,31 +352,31 @@ export function FormComparisonView({
               <SummaryCard
                 label="Unchanged"
                 value={comparisonData.summary.unchangedCount}
-                icon={<Check className="h-4 w-4 text-green-500" />}
+                icon={<Check className="h-4 w-4 text-success" />}
                 variant="success"
               />
               <SummaryCard
                 label="Increased"
                 value={comparisonData.summary.increasedCount}
-                icon={<ArrowUp className="h-4 w-4 text-blue-500" />}
+                icon={<ArrowUp className="h-4 w-4 text-info" />}
                 variant="info"
               />
               <SummaryCard
                 label="Decreased"
                 value={comparisonData.summary.decreasedCount}
-                icon={<ArrowDown className="h-4 w-4 text-orange-500" />}
+                icon={<ArrowDown className="h-4 w-4 text-warning" />}
                 variant="warning"
               />
               <SummaryCard
                 label="Critical"
                 value={comparisonData.summary.criticalChanges}
-                icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+                icon={<AlertTriangle className="h-4 w-4 text-destructive" />}
                 variant="danger"
               />
               <SummaryCard
                 label="Attention"
                 value={comparisonData.summary.attentionChanges}
-                icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                icon={<AlertTriangle className="h-4 w-4 text-warning" />}
                 variant="warning"
               />
             </div>
@@ -423,7 +423,7 @@ export function FormComparisonView({
                                 <Badge variant="destructive">Critical</Badge>
                               )}
                               {fields.some(f => f.significance === 'attention') && (
-                                <Badge className="bg-yellow-500">Attention</Badge>
+                                <Badge className="bg-warning text-warning-foreground">Attention</Badge>
                               )}
                             </div>
                           </button>
@@ -466,10 +466,10 @@ function SummaryCard({
 }) {
   const bgColors = {
     default: 'bg-muted',
-    success: 'bg-green-50 dark:bg-green-950',
-    warning: 'bg-yellow-50 dark:bg-yellow-950',
-    danger: 'bg-red-50 dark:bg-red-950',
-    info: 'bg-blue-50 dark:bg-blue-950',
+    success: 'bg-success/10',
+    warning: 'bg-warning/10',
+    danger: 'bg-destructive/10',
+    info: 'bg-info/10',
   };
 
   return (
@@ -487,17 +487,17 @@ function ComparisonRow({ comparison }: { comparison: FormComparison }) {
   const getChangeIcon = () => {
     switch (comparison.change_type) {
       case 'increased':
-        return <ArrowUp className="h-4 w-4 text-blue-500" />;
+        return <ArrowUp className="h-4 w-4 text-info" />;
       case 'decreased':
-        return <ArrowDown className="h-4 w-4 text-orange-500" />;
+        return <ArrowDown className="h-4 w-4 text-warning" />;
       case 'added':
-        return <Plus className="h-4 w-4 text-green-500" />;
+        return <Plus className="h-4 w-4 text-success" />;
       case 'removed':
-        return <Minus className="h-4 w-4 text-red-500" />;
+        return <Minus className="h-4 w-4 text-destructive" />;
       case 'modified':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-4 w-4 text-warning" />;
       default:
-        return <Check className="h-4 w-4 text-gray-400" />;
+        return <Check className="h-4 w-4 text-cc-text-faint" />;
     }
   };
 
@@ -506,7 +506,7 @@ function ComparisonRow({ comparison }: { comparison: FormComparison }) {
       return <Badge variant="destructive">Critical</Badge>;
     }
     if (comparison.significance === 'attention') {
-      return <Badge className="bg-yellow-500">Attention</Badge>;
+      return <Badge className="bg-warning text-warning-foreground">Attention</Badge>;
     }
     return null;
   };

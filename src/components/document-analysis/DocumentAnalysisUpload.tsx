@@ -242,7 +242,7 @@ export function DocumentAnalysisUpload() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <CheckCircle2 className="h-5 w-5 text-success" />
                 Analysis Complete
               </CardTitle>
             </CardHeader>
@@ -304,9 +304,9 @@ export function DocumentAnalysisUpload() {
 
               {/* Premium */}
               {result.structured_data.premium?.total && (
-                <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                <div className="p-4 bg-success/10 rounded-lg">
                   <p className="text-sm text-muted-foreground">Total Premium</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  <p className="text-2xl font-bold text-success">
                     ${result.structured_data.premium.total.toLocaleString()}
                     {result.structured_data.premium.frequency && (
                       <span className="text-sm font-normal text-muted-foreground ml-2">

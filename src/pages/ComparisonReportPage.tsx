@@ -69,8 +69,8 @@ export default function ComparisonReportPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="flex h-96 items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-cc-text-muted" aria-hidden="true" />
         </div>
       </AppLayout>
     );
@@ -79,11 +79,11 @@ export default function ComparisonReportPage() {
   if (!comparison) {
     return (
       <AppLayout>
-        <div className="container mx-auto py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Report Not Found</h1>
-            <p className="text-muted-foreground mt-2">
-              The comparison report you're looking for could not be found.
+        <div className="mx-auto max-w-[1100px] p-6">
+          <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface px-6 py-16 text-center shadow-card">
+            <h1 className="text-lg font-bold text-cc-text-primary">Report not found</h1>
+            <p className="mt-1 text-sm text-cc-text-muted">
+              The comparison report you are looking for could not be found.
             </p>
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function ComparisonReportPage() {
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-8">
+      <div className="mx-auto max-w-[1100px] p-6">
         <ComparisonReport comparison={comparison} />
       </div>
     </AppLayout>

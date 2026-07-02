@@ -10,8 +10,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
-import { useAccountMemberships } from '@/hooks/useAccountMemberships';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { normalizePolicyType, getPolicyTypeLabel } from '@/lib/policyTypes';
 import { detectEntityFromName, parseCompoundInsuredName, type EntityType } from '@/lib/insuredNames';
@@ -172,7 +170,7 @@ const initialPolicyData: PolicyData = {
   policy_number: '',
   carrier: '',
   line_of_business: '',
-  policy_term: '6', // Default to 6-month (semi-annual) term
+  policy_term: 'semiannual', // 6-month term. Must match policies_policy_term_check (semiannual|annual)
   premium: '',
   effective_date: '',
   expiration_date: '',
@@ -180,15 +178,7 @@ const initialPolicyData: PolicyData = {
   status: 'active',
 };
 
-function mapCustomerTypeToAccountType(
-  type: 'household' | 'commercial_business'
-): 'individual' | 'business' {
-  return type === 'commercial_business' ? 'business' : 'individual';
-}
-
 export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerModalProps) {
-  const { activeAgency } = useActiveAgency();
-  const { createOwnerMembership } = useAccountMemberships();
   const [formData, setFormData] = useState({
     name: '',
     spouse_name: '',
@@ -531,21 +521,15 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
     setLoading(true);
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
+      // Resolve the user's agency workspace so the account is never created
+      // orphaned. The accounts RLS INSERT policy allows staff to insert a row
+      // with a null agency_workspace_id, but a workspace-less account then
+      // breaks every workspace-scoped feature (e.g. recording payments).
+      const { data: orgId, error: orgError } = await supabase.rpc('get_user_org_id');
+      if (orgError || !orgId) {
         toast({
-          title: 'Authentication required',
-          description: 'You must be signed in to add a customer.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const agencyWorkspaceId = activeAgency?.agency_workspace_id;
-      if (!agencyWorkspaceId) {
-        toast({
-          title: 'No agency workspace',
-          description: 'Select or join an agency workspace before adding customers.',
+          title: 'Error creating customer',
+          description: 'Could not determine your agency workspace. Please re-select your workspace and try again.',
           variant: 'destructive',
         });
         return;
@@ -553,11 +537,10 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
       // Create customer
       const customerData = {
+        agency_workspace_id: orgId,
         name: formData.name.trim() || null,
         spouse_name: formData.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
         type: formData.type,
-        account_type: mapCustomerTypeToAccountType(formData.type),
-        agency_workspace_id: agencyWorkspaceId,
         account_status: formData.account_status,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
@@ -593,17 +576,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         return;
       }
 
-      const membershipCreated = await createOwnerMembership(newCustomer.id, user.id);
-      if (!membershipCreated) {
-        await supabase.from('accounts').delete().eq('id', newCustomer.id);
-        toast({
-          title: 'Error creating customer',
-          description: 'Failed to link the customer to your account. Please try again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
       let createdPolicyId: string | null = null;
 
       // Create policy if enabled and has required data
@@ -1167,10 +1141,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                         <SelectValue placeholder="Select term" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1 Month</SelectItem>
-                        <SelectItem value="3">3 Months</SelectItem>
-                        <SelectItem value="6">6 Months</SelectItem>
-                        <SelectItem value="12">12 Months</SelectItem>
+                        <SelectItem value="semiannual">6 Months (Semi-Annual)</SelectItem>
+                        <SelectItem value="annual">12 Months (Annual)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

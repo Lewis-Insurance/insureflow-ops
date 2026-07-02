@@ -1,4 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+/* eslint-disable storybook/no-renderer-packages -- pre-existing; /react-vite not resolvable in node_modules */
+import type { Meta, StoryObj } from '@storybook/react';
 import { Badge } from './badge';
 
 const meta: Meta<typeof Badge> = {

@@ -96,21 +96,21 @@ export function WorkspaceItem({ workspace, onClick, selected, onSelect }: Worksp
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'processing':
-                return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+                return <Loader2 className="h-4 w-4 animate-spin text-info" />;
             case 'completed':
-                return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+                return <CheckCircle2 className="h-4 w-4 text-success" />;
             case 'failed':
-                return <XCircle className="h-4 w-4 text-red-500" />;
+                return <XCircle className="h-4 w-4 text-destructive" />;
             default:
-                return <Clock className="h-4 w-4 text-gray-500" />;
+                return <Clock className="h-4 w-4 text-cc-text-muted" />;
         }
     };
 
     const getStatusBadge = (status: string) => {
         const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
             idle: { variant: 'outline' },
-            processing: { variant: 'default', className: 'bg-blue-500' },
-            completed: { variant: 'secondary', className: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' },
+            processing: { variant: 'default', className: 'bg-info text-info-foreground' },
+            completed: { variant: 'secondary', className: 'bg-success/10 text-success' },
             failed: { variant: 'destructive' },
         };
         const { variant, className } = config[status] || config.idle;
@@ -142,7 +142,7 @@ export function WorkspaceItem({ workspace, onClick, selected, onSelect }: Worksp
                                 e.stopPropagation();
                                 onSelect(e.target.checked);
                             }}
-                            className="mt-1 h-4 w-4 rounded border-gray-300"
+                            className="mt-1 h-4 w-4 rounded border-cc-border-interactive"
                         />
                     )}
 

@@ -1,12 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePolicies } from '@/hooks/usePolicies';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { StatusPill, Chip, AccentSpine } from '@/components/cc';
+import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
-import { Shield, Calendar, DollarSign, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
+import { humanizeLine, humanizeCarrier } from '@/lib/format';
 import { AddPolicyModal } from './AddPolicyModal';
 import { AddQuoteModal } from './AddQuoteModal';
 import { AddNoteModal } from './AddNoteModal';
@@ -19,11 +26,23 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface CustomerPoliciesSectionProps {
   accountId: string;
+  /** Enables the duplicate-policy compare/merge dialog on the customer record. */
+  customerName?: string;
 }
 
-export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionProps) {
+// A coverage value can be null, an empty object, or a populated object. Never
+// render a raw object or a literal "{}" to the user (DATA-REALITY.md).
+function hasCoverage(coverage: unknown): boolean {
+  if (coverage == null) return false;
+  if (typeof coverage === 'object') return Object.keys(coverage as object).length > 0;
+  if (typeof coverage === 'string') return coverage.trim().length > 0 && coverage.trim() !== '{}';
+  return true;
+}
+
+export function CustomerPoliciesSection({ accountId, customerName }: CustomerPoliciesSectionProps) {
   const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies();
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
+  const navigate = useNavigate();
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
@@ -31,19 +50,21 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
-  const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyWithAccount | null>(null);
   const { toast } = useToast();
 
   // Filter policies for this specific customer
   const policies = allPolicies.filter(policy => policy.account_id === accountId);
 
-  // Split policies into active and inactive
-  const activePolicies = policies.filter(policy =>
-    ['active', 'bound', 'pending'].includes(policy.status?.toLowerCase() || 'active')
-  );
-  const inactivePolicies = policies.filter(policy =>
-    ['cancelled', 'lapsed', 'expired', 'inactive'].includes(policy.status?.toLowerCase() || '')
-  );
+  // Split policies into active and inactive. Active is the explicit live set; inactive is
+  // EVERYTHING else (catch-all) so a terminal status the list doesn't enumerate (e.g. a
+  // renewal marked 'lost' or 'non_renewed') can never fall through both filters and vanish
+  // from the customer record. A null status defaults to active (unchanged prior behavior).
+  const ACTIVE_STATUSES = ['active', 'bound', 'pending'];
+  const isActivePolicy = (policy: PolicyWithAccount) =>
+    ACTIVE_STATUSES.includes(policy.status?.toLowerCase() || 'active');
+  const activePolicies = policies.filter(isActivePolicy);
+  const inactivePolicies = policies.filter((policy) => !isActivePolicy(policy));
 
   const isLoading = policiesLoading || quotesLoading;
 
@@ -83,22 +104,6 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-      case 'bound':
-        return 'default';
-      case 'pending':
-      case 'quoted':
-        return 'secondary';
-      case 'expired':
-      case 'cancelled':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
   if (isLoading) {
     return (
       <Card className="col-span-3">
@@ -115,21 +120,175 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
     );
   }
 
-  const getQuoteStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'won':
-      case 'bound':
-        return 'default';
-      case 'open':
-      case 'pending':
-        return 'secondary';
-      case 'lost':
-      case 'declined':
-      case 'expired':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
+  // Renders a single policy card. The card is intentionally NOT clickable so the
+  // text (policy number, dates) stays selectable for copy/paste. Navigation is an
+  // explicit "View full policy" button. Per-card actions are that button + a
+  // three-dot overflow only. No per-card lime fill: the surface shows many cards
+  // and the one lime fill on this tab is the section-level "New policy" button.
+  const renderPolicyCard = (policy: PolicyWithAccount, variant: 'active' | 'inactive') => {
+    const openPolicy = () => navigate(`/policies/${policy.id}`);
+    const isActive = variant === 'active';
+
+    return (
+      <AccentSpine key={policy.id} active={isActive} className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Policy Basic Info */}
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h4 className="font-semibold text-cc-text-primary">
+                {humanizeLine(policy.line_of_business) || 'General policy'}
+              </h4>
+              <StatusPill status={policy.status || (isActive ? 'active' : 'cancelled')} />
+            </div>
+            <div className="space-y-1 text-sm text-cc-text-muted">
+              {policy.policy_number && (
+                <div className="flex items-center gap-2">
+                  <span>Policy #:</span>
+                  <span className="font-mono cc-num">{policy.policy_number}</span>
+                </div>
+              )}
+              {policy.carrier_info?.name && (
+                <div className="flex items-center gap-2">
+                  <Building className="h-3 w-3" />
+                  <Chip>{humanizeCarrier(policy.carrier_info.name)}</Chip>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dates */}
+          <div>
+            <div className="space-y-1 text-sm">
+              {policy.effective_date && (
+                <div>
+                  <span className="text-cc-text-muted">Effective:</span>
+                  <div className="flex items-center gap-1 text-cc-text-secondary">
+                    <Calendar className="h-3 w-3" />
+                    <span className="cc-num">{formatLocalDateDisplay(policy.effective_date)}</span>
+                  </div>
+                </div>
+              )}
+              {policy.expiration_date && (
+                <div>
+                  <span className="text-cc-text-muted">Expires:</span>
+                  <div className="flex items-center gap-1 text-cc-text-secondary">
+                    <Calendar className="h-3 w-3" />
+                    <span className="cc-num">{formatLocalDateDisplay(policy.expiration_date)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Premium: the anchor. Carried by weight, rendered once (no standalone $ glyph). */}
+          <div>
+            <span className="text-cc-text-muted text-xs">Premium</span>
+            <div className="mt-0.5 flex items-baseline gap-1.5">
+              <span className="cc-num font-mono text-xl font-semibold text-cc-text-primary">
+                {formatCurrency(policy.premium)}
+              </span>
+              {policy.premium ? (
+                <span className="text-sm text-cc-text-muted">
+                  / {policy.billing_frequency || 'annual'}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions: an explicit "View full policy" + a three-dot overflow. No per-card lime. */}
+        <div className="mt-3 pt-3 border-t border-cc-border-subtle flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openPolicy}
+            className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+          >
+            <Eye className="h-4 w-4" />
+            View full policy
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="More policy actions"
+                className="h-9 w-9 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-cc-lg">
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPolicy(policy);
+                  setEditPolicyOpen(true);
+                }}
+                className="gap-2 text-cc-text-secondary"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit policy
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPolicyId(policy.id);
+                  setAddNoteOpen(true);
+                }}
+                className="gap-2 text-cc-text-secondary"
+              >
+                <FileText className="h-4 w-4" />
+                Add note
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPolicyId(policy.id);
+                  setAddTaskOpen(true);
+                }}
+                className="gap-2 text-cc-text-secondary"
+              >
+                <CheckSquare className="h-4 w-4" />
+                Add task
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPolicyId(policy.id);
+                  setUploadDocOpen(true);
+                }}
+                className="gap-2 text-cc-text-secondary"
+              >
+                <FolderOpen className="h-4 w-4" />
+                Documents
+              </DropdownMenuItem>
+              {isActive ? (
+                <DropdownMenuItem
+                  onClick={() => updatePolicyStatus(policy.id, 'inactive')}
+                  className="gap-2 text-cc-text-secondary"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Mark inactive
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => updatePolicyStatus(policy.id, 'active')}
+                  className="gap-2 text-cc-text-secondary"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Mark active
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Coverage line: muted summary or nothing. Never a raw object. */}
+        {hasCoverage(policy.coverage) && (
+          <div className="mt-3 pt-3 border-t border-cc-border-subtle text-sm text-cc-text-muted">
+            <span>Coverage on file</span>
+          </div>
+        )}
+      </AccentSpine>
+    );
   };
 
   return (
@@ -140,13 +299,24 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           Policies & Quotes
         </CardTitle>
         <div className="flex gap-2">
-          <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => setAddQuoteOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Quote
+          {/* New quote is the ghost secondary. New policy is the single lime primary. */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAddQuoteOpen(true)}
+            className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+          >
+            <Plus className="h-4 w-4" />
+            New quote
           </Button>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setAddPolicyOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Policy
+          <Button
+            data-primary
+            size="sm"
+            onClick={() => setAddPolicyOpen(true)}
+            className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+          >
+            <Plus className="h-4 w-4" />
+            New policy
           </Button>
         </div>
       </CardHeader>
@@ -155,11 +325,11 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="policies">
               <Shield className="h-4 w-4 mr-2" />
-              Policies ({policies.length})
+              Policies (<span className="cc-num">{policies.length}</span>)
             </TabsTrigger>
             <TabsTrigger value="quotes">
               <Quote className="h-4 w-4 mr-2" />
-              Quotes ({quotes.length})
+              Quotes (<span className="cc-num">{quotes.length}</span>)
             </TabsTrigger>
           </TabsList>
 
@@ -167,302 +337,52 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           <TabsContent value="policies">
             {policies.length === 0 ? (
               <div className="text-center py-8">
-                <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Policies</h3>
-                <p className="text-muted-foreground mb-4">
-                  This customer doesn't have any policies yet.
+                <Shield className="h-12 w-12 text-cc-text-muted mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-cc-text-primary">No policies</h3>
+                <p className="text-cc-text-muted mb-4">
+                  This customer doesn't have any policies yet. Use New policy above to add the first and start the book.
                 </p>
-                <Button onClick={() => setAddPolicyOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Policy
+                <Button
+                  variant="outline"
+                  onClick={() => setAddPolicyOpen(true)}
+                  className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add policy
                 </Button>
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Active Policies Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    Active Policies ({activePolicies.length})
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-cc-text-primary">
+                    <CheckCircle className="h-5 w-5 text-cc-success" />
+                    Active policies (<span className="cc-num">{activePolicies.length}</span>)
                   </h3>
                   {activePolicies.length === 0 ? (
-                    <div className="text-center py-4 border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">No active policies</p>
+                    <div className="text-center py-4 rounded-cc-md border border-cc-border-subtle bg-cc-surface">
+                      <p className="text-cc-text-muted">No active policies</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {activePolicies.map((policy) => (
-                        <div
-                          key={policy.id}
-                          className="border rounded-lg p-4 hover:bg-muted/30 transition-colors border-green-200 bg-green-50/30"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {/* Policy Basic Info */}
-                            <div className="md:col-span-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h4 className="font-semibold">{policy.line_of_business || 'General Policy'}</h4>
-                                <Badge variant={getStatusColor(policy.status || 'active')}>
-                                  {policy.status || 'Active'}
-                                </Badge>
-                              </div>
-                              <div className="space-y-1 text-sm text-muted-foreground">
-                                {policy.policy_number && (
-                                  <div className="flex items-center gap-2">
-                                    <span>Policy #:</span>
-                                    <span className="font-mono">{policy.policy_number}</span>
-                                  </div>
-                                )}
-                                {policy.carrier_info?.name && (
-                                  <div className="flex items-center gap-2">
-                                    <Building className="h-3 w-3" />
-                                    <span>{policy.carrier_info.name}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Dates */}
-                            <div>
-                              <div className="space-y-1 text-sm">
-                                {policy.effective_date && (
-                                  <div>
-                                    <label className="text-muted-foreground">Effective:</label>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3 w-3" />
-                                      <span>{formatLocalDateDisplay(policy.effective_date)}</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {policy.expiration_date && (
-                                  <div>
-                                    <label className="text-muted-foreground">Expires:</label>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3 w-3" />
-                                      <span>{formatLocalDateDisplay(policy.expiration_date)}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Premium */}
-                            <div>
-                              <div className="text-sm">
-                                <label className="text-muted-foreground">Premium:</label>
-                                <div className="flex items-center gap-1 font-semibold">
-                                  <DollarSign className="h-3 w-3" />
-                                  <span>{formatCurrency(policy.premium)}</span>
-                                </div>
-                                {policy.premium && (
-                                  <span className="text-muted-foreground text-xs">
-                                    / {policy.billing_frequency || 'annual'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions - Colorful Buttons */}
-                          <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
-                              <Link to={`/policies/${policy.id}`}>
-                                <Eye className="h-4 w-4 mr-1" />
-                                View Policy
-                              </Link>
-                            </Button>
-                            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
-                              setSelectedPolicy(policy);
-                              setEditPolicyOpen(true);
-                            }}>
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Edit Policy
-                            </Button>
-                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setAddNoteOpen(true);
-                            }}>
-                              <FileText className="h-4 w-4 mr-1" />
-                              Add Note
-                            </Button>
-                            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setAddTaskOpen(true);
-                            }}>
-                              <CheckSquare className="h-4 w-4 mr-1" />
-                              Add Task
-                            </Button>
-                            <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setUploadDocOpen(true);
-                            }}>
-                              <FolderOpen className="h-4 w-4 mr-1" />
-                              Documents
-                            </Button>
-                            {/* Status Toggle Buttons */}
-                            <div className="ml-auto flex gap-2">
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Active
-                              </Button>
-                              <Button size="sm" className="bg-gray-600 hover:bg-gray-700 text-white" onClick={() => updatePolicyStatus(policy.id, 'inactive')}>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Inactive
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Additional Info */}
-                          {policy.coverage && (
-                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                              <span>Coverage: {JSON.stringify(policy.coverage)}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                      {activePolicies.map((policy) => renderPolicyCard(policy, 'active'))}
                     </div>
                   )}
                 </div>
 
                 {/* Inactive Policies Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-gray-500" />
-                    Inactive Policies ({inactivePolicies.length})
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-cc-text-secondary">
+                    <XCircle className="h-5 w-5 text-cc-text-muted" />
+                    Inactive policies (<span className="cc-num">{inactivePolicies.length}</span>)
                   </h3>
                   {inactivePolicies.length === 0 ? (
-                    <div className="text-center py-4 border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">No inactive policies</p>
+                    <div className="text-center py-4 rounded-cc-md border border-cc-border-subtle bg-cc-surface">
+                      <p className="text-cc-text-muted">No inactive policies</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {inactivePolicies.map((policy) => (
-                        <div
-                          key={policy.id}
-                          className="border rounded-lg p-4 hover:bg-muted/30 transition-colors border-gray-200 bg-gray-50/50"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {/* Policy Basic Info */}
-                            <div className="md:col-span-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h4 className="font-semibold text-muted-foreground">{policy.line_of_business || 'General Policy'}</h4>
-                                <Badge variant={getStatusColor(policy.status || 'cancelled')}>
-                                  {policy.status || 'Cancelled'}
-                                </Badge>
-                              </div>
-                              <div className="space-y-1 text-sm text-muted-foreground">
-                                {policy.policy_number && (
-                                  <div className="flex items-center gap-2">
-                                    <span>Policy #:</span>
-                                    <span className="font-mono">{policy.policy_number}</span>
-                                  </div>
-                                )}
-                                {policy.carrier_info?.name && (
-                                  <div className="flex items-center gap-2">
-                                    <Building className="h-3 w-3" />
-                                    <span>{policy.carrier_info.name}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Dates */}
-                            <div>
-                              <div className="space-y-1 text-sm">
-                                {policy.effective_date && (
-                                  <div>
-                                    <label className="text-muted-foreground">Effective:</label>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3 w-3" />
-                                      <span>{formatLocalDateDisplay(policy.effective_date)}</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {policy.expiration_date && (
-                                  <div>
-                                    <label className="text-muted-foreground">Expires:</label>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3 w-3" />
-                                      <span>{formatLocalDateDisplay(policy.expiration_date)}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Premium */}
-                            <div>
-                              <div className="text-sm">
-                                <label className="text-muted-foreground">Premium:</label>
-                                <div className="flex items-center gap-1 font-semibold text-muted-foreground">
-                                  <DollarSign className="h-3 w-3" />
-                                  <span>{formatCurrency(policy.premium)}</span>
-                                </div>
-                                {policy.premium && (
-                                  <span className="text-muted-foreground text-xs">
-                                    / {policy.billing_frequency || 'annual'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions - Colorful Buttons */}
-                          <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
-                              <Link to={`/policies/${policy.id}`}>
-                                <Eye className="h-4 w-4 mr-1" />
-                                View Policy
-                              </Link>
-                            </Button>
-                            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => {
-                              setSelectedPolicy(policy);
-                              setEditPolicyOpen(true);
-                            }}>
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Edit Policy
-                            </Button>
-                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setAddNoteOpen(true);
-                            }}>
-                              <FileText className="h-4 w-4 mr-1" />
-                              Add Note
-                            </Button>
-                            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setAddTaskOpen(true);
-                            }}>
-                              <CheckSquare className="h-4 w-4 mr-1" />
-                              Add Task
-                            </Button>
-                            <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => {
-                              setSelectedPolicyId(policy.id);
-                              setUploadDocOpen(true);
-                            }}>
-                              <FolderOpen className="h-4 w-4 mr-1" />
-                              Documents
-                            </Button>
-                            {/* Status Toggle Buttons */}
-                            <div className="ml-auto flex gap-2">
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updatePolicyStatus(policy.id, 'active')}>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Active
-                              </Button>
-                              <Button size="sm" className="bg-gray-600 hover:bg-gray-700 text-white" disabled>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Inactive
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Additional Info */}
-                          {policy.coverage && (
-                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                              <span>Coverage: {JSON.stringify(policy.coverage)}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                      {inactivePolicies.map((policy) => renderPolicyCard(policy, 'inactive'))}
                     </div>
                   )}
                 </div>
@@ -474,14 +394,18 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           <TabsContent value="quotes">
             {quotes.length === 0 ? (
               <div className="text-center py-8">
-                <Quote className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Quotes</h3>
-                <p className="text-muted-foreground mb-4">
+                <Quote className="h-12 w-12 text-cc-text-muted mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-cc-text-primary">No quotes</h3>
+                <p className="text-cc-text-muted mb-4">
                   This customer doesn't have any quotes yet.
                 </p>
-                <Button onClick={() => setAddQuoteOpen(true)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setAddQuoteOpen(true)}
+                  className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Create First Quote
+                  Create first quote
                 </Button>
               </div>
             ) : (
@@ -495,10 +419,8 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                       {/* Quote Basic Info */}
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{quote.line_of_business || 'General Quote'}</h4>
-                          <Badge variant={getQuoteStatusColor(quote.status || 'open')}>
-                            {quote.status || 'Open'}
-                          </Badge>
+                          <h4 className="font-semibold">{humanizeLine(quote.line_of_business) || 'General Quote'}</h4>
+                          <StatusPill status={quote.status || 'open'} />
                         </div>
                         <div className="space-y-1 text-sm text-muted-foreground">
                           {quote.quote_ref && (
@@ -510,12 +432,13 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                           {quote.carrier_info?.name && (
                             <div className="flex items-center gap-2">
                               <Building className="h-3 w-3" />
-                              <span>{quote.carrier_info.name}</span>
+                              <Chip>{humanizeCarrier(quote.carrier_info.name)}</Chip>
                             </div>
                           )}
                           {quote.competitor_carrier && (
-                            <div className="flex items-center gap-2 text-orange-600">
-                              <span>Competitor: {quote.competitor_carrier}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">Competitor:</span>
+                              <Chip>{humanizeCarrier(quote.competitor_carrier)}</Chip>
                             </div>
                           )}
                         </div>
@@ -546,32 +469,41 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
                       {/* Premium */}
                       <div>
                         <div className="text-sm">
-                          <label className="text-muted-foreground">Premium:</label>
-                          <div className="flex items-center gap-1 font-semibold">
-                            <DollarSign className="h-3 w-3" />
-                            <span>{formatCurrency(quote.premium)}</span>
+                          <label className="text-cc-text-muted">Premium:</label>
+                          <div className="font-semibold text-cc-text-primary">
+                            <span className="cc-num font-mono">{formatCurrency(quote.premium)}</span>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-cc-border-subtle pt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                        className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                      >
                         <Link to={`/quotes/${quote.id}`}>
                           <Eye className="h-4 w-4 mr-1" />
-                          View Quote
+                          View quote
                         </Link>
                       </Button>
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => {
-                        // Convert quote to policy
-                        toast({
-                          title: 'Convert to Policy',
-                          description: 'This feature is coming soon.',
-                        });
-                      }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                        onClick={() => {
+                          // Convert quote to policy
+                          toast({
+                            title: 'Convert to policy',
+                            description: 'This feature is coming soon.',
+                          });
+                        }}
+                      >
                         <Shield className="h-4 w-4 mr-1" />
-                        Bind Policy
+                        Bind policy
                       </Button>
                     </div>
                   </div>
@@ -581,12 +513,14 @@ export function CustomerPoliciesSection({ accountId }: CustomerPoliciesSectionPr
           </TabsContent>
         </Tabs>
       </CardContent>
-      
+
       <AddPolicyModal
         open={addPolicyOpen}
         onOpenChange={setAddPolicyOpen}
         accountId={accountId}
         onSuccess={refetch}
+        enableDuplicateMerge
+        currentCustomerName={customerName}
       />
       <AddQuoteModal
         open={addQuoteOpen}

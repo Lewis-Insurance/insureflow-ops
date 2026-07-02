@@ -174,9 +174,9 @@ export function MessageInput({
 
       {/* Edit indicator */}
       {editingMessage && (
-        <div className="flex items-center gap-2 mb-2 p-2 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
+        <div className="flex items-center gap-2 mb-2 p-2 bg-warning/10 rounded-lg">
           <div className="flex-1">
-            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+            <p className="text-xs text-warning font-medium">
               Editing message
             </p>
           </div>

@@ -62,9 +62,9 @@ const TYPE_LABELS: Record<EnrichmentType, string> = {
 };
 
 const TIER_COLORS = {
-  basic: 'bg-gray-100 text-gray-800',
-  standard: 'bg-blue-100 text-blue-800',
-  premium: 'bg-purple-100 text-purple-800',
+  basic: 'bg-cc-surface-overlay text-cc-text-secondary',
+  standard: 'bg-info/10 text-info',
+  premium: 'bg-info/10 text-info',
 };
 
 // ============================================
@@ -141,22 +141,22 @@ export function EnrichmentQuotaDisplay({
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">Lookups Used</span>
-            <span className={isNearLimit ? 'text-orange-500' : ''}>
+            <span className={isNearLimit ? 'text-warning' : ''}>
               {quotaStatus.usedThisMonth} / {quotaStatus.monthlyQuota}
             </span>
           </div>
           <Progress
             value={usagePercent}
-            className={`h-2 ${isAtLimit ? 'bg-red-200' : isNearLimit ? 'bg-orange-200' : ''}`}
+            className={`h-2 ${isAtLimit ? 'bg-destructive/20' : isNearLimit ? 'bg-warning/20' : ''}`}
           />
           {isAtLimit && (
-            <div className="flex items-center gap-2 text-sm text-red-600">
+            <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4" />
               Quota exceeded. Resets on the 1st of next month.
             </div>
           )}
           {!isAtLimit && isNearLimit && (
-            <div className="flex items-center gap-2 text-sm text-orange-600">
+            <div className="flex items-center gap-2 text-sm text-warning">
               <AlertTriangle className="h-4 w-4" />
               Approaching quota limit
             </div>
@@ -217,11 +217,11 @@ export function EnrichmentQuotaDisplay({
         {/* Free vs Paid Info */}
         <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle className="h-4 w-4 text-success" />
             <span>VIN lookups are FREE (powered by NHTSA)</span>
           </div>
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-yellow-500" />
+            <DollarSign className="h-4 w-4 text-warning" />
             <span>Property & business lookups cost ${quotaStatus.pricePerLookup.toFixed(2)} each</span>
           </div>
         </div>
@@ -260,7 +260,7 @@ export function EnrichmentConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-[var(--cc-scrim)] flex items-center justify-center z-50">
       <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
         <div className="flex items-center gap-3 mb-4">
           {TYPE_ICONS[type]}

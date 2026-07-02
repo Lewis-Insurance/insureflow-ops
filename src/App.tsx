@@ -46,6 +46,7 @@ const TelephonyDashboard = lazyWithRetry(() => import("./pages/TelephonyDashboar
 const ReportsPage = lazyWithRetry(() => import("./pages/ReportsPage"));
 const CommandCenterPage = lazyWithRetry(() => import("./pages/CommandCenterPage"));
 const MergeCustomersPage = lazyWithRetry(() => import("./pages/MergeCustomersPage"));
+const DuplicatesReviewPage = lazyWithRetry(() => import("./pages/DuplicatesReviewPage"));
 const TeamMessagingPage = lazyWithRetry(() => import("./pages/TeamMessagingPage"));
 const ExecutivePage = lazyWithRetry(() => import("./pages/ExecutivePage"));
 const AnalyticsPage = lazyWithRetry(() => import("./pages/AnalyticsPage"));
@@ -151,7 +152,8 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <ErrorBoundary level="app" resetOnPropsChange>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    {/* Calm Command defaults to dark; light theme is a full brand counterpart (design-system/constitution.md). */}
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <NavigationGuardProvider>
@@ -531,6 +533,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/duplicates"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <DuplicatesReviewPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
                   path="/team-messaging"
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
@@ -785,6 +795,14 @@ const App = () => (
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <ComparisonPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/insurance-comparison"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <InsuranceComparison />
                     </ErrorBoundary>
                   }
                 />

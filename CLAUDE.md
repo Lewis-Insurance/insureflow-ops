@@ -14,6 +14,22 @@
 
 ---
 
+## Design System: Calm Command (binding for all UI)
+
+The in-app CRM follows **Calm Command** — a dark-first operations console (with a full light theme) extracted from the AO Renewal Command Center. One lime accent (`#BEF264`), hierarchy from weight and spacing, not color. The full system lives in `design-system/`:
+
+- `design-system/constitution.md` — the ten rules and non-negotiables (read first)
+- `design-system/surface-map.md` — page archetypes (Record Command, Index/List, Form, etc.)
+- `design-system/component-rules.md` — every component, states, action hierarchy
+- `design-system/design-tokens.css` — source of color/spacing/radius/shadow/motion/z-index (mirrored into `src/index.css`)
+- `design-system/acceptance-checklist.md` — the gate before any screen is done
+- `design-system/anti-patterns.md` — forbidden (rainbow toolbar, vanity metric wall, carrier-by-color, etc.)
+- `design-system/builder-prompt.md` — drop into a fresh agent session to build a surface
+
+Reusable primitives live in `src/components/cc/`. The app defaults to dark (`class="dark"` on `<html>`, `defaultTheme="dark"`) and ships a full **light** counterpart selectable from the header theme toggle (light / dark / system). Both themes are one token set: dark tokens on `:root, .dark`, light overrides on `.light` (see `src/index.css` / `design-system/design-tokens.css`). The single lime accent deepens to lime-700 (`#4D7C0F`) in light so it stays AA as a fill and as text/icon/border on white. Tokens are consumed via Tailwind `cc-*` classes (e.g. `bg-cc-surface`, `text-cc-text-muted`, `rounded-cc-xl`). Non-negotiables: one lime primary per surface, tabular figures, mask SSN/DOB/DLN, carriers are name chips not colors, no em or en dashes in copy.
+
+---
+
 ## Deployment Architecture
 
 ### Production Environment
@@ -1108,6 +1124,35 @@ insureflow-ops/
 ---
 
 ## Change Log
+
+### 2026-06-30 (Light theme: working selector + full app conversion)
+- ✅ **Light mode is now a real, first-class theme** (previously the header toggle was inert because `App.tsx` wrapped everything in `forcedTheme="dark"`).
+  - `App.tsx`: removed `forcedTheme`, enabled `enableSystem` + `disableTransitionOnChange`. The existing header `ThemeToggle` (light / dark / system) now drives the theme and persists to localStorage via next-themes.
+  - `src/index.css` + `design-system/design-tokens.css`: added a full `.light` token set (mirror of the `:root, .dark` set; only color tokens overridden). `color-scheme` now follows the theme class.
+  - **Single lime accent preserved**: in light mode the accent deepens to lime-700 (`#4D7C0F`) so it stays AA as a fill (white text) AND as text/icon/border/focus on white. Semantics deepen to their 700 shades so the 14% `StatusPill` tints stay legible.
+  - `tailwind.config.ts`: added `<alpha-value>` to every `hsl(var(--x))` color so opacity modifiers work (`bg-destructive/10`, `bg-success/10`, etc.). cc-* hex tokens unchanged.
+  - **App-wide conversion**: swept 99 files that hardcoded theme-blind colors (`bg-slate-900`, `text-white`, `text-red-400`, `bg-black/80` scrims, dark hex panels) and replaced them with adaptive tokens (cc-* surfaces/text/borders + shadcn semantic tints). Build green; ~95 files changed, color-class-only edits. Intentional KEEPs: white-on-saturated-fill CTAs/badges, AI/brand gradient orbs, category-color legends, chart series, the black camera viewfinder, and the self-branded public `DocumentCollectionPortal`.
+  - Conversion guide (mapping table) used for the sweep is in the session scratchpad, not the repo.
+
+### 2026-06-29 (Relationship Graph v2 + Merge consolidation + Importer hardening)
+- ✅ **Relationship Graph v2** (PR #13, migrations `20260629210000`–`260000`, applied to prod):
+  - **Edge vocabulary**: `affiliated_business` + `dependent` added to the `rel_type` CHECK on `account_relationships` and `account_relationship_suggestions`.
+  - **Recursive Hub** `get_account_cluster(account_id)`: bounded, cycle-guarded walk over owns/spouse/household_member/dependent/affiliated_business/parent_company; owner-centered, per-node policy/premium/next-expiration + cluster roll-ups. `ClusterHub` renders it in the Customer Relationships tab (owner center, company cards with sibling nav, household block, cross-sell line). `search_accounts` gained `owned_business_count` (shown in the Link drawer).
+  - **Noise-free suggester**: `surname_business` `owns` now requires a co-occurring shared contact (phone/email/address/TIN, read from BOTH normalized `insured_*` and legacy `accounts` columns); added `affiliated_business` (shared owner/contact) + household_member/dependent; one ranked candidate per pair; all human-confirm.
+  - **Confirm-gated retype staging**: `retype_candidates` (RLS staff-only) + `generate_retype_candidates` (stages type/policy mismatches from `policies.line_category='commercial'`, never mutates) + `approve/reject_retype_candidate` (only approve writes a type, human-gated, keeps `account_type`/`type`/`insured_profiles.type` consistent).
+- ✅ **Single merge engine**: `_do_account_merge(survivor, losers, rule, apply boolean default true)` is now the only merge body (apply=false = pure compute path for `preview_merge`). Legacy 5-arg `merge_accounts` **dropped**. EXECUTE on `_do_account_merge` is postgres/service_role only; `merge_accounts_manual` / `relgraph_merge_duplicate_group` / `preview_merge` are `is_staff()`-gated and reach it as SECURITY DEFINER. Carrier de-dup key normalizes `&`↔`and`.
+- ✅ **Importer hardening** (PRs #11/#12): `import_resolve_account` RPC + `normalize_entity_name`; the bulk importer resolves-or-creates instead of blind-inserting (matches businesses by normalized name, individuals by name + shared email/phone, follows `merged_into_id` to the live survivor), tenant-scopes new accounts to the caller's workspace and refuses a null/ambiguous workspace.
+- ✅ **Data fixes (prod)**: Sorensen & Smith LLC cluster merged 6→1; Elite Rc Productions Llc + Pbc Inc cross-type dups merged; Milton G Smith person hub created (owns Sorensen & Smith + GSMS + Hendrix).
+- **Known debt (NOT addressed, by decision)**: `npm run typecheck` carries ~1156 pre-existing TS errors across ~209 files (code↔generated-types drift; not a deploy gate — Vite build + lint are green). This session added 0 new type errors. Tracked as a separate, dedicated effort.
+- Enum reference: `accounts.account_type` is enum `account_type_new` (`individual`/`business`); `accounts.type` is enum `account_type_v2` (`household`/`commercial_business`); `sync_account_types` mirrors them.
+
+### 2026-06-28 (Relationship Graph)
+- ✅ **One identity-and-relationship graph keyed to `accounts.id`** (docs/Lewis-CRM-Relationship-Graph-Plan.md). All 4 phases, applied directly to prod.
+  - **Phase 0 — "goes by" / alias search**: `accounts.goes_by` + `account_aliases` table; `goes_by` folded into `accounts_search_vector_tg`; `unified_customer_search` + `global_search_v1` made alias + trigram (pg_trgm) aware; new `search_accounts(q)` RPC returns a match reason ("goes by Lance", "fuzzy: McDonald"). Inline "Goes by" capture on the customer header.
+  - **Phase 1 — the edge table**: `account_relationships` (typed/directional: owns, spouse, parent_company, same_as, related, household_member) + `get_account_relationships()` RPC. Relationships tab + Link drawer + Snapshot cross-sell line on the customer record. Households stay the set-grouping container (`household_rollup`). Backfilled spouse edges from `spouse_name`.
+  - **Phase 2 — suggestions**: `account_relationship_suggestions` staging table (never auto-commit) + `generate_relationship_suggestions()` engine (shared phone/address, surname-business, business-email-name, spouse name). Edge fn `suggest-account-links` (CRON_SECRET) + nightly GitHub Action. One-click confirm promotes to a `source='suggested'` edge.
+  - **Phase 3 — dedup + consolidation**: `/duplicates` review queue over pending `duplicate_groups` (`list_duplicate_groups_for_review`), merge via `relgraph_merge_duplicate_group()` which records a `same_as` provenance edge then calls the existing `merge_duplicate_records`. Dropped dead `customer_identities` (0 rows). Kept `businesses` (still read by CompanyManagement/global_search).
+  - Key files: `useRelationshipGraph.ts`, `components/relationships/*`, `DuplicatesReviewPage.tsx`, migrations `20260628200000`–`204000`. All new SECURITY DEFINER RPCs revoked from anon/public.
 
 ### 2024-12-28 (Predictive Analytics Suite + CEO Digest Schema Fixes)
 - ✅ **CEO Digest Schema Fixes**

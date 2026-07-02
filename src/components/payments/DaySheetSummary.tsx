@@ -1,15 +1,11 @@
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Banknote,
   Receipt,
   CreditCard,
   Building2,
-  Clock,
-  CheckCircle2,
-  Archive,
 } from 'lucide-react';
 import type { DaySheet } from '@/types/payments';
 
@@ -17,18 +13,6 @@ interface DaySheetSummaryProps {
   daySheet: DaySheet;
   showDetailed?: boolean;
 }
-
-const statusIcons = {
-  open: Clock,
-  closed: CheckCircle2,
-  deposited: Archive,
-};
-
-const statusColors = {
-  open: 'bg-blue-100 text-blue-800',
-  closed: 'bg-amber-100 text-amber-800',
-  deposited: 'bg-green-100 text-green-800',
-};
 
 export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSummaryProps) {
   const formatCurrency = (amount: number) => {
@@ -38,8 +22,6 @@ export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSumm
     }).format(amount);
   };
 
-  const StatusIcon = statusIcons[daySheet.status] || Clock;
-
   // Calculate breakdown percentages
   const total = daySheet.grand_total || 0;
   const breakdown = [
@@ -47,55 +29,28 @@ export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSumm
     { label: 'Checks', amount: daySheet.total_checks || 0, icon: Receipt, color: 'bg-blue-500' },
     {
       label: 'Cards',
-      amount: (daySheet.total_credit_cards || 0) + (daySheet.total_debit_cards || 0),
+      amount: daySheet.total_credit_cards || 0,
       icon: CreditCard,
       color: 'bg-purple-500',
     },
     { label: 'ACH', amount: daySheet.total_ach || 0, icon: Building2, color: 'bg-orange-500' },
-    {
-      label: 'Agency Bill',
-      amount: daySheet.total_agency_bill || 0,
-      icon: Building2,
-      color: 'bg-gray-500',
-    },
   ].filter((item) => item.amount > 0);
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                daySheet.status === 'open'
-                  ? 'bg-blue-100'
-                  : daySheet.status === 'closed'
-                  ? 'bg-amber-100'
-                  : 'bg-green-100'
-              }`}
-            >
-              <StatusIcon
-                className={`h-5 w-5 ${
-                  daySheet.status === 'open'
-                    ? 'text-blue-600'
-                    : daySheet.status === 'closed'
-                    ? 'text-amber-600'
-                    : 'text-green-600'
-                }`}
-              />
-            </div>
-            <div>
-              <CardTitle className="text-lg">
-                {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
-              </CardTitle>
-              {daySheet.sheet_number && (
-                <p className="text-sm text-muted-foreground font-mono">{daySheet.sheet_number}</p>
-              )}
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+            <Receipt className="h-5 w-5 text-emerald-700" />
           </div>
-          <Badge className={statusColors[daySheet.status]}>
-            {daySheet.status.charAt(0).toUpperCase() + daySheet.status.slice(1)}
-          </Badge>
+          <div>
+            <CardTitle className="text-lg">
+              {format(parseISO(daySheet.sheet_date), 'EEEE, MMMM d, yyyy')}
+            </CardTitle>
+            {daySheet.sheet_number && (
+              <p className="text-sm text-muted-foreground font-mono">{daySheet.sheet_number}</p>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -152,7 +107,7 @@ export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSumm
                 <CreditCard className="h-4 w-4 mx-auto text-purple-600" />
                 <p className="text-xs text-muted-foreground mt-1">Cards</p>
                 <p className="font-medium text-sm">
-                  {formatCurrency((daySheet.total_credit_cards || 0) + (daySheet.total_debit_cards || 0))}
+                  {formatCurrency(daySheet.total_credit_cards || 0)}
                 </p>
               </div>
               <div className="p-2 rounded bg-orange-50">
@@ -160,15 +115,6 @@ export function DaySheetSummary({ daySheet, showDetailed = false }: DaySheetSumm
                 <p className="text-xs text-muted-foreground mt-1">ACH</p>
                 <p className="font-medium text-sm">{formatCurrency(daySheet.total_ach || 0)}</p>
               </div>
-            </div>
-          )}
-
-          {/* Timestamps */}
-          {daySheet.status !== 'open' && (
-            <div className="pt-3 border-t text-sm text-muted-foreground">
-              {daySheet.closed_at && (
-                <p>Closed: {format(new Date(daySheet.closed_at), 'MMM d, yyyy h:mm a')}</p>
-              )}
             </div>
           )}
         </div>

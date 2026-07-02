@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DuplicatePolicyDialog, type ExistingPolicyInfo } from './DuplicatePolicyDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,9 +36,25 @@ interface AddPolicyModalProps {
   onOpenChange: (open: boolean) => void;
   accountId: string;
   onSuccess?: () => void;
+  /**
+   * Customer record pages only: when a policy number is already in use, show a
+   * side-by-side compare with a "Merge Clients" shortcut instead of a raw DB
+   * error. Left off elsewhere (e.g. the global Policies list, renewals).
+   */
+  enableDuplicateMerge?: boolean;
+  /** Name of the customer whose record we're on (left panel + merge context). */
+  currentCustomerName?: string;
 }
 
-export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: AddPolicyModalProps) {
+export function AddPolicyModal({
+  open,
+  onOpenChange,
+  accountId,
+  onSuccess,
+  enableDuplicateMerge = false,
+  currentCustomerName,
+}: AddPolicyModalProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     policy_number: '',
     carrier: '',
@@ -59,6 +77,10 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
   // Tracks fields where the parser returned a value but we couldn't cleanly
   // map it to a canonical option, so the user must explicitly confirm.
   const [needsConfirmation, setNeedsConfirmation] = useState<Record<string, boolean>>({});
+  // Duplicate policy-number compare dialog (customer pages only).
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
+  const [duplicateExisting, setDuplicateExisting] = useState<ExistingPolicyInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -288,6 +310,52 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
     }
   };
 
+  // A policy number is globally unique across accounts (active policies), so a
+  // collision usually means the same policy is already on another customer.
+  // Look up who owns it and open the compare/merge dialog.
+  async function openDuplicateDialog(policyNumber: string) {
+    setDuplicateExisting(null);
+    setDuplicateLoading(true);
+    setDuplicateOpen(true);
+    try {
+      const { data: existing } = await supabase
+        .from('policies')
+        .select('id, policy_number, carrier, line_of_business, status, account_id')
+        .eq('policy_number', policyNumber)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existing) {
+        // Nothing found (e.g. an RLS-hidden record). Fall back to a plain notice.
+        setDuplicateOpen(false);
+        toast({
+          title: 'Policy number already in use',
+          description: `Policy ${policyNumber} already exists. Please check the number and try again.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { data: acc } = await supabase
+        .from('accounts')
+        .select('id, name')
+        .eq('id', existing.account_id)
+        .maybeSingle();
+
+      setDuplicateExisting({ ...existing, account_name: acc?.name ?? 'Unknown customer' });
+    } catch {
+      setDuplicateOpen(false);
+      toast({
+        title: 'Policy number already in use',
+        description: `Policy ${policyNumber} already exists. Please check the number and try again.`,
+        variant: 'destructive',
+      });
+    } finally {
+      setDuplicateLoading(false);
+    }
+  }
+
   async function handleSave() {
     if (!validateForm()) return;
 
@@ -330,6 +398,15 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         .single();
 
       if (error) {
+        // Duplicate policy number: on customer pages, show the compare/merge
+        // dialog instead of a raw unique-constraint error.
+        const isDuplicatePolicyNumber =
+          error.code === '23505' ||
+          /policies_policy_number_active_unique|duplicate key|already exists/i.test(error.message || '');
+        if (enableDuplicateMerge && isDuplicatePolicyNumber) {
+          await openDuplicateDialog(policyData.policy_number);
+          return;
+        }
         toast({
           title: 'Error',
           description: error.message,
@@ -442,6 +519,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -454,9 +532,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
               isDragging
                 ? 'border-primary bg-primary/5'
                 : parseStatus === 'success'
-                ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                ? 'border-success/50 bg-success/10'
                 : parseStatus === 'error'
-                ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+                ? 'border-destructive/50 bg-destructive/10'
                 : 'border-muted-foreground/25 hover:border-primary/50'
             }`}
             onDragOver={handleDragOver}
@@ -485,9 +563,9 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
                   <>
                     <div className="flex items-center gap-2">
                       {parseStatus === 'success' ? (
-                        <CheckCircle className="h-6 w-6 text-green-500" />
+                        <CheckCircle className="h-6 w-6 text-success" />
                       ) : parseStatus === 'error' ? (
-                        <AlertCircle className="h-6 w-6 text-red-500" />
+                        <AlertCircle className="h-6 w-6 text-destructive" />
                       ) : (
                         <FileText className="h-6 w-6 text-primary" />
                       )}
@@ -582,7 +660,7 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
               <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
             )}
             {needsConfirmation.line_of_business && !errors.line_of_business && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+              <p className="text-sm text-warning mt-1">
                 Couldn't auto-match the parsed line of business — please pick one.
               </p>
             )}
@@ -704,5 +782,30 @@ export function AddPolicyModal({ open, onOpenChange, accountId, onSuccess }: Add
         </div>
       </DialogContent>
     </Dialog>
+
+    <DuplicatePolicyDialog
+      open={duplicateOpen}
+      onOpenChange={setDuplicateOpen}
+      loading={duplicateLoading}
+      attempted={{
+        policy_number: formData.policy_number.trim(),
+        carrier: formData.carrier.trim(),
+        line_of_business: formData.line_of_business.trim(),
+      }}
+      existing={duplicateExisting}
+      currentCustomerName={currentCustomerName ?? ''}
+      currentAccountId={accountId}
+      onMerge={(existingAccountId) => {
+        setDuplicateOpen(false);
+        onOpenChange(false);
+        navigate(`/merge-customers?masterId=${accountId}&duplicateId=${existingAccountId}`);
+      }}
+      onSeePolicy={(policyId) => {
+        setDuplicateOpen(false);
+        onOpenChange(false);
+        navigate(`/policies/${policyId}`);
+      }}
+    />
+    </>
   );
 }

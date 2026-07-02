@@ -1,0 +1,21 @@
+-- =====================================================================
+-- Wave 2 (hotfix) — merge tooling FK-discovery performance rewrite
+-- =====================================================================
+-- RECONSTRUCTION FOR REPO↔PROD HISTORY COMPLETENESS (Batch 2B).
+-- This version (20260628145732) was applied to prod during Effort 1 but its
+-- file was never committed. It is already recorded in prod
+-- supabase_migrations.schema_migrations, so `supabase db push` SKIPS it — this
+-- file is documentation/history only.
+--
+-- WHAT IT DID: the first merge_accounts() built its 106-FK re-parent map from
+-- information_schema, which looped too slowly and hit a statement timeout on the
+-- 25× dry-run. This hotfix rewrote FK discovery to read pg_catalog
+-- (pg_constraint/pg_class/pg_attribute) instead.
+--
+-- SUPERSEDED BY: 20260628151600_wave2_dup1b_merge_engine_hardened.sql, which
+-- replaced merge_accounts() wholesale (and is the authoritative committed
+-- definition). No SQL is reproduced here to avoid presenting a stale body as
+-- current; the live engine is the hardened one.
+-- =====================================================================
+-- (no-op: superseded; retained for migration-history alignment only)
+SELECT 1;

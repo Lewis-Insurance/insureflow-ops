@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, CreditCard, Hash, Briefcase, Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, Hash, Briefcase, Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
+import { NotesPanel } from '@/components/notes/NotesPanel';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
@@ -90,20 +91,7 @@ export default function PolicyDetail() {
     retry: 1,
   });
 
-  const { data: policyNotes = [] } = useQuery({
-    queryKey: ['policy-notes', policyId],
-    queryFn: async () => {
-      if (!policyId) return [];
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('policy_id', policyId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!policyId,
-  });
+  // Policy notes now come from the unified, account-scoped NotesPanel (customer_notes).
 
   const { data: policyTasks = [] } = useQuery({
     queryKey: ['policy-tasks', policyId],
@@ -226,11 +214,11 @@ export default function PolicyDetail() {
               </Button>
             )}
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white"
               onClick={() => setPaymentModalOpen(true)}
             >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Make Payment
+              <DollarSign className="h-4 w-4 mr-2" />
+              Record Payment
             </Button>
             <Button variant="outline" onClick={handleEdit}>
               <Edit className="h-4 w-4 mr-2" />
@@ -379,7 +367,7 @@ export default function PolicyDetail() {
                 {policy.total_premium && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Total Premium</label>
-                    <div className="flex items-center gap-1 text-lg font-semibold text-green-600">
+                    <div className="flex items-center gap-1 text-lg font-semibold text-success">
                       <DollarSign className="h-4 w-4" />
                       <span>{formatCurrency(policy.total_premium)}</span>
                     </div>
@@ -675,36 +663,9 @@ export default function PolicyDetail() {
 
         {/* Policy Notes & Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Policy Notes ({policyNotes.length})
-              </CardTitle>
-              <Button size="sm" variant="outline" onClick={() => setAddNoteOpen(true)}>
-                Add Note
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {policyNotes.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-4">No policy notes yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {policyNotes.slice(0, 6).map((note: any) => (
-                    <div key={note.id} className="border-l-2 border-primary/20 pl-3">
-                      <p className="text-sm whitespace-pre-wrap">{note.body}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(note.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
-                  {policyNotes.length > 6 && (
-                    <p className="text-xs text-muted-foreground">+{policyNotes.length - 6} more notes</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {policy?.account?.id && (
+            <NotesPanel accountId={policy.account.id} policyId={policy.id} title="Notes" />
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">

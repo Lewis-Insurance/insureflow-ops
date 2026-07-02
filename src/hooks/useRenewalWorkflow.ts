@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logger } from '@/lib/logger';
 import { useAuth } from './useAuth';
+import {
+  mapLostReason,
+  type PolicyTerm,
+  type LostReasonCategory,
+} from '@/lib/renewals/renewalTerm';
 
 // ============================================================================
 // TYPES
@@ -38,6 +43,10 @@ export interface Renewal {
   carrier: string | null;
   renewal_date: string;
   expiration_date: string | null;
+  // Draft (in-progress) new-term fields — persisted on Save, pushed to the policy on commit.
+  policy_term: string | null;
+  new_effective_date: string | null;
+  new_expiration_date: string | null;
   current_premium: number | null;
   renewal_premium: number | null;
   price_change_pct: number | null;
@@ -397,6 +406,7 @@ export function useRenewalDocuments(renewalId: string | null | undefined) {
           uploader:profiles!uploaded_by(id, full_name, email)
         `)
         .eq('renewal_id', renewalId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -850,10 +860,12 @@ export function useUploadRenewalDocument() {
       file: File;
       document_type?: DocumentType;
       description?: string;
+      accountId?: string | null;
+      policyId?: string | null;
     }) => {
-      const { renewalId, file, document_type, description } = params;
+      const { renewalId, file, document_type, description, accountId, policyId } = params;
 
-      // Upload file to storage
+      // Upload file to storage (single object, shared by both document records).
       const filePath = `renewals/${renewalId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('documents')
@@ -861,7 +873,7 @@ export function useUploadRenewalDocument() {
 
       if (uploadError) throw uploadError;
 
-      // Create document record
+      // Create renewal document record
       const { data, error } = await supabase
         .from('renewal_documents')
         .insert({
@@ -877,10 +889,39 @@ export function useUploadRenewalDocument() {
         .single();
 
       if (error) throw error;
+
+      // Dual-write to the shared documents table so the dec page / application is
+      // immediately visible on the customer + policy pages. Best-effort: a mirror failure
+      // must not strand the renewal upload (same storage object backs both rows).
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        await supabase.from('documents').insert({
+          account_id: accountId ?? null,
+          policy_id: policyId ?? null,
+          name: file.name,
+          filename: file.name,
+          file_name: file.name,
+          storage_path: filePath,
+          file_path: filePath,
+          storage_bucket: 'documents',
+          mime_type: file.type,
+          file_size: file.size,
+          size_bytes: file.size,
+          kind: 'renewal_document',
+          document_type: document_type ?? null,
+          uploaded_by: auth?.user?.id ?? null,
+          created_by: auth?.user?.id ?? null,
+          file_missing: false,
+        });
+      } catch (mirrorError) {
+        logger.warn('[useUploadRenewalDocument] documents mirror failed:', mirrorError);
+      }
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['renewal-documents', data.renewal_id] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
       toast.success('Document uploaded');
     },
     onError: (error) => {
@@ -899,20 +940,30 @@ export function useDeleteRenewalDocument() {
   return useMutation({
     mutationFn: async (params: { documentId: string; renewalId: string; filePath: string }) => {
       const { documentId, filePath } = params;
+      const now = new Date().toISOString();
 
-      // Delete from storage
-      await supabase.storage.from('documents').remove([filePath]);
-
-      // Delete record
+      // Soft delete (invariant: soft deletes only). The storage object is retained.
       const { error } = await supabase
         .from('renewal_documents')
-        .delete()
+        .update({ deleted_at: now })
         .eq('id', documentId);
 
       if (error) throw error;
+
+      // Soft-delete the mirrored documents row pointing at the same storage object.
+      try {
+        await supabase
+          .from('documents')
+          .update({ deleted_at: now })
+          .eq('storage_path', filePath)
+          .eq('kind', 'renewal_document');
+      } catch (mirrorError) {
+        logger.warn('[useDeleteRenewalDocument] documents mirror soft-delete failed:', mirrorError);
+      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['renewal-documents', variables.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
       toast.success('Document deleted');
     },
     onError: (error) => {
@@ -982,79 +1033,143 @@ export function useBulkAssignRenewals() {
   });
 }
 
+// ============================================================================
+// WRITE-THROUGH TERMINAL COMMITS (two-tier renewal model)
+// ============================================================================
+
+/** Append an audit note to the shared customer record (best-effort). */
+async function appendCustomerNote(accountId: string, text: string): Promise<void> {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from('customer_notes').insert({
+      customer_id: accountId,
+      note_text: text,
+      created_by: auth?.user?.id ?? null,
+    });
+    if (error) logger.warn('[renewal write-through] customer note failed:', error);
+  } catch (e) {
+    logger.warn('[renewal write-through] customer note threw:', e);
+  }
+}
+
+/** Kick the retention model after a terminal commit (best-effort; never gates the save). */
+async function bestEffortRetention(policyId: string): Promise<void> {
+  try {
+    await supabase.functions.invoke('run-retention-scoring', {
+      body: { policy_id: policyId, immediate: true },
+    });
+  } catch (e) {
+    logger.warn('[renewal write-through] retention scoring failed:', e);
+  }
+}
+
 /**
- * Complete a renewal (mark as renewed and update policy)
- * This updates the existing policy with new term details
+ * Working "Save" — persists the agent's in-progress edits to the RENEWAL row only.
+ * Never touches the policy. The draft (new_effective_date/new_expiration_date/policy_term/
+ * renewal_premium/policy_number) is pushed to the policy only by a terminal commit below.
+ * Working status maps: "Pending" -> stored 'upcoming' (keeps policy->renewal sync live),
+ * "Quoted" -> 'quoted'.
  */
-export function useCompleteRenewal() {
+export function useSaveRenewalDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      renewalId: string;
+      status?: 'upcoming' | 'quoted';
+      policy_number?: string | null;
+      renewal_premium?: number | null;
+      policy_term?: PolicyTerm | null;
+      new_effective_date?: string | null;
+      new_expiration_date?: string | null;
+      /** Autosave path: skip the success toast (an inline "Saved" indicator carries it). */
+      silent?: boolean;
+    }) => {
+      const { renewalId, silent: _silent, ...rest } = params;
+      const update: Record<string, any> = {};
+      for (const [k, v] of Object.entries(rest)) {
+        if (v !== undefined) update[k] = v;
+      }
+
+      const { data, error } = await supabase
+        .from('renewals')
+        .update(update)
+        .eq('id', renewalId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['renewal', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      if (!variables.silent) toast.success('Renewal saved');
+    },
+    onError: (error) => {
+      logger.error('[useSaveRenewalDraft] Error:', error);
+      toast.error('Failed to save renewal');
+    },
+  });
+}
+
+/**
+ * Terminal commit: RENEWED. Overwrites the existing policy in place with the new-term
+ * details (number/premium/effective/expiration/policy_term, status active) and closes the
+ * renewal as 'renewed'. The policy->renewal sync trigger spawns the next 'upcoming' renewal
+ * for the new expiration automatically.
+ */
+export function useMarkRenewed() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: {
       renewalId: string;
       policyId: string;
-      policyUpdates: {
-        policy_number?: string;
-        premium: number;
-        effective_date: string;
-        expiration_date: string;
-      };
+      accountId: string;
+      policy_number: string;
+      premium: number;
+      policy_term: PolicyTerm;
+      effective_date: string;
+      expiration_date: string;
       notes?: string;
     }) => {
-      const { renewalId, policyId, policyUpdates, notes } = params;
+      const {
+        renewalId, policyId, accountId, policy_number, premium,
+        policy_term, effective_date, expiration_date, notes,
+      } = params;
 
-      // 1. Update the policy record with new term details
+      // 1. Overwrite the policy in place (source of truth for the customer page).
       const { error: policyError } = await supabase
         .from('policies')
         .update({
-          policy_number: policyUpdates.policy_number,
-          premium: policyUpdates.premium,
-          effective_date: policyUpdates.effective_date,
-          expiration_date: policyUpdates.expiration_date,
+          policy_number,
+          premium,
+          effective_date,
+          expiration_date,
+          policy_term,
           status: 'active',
         })
         .eq('id', policyId);
+      if (policyError) throw new Error(`Policy update failed: ${policyError.message}`);
 
-      if (policyError) {
-        logger.error('[useCompleteRenewal] Policy update failed:', policyError);
-        throw new Error(`Policy update failed: ${policyError.message}`);
-      }
-
-      // 2. Update renewal status to 'renewed' (trigger auto-sets completed_at)
+      // 2. Close the renewal (status + completed_at handled by renewal_status_change_trigger).
+      const renewedUpdate: Record<string, any> = {
+        status: 'renewed',
+        renewal_premium: premium,
+        policy_number,
+        policy_term,
+        new_effective_date: effective_date,
+        new_expiration_date: expiration_date,
+      };
       const { error: renewalError } = await supabase
         .from('renewals')
-        .update({
-          status: 'renewed',
-          renewal_premium: policyUpdates.premium,
-        })
+        .update(renewedUpdate)
         .eq('id', renewalId);
+      if (renewalError) throw new Error(`Renewal update failed: ${renewalError.message}`);
 
-      if (renewalError) {
-        logger.error('[useCompleteRenewal] Renewal update failed:', renewalError);
-        throw new Error(`Renewal update failed: ${renewalError.message}`);
-      }
-
-      // 3. Add note if provided
-      if (notes) {
-        const { error: noteError } = await supabase.from('renewal_notes').insert({
-          renewal_id: renewalId,
-          content: `Renewal completed: ${notes}`,
-        });
-        if (noteError) {
-          logger.warn('[useCompleteRenewal] Note insert failed:', noteError);
-          // Don't fail the whole operation for notes
-        }
-      }
-
-      // 4. Trigger retention analytics recalculation (best effort)
-      try {
-        await supabase.functions.invoke('run-retention-scoring', {
-          body: { policy_id: policyId, immediate: true },
-        });
-      } catch (analyticsError) {
-        logger.warn('[useCompleteRenewal] Analytics trigger failed:', analyticsError);
-        // Don't fail the whole operation for analytics
-      }
+      await appendCustomerNote(accountId, notes ? `Renewal completed: ${notes}` : 'Policy renewed');
+      await bestEffortRetention(policyId);
 
       return { renewalId, policyId };
     },
@@ -1063,109 +1178,154 @@ export function useCompleteRenewal() {
       queryClient.invalidateQueries({ queryKey: ['renewals'] });
       queryClient.invalidateQueries({ queryKey: ['policy', data.policyId] });
       queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
       queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
       toast.success('Renewal completed successfully');
     },
     onError: (error: Error) => {
-      logger.error('[useCompleteRenewal] Error:', error);
+      logger.error('[useMarkRenewed] Error:', error);
       toast.error(error.message || 'Failed to complete renewal');
     },
   });
 }
 
 /**
- * Terminate a renewal (cancelled, lapsed, non_renewed, lost, moved)
- * Updates both renewal and policy status with full details
+ * Terminal commit: MOVED. Creates a NEW active policy with the moved-to carrier/term/premium
+ * (copying durable fields from the old policy), flips the OLD policy to 'inactive' (its data
+ * preserved), and closes the renewal as 'moved'. The new policy gets its own 'upcoming'
+ * renewal via the policy->renewal sync trigger.
  */
-export function useTerminateRenewal() {
+export function useMarkMoved() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: {
       renewalId: string;
       policyId: string;
-      status: 'cancelled' | 'lapsed' | 'non_renewed' | 'lost' | 'moved';
-      reason: string;
-      terminationDate: string;
+      accountId: string;
+      carrier: string;
+      policy_number: string;
+      premium: number;
+      policy_term: PolicyTerm;
+      effective_date: string;
+      expiration_date: string;
       notes?: string;
-      movedData?: {
-        carrier: string;
-        premium: number;
-        term: '6_month' | 'annual';
-      };
     }) => {
-      const { renewalId, policyId, status, reason, terminationDate, notes, movedData } = params;
+      const {
+        renewalId, policyId, accountId, carrier, policy_number, premium,
+        policy_term, effective_date, expiration_date, notes,
+      } = params;
 
-      // Build renewal update object
-      const renewalUpdate: Record<string, any> = {
-        status,
-        termination_effective_date: terminationDate,
-      };
-
-      // Set reason field based on status
-      switch (status) {
-        case 'cancelled':
-          renewalUpdate.cancelled_reason = reason;
-          break;
-        case 'lapsed':
-          renewalUpdate.lapsed_reason = reason;
-          break;
-        case 'non_renewed':
-          renewalUpdate.non_renewal_reason = reason;
-          break;
-        case 'lost':
-          renewalUpdate.lost_reason = reason;
-          break;
-        case 'moved':
-          if (movedData) {
-            renewalUpdate.moved_carrier = movedData.carrier;
-            renewalUpdate.moved_premium = movedData.premium;
-            renewalUpdate.moved_term = movedData.term;
-          }
-          break;
+      // Atomic + idempotent: the new policy INSERT, old policy -> inactive, renewal -> moved,
+      // and the audit note all run in one transaction inside renewal_mark_moved, so a failed or
+      // retried commit can never leave two active policies or duplicate the new policy.
+      const { data: newPolicyId, error } = await (supabase as any).rpc('renewal_mark_moved', {
+        p_renewal_id: renewalId,
+        p_policy_id: policyId,
+        p_account_id: accountId,
+        p_carrier: carrier,
+        p_policy_number: policy_number,
+        p_premium: premium,
+        p_policy_term: policy_term,
+        p_effective_date: effective_date,
+        p_expiration_date: expiration_date,
+        p_notes: notes ?? null,
+      });
+      if (error) {
+        // The RPC raises a human MESSAGE with the owner account id in DETAIL
+        // ('DUPLICATE_POLICY_NUMBER=<uuid>'); a raw 23505 is the fallback. Any of these becomes a
+        // typed error the widget turns into the friendly "already added" prompt with a deep link.
+        const msg = error.message || '';
+        const blob = `${msg} ${(error as any).details || ''}`;
+        const dup = /DUPLICATE_POLICY_NUMBER=([0-9a-fA-F-]*)/.exec(blob);
+        if (dup || (error as any).code === '23505' || /already added/i.test(msg)) {
+          const dupErr: any = new Error(msg || 'This policy is already added for this customer.');
+          dupErr.code = 'DUPLICATE_POLICY';
+          dupErr.existingAccountId = dup?.[1] || null;
+          throw dupErr;
+        }
+        throw new Error(msg || 'Failed to record move');
       }
 
-      // 1. Update renewal (trigger auto-sets completed_at)
+      await bestEffortRetention(policyId);
+
+      return { renewalId, policyId, newPolicyId: newPolicyId as string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['policy', data.policyId] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
+      toast.success('Policy moved — new policy created');
+    },
+    onError: (error: any) => {
+      if (error?.code === 'DUPLICATE_POLICY') return; // widget shows a friendly modal instead
+      logger.error('[useMarkMoved] Error:', error);
+      toast.error(error.message || 'Failed to record move');
+    },
+  });
+}
+
+/**
+ * Terminal commit: LOST / DID NOT RENEW. Writes the reason-mapped terminal status to both
+ * the renewal and the policy (cancelled / non_renewed / lost / lapsed; 'other' -> lost with a
+ * neutral cancelled policy). Policy data is preserved aside from status (+ cancellation fields
+ * when cancelled).
+ */
+export function useMarkLost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      renewalId: string;
+      policyId: string;
+      accountId: string;
+      category: LostReasonCategory;
+      reason: string;
+      terminationDate?: string;
+      notes?: string;
+    }) => {
+      const { renewalId, policyId, accountId, category, reason, terminationDate, notes } = params;
+      const { renewalStatus, reasonColumn, policyStatus } = mapLostReason(category);
+
+      // 1. Write the mapped status through to the policy.
+      const policyUpdate: Record<string, any> = { status: policyStatus };
+      if (policyStatus === 'cancelled') {
+        if (terminationDate) policyUpdate.cancelled_at = terminationDate;
+        policyUpdate.cancellation_reason = reason;
+      }
+      const { error: policyError } = await supabase
+        .from('policies')
+        .update(policyUpdate)
+        .eq('id', policyId);
+      if (policyError) throw new Error(`Policy update failed: ${policyError.message}`);
+
+      // 2. Close the renewal with status + reason atomically (read by the history trigger).
+      const renewalUpdate: Record<string, any> = {
+        status: renewalStatus,
+        [reasonColumn]: category === 'other' ? `Other: ${reason}` : reason,
+      };
+      if (terminationDate) renewalUpdate.termination_effective_date = terminationDate;
+      // 'lapsed' is not in the trigger's terminal completed_at set; close it explicitly.
+      if (renewalStatus === 'lapsed') renewalUpdate.completed_at = new Date().toISOString();
+
       const { error: renewalError } = await supabase
         .from('renewals')
         .update(renewalUpdate)
         .eq('id', renewalId);
+      if (renewalError) throw new Error(`Renewal update failed: ${renewalError.message}`);
 
-      if (renewalError) throw renewalError;
+      await appendCustomerNote(
+        accountId,
+        notes ? `Not renewed (${category}): ${reason}. ${notes}` : `Not renewed (${category}): ${reason}`,
+      );
+      await bestEffortRetention(policyId);
 
-      // 2. Update policy status
-      // For 'moved', we mark the policy as cancelled since customer moved elsewhere
-      const policyStatus = status === 'moved' ? 'cancelled' : status;
-      const { error: policyError } = await supabase
-        .from('policies')
-        .update({
-          status: policyStatus,
-        })
-        .eq('id', policyId);
-
-      if (policyError) throw policyError;
-
-      // 3. Add note with status change details
-      const noteContent = notes
-        ? `Status changed to ${status}: ${reason}. ${notes}`
-        : `Status changed to ${status}: ${reason}`;
-
-      await supabase.from('renewal_notes').insert({
-        renewal_id: renewalId,
-        content: noteContent,
-      });
-
-      // 4. Trigger retention analytics recalculation (best effort)
-      try {
-        await supabase.functions.invoke('run-retention-scoring', {
-          body: { policy_id: policyId, immediate: true },
-        });
-      } catch (analyticsError) {
-        logger.warn('[useTerminateRenewal] Analytics trigger failed:', analyticsError);
-      }
-
-      return { renewalId, policyId, status };
+      return { renewalId, policyId, status: renewalStatus };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['renewal', data.renewalId] });
@@ -1174,11 +1334,41 @@ export function useTerminateRenewal() {
       queryClient.invalidateQueries({ queryKey: ['policies'] });
       queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
       queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
-      toast.success(`Renewal marked as ${data.status}`);
+      toast.success(`Renewal marked ${data.status}`);
     },
-    onError: (error) => {
-      logger.error('[useTerminateRenewal] Error:', error);
-      toast.error('Failed to update renewal status');
+    onError: (error: Error) => {
+      logger.error('[useMarkLost] Error:', error);
+      toast.error(error.message || 'Failed to update renewal');
+    },
+  });
+}
+
+/**
+ * Reopen a closed renewal (from the Renewals page "Closed" view). Returns it to the working
+ * queue as 'upcoming' and, for the did-not-renew family (lost/cancelled/non_renewed/lapsed),
+ * reactivates the policy. Moved/renewed reopen the renewal only. See the renewal_reopen RPC.
+ */
+export function useReopenRenewal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { renewalId: string }) => {
+      const { error } = await (supabase as any).rpc('renewal_reopen', {
+        p_renewal_id: params.renewalId,
+      });
+      if (error) throw new Error(error.message || 'Failed to reopen renewal');
+      return params;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['policy-renewal-risk-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['account-churn-risk-scores'] });
+      toast.success('Renewal reopened');
+    },
+    onError: (error: Error) => {
+      logger.error('[useReopenRenewal] Error:', error);
+      toast.error(error.message || 'Failed to reopen renewal');
     },
   });
 }

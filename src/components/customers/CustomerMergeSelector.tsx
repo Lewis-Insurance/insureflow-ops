@@ -76,11 +76,34 @@ function CustomerSearchDropdown({
     staleTime: 30000,
   });
 
+  // Resolve the selected account by id directly. A prefilled selection (deep
+  // linked from a customer record or the duplicate-policy "Merge Clients"
+  // shortcut) is almost never inside the first search page, so we can't rely on
+  // finding it in `accounts` alone or the trigger would render empty.
+  const { data: selectedById } = useQuery({
+    queryKey: ['accounts-merge-selected', value],
+    queryFn: async () => {
+      if (!value) return null;
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, name, type, email, phone')
+        .eq('id', value)
+        .maybeSingle();
+      if (error) {
+        console.error('Error fetching selected account:', error);
+        return null;
+      }
+      return (data as Account) ?? null;
+    },
+    enabled: !!value,
+    staleTime: 30000,
+  });
+
   // Find selected account
   const selectedAccount = useMemo(() => {
     if (!value) return null;
-    return accounts.find((a) => a.id === value) || null;
-  }, [value, accounts]);
+    return accounts.find((a) => a.id === value) || selectedById || null;
+  }, [value, accounts, selectedById]);
 
   // Filter out excluded account
   const filteredAccounts = useMemo(() => {

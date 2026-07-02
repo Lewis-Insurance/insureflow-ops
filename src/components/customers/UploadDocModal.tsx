@@ -124,11 +124,12 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
 
       // Create note if provided
       if (noteContent.trim()) {
-        const { error: noteError } = await supabase.from('notes').insert({
-          account_id: accountId,
-          body: noteContent,
-          author_id: user.id,
-        });
+        const { error: noteError } = await supabase.from('customer_notes').insert({
+          customer_id: accountId,
+          note_text: noteContent,
+          created_by: user.id,
+          source: 'document',
+        } as any);
 
         if (noteError) {
           console.error('Failed to create note:', noteError);

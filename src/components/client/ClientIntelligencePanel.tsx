@@ -305,7 +305,7 @@ export function ClientIntelligencePanel({
         {responses.length === 0 && showSuggestions && (
           <div className="space-y-4">
             <div className="text-center py-4">
-              <Sparkles className="h-8 w-8 mx-auto mb-2 text-violet-500" />
+              <Sparkles className="h-8 w-8 mx-auto mb-2 text-info" />
               <p className="font-medium">What would you like to know?</p>
               <p className="text-sm text-muted-foreground">
                 Choose a suggested question or ask your own
@@ -323,7 +323,7 @@ export function ClientIntelligencePanel({
                     onClick={() => handleSuggestedQuestion(template)}
                     disabled={isAsking}
                   >
-                    <Icon className="h-4 w-4 mr-3 flex-shrink-0 text-violet-500" />
+                    <Icon className="h-4 w-4 mr-3 flex-shrink-0 text-info" />
                     <div className="min-w-0">
                       <div className="font-medium text-sm">{template.title}</div>
                       <div className="text-xs text-muted-foreground truncate">
@@ -352,7 +352,7 @@ export function ClientIntelligencePanel({
         {/* Loading indicator */}
         {isAsking && (
           <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg mt-4">
-            <Loader2 className="h-5 w-5 animate-spin text-violet-500" />
+            <Loader2 className="h-5 w-5 animate-spin text-info" />
             <div className="flex-1">
               <p className="font-medium">Analyzing client data...</p>
               <p className="text-sm text-muted-foreground">
@@ -456,10 +456,10 @@ function ResponseCard({ response, onCopy, onCreateTask }: ResponseCardProps) {
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between p-3 bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors">
             <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="h-4 w-4 text-violet-500 flex-shrink-0" />
+              <Sparkles className="h-4 w-4 text-info flex-shrink-0" />
               <span className="font-medium text-sm truncate">{response.question}</span>
               {hasStructuredResponse && (
-                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
                   Structured
                 </Badge>
               )}
@@ -561,7 +561,7 @@ function ResponseContent({ content }: { content: string }) {
         if (line.startsWith('- ') || line.startsWith('* ')) {
           return (
             <div key={i} className="flex gap-2 pl-2">
-              <span className="text-violet-500">•</span>
+              <span className="text-info">•</span>
               <span>{renderInlineFormatting(line.slice(2))}</span>
             </div>
           );
@@ -572,7 +572,7 @@ function ResponseContent({ content }: { content: string }) {
         if (numberedMatch) {
           return (
             <div key={i} className="flex gap-2 pl-2">
-              <span className="text-violet-500 font-medium">{numberedMatch[1]}.</span>
+              <span className="text-info font-medium">{numberedMatch[1]}.</span>
               <span>{renderInlineFormatting(line.slice(numberedMatch[0].length))}</span>
             </div>
           );

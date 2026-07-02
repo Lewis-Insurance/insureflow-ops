@@ -437,7 +437,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
               <div key={stepName} className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
                   step === stepName ? 'bg-primary text-primary-foreground' :
-                  ['upload', 'mapping', 'preview'].indexOf(step) > index ? 'bg-green-600 text-white' :
+                  ['upload', 'mapping', 'preview'].indexOf(step) > index ? 'bg-success text-success-foreground' :
                   'bg-muted text-muted-foreground'
                 }`}>
                   {['upload', 'mapping', 'preview'].indexOf(step) > index ? (
@@ -448,7 +448,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
                 </div>
                 {index < 4 && (
                   <div className={`w-12 h-0.5 mx-2 ${
-                    ['upload', 'mapping', 'preview'].indexOf(step) > index ? 'bg-green-600' : 'bg-muted'
+                    ['upload', 'mapping', 'preview'].indexOf(step) > index ? 'bg-success' : 'bg-muted'
                   }`} />
                 )}
               </div>
@@ -497,10 +497,10 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
               </div>
               
               {csvFile && (
-                <Card className="border-green-200 bg-green-50">
+                <Card className="border-success/30 bg-success/10">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-green-600" />
+                      <FileText className="h-5 w-5 text-success" />
                       <div>
                         <p className="font-medium">{csvFile.name}</p>
                         <p className="text-sm text-muted-foreground">
@@ -577,13 +577,13 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
               <div className="grid grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="pt-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">{currentBatch.successful_rows}</div>
+                    <div className="text-2xl font-bold text-success">{currentBatch.successful_rows}</div>
                     <p className="text-sm text-muted-foreground">Valid Rows</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4 text-center">
-                    <div className="text-2xl font-bold text-red-600">{currentBatch.error_rows}</div>
+                    <div className="text-2xl font-bold text-destructive">{currentBatch.error_rows}</div>
                     <p className="text-sm text-muted-foreground">Error Rows</p>
                   </CardContent>
                 </Card>
@@ -596,10 +596,10 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
               </div>
               
               {errorRows.length > 0 && (
-                <Card className="border-red-200">
+                <Card className="border-destructive/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertCircle className="h-4 w-4 text-destructive" />
                       Validation Errors
                     </CardTitle>
                   </CardHeader>
@@ -656,7 +656,7 @@ export function CSVImport({ onImportComplete, className }: CSVImportProps) {
           {step === 'complete' && currentBatch && (
             <div className="space-y-4 text-center">
               <div className="flex justify-center">
-                <CheckCircle2 className="h-16 w-16 text-green-600" />
+                <CheckCircle2 className="h-16 w-16 text-success" />
               </div>
               
               <div>

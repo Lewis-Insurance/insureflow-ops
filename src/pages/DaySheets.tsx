@@ -4,7 +4,6 @@ import { format, subDays, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -16,21 +15,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   CalendarDays,
-  Clock,
-  CheckCircle2,
-  Archive,
   ArrowRight,
   DollarSign,
   Receipt,
-  Filter,
   Printer,
   CalendarSearch,
 } from 'lucide-react';
@@ -45,18 +33,6 @@ type DateRange = {
   to: Date;
 };
 
-const statusIcons = {
-  open: Clock,
-  closed: CheckCircle2,
-  deposited: Archive,
-};
-
-const statusColors = {
-  open: 'bg-blue-100 text-blue-800',
-  closed: 'bg-amber-100 text-amber-800',
-  deposited: 'bg-green-100 text-green-800',
-};
-
 export default function DaySheets() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -64,7 +40,6 @@ export default function DaySheets() {
     from: subDays(new Date(), 30),
     to: new Date(),
   });
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [goToDateOpen, setGoToDateOpen] = useState(false);
   const [selectedGoToDate, setSelectedGoToDate] = useState<Date | undefined>(undefined);
@@ -73,7 +48,6 @@ export default function DaySheets() {
   const { data: daySheets = [], isLoading } = useDaySheets({
     startDate: format(dateRange.from, 'yyyy-MM-dd'),
     endDate: format(dateRange.to, 'yyyy-MM-dd'),
-    status: statusFilter === 'all' ? undefined : (statusFilter as 'open' | 'closed' | 'deposited'),
   });
 
   const { data: currentDaySheet } = useCurrentDaySheet();
@@ -134,9 +108,6 @@ export default function DaySheets() {
   const stats = {
     totalCollected: daySheets.reduce((sum, ds) => sum + (ds.grand_total || 0), 0),
     totalPayments: daySheets.reduce((sum, ds) => sum + (ds.payment_count || 0), 0),
-    openSheets: daySheets.filter((ds) => ds.status === 'open').length,
-    closedSheets: daySheets.filter((ds) => ds.status === 'closed').length,
-    depositedSheets: daySheets.filter((ds) => ds.status === 'deposited').length,
   };
 
   const quickDateRanges = [

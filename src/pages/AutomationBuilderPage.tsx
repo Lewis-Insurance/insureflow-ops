@@ -73,17 +73,17 @@ import {
 
 // Step type configurations
 const STEP_TYPES: Record<StepType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  send_email: { label: 'Send Email', icon: Mail, color: 'bg-blue-500' },
-  send_sms: { label: 'Send SMS', icon: MessageSquare, color: 'bg-green-500' },
-  wait: { label: 'Wait/Delay', icon: Clock, color: 'bg-yellow-500' },
-  branch: { label: 'Branch/Condition', icon: GitBranch, color: 'bg-purple-500' },
-  add_tag: { label: 'Add Tag', icon: Tag, color: 'bg-orange-500' },
-  remove_tag: { label: 'Remove Tag', icon: Tag, color: 'bg-red-500' },
-  update_field: { label: 'Update Field', icon: Settings2, color: 'bg-gray-500' },
-  create_task: { label: 'Create Task', icon: CheckCircle, color: 'bg-indigo-500' },
-  send_notification: { label: 'Send Notification', icon: Bell, color: 'bg-pink-500' },
-  enroll_in_automation: { label: 'Enroll in Automation', icon: PlayCircle, color: 'bg-cyan-500' },
-  exit: { label: 'Exit Automation', icon: CheckCircle, color: 'bg-gray-700' },
+  send_email: { label: 'Send Email', icon: Mail, color: 'bg-info' },
+  send_sms: { label: 'Send SMS', icon: MessageSquare, color: 'bg-success' },
+  wait: { label: 'Wait/Delay', icon: Clock, color: 'bg-warning' },
+  branch: { label: 'Branch/Condition', icon: GitBranch, color: 'bg-info' },
+  add_tag: { label: 'Add Tag', icon: Tag, color: 'bg-warning' },
+  remove_tag: { label: 'Remove Tag', icon: Tag, color: 'bg-destructive' },
+  update_field: { label: 'Update Field', icon: Settings2, color: 'bg-cc-text-muted' },
+  create_task: { label: 'Create Task', icon: CheckCircle, color: 'bg-info' },
+  send_notification: { label: 'Send Notification', icon: Bell, color: 'bg-info' },
+  enroll_in_automation: { label: 'Enroll in Automation', icon: PlayCircle, color: 'bg-info' },
+  exit: { label: 'Exit Automation', icon: CheckCircle, color: 'bg-cc-text-secondary' },
 };
 
 const TRIGGER_TYPES: Record<TriggerType, { label: string; icon: React.ComponentType<{ className?: string }>; description: string }> = {
@@ -658,7 +658,7 @@ export default function AutomationBuilderPage() {
                               <div className="text-muted-foreground">
                                 <GripVertical className="h-5 w-5" />
                               </div>
-                              <div className={`p-2 rounded-lg ${stepConfig?.color || 'bg-gray-500'}`}>
+                              <div className={`p-2 rounded-lg ${stepConfig?.color || 'bg-cc-text-muted'}`}>
                                 <StepIcon className="h-4 w-4 text-white" />
                               </div>
                               <div className="flex-1 min-w-0">

@@ -294,7 +294,7 @@ export default function CanopyImportPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'complete':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Complete</Badge>;
+        return <Badge className="bg-success text-success-foreground"><CheckCircle className="w-3 h-3 mr-1" /> Complete</Badge>;
       case 'pending':
       case 'processing':
         return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Processing</Badge>;
@@ -554,7 +554,7 @@ export default function CanopyImportPage() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Completed</span>
-                  <span className="font-bold text-lg text-green-600">
+                  <span className="font-bold text-lg text-success">
                     {recentPulls?.filter(p => p.status === 'complete').length || 0}
                   </span>
                 </div>

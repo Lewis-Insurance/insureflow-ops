@@ -641,8 +641,8 @@ export default function FormManagement() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-3 bg-info/10 rounded-lg">
+                <FileText className="h-6 w-6 text-info" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{forms.length}</p>
@@ -654,8 +654,8 @@ export default function FormManagement() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <Edit className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="p-3 bg-warning/10 rounded-lg">
+                <Edit className="h-6 w-6 text-warning" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
@@ -669,8 +669,8 @@ export default function FormManagement() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-3 bg-success/10 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-success" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
@@ -684,8 +684,8 @@ export default function FormManagement() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                <Send className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-3 bg-info/10 rounded-lg">
+                <Send className="h-6 w-6 text-info" />
               </div>
               <div>
                 <p className="text-2xl font-bold">

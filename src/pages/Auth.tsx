@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff, AlertCircle, ArrowRight, Lock, ArrowUp, CheckCircle2 } from 'lucide-react';
-import '../styles/auth-login.css';
+import { Button } from '@/components/ui/button';
+import { Eye, EyeOff, AlertCircle, Lock, ArrowUp, CheckCircle2 } from 'lucide-react';
 
 // Feature flags via environment variables with safe defaults
 const ENABLE_SIGNUP = (import.meta.env.VITE_ENABLE_SIGNUP ?? 'false') === 'true';
@@ -11,36 +11,9 @@ const REQUIRE_MFA = (import.meta.env.VITE_REQUIRE_MFA ?? 'false') === 'true';
 const REQUIRE_PHONE_VERIFICATION = (import.meta.env.VITE_REQUIRE_PHONE ?? 'false') === 'true';
 const MIN_PASSWORD_LENGTH = Number(import.meta.env.VITE_MIN_PW_LEN ?? 12);
 
-/* InsureFlow mark — vector stand-in for the official logo.
-   TODO(brand): replace with the vectorized official logo (full-color + reversed). */
-function IFLogo({ variant, sm }: { variant: 'color' | 'reversed'; sm?: boolean }) {
-  const waves = variant === 'reversed' ? '#FFFFFF' : '#143A5E';
-  const [failed, setFailed] = useState(false);
-  // Prefer the official asset if present in /public/brand; else show the vector stand-in.
-  if (!failed) {
-    return (
-      <span className={`if-logo${sm ? ' sm' : ''}`}>
-        <img className="if-logoimg" src={`/brand/insureflow-logo-${variant}.png`} alt="InsureFlow" onError={() => setFailed(true)} />
-      </span>
-    );
-  }
-  return (
-    <span className={`if-logo${sm ? ' sm' : ''}`}>
-      <svg className="if-emblem" viewBox="0 0 64 64" aria-hidden="true" fill="none">
-        <path d="M22 10C16 11 12 13 12 16L12 34C12 46 22 54 32 58C42 54 52 46 52 34L52 16C52 13 48 11 42 10"
-          stroke="#E8772E" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="32" cy="14" r="2.6" fill="#E8772E" />
-        <path d="M16 30C21.5 26 26.5 34 32 30C37.5 26 42.5 34 48 30" stroke={waves} strokeWidth="4.4" strokeLinecap="round" />
-        <path d="M16 38C21.5 34 26.5 42 32 38C37.5 34 42.5 42 48 38" stroke={waves} strokeWidth="4.4" strokeLinecap="round" />
-      </svg>
-      <span className="if-wordmark"><b>Insure<span className="o">Flow</span></b></span>
-    </span>
-  );
-}
-
-const WAVE_BACK = 'M0,62 q120,-30 240,0 q120,30 240,0 q120,-30 240,0 q120,30 240,0 q120,-30 240,0 q120,30 240,0 q120,-30 240,0 q120,30 240,0 q120,-30 240,0 q120,30 240,0 q120,-30 240,0 q120,30 240,0 L2880,160 L0,160 Z';
-const WAVE_MID = 'M0,96 q120,-26 240,0 q120,26 240,0 q120,-26 240,0 q120,26 240,0 q120,-26 240,0 q120,26 240,0 q120,-26 240,0 q120,26 240,0 q120,-26 240,0 q120,26 240,0 q120,-26 240,0 q120,26 240,0 L2880,160 L0,160 Z';
-const WAVE_FRONT = 'M0,120 q120,-22 240,0 q120,22 240,0 q120,-22 240,0 q120,22 240,0 q120,-22 240,0 q120,22 240,0 q120,-22 240,0 q120,22 240,0 q120,-22 240,0 q120,22 240,0 q120,-22 240,0 q120,22 240,0 L2880,160 L0,160 Z';
+// Field classes shared by every input on this surface (cc Input spec).
+const INPUT_BASE =
+  'h-10 w-full rounded-cc-md border bg-cc-surface-raised px-3 text-cc-text-primary placeholder:text-cc-text-muted';
 
 export default function Auth() {
   const { signIn, signUp, loading, isAuthenticated, profile } = useAuth();
@@ -58,10 +31,10 @@ export default function Auth() {
   // Prevent redirect flicker while auth is loading
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+      <div className="flex min-h-screen w-full items-center justify-center bg-cc-bg p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading…</p>
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-cc-border-subtle border-t-cc-accent" />
+          <p className="text-cc-text-muted">Loading</p>
         </div>
       </div>
     );
@@ -158,179 +131,319 @@ export default function Auth() {
   };
 
   return (
-    <div className="if-auth">
-      {/* ---------- brand panel ---------- */}
-      <section className="if-brand">
-        <div className="if-tide" aria-hidden="true">
-          <div className="if-wave back"><svg viewBox="0 0 2880 160" preserveAspectRatio="none"><path d={WAVE_BACK} fill="#11314F" /></svg></div>
-          <div className="if-wave mid"><svg viewBox="0 0 2880 160" preserveAspectRatio="none"><path d={WAVE_MID} fill="#0C2742" /></svg></div>
-          <div className="if-wave front"><svg viewBox="0 0 2880 160" preserveAspectRatio="none"><path d={WAVE_FRONT} fill="#08203A" /></svg></div>
-        </div>
-        <div className="if-horizon" aria-hidden="true" />
-        <div className="if-glow" aria-hidden="true" />
-        <div className="if-grain" aria-hidden="true" />
-        <svg className="if-watermark" viewBox="0 0 64 64" aria-hidden="true" fill="none">
-          <path d="M22 10C16 11 12 13 12 16L12 34C12 46 22 54 32 58C42 54 52 46 52 34L52 16C52 13 48 11 42 10" stroke="currentColor" strokeWidth="2.4" />
-          <path d="M16 30C21.5 26 26.5 34 32 30C37.5 26 42.5 34 48 30" stroke="currentColor" strokeWidth="3" />
-          <path d="M16 38C21.5 34 26.5 42 32 38C37.5 34 42.5 42 48 38" stroke="currentColor" strokeWidth="3" />
-        </svg>
-
-        <div className="if-reveal" style={{ animationDelay: '.05s' }}><IFLogo variant="reversed" /></div>
-
-        <div className="if-mid if-reveal" style={{ animationDelay: '.12s' }}>
-          <div className="if-eyebrow">Agency Operating System</div>
-          <h2 className="if-headline">Every client, in one current.</h2>
-          <p className="if-sub">Where every policy, quote, and renewal keeps moving, and stays protected.</p>
+    <div className="flex min-h-screen w-full items-center justify-center bg-cc-bg p-4">
+      <main className="w-full max-w-[400px] rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-8 shadow-card">
+        {/* Real Lewis Insurance logo, reused from AppLayout. Never a fabricated mark. */}
+        <div className="flex justify-center">
+          <img
+            src="/lovable-uploads/638e588a-8405-4da7-8119-439f406132da.png"
+            alt="Lewis Insurance"
+            className="h-16 w-auto"
+          />
         </div>
 
-        <div className="if-anchor if-reveal" style={{ animationDelay: '.18s' }}>
-          <span>by Lewis Insurance</span><span className="if-dot" /><span>Lake City, FL</span><span className="if-dot" /><span>Since 1981</span>
-        </div>
-      </section>
+        {mode === 'signin' ? (
+          <>
+            <h1 className="mt-6 text-center text-2xl font-semibold text-cc-text-primary">Welcome back</h1>
+            <p className="mt-1 text-center text-sm text-cc-text-muted">Sign in to your workspace</p>
 
-      {/* ---------- auth column ---------- */}
-      <section className="if-col">
-        <div className="if-inner">
-          <div className="if-collogo if-reveal" style={{ animationDelay: '.10s' }}><IFLogo variant="color" sm /></div>
+            {notice && (
+              <div
+                className={`mt-6 flex items-start gap-2 rounded-cc-md border px-3 py-2.5 text-sm ${
+                  notice.type === 'ok'
+                    ? 'border-cc-border-subtle bg-cc-surface-raised text-cc-text-secondary'
+                    : 'border-cc-danger bg-cc-surface-raised text-cc-danger'
+                }`}
+                role="status"
+                aria-live="polite"
+              >
+                {notice.type === 'ok' ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                )}
+                <span>{notice.text}</span>
+              </div>
+            )}
+            {signInErrors.general && (
+              <div
+                className="mt-6 flex items-start gap-2 rounded-cc-md border border-cc-danger bg-cc-surface-raised px-3 py-2.5 text-sm text-cc-danger"
+                role="alert"
+                aria-live="polite"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{signInErrors.general}</span>
+              </div>
+            )}
 
-          {mode === 'signin' ? (
-            <>
-              <h1 className="if-title if-reveal" style={{ animationDelay: '.16s' }}>Welcome back</h1>
-              <p className="if-subtitle if-reveal" style={{ animationDelay: '.20s' }}>Sign in to your InsureFlow workspace</p>
+            <form onSubmit={handleSignIn} noValidate className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm text-cc-text-secondary" htmlFor="signin-email">
+                  Email
+                </label>
+                <input
+                  id="signin-email"
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="email"
+                  placeholder="you@lewisinsurance.com"
+                  autoFocus
+                  className={`${INPUT_BASE} ${signInErrors.email ? 'border-cc-danger' : 'border-cc-border-interactive'}`}
+                  value={signInData.email}
+                  onChange={(e) => { setSignInData({ ...signInData, email: e.target.value }); if (signInErrors.email) { const n = { ...signInErrors }; delete n.email; setSignInErrors(n); } }}
+                  aria-invalid={!!signInErrors.email}
+                  aria-describedby={signInErrors.email ? 'signin-email-error' : undefined}
+                  required
+                />
+                {signInErrors.email && (
+                  <p id="signin-email-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {signInErrors.email}
+                  </p>
+                )}
+              </div>
 
-              {notice && (
-                <div className={`if-banner if-reveal${notice.type === 'ok' ? ' ok' : ''}`} role="status" aria-live="polite" style={{ marginTop: 22 }}>
-                  {notice.type === 'ok' ? <CheckCircle2 /> : <AlertCircle />}<span>{notice.text}</span>
+              <div>
+                <label className="mb-1.5 block text-sm text-cc-text-secondary" htmlFor="signin-password">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="signin-password"
+                    type={showPw ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    className={`${INPUT_BASE} pr-11 ${signInErrors.password ? 'border-cc-danger' : 'border-cc-border-interactive'}`}
+                    value={signInData.password}
+                    onKeyUp={onPwKey}
+                    onKeyDown={onPwKey}
+                    onBlur={() => setCapsOn(false)}
+                    onChange={(e) => { setSignInData({ ...signInData, password: e.target.value }); if (signInErrors.password) { const n = { ...signInErrors }; delete n.password; setSignInErrors(n); } }}
+                    aria-invalid={!!signInErrors.password}
+                    aria-describedby={signInErrors.password ? 'signin-password-error' : undefined}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-cc-sm text-cc-text-muted hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+                    aria-pressed={showPw}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPw((s) => !s)}
+                  >
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-              )}
-              {signInErrors.general && (
-                <div className="if-banner if-reveal" role="alert" aria-live="polite" style={{ marginTop: 22 }}>
-                  <AlertCircle /><span>{signInErrors.general}</span>
-                </div>
-              )}
+                {capsOn && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-text-secondary">
+                    <ArrowUp className="h-4 w-4 shrink-0" />
+                    Caps Lock is on
+                  </p>
+                )}
+                {signInErrors.password && (
+                  <p id="signin-password-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {signInErrors.password}
+                  </p>
+                )}
+              </div>
 
-              <form onSubmit={handleSignIn} noValidate style={{ marginTop: 22 }}>
-                <div className="if-field if-reveal" style={{ animationDelay: '.26s' }}>
-                  <label className="if-label" htmlFor="signin-email">Email</label>
-                  <div className="if-control">
-                    <input
-                      id="signin-email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off"
-                      autoComplete="email" placeholder="you@lewisinsurance.com" autoFocus
-                      className={`if-input${signInErrors.email ? ' invalid' : ''}`}
-                      value={signInData.email}
-                      onChange={(e) => { setSignInData({ ...signInData, email: e.target.value }); if (signInErrors.email) { const n = { ...signInErrors }; delete n.email; setSignInErrors(n); } }}
-                      aria-invalid={!!signInErrors.email}
-                      aria-describedby={signInErrors.email ? 'signin-email-error' : undefined}
-                      required
-                    />
-                  </div>
-                  {signInErrors.email && <p id="signin-email-error" className="if-fielderror"><AlertCircle />{signInErrors.email}</p>}
-                </div>
-
-                <div className="if-field if-haspw if-reveal" style={{ animationDelay: '.30s' }}>
-                  <label className="if-label" htmlFor="signin-password">Password</label>
-                  <div className="if-control">
-                    <input
-                      id="signin-password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
-                      placeholder="Enter your password"
-                      className={`if-input${signInErrors.password ? ' invalid' : ''}`}
-                      value={signInData.password}
-                      onKeyUp={onPwKey} onKeyDown={onPwKey} onBlur={() => setCapsOn(false)}
-                      onChange={(e) => { setSignInData({ ...signInData, password: e.target.value }); if (signInErrors.password) { const n = { ...signInErrors }; delete n.password; setSignInErrors(n); } }}
-                      aria-invalid={!!signInErrors.password}
-                      aria-describedby={signInErrors.password ? 'signin-password-error' : undefined}
-                      required
-                    />
-                    <button type="button" className="if-pwtoggle" aria-pressed={showPw}
-                      aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((s) => !s)}>
-                      {showPw ? <EyeOff /> : <Eye />}
-                    </button>
-                  </div>
-                  {capsOn && <p className="if-caps"><ArrowUp />Caps Lock is on</p>}
-                  {signInErrors.password && <p id="signin-password-error" className="if-fielderror"><AlertCircle />{signInErrors.password}</p>}
-                </div>
-
-                <div className="if-row if-reveal" style={{ animationDelay: '.34s' }}>
-                  <button type="button" className="if-link" onClick={handleForgot}>Forgot password?</button>
-                </div>
-
-                <button type="submit" className="if-btn if-reveal" style={{ animationDelay: '.38s' }} disabled={isLoading} aria-busy={isLoading}>
-                  {isLoading ? (<><span className="if-spinner" />Signing in…</>) : (<>Sign in<ArrowRight className="if-arrow" width={17} height={17} /></>)}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="text-sm text-cc-link hover:text-cc-link-hover"
+                  onClick={handleForgot}
+                >
+                  Forgot password?
                 </button>
-              </form>
+              </div>
 
-              {ENABLE_SIGNUP && (
-                <p className="if-toggle if-reveal" style={{ animationDelay: '.44s' }}>
-                  Need an account? <button type="button" className="if-link" onClick={() => { setMode('signup'); setNotice(null); }}>Create one</button>
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <h1 className="if-title">Create your account</h1>
-              <p className="if-subtitle">New accounts start with customer access. An admin grants staff roles.</p>
+              <Button
+                type="submit"
+                data-primary
+                disabled={isLoading}
+                aria-busy={isLoading}
+                className="w-full rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-cc-on-accent/40 border-t-cc-on-accent" />
+                    Signing in
+                  </>
+                ) : (
+                  'Sign in'
+                )}
+              </Button>
+            </form>
 
-              {signUpErrors.general && (
-                <div className="if-banner" role="alert" aria-live="polite" style={{ marginTop: 22 }}>
-                  <AlertCircle /><span>{signUpErrors.general}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSignUp} noValidate style={{ marginTop: 22 }}>
-                <div className="if-field">
-                  <label className="if-label" htmlFor="signup-name">Full name</label>
-                  <div className="if-control">
-                    <input id="signup-name" type="text" autoComplete="name" placeholder="Your full name"
-                      className={`if-input${signUpErrors.fullName ? ' invalid' : ''}`} value={signUpData.fullName}
-                      onChange={(e) => { setSignUpData({ ...signUpData, fullName: e.target.value }); if (signUpErrors.fullName) { const n = { ...signUpErrors }; delete n.fullName; setSignUpErrors(n); } }}
-                      aria-invalid={!!signUpErrors.fullName} required />
-                  </div>
-                  {signUpErrors.fullName && <p className="if-fielderror"><AlertCircle />{signUpErrors.fullName}</p>}
-                </div>
-                <div className="if-field">
-                  <label className="if-label" htmlFor="signup-email">Email</label>
-                  <div className="if-control">
-                    <input id="signup-email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off"
-                      autoComplete="email" placeholder="you@lewisinsurance.com"
-                      className={`if-input${signUpErrors.email ? ' invalid' : ''}`} value={signUpData.email}
-                      onChange={(e) => { setSignUpData({ ...signUpData, email: e.target.value }); if (signUpErrors.email) { const n = { ...signUpErrors }; delete n.email; setSignUpErrors(n); } }}
-                      aria-invalid={!!signUpErrors.email} required />
-                  </div>
-                  {signUpErrors.email && <p className="if-fielderror"><AlertCircle />{signUpErrors.email}</p>}
-                </div>
-                <div className="if-field if-haspw">
-                  <label className="if-label" htmlFor="signup-password">Password</label>
-                  <div className="if-control">
-                    <input id="signup-password" type={showPw ? 'text' : 'password'} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH}
-                      placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-                      className={`if-input${signUpErrors.password ? ' invalid' : ''}`} value={signUpData.password}
-                      onKeyUp={onPwKey} onKeyDown={onPwKey} onBlur={() => setCapsOn(false)}
-                      onChange={(e) => { setSignUpData({ ...signUpData, password: e.target.value }); if (signUpErrors.password) { const n = { ...signUpErrors }; delete n.password; setSignUpErrors(n); } }}
-                      aria-invalid={!!signUpErrors.password} required />
-                    <button type="button" className="if-pwtoggle" aria-pressed={showPw} aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((s) => !s)}>
-                      {showPw ? <EyeOff /> : <Eye />}
-                    </button>
-                  </div>
-                  {capsOn && <p className="if-caps"><ArrowUp />Caps Lock is on</p>}
-                  {signUpErrors.password && <p className="if-fielderror"><AlertCircle />{signUpErrors.password}</p>}
-                </div>
-                <button type="submit" className="if-btn" disabled={isLoading} aria-busy={isLoading} style={{ marginTop: 4 }}>
-                  {isLoading ? (<><span className="if-spinner" />Creating account…</>) : (<>Create account<ArrowRight className="if-arrow" width={17} height={17} /></>)}
+            {ENABLE_SIGNUP && (
+              <p className="mt-6 text-center text-sm text-cc-text-muted">
+                Need an account?{' '}
+                <button
+                  type="button"
+                  className="text-cc-link hover:text-cc-link-hover"
+                  onClick={() => { setMode('signup'); setNotice(null); }}
+                >
+                  Create one
                 </button>
-              </form>
-
-              <p className="if-toggle">
-                Already have an account? <button type="button" className="if-link" onClick={() => { setMode('signin'); setSignUpErrors({}); }}>Sign in</button>
               </p>
-            </>
-          )}
+            )}
+          </>
+        ) : (
+          <>
+            <h1 className="mt-6 text-center text-2xl font-semibold text-cc-text-primary">Create your account</h1>
+            <p className="mt-1 text-center text-sm text-cc-text-muted">
+              New accounts start with customer access. An admin grants staff roles.
+            </p>
 
-          <p className="if-foot if-reveal" style={{ animationDelay: '.5s' }}>
-            <span className="lock"><Lock />Authorized staff only · Encrypted connection</span><br />
-            <b>InsureFlow</b> · by Lewis Insurance · Since 1981
+            {signUpErrors.general && (
+              <div
+                className="mt-6 flex items-start gap-2 rounded-cc-md border border-cc-danger bg-cc-surface-raised px-3 py-2.5 text-sm text-cc-danger"
+                role="alert"
+                aria-live="polite"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{signUpErrors.general}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSignUp} noValidate className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm text-cc-text-secondary" htmlFor="signup-name">
+                  Full name
+                </label>
+                <input
+                  id="signup-name"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Your full name"
+                  className={`${INPUT_BASE} ${signUpErrors.fullName ? 'border-cc-danger' : 'border-cc-border-interactive'}`}
+                  value={signUpData.fullName}
+                  onChange={(e) => { setSignUpData({ ...signUpData, fullName: e.target.value }); if (signUpErrors.fullName) { const n = { ...signUpErrors }; delete n.fullName; setSignUpErrors(n); } }}
+                  aria-invalid={!!signUpErrors.fullName}
+                  aria-describedby={signUpErrors.fullName ? 'signup-name-error' : undefined}
+                  required
+                />
+                {signUpErrors.fullName && (
+                  <p id="signup-name-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {signUpErrors.fullName}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm text-cc-text-secondary" htmlFor="signup-email">
+                  Email
+                </label>
+                <input
+                  id="signup-email"
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="email"
+                  placeholder="you@lewisinsurance.com"
+                  className={`${INPUT_BASE} ${signUpErrors.email ? 'border-cc-danger' : 'border-cc-border-interactive'}`}
+                  value={signUpData.email}
+                  onChange={(e) => { setSignUpData({ ...signUpData, email: e.target.value }); if (signUpErrors.email) { const n = { ...signUpErrors }; delete n.email; setSignUpErrors(n); } }}
+                  aria-invalid={!!signUpErrors.email}
+                  aria-describedby={signUpErrors.email ? 'signup-email-error' : undefined}
+                  required
+                />
+                {signUpErrors.email && (
+                  <p id="signup-email-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {signUpErrors.email}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm text-cc-text-secondary" htmlFor="signup-password">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="signup-password"
+                    type={showPw ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    minLength={MIN_PASSWORD_LENGTH}
+                    placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                    className={`${INPUT_BASE} pr-11 ${signUpErrors.password ? 'border-cc-danger' : 'border-cc-border-interactive'}`}
+                    value={signUpData.password}
+                    onKeyUp={onPwKey}
+                    onKeyDown={onPwKey}
+                    onBlur={() => setCapsOn(false)}
+                    onChange={(e) => { setSignUpData({ ...signUpData, password: e.target.value }); if (signUpErrors.password) { const n = { ...signUpErrors }; delete n.password; setSignUpErrors(n); } }}
+                    aria-invalid={!!signUpErrors.password}
+                    aria-describedby={signUpErrors.password ? 'signup-password-error' : undefined}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-cc-sm text-cc-text-muted hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+                    aria-pressed={showPw}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPw((s) => !s)}
+                  >
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {capsOn && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-text-secondary">
+                    <ArrowUp className="h-4 w-4 shrink-0" />
+                    Caps Lock is on
+                  </p>
+                )}
+                {signUpErrors.password && (
+                  <p id="signup-password-error" className="mt-1.5 flex items-center gap-1.5 text-sm text-cc-danger">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {signUpErrors.password}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                data-primary
+                disabled={isLoading}
+                aria-busy={isLoading}
+                className="w-full rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-cc-on-accent/40 border-t-cc-on-accent" />
+                    Creating account
+                  </>
+                ) : (
+                  'Create account'
+                )}
+              </Button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-cc-text-muted">
+              Already have an account?{' '}
+              <button
+                type="button"
+                className="text-cc-link hover:text-cc-link-hover"
+                onClick={() => { setMode('signin'); setSignUpErrors({}); }}
+              >
+                Sign in
+              </button>
+            </p>
+          </>
+        )}
+
+        <div className="mt-8 border-t border-cc-border-subtle pt-4 text-center text-xs text-cc-text-muted">
+          <p className="flex items-center justify-center gap-1.5">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Authorized staff only · Encrypted connection
           </p>
+          <p className="mt-1">by Lewis Insurance · Since 1981</p>
         </div>
-      </section>
+      </main>
     </div>
   );
 }

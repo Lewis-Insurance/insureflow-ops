@@ -558,9 +558,9 @@ export default function ExtractionReviewDetail() {
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.9) return 'text-green-600 bg-green-50';
-    if (confidence >= 0.7) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+    if (confidence >= 0.9) return 'text-success bg-success/10';
+    if (confidence >= 0.7) return 'text-warning bg-warning/10';
+    return 'text-destructive bg-destructive/10';
   };
 
   const getFieldStatus = (field: string) => {
@@ -573,11 +573,11 @@ export default function ExtractionReviewDetail() {
   const getFieldIcon = (status: string) => {
     switch (status) {
       case 'auto':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case 'review':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-4 w-4 text-warning" />;
       case 'flagged':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-destructive" />;
       default:
         return null;
     }
@@ -631,7 +631,7 @@ export default function ExtractionReviewDetail() {
                 {corrections.length > 0 && (
                   <>
                     <span>•</span>
-                    <span className="text-blue-600">
+                    <span className="text-info">
                       <Brain className="h-3 w-3 inline mr-1" />
                       {corrections.length} correction(s)
                     </span>
@@ -644,7 +644,7 @@ export default function ExtractionReviewDetail() {
             <Button
               variant="outline"
               onClick={handleReject}
-              className="text-red-600"
+              className="text-destructive"
             >
               <XCircle className="h-4 w-4 mr-2" />
               Reject
@@ -662,13 +662,13 @@ export default function ExtractionReviewDetail() {
 
         {/* Suggestions Banner */}
         {extraction.claude_suggestions && extraction.claude_suggestions.length > 0 && (
-          <Card className="mb-4 border-blue-200 bg-blue-50">
+          <Card className="mb-4 border-info/30 bg-info/10">
             <CardContent className="py-3">
               <div className="flex items-start gap-2">
-                <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Sparkles className="h-5 w-5 text-info mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">AI Suggestions</p>
-                  <ul className="text-sm text-blue-800 mt-1 space-y-1">
+                  <p className="font-medium text-info">AI Suggestions</p>
+                  <ul className="text-sm text-info mt-1 space-y-1">
                     {extraction.claude_suggestions.map((suggestion, i) => (
                       <li key={i}>• {suggestion}</li>
                     ))}
@@ -684,7 +684,7 @@ export default function ExtractionReviewDetail() {
           {/* Document Viewer */}
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b bg-gray-50">
+              <div className="flex items-center justify-between p-3 border-b bg-cc-surface-raised">
                 <span className="font-medium text-sm">Document Preview</span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -732,7 +732,7 @@ export default function ExtractionReviewDetail() {
                   )}
                 </div>
               </div>
-              <ScrollArea className="flex-1 p-4 bg-gray-100">
+              <ScrollArea className="flex-1 p-4 bg-cc-surface-raised">
                 {documentUrl ? (
                   <div
                     ref={documentContainerRef}
@@ -824,7 +824,7 @@ export default function ExtractionReviewDetail() {
           {/* Extracted Fields */}
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b bg-gray-50">
+              <div className="flex items-center justify-between p-3 border-b bg-cc-surface-raised">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">Extracted Fields</span>
                   <Badge variant="secondary">{Object.keys(editedFields).length}</Badge>
@@ -856,24 +856,24 @@ export default function ExtractionReviewDetail() {
                         <div className="flex items-center gap-2 mb-2">
                           {tier === 'auto' && (
                             <>
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              <span className="text-sm font-medium text-green-700">
+                              <CheckCircle className="h-4 w-4 text-success" />
+                              <span className="text-sm font-medium text-success">
                                 High Confidence (Auto-Apply)
                               </span>
                             </>
                           )}
                           {tier === 'review' && (
                             <>
-                              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                              <span className="text-sm font-medium text-yellow-700">
+                              <AlertTriangle className="h-4 w-4 text-warning" />
+                              <span className="text-sm font-medium text-warning">
                                 Needs Review
                               </span>
                             </>
                           )}
                           {tier === 'flagged' && (
                             <>
-                              <XCircle className="h-4 w-4 text-red-500" />
-                              <span className="text-sm font-medium text-red-700">
+                              <XCircle className="h-4 w-4 text-destructive" />
+                              <span className="text-sm font-medium text-destructive">
                                 Low Confidence (Flagged)
                               </span>
                             </>
@@ -899,11 +899,11 @@ export default function ExtractionReviewDetail() {
                               <Card
                                 key={field}
                                 className={`cursor-pointer transition-all ${
-                                  isEdited ? 'border-blue-300 bg-blue-50' : ''
+                                  isEdited ? 'border-info/30 bg-info/10' : ''
                                 } ${
                                   selectedFields.has(field) ? 'ring-2 ring-primary' : ''
                                 } ${
-                                  hoveredField === field ? 'shadow-md border-blue-200' : ''
+                                  hoveredField === field ? 'shadow-md border-info/30' : ''
                                 }`}
                                 onMouseEnter={() => setHoveredField(field)}
                                 onMouseLeave={() => setHoveredField(null)}
@@ -929,7 +929,7 @@ export default function ExtractionReviewDetail() {
                                             <TooltipProvider>
                                               <Tooltip>
                                                 <TooltipTrigger>
-                                                  <MousePointer className="h-3 w-3 text-blue-400" />
+                                                  <MousePointer className="h-3 w-3 text-info" />
                                                 </TooltipTrigger>
                                                 <TooltipContent>
                                                   Click to highlight source in document
@@ -947,7 +947,7 @@ export default function ExtractionReviewDetail() {
                                                   <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-6 w-6 text-orange-500"
+                                                    className="h-6 w-6 text-warning"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       handleReprocessField(field);
@@ -972,7 +972,7 @@ export default function ExtractionReviewDetail() {
                                                   <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-6 w-6 text-purple-500"
+                                                    className="h-6 w-6 text-info"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       handleSelectCandidate(field);
@@ -1028,14 +1028,14 @@ export default function ExtractionReviewDetail() {
 
                                       {/* Evidence snippet */}
                                       {hasEvidence && (
-                                        <p className="text-xs text-gray-500 mt-1 truncate">
-                                          <span className="text-gray-400">Source: </span>
+                                        <p className="text-xs text-cc-text-muted mt-1 truncate">
+                                          <span className="text-cc-text-faint">Source: </span>
                                           "{fieldEvid[0].snippet_text.substring(0, 50)}..."
                                         </p>
                                       )}
 
                                       {isEdited && (
-                                        <p className="text-xs text-blue-600 mt-1">
+                                        <p className="text-xs text-info mt-1">
                                           Original: "{extraction.extracted_fields[field]}"
                                         </p>
                                       )}
@@ -1053,13 +1053,13 @@ export default function ExtractionReviewDetail() {
               </ScrollArea>
 
               {/* Action Footer */}
-              <div className="p-3 border-t bg-gray-50">
+              <div className="p-3 border-t bg-cc-surface-raised">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
                     {selectedFields.size} of {Object.keys(editedFields).length} fields selected
                   </span>
                   {corrections.length > 0 && (
-                    <span className="text-blue-600 flex items-center gap-1">
+                    <span className="text-info flex items-center gap-1">
                       <Brain className="h-4 w-4" />
                       {corrections.length} correction(s) will improve future extractions
                     </span>
@@ -1080,7 +1080,7 @@ export default function ExtractionReviewDetail() {
               </DialogDescription>
             </DialogHeader>
             {pendingCorrection && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+              <div className="mb-4 p-3 bg-cc-surface-raised rounded-lg text-sm">
                 <p><strong>Field:</strong> {pendingCorrection.field}</p>
                 <p><strong>Original:</strong> "{pendingCorrection.originalValue}"</p>
                 <p><strong>Corrected:</strong> "{pendingCorrection.correctedValue}"</p>
@@ -1092,7 +1092,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('OCR_ERROR')}
               >
-                <XCircle className="h-4 w-4 mr-2 text-red-500" />
+                <XCircle className="h-4 w-4 mr-2 text-destructive" />
                 OCR Misread
               </Button>
               <Button
@@ -1100,7 +1100,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('WRONG_CANDIDATE')}
               >
-                <AlertTriangle className="h-4 w-4 mr-2 text-yellow-500" />
+                <AlertTriangle className="h-4 w-4 mr-2 text-warning" />
                 Wrong Selection
               </Button>
               <Button
@@ -1108,7 +1108,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('MISSING_FIELD')}
               >
-                <Eye className="h-4 w-4 mr-2 text-blue-500" />
+                <Eye className="h-4 w-4 mr-2 text-info" />
                 Field Not Found
               </Button>
               <Button
@@ -1116,7 +1116,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('FALSE_POSITIVE')}
               >
-                <Info className="h-4 w-4 mr-2 text-orange-500" />
+                <Info className="h-4 w-4 mr-2 text-warning" />
                 Shouldn't Exist
               </Button>
               <Button
@@ -1124,7 +1124,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('NORMALIZATION')}
               >
-                <Edit2 className="h-4 w-4 mr-2 text-purple-500" />
+                <Edit2 className="h-4 w-4 mr-2 text-info" />
                 Format Issue
               </Button>
               <Button
@@ -1132,7 +1132,7 @@ export default function ExtractionReviewDetail() {
                 className="justify-start"
                 onClick={() => handleErrorTypeSelect('VALIDATION')}
               >
-                <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                <CheckCircle className="h-4 w-4 mr-2 text-success" />
                 Validation Error
               </Button>
             </div>
