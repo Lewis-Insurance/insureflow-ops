@@ -40,7 +40,9 @@ function hasCoverage(coverage: unknown): boolean {
 }
 
 export function CustomerPoliciesSection({ accountId, customerName }: CustomerPoliciesSectionProps) {
-  const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies();
+  // Server-side scoped to this account: the unfiltered hook paginates the entire
+  // policies book (1000-row pages with 3 joins) on every customer record open.
+  const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies({ accountId });
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
@@ -528,19 +530,35 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
         accountId={accountId}
         onSuccess={refetch}
       />
+      {/* These modals only open from a policy card's overflow menu, so the
+          selected policy id must ride along - dropping it stored the note/task
+          with policy_id NULL and lost the "Policy #" context chip. */}
       <AddNoteModal
         open={addNoteOpen}
-        onOpenChange={setAddNoteOpen}
+        onOpenChange={(open) => {
+          setAddNoteOpen(open);
+          if (!open) setSelectedPolicyId(null);
+        }}
         accountId={accountId}
+        policyId={selectedPolicyId ?? undefined}
       />
       <AddTaskModal
         open={addTaskOpen}
-        onOpenChange={setAddTaskOpen}
+        onOpenChange={(open) => {
+          setAddTaskOpen(open);
+          if (!open) setSelectedPolicyId(null);
+        }}
         accountId={accountId}
+        policyId={selectedPolicyId ?? undefined}
       />
       <UploadDocModal
+        key={selectedPolicyId ?? 'no-policy'}
+        policyId={selectedPolicyId ?? undefined}
         open={uploadDocOpen}
-        onOpenChange={setUploadDocOpen}
+        onOpenChange={(open) => {
+          setUploadDocOpen(open);
+          if (!open) setSelectedPolicyId(null);
+        }}
         accountId={accountId}
         onSuccess={() => {
           toast({

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceFromTodayInLocalDays } from '@/lib/date/localDate';
 import { Search, Brain, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,8 +35,10 @@ type Scope = 'open' | 'closed' | 'all';
 const OPEN_STATUSES = new Set(['pending', 'contacted', 'quoted', 'upcoming', 'in_progress']);
 
 const isOpen = (r: Renewal) => OPEN_STATUSES.has(r.status);
+// Local-date math: new Date('YYYY-MM-DD') is UTC midnight, which shifts the
+// Overdue / Due-this-week cohorts a day early in US timezones.
 const daysToRenewal = (r: Renewal) =>
-  r.renewal_date ? differenceInCalendarDays(new Date(r.renewal_date), new Date()) : null;
+  r.renewal_date ? differenceFromTodayInLocalDays(r.renewal_date) : null;
 const isHighRisk = (r: Renewal) => r.risk_level === 'high' || r.risk_level === 'critical';
 
 // Each cohort is a predicate over a renewal. 'all' is the unfiltered book.

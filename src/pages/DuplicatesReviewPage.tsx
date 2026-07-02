@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { StatusPill, Chip, SectionLabel } from '@/components/cc';
@@ -9,6 +10,7 @@ import {
   useDuplicateGroups,
   useRecentMerges,
   unmergeAccount,
+  invalidateAccountDataCaches,
   displayWithGoesBy,
   formatPremium,
   accountTypeLabel,
@@ -90,15 +92,28 @@ function GroupCard({ group, onReview }: { group: DuplicateGroup; onReview: (g: D
   );
 }
 
-function RecentlyMerged() {
+function RecentlyMerged({ refreshKey, onUndone }: { refreshKey: number; onUndone: () => void }) {
+  const queryClient = useQueryClient();
   const { merges, loading, refetch } = useRecentMerges();
   const [undoing, setUndoing] = useState<string | null>(null);
+
+  // A merge on this page must appear here immediately so it can be undone
+  // without a full reload.
+  useEffect(() => {
+    if (refreshKey > 0) refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const handleUndo = async (id: string) => {
     setUndoing(id);
     const ok = await unmergeAccount(id);
     setUndoing(null);
-    if (ok) refetch();
+    if (ok) {
+      // Un-merge moves records back; both the queue and account caches are stale.
+      invalidateAccountDataCaches(queryClient);
+      refetch();
+      onUndone();
+    }
   };
 
   if (loading) {
@@ -143,8 +158,9 @@ function RecentlyMerged() {
 }
 
 export default function DuplicatesReviewPage() {
-  const { groups, total, loading, refetch, merge, linkInstead } = useDuplicateGroups();
+  const { groups, total, loading, loadingMore, hasMore, loadMore, refetch, merge, linkInstead } = useDuplicateGroups();
   const [activeGroup, setActiveGroup] = useState<DuplicateGroup | null>(null);
+  const [mergesVersion, setMergesVersion] = useState(0);
 
   const drawerMembers: MergeMember[] = (activeGroup?.members ?? []).map((m) => ({
     account_id: m.account_id,
@@ -206,6 +222,18 @@ export default function DuplicatesReviewPage() {
             {groups.map((g) => (
               <GroupCard key={g.group_id} group={g} onReview={setActiveGroup} />
             ))}
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  disabled={loadingMore}
+                  onClick={loadMore}
+                  className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
+                  {loadingMore ? 'Loading…' : `Load more (${groups.length} of ${total})`}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -214,7 +242,7 @@ export default function DuplicatesReviewPage() {
             <History className="h-4 w-4 text-cc-text-muted" />
             <SectionLabel>Recently merged</SectionLabel>
           </div>
-          <RecentlyMerged />
+          <RecentlyMerged refreshKey={mergesVersion} onUndone={refetch} />
         </section>
       </div>
 
@@ -225,6 +253,7 @@ export default function DuplicatesReviewPage() {
         onConfirm={async (survivorId) => {
           if (!activeGroup) return false;
           const ok = await merge(activeGroup.group_id, survivorId);
+          if (ok) setMergesVersion((v) => v + 1);
           return ok;
         }}
         onLinkInstead={async (fromId, toId) => {

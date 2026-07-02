@@ -2,6 +2,24 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Pre-paint theme: next-themes only swaps the class after the bundle
+      // mounts, so without this a light-theme user sees a dark flash on every
+      // load. Mirrors next-themes' storage key + system behavior.
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          // No stored choice -> the app's defaultTheme (dark), NOT system,
+          // so first paint matches what next-themes will mount with.
+          if (!t) t = 'dark';
+          if (t === 'system') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.classList.remove('dark', 'light');
+          document.documentElement.classList.add(t === 'light' ? 'light' : 'dark');
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InsureFlow Ops - Lewis Insurance</title>
     <meta name="description" content="InsureFlow Ops - Insurance Agency Management System" />
@@ -10,7 +28,7 @@
     <!-- Calm Command typeface: Inter (interface) + Geist Mono (figures and identifiers) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
     <!-- Favicons from Supabase Storage -->
     <link rel="apple-touch-icon" sizes="180x180" href="https://lrqajzwcmdwahnjyidgv.supabase.co/storage/v1/object/public/favicon/apple-touch-icon.png" />

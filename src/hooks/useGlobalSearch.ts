@@ -1,6 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
 export interface SearchResult {
@@ -21,8 +20,12 @@ export function useGlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Monotonic request counter: a slow response for "smi" must never overwrite
+  // the results for "smith" typed after it (Enter would open the wrong record).
+  const requestSeq = useRef(0);
 
   const search = useCallback(async (query: string) => {
+    const seq = ++requestSeq.current;
     if (!query || typeof query !== 'string' || !query.trim()) {
       setResults([]);
       return;
@@ -57,18 +60,14 @@ export function useGlobalSearch() {
       }));
 
       logger.debug('Global search results count:', searchResults.length);
-      setResults(searchResults);
+      if (seq === requestSeq.current) setResults(searchResults);
 
     } catch (err: any) {
+      if (seq !== requestSeq.current) return; // superseded; a flaky request must not toast-spam
       logger.error('Global search error:', err);
       setError(err.message || 'Search failed');
-      toast({
-        title: "Search Error",
-        description: err.message || 'Failed to search customers',
-        variant: "destructive",
-      });
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }, []);
 

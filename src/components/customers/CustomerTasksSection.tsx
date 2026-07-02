@@ -11,11 +11,17 @@ import { usePermissions } from '@/hooks/usePermissions';
 
 interface CustomerTasksSectionProps {
   accountId: string;
+  /** Optional shared useTasks(accountId) instance from the host page. */
+  tasksApi?: ReturnType<typeof useTasks>;
 }
 
-export function CustomerTasksSection({ accountId }: CustomerTasksSectionProps) {
+export function CustomerTasksSection({ accountId, tasksApi }: CustomerTasksSectionProps) {
   const { canEdit } = usePermissions();
-  const { tasks, loading, fetchTasks, createTask, updateTask } = useTasks(accountId);
+  // The host page can inject its useTasks instance so the Quick-actions tiles
+  // and this section share ONE task list (separate instances made the tiles
+  // freeze at their mount-time counts).
+  const ownApi = useTasks(tasksApi ? undefined : accountId);
+  const { tasks, loading, fetchTasks, createTask, updateTask } = tasksApi ?? ownApi;
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);

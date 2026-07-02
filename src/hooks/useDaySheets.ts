@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DaySheet, DaySheetFilters } from '@/types/payments';
+import { todayLocalDate } from '@/lib/date/localDate';
 
 // Query keys
 export const daySheetKeys = {
@@ -80,12 +81,13 @@ export function useDaySheet(id: string) {
 
 // Fetch current (today's) open day sheet
 export function useCurrentDaySheet() {
+  // Business-timezone "today" (America/New_York), matching the Record Payment
+  // form's day_sheet_date default - device-local time booked/printed the wrong
+  // sheet for anyone outside ET. Included in the key so it rolls over midnight.
+  const today = todayLocalDate();
   return useQuery({
-    queryKey: daySheetKeys.current(),
+    queryKey: [...daySheetKeys.current(), today],
     queryFn: async () => {
-      // Use local date (not UTC) to avoid timezone issues
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       const { data, error } = await supabase
         .from('day_sheets')

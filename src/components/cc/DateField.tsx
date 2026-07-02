@@ -44,7 +44,10 @@ function parseToIso(input: string): string | null {
   let m: RegExpExecArray | null;
   if ((m = /^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/.exec(s))) candidates.push([+m[1], +m[2], +m[3]]);
   if ((m = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2}|\d{4})$/.exec(s))) {
-    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    // Century pivot: two-digit years within 10 years ahead read as 20xx,
+    // otherwise 19xx ("12/31/99" is 1999, not 2099 - DOBs flow through here).
+    const pivot = (new Date().getFullYear() % 100) + 10;
+    const y = m[3].length === 2 ? (+m[3] <= pivot ? 2000 + +m[3] : 1900 + +m[3]) : +m[3];
     candidates.push([y, +m[1], +m[2]]);
   }
   if ((m = /^(\d{2})(\d{2})(\d{4})$/.exec(s))) candidates.push([+m[3], +m[1], +m[2]]); // MMDDYYYY
@@ -122,8 +125,10 @@ export function DateField({
           const raw = e.target.value;
           setDraft(raw);
           // Commit live once a complete, valid date is present so downstream derivations
-          // (e.g. expiration from effective) update as you type. Partial input stays local.
-          const iso = parseToIso(raw);
+          // (e.g. expiration from effective) update as you type. Partial input stays
+          // local, and 2-digit years only commit on blur/Enter - typing toward
+          // "1/1/2026" must not transiently commit 2020-01-01 into the autosave.
+          const iso = /\d{4}/.test(raw) ? parseToIso(raw) : null;
           if (iso && iso !== value) onChange(iso);
           else if (raw.trim() === '' && value !== '') onChange('');
         }}

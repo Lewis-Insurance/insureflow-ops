@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { Phone, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 
 interface AddCallLogModalProps {
@@ -29,6 +30,7 @@ export function AddCallLogModal({ open, onOpenChange, accountId, defaultPhone, d
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Reset phone to default when modal opens
   useEffect(() => {
@@ -79,6 +81,12 @@ export function AddCallLogModal({ open, onOpenChange, accountId, defaultPhone, d
         }]);
 
       if (error) throw error;
+
+      // The Activity panel reads ['communication-history', accountId]; without
+      // this the logged call is invisible for up to 5 minutes and agents
+      // re-log it, creating duplicate communications.
+      queryClient.invalidateQueries({ queryKey: ['communication-history', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['communication-engagement-stats', accountId] });
 
       toast({
         title: 'Success',

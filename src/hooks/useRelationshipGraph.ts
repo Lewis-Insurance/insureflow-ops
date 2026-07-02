@@ -1,7 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+
+/**
+ * A merge (or un-merge) reparents rows across every account-keyed table. With the
+ * app-wide 5-minute staleTime, stale caches make the survivor render WITHOUT the
+ * merged-in policies - reading as "the merge failed" and inviting a re-run or a
+ * re-keyed policy. Call after every successful merge/unmerge.
+ */
+export function invalidateAccountDataCaches(queryClient: QueryClient) {
+  for (const key of [
+    'policies',
+    'unified-customers',
+    'payments',
+    'documents',
+    'account-notes',
+    'tasks',
+    'quotes',
+    'renewals',
+    'communication-history',
+  ]) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
 
 /**
  * Data layer for the account relationship graph (account_relationships +
@@ -283,14 +306,18 @@ export function useHouseholdSummary(householdId?: string | null) {
 export function useAccountSearch() {
   const [results, setResults] = useState<AccountSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  // Monotonic guard: a slow older response must not overwrite a newer one.
+  const requestSeq = useRef(0);
 
   const search = useCallback(async (q: string) => {
+    const seq = ++requestSeq.current;
     if (!q || !q.trim()) {
       setResults([]);
       return;
     }
     setLoading(true);
     const { data, error } = await supabase.rpc('search_accounts', { p_q: q.trim(), p_limit: 20 });
+    if (seq !== requestSeq.current) return;
     if (error) {
       logger.error('account search error', error);
       setResults([]);
@@ -437,15 +464,20 @@ export interface DuplicateGroup {
   members: DuplicateMember[];
 }
 
+const DUPLICATE_GROUPS_PAGE_SIZE = 50;
+
 export function useDuplicateGroups() {
+  const queryClient = useQueryClient();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   const refetch = useCallback(async () => {
     setLoading(true);
     const [{ data, error }, countRes] = await Promise.all([
-      supabase.rpc('list_duplicate_groups_for_review', { p_limit: 200, p_offset: 0 }),
+      supabase.rpc('list_duplicate_groups_for_review', { p_limit: DUPLICATE_GROUPS_PAGE_SIZE, p_offset: 0 }),
       supabase
         .from('duplicate_groups')
         .select('id', { count: 'exact', head: true })
@@ -455,12 +487,37 @@ export function useDuplicateGroups() {
     if (error) {
       logger.error('duplicate groups error', error);
       setGroups([]);
+      setHasMore(false);
     } else {
-      setGroups((data || []) as unknown as DuplicateGroup[]);
+      const rows = (data || []) as unknown as DuplicateGroup[];
+      setGroups(rows);
+      setHasMore(rows.length === DUPLICATE_GROUPS_PAGE_SIZE);
     }
     setTotal(countRes.count || 0);
     setLoading(false);
   }, []);
+
+  // With ~14k redundant accounts in the book, a fixed 200-row cap left most
+  // groups unreachable while the header count showed the true total. Pages of
+  // 50 with an explicit Load more keep everything reachable.
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true);
+    const { data, error } = await supabase.rpc('list_duplicate_groups_for_review', {
+      p_limit: DUPLICATE_GROUPS_PAGE_SIZE,
+      p_offset: groups.length,
+    });
+    if (error) {
+      logger.error('duplicate groups load-more error', error);
+    } else {
+      const rows = (data || []) as unknown as DuplicateGroup[];
+      setGroups((prev) => {
+        const seen = new Set(prev.map((g) => g.group_id));
+        return [...prev, ...rows.filter((g) => !seen.has(g.group_id))];
+      });
+      setHasMore(rows.length === DUPLICATE_GROUPS_PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  }, [groups.length]);
 
   useEffect(() => {
     refetch();
@@ -477,10 +534,11 @@ export function useDuplicateGroups() {
         return false;
       }
       toast({ title: 'Records merged', description: 'History preserved with a same-as link.' });
+      invalidateAccountDataCaches(queryClient);
       await refetch();
       return true;
     },
-    [refetch],
+    [refetch, queryClient],
   );
 
   const linkInstead = useCallback(
@@ -492,17 +550,28 @@ export function useDuplicateGroups() {
         note: 'Linked from duplicate review (not a merge)',
       });
       if (!ok) return false;
-      await supabase
+      // If this update fails the group stays in the queue and a second "Link
+      // instead" click would hit the unique edge index with a raw DB error -
+      // surface it instead of discarding it.
+      const { error: groupError } = await supabase
         .from('duplicate_groups')
         .update({ status: 'linked', reviewed_at: new Date().toISOString() })
         .eq('id', groupId);
+      if (groupError) {
+        toast({
+          title: 'Linked, but the group could not be marked reviewed',
+          description: groupError.message,
+          variant: 'destructive',
+        });
+        return false;
+      }
       await refetch();
       return true;
     },
     [refetch],
   );
 
-  return { groups, total, loading, refetch, merge, linkInstead };
+  return { groups, total, loading, loadingMore, hasMore, loadMore, refetch, merge, linkInstead };
 }
 
 // ---------------------------------------------------------------------------

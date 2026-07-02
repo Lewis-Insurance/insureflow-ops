@@ -11,6 +11,21 @@ import {
 import { resolveCarriers } from './carrierResolver';
 
 const BATCH_SIZE = 100;
+// Rows in flight at once during contact resolution (per browser tab).
+const IMPORT_CONCURRENCY = 8;
+
+/** Run task thunks with at most `limit` in flight; resolves when all settle. */
+async function runWithConcurrency(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      const idx = next++;
+      await tasks[idx]();
+    }
+  });
+  await Promise.all(workers);
+}
+
 
 export interface ImportProgress {
   phase: 'contacts' | 'policies';
@@ -92,7 +107,7 @@ export async function updateBatchStatus(
 
   if (status === 'processing') {
     updates.started_at = new Date().toISOString();
-  } else if (status === 'completed' || status === 'failed' || status === 'rolled_back') {
+  } else if (status === 'completed' || status === 'completed_with_errors' || status === 'failed' || status === 'rolled_back') {
     updates.completed_at = new Date().toISOString();
   }
 
@@ -142,11 +157,15 @@ export async function processContacts(
       errors: errors.length,
     });
 
-    // Process each contact in the batch
-    for (let i = 0; i < batch.length; i++) {
-      const contact = batch[i];
-      const rowNumber = start + i + 1;
-
+    // Rows run with bounded concurrency: one awaited RPC per row made a
+    // 10-15k-row book import ~10-15k sequential round trips (tens of minutes).
+    // Order does not matter (results land in a map keyed by master_id).
+    // Per-batch tallies drive the circuit breaker (below) - an order-independent
+    // signal, unlike a "consecutive failures" counter which under concurrency
+    // reflects completion order rather than CSV row order.
+    let batchSuccesses = 0;
+    let batchFailures = 0;
+    const processRow = async (contact: ContactImportRecord, rowNumber: number) => {
       try {
         // Resolve-or-create instead of a blind insert. import_resolve_account
         // normalizes the name (case, & vs AND, punctuation), matches an existing
@@ -210,14 +229,35 @@ export async function processContacts(
             contactsCreated++;
           }
         }
+        batchSuccesses++;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        batchFailures++;
         errors.push({
           rowNumber,
           sourceId: contact.master_id,
           error: errorMessage,
         });
       }
+    };
+
+    await runWithConcurrency(
+      batch.map((contact, i) => () => processRow(contact, start + i + 1)),
+      IMPORT_CONCURRENCY
+    );
+
+    // Circuit breaker: a dead connection/expired session makes an ENTIRE batch
+    // fail. Requiring zero successes (not a consecutive-failure count) keeps
+    // this order-independent under concurrency and immune to a cluster of
+    // legitimately-invalid rows, which will always sit alongside some
+    // successes. A full BATCH_SIZE with no success is the dead-connection tell.
+    if (batchSuccesses === 0 && batchFailures > 0) {
+      errors.push({
+        rowNumber: end,
+        sourceId: '(batch)',
+        error: `Aborted: all ${batchFailures} rows in this batch failed - check the connection/session and re-run the import.`,
+      });
+      break;
     }
   }
 
@@ -414,10 +454,13 @@ export async function runBulkImport(
 
     // Calculate totals
     const totalErrors = contactResult.errors.length + policyResult.errors.length;
-    const totalSuccess = contactResult.accountsCreated + policyResult.policiesCreated;
+    // Matched accounts are successful rows too - omitting them understated
+    // successful_rows for every re-import of an existing book.
+    const totalSuccess =
+      contactResult.accountsCreated + contactResult.accountsMatched + policyResult.policiesCreated;
 
     // Update batch status
-    await updateBatchStatus(batchId, totalErrors > 0 ? 'completed' : 'completed', {
+    await updateBatchStatus(batchId, totalErrors > 0 ? 'completed_with_errors' : 'completed', {
       processedRows: totalRecords,
       successfulRows: totalSuccess,
       errorRows: totalErrors,

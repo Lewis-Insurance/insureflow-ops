@@ -3967,6 +3967,39 @@ export type Database = {
         }
         Relationships: []
       }
+      bak_policies_20260630: {
+        Row: {
+          custom: Json | null
+          deleted_at: string | null
+          effective_date: string | null
+          expiration_date: string | null
+          id: string | null
+          policy_number: string | null
+          premium: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          custom?: Json | null
+          deleted_at?: string | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          id?: string | null
+          policy_number?: string | null
+          premium?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          custom?: Json | null
+          deleted_at?: string | null
+          effective_date?: string | null
+          expiration_date?: string | null
+          id?: string | null
+          policy_number?: string | null
+          premium?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_name: string
@@ -12752,33 +12785,94 @@ export type Database = {
           created_at: string
           created_by: string
           customer_id: string
+          deleted_at: string | null
           id: string
           is_important: boolean | null
           note_category: string | null
           note_text: string
+          policy_id: string | null
+          renewal_id: string | null
+          source: string
           tags: string[] | null
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           created_by: string
           customer_id: string
+          deleted_at?: string | null
           id?: string
           is_important?: boolean | null
           note_category?: string | null
           note_text: string
+          policy_id?: string | null
+          renewal_id?: string | null
+          source?: string
           tags?: string[] | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string
           customer_id?: string
+          deleted_at?: string | null
           id?: string
           is_important?: boolean | null
           note_category?: string | null
           note_text?: string
+          policy_id?: string | null
+          renewal_id?: string | null
+          source?: string
           tags?: string[] | null
+          updated_at?: string
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "at_risk_renewals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_renewal_id_fkey"
+            columns: ["renewal_id"]
+            isOneToOne: false
+            referencedRelation: "renewals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_predictions: {
         Row: {
@@ -32314,7 +32408,7 @@ export type Database = {
           nsf_at: string | null
           nsf_fee: number | null
           org_id: string | null
-          paid_to: string | null
+          paid_to: string
           payer_address: string | null
           payer_name: string | null
           payment_method_id: string
@@ -32338,7 +32432,7 @@ export type Database = {
           check_date?: string | null
           check_number?: string | null
           created_at?: string | null
-          day_sheet_date?: string
+          day_sheet_date: string
           day_sheet_id?: string | null
           deleted_at?: string | null
           id?: string
@@ -32347,7 +32441,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
-          paid_to?: string | null
+          paid_to: string
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id: string
@@ -32380,7 +32474,7 @@ export type Database = {
           nsf_at?: string | null
           nsf_fee?: number | null
           org_id?: string | null
-          paid_to?: string | null
+          paid_to?: string
           payer_address?: string | null
           payer_name?: string | null
           payment_method_id?: string
@@ -41085,6 +41179,22 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: Json
       }
+      get_account_notes: {
+        Args: { p_account_id: string }
+        Returns: {
+          author_name: string
+          context_label: string
+          created_at: string
+          created_by: string
+          id: string
+          is_important: boolean
+          note_text: string
+          policy_id: string
+          renewal_id: string
+          source: string
+          updated_at: string
+        }[]
+      }
       get_account_relationships: {
         Args: { p_account_id: string }
         Returns: {
@@ -42256,6 +42366,7 @@ export type Database = {
         Args: { p_lease_ttl_minutes?: number }
         Returns: number
       }
+      reconcile_notes_to_survivors: { Args: never; Returns: number }
       record_extraction_correction: {
         Args: {
           p_carrier_name?: string
@@ -42310,6 +42421,48 @@ export type Database = {
         Args: { p_group_id: string; p_survivor_id: string }
         Returns: Json
       }
+      renewal_mark_lost: {
+        Args: {
+          p_account_id: string
+          p_category: string
+          p_notes?: string
+          p_policy_id: string
+          p_reason: string
+          p_renewal_id: string
+          p_termination_date?: string
+        }
+        Returns: string
+      }
+      renewal_mark_moved: {
+        Args: {
+          p_account_id: string
+          p_carrier: string
+          p_effective_date: string
+          p_expiration_date: string
+          p_notes?: string
+          p_policy_id: string
+          p_policy_number: string
+          p_policy_term: string
+          p_premium: number
+          p_renewal_id: string
+        }
+        Returns: string
+      }
+      renewal_mark_renewed: {
+        Args: {
+          p_account_id: string
+          p_effective_date: string
+          p_expiration_date: string
+          p_notes?: string
+          p_policy_id: string
+          p_policy_number: string
+          p_policy_term: string
+          p_premium: number
+          p_renewal_id: string
+        }
+        Returns: undefined
+      }
+      renewal_reopen: { Args: { p_renewal_id: string }; Returns: undefined }
       replay_dead_events: {
         Args: {
           p_event_type?: string

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EnumCombobox } from '@/components/ui/enum-combobox';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeForILike } from '@/lib/sanitize';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
@@ -318,13 +319,20 @@ export function AddPolicyModal({
     setDuplicateLoading(true);
     setDuplicateOpen(true);
     try {
-      const { data: existing } = await supabase
+      // Match the violated constraint (the active-only partial unique index):
+      // case-insensitive, live rows, active statuses first, newest first. An
+      // unordered limit(1) could surface an inactive twin on a DIFFERENT
+      // customer and the "Merge Clients" CTA would target the wrong record.
+      const { data: candidates } = await supabase
         .from('policies')
-        .select('id, policy_number, carrier, line_of_business, status, account_id')
-        .eq('policy_number', policyNumber)
+        .select('id, policy_number, carrier, line_of_business, status, account_id, created_at')
+        .ilike('policy_number', sanitizeForILike(policyNumber))
         .is('deleted_at', null)
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(10);
+      const ACTIVE = ['active', 'bound', 'pending'];
+      const existing =
+        candidates?.find((p) => ACTIVE.includes((p.status || '').toLowerCase())) ?? candidates?.[0] ?? null;
 
       if (!existing) {
         // Nothing found (e.g. an RLS-hidden record). Fall back to a plain notice.

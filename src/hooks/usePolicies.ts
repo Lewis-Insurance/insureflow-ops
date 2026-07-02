@@ -6,6 +6,8 @@ import { sanitizeForILike, sanitizeMultiFieldSearch } from '@/lib/sanitize';
 export type Policy = Database['public']['Tables']['policies']['Row'];
 
 export interface PolicyFilters {
+  /** Scope the query server-side to one account (customer record) instead of paginating the whole book. */
+  accountId?: string;
   search?: string;
   policyNumber?: string;
   effectiveDateFrom?: string;
@@ -69,10 +71,15 @@ export function usePolicies(filters: PolicyFilters = {}) {
               code
             )
           `)
+          .is('deleted_at', null) // merge-tombstoned duplicates must never render
           .order('created_at', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         // Apply filters
+        if (filters.accountId) {
+          query = query.eq('account_id', filters.accountId);
+        }
+
         if (filters.search) {
           // Note: carrier is a FK (carrier_id), not a text field - search by policy_number and line_of_business only
           // Carrier name search is handled client-side after the JOIN
