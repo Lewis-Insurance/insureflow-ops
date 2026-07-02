@@ -31,6 +31,7 @@ import { RecordPaymentForm } from '@/components/payments/RecordPaymentForm';
 import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { usePayments, useVoidPayment } from '@/hooks/usePayments';
 import { useCurrentDaySheet } from '@/hooks/useDaySheets';
+import { useToast } from '@/hooks/use-toast';
 import type { PremiumPayment } from '@/types/payments';
 import { cn } from '@/lib/utils';
 
@@ -56,29 +57,30 @@ export default function PaymentList() {
 
   // Only ever show payments that were actually taken (no voided rows).
   const payments = allPayments.filter((p) => p.status !== 'voided');
+  // Totals count only money actually collected: NSF (bounced) payments stay
+  // visible in the list but must not inflate Total Collected / method cards,
+  // matching the day sheets' grand_total (status='recorded' only).
+  const collected = payments.filter((p) => p.status !== 'nsf');
 
   const { data: currentDaySheet } = useCurrentDaySheet();
   const voidPayment = useVoidPayment();
+  const { toast } = useToast();
 
   // Calculate summary stats
   const stats = {
-    totalAmount: payments.reduce((sum, p) => sum + (p.status !== 'voided' ? p.amount : 0), 0),
-    paymentCount: payments.filter((p) => p.status !== 'voided').length,
-    cashTotal: payments
-      .filter((p) => p.payment_method?.type === 'cash' && p.status !== 'voided')
+    totalAmount: collected.reduce((sum, p) => sum + p.amount, 0),
+    paymentCount: collected.length,
+    cashTotal: collected
+      .filter((p) => p.payment_method?.type === 'cash')
       .reduce((sum, p) => sum + p.amount, 0),
-    checkTotal: payments
-      .filter((p) => p.payment_method?.type === 'check' && p.status !== 'voided')
+    checkTotal: collected
+      .filter((p) => p.payment_method?.type === 'check')
       .reduce((sum, p) => sum + p.amount, 0),
-    cardTotal: payments
-      .filter(
-        (p) =>
-          (p.payment_method?.type === 'credit_card' || p.payment_method?.type === 'debit_card') &&
-          p.status !== 'voided'
-      )
+    cardTotal: collected
+      .filter((p) => p.payment_method?.type === 'credit_card' || p.payment_method?.type === 'debit_card')
       .reduce((sum, p) => sum + p.amount, 0),
-    achTotal: payments
-      .filter((p) => p.payment_method?.type === 'ach' && p.status !== 'voided')
+    achTotal: collected
+      .filter((p) => p.payment_method?.type === 'ach')
       .reduce((sum, p) => sum + p.amount, 0),
   };
 
@@ -111,6 +113,11 @@ export default function PaymentList() {
         });
       } catch (error) {
         console.error('Failed to void payment:', error);
+        toast({
+          title: 'Void failed',
+          description: error instanceof Error ? error.message : 'The payment was NOT voided. Try again.',
+          variant: 'destructive',
+        });
       }
     }
   };

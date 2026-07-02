@@ -46,8 +46,13 @@ export function sanitizeForILike(input: string): string {
  * query.or(condition);
  */
 export function sanitizeMultiFieldSearch(searchTerm: string, fields: string[]): string {
-  const sanitized = sanitizeForILike(searchTerm);
-  return fields.map(field => `${field}.ilike.%${sanitized}%`).join(',');
+  const likeEscaped = sanitizeForILike(searchTerm);
+  // Double-quote the pattern for the PostgREST .or() grammar so commas and
+  // parentheses in user input ("Smith, John") stay literal instead of breaking
+  // the filter string into malformed conditions (a silent 400 -> empty results).
+  // Inside a quoted value, backslash escapes itself and the double quote.
+  const quoted = likeEscaped.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return fields.map(field => `${field}.ilike."%${quoted}%"`).join(',');
 }
 
 /**

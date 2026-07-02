@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -47,7 +47,7 @@ import type { PremiumPayment } from '@/types/payments';
 export default function DaySheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
@@ -56,7 +56,11 @@ export default function DaySheetDetail() {
   const [isPrinting, setIsPrinting] = useState(false);
 
   const { data: daySheet, isLoading: isLoadingSheet } = useDaySheet(id!);
-  const { data: payments = [], isLoading: isLoadingPayments } = usePayments({
+  const {
+    data: payments = [],
+    isLoading: isLoadingPayments,
+    isSuccess: paymentsLoaded,
+  } = usePayments({
     day_sheet_id: id,
   });
 
@@ -64,13 +68,22 @@ export default function DaySheetDetail() {
   // and cash sheet consistent with that.
   const recordedPayments = payments.filter((p) => p.status === 'recorded');
 
-  // Auto-trigger print from URL params
+  // Auto-trigger print from URL params: exactly once, and only after the
+  // payments query has actually resolved (printing on the default [] produced
+  // an empty PDF, and re-renders/mutations kept opening new print tabs).
+  const autoPrintedRef = useRef(false);
   useEffect(() => {
     const action = searchParams.get('action');
-    if (action === 'print' && daySheet && payments) {
-      handlePrintDaySheet();
-    }
-  }, [searchParams, daySheet, payments]);
+    if (action !== 'print' || autoPrintedRef.current) return;
+    if (!daySheet || !paymentsLoaded) return;
+    autoPrintedRef.current = true;
+    // Drop the param so payment mutations on this page can't re-trigger printing.
+    const next = new URLSearchParams(searchParams);
+    next.delete('action');
+    setSearchParams(next, { replace: true });
+    handlePrintDaySheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, daySheet, paymentsLoaded]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -106,6 +119,11 @@ export default function DaySheetDetail() {
       );
     } catch (error) {
       console.error('Failed to print PDF:', error);
+      toast({
+        title: 'Could not generate the PDF',
+        description: error instanceof Error ? error.message : 'Try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsPrinting(false);
     }
@@ -347,6 +365,7 @@ export default function DaySheetDetail() {
             </DialogDescription>
           </DialogHeader>
           <RecordPaymentForm
+            defaultDaySheetDate={daySheet?.sheet_date}
             onCancel={() => setShowNewPaymentDialog(false)}
             onSuccess={() => setShowNewPaymentDialog(false)}
           />

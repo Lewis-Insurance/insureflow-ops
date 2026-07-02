@@ -97,8 +97,12 @@ export function PaymentHistoryWidget({
   }
 
   const displayPayments = payments?.slice(0, maxItems) || [];
-  const totalPayments = payments?.length || 0;
-  const totalAmount = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+  // Totals count only money actually collected - voided and NSF rows stay in
+  // the list for the audit trail but must not inflate the customer's total
+  // (which would disagree with the day sheets and the Payments page).
+  const collected = payments?.filter((p) => p.status !== 'voided' && p.status !== 'nsf') || [];
+  const totalPayments = collected.length;
+  const totalAmount = collected.reduce((sum, p) => sum + (p.amount || 0), 0);
 
   return (
     <Card>
