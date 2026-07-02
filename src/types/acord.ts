@@ -14,7 +14,7 @@ export interface AcordTemplate {
   is_current: boolean;
   effective_date: string | null;
   sunset_date: string | null;
-  pdf_type: 'acroform' | 'xfa' | 'static';
+  pdf_type: 'acroform' | 'acroform_hybrid' | 'xfa' | 'static';
   pdf_template_url: string;
   pdf_url?: string; // Alias for pdf_template_url
   field_inventory: FieldInventoryItem[];

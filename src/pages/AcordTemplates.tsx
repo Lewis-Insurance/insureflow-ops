@@ -73,7 +73,7 @@ export default function AcordTemplates() {
     licenseNotes: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
+  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[]; warnings?: string[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'current' | 'archived'>('current');
@@ -116,6 +116,12 @@ export default function AcordTemplates() {
         title: 'Invalid PDF',
         description: result.errors.join(', '),
         variant: 'destructive',
+      });
+    } else if (result.warnings?.length > 0) {
+      toast({
+        title: 'PDF accepted with a note',
+        description: result.warnings[0],
+        variant: 'default',
       });
     }
   };
@@ -198,7 +204,7 @@ export default function AcordTemplates() {
               <DialogHeader>
                 <DialogTitle>Upload ACORD Template</DialogTitle>
                 <DialogDescription>
-                  Upload a fillable PDF ACORD form. Only AcroForm PDFs are supported (XFA forms are not supported).
+                  Upload a fillable PDF ACORD form. AcroForm PDFs are supported. XFA-hybrid PDFs are accepted; the XFA layer is removed automatically and the AcroForm fields are kept.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -224,6 +230,12 @@ export default function AcordTemplates() {
                           {validationResult.errors[0]}
                         </>
                       )}
+                    </div>
+                  )}
+                  {validationResult?.valid && validationResult.warnings?.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-warning">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationResult.warnings[0]}
                     </div>
                   )}
                 </div>

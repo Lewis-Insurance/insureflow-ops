@@ -318,8 +318,9 @@ export function useAcordForms(): UseAcordFormsReturn {
           throw new Error(result.errors.join(', '));
         }
 
-        // Upload generated PDF
-        const fileName = `acord-forms/${form.account_id}/${formId}/${form.acord_templates.form_number}_${Date.now()}.pdf`;
+        // Upload generated PDF. Account UUID is the FIRST path segment so
+        // (storage.foldername(name))[1] resolves to the account for RLS scoping.
+        const fileName = `${form.account_id}/acord-forms/${formId}/${form.acord_templates.form_number}_${Date.now()}.pdf`;
         const { error: uploadError } = await supabase.storage
           .from('documents')
           .upload(fileName, result.pdfBytes, {
@@ -343,6 +344,29 @@ export function useAcordForms(): UseAcordFormsReturn {
           .eq('id', formId);
 
         if (updateError) throw updateError;
+
+        // Record the generated PDF as a document so it lands in the customer's
+        // Documents tab. document_type is constrained by migration
+        // 20251204000003; ACORD 25 maps to 'coi', everything else to 'application'.
+        const { data: { user } } = await supabase.auth.getUser();
+        const formNumber = form.acord_templates.form_number;
+        const generatedFileName = `ACORD ${formNumber} - ${new Date().toLocaleDateString()}.pdf`;
+        const { error: documentError } = await supabase.from('documents').insert({
+          account_id: form.account_id,
+          filename: generatedFileName,
+          kind: 'document',
+          name: generatedFileName,
+          category: 'acord_form',
+          document_type: formNumber === '25' ? 'coi' : 'application',
+          storage_path: fileName,
+          storage_bucket: 'documents',
+          file_missing: false,
+          mime_type: 'application/pdf',
+          size_bytes: result.pdfBytes.length,
+          uploaded_by: user?.id,
+        });
+
+        if (documentError) throw documentError;
 
         // Update local state
         setForms(prev =>
@@ -645,7 +669,10 @@ export function useAcordForms(): UseAcordFormsReturn {
   const deleteForm = useCallback(
     async (formId: string): Promise<boolean> => {
       try {
-        const { error: deleteError } = await supabase.from('acord_forms').delete().eq('id', formId);
+        const { error: deleteError } = await supabase
+          .from('acord_forms')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', formId);
 
         if (deleteError) throw deleteError;
 

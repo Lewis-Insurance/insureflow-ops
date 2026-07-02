@@ -345,14 +345,14 @@ export default function FormManagement() {
     }
   };
 
-  // Delete form
+  // Delete form (soft delete: sets deleted_at, hidden by RLS)
   const handleDeleteForm = async (formId: string) => {
-    if (!confirm('Are you sure you want to delete this form? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this form? It will be archived and removed from this list.')) return;
 
     try {
       const { error } = await supabase
         .from('acord_forms')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', formId);
 
       if (error) throw error;

@@ -1019,9 +1019,11 @@ export type Database = {
         Row: {
           account_id: string | null
           addendum_url: string | null
+          agency_workspace_id: string
           cloned_from: string | null
           created_at: string | null
           created_by: string | null
+          deleted_at: string | null
           field_values: Json
           form_name: string | null
           form_number: string | null
@@ -1046,9 +1048,11 @@ export type Database = {
         Insert: {
           account_id?: string | null
           addendum_url?: string | null
+          agency_workspace_id?: string
           cloned_from?: string | null
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
           field_values?: Json
           form_name?: string | null
           form_number?: string | null
@@ -1073,9 +1077,11 @@ export type Database = {
         Update: {
           account_id?: string | null
           addendum_url?: string | null
+          agency_workspace_id?: string
           cloned_from?: string | null
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
           field_values?: Json
           form_name?: string | null
           form_number?: string | null
@@ -1110,6 +1116,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "v_business_type_violations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acord_forms_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "agency_workspaces"
             referencedColumns: ["id"]
           },
           {
