@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logger } from '@/lib/logger';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import { useAuth } from './useAuth';
 import {
   mapLostReason,
@@ -275,9 +276,11 @@ export function useRenewals(filters?: RenewalFilters) {
       }
 
       if (filters?.search) {
-        query = query.or(
-          `policy_number.ilike.%${filters.search}%,account.name.ilike.%${filters.search}%`
-        );
+        // Embedded-resource columns (account.name) are not valid inside a
+        // top-level .or() - that form errors at runtime. Name search stays
+        // client-side (RenewalsPage filters the loaded rows); this covers the
+        // server-side path with a sanitized policy-number match.
+        query = query.or(sanitizeMultiFieldSearch(filters.search, ['policy_number', 'carrier']));
       }
 
       const { data, error } = await query;

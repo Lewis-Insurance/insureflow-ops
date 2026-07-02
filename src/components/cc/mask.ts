@@ -25,6 +25,10 @@ export function maskDln(value?: string | null): string {
 /** Date of birth -> year only (age math is allowed, the full DOB is not). */
 export function maskDob(value?: string | null): string {
   if (!value) return '';
+  // Read the year straight off the string: new Date('YYYY-MM-DD') parses as
+  // UTC midnight, so a Jan-1 birthday masked to the PREVIOUS year in US zones.
+  const m = /^(\d{4})-\d{2}-\d{2}/.exec(value.trim());
+  if (m) return `••/••/${m[1]}`;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '••/••/••••';
   return `••/••/${d.getFullYear()}`;

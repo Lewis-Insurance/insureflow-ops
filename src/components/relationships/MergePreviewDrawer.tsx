@@ -111,7 +111,12 @@ export function MergePreviewDrawer({ open, onOpenChange, members, onConfirm, onL
   const handleLink = async () => {
     if (!onLinkInstead || members.length < 2) return;
     setLinking(true);
-    const ok = await onLinkInstead(members[0].account_id, members[1].account_id);
+    // Link every other member to the first (anchor): a 3+ member group used
+    // to link only the first pair and silently drop the rest from review.
+    let ok = true;
+    for (const other of members.slice(1)) {
+      ok = (await onLinkInstead(members[0].account_id, other.account_id)) && ok;
+    }
     setLinking(false);
     if (ok) onOpenChange(false);
   };
@@ -138,21 +143,29 @@ export function MergePreviewDrawer({ open, onOpenChange, members, onConfirm, onL
                 {members.map((m) => {
                   const Icon = typeIcon(m.type);
                   const isRec = recommended === m.account_id;
+                  // Tombstoned members can't survive a merge (the server raises);
+                  // render them, but not as selectable survivors.
+                  const selectable = !m.deleted_at;
                   return (
                     <AccentSpine
                       key={m.account_id}
                       active={survivor === m.account_id}
                       role="radio"
                       aria-checked={survivor === m.account_id}
-                      tabIndex={0}
-                      onClick={() => setSurvivor(m.account_id)}
+                      aria-disabled={!selectable}
+                      tabIndex={selectable ? 0 : -1}
+                      onClick={() => selectable && setSurvivor(m.account_id)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (selectable && (e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
                           setSurvivor(m.account_id);
                         }
                       }}
-                      className="cursor-pointer p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring"
+                      className={
+                        selectable
+                          ? 'cursor-pointer p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring'
+                          : 'cursor-not-allowed p-3 opacity-50'
+                      }
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
