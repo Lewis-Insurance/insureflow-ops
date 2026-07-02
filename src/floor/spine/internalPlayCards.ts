@@ -4,6 +4,8 @@ import type { CoverageGapOpportunityRow } from './plays/coverageGapRoundout.ts';
 import type { CoverageGapRoundoutPlayResult } from './plays/coverageGapRoundout.ts';
 import type { NonpayCancelCandidate } from './plays/nonpayCancelWatch.ts';
 import type { OpenItemNudgeItem } from './plays/openItemNudge.ts';
+import type { PolicyRenewalRiskScoreRow } from './plays/retentionSaveList.ts';
+import { retentionSaveListReason } from './plays/retentionSaveList.ts';
 
 export interface InternalPlayCardPlan {
   play_id: string;
@@ -136,6 +138,33 @@ export function planOpenItemNudgeCards(
     risk: item.severity_score >= 50 ? ('yellow' as RiskLevel) : ('green' as RiskLevel),
     policy_ref: null,
     task_id: item.kind === 'task' ? item.item_id : null,
+  }));
+}
+
+/** Play 7: save-list cards for high/critical renewal risk scores. */
+export function planRetentionSaveListCards(
+  scores: PolicyRenewalRiskScoreRow[],
+  summary: { play_id: 'retention.save.list'; play_version: string },
+  opts: {
+    dayKey: string;
+    limit?: number;
+    defaultOwnerId?: string | null;
+    ownerByAccountId?: Record<string, string | null | undefined>;
+  },
+): InternalPlayCardPlan[] {
+  const limit = opts.limit ?? 5;
+
+  return scores.slice(0, limit).map((row) => ({
+    play_id: summary.play_id,
+    play_version: summary.play_version,
+    idempotency_key: `play7:${summary.play_id}:${row.id}:${opts.dayKey}`,
+    client_account_id: row.account_id,
+    owner_id: opts.ownerByAccountId?.[row.account_id] ?? opts.defaultOwnerId ?? null,
+    headline: 'Retention save — review',
+    summary: `${row.policy_number ? `Policy ${row.policy_number}` : 'Policy renewal'} — ${retentionSaveListReason(row)}. Internal save list; no client send.`,
+    risk: row.risk_level === 'critical' ? ('red' as RiskLevel) : ('yellow' as RiskLevel),
+    policy_ref: policyOpaqueRef(row.policy_id),
+    task_id: null,
   }));
 }
 

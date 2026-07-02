@@ -20,3 +20,8 @@ export function resolveOpenItemNudgeOwnerId(): string {
 export function resolveNonpayWatchOwnerId(): string {
   return readEnv('FLOOR_NONPAY_WATCH_OWNER_ID') ?? 'd20dd72e-5dc6-4004-8729-842ea9c16b88';
 }
+
+/** Dev default retention save-list owner — Kelli Lee. Override with FLOOR_RETENTION_SAVE_OWNER_ID. */
+export function resolveRetentionSaveListOwnerId(): string {
+  return readEnv('FLOOR_RETENTION_SAVE_OWNER_ID') ?? KELLI_DEV_OWNER_ID;
+}

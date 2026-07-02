@@ -25,6 +25,7 @@ HB_PLAY3=2
 HB_PLAY4=2
 HB_PLAY5=2
 HB_PLAY6=2
+HB_PLAY7=2
 
 mint_service_key() {
   local keys_json
@@ -55,7 +56,8 @@ invoke_heartbeat() {
       \"play3_limit\":${HB_PLAY3},
       \"play4_limit\":${HB_PLAY4},
       \"play5_limit\":${HB_PLAY5},
-      \"play6_limit\":${HB_PLAY6}
+      \"play6_limit\":${HB_PLAY6},
+      \"play7_limit\":${HB_PLAY7}
     }"
 }
 

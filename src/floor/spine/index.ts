@@ -12,6 +12,7 @@ export * from './plays/carrierReconciliation.ts';
 export * from './plays/coverageGapRoundout.ts';
 export * from './plays/openItemNudge.ts';
 export * from './plays/nonpayCancelWatch.ts';
+export * from './plays/retentionSaveList.ts';
 export * from './plays/suspenseSweep.ts';
 export * from './plays/coiIssueInbound.ts';
 export * from './plays/idCardIssueInbound.ts';

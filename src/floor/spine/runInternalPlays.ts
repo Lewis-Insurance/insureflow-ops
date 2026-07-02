@@ -9,12 +9,18 @@ import {
   summarizeOpenItemNudgePlay,
   type OpenQuoteRow,
 } from './plays/openItemNudge.ts';
+import {
+  rankRetentionSaveListScores,
+  runRetentionSaveListPlay,
+  type PolicyRenewalRiskScoreRow,
+} from './plays/retentionSaveList.ts';
 import { runSuspenseSweepPlay } from './plays/suspenseSweep.ts';
 import {
   planCarrierReconciliationCards,
   planCoverageGapRoundoutCards,
   planNonpayCancelWatchCards,
   planOpenItemNudgeCards,
+  planRetentionSaveListCards,
   planSuspenseSweepCards,
   type InternalPlayCardPlan,
 } from './internalPlayCards.ts';
@@ -28,16 +34,19 @@ export interface RunInternalPlaysInput {
   tasks: SuspenseTaskRow[];
   coverageGapOpportunities?: CoverageGapOpportunityRow[];
   openQuotes?: OpenQuoteRow[];
+  retentionRiskScores?: PolicyRenewalRiskScoreRow[];
   dayKey?: string;
   play1Limit?: number;
   play3Limit?: number;
   play4Limit?: number;
   play5Limit?: number;
   play6Limit?: number;
+  play7Limit?: number;
   defaultOwnerId?: string | null;
   gapRoundoutOwnerId?: string | null;
   openItemNudgeOwnerId?: string | null;
   nonpayWatchOwnerId?: string | null;
+  retentionSaveListOwnerId?: string | null;
   ownerByAccountId?: Record<string, string | null | undefined>;
   /** When set, only persist cards for these play_ids. */
   playIds?: string[];
@@ -49,6 +58,7 @@ export interface RunInternalPlaysPlan {
   play4_summary: ReturnType<typeof runCoverageGapRoundoutPlay>;
   play5_summary: ReturnType<typeof summarizeOpenItemNudgePlay>;
   play6_summary: ReturnType<typeof summarizeNonpayCancelWatch>;
+  play7_summary: ReturnType<typeof runRetentionSaveListPlay>;
   plans: InternalPlayCardPlan[];
 }
 
@@ -67,6 +77,9 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
   const play5Summary = summarizeOpenItemNudgePlay(play5Items);
   const nonpayCandidates = detectNonpayCancelCandidates(input.policies);
   const play6Summary = summarizeNonpayCancelWatch(nonpayCandidates);
+  const retentionScores = input.retentionRiskScores ?? [];
+  const play7Summary = runRetentionSaveListPlay(retentionScores);
+  const rankedRetentionScores = rankRetentionSaveListScores(retentionScores, input.play7Limit ?? 5);
 
   const play1Cards = planCarrierReconciliationCards(input.policies, play1Summary, {
     dayKey,
@@ -96,8 +109,14 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
     defaultOwnerId: input.nonpayWatchOwnerId ?? input.defaultOwnerId ?? null,
     ownerByAccountId: input.ownerByAccountId,
   });
+  const play7Cards = planRetentionSaveListCards(rankedRetentionScores, play7Summary, {
+    dayKey,
+    limit: input.play7Limit ?? 5,
+    defaultOwnerId: input.retentionSaveListOwnerId ?? input.defaultOwnerId ?? null,
+    ownerByAccountId: input.ownerByAccountId,
+  });
 
-  let plans = [...play1Cards, ...play3Cards, ...play4Cards, ...play5Cards, ...play6Cards];
+  let plans = [...play1Cards, ...play3Cards, ...play4Cards, ...play5Cards, ...play6Cards, ...play7Cards];
   if (input.playIds?.length) {
     const allowed = new Set(input.playIds);
     plans = plans.filter((plan) => allowed.has(plan.play_id));
@@ -109,6 +128,7 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
     play4_summary: play4Summary,
     play5_summary: play5Summary,
     play6_summary: play6Summary,
+    play7_summary: play7Summary,
     plans,
   };
 }
@@ -125,6 +145,7 @@ export function summarizePlannedCounts(planned: RunInternalPlaysPlan): {
   play4_planned: number;
   play5_planned: number;
   play6_planned: number;
+  play7_planned: number;
 } {
   const count = (playId: string) => planned.plans.filter((plan) => plan.play_id === playId).length;
   return {
@@ -134,6 +155,7 @@ export function summarizePlannedCounts(planned: RunInternalPlaysPlan): {
     play4_planned: count('coverage.gap.roundout'),
     play5_planned: count('open.item.nudge'),
     play6_planned: count('nonpay.cancel.watch'),
+    play7_planned: count('retention.save.list'),
   };
 }
 
@@ -147,6 +169,7 @@ export async function runInternalPlays(
     play4_summary: RunInternalPlaysPlan['play4_summary'];
     play5_summary: RunInternalPlaysPlan['play5_summary'];
     play6_summary: RunInternalPlaysPlan['play6_summary'];
+    play7_summary: RunInternalPlaysPlan['play7_summary'];
     planned: number;
   }
 > {
@@ -159,6 +182,7 @@ export async function runInternalPlays(
     play4_summary: planned.play4_summary,
     play5_summary: planned.play5_summary,
     play6_summary: planned.play6_summary,
+    play7_summary: planned.play7_summary,
     planned: planned.plans.length,
   };
 }

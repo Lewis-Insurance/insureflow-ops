@@ -15,3 +15,8 @@ export function resolveOpenItemNudgeOwnerId(): string {
 export function resolveNonpayWatchOwnerId(): string {
   return Deno.env.get('FLOOR_NONPAY_WATCH_OWNER_ID')?.trim() || LETITIA_DEV_OWNER_ID;
 }
+
+/** Dev default retention save-list owner — Kelli Lee. Override with FLOOR_RETENTION_SAVE_OWNER_ID. */
+export function resolveRetentionSaveListOwnerId(): string {
+  return Deno.env.get('FLOOR_RETENTION_SAVE_OWNER_ID')?.trim() || KELLI_DEV_OWNER_ID;
+}

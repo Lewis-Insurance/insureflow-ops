@@ -9,7 +9,7 @@ import {
   summarizePlannedCounts,
   type PlayCardsDb,
 } from '../_shared/floor/runInternalPlays.ts';
-import { resolveGapRoundoutOwnerId, resolveNonpayWatchOwnerId, resolveOpenItemNudgeOwnerId } from '../_shared/floor/floorOwners.ts';
+import { resolveGapRoundoutOwnerId, resolveNonpayWatchOwnerId, resolveOpenItemNudgeOwnerId, resolveRetentionSaveListOwnerId } from '../_shared/floor/floorOwners.ts';
 import type { PolicyInForceRow, SuspenseTaskRow } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-run-plays');
@@ -50,6 +50,25 @@ async function loadOwnerByAccountId(
     }
   }
   return ownerByAccountId;
+}
+
+async function loadPolicyNumberById(
+  supabase: ReturnType<typeof createClient>,
+  policyIds: string[],
+): Promise<Record<string, string | null>> {
+  const policyNumberById: Record<string, string | null> = {};
+  for (let offset = 0; offset < policyIds.length; offset += ACCOUNT_OWNER_BATCH) {
+    const chunk = policyIds.slice(offset, offset + ACCOUNT_OWNER_BATCH);
+    const { data: policyRows, error: policyError } = await supabase
+      .from('policies')
+      .select('id, policy_number')
+      .in('id', chunk);
+    if (policyError) throw new ValidationError(`policies: ${policyError.message}`);
+    for (const row of policyRows ?? []) {
+      policyNumberById[row.id as string] = (row.policy_number as string | null) ?? null;
+    }
+  }
+  return policyNumberById;
 }
 
 function supabasePlayCardsDb(supabase: ReturnType<typeof createClient>): PlayCardsDb {
@@ -104,6 +123,7 @@ function playResponsePayload(
     play4_summary: planned.play4_summary,
     play5_summary: planned.play5_summary,
     play6_summary: planned.play6_summary,
+    play7_summary: planned.play7_summary,
     ...extra,
   };
 }
@@ -155,6 +175,7 @@ serve(async (req) => {
     let play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
     let play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
     let play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
+    let play7Limit = typeof body.play7_limit === 'number' ? body.play7_limit : 5;
 
     if (isHeartbeat) {
       play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 5;
@@ -162,6 +183,7 @@ serve(async (req) => {
       play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
       play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
       play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
+      play7Limit = typeof body.play7_limit === 'number' ? body.play7_limit : 5;
     }
 
     if (body.play4_only === true) {
@@ -169,6 +191,7 @@ serve(async (req) => {
       play3Limit = 0;
       play5Limit = 0;
       play6Limit = 0;
+      play7Limit = 0;
     }
 
     if (body.play5_only === true) {
@@ -176,6 +199,7 @@ serve(async (req) => {
       play3Limit = 0;
       play4Limit = 0;
       play6Limit = 0;
+      play7Limit = 0;
     }
 
     if (body.play6_only === true) {
@@ -183,6 +207,15 @@ serve(async (req) => {
       play3Limit = 0;
       play4Limit = 0;
       play5Limit = 0;
+      play7Limit = 0;
+    }
+
+    if (body.retention_only === true || body.play7_only === true) {
+      play1Limit = 0;
+      play3Limit = 0;
+      play4Limit = 0;
+      play5Limit = 0;
+      play6Limit = 0;
     }
 
     const playIds = Array.isArray(body.play_ids)
@@ -193,7 +226,9 @@ serve(async (req) => {
           ? ['open.item.nudge']
           : body.play6_only === true
             ? ['nonpay.cancel.watch']
-            : undefined;
+            : body.retention_only === true || body.play7_only === true
+              ? ['retention.save.list']
+              : undefined;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -203,6 +238,7 @@ serve(async (req) => {
     const needTasks = play3Limit > 0 || play5Limit > 0;
     const needQuotes = play5Limit > 0;
     const needGaps = play4Limit > 0;
+    const needRetention = play7Limit > 0;
 
     let policyRows: Record<string, unknown>[] | null = null;
     if (needPolicies) {
@@ -248,6 +284,19 @@ serve(async (req) => {
       quoteRows = data;
     }
 
+    let retentionRows: Record<string, unknown>[] | null = null;
+    if (needRetention) {
+      const { data, error: retentionError } = await supabase
+        .from('policy_renewal_risk_scores')
+        .select('id, account_id, policy_id, renewal_date, score, risk_level, top_factors')
+        .eq('agency_workspace_id', agencyWorkspaceId)
+        .in('risk_level', ['high', 'critical'])
+        .order('score', { ascending: false })
+        .limit(Math.max(play7Limit * 5, 25));
+      if (retentionError) throw new ValidationError(`policy_renewal_risk_scores: ${retentionError.message}`);
+      retentionRows = data;
+    }
+
     const policies = (policyRows ?? []) as PolicyInForceRow[];
     const tasks: SuspenseTaskRow[] = (taskRows ?? []).map((row) => ({
       id: row.id as string,
@@ -274,6 +323,25 @@ serve(async (req) => {
       premium: (row.premium as number | null) ?? null,
       updated_at: (row.updated_at as string | null) ?? null,
     }));
+    const retentionRiskScores = (retentionRows ?? []).map((row) => ({
+      id: row.id as string,
+      account_id: row.account_id as string,
+      policy_id: row.policy_id as string,
+      policy_number: null as string | null,
+      renewal_date: row.renewal_date as string,
+      score: Number(row.score),
+      risk_level: row.risk_level as 'high' | 'critical',
+      top_factors: (row.top_factors as Array<{ factor_key?: string; explanation?: string }>) ?? [],
+    }));
+    if (retentionRiskScores.length > 0) {
+      const policyNumberById = await loadPolicyNumberById(
+        supabase,
+        [...new Set(retentionRiskScores.map((row) => row.policy_id))],
+      );
+      for (const row of retentionRiskScores) {
+        row.policy_number = policyNumberById[row.policy_id] ?? null;
+      }
+    }
 
     const playInputBase = {
       agency_workspace_id: agencyWorkspaceId,
@@ -281,14 +349,17 @@ serve(async (req) => {
       tasks,
       coverageGapOpportunities,
       openQuotes,
+      retentionRiskScores,
       play1Limit,
       play3Limit,
       play4Limit,
       play5Limit,
       play6Limit,
+      play7Limit,
       gapRoundoutOwnerId: resolveGapRoundoutOwnerId(),
       openItemNudgeOwnerId: resolveOpenItemNudgeOwnerId(),
       nonpayWatchOwnerId: resolveNonpayWatchOwnerId(),
+      retentionSaveListOwnerId: resolveRetentionSaveListOwnerId(),
       ownerByAccountId: {} as Record<string, string | null>,
       playIds,
     };

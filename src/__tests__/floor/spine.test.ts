@@ -47,6 +47,9 @@ import {
   planCoverageGapRoundoutCards,
   planOpenItemNudgeCards,
   planNonpayCancelWatchCards,
+  planRetentionSaveListCards,
+  rankRetentionSaveListScores,
+  runRetentionSaveListPlay,
   wrapPayloadWithSurface,
   type AccountRecord,
   type FloorClientSendApproval,
@@ -535,6 +538,34 @@ describe('Floor plays — internal card pipeline', () => {
     ]);
     const play6 = planNonpayCancelWatchCards(nonpay, { dayKey: '2026-07-01' });
     expect(play6[0]?.play_id).toBe('nonpay.cancel.watch');
+
+    const retentionScores = rankRetentionSaveListScores([
+      {
+        id: 'rs1',
+        account_id: 'a1',
+        policy_id: 'p1',
+        policy_number: 'PN1',
+        renewal_date: '2026-08-01',
+        score: 0.72,
+        risk_level: 'high',
+        top_factors: [{ explanation: 'No contact in 90+ days' }],
+      },
+      {
+        id: 'rs2',
+        account_id: 'a2',
+        policy_id: 'p2',
+        policy_number: 'PN2',
+        renewal_date: '2026-08-15',
+        score: 0.91,
+        risk_level: 'critical',
+        top_factors: [],
+      },
+    ]);
+    const play7Summary = runRetentionSaveListPlay(retentionScores);
+    const play7 = planRetentionSaveListCards(retentionScores, play7Summary, { dayKey: '2026-07-01' });
+    expect(play7[0]?.play_id).toBe('retention.save.list');
+    expect(play7[0]?.risk).toBe('red');
+    expect(play7[0]?.idempotency_key).toContain('play7:retention.save.list:rs2:');
   });
 
   it('planInternalPlays play_ids filter keeps only coverage.gap.roundout', () => {
@@ -620,6 +651,33 @@ describe('Floor plays — internal card pipeline', () => {
     expect(planned.plans[0]?.owner_id).toBe('letitia-owner-id');
   });
 
+  it('planInternalPlays play_ids filter keeps only retention.save.list with Kelli default', () => {
+    const planned = planInternalPlays({
+      agency_workspace_id: '00000000-0000-4000-8000-000000000001',
+      dayKey: '2026-07-01',
+      policies: [],
+      tasks: [],
+      retentionRiskScores: [
+        {
+          id: 'rs-high',
+          account_id: 'a1',
+          policy_id: 'p1',
+          policy_number: 'PN-RET',
+          renewal_date: '2026-08-01',
+          score: 0.78,
+          risk_level: 'high',
+          top_factors: [{ explanation: 'Payment delinquency signal' }],
+        },
+      ],
+      play7Limit: 5,
+      playIds: ['retention.save.list'],
+      retentionSaveListOwnerId: 'kelli-owner-id',
+    });
+    expect(planned.plans.every((plan) => plan.play_id === 'retention.save.list')).toBe(true);
+    expect(planned.plans[0]?.owner_id).toBe('kelli-owner-id');
+    expect(planned.plans[0]?.headline).toBe('Retention save — review');
+  });
+
   it('summarizePlannedCounts groups plans by play_id', () => {
     const planned = planInternalPlays({
       agency_workspace_id: '00000000-0000-4000-8000-000000000001',
@@ -644,7 +702,14 @@ describe('Floor plays — internal card pipeline', () => {
     });
     const counts = summarizePlannedCounts(planned);
     expect(counts.play1_planned).toBe(1);
-    expect(counts.planned).toBe(counts.play1_planned + counts.play3_planned + counts.play4_planned + counts.play5_planned + counts.play6_planned);
+    expect(counts.planned).toBe(
+      counts.play1_planned +
+        counts.play3_planned +
+        counts.play4_planned +
+        counts.play5_planned +
+        counts.play6_planned +
+        counts.play7_planned,
+    );
   });
 
   it('persists internal play cards with idempotency', async () => {
