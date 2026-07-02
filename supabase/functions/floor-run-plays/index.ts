@@ -3,9 +3,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
-import { runInternalPlays, type PlayCardsDb } from '../_shared/floor/runInternalPlays.ts';
+import {
+  planInternalPlays,
+  runInternalPlays,
+  summarizePlannedCounts,
+  type PlayCardsDb,
+} from '../_shared/floor/runInternalPlays.ts';
 import { resolveGapRoundoutOwnerId, resolveNonpayWatchOwnerId, resolveOpenItemNudgeOwnerId } from '../_shared/floor/floorOwners.ts';
-import { detectNonpayCancelCandidates } from '../_shared/floor/plays/nonpayCancelWatch.ts';
 import type { PolicyInForceRow, SuspenseTaskRow } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-run-plays');
@@ -89,6 +93,21 @@ function supabasePlayCardsDb(supabase: ReturnType<typeof createClient>): PlayCar
   };
 }
 
+function playResponsePayload(
+  planned: ReturnType<typeof planInternalPlays>,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    ...summarizePlannedCounts(planned),
+    play1_summary: planned.play1_summary,
+    play3_count: planned.play3_count,
+    play4_summary: planned.play4_summary,
+    play5_summary: planned.play5_summary,
+    play6_summary: planned.play6_summary,
+    ...extra,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -128,12 +147,22 @@ serve(async (req) => {
       );
     }
 
+    const isHeartbeat = body.heartbeat === true;
+    const dryRun = body.dry_run === true;
+
     let play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 10;
     let play3Limit = typeof body.play3_limit === 'number' ? body.play3_limit : 10;
     let play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
     let play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
     let play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
-    const dryRun = body.dry_run === true;
+
+    if (isHeartbeat) {
+      play1Limit = typeof body.play1_limit === 'number' ? body.play1_limit : 5;
+      play3Limit = typeof body.play3_limit === 'number' ? body.play3_limit : 10;
+      play4Limit = typeof body.play4_limit === 'number' ? body.play4_limit : 5;
+      play5Limit = typeof body.play5_limit === 'number' ? body.play5_limit : 5;
+      play6Limit = typeof body.play6_limit === 'number' ? body.play6_limit : 5;
+    }
 
     if (body.play4_only === true) {
       play1Limit = 0;
@@ -219,37 +248,7 @@ serve(async (req) => {
       quoteRows = data;
     }
 
-    const accountIds = [
-      ...new Set(
-        [
-          ...(policyRows ?? []).map((row) => row.account_id as string | null),
-          ...(taskRows ?? []).map((row) => row.account_id as string | null),
-          ...(gapRows ?? []).map((row) => row.account_id as string | null),
-          ...(quoteRows ?? []).map((row) => row.account_id as string | null),
-        ].filter((id): id is string => Boolean(id)),
-      ),
-    ];
-
     const policies = (policyRows ?? []) as PolicyInForceRow[];
-
-    let ownerAccountIds = accountIds;
-    if (
-      play6Limit > 0 &&
-      play1Limit === 0 &&
-      play3Limit === 0 &&
-      play4Limit === 0 &&
-      play5Limit === 0
-    ) {
-      ownerAccountIds = [
-        ...new Set(
-          detectNonpayCancelCandidates(policies)
-            .map((row) => row.account_id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      ];
-    }
-
-    const ownerByAccountId = ownerAccountIds.length > 0 ? await loadOwnerByAccountId(supabase, ownerAccountIds) : {};
     const tasks: SuspenseTaskRow[] = (taskRows ?? []).map((row) => ({
       id: row.id as string,
       title: row.title as string,
@@ -276,7 +275,7 @@ serve(async (req) => {
       updated_at: (row.updated_at as string | null) ?? null,
     }));
 
-    const playInput = {
+    const playInputBase = {
       agency_workspace_id: agencyWorkspaceId,
       policies,
       tasks,
@@ -290,28 +289,25 @@ serve(async (req) => {
       gapRoundoutOwnerId: resolveGapRoundoutOwnerId(),
       openItemNudgeOwnerId: resolveOpenItemNudgeOwnerId(),
       nonpayWatchOwnerId: resolveNonpayWatchOwnerId(),
-      ownerByAccountId,
+      ownerByAccountId: {} as Record<string, string | null>,
       playIds,
     };
 
+    const preview = planInternalPlays(playInputBase);
+    const ownerAccountIds = [...new Set(preview.plans.map((plan) => plan.client_account_id))];
+    const ownerByAccountId = ownerAccountIds.length > 0
+      ? await loadOwnerByAccountId(supabase, ownerAccountIds)
+      : {};
+    const playInput = { ...playInputBase, ownerByAccountId };
+
     if (dryRun) {
-      const { planInternalPlays } = await import('../_shared/floor/runInternalPlays.ts');
       const planned = planInternalPlays(playInput);
-      const gapPlans = planned.plans.filter((plan) => plan.play_id === 'coverage.gap.roundout');
-      const nudgePlans = planned.plans.filter((plan) => plan.play_id === 'open.item.nudge');
-      const nonpayPlans = planned.plans.filter((plan) => plan.play_id === 'nonpay.cancel.watch');
       return new Response(
         JSON.stringify({
           ok: true,
           dry_run: true,
-          planned: planned.plans.length,
-          play4_planned: gapPlans.length,
-          play5_planned: nudgePlans.length,
-          play6_planned: nonpayPlans.length,
-          play1_summary: planned.play1_summary,
-          play4_summary: planned.play4_summary,
-          play5_summary: planned.play5_summary,
-          play6_summary: planned.play6_summary,
+          heartbeat: isHeartbeat,
+          ...playResponsePayload(planned),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
@@ -321,14 +317,20 @@ serve(async (req) => {
 
     logger.info('Floor plays completed', {
       agencyWorkspaceId,
+      heartbeat: isHeartbeat,
       created: result.created,
       idempotent: result.idempotent,
       planned: result.planned,
     });
 
-    return new Response(JSON.stringify({ ok: true, ...result }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        heartbeat: isHeartbeat,
+        ...result,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     const response = createErrorResponse(err);

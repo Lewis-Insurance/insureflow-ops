@@ -113,6 +113,30 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
   };
 }
 
+/** Account IDs that need owner_agent_id lookup for a planned card batch. */
+export function ownerAccountIdsFromPlans(plans: InternalPlayCardPlan[]): string[] {
+  return [...new Set(plans.map((plan) => plan.client_account_id))];
+}
+
+export function summarizePlannedCounts(planned: RunInternalPlaysPlan): {
+  planned: number;
+  play1_planned: number;
+  play3_planned: number;
+  play4_planned: number;
+  play5_planned: number;
+  play6_planned: number;
+} {
+  const count = (playId: string) => planned.plans.filter((plan) => plan.play_id === playId).length;
+  return {
+    planned: planned.plans.length,
+    play1_planned: count('carrier.reconcile'),
+    play3_planned: count('suspense.sweep'),
+    play4_planned: count('coverage.gap.roundout'),
+    play5_planned: count('open.item.nudge'),
+    play6_planned: count('nonpay.cancel.watch'),
+  };
+}
+
 export async function runInternalPlays(
   db: PlayCardsDb,
   input: RunInternalPlaysInput,

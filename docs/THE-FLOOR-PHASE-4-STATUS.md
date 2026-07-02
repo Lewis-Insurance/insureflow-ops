@@ -132,7 +132,9 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ## Phase 4 complete (dev spine)
 
-Slices 1–3 wire the three Phase 4 internal plays on dev. Remaining Phase 4 items (endorsement capture, licensing alerts, SMS intake) are separate roadmap tracks.
+Slices 1–3 wire the three Phase 4 internal plays on dev. **Phase 5 Slice 1 (`heartbeat.book.scan`)** consolidates them into a nightly fan-out — see [`THE-FLOOR-PHASE-5-STATUS.md`](./THE-FLOOR-PHASE-5-STATUS.md).
+
+Remaining Phase 4 items (endorsement capture, licensing alerts, SMS intake) are separate roadmap tracks.
 
 ---
 

@@ -21,6 +21,7 @@ import {
   runCarrierReconciliationPlay,
   runSuspenseSweepPlay,
   planInternalPlays,
+  summarizePlannedCounts,
   persistInternalPlayCards,
   shouldForceIdentityPick,
   stageClientSend,
@@ -617,6 +618,33 @@ describe('Floor plays — internal card pipeline', () => {
     });
     expect(planned.plans.every((plan) => plan.play_id === 'nonpay.cancel.watch')).toBe(true);
     expect(planned.plans[0]?.owner_id).toBe('letitia-owner-id');
+  });
+
+  it('summarizePlannedCounts groups plans by play_id', () => {
+    const planned = planInternalPlays({
+      agency_workspace_id: '00000000-0000-4000-8000-000000000001',
+      dayKey: '2026-07-01',
+      policies: [
+        {
+          policy_id: 'p-lapsed',
+          account_id: 'a1',
+          policy_number: 'PN-LAP',
+          in_force: false,
+          premium: 500,
+          cgl_details: null,
+          bap_details: null,
+          evaluated_at: '2026-07-01T00:00:00Z',
+        },
+      ],
+      tasks: [],
+      play1Limit: 1,
+      play4Limit: 0,
+      play5Limit: 0,
+      play6Limit: 0,
+    });
+    const counts = summarizePlannedCounts(planned);
+    expect(counts.play1_planned).toBe(1);
+    expect(counts.planned).toBe(counts.play1_planned + counts.play3_planned + counts.play4_planned + counts.play5_planned + counts.play6_planned);
   });
 
   it('persists internal play cards with idempotency', async () => {
