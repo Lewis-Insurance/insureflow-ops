@@ -129,10 +129,15 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
           note_text: noteContent,
           created_by: user.id,
           source: 'document',
+          // Keep the policy tag when the upload is policy-associated so the
+          // note carries its context chip.
+          policy_id: associationType === 'policy' && selectedPolicyId ? selectedPolicyId : null,
         } as any);
 
         if (noteError) {
           console.error('Failed to create note:', noteError);
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['account-notes', accountId] });
         }
       }
 

@@ -91,20 +91,6 @@ export interface Renewal {
   };
 }
 
-export interface RenewalNote {
-  id: string;
-  renewal_id: string;
-  content: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  author?: {
-    id: string;
-    full_name: string | null;
-    email: string | null;
-  };
-}
-
 export interface RenewalContact {
   id: string;
   renewal_id: string;
@@ -303,35 +289,6 @@ export function useRenewals(filters?: RenewalFilters) {
 
       return data as Renewal[];
     },
-  });
-}
-
-/**
- * Fetch notes for a renewal
- */
-export function useRenewalNotes(renewalId: string | null | undefined) {
-  return useQuery({
-    queryKey: ['renewal-notes', renewalId],
-    queryFn: async () => {
-      if (!renewalId) return [];
-
-      const { data, error } = await supabase
-        .from('renewal_notes')
-        .select(`
-          *,
-          author:profiles!created_by(id, full_name, email)
-        `)
-        .eq('renewal_id', renewalId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        logger.error('[useRenewalNotes] Error:', error);
-        throw error;
-      }
-
-      return data as RenewalNote[];
-    },
-    enabled: !!renewalId,
   });
 }
 
@@ -576,95 +533,6 @@ export function useAssignRenewal() {
     onError: (error) => {
       logger.error('[useAssignRenewal] Error:', error);
       toast.error('Failed to assign renewal');
-    },
-  });
-}
-
-/**
- * Add a note to a renewal
- */
-export function useAddRenewalNote() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { renewalId: string; content: string }) => {
-      const { renewalId, content } = params;
-
-      const { data, error } = await supabase
-        .from('renewal_notes')
-        .insert({ renewal_id: renewalId, content })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['renewal-notes', data.renewal_id] });
-      toast.success('Note added');
-    },
-    onError: (error) => {
-      logger.error('[useAddRenewalNote] Error:', error);
-      toast.error('Failed to add note');
-    },
-  });
-}
-
-/**
- * Update a note
- */
-export function useUpdateRenewalNote() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { noteId: string; content: string; renewalId: string }) => {
-      const { noteId, content } = params;
-
-      const { data, error } = await supabase
-        .from('renewal_notes')
-        .update({ content })
-        .eq('id', noteId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['renewal-notes', variables.renewalId] });
-      toast.success('Note updated');
-    },
-    onError: (error) => {
-      logger.error('[useUpdateRenewalNote] Error:', error);
-      toast.error('Failed to update note');
-    },
-  });
-}
-
-/**
- * Delete a note
- */
-export function useDeleteRenewalNote() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { noteId: string; renewalId: string }) => {
-      const { noteId } = params;
-
-      const { error } = await supabase
-        .from('renewal_notes')
-        .delete()
-        .eq('id', noteId);
-
-      if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['renewal-notes', variables.renewalId] });
-      toast.success('Note deleted');
-    },
-    onError: (error) => {
-      logger.error('[useDeleteRenewalNote] Error:', error);
-      toast.error('Failed to delete note');
     },
   });
 }

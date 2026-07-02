@@ -15,6 +15,7 @@ import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo'
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
+import { useTasks } from '@/hooks/useTasks';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
@@ -79,24 +80,6 @@ interface Account {
   updated_at: string;
 }
 
-interface Note {
-  id: string;
-  body: string;
-  created_at: string;
-  author_id: string;
-}
-
-interface Task {
-  id: string;
-  account_id: string;
-  title: string;
-  description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  due_at?: string;
-  created_at: string;
-  updated_at: string;
-}
 
 const STATUS_OPTIONS = ['active', 'lead', 'prospect', 'inactive'];
 
@@ -167,8 +150,10 @@ export default function CustomerDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [account, setAccount] = useState<Account | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // Shared with CustomerTasksSection so the Quick-actions tiles track the same
+  // list (a second one-shot fetch froze the tile counts at mount time).
+  const tasksApi = useTasks(id);
+  const { tasks } = tasksApi;
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
 
@@ -188,17 +173,6 @@ export default function CustomerDetail() {
   const scrollToSection = useCallback((sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
-
-  const refetchNotes = async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from('customer_notes')
-      .select('*')
-      .eq('customer_id', id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-    setNotes((data || []).map((n) => ({ id: n.id, body: n.note_text, created_at: n.created_at, author_id: n.created_by })));
-  };
 
   /** Refresh just the account row (e.g. after a contact-info edit) instead of reloading the page. */
   const refetchAccount = async () => {
@@ -225,21 +199,6 @@ export default function CustomerDetail() {
           return;
         }
         setAccount(accountData);
-
-        const { data: notesData } = await supabase
-          .from('customer_notes')
-          .select('*')
-          .eq('customer_id', id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
-        setNotes((notesData || []).map((n) => ({ id: n.id, body: n.note_text, created_at: n.created_at, author_id: n.created_by })));
-
-        const { data: tasksData } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('account_id', id)
-          .order('created_at', { ascending: false });
-        setTasks(tasksData || []);
       } catch {
         toast({ title: 'Error', description: 'Failed to load customer data', variant: 'destructive' });
       } finally {
@@ -494,7 +453,7 @@ export default function CustomerDetail() {
         {/* ===================== Notes & tasks ===================== */}
         <section id="notes" className="scroll-mt-20 space-y-4">
           <NotesPanel accountId={account.id} onChange={refetchNotes} />
-          <CustomerTasksSection accountId={account.id} />
+          <CustomerTasksSection accountId={account.id} tasksApi={tasksApi} />
         </section>
 
         {/* ===================== Relationships (lower priority) ===================== */}
@@ -564,8 +523,13 @@ export default function CustomerDetail() {
       </div>
 
       {/* Modals */}
-      <AddNoteModal open={addNoteOpen} onOpenChange={setAddNoteOpen} accountId={account.id} onSuccess={refetchNotes} />
-      <AddTaskModal open={addTaskOpen} onOpenChange={setAddTaskOpen} accountId={account.id} />
+      <AddNoteModal open={addNoteOpen} onOpenChange={setAddNoteOpen} accountId={account.id} />
+      <AddTaskModal
+        open={addTaskOpen}
+        onOpenChange={setAddTaskOpen}
+        accountId={account.id}
+        onSuccess={() => tasksApi.fetchTasks()}
+      />
       <AddPolicyModal
         open={addPolicyOpen}
         onOpenChange={setAddPolicyOpen}
@@ -581,7 +545,6 @@ export default function CustomerDetail() {
         accountId={account.id}
         defaultPhone={account.phone}
         defaultPhoneSecondary={account.phone_secondary}
-        onSuccess={refetchNotes}
       />
       <EmailComposerModal
         open={emailComposerOpen}
