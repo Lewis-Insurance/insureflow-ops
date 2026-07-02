@@ -32,7 +32,7 @@ Phase 4 fills the safe book: non-pay and cancellation detection off the carrier 
 
 The felt change: the morning tray replaces the inbox. Work is done before the office opens. The invisible tax (logging, chasing, follow-up) measurably collapses, and the office starts improving its own plays from its own corrections.
 
-Where the build already reaches into this horizon (2026-07-02, dev): Phase 4 slices 1-3 shipped three internal Tier-2 card plays on scheduled crons (`coverage.gap.roundout`, `open.item.nudge`, `nonpay.cancel.watch`), and Phase 5 slices 1-2 shipped the nightly `heartbeat.book.scan` fan-out (`source='heartbeat'`, all internal plays, capped per play) and `retention.save.list`. Still ahead in this horizon: morning tray DM batching (Phase 5 Slice 3), `remarket.packet.auto` (Slice 4), `play.patch.compile` (Slice 5), endorsement capture, licensing alerts, voice, and SMS intake.
+Where the build already reaches into this horizon (2026-07-02, dev): Phase 4 slices 1-3 shipped three internal Tier-2 card plays on scheduled crons (`coverage.gap.roundout`, `open.item.nudge`, `nonpay.cancel.watch`), and Phase 5 slices 1-3 shipped the nightly `heartbeat.book.scan` fan-out (`source='heartbeat'`, all internal plays, capped per play), `retention.save.list`, and morning tray DM batching (heartbeat packages → one digest DM per agent at office open). Still ahead in this horizon: `remarket.packet.auto` (Slice 4), `play.patch.compile` (Slice 5), endorsement capture, licensing alerts, voice, and SMS intake.
 
 ### Horizon 3: The institution (Phase 6)
 
@@ -54,7 +54,7 @@ The governing pillar: within ten seconds of looking, a human knows what their ag
 
 **Parity without duplicated cognition.** One endpoint (`floor-action`), one package row, two renderers. Neither surface computes risk, diff, or tier; they display what the play wrote. One canonical row means a card cannot be decided twice by design (ADR 002); the Slack-side revision stale-guard enforces this today, and full cross-surface invalidation rides the projection sync. The warning stands: the cockpit must never become a third approval track.
 
-**The morning tray, concretely (PROPOSED choreography; tray blocks exist as code; the heartbeat fan-out is live on dev, tray DM batching is Phase 5 Slice 3).** Overnight, heartbeat-built packages land as awaiting_approval. At office open, each agent posts one tray DM, ordered: (1) time-critical client-facing items, (2) Tier-3 one-taps ready to sign, (3) Tier-2 work already done with undo windows, (4) FYI reads. Between tray and close, only two things ping: a `failed_delivery` on a client-facing send, and an in-force demotion on a card already opened. Never pings: Tier-1 completions, metrics, anything about a colleague's throughput.
+**The morning tray, concretely (SHIPPED on dev, Phase 5 Slice 3; tray blocks + Mac Mini scheduler).** Overnight, heartbeat-built packages land as awaiting_approval. At office open, each agent posts one tray DM, ordered: (1) time-critical client-facing items, (2) Tier-3 one-taps ready to sign, (3) Tier-2 work already done with undo windows, (4) FYI reads. Between tray and close, only two things ping: a `failed_delivery` on a client-facing send, and an in-force demotion on a card already opened. Never pings: Tier-1 completions, metrics, anything about a colleague's throughput.
 
 **Six humans, six distinct agents (persona work is PROPOSED except where cited):**
 

@@ -74,11 +74,41 @@ chmod +x scripts/phase5-retention-save-soak.sh
 
 ---
 
+## Slice 3 — Morning tray DM batching
+
+**Goal:** Heartbeat-built packages (`source='heartbeat'`) batch into **one tray DM per agent** at office open — no per-card ping storm. Immediate delivery (`deliver:canonical-decision-cards`) handles non-heartbeat only (CRM button, email intake, etc.).
+
+| Item | Status |
+|------|--------|
+| RPC `floor_list_morning_tray_packages` + `floor_record_morning_tray_deliveries` | ✅ Slice 3 |
+| `floor_list_undelivered_slack_packages` excludes `source='heartbeat'` | ✅ Slice 3 |
+| Mac Mini `npm run deliver:morning-tray-batch` (`lewis-the-floor`) | ✅ Slice 3 |
+| Soak script `scripts/phase5-morning-tray-soak.sh` | ✅ Slice 3 |
+| Mac Mini cron at 13:00 UTC Mon–Fri (after materializer) | 📋 ops |
+
+**Mac Mini (dev/prod):**
+
+```bash
+cd /Users/rocky/lewis-the-floor
+npm run materialize:home-snapshots
+npm run deliver:morning-tray-batch
+```
+
+**Run soak (insureflow-ops, after migration applied):**
+
+```bash
+chmod +x scripts/phase5-morning-tray-soak.sh
+./scripts/phase5-morning-tray-soak.sh
+```
+
+**Ordering:** client-facing (`involves_external_send`) first, then internal heartbeat cards by `created_at`.
+
+---
+
 ## Upcoming slices (not started)
 
 | Slice | Play / feature | Notes |
 |-------|----------------|-------|
-| 3 | Morning tray DM batching | Requires Slack tray scheduler |
 | 4 | `remarket.packet.auto` | ADR 003, Tier-4 draft-only |
 | 5 | `play.patch.compile` | FeedbackEvents → vault PR |
 
@@ -93,7 +123,7 @@ chmod +x scripts/phase5-retention-save-soak.sh
 
 ---
 
-**Last updated:** 2026-07-02 (Slice 2)
+**Last updated:** 2026-07-02 (Slice 3)
 
 ### Slice 1 soak (dev)
 
@@ -111,4 +141,14 @@ Part B live: created=1 idempotent=0 (first run) / idempotent=1 (replay) ✅
 Part C replay: idempotent=1 ✅
 Owner: Kelli (e321fae3…) ✅
 Note: run-retention-scoring not deployed on dev yet; soak seeds score when empty.
+```
+
+### Slice 3 soak (dev)
+
+```text
+Part A: RPC floor_list_morning_tray_packages present ✅
+Part B: heartbeat idempotent=6, tray_queue_count=1 ✅
+Part C: immediate queue excludes heartbeat (overlap=0) ✅
+Part D: grouped by agent (kelli=1) ✅
+Mac Mini live: npm run deliver:morning-tray-batch (ops)
 ```

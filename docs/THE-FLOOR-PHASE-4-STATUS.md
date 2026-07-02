@@ -130,6 +130,28 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ---
 
+## Phase 4 dev close-out (2026-07-02)
+
+| Step | Result |
+|------|--------|
+| Dev Supabase secrets (`CRON_SECRET`, `FLOOR_COCKPIT_ENABLED`, play owner IDs) | ✅ |
+| GitHub secrets (`FLOOR_DEV_SERVICE_ROLE_KEY`, `FLOOR_DEV_CRON_SECRET`) | ✅ |
+| Local soak `scripts/phase4-gap-roundout-soak.sh` | ✅ `play4_planned=1`, idempotent |
+| Mac Mini `npm run deliver:canonical-decision-cards` | ✅ **16 delivered**, 1 skipped, 1 error (SSN lint — expected safety block) |
+
+**Mac Mini schedule (recommended):**
+
+```cron
+# Heartbeat packages → morning tray batch at office open (8 AM ET ≈ 13:00 UTC)
+0 13 * * 1-5 cd /Users/rocky/lewis-the-floor && npm run materialize:home-snapshots && npm run deliver:morning-tray-batch
+# Immediate (non-heartbeat) cards + retries every 2 min
+*/2 * * * * cd /Users/rocky/lewis-the-floor && npm run deliver:canonical-decision-cards
+```
+
+**Note:** Floor GitHub cron workflows are on `feat/floor-v1-spine` only until merge to `main`. Dev close-out was validated via local soak + Mac Mini delivery, not GitHub Actions UI.
+
+---
+
 ## Phase 4 complete (dev spine)
 
 Slices 1–3 wire the three Phase 4 internal plays on dev. **Phase 5 Slice 1 (`heartbeat.book.scan`)** consolidates them into a nightly fan-out — see [`THE-FLOOR-PHASE-5-STATUS.md`](./THE-FLOOR-PHASE-5-STATUS.md).
@@ -147,7 +169,7 @@ Remaining Phase 4 items (endorsement capture, licensing alerts, SMS intake) are 
 
 ---
 
-**Last updated:** 2026-07-02 (Slice 3)
+**Last updated:** 2026-07-02 (dev close-out)
 
 ### Slice 3 soak (dev)
 
