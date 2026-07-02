@@ -368,7 +368,7 @@ export function AdvancedImportSystem({ onImportComplete }: AdvancedImportSystemP
                             {batch.import_type} • {batch.total_rows} rows • 
                             {new Date(batch.created_at).toLocaleDateString()}
                           </div>
-                          {batch.status === 'completed' && (
+                          {(batch.status === 'completed' || batch.status === 'completed_with_errors') && (
                             <div className="text-xs text-muted-foreground">
                               {batch.successful_rows} successful, {batch.error_rows} errors
                             </div>

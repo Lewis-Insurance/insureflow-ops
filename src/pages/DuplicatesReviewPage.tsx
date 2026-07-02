@@ -158,7 +158,7 @@ function RecentlyMerged({ refreshKey, onUndone }: { refreshKey: number; onUndone
 }
 
 export default function DuplicatesReviewPage() {
-  const { groups, total, loading, refetch, merge, linkInstead } = useDuplicateGroups();
+  const { groups, total, loading, loadingMore, hasMore, loadMore, refetch, merge, linkInstead } = useDuplicateGroups();
   const [activeGroup, setActiveGroup] = useState<DuplicateGroup | null>(null);
   const [mergesVersion, setMergesVersion] = useState(0);
 
@@ -222,6 +222,18 @@ export default function DuplicatesReviewPage() {
             {groups.map((g) => (
               <GroupCard key={g.group_id} group={g} onReview={setActiveGroup} />
             ))}
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  disabled={loadingMore}
+                  onClick={loadMore}
+                  className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
+                  {loadingMore ? 'Loading…' : `Load more (${groups.length} of ${total})`}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

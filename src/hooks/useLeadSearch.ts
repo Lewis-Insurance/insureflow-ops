@@ -49,6 +49,7 @@ export function useLeadSearch() {
   // Active filters + how many rows are loaded, so fetchNextPage pages from the
   // right offset without re-running the whole query.
   const filtersRef = useRef<LeadFilters>({ q: '', sort: 'score_desc' });
+  const requestSeqRef = useRef(0);
   const loadedRef = useRef(0);
 
   const buildFilters = (f: LeadFilters): Record<string, string> => {
@@ -62,6 +63,9 @@ export function useLeadSearch() {
   // Cohort and status are applied server-side so the rendered rows match the
   // triage tile / status filter.
   const fetchLeads = async (q = '', sort = 'score_desc', cohort?: string, status?: string) => {
+    // Monotonic guard: a slow response for an older filter set (e.g. a search
+    // keystroke racing a cohort-tile click) must not overwrite the newer rows.
+    const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
       filtersRef.current = { q, sort, cohort, status };
@@ -73,6 +77,7 @@ export function useLeadSearch() {
         p_sort: sort,
       });
 
+      if (seq !== requestSeqRef.current) return;
       if (error) throw error;
 
       const rows = (data || []) as LeadRow[];
@@ -82,6 +87,7 @@ export function useLeadSearch() {
       setTotalCount(rows.length);
       setError(null);
     } catch (err) {
+      if (seq !== requestSeqRef.current) return;
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
       toast({
@@ -90,7 +96,7 @@ export function useLeadSearch() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   };
 
