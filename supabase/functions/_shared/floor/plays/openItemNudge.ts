@@ -16,6 +16,8 @@ export interface OpenItemNudgeItem {
   title: string;
   severity_score: number;
   reason: string;
+  /** Task assignee when kind=task; quotes use account/default owner at plan time. */
+  owner_id?: string | null;
 }
 
 export interface OpenItemNudgePlayResult {
@@ -61,6 +63,7 @@ export function runOpenItemNudgePlay(
     title: task.title,
     severity_score: 25,
     reason: 'Open task — distinct from suspense sweep',
+    owner_id: task.assignee_id,
   })).filter((item) => item.account_id);
 
   return [...quoteItems, ...taskItems]

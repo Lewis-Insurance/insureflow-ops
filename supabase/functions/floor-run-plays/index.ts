@@ -4,7 +4,7 @@ import { verifyCronSecret } from '../_shared/cron-auth.ts';
 import { createErrorResponse, ValidationError } from '../_shared/error-handler.ts';
 import { createLogger } from '../_shared/logger.ts';
 import { runInternalPlays, type PlayCardsDb } from '../_shared/floor/runInternalPlays.ts';
-import { resolveGapRoundoutOwnerId } from '../_shared/floor/floorOwners.ts';
+import { resolveGapRoundoutOwnerId, resolveOpenItemNudgeOwnerId } from '../_shared/floor/floorOwners.ts';
 import type { PolicyInForceRow, SuspenseTaskRow } from '../_shared/floor/types.ts';
 
 const logger = createLogger('floor-run-plays');
@@ -141,11 +141,20 @@ serve(async (req) => {
       play6Limit = 0;
     }
 
+    if (body.play5_only === true) {
+      play1Limit = 0;
+      play3Limit = 0;
+      play4Limit = 0;
+      play6Limit = 0;
+    }
+
     const playIds = Array.isArray(body.play_ids)
       ? body.play_ids.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
       : body.play4_only === true
         ? ['coverage.gap.roundout']
-        : undefined;
+        : body.play5_only === true
+          ? ['open.item.nudge']
+          : undefined;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -252,6 +261,7 @@ serve(async (req) => {
       play5Limit,
       play6Limit,
       gapRoundoutOwnerId: resolveGapRoundoutOwnerId(),
+      openItemNudgeOwnerId: resolveOpenItemNudgeOwnerId(),
       ownerByAccountId,
       playIds,
     };
@@ -260,12 +270,14 @@ serve(async (req) => {
       const { planInternalPlays } = await import('../_shared/floor/runInternalPlays.ts');
       const planned = planInternalPlays(playInput);
       const gapPlans = planned.plans.filter((plan) => plan.play_id === 'coverage.gap.roundout');
+      const nudgePlans = planned.plans.filter((plan) => plan.play_id === 'open.item.nudge');
       return new Response(
         JSON.stringify({
           ok: true,
           dry_run: true,
           planned: planned.plans.length,
           play4_planned: gapPlans.length,
+          play5_planned: nudgePlans.length,
           play1_summary: planned.play1_summary,
           play4_summary: planned.play4_summary,
           play5_summary: planned.play5_summary,

@@ -51,11 +51,48 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ---
 
+## Slice 2 — `open.item.nudge` (Tier 2 internal cards)
+
+**Goal:** Open quotes + non-suspense pending tasks → internal nudge cards → cockpit + Slack queue.
+
+| Item | Status |
+|------|--------|
+| Play scaffold (`openItemNudge.ts`, `planOpenItemNudgeCards`) | ✅ Phase 3 |
+| `floor-run-plays` queries open `quotes` + pending `tasks` | ✅ |
+| Kelli default owner (`FLOOR_OPEN_ITEM_NUDGE_OWNER_ID`) | ✅ Slice 2 |
+| Task assignee preferred over account/Kelli default | ✅ Slice 2 |
+| `play5_only` + `play_ids` filter on `floor-run-plays` | ✅ Slice 2 |
+| GitHub Action `.github/workflows/floor-open-item-nudge-cron.yml` (dev) | ✅ Slice 2 |
+| Soak script `scripts/phase4-open-item-nudge-soak.sh` | ✅ Slice 2 |
+
+**Chain (dev):**
+
+1. Live data: `quotes.status='open'` and pending tasks without "suspense" in title
+2. `floor-run-plays` with `play5_only: true` — persists internal cards
+3. Mac Mini / Hermes: Slack delivery queue
+
+**Run soak locally:**
+
+```bash
+chmod +x scripts/phase4-open-item-nudge-soak.sh
+./scripts/phase4-open-item-nudge-soak.sh
+```
+
+**Deploy (dev):**
+
+```bash
+supabase secrets set --project-ref klnygbbmognbslgobmzc \
+  FLOOR_OPEN_ITEM_NUDGE_OWNER_ID=e321fae3-f28b-4170-8316-9460cb9eb2fc
+
+supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
+```
+
+---
+
 ## Upcoming slices (not started)
 
 | Slice | Play | Notes |
 |-------|------|-------|
-| 2 | `open.item.nudge` | Open quotes + non-suspense tasks |
 | 3 | `nonpay.cancel.watch` | FL day-count fork (Brian) |
 | 4+ | Endorsement capture, licensing alerts, SMS intake | Roadmap Phase 4 |
 
@@ -70,7 +107,15 @@ supabase functions deploy floor-run-plays --project-ref klnygbbmognbslgobmzc
 
 ---
 
-**Last updated:** 2026-07-01 (Slice 1)
+**Last updated:** 2026-07-02 (Slice 2)
+
+### Slice 2 soak (dev)
+
+```text
+Part A dry_run: play5_planned=10 ✅
+Part B live: created=10 ✅
+Part C replay: idempotent=10 ✅
+```
 
 ### Slice 1 soak (dev)
 

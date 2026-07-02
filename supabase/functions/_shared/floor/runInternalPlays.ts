@@ -36,6 +36,7 @@ export interface RunInternalPlaysInput {
   play6Limit?: number;
   defaultOwnerId?: string | null;
   gapRoundoutOwnerId?: string | null;
+  openItemNudgeOwnerId?: string | null;
   ownerByAccountId?: Record<string, string | null | undefined>;
   /** When set, only persist cards for these play_ids. */
   playIds?: string[];
@@ -85,6 +86,8 @@ export function planInternalPlays(input: RunInternalPlaysInput): RunInternalPlay
   const play5Cards = planOpenItemNudgeCards(play5Items, {
     dayKey,
     limit: input.play5Limit ?? 5,
+    defaultOwnerId: input.openItemNudgeOwnerId ?? input.defaultOwnerId ?? null,
+    ownerByAccountId: input.ownerByAccountId,
   });
   const play6Cards = planNonpayCancelWatchCards(nonpayCandidates, {
     dayKey,

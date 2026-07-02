@@ -116,7 +116,12 @@ export function planCoverageGapRoundoutCards(
 /** Play 5: nudge cards for open quotes and non-suspense tasks. */
 export function planOpenItemNudgeCards(
   items: OpenItemNudgeItem[],
-  opts: { dayKey: string; limit?: number },
+  opts: {
+    dayKey: string;
+    limit?: number;
+    defaultOwnerId?: string | null;
+    ownerByAccountId?: Record<string, string | null | undefined>;
+  },
 ): InternalPlayCardPlan[] {
   const limit = opts.limit ?? 5;
 
@@ -125,7 +130,7 @@ export function planOpenItemNudgeCards(
     play_version: '1.0.0',
     idempotency_key: `play5:open.item.nudge:${item.kind}:${item.item_id}:${opts.dayKey}`,
     client_account_id: item.account_id,
-    owner_id: null,
+    owner_id: item.owner_id ?? opts.ownerByAccountId?.[item.account_id] ?? opts.defaultOwnerId ?? null,
     headline: item.kind === 'quote' ? 'Open quote follow-up' : 'Open item follow-up',
     summary: `${item.title} — ${item.reason}. Internal owner nudge; no client send.`,
     risk: item.severity_score >= 50 ? ('yellow' as RiskLevel) : ('green' as RiskLevel),

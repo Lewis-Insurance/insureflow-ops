@@ -570,6 +570,30 @@ describe('Floor plays — internal card pipeline', () => {
     expect(planned.plans[0]?.owner_id).toBe('kelli-owner-id');
   });
 
+  it('planInternalPlays play_ids filter keeps only open.item.nudge with Kelli default', () => {
+    const planned = planInternalPlays({
+      agency_workspace_id: '00000000-0000-4000-8000-000000000001',
+      dayKey: '2026-07-01',
+      policies: [],
+      tasks: [],
+      openQuotes: [
+        {
+          id: 'q1',
+          account_id: 'a1',
+          status: 'open',
+          line_of_business: 'Auto',
+          premium: 1200,
+          updated_at: '2026-06-20T00:00:00Z',
+        },
+      ],
+      play5Limit: 5,
+      playIds: ['open.item.nudge'],
+      openItemNudgeOwnerId: 'kelli-owner-id',
+    });
+    expect(planned.plans.every((plan) => plan.play_id === 'open.item.nudge')).toBe(true);
+    expect(planned.plans[0]?.owner_id).toBe('kelli-owner-id');
+  });
+
   it('persists internal play cards with idempotency', async () => {
     const inserted: string[] = [];
     const db = {
