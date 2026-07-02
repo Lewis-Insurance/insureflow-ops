@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
-import { format, differenceInCalendarDays } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { differenceFromTodayInLocalDays, extractLocalDate, parseLocalDate } from '@/lib/date/localDate';
 
 /**
  * Next renewal as a banded, labeled state (component-rules.md "Renewal countdown").
@@ -22,8 +23,10 @@ export function NextRenewal({
     return <span className={cn('text-sm text-cc-text-muted', className)}>{emptyLabel}</span>;
   }
 
-  const d = new Date(date);
-  const days = differenceInCalendarDays(d, new Date());
+  // Local-date parsing: new Date('YYYY-MM-DD') is UTC midnight, which renders the
+  // previous day and flips "Overdue" a day early in US timezones.
+  const d = parseLocalDate(extractLocalDate(date));
+  const days = differenceFromTodayInLocalDays(date) ?? 0;
   const overdue = days < 0;
   const soon = days >= 0 && days <= 30;
 
