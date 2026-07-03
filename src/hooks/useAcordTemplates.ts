@@ -27,7 +27,7 @@ export interface UseAcordTemplatesReturn {
   setCurrentVersion: (id: string) => Promise<boolean>;
   archiveTemplate: (id: string) => Promise<boolean>;
   deleteTemplate: (id: string) => Promise<boolean>;
-  validatePdf: (file: File) => Promise<{ valid: boolean; errors: string[] }>;
+  validatePdf: (file: File) => Promise<{ valid: boolean; errors: string[]; warnings: string[] }>;
 }
 
 // ============================================
@@ -154,11 +154,13 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
           throw new Error(result.errors.join(', '));
         }
 
-        // Upload PDF to storage
+        // Upload PDF to storage. Store the sanitized (XFA-stripped) bytes when
+        // available so the persisted template is a clean AcroForm-only copy.
         const fileName = `acord-templates/${options.formNumber}/${options.version}/${file.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(fileName, file, {
+          .upload(fileName, result.sanitizedBytes ?? pdfBytes, {
+            contentType: 'application/pdf',
             cacheControl: '3600',
             upsert: true,
           });
@@ -407,16 +409,17 @@ export function useAcordTemplates(): UseAcordTemplatesReturn {
   // VALIDATION
   // ============================================
 
-  const validatePdf = useCallback(async (file: File): Promise<{ valid: boolean; errors: string[] }> => {
+  const validatePdf = useCallback(async (file: File): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(arrayBuffer);
       const result = await validatePdfForAcord(pdfBytes);
-      return { valid: result.valid, errors: result.errors };
+      return { valid: result.valid, errors: result.errors, warnings: result.warnings ?? [] };
     } catch (err) {
       return {
         valid: false,
         errors: [err instanceof Error ? err.message : 'Failed to validate PDF'],
+        warnings: [],
       };
     }
   }, []);

@@ -3,7 +3,7 @@
 // Handles PDF upload, validation, and field extraction
 // ============================================
 
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFButton } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFButton, PDFName, PDFDict } from 'pdf-lib';
 import type { AcordTemplate, FieldInventoryItem, FieldSchemaItem, SectionDefinition } from '@/types/acord';
 
 // ============================================
@@ -16,6 +16,7 @@ export interface TemplateIngestionResult {
   fieldInventory: FieldInventoryItem[];
   fieldSchema: FieldSchemaItem[];
   sections: SectionDefinition[];
+  sanitizedBytes?: Uint8Array;
   errors: string[];
   warnings: string[];
 }
@@ -68,6 +69,20 @@ const SECTION_PATTERNS: Record<number, { name: string; patterns: RegExp[] }> = {
 };
 
 // ============================================
+// XFA DETECTION
+// ============================================
+
+/**
+ * Detects whether a PDF carries an XFA packet in its AcroForm dictionary.
+ * Must be called BEFORE getForm(), because getForm() auto-strips the XFA entry
+ * (pdf-lib preserves the underlying AcroForm fields but removes the XFA layer).
+ */
+export function hasXfaPacket(pdfDoc: PDFDocument): boolean {
+  const acroForm = pdfDoc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  return !!acroForm?.has(PDFName.of('XFA'));
+}
+
+// ============================================
 // MAIN INGESTION FUNCTION
 // ============================================
 
@@ -85,23 +100,24 @@ export async function ingestAcordTemplate(
     // Load the PDF
     const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
-    // Check for XFA forms (not supported)
-    const acroForm = pdfDoc.catalog.lookup(pdfDoc.catalog.get('AcroForm' as any) as any);
-    if (acroForm) {
-      const xfa = (acroForm as any).get?.('XFA');
-      if (xfa) {
-        errors.push('XFA forms are not supported. Please use an AcroForm-based PDF.');
-        return { success: false, fieldInventory: [], fieldSchema: [], sections: [], errors, warnings };
-      }
-    }
+    // Detect XFA BEFORE getForm() (getForm auto-strips the XFA entry)
+    const isXfaHybrid = hasXfaPacket(pdfDoc);
 
     // Get form fields
     const form = pdfDoc.getForm();
     const fields = form.getFields();
 
     if (fields.length === 0) {
-      errors.push('No form fields found in PDF. Please upload a fillable AcroForm PDF.');
+      errors.push(
+        isXfaHybrid
+          ? 'This PDF is XFA-only (no AcroForm fields). Export or re-download an AcroForm version of the form.'
+          : 'No form fields found in PDF. Please upload a fillable AcroForm PDF.'
+      );
       return { success: false, fieldInventory: [], fieldSchema: [], sections: [], errors, warnings };
+    }
+
+    if (isXfaHybrid) {
+      warnings.push(`XFA form data detected and removed. ${fields.length} AcroForm fields were preserved and will be used for filling.`);
     }
 
     // Process each field
@@ -162,7 +178,7 @@ export async function ingestAcordTemplate(
       form_name: options.formName,
       version: options.version,
       is_current: true,
-      pdf_type: 'acroform',
+      pdf_type: isXfaHybrid ? 'acroform_hybrid' : 'acroform',
       field_inventory: fieldInventory,
       field_schema: fieldSchema,
       section_definitions: sections,
@@ -173,12 +189,17 @@ export async function ingestAcordTemplate(
       license_notes: options.licenseNotes,
     };
 
+    // Serialize the parsed document. Accessing getForm() above strips the XFA
+    // entry, so these bytes are a clean AcroForm-only copy safe to store.
+    const sanitizedBytes = new Uint8Array(await pdfDoc.save());
+
     return {
       success: true,
       template,
       fieldInventory,
       fieldSchema,
       sections,
+      sanitizedBytes,
       errors,
       warnings,
     };
@@ -437,48 +458,29 @@ function validateAcordFields(formNumber: string, inventory: FieldInventoryItem[]
 // VALIDATION UTILITIES
 // ============================================
 
-export function validatePdfForAcord(pdfBytes: Uint8Array | ArrayBuffer): Promise<{
+export async function validatePdfForAcord(pdfBytes: Uint8Array | ArrayBuffer): Promise<{
   valid: boolean;
   isAcroForm: boolean;
-  isXFA: boolean;
+  isXfaHybrid: boolean;
   fieldCount: number;
   errors: string[];
+  warnings: string[];
 }> {
-  return new Promise(async (resolve) => {
-    try {
-      const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-      const form = pdfDoc.getForm();
-      const fields = form.getFields();
-
-      // Check for XFA
-      const acroForm = pdfDoc.catalog.lookup(pdfDoc.catalog.get('AcroForm' as any) as any);
-      let isXFA = false;
-      if (acroForm) {
-        const xfa = (acroForm as any).get?.('XFA');
-        isXFA = !!xfa;
-      }
-
-      resolve({
-        valid: !isXFA && fields.length > 0,
-        isAcroForm: fields.length > 0,
-        isXFA,
-        fieldCount: fields.length,
-        errors: isXFA
-          ? ['XFA forms are not supported']
-          : fields.length === 0
-          ? ['No form fields found']
-          : [],
-      });
-    } catch (error) {
-      resolve({
-        valid: false,
-        isAcroForm: false,
-        isXFA: false,
-        fieldCount: 0,
-        errors: [error instanceof Error ? error.message : 'Failed to parse PDF'],
-      });
-    }
-  });
+  try {
+    const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+    const isXfaHybrid = hasXfaPacket(pdfDoc);   // before getForm()
+    const fields = pdfDoc.getForm().getFields();
+    return {
+      valid: fields.length > 0,
+      isAcroForm: fields.length > 0,
+      isXfaHybrid,
+      fieldCount: fields.length,
+      errors: fields.length === 0 ? [isXfaHybrid ? 'XFA-only PDF: no AcroForm fields to fill' : 'No form fields found'] : [],
+      warnings: isXfaHybrid && fields.length > 0 ? ['XFA data present; it will be removed at upload and the AcroForm fields kept'] : [],
+    };
+  } catch (error) {
+    return { valid: false, isAcroForm: false, isXfaHybrid: false, fieldCount: 0, warnings: [], errors: [error instanceof Error ? error.message : 'Failed to parse PDF'] };
+  }
 }
 
 // ============================================
