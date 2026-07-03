@@ -426,7 +426,7 @@ export default function CustomerDetail() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onSelect={() => navigate(`/coi-generator?accountId=${account.id}`)}>
+                  <DropdownMenuItem onSelect={() => navigate(`/certificates?accountId=${account.id}`)}>
                     <Award className="mr-2 h-4 w-4" /> New certificate
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setAddPolicyOpen(true)}>

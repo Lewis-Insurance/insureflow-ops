@@ -423,9 +423,13 @@ describe('server-verified client send approval gate', () => {
   });
 
   it('wraps legitimate human client-effect flows with the server-minted approval marker', () => {
+    // Note: the legacy client-side COI generation hook was retired in COI Module
+    // Phase 1 (System B demolition), so it is no longer asserted here. The
+    // send-coi-email edge function itself is kept and still gated; its wiring is
+    // covered by the clientEffectFunctions and surfaceCases tests above. A client
+    // caller returns in Phase 5 (v2), at which point a coverage assertion returns here.
     const hookSource = readFileSync(resolve(repoRoot, 'src/hooks/useSMSMessages.ts'), 'utf8');
     const modalSource = readFileSync(resolve(repoRoot, 'src/components/communications/SMSComposerModal.tsx'), 'utf8');
-    const coiSource = readFileSync(resolve(repoRoot, 'src/hooks/useCOIGeneration.ts'), 'utf8');
     const signatureHookSource = readFileSync(resolve(repoRoot, 'src/hooks/useSignature.ts'), 'utf8');
     const signatureModalSource = readFileSync(resolve(repoRoot, 'src/components/signatures/SignatureRequestModal.tsx'), 'utf8');
     const helperSource = readFileSync(resolve(repoRoot, 'src/lib/clientSendApproval.ts'), 'utf8');
@@ -435,8 +439,6 @@ describe('server-verified client send approval gate', () => {
     expect(hookSource).toContain('client_send_approval');
     expect(modalSource).toContain("createClientSendApproval('send-sms', sendPayload)");
     expect(modalSource).toContain('client_send_approval');
-    expect(coiSource).toContain("createClientSendApproval('send-coi-email', sendPayload)");
-    expect(coiSource).toContain('client_send_approval');
     expect(signatureHookSource).toContain("createClientSendApproval('esign-create-request', signatureRequestPayload)");
     expect(signatureHookSource).toContain('client_send_approval');
     expect(signatureModalSource).toContain("createClientSendApproval('esign-create-request', signatureRequestPayload)");

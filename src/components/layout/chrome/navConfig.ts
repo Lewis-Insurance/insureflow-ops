@@ -129,7 +129,7 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'MGAs', to: '/mgas', icon: Briefcase },
   { label: 'ACORD Templates', to: '/acord-templates', icon: ScrollText },
   { label: 'Intake Templates', to: '/intake-templates', icon: ClipboardList },
-  { label: 'COI Generator', to: '/coi-generator', icon: Award },
+  { label: 'Certificates', to: '/certificates', icon: Award },
   { label: 'Carrier Templates', to: '/carrier-templates', icon: FileStack },
   { label: 'Extraction Review', to: '/extraction-review', icon: Eye },
   { label: 'Extraction Analytics', to: '/extraction-analytics', icon: Activity },
