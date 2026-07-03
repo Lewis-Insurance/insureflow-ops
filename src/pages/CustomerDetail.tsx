@@ -13,6 +13,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/u
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
+import { MasterCOISection } from '@/components/customers/MasterCOISection';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
@@ -102,7 +103,7 @@ const STATUS_OPTIONS = ['active', 'lead', 'prospect', 'inactive'];
 
 // Sections are now always-visible panels (no tabs). A legacy ?tab= deep link
 // (e.g. a renewal's "already added" prompt) scrolls to the matching section.
-const SECTION_IDS = ['contact', 'policies', 'relationships', 'documents', 'notes', 'activity'];
+const SECTION_IDS = ['contact', 'policies', 'master-coi', 'relationships', 'documents', 'notes', 'activity'];
 
 // Error boundary so a failing Document Collection never blanks the record.
 class ErrorBoundaryWrapper extends React.Component<
@@ -470,6 +471,11 @@ export default function CustomerDetail() {
         <section id="policies" className="scroll-mt-20 space-y-4">
           <CustomerPoliciesSection accountId={account.id} customerName={account.name} />
           <PaymentHistoryWidget accountId={account.id} title="Payment history" maxItems={10} showPolicyColumn />
+        </section>
+
+        {/* ===================== Master COI ===================== */}
+        <section id="master-coi" className="scroll-mt-20 space-y-4">
+          <MasterCOISection accountId={account.id} accountName={account.name} />
         </section>
 
         {/* ===================== Documents ===================== */}
