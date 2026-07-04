@@ -31,6 +31,8 @@ import { PolicyManualDetailsModal } from '@/components/policies/PolicyManualDeta
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
+import { CancellationHolderList } from '@/components/certificates/CancellationHolderList';
+import { useCancellationHolders } from '@/hooks/useCancellationHolders';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -108,6 +110,12 @@ export default function PolicyDetail() {
     enabled: !!policyId,
   });
 
+  // Cancellation notice (07 §5.2): active certificate holders that reference
+  // this policy. The section renders whenever there are holders; it is
+  // emphasized (warning-toned header) when the policy is cancelled/non_renewed.
+  // The child component shares this query by key, so this is a single fetch.
+  const { holders: cancellationHolders } = useCancellationHolders(policyId ?? null);
+
   const formatCurrency = (amount: number | null) => {
     if (!amount) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -146,6 +154,13 @@ export default function PolicyDetail() {
 
   // Parse WC details from the policy's wc_details JSON field
   const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
+
+  // Cancellation notice emphasis (07 §5.2): a cancelled or non-renewed policy
+  // turns the certificate-holder section into a warning-toned "Notify" prompt.
+  const policyStatus = (policy?.status || '').toLowerCase();
+  const isCancelledOrNonRenewed =
+    policyStatus === 'cancelled' || policyStatus === 'non_renewed';
+  const hasCancellationHolders = cancellationHolders.length > 0;
 
   if (isLoading) {
     return (
@@ -721,6 +736,47 @@ export default function PolicyDetail() {
             maxItems={5}
             showPolicyColumn={false}
           />
+        )}
+
+        {/* Certificate holders (07 §5.2): shown whenever active cert holders
+            reference this policy. Emphasized (warning-toned) when the policy is
+            cancelled or non-renewed, because those holders were promised notice. */}
+        {policyId && hasCancellationHolders && (
+          <Card
+            className={
+              isCancelledOrNonRenewed
+                ? 'border-warning/40 bg-warning/5'
+                : undefined
+            }
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award
+                  className={
+                    isCancelledOrNonRenewed ? 'h-5 w-5 text-warning' : 'h-5 w-5'
+                  }
+                />
+                <span className={isCancelledOrNonRenewed ? 'text-warning' : undefined}>
+                  {isCancelledOrNonRenewed
+                    ? 'Notify certificate holders'
+                    : 'Certificate holders'}
+                </span>
+              </CardTitle>
+              {isCancelledOrNonRenewed && (
+                <p className="text-sm text-muted-foreground">
+                  This policy is {policyStatus === 'cancelled' ? 'cancelled' : 'non-renewed'}.
+                  The holders below were promised notice. Send each a notice or mark them
+                  notified once contacted.
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              <CancellationHolderList
+                policyId={policyId}
+                accountId={policy?.account?.id}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {/* Inland Marine Details Section */}
