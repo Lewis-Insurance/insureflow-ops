@@ -11,7 +11,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Chip } from '@/components/cc';
-import { UserPlus, Pencil, Check, Loader2, ShieldQuestion } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  UserPlus,
+  Pencil,
+  Check,
+  Loader2,
+  ShieldQuestion,
+  ChevronDown,
+  ClipboardCheck,
+  Plus,
+  X,
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -21,6 +36,13 @@ import {
   type AdditionalInsuredSearchResult,
   type AdditionalInsuredSavedRow,
 } from '@/hooks/useAdditionalInsureds';
+import {
+  parseHolderRequirements,
+  type HolderRequirements,
+  type HolderRequirementsMinLimit,
+  type HolderRequirementsFlag,
+} from '@/lib/acord/acord25/requirements';
+import type { Acord25LineKey } from '@/lib/acord/acord25/types';
 
 /**
  * Add / edit an additional insured (certificate holder). Forked from
@@ -131,6 +153,518 @@ async function hydrateSavedRow(id: string): Promise<AdditionalInsuredSavedRow | 
   return (data as unknown as AdditionalInsuredSavedRow) ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Holder requirements editor (07 Section 4.3).
+//
+// Edits the closed schema stored on additional_insureds.requirements jsonb
+// (07 Section 4.2): structured min_limit rows, per-line flag toggles, notice
+// days, endorsement form chips, required lines, plus free-text notes. All
+// optional; a holder with no requirements behaves exactly as today. The shape
+// here is the same HolderRequirements consumed by the shared evaluator, so the
+// generator reads back exactly what this editor writes.
+// ---------------------------------------------------------------------------
+
+const REQ_LINE_OPTIONS: Array<{ value: Acord25LineKey; label: string }> = [
+  { value: 'gl', label: 'General Liability' },
+  { value: 'auto', label: 'Automobile Liability' },
+  { value: 'umbrella', label: 'Umbrella / Excess' },
+  { value: 'wc', label: 'Workers Compensation' },
+  { value: 'property', label: 'Property' },
+  { value: 'other', label: 'Other' },
+];
+
+/**
+ * Field keys offered per line for a min_limit row. Each is a key that resolves
+ * to a numeric COICell in the get_master_coi line contract (matching the
+ * resolver in requirements.ts). GL nests its limits under limits.{field}; the
+ * others carry them directly. 'other' has no canonical numeric field, so it
+ * offers none.
+ */
+const REQ_FIELD_OPTIONS: Record<Acord25LineKey, Array<{ value: string; label: string }>> = {
+  gl: [
+    { value: 'each_occurrence', label: 'Each occurrence' },
+    { value: 'general_aggregate', label: 'General aggregate' },
+    { value: 'products_completed_ops_aggregate', label: 'Products / completed ops aggregate' },
+    { value: 'personal_advertising_injury', label: 'Personal and advertising injury' },
+    { value: 'damage_to_rented_premises', label: 'Damage to rented premises' },
+    { value: 'medical_expense', label: 'Medical expense' },
+  ],
+  auto: [
+    { value: 'csl', label: 'Combined single limit' },
+    { value: 'bi_per_person', label: 'Bodily injury per person' },
+    { value: 'bi_per_accident', label: 'Bodily injury per accident' },
+    { value: 'pd_per_accident', label: 'Property damage per accident' },
+  ],
+  umbrella: [
+    { value: 'each_occurrence', label: 'Each occurrence' },
+    { value: 'aggregate', label: 'Aggregate' },
+  ],
+  wc: [
+    { value: 'el_each_accident', label: 'EL each accident' },
+    { value: 'el_disease_each_employee', label: 'EL disease, each employee' },
+    { value: 'el_disease_policy_limit', label: 'EL disease, policy limit' },
+  ],
+  property: [{ value: 'limit_amount', label: 'Limit amount' }],
+  other: [],
+};
+
+/** The editor's working form: HolderRequirements plus the notes string. */
+interface RequirementsFormState {
+  min_limits: HolderRequirementsMinLimit[];
+  flags: HolderRequirementsFlag[];
+  required_endorsement_forms: string[];
+  notice_days: string;
+  required_lines: Acord25LineKey[];
+  notes: string;
+}
+
+const EMPTY_REQUIREMENTS: RequirementsFormState = {
+  min_limits: [],
+  flags: [],
+  required_endorsement_forms: [],
+  notice_days: '',
+  required_lines: [],
+  notes: '',
+};
+
+/** Seed the editor form from parsed requirements + the notes column. */
+function requirementsToForm(
+  parsed: HolderRequirements | null,
+  notes: string | null,
+): RequirementsFormState {
+  if (!parsed) {
+    return { ...EMPTY_REQUIREMENTS, notes: notes ?? '' };
+  }
+  return {
+    min_limits: parsed.min_limits.map((m) => ({ ...m })),
+    flags: parsed.flags.map((f) => ({ ...f })),
+    required_endorsement_forms: [...parsed.required_endorsement_forms],
+    notice_days: parsed.notice_days != null ? String(parsed.notice_days) : '',
+    required_lines: [...parsed.required_lines],
+    notes: notes ?? '',
+  };
+}
+
+/**
+ * Serialize the editor form back into the closed requirements jsonb the RPC
+ * stores. Empty / partial rows are dropped so a holder that opened the section
+ * but added nothing stays with no requirements.
+ */
+function formToRequirementsPayload(form: RequirementsFormState): Record<string, unknown> {
+  const min_limits = form.min_limits
+    .filter((m) => m.field.trim().length > 0 && Number.isFinite(m.min))
+    .map((m) => ({ line_key: m.line_key, field: m.field, min: m.min }));
+
+  const flags = form.flags
+    .filter((f) => f.requires_additional_insured || f.requires_waiver)
+    .map((f) => ({
+      line_key: f.line_key,
+      requires_additional_insured: !!f.requires_additional_insured,
+      requires_waiver: !!f.requires_waiver,
+    }));
+
+  const required_endorsement_forms = form.required_endorsement_forms
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  const noticeNum = Number.parseInt(form.notice_days, 10);
+  const notice_days = Number.isFinite(noticeNum) && noticeNum > 0 ? noticeNum : null;
+
+  return {
+    min_limits,
+    flags,
+    required_endorsement_forms,
+    notice_days,
+    required_lines: [...form.required_lines],
+  };
+}
+
+interface RequirementsSectionProps {
+  form: RequirementsFormState;
+  onChange: (next: RequirementsFormState) => void;
+  loading: boolean;
+}
+
+/** The collapsed Requirements editor rendered inside the drawer (edit mode). */
+function RequirementsSection({ form, onChange, loading }: RequirementsSectionProps) {
+  const [open, setOpen] = useState(false);
+  const [formInput, setFormInput] = useState('');
+
+  const ruleCount =
+    form.min_limits.length +
+    form.flags.length +
+    form.required_endorsement_forms.length +
+    form.required_lines.length +
+    (form.notice_days.trim() ? 1 : 0);
+
+  const flagFor = (line: Acord25LineKey): HolderRequirementsFlag =>
+    form.flags.find((f) => f.line_key === line) ?? {
+      line_key: line,
+      requires_additional_insured: false,
+      requires_waiver: false,
+    };
+
+  const setFlag = (line: Acord25LineKey, patch: Partial<HolderRequirementsFlag>) => {
+    const current = flagFor(line);
+    const next: HolderRequirementsFlag = { ...current, ...patch };
+    const others = form.flags.filter((f) => f.line_key !== line);
+    const cleaned = next.requires_additional_insured || next.requires_waiver ? [next] : [];
+    onChange({ ...form, flags: [...others, ...cleaned] });
+  };
+
+  const addMinLimit = () => {
+    onChange({
+      ...form,
+      min_limits: [
+        ...form.min_limits,
+        { line_key: 'gl', field: 'general_aggregate', min: 1000000 },
+      ],
+    });
+  };
+
+  const updateMinLimit = (index: number, patch: Partial<HolderRequirementsMinLimit>) => {
+    const next = form.min_limits.map((m, i) => {
+      if (i !== index) return m;
+      const merged = { ...m, ...patch };
+      // When the line changes, snap the field to the first valid field for it.
+      if (patch.line_key && patch.line_key !== m.line_key) {
+        const fields = REQ_FIELD_OPTIONS[patch.line_key];
+        merged.field = fields.length > 0 ? fields[0].value : '';
+      }
+      return merged;
+    });
+    onChange({ ...form, min_limits: next });
+  };
+
+  const removeMinLimit = (index: number) => {
+    onChange({ ...form, min_limits: form.min_limits.filter((_, i) => i !== index) });
+  };
+
+  const toggleRequiredLine = (line: Acord25LineKey) => {
+    const has = form.required_lines.includes(line);
+    onChange({
+      ...form,
+      required_lines: has
+        ? form.required_lines.filter((l) => l !== line)
+        : [...form.required_lines, line],
+    });
+  };
+
+  const addForm = () => {
+    const value = formInput.trim();
+    if (!value) return;
+    if (form.required_endorsement_forms.some((f) => f.toLowerCase() === value.toLowerCase())) {
+      setFormInput('');
+      return;
+    }
+    onChange({ ...form, required_endorsement_forms: [...form.required_endorsement_forms, value] });
+    setFormInput('');
+  };
+
+  const removeForm = (value: string) => {
+    onChange({
+      ...form,
+      required_endorsement_forms: form.required_endorsement_forms.filter((f) => f !== value),
+    });
+  };
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="space-y-3">
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised px-3 py-2.5 text-left hover:bg-cc-surface-overlay">
+        <span className="flex items-center gap-2 text-sm font-medium text-cc-text-primary">
+          <ClipboardCheck className="h-4 w-4 text-cc-accent" />
+          Requirements
+          <span className="normal-case text-cc-text-faint">(optional)</span>
+        </span>
+        <span className="flex items-center gap-2">
+          {ruleCount > 0 && (
+            <Chip>
+              <span className="cc-num">{ruleCount}</span>&nbsp;{ruleCount === 1 ? 'rule' : 'rules'}
+            </Chip>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 text-cc-text-muted transition-transform duration-base ${open ? 'rotate-180' : ''}`}
+          />
+        </span>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent className="space-y-5">
+        {loading ? (
+          <div className="flex items-center gap-2 px-1 py-2 text-sm text-cc-text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading requirements
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-cc-text-muted">
+              What this holder demands on a certificate. Checked before generation and shown as
+              advisory pass or fail pills. Never blocks issuing.
+            </p>
+
+            {/* Minimum limits */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-cc-text-muted">
+                Minimum limits
+              </label>
+              {form.min_limits.length === 0 && (
+                <p className="text-xs text-cc-text-faint">No minimum limits set.</p>
+              )}
+              <div className="space-y-2">
+                {form.min_limits.map((row, index) => {
+                  const fields = REQ_FIELD_OPTIONS[row.line_key];
+                  return (
+                    <div
+                      key={index}
+                      className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface p-2"
+                    >
+                      <Select
+                        value={row.line_key}
+                        onValueChange={(v) => updateMinLimit(index, { line_key: v as Acord25LineKey })}
+                      >
+                        <SelectTrigger
+                          aria-label="Minimum limit line"
+                          className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REQ_LINE_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {fields.length > 0 ? (
+                        <Select
+                          value={row.field}
+                          onValueChange={(v) => updateMinLimit(index, { field: v })}
+                        >
+                          <SelectTrigger
+                            aria-label="Minimum limit field"
+                            className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
+                          >
+                            <SelectValue placeholder="Field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fields.map((f) => (
+                              <SelectItem key={f.value} value={f.value}>
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          aria-label="Minimum limit field"
+                          value={row.field}
+                          onChange={(e) => updateMinLimit(index, { field: e.target.value })}
+                          placeholder="Field key"
+                          className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
+                        />
+                      )}
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove minimum limit"
+                        onClick={() => removeMinLimit(index)}
+                        className="h-9 w-9 text-cc-text-muted hover:text-cc-text-primary"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+
+                      <Input
+                        aria-label="Minimum amount"
+                        inputMode="numeric"
+                        value={Number.isFinite(row.min) ? String(row.min) : ''}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^0-9]/g, '');
+                          updateMinLimit(index, { min: digits === '' ? NaN : Number.parseInt(digits, 10) });
+                        }}
+                        placeholder="Minimum amount"
+                        className="col-span-3 rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary [font-variant-numeric:tabular-nums]"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addMinLimit}
+                className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add minimum limit
+              </Button>
+            </div>
+
+            {/* Endorsement flags per line */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-cc-text-muted">
+                Endorsement flags
+              </label>
+              <div className="space-y-1.5">
+                {REQ_LINE_OPTIONS.map((o) => {
+                  const flag = flagFor(o.value);
+                  return (
+                    <div
+                      key={o.value}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface px-3 py-2"
+                    >
+                      <span className="text-sm text-cc-text-primary">{o.label}</span>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 text-xs text-cc-text-secondary">
+                          <input
+                            type="checkbox"
+                            checked={!!flag.requires_additional_insured}
+                            onChange={(e) =>
+                              setFlag(o.value, { requires_additional_insured: e.target.checked })
+                            }
+                            className="h-3.5 w-3.5 accent-cc-accent"
+                          />
+                          Additional insured
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-cc-text-secondary">
+                          <input
+                            type="checkbox"
+                            checked={!!flag.requires_waiver}
+                            onChange={(e) => setFlag(o.value, { requires_waiver: e.target.checked })}
+                            className="h-3.5 w-3.5 accent-cc-accent"
+                          />
+                          Waiver of subrogation
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Required lines */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-cc-text-muted">
+                Required lines
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {REQ_LINE_OPTIONS.map((o) => {
+                  const active = form.required_lines.includes(o.value);
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => toggleRequiredLine(o.value)}
+                      className={`rounded-pill border px-2.5 py-1 text-xs transition-colors ${
+                        active
+                          ? 'border-cc-accent bg-cc-accent/15 text-cc-text-primary'
+                          : 'border-cc-border-subtle bg-cc-surface text-cc-text-secondary hover:bg-cc-surface-overlay'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Required endorsement forms (chips) */}
+            <div className="space-y-2">
+              <label
+                htmlFor="req-form-input"
+                className="text-xs font-medium uppercase tracking-wide text-cc-text-muted"
+              >
+                Required endorsement forms
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="req-form-input"
+                  value={formInput}
+                  onChange={(e) => setFormInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addForm();
+                    }
+                  }}
+                  placeholder="e.g. CG 20 10"
+                  className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addForm}
+                  disabled={!formInput.trim()}
+                  className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
+              {form.required_endorsement_forms.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.required_endorsement_forms.map((f) => (
+                    <span
+                      key={f}
+                      className="inline-flex items-center gap-1 rounded-pill bg-cc-surface-overlay px-2.5 py-0.5 text-xs text-cc-text-secondary"
+                    >
+                      {f}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${f}`}
+                        onClick={() => removeForm(f)}
+                        className="text-cc-text-muted hover:text-cc-text-primary"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notice days */}
+            <div className="space-y-2">
+              <label
+                htmlFor="req-notice-days"
+                className="text-xs font-medium uppercase tracking-wide text-cc-text-muted"
+              >
+                Notice of cancellation <span className="normal-case text-cc-text-faint">(days)</span>
+              </label>
+              <Input
+                id="req-notice-days"
+                inputMode="numeric"
+                value={form.notice_days}
+                onChange={(e) =>
+                  onChange({ ...form, notice_days: e.target.value.replace(/[^0-9]/g, '') })
+                }
+                placeholder="e.g. 30"
+                className="w-28 rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary [font-variant-numeric:tabular-nums]"
+              />
+            </div>
+
+            {/* Requirements notes (never evaluated) */}
+            <div className="space-y-2">
+              <label
+                htmlFor="req-notes"
+                className="text-xs font-medium uppercase tracking-wide text-cc-text-muted"
+              >
+                Requirements notes <span className="normal-case text-cc-text-faint">(optional)</span>
+              </label>
+              <Textarea
+                id="req-notes"
+                value={form.notes}
+                onChange={(e) => onChange({ ...form, notes: e.target.value })}
+                placeholder="Free text about this holder's requirements. Not evaluated."
+                rows={2}
+                className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
+              />
+            </div>
+          </>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function AdditionalInsuredDrawer({
   open,
   onOpenChange,
@@ -143,6 +677,10 @@ export function AdditionalInsuredDrawer({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [selectedMatch, setSelectedMatch] = useState<AdditionalInsuredSearchResult | null>(null);
   const [saving, setSaving] = useState(false);
+  // Requirements editor state (edit mode only). Loaded on open via
+  // get_additional_insured_requirements; persisted via set_..._requirements.
+  const [reqForm, setReqForm] = useState<RequirementsFormState>(EMPTY_REQUIREMENTS);
+  const [reqLoading, setReqLoading] = useState(false);
 
   // Seed the form each time the drawer opens (edit row, seeded name, or blank).
   useEffect(() => {
@@ -155,11 +693,43 @@ export function AdditionalInsuredDrawer({
     setSelectedMatch(null);
   }, [open, initial, initialName]);
 
+  // Load the holder's stored requirements when editing an existing record.
+  useEffect(() => {
+    if (!open || !initial) {
+      setReqForm(EMPTY_REQUIREMENTS);
+      return;
+    }
+    let cancelled = false;
+    setReqLoading(true);
+    setReqForm(EMPTY_REQUIREMENTS);
+    (async () => {
+      const { data, error } = await supabase.rpc('get_additional_insured_requirements', {
+        p_id: initial.id,
+      });
+      if (cancelled) return;
+      if (error) {
+        logger.error('additional insured requirements load error', error);
+        setReqLoading(false);
+        return;
+      }
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | { requirements?: unknown; requirements_notes?: string | null }
+        | null;
+      const parsed = parseHolderRequirements(row?.requirements ?? null);
+      setReqForm(requirementsToForm(parsed, row?.requirements_notes ?? null));
+      setReqLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initial]);
+
   // Reset transient state when the drawer closes.
   useEffect(() => {
     if (!open) {
       setForm(EMPTY_FORM);
       setSelectedMatch(null);
+      setReqForm(EMPTY_REQUIREMENTS);
       clear();
     }
   }, [open, clear]);
@@ -243,6 +813,23 @@ export function AdditionalInsuredDrawer({
       .eq('id', initial.id);
     if (error) {
       toast({ title: 'Could not save changes', description: error.message, variant: 'destructive' });
+      setSaving(false);
+      return;
+    }
+    // Persist holder requirements alongside the base record (edit mode). The
+    // onSaved row shape is unchanged; requirements are stored on the holder and
+    // fetched by the generator with the holder pick, not returned here.
+    const { error: reqError } = await supabase.rpc('set_additional_insured_requirements', {
+      p_id: initial.id,
+      p_requirements: formToRequirementsPayload(reqForm),
+      p_requirements_notes: reqForm.notes.trim() || null,
+    });
+    if (reqError) {
+      toast({
+        title: 'Could not save requirements',
+        description: reqError.message,
+        variant: 'destructive',
+      });
       setSaving(false);
       return;
     }
@@ -477,6 +1064,11 @@ export function AdditionalInsuredDrawer({
                 className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
               />
             </div>
+
+            {/* Requirements (edit mode only): the holder's compliance profile. */}
+            {isEdit && (
+              <RequirementsSection form={reqForm} onChange={setReqForm} loading={reqLoading} />
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-cc-border-subtle p-6">

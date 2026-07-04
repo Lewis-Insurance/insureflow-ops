@@ -34,7 +34,9 @@ export type CertificateEventAction =
   | 'emailed'
   | 'reissued'
   | 'voided'
-  | 'document_restored';
+  | 'document_restored'
+  /** 07 §4.4 (E5): operator proceeded past a failing holder-requirements evaluation. */
+  | 'requirements_overridden';
 
 /**
  * Endorsement resolution three-state (02 Section 4.7; only 'endorsed' can print
@@ -311,6 +313,14 @@ export interface GenerateCertificateRequest {
   mode?: 'interactive' | 'reissue';
   /** The certificate to reissue (required when mode==='reissue'). */
   reissue_of?: string;
+  /**
+   * 07 §4.4 holder-requirements override acknowledgment. The client sets this true only
+   * after the operator confirms the "requirements failing" dialog. The server re-runs the
+   * SAME shared evaluation and, when the server's result also fails, records the override
+   * (snapshot `requirements_evaluation.overridden` + a `requirements_overridden` event).
+   * Advisory only: it never gates issuance and the server never 422s on requirement failures.
+   */
+  requirements_overridden?: boolean;
 }
 
 /** Per-line old-vs-new diff returned by a reissue (07 §3.4). */
