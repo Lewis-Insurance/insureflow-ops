@@ -51,12 +51,14 @@ export function appendTsToRelativeImports(source: string): string {
 
 /**
  * The fromMasterCoi module imports `@/types/master-coi`; in Deno that becomes the
- * local mirror `./master-coi-types.ts`. Applied only to fromMasterCoi.ts.
+ * mirror `../master-coi-types.ts`. The mirror lives in _shared/ (one level up from
+ * _shared/acord25/, where fromMasterCoi.ts sits), so the specifier is '../'.
+ * Applied only to fromMasterCoi.ts.
  */
 export function rewriteMasterCoiImport(source: string): string {
   return source.replace(
     /(['"])@\/types\/master-coi\1/g,
-    (_m, q: string) => `${q}./master-coi-types.ts${q}`,
+    (_m, q: string) => `${q}../master-coi-types.ts${q}`,
   );
 }
 
