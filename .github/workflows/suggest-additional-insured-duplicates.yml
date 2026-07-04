@@ -1,0 +1,54 @@
+# Suggest Additional Insured Duplicates Scheduler
+#
+# Triggers the suggest-additional-insured-duplicates edge function nightly. It
+# proposes duplicate additional-insured (certificate holder) groups from existing
+# signals (exact normalized name, name-trigram + city/state, shared address,
+# shared contact) into duplicate_groups with entity_type='additional_insureds'.
+# It never auto-commits; a producer confirms each merge (or dismisses) in one
+# click from the /additional-insureds review view.
+#
+# Required GitHub Secrets:
+# - CRON_SECRET: Secret key matching CRON_SECRET in Supabase Edge Functions
+# - SUPABASE_URL: Your Supabase project URL
+
+name: Suggest Additional Insured Duplicates
+
+on:
+  schedule:
+    # Nightly at 07:45 UTC (after suggest-account-links at 07:30).
+    - cron: '45 7 * * *'
+
+  # Allow manual triggering.
+  workflow_dispatch:
+
+jobs:
+  trigger-suggestions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger Suggest Additional Insured Duplicates
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          URL="${SUPABASE_URL}/functions/v1/suggest-additional-insured-duplicates"
+          echo "Calling suggest-additional-insured-duplicates function..."
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Duplicate suggestions generated successfully."
+          else
+            echo "::error::suggest-additional-insured-duplicates failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
