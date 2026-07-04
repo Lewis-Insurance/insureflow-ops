@@ -293,11 +293,40 @@ export interface GenerateCertificateRequest {
   description_of_operations: string;
   /** Its own labeled field in the generator (R18). */
   remarks?: string;
-  /** Hash of the client's previewed deterministic build (R9). */
-  preview_sha256: string;
+  /**
+   * Hash of the client's previewed deterministic build (R9). Required in interactive
+   * mode; optional in reissue mode (07 §3.4), where the server derives everything from
+   * the source snapshot and the diff gate replaces the preview binding.
+   */
+  preview_sha256?: string;
   supersedes_certificate_id?: string;
   /** Optional acord_forms provenance only (R1). */
   source_form_id?: string;
+  /**
+   * 07 §3.4 renewal cascade. Default 'interactive' (omit for the byte-identical
+   * pre-extension contract). In 'reissue' mode the server loads `reissue_of`'s snapshot
+   * and derives holder/lines/print-intent/DOO/remarks from it; any of those present in
+   * the request are ignored.
+   */
+  mode?: 'interactive' | 'reissue';
+  /** The certificate to reissue (required when mode==='reissue'). */
+  reissue_of?: string;
+}
+
+/** Per-line old-vs-new diff returned by a reissue (07 §3.4). */
+export interface DiffSummaryField<T = string | null> {
+  old: T;
+  new: T;
+}
+export interface DiffSummaryLine {
+  line_key: string;
+  effective_date: DiffSummaryField;
+  expiration_date: DiffSummaryField;
+  insurer_letter: DiffSummaryField;
+  addl_insd: DiffSummaryField;
+  subr_wvd: DiffSummaryField;
+  limits: Record<string, DiffSummaryField<unknown>>;
+  changed: boolean;
 }
 
 /** 200 response from `generate-certificate` (04 Section 7.2). */
@@ -310,6 +339,8 @@ export interface GenerateCertificateResponse {
   document_id: string;
   /** Near-expiry within 30 days ONLY (R6). */
   warnings: string[];
+  /** Present only for a reissue (mode==='reissue'): per-line old-vs-new (07 §3.4). */
+  diff_summary?: DiffSummaryLine[];
 }
 
 // ---------------------------------------------------------------------------

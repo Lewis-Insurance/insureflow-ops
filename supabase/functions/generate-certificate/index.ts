@@ -72,6 +72,22 @@ interface GenerateRequest {
   preview_sha256: string;
   supersedes_certificate_id?: string;
   source_form_id?: string;
+  // 07 §3.4 renewal cascade: mode 'reissue' derives holder/lines/DOO/remarks from the
+  // source cert's snapshot (request omits them) and makes preview_sha256 optional.
+  mode?: 'interactive' | 'reissue';
+  reissue_of?: string;
+}
+
+/** Per-line old-vs-new diff for a reissue (07 §3.4). */
+interface DiffSummaryLine {
+  line_key: string;
+  effective_date: { old: string | null; new: string | null };
+  expiration_date: { old: string | null; new: string | null };
+  insurer_letter: { old: string | null; new: string | null };
+  addl_insd: { old: string | null; new: string | null };
+  subr_wvd: { old: string | null; new: string | null };
+  limits: Record<string, { old: unknown; new: unknown }>;
+  changed: boolean;
 }
 
 /** Structured 422 error carrying the per-line/per-code list. */
@@ -267,10 +283,59 @@ async function handle(req: Request): Promise<Response> {
   }
 
   try {
+    // 07 §3.4 reissue mode: derive the selection from the source cert's snapshot
+    // BEFORE validation, so the request may omit holder/lines/DOO/remarks. Every
+    // server gate below (readiness 422, letter 422, endorsement 422, fill, finalize,
+    // supersede chain) then runs identically to an interactive issue.
+    let reissueSourceSnapshot: Record<string, unknown> | null = null;
+    if (body.mode === 'reissue') {
+      if (!body.reissue_of) {
+        throw fail(422, 'VALIDATION_ERROR', 'reissue_of is required in reissue mode');
+      }
+      const { data: reStaff } = await caller.rpc('is_staff');
+      if (reStaff !== true) {
+        throw fail(403, 'FORBIDDEN', 'Staff access required');
+      }
+      const { data: src, error: srcErr } = await admin
+        .from('certificates')
+        .select('id, account_id, holder_id, status, superseded_by_id, snapshot')
+        .eq('id', body.reissue_of)
+        .maybeSingle();
+      if (srcErr) {
+        throw fail(500, 'INTERNAL_ERROR', `reissue source lookup failed: ${srcErr.message}`);
+      }
+      if (!src) {
+        throw fail(404, 'NOT_FOUND', 'reissue source certificate not found');
+      }
+      if ((src.status !== 'issued' && src.status !== 'sent') || src.superseded_by_id) {
+        throw fail(422, 'REISSUE_CONFLICT', `cannot reissue a ${src.status} certificate`);
+      }
+      const snap = (src.snapshot ?? {}) as Record<string, unknown>;
+      reissueSourceSnapshot = snap;
+      const snapLines = Array.isArray(snap.lines) ? (snap.lines as Array<Record<string, unknown>>) : [];
+      body.account_id = src.account_id as string;
+      body.holder_id = src.holder_id as string;
+      body.lines = snapLines.map((sl) => ({
+        policy_id: sl.policy_id as string,
+        line_key: sl.line_key as LineKey,
+        insurer_letter: sl.insurer_letter as InsurerLetter,
+        per_line: {
+          addl_insd: typeof sl.addl_insd_intent === 'boolean' ? sl.addl_insd_intent : sl.addl_insd === 'Y',
+          subr_wvd: typeof sl.subr_wvd_intent === 'boolean' ? sl.subr_wvd_intent : sl.subr_wvd === 'Y',
+        },
+      }));
+      body.description_of_operations =
+        typeof snap.description_of_operations === 'string' ? snap.description_of_operations : '';
+      body.remarks = typeof snap.remarks === 'string' ? snap.remarks : undefined;
+      body.supersedes_certificate_id = body.reissue_of;
+    }
+
     if (!body.account_id || !body.holder_id || !Array.isArray(body.lines) || body.lines.length === 0) {
       throw fail(422, 'VALIDATION_ERROR', 'account_id, holder_id, and at least one line are required');
     }
-    if (typeof body.preview_sha256 !== 'string' || body.preview_sha256.length === 0) {
+    // preview_sha256 is required in interactive mode (R9); optional in reissue mode
+    // (07 §3.4: a reissue is verified by the diff gate, not the preview binding).
+    if (body.mode !== 'reissue' && (typeof body.preview_sha256 !== 'string' || body.preview_sha256.length === 0)) {
       throw fail(422, 'VALIDATION_ERROR', 'preview_sha256 is required');
     }
 
@@ -564,9 +629,13 @@ async function handle(req: Request): Promise<Response> {
     }
 
     // --- Step 7: preview binding (R9) ----------------------------------------
-    const serverPreviewHash = await hashFieldValuesForPreview(build.fieldValues);
-    if (serverPreviewHash !== body.preview_sha256) {
-      throw fail(409, 'PREVIEW_MISMATCH', 'data changed since preview, re-preview required');
+    // Skipped in reissue mode: there is no interactive preview to bind to; the reissue
+    // is verified by the diff_summary gate the caller confirms (07 §3.4).
+    if (body.mode !== 'reissue') {
+      const serverPreviewHash = await hashFieldValuesForPreview(build.fieldValues);
+      if (serverPreviewHash !== body.preview_sha256) {
+        throw fail(409, 'PREVIEW_MISMATCH', 'data changed since preview, re-preview required');
+      }
     }
 
     // --- Step 8: reserve identity --------------------------------------------
@@ -605,6 +674,12 @@ async function handle(req: Request): Promise<Response> {
       insurerByLetter,
       asOf,
     });
+
+    // Reissue diff (07 §3.4): per-line old-vs-new so the batch/inline UI can show
+    // and require confirmation of what changed since the superseded certificate.
+    const diffSummary = reissueSourceSnapshot
+      ? computeDiffSummary(reissueSourceSnapshot, snapshot)
+      : undefined;
 
     // --- Step 9: fill + hash -------------------------------------------------
     const fill = await fillAcord25Pdf(templateBytes, fieldValues);
@@ -702,6 +777,7 @@ async function handle(req: Request): Promise<Response> {
       signed_url: signed?.signedUrl ?? '',
       document_id: documentId,
       warnings,
+      ...(diffSummary && { diff_summary: diffSummary }),
     });
   } catch (error) {
     if (isStructuredError(error)) {
@@ -858,6 +934,61 @@ function pickRepresentativePolicy(body: GenerateRequest): string | null {
     return gl.policy_id;
   }
   return body.lines[0]?.policy_id ?? null;
+}
+
+/**
+ * Per-line old-vs-new diff between the superseded cert's snapshot and the freshly
+ * built one, for the reissue confirm gate (07 §3.4). Matches lines by line_key and
+ * compares printed dates, insurer letter, ADDL INSD / SUBR WVD, and each limit.
+ */
+function computeDiffSummary(
+  oldSnap: Record<string, unknown>,
+  newSnap: Record<string, unknown>,
+): DiffSummaryLine[] {
+  const asLines = (s: Record<string, unknown>): Array<Record<string, unknown>> =>
+    Array.isArray(s.lines) ? (s.lines as Array<Record<string, unknown>>) : [];
+  const byKey = (ls: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> => {
+    const m = new Map<string, Record<string, unknown>>();
+    for (const l of ls) m.set(String(l.line_key), l);
+    return m;
+  };
+  const oldMap = byKey(asLines(oldSnap));
+  const newMap = byKey(asLines(newSnap));
+  const strOrNull = (v: unknown): string | null => (v === undefined || v === null ? null : String(v));
+  const out: DiffSummaryLine[] = [];
+  for (const k of new Set<string>([...oldMap.keys(), ...newMap.keys()])) {
+    const o = oldMap.get(k) ?? {};
+    const n = newMap.get(k) ?? {};
+    const oLimits = (o.limits as Record<string, unknown>) ?? {};
+    const nLimits = (n.limits as Record<string, unknown>) ?? {};
+    const limits: Record<string, { old: unknown; new: unknown }> = {};
+    let limitsChanged = false;
+    for (const lk of new Set<string>([...Object.keys(oLimits), ...Object.keys(nLimits)])) {
+      const ov = oLimits[lk] ?? null;
+      const nv = nLimits[lk] ?? null;
+      limits[lk] = { old: ov, new: nv };
+      if (JSON.stringify(ov) !== JSON.stringify(nv)) limitsChanged = true;
+    }
+    const line: DiffSummaryLine = {
+      line_key: k,
+      effective_date: { old: strOrNull(o.effective_date), new: strOrNull(n.effective_date) },
+      expiration_date: { old: strOrNull(o.expiration_date), new: strOrNull(n.expiration_date) },
+      insurer_letter: { old: strOrNull(o.insurer_letter), new: strOrNull(n.insurer_letter) },
+      addl_insd: { old: strOrNull(o.addl_insd), new: strOrNull(n.addl_insd) },
+      subr_wvd: { old: strOrNull(o.subr_wvd), new: strOrNull(n.subr_wvd) },
+      limits,
+      changed: false,
+    };
+    line.changed =
+      line.effective_date.old !== line.effective_date.new ||
+      line.expiration_date.old !== line.expiration_date.new ||
+      line.insurer_letter.old !== line.insurer_letter.new ||
+      line.addl_insd.old !== line.addl_insd.new ||
+      line.subr_wvd.old !== line.subr_wvd.new ||
+      limitsChanged;
+    out.push(line);
+  }
+  return out;
 }
 
 async function uploadWithRetry(
