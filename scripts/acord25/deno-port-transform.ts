@@ -18,8 +18,13 @@ export const PORTED_MODULES = [
   'buildAcord25FieldValues.ts',
   'validateAcord25.ts',
   'fromMasterCoi.ts',
+  'requirements.ts',
   'previewHash.ts',
 ] as const;
+
+// Modules that import `@/types/master-coi` and therefore need the master-coi
+// import specifier rewritten to the Deno mirror (see rewriteMasterCoiImport).
+const MASTER_COI_IMPORTERS = new Set<string>(['fromMasterCoi.ts', 'requirements.ts']);
 
 export const SRC_DIR = path.resolve('src/lib/acord/acord25');
 export const DENO_DIR = path.resolve('supabase/functions/_shared/acord25');
@@ -50,10 +55,10 @@ export function appendTsToRelativeImports(source: string): string {
 }
 
 /**
- * The fromMasterCoi module imports `@/types/master-coi`; in Deno that becomes the
- * mirror `../master-coi-types.ts`. The mirror lives in _shared/ (one level up from
- * _shared/acord25/, where fromMasterCoi.ts sits), so the specifier is '../'.
- * Applied only to fromMasterCoi.ts.
+ * Modules that import `@/types/master-coi` (fromMasterCoi.ts, requirements.ts)
+ * become the mirror `../master-coi-types.ts` in Deno. The mirror lives in _shared/
+ * (one level up from _shared/acord25/, where those modules sit), so the specifier
+ * is '../'. Applied only to the MASTER_COI_IMPORTERS.
  */
 export function rewriteMasterCoiImport(source: string): string {
   return source.replace(
@@ -65,7 +70,7 @@ export function rewriteMasterCoiImport(source: string): string {
 /** Full transform for a given source basename. */
 export function transformModule(basename: string, source: string): string {
   let out = source;
-  if (basename === 'fromMasterCoi.ts') {
+  if (MASTER_COI_IMPORTERS.has(basename)) {
     out = rewriteMasterCoiImport(out);
   }
   out = appendTsToRelativeImports(out);

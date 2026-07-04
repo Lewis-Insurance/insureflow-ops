@@ -28,6 +28,11 @@ import { validateAcord25 } from '../_shared/acord25/validateAcord25.ts';
 import { toAcord25BuildInput } from '../_shared/acord25/fromMasterCoi.ts';
 import { hashFieldValuesForPreview } from '../_shared/acord25/previewHash.ts';
 import {
+  parseHolderRequirements,
+  evaluateHolderRequirements,
+} from '../_shared/acord25/requirements.ts';
+import type { RequirementsEvaluation } from '../_shared/acord25/requirements.ts';
+import {
   ACORD25_TEMPLATE_SHA256,
   ACORD25_FIELD_MAP,
 } from '../_shared/acord25/fieldMap.ts';
@@ -76,6 +81,11 @@ interface GenerateRequest {
   // source cert's snapshot (request omits them) and makes preview_sha256 optional.
   mode?: 'interactive' | 'reissue';
   reissue_of?: string;
+  // 07 §4.4 holder-requirements override: the client's explicit acknowledgment that the
+  // operator confirmed the failing-requirements dialog. The server re-runs the SAME
+  // evaluation; this flag only decides whether the server records the override on its own
+  // (also-failing) result. Advisory: requirement failures never 422.
+  requirements_overridden?: boolean;
 }
 
 /** Per-line old-vs-new diff for a reissue (07 §3.4). */
@@ -588,6 +598,46 @@ async function handle(req: Request): Promise<Response> {
       throw fail(422, 'ENDORSEMENT_NOT_PERMITTED', 'cannot print Y for an unconfirmed endorsement', intentErrors);
     }
 
+    // --- Step 5b: holder-requirements re-evaluation (07 §4.4) -----------------
+    // Advisory, never a hard block: the server re-runs the SAME shared pure evaluation
+    // the client ran (evaluateHolderRequirements) against the SERVER's master COI, the
+    // selected line keys, and the holder-resolved endorsement rows, so the snapshot
+    // records the SERVER's pass/fail set, not the client's claim. Requirement failures
+    // never 422 (only the six correctness blockers do). When the server's own result
+    // fails AND the client acknowledged the override, we mark it overridden and, after
+    // finalize, log a 'requirements_overridden' event.
+    const { data: reqData, error: reqErr } = await admin.rpc('get_additional_insured_requirements', {
+      p_id: body.holder_id,
+    });
+    if (reqErr) {
+      throw fail(500, 'INTERNAL_ERROR', `get_additional_insured_requirements failed: ${reqErr.message}`);
+    }
+    const reqRow = Array.isArray(reqData) ? reqData[0] : reqData;
+    const holderRequirements = parseHolderRequirements(
+      (reqRow as { requirements?: unknown } | null)?.requirements ?? null,
+    );
+    const requirementsEvaluation: RequirementsEvaluation = evaluateHolderRequirements({
+      requirements: holderRequirements,
+      masterCoi: mc,
+      selectedLineKeys: [...selectedLineKeys] as LineKey[],
+      // Map get_master_coi's resolution rows to the evaluator's row shape; basis is
+      // stringified so required_endorsement_forms substring matching can find a form name.
+      holderResolution: resolutions.map((r) => ({
+        line_key: r.line_key as string,
+        addl_insd_resolved: r.addl_insd_resolved as string,
+        subr_wvd_resolved: r.subr_wvd_resolved as string,
+        basis: r.basis != null ? JSON.stringify(r.basis) : null,
+      })),
+    });
+    const requirementsOverridden =
+      requirementsEvaluation.has_requirements &&
+      !requirementsEvaluation.all_pass &&
+      body.requirements_overridden === true;
+    if (requirementsOverridden) {
+      requirementsEvaluation.overridden = true;
+      requirementsEvaluation.overridden_by = user.id;
+    }
+
     // --- Step 6: build field_values via the 05 Deno ports --------------------
     const holderAddressLines = composeHolderAddress(holder);
     const certDate = formatIssueDate(asOf);
@@ -673,6 +723,9 @@ async function handle(req: Request): Promise<Response> {
       printFlags,
       insurerByLetter,
       asOf,
+      // 07 §4.4 / E4: embed the SERVER's requirements evaluation ONLY when the holder
+      // actually has requirements, so a holder with none produces no snapshot key.
+      requirementsEvaluation: requirementsEvaluation.has_requirements ? requirementsEvaluation : null,
     });
 
     // Reissue diff (07 §3.4): per-line old-vs-new so the batch/inline UI can show
@@ -758,6 +811,38 @@ async function handle(req: Request): Promise<Response> {
     const finalizeRow = Array.isArray(finalizeData) ? finalizeData[0] : finalizeData;
     const documentId = finalizeRow?.document_id ?? null;
 
+    // 07 §4.4: log the override once the certificate row exists (the fill-workspace
+    // trigger copies agency_workspace_id from the parent). Advisory: a failure to log
+    // must not fail an already-persisted issuance, so we only warn on error.
+    if (requirementsOverridden) {
+      const { error: overrideEventErr } = await admin.from('certificate_events').insert({
+        certificate_id: certificateId,
+        action: 'requirements_overridden',
+        actor_id: user.id,
+        metadata: {
+          failure_count: requirementsEvaluation.failure_count,
+          failures: requirementsEvaluation.results
+            .filter((r) => r.severity === 'fail' && !r.pass)
+            .map((r) => ({
+              kind: r.kind,
+              line_key: r.line_key ?? null,
+              field: r.field ?? null,
+              label: r.label,
+              expected: r.expected,
+              actual: r.actual,
+              message: r.message,
+            })),
+        },
+      });
+      if (overrideEventErr) {
+        logger.warn('failed to log requirements_overridden event', {
+          certificate_id: certificateId,
+          certificate_number: certificateNumber,
+          error: overrideEventErr.message,
+        });
+      }
+    }
+
     // --- Step 12: signed URL + response --------------------------------------
     const { data: signed, error: signErr } = await admin.storage
       .from(CERT_BUCKET)
@@ -811,6 +896,8 @@ function buildSnapshot(args: {
   >;
   insurerByLetter: Map<InsurerLetter, COIInsurer>;
   asOf: string;
+  /** 07 §4.4: embedded only when the holder has requirements (E4); null otherwise. */
+  requirementsEvaluation: RequirementsEvaluation | null;
 }): Record<string, unknown> {
   const { mc, body } = args;
 
@@ -892,6 +979,11 @@ function buildSnapshot(args: {
       as_of: args.asOf,
       source: 'master_coi',
     },
+    // 07 §4.4 / E4: present ONLY when the holder has requirements. Records the SERVER's
+    // full pass/fail set plus overridden/overridden_by, inside the hashed snapshot.
+    ...(args.requirementsEvaluation
+      ? { requirements_evaluation: args.requirementsEvaluation }
+      : {}),
   };
 }
 

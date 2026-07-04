@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -22,10 +22,13 @@ import { HolderField } from '@/components/certificates/HolderField';
 import { fetchHolderById, type SelectedHolder } from '@/components/certificates/holderUtils';
 import { OperationsAndRemarksFields } from '@/components/certificates/OperationsAndRemarksFields';
 import { ValidationStrip, type ValidationIssue } from '@/components/certificates/ValidationStrip';
+import { ComplianceStrip } from '@/components/certificates/ComplianceStrip';
 import { CertificatePreview } from '@/components/certificates/CertificatePreview';
 import { CertificateIssuanceLog } from '@/components/certificates/CertificateIssuanceLog';
 import { useMasterCoi } from '@/hooks/useMasterCoi';
 import { useHolderEndorsementStatus } from '@/hooks/useHolderEndorsementStatus';
+import { useHolderRequirements } from '@/hooks/useHolderRequirements';
+import { evaluateHolderRequirements } from '@/lib/acord/acord25/requirements';
 import { useCertificatePreview } from '@/hooks/useCertificatePreview';
 import { useIssueCertificate, IssueCertificateError } from '@/hooks/useIssueCertificate';
 import { toAcord25BuildInput } from '@/lib/acord/acord25/fromMasterCoi';
@@ -454,6 +457,39 @@ function CertificateGenerator({
   }, [endorsementByLine, state.holder, state.selectedLineKeys]);
 
   // -----------------------------------------------------------------------
+  // Holder requirements evaluation (07 §4.4): advisory compliance strip.
+  // Fetch the picked holder's requirements profile, then run the SAME shared
+  // pure evaluation the server re-runs, against the selected lines' master COI
+  // values and the holder-resolved endorsement rows. Failures never disable
+  // Generate; they only surface the strip + the confirm dialog below.
+  // -----------------------------------------------------------------------
+  const requirementsQuery = useHolderRequirements(state.holder?.id ?? null);
+  const holderRequirements = requirementsQuery.data?.requirements ?? null;
+
+  const requirementsEvaluation = useMemo(() => {
+    if (!masterCoi) {
+      return { has_requirements: false, results: [], all_pass: true, failure_count: 0 };
+    }
+    const resolutionArray = toResolutionArray(endorsementByLine);
+    return evaluateHolderRequirements({
+      requirements: holderRequirements,
+      masterCoi,
+      selectedLineKeys: state.selectedLineKeys,
+      holderResolution: (resolutionArray ?? []).map((row) => ({
+        line_key: row.line_key,
+        addl_insd_resolved: row.addl_insd_resolved,
+        subr_wvd_resolved: row.subr_wvd_resolved,
+        basis: typeof row.basis === 'string' ? row.basis : null,
+      })),
+    });
+  }, [masterCoi, holderRequirements, state.selectedLineKeys, endorsementByLine]);
+
+  const requirementFailures = useMemo(
+    () => requirementsEvaluation.results.filter((r) => r.severity === 'fail' && !r.pass),
+    [requirementsEvaluation],
+  );
+
+  // -----------------------------------------------------------------------
   // The deterministic build (used by preview AND to validate before issue).
   // -----------------------------------------------------------------------
   const buildResult = useCallback((): BuildAcord25Result | null => {
@@ -562,6 +598,7 @@ function CertificateGenerator({
   const [reissueBanner, setReissueBanner] = useState<string | null>(null);
   const [rePreviewBanner, setRePreviewBanner] = useState(false);
   const [staleConfirmOpen, setStaleConfirmOpen] = useState(false);
+  const [requirementsConfirmOpen, setRequirementsConfirmOpen] = useState(false);
 
   const refreshPreview = useCallback(() => {
     setRePreviewBanner(false);
@@ -569,7 +606,7 @@ function CertificateGenerator({
     endorsementQuery.refetch();
   }, [masterCoiQuery, endorsementQuery]);
 
-  const doIssue = useCallback(async () => {
+  const doIssue = useCallback(async (requirementsOverridden = false) => {
     if (!masterCoi || !state.holder || !preview.previewSha256) return;
 
     const lines: GenerateCertificateRequestLine[] = state.selectedLineKeys.map((lineKey) => {
@@ -591,6 +628,9 @@ function CertificateGenerator({
       remarks: state.remarks || undefined,
       preview_sha256: preview.previewSha256,
       supersedes_certificate_id: state.supersedesCertificateId ?? undefined,
+      // 07 §4.4: advisory acknowledgment. The server re-runs the same evaluation
+      // and only records the override on its own (also-failing) result.
+      requirements_overridden: requirementsOverridden || undefined,
     };
 
     setServerIssues([]);
@@ -644,13 +684,23 @@ function CertificateGenerator({
     refreshPreview,
   ]);
 
+  // After any stale-review acknowledgment: if the holder's requirements fail,
+  // stop for the explicit override dialog (07 §4.4); otherwise issue normally.
+  const proceedToIssue = useCallback(() => {
+    if (requirementFailures.length > 0) {
+      setRequirementsConfirmOpen(true);
+      return;
+    }
+    void doIssue(false);
+  }, [requirementFailures.length, doIssue]);
+
   const onGenerateClick = useCallback(() => {
     if (masterCoi?.review?.stale) {
       setStaleConfirmOpen(true);
       return;
     }
-    void doIssue();
-  }, [masterCoi, doIssue]);
+    proceedToIssue();
+  }, [masterCoi, proceedToIssue]);
 
   // -----------------------------------------------------------------------
   // Reissue hydration (blueprint D Section 9).
@@ -816,6 +866,8 @@ function CertificateGenerator({
 
                 <ValidationStrip issues={validationIssues} />
 
+                <ComplianceStrip evaluation={requirementsEvaluation} />
+
                 {rePreviewBanner && (
                   <div className="flex items-start gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3 text-sm text-cc-text-secondary">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-cc-info" aria-hidden="true" />
@@ -890,11 +942,58 @@ function CertificateGenerator({
             <Button
               onClick={() => {
                 setStaleConfirmOpen(false);
-                void doIssue();
+                proceedToIssue();
               }}
               className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
             >
               Generate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Holder requirements override (07 §4.4): advisory, never a block. */}
+      <Dialog open={requirementsConfirmOpen} onOpenChange={setRequirementsConfirmOpen}>
+        <DialogContent className="bg-cc-surface-raised">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">Holder requirements not met</DialogTitle>
+            <DialogDescription className="text-cc-text-muted">
+              This certificate does not meet every requirement published by the holder. You can
+              still generate it; the override is recorded on the issued certificate.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-64 space-y-2 overflow-y-auto">
+            {requirementFailures.map((failure, i) => (
+              <li
+                key={`${failure.kind}-${failure.line_key ?? ''}-${failure.field ?? i}`}
+                className="flex items-start gap-2 text-sm"
+              >
+                <AlertTriangle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-cc-warning"
+                  aria-hidden="true"
+                />
+                <span className="text-cc-text-secondary [font-variant-numeric:tabular-nums]">
+                  {failure.message}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setRequirementsConfirmOpen(false)}
+              className="text-cc-text-secondary hover:text-cc-text-primary"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setRequirementsConfirmOpen(false);
+                void doIssue(true);
+              }}
+              className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
+            >
+              Generate anyway
             </Button>
           </DialogFooter>
         </DialogContent>
