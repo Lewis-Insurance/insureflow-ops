@@ -174,3 +174,6 @@ verify_jwt = true
 
 [functions.suggest-additional-insured-duplicates]
 verify_jwt = false
+
+[functions.generate-certificate]
+verify_jwt = true
