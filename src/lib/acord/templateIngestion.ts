@@ -5,6 +5,7 @@
 
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFButton, PDFName, PDFDict } from 'pdf-lib';
 import type { AcordTemplate, FieldInventoryItem, FieldSchemaItem, SectionDefinition } from '@/types/acord';
+import { ACORD25_EXPECTED_FIELD_NAMES } from './acord25/fieldMap';
 
 // ============================================
 // TYPES
@@ -440,6 +441,10 @@ function validateAcordFields(formNumber: string, inventory: FieldInventoryItem[]
     '127': ['Veh_Year', 'Veh_Make', 'Veh_VIN', 'Veh_GVW', 'CSL_Limit'],
     '130': ['WC_PerAccident', 'WC_Disease', 'Class_Code', 'Payroll'],
     '140': ['Prop_Limit', 'Bldg_Value', 'BPP_Value', 'Location_Addr'],
+    // ACORD 25: sourced from the committed field map so the ingestion warning
+    // list and the fill contract can never drift. Empty pre-onboarding (the loop
+    // below iterates zero times); populated at onboarding with the critical names.
+    '25': ACORD25_EXPECTED_FIELD_NAMES,
   };
 
   const expected = expectedFields[formNumber];
