@@ -381,7 +381,7 @@ async function handle(req: Request): Promise<Response> {
 
     const { data: holder, error: holderErr } = await admin
       .from('additional_insureds')
-      .select('id, name, address_line1, city, state, zip_code, merged_into_id')
+      .select('id, name, address_line1, city, state, zip_code, merged_into_id, agency_workspace_id')
       .eq('id', body.holder_id)
       .maybeSingle();
     if (holderErr) {
@@ -392,6 +392,18 @@ async function handle(req: Request): Promise<Response> {
     }
     if (holder.merged_into_id) {
       throw fail(422, 'HOLDER_MERGED', 'holder has been merged; use the surviving holder');
+    }
+    // Tenant integrity: the holder must live in the same workspace as the account.
+    // finalize_certificate_issue stamps the certificate workspace from the account,
+    // so an out-of-workspace holder would produce a certificate whose holder_id and
+    // agency_workspace_id disagree -- the divergence that lets holder-usage reads
+    // straddle tenants. The membership check above only proves the account's
+    // workspace; the caller (or a directly-crafted request) could still pass a
+    // holder_id from another workspace, so reject it here. (Applies to reissue mode
+    // too: body.holder_id is resolved from the source snapshot before this point.)
+    if (holder.agency_workspace_id !== account.agency_workspace_id) {
+      throw fail(422, 'HOLDER_WORKSPACE_MISMATCH',
+        'holder belongs to a different workspace than the account');
     }
 
     const policyIds = body.lines.map((l) => l.policy_id);
