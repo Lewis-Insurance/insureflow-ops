@@ -343,7 +343,24 @@ export function toAcord25BuildInput(args: FromMasterCoiArgs): Acord25BuildInput 
     ),
   };
 
+  // `other` is the 02 data layer's informational bucket, not a printable line.
+  // get_master_coi surfaces unclassified policies under lines.other[] (a
+  // COILineOtherEntry[] with no printable limit or label) solely so staff can
+  // reclassify them; 02 Section 2.6 declares `other` "not printed by default" and
+  // the letter algorithm excludes it from the insurer table
+  // (20260702172000_master_coi_rpcs.sql:1001 "other excluded from the insurer
+  // table"), so a real MasterCOI never carries `other` in insurers[].lines. The
+  // ACORD 25 OTHER row is filled only by `property` (buildProperty) here.
+  //
+  // The public Acord25LineKey[] contract still admits 'other', so drop it from the
+  // working selection up front: this makes the letterAssignments reduction below
+  // provably unable to retain an `other`-only (orphan) assignment even against a
+  // hand-built caller or a future data-source regression, and it keeps the
+  // "no coverage line for 'other'" behavior explicit rather than incidental. If a
+  // later data-layer change ever makes `other` a printable singular line, add a
+  // buildOther() beside buildProperty and stop deleting it here.
   const selected = new Set(args.selectedLines);
+  selected.delete('other');
   const lines: Acord25CoverageLine[] = [];
 
   // Canonical line order gl, auto, umbrella, wc, property, other.
