@@ -13,8 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/cc';
+import { Skeleton, TriageTile } from '@/components/cc';
 import { CustomerPickerEmptyState } from '@/components/certificates/CustomerPickerEmptyState';
+import { ReissueQueue } from '@/components/certificates/ReissueQueue';
+import { useCertificatesNeedingReissue } from '@/hooks/useCertificatesNeedingReissue';
 import { PolicyLineSelector, type CertLineKey } from '@/components/certificates/PolicyLineSelector';
 import { HolderField } from '@/components/certificates/HolderField';
 import { fetchHolderById, type SelectedHolder } from '@/components/certificates/holderUtils';
@@ -303,6 +305,14 @@ function CertificateGenerator({
   const preselectHolderId = searchParams.get('holderId');
 
   const [state, dispatch] = useReducer(reducer, accountId, initialState);
+
+  // Which surface this view shows. Exactly ONE lime fill per view (Calm
+  // Command): the generator's lime is "Generate certificate"; the queue's lime
+  // is "Reissue selected". They are never on screen together (07 §3.5).
+  const [view, setView] = useState<'generator' | 'queue'>('generator');
+
+  // Reissue-cascade count for the "Needs reissue: N" triage tile (07 §3.5).
+  const { count: reissueCount } = useCertificatesNeedingReissue(accountId);
 
   // -----------------------------------------------------------------------
   // Data.
@@ -736,7 +746,11 @@ function CertificateGenerator({
           </p>
         </header>
 
-        {loadingCore || !masterCoi ? (
+        {view === 'queue' ? (
+          // Queue view: the single lime here is the queue's "Reissue selected".
+          // The generator (and its lime) is hidden; a ghost returns to it.
+          <ReissueQueue accountId={accountId} onDone={() => setView('generator')} />
+        ) : loadingCore || !masterCoi ? (
           <div className="grid gap-6 lg:grid-cols-[minmax(400px,520px)_1fr]">
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -747,6 +761,17 @@ function CertificateGenerator({
           </div>
         ) : (
           <>
+            {reissueCount > 0 && (
+              <div className="flex flex-wrap items-start gap-3">
+                <TriageTile
+                  label="Needs reissue"
+                  count={reissueCount}
+                  tone="warning"
+                  onClick={() => setView('queue')}
+                />
+              </div>
+            )}
+
             <div className="grid gap-6 lg:grid-cols-[minmax(400px,520px)_1fr]">
               <div className="space-y-5">
                 {reissueBanner && (
