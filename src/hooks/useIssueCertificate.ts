@@ -69,12 +69,30 @@ async function toIssueError(error: unknown): Promise<IssueCertificateError> {
     try {
       const body = (await response.clone().json()) as {
         issues?: IssueCertificateIssue[];
-        error?: string;
+        // generate-certificate returns { error: { code, message, errors } }; older
+        // shapes used { error: string } / { issues }. Handle all three.
+        error?:
+          | string
+          | { code?: string; message?: string; errors?: Array<{ line_key?: string; code?: string; message?: string }> };
         message?: string;
       };
-      if (Array.isArray(body.issues)) issues = body.issues;
-      if (body.error) message = body.error;
-      else if (body.message) message = body.message;
+      if (typeof body.error === 'object' && body.error !== null) {
+        if (body.error.message) message = body.error.message;
+        if (Array.isArray(body.error.errors)) {
+          issues = body.error.errors.map((e) => ({
+            code: e.code ?? '',
+            severity: 'error' as const,
+            message: e.message ?? 'Requirement not met.',
+            lineKey: e.line_key,
+          }));
+        }
+      } else if (typeof body.error === 'string') {
+        message = body.error;
+      } else if (body.message) {
+        message = body.message;
+      }
+      // Back-compat: a flat { issues } body still populates the list.
+      if (issues.length === 0 && Array.isArray(body.issues)) issues = body.issues;
     } catch {
       // Body was not JSON; keep the default message.
     }

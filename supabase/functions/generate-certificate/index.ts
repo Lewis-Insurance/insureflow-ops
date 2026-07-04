@@ -537,6 +537,12 @@ async function handle(req: Request): Promise<Response> {
           line_key: l.line_key,
           message: `no insurer letter is assigned to ${l.line_key} in Master COI`,
         });
+      } else if (body.mode === 'reissue') {
+        // Reissue ADOPTS the current insurer letter: a renewal or policy edit may have
+        // regrouped carriers, and there is no client-displayed letter to cross-check
+        // against (the line came from the stale source snapshot). The freshly built
+        // snapshot must print the CURRENT letter, so overwrite rather than 422.
+        l.insurer_letter = expected;
       } else if (expected !== l.insurer_letter) {
         letterMismatches.push({
           line_key: l.line_key,
