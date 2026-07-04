@@ -27,6 +27,16 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { StatusPill, TriageTile, Skeleton } from '@/components/cc';
 import {
   useCertificatesNeedingReissue,
@@ -145,6 +155,9 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BatchResult | null>(null);
+  // 07 §3.4: the batch MUST show the diff and take one explicit confirm before it
+  // supersedes anything. "Reissue selected" opens this dialog; only its confirm runs.
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const readyRows = useMemo(() => rows.filter((r) => r.is_ready), [rows]);
   const readyIds = useMemo(() => new Set(readyRows.map((r) => r.certificate_id)), [readyRows]);
@@ -440,7 +453,7 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               data-primary
-              onClick={() => void reissueSelected()}
+              onClick={() => setConfirmOpen(true)}
               disabled={selectedReadyCount === 0 || running}
               className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
             >
@@ -467,6 +480,54 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
               </span>
             )}
           </div>
+
+          {/* 07 §3.4: display the diff and take one explicit confirm before executing. */}
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogContent className="max-w-lg">
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Reissue {selectedReadyCount} certificate{selectedReadyCount === 1 ? '' : 's'}?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Each selected certificate is reissued with current coverage and the original is
+                  marked superseded. Review the changes below, then confirm.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="max-h-72 space-y-3 overflow-y-auto">
+                {readyRows
+                  .filter((r) => selected.has(r.certificate_id))
+                  .map((cert) => (
+                    <div
+                      key={cert.certificate_id}
+                      className="rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3"
+                    >
+                      <div className="cc-num [font-variant-numeric:tabular-nums] text-sm font-semibold text-cc-text-primary">
+                        {cert.certificate_number}
+                      </div>
+                      <div className="text-xs text-cc-text-muted">{cert.holder_name}</div>
+                      <div className="mt-1.5 space-y-1">
+                        {cert.stale_lines.map((line) => (
+                          <StaleLineChange key={`${line.line_key}:${line.policy_id}`} line={line} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={running}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  data-primary
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    void reissueSelected();
+                  }}
+                  className="font-semibold"
+                >
+                  Reissue {selectedReadyCount} certificate{selectedReadyCount === 1 ? '' : 's'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>
