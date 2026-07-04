@@ -261,6 +261,81 @@ describe('fromMasterCoi holder endorsement resolution across lines', () => {
     expect(build.fieldValues[ACORD25_FIELD_MAP.auto_subrWvd.pdfField]).toBe('N');
   });
 
+  it('drops a selected `other` line: no OTHER-row coverage line and no orphan insurer row', () => {
+    // `other` is the 02 informational bucket (lines.other[]), "not printed by
+    // default", and get_master_coi excludes it from the insurer table. But the
+    // public Acord25LineKey[] contract admits 'other', so guard the adapter against
+    // a hand-built caller (or a future data-source regression) that both selects
+    // 'other' AND carries an `other`-only insurer assignment. Without the guard the
+    // reduction retains insurer B as an orphan row (V6 looks-right-but-wrong).
+    const mc = masterCoi();
+    mc.lines.other = [
+      {
+        policy_id: 'pol-other',
+        policy_number: 'MISC-1',
+        line_of_business: 'Commercial (unspecified)',
+        line_canonical: 'other',
+        carrier: 'Unclassified Carrier',
+        status: 'active',
+        effective_date: '2026-01-01',
+        expiration_date: '2027-01-01',
+      },
+    ];
+    // Hypothetical orphan: an insurer whose ONLY line is 'other'. A real
+    // get_master_coi never emits this (line 1001), which is exactly why the adapter
+    // must not depend on that invariant to stay orphan-free.
+    mc.insurers = [
+      ...mc.insurers,
+      {
+        letter: 'B',
+        name: cell('Unclassified Carrier'),
+        naic: cell('99999'),
+        carrier_id: null,
+        resolution: 'exact',
+        lines: ['other'],
+        policy_ids: ['pol-other'],
+      },
+    ];
+
+    const input = toAcord25BuildInput({
+      masterCoi: mc,
+      selectedLines: ['gl', 'other'],
+      holder: null,
+      holderResolution: null,
+      printIntents: {},
+      descriptionOfOperations: '',
+      remarks: '',
+      certificateDate: '2026-07-01',
+      authorizedRepName: 'Dana Producer',
+    });
+
+    // No coverage line is emitted for `other`, and no letter assignment retains it.
+    expect(input.lines.some((l) => l.line === 'other')).toBe(false);
+    expect(input.letterAssignments.some((a) => a.lines.includes('other'))).toBe(false);
+    // The orphan insurer B (its only line was `other`) is dropped, not carried.
+    expect(input.letterAssignments.some((a) => a.letter === 'B')).toBe(false);
+
+    const build = buildAcord25FieldValues(input);
+
+    // Downstream proof: no orphan insurer row (B), OTHER row untouched, build clean.
+    expect(build.fieldValues[ACORD25_FIELD_MAP.insurerName_B.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.other_type.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.other_limitsText.pdfField]).toBe('');
+    expect(
+      build.issues.some(
+        (i) =>
+          i.code === 'OTHER_ROW_CONFLICT' ||
+          i.code === 'LETTER_UNASSIGNED' ||
+          i.code === 'LETTER_CONFLICT',
+      ),
+    ).toBe(false);
+    expect(build.ok).toBe(true);
+    // The real gl line still prints normally.
+    expect(build.fieldValues[ACORD25_FIELD_MAP.insurerName_A.pdfField]).toBe(
+      'Acme National Insurance Co',
+    );
+  });
+
   it('a null holder forces every flag to none/false regardless of rows', () => {
     const input = toAcord25BuildInput({
       masterCoi: masterCoi(),
