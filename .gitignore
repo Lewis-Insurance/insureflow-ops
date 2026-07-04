@@ -37,6 +37,9 @@ dist-ssr
 *storybook.log
 storybook-static
 
+# ACORD 25 visual test output (rasterized PNGs / flattened PDFs); never commit
+test-output/
+
 # Actual env files with real secrets — never commit these
 .env.production
 .env.development
