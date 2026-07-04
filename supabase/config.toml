@@ -177,3 +177,9 @@ verify_jwt = false
 
 [functions.generate-certificate]
 verify_jwt = true
+
+# send-coi-email does its own auth (requireAuth inside, plus the Floor cron
+# service-release path via X-Cron-Secret), so JWT verification stays off at the
+# gateway. Matches the live posture (deployed verify_jwt=false).
+[functions.send-coi-email]
+verify_jwt = false
