@@ -809,6 +809,10 @@ export function AdditionalInsuredDrawer({
   // Edit path: direct update by id.
   const handleUpdate = async () => {
     if (!initial || !form.name.trim()) return;
+    if (reqLoading) {
+      toast({ title: 'Hold on', description: 'Requirements are still loading; saving now could erase them.' });
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from('additional_insureds' as any)
@@ -1129,7 +1133,7 @@ export function AdditionalInsuredDrawer({
                 data-primary
                 disabled={
                   isEdit
-                    ? saving || !nameEntered
+                    ? saving || !nameEntered || reqLoading
                     : selectedMatch
                       ? saving
                       : primaryDisabled
