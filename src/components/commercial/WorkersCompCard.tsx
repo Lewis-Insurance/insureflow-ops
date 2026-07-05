@@ -9,7 +9,7 @@
 // Calm Command: cc-* tokens, NO lime, cc-num tabular, no em or en dashes.
 // ============================================================================
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { HardHat, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -72,10 +72,16 @@ export function WorkersCompCard({ accountId }: { accountId: string }) {
     [classes],
   );
 
+  // Track whether the description came from the reference list, so switching
+  // codes replaces a stale auto-description but never a hand-typed one.
+  const descAutoRef = useRef(false);
   const handleCodePick = (code: string) => {
     setCCode(code);
     const match = classCodes.find((c) => c.code === code);
-    if (match && !cDesc.trim()) setCDesc(match.description);
+    if (match && (!cDesc.trim() || descAutoRef.current)) {
+      setCDesc(match.description);
+      descAutoRef.current = true;
+    }
   };
 
   const handleAddClass = () => {
@@ -135,7 +141,12 @@ export function WorkersCompCard({ accountId }: { accountId: string }) {
 
   const exemptionTone = (exp: string | null): { label: string; cls: string } | null => {
     if (!exp) return null;
-    const days = Math.floor((new Date(exp).getTime() - Date.now()) / 86400000);
+    // Parse as a LOCAL calendar date: new Date('YYYY-MM-DD') is UTC midnight
+    // and skews the warning by a day near the boundary (review fix).
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(exp);
+    if (!m) return null;
+    const expiry = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59);
+    const days = Math.floor((expiry.getTime() - Date.now()) / 86400000);
     if (days < 0) return { label: 'expired', cls: 'bg-destructive/10 text-destructive' };
     if (days <= 60) return { label: `expires in ${days}d`, cls: 'bg-warning/10 text-warning' };
     return null;
@@ -230,7 +241,7 @@ export function WorkersCompCard({ accountId }: { accountId: string }) {
               ))}
             </datalist>
           </div>
-          <Input placeholder="Description" value={cDesc} onChange={(e) => setCDesc(e.target.value)} aria-label="Class description" />
+          <Input placeholder="Description" value={cDesc} onChange={(e) => { descAutoRef.current = false; setCDesc(e.target.value); }} aria-label="Class description" />
           <Input placeholder="Empl" inputMode="numeric" value={cEmployees} onChange={(e) => setCEmployees(e.target.value)} aria-label="Employee count" />
           <Input placeholder="Annual payroll" inputMode="numeric" value={cPayroll} onChange={(e) => setCPayroll(e.target.value)} aria-label="Annual payroll" />
           <Button variant="ghost" onClick={handleAddClass} disabled={saveClass.isPending}

@@ -472,14 +472,16 @@ const money = (n: number | null | undefined): string =>
   n == null ? '' : `$${Number(n).toLocaleString('en-US')}`;
 
 function QuotesBlock({ accountId, submission }: { accountId: string; submission: CommercialSubmission }) {
-  // Line mode (Phase 3): GL when present, else property. Mixed GL+property
-  // submissions (BOP) capture the GL quote here; the property limit rides the
-  // packet phase.
-  const lineMode: 'gl' | 'property' | 'wc' =
-    submission.target_lines.includes('gl') ? 'gl'
-    : submission.target_lines.includes('wc') ? 'wc'
-    : submission.target_lines.includes('property') ? 'property'
-    : 'gl';
+  // Quotable lines on this submission; when more than one, the user picks
+  // which line this quote covers (review fix: a fixed priority locked
+  // property+wc submissions out of property quotes).
+  const quotableLines = useMemo(
+    () => (['gl', 'wc', 'property'] as const).filter((l) => submission.target_lines.includes(l)),
+    [submission.target_lines],
+  );
+  const [lineChoice, setLineChoice] = useState<'gl' | 'wc' | 'property' | null>(null);
+  const lineMode: 'gl' | 'wc' | 'property' =
+    lineChoice && quotableLines.includes(lineChoice) ? lineChoice : (quotableLines[0] ?? 'gl');
   const { data: quotes = [] } = useSubmissionQuotes(submission.id);
   const addQuote = useAddSubmissionQuote();
   const bindQuote = useBindSubmissionQuote();
@@ -593,16 +595,30 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-cc-text-primary">
-        Quotes{' '}
-        <span className="font-normal text-cc-text-muted">
-          {lineMode === 'gl'
-            ? '(GL limits feed the COI on bind)'
-            : lineMode === 'wc'
-              ? '(EL limits feed the COI on bind)'
-              : '(the property limit feeds the COI on bind)'}
-        </span>
-      </h4>
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold text-cc-text-primary">
+          Quotes{' '}
+          <span className="font-normal text-cc-text-muted">
+            {lineMode === 'gl'
+              ? '(GL limits feed the COI on bind)'
+              : lineMode === 'wc'
+                ? '(EL limits feed the COI on bind)'
+                : '(the property limit feeds the COI on bind)'}
+          </span>
+        </h4>
+        {quotableLines.length > 1 && (
+          <Select value={lineMode} onValueChange={(v) => setLineChoice(v as 'gl' | 'wc' | 'property')}>
+            <SelectTrigger className="h-7 w-36" aria-label="Quote line">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {quotableLines.map((l) => (
+                <SelectItem key={l} value={l}>{lineLabel(l)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
 
       {quotes.length > 0 && (
         <ul className="space-y-1.5">
@@ -636,6 +652,16 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
               {coverageLimit(q, 'wc_el_each_accident') != null && (
                 <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
                   EL {money(coverageLimit(q, 'wc_el_each_accident'))}
+                </span>
+              )}
+              {coverageLimit(q, 'wc_el_disease_each_employee') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  dis/empl {money(coverageLimit(q, 'wc_el_disease_each_employee'))}
+                </span>
+              )}
+              {coverageLimit(q, 'wc_el_disease_policy_limit') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  dis/policy {money(coverageLimit(q, 'wc_el_disease_policy_limit'))}
                 </span>
               )}
               {coverageLimit(q, 'gl_general_aggregate') != null && (
