@@ -1,0 +1,11 @@
+-- Tighten is_staff_member_of EXECUTE (Bugbot: membership oracle, medium).
+--
+-- 20260705130000 granted EXECUTE to `authenticated` as well as `service_role`.
+-- The function is SECURITY DEFINER and reads profiles + agency_workspace_memberships,
+-- so an `authenticated` grant lets ANY signed-in user probe arbitrary
+-- (user_id, agency_id) pairs and learn whether that user is active staff in that
+-- workspace -- a membership/staff oracle. The only caller is the service-role Floor
+-- branch of send-coi-email (auth.uid() is null there, which is why the id is passed
+-- explicitly); `authenticated` never needs it. Revoke it; service_role + postgres
+-- retain EXECUTE. Idempotent.
+revoke execute on function public.is_staff_member_of(uuid, uuid) from authenticated;
