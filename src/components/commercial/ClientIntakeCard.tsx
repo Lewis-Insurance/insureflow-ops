@@ -8,7 +8,7 @@
 // Calm Command: cc-* tokens, NO lime, tabular figures, no em or en dashes.
 // ============================================================================
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Copy, Link2, UserRoundCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,9 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
   const setStatus = useSetIntakeSubmissionStatus();
   const saveProfile = useSaveCommercialProfile();
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  // Synchronous re-entrancy lock: state updates are async, so two clicks in
+  // the same tick would both pass a state-based guard. The ref closes that.
+  const applyLockRef = useRef(false);
 
   const activeLinks = useMemo(
     () => links.filter((l) => !l.revoked_at && new Date(l.expires_at).getTime() > Date.now()),
@@ -77,24 +80,32 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
 
   const handleApply = async (row: IntakeStagedSubmission) => {
     // One apply at a time: during the refetch await, saveProfile.isPending is
-    // still false, so this guard (plus disabling every row's buttons while
-    // applyingId is set) is what prevents interleaved applies (review fix).
-    if (applyingId !== null) return;
+    // still false, and applyingId (React state) is not set synchronously - the
+    // ref is the actual lock; the state only drives the disabled buttons.
+    if (applyLockRef.current) return;
+    applyLockRef.current = true;
     setApplyingId(row.id);
     const changes = row.payload as CommercialProfileInput;
     const sources = Object.fromEntries(Object.keys(row.payload).map((k) => [k, 'client' as const]));
     // Review fix (stale profile): applying two submissions back-to-back must
-    // diff against the CURRENT row, not the pre-first-apply cache.
-    const fresh = (await profileQuery.refetch()).data ?? profile;
+    // diff against the CURRENT row, not the pre-first-apply cache. Fall back
+    // to the cached profile only when the REFETCH ITSELF failed - a successful
+    // refetch returning null means the profile is genuinely absent (insert path).
+    const refetched = await profileQuery.refetch();
+    const fresh = refetched.error ? (profile ?? null) : (refetched.data ?? null);
+    const release = () => {
+      applyLockRef.current = false;
+      setApplyingId(null);
+    };
     saveProfile.mutate(
-      { accountId, existing: fresh ?? null, changes, sources },
+      { accountId, existing: fresh, changes, sources },
       {
         onSuccess: () =>
           setStatus.mutate(
             { accountId, stagedId: row.id, status: 'applied' },
-            { onSettled: () => setApplyingId(null) },
+            { onSettled: release },
           ),
-        onError: () => setApplyingId(null),
+        onError: release,
       },
     );
   };
