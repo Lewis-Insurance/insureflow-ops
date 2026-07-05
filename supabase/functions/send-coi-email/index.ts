@@ -322,8 +322,14 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse the request body once, up front: it is needed to read a Floor
-    // service-release marker before the auth decision.
-    const body = (await req.json()) as SendCertificateEmailRequest & Record<string, unknown>;
+    // service-release marker before the auth decision. A malformed/empty body is a
+    // 400, not a generic 500 from the outer catch.
+    let body: SendCertificateEmailRequest & Record<string, unknown>;
+    try {
+      body = (await req.json()) as SendCertificateEmailRequest & Record<string, unknown>;
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid or empty JSON body' }, 400, corsHeaders);
+    }
 
     // Auth: either the Floor service-release path (cron secret + a floor approval
     // marker minted server-side) or an interactive staff caller via requireAuth.
@@ -503,11 +509,17 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
     if (cert.status === 'superseded') {
-      const { data: successor } = await supabase
-        .from('certificates')
-        .select('certificate_number')
-        .eq('id', cert.superseded_by_id)
-        .maybeSingle();
+      // Guard superseded_by_id: normally set with the status, but this function
+      // does not own that invariant, and .eq('id', null) would query for nothing.
+      const successor = cert.superseded_by_id
+        ? (
+            await supabase
+              .from('certificates')
+              .select('certificate_number')
+              .eq('id', cert.superseded_by_id)
+              .maybeSingle()
+          ).data
+        : null;
       const successorNumber = successor?.certificate_number ?? 'a newer certificate';
       return jsonResponse(
         {

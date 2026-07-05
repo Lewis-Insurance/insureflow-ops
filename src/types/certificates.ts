@@ -7,6 +7,8 @@
 // `certificates` / `certificate_policies` / `certificate_events` tables and the
 // `generate-certificate` edge-function wire contract exactly.
 
+import type { RequirementsEvaluation } from '@/lib/acord/acord25/requirements';
+
 // ---------------------------------------------------------------------------
 // Canonical enums (04 Sections 0, 2, 9.1)
 // ---------------------------------------------------------------------------
@@ -182,6 +184,15 @@ export interface CertificateSnapshot {
     as_of: string;
     source: 'master_coi';
   };
+
+  /**
+   * The holder-requirements evaluation the SERVER re-ran at issue time (07 §4),
+   * embedded in the immutable snapshot ONLY when the holder has requirements.
+   * Carries the per-requirement results plus the override provenance (overridden /
+   * overridden_by) when the operator issued over a failing evaluation. Absent when
+   * the holder has no requirements.
+   */
+  requirements_evaluation?: RequirementsEvaluation;
 }
 
 // ---------------------------------------------------------------------------
