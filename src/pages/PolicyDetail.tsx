@@ -20,6 +20,8 @@ import { WCPolicyDetailsView } from '@/components/policies/WCPolicyDetails';
 import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
+import { useCreateSubmission } from '@/hooks/useCommercialSubmissions';
+import { commercialLinesForPolicy, remarketNote } from '@/lib/commercial/remarket';
 import { CGLPolicyDetailsView } from '@/components/policies/CGLPolicyDetails';
 import { InlandMarinePolicyDetails } from '@/components/policies/InlandMarinePolicyDetails';
 import { useExtractInlandMarinePolicy, isInlandMarinePolicy } from '@/hooks/useInlandMarineExtraction';
@@ -50,6 +52,7 @@ export default function PolicyDetail() {
   // Extraction hooks
   const extractWC = useExtractWCPolicy();
   const extractCGL = useExtractCGLPolicy();
+  const createSubmission = useCreateSubmission();
   const queryClient = useQueryClient();
   // Which line's extraction should run after the next document upload. Set by
   // the per-line "Extract details" buttons; consumed once by onUploaded.
@@ -535,6 +538,33 @@ export default function PolicyDetail() {
                       <Award className="h-4 w-4 mr-2" />
                       Generate Certificate
                     </Button>
+                    {(policy as any).line_category === 'commercial' && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        disabled={createSubmission.isPending}
+                        onClick={() => {
+                          // Remarket clone (SOW v3 feeder #5): open a prefilled
+                          // submission targeting this policy's line and x-date.
+                          createSubmission.mutate(
+                            {
+                              accountId: policy.account!.id,
+                              targetLines: commercialLinesForPolicy(policy as any),
+                              effectiveDate: (policy as any).expiration_date ?? null,
+                              notes: remarketNote(policy as any),
+                              remarketOfPolicyId: policy.id,
+                            },
+                            {
+                              onSuccess: () =>
+                                navigate(`/customers/${policy.account!.id}?tab=commercial`),
+                            },
+                          );
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        {createSubmission.isPending ? 'Creating submission...' : 'Remarket this policy'}
+                      </Button>
+                    )}
                     <DocumentAnalysisButton
                       accountId={policy.account.id}
                       variant="outline"
