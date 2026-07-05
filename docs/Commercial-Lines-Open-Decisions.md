@@ -4,6 +4,8 @@
 **Date:** 2026-07-05
 **Who answers:** Landen (loop in Brian on Q1 and Q2 - they are about agency practice, not software)
 
+> **STATUS: ANSWERED (Landen, 2026-07-05). Scope locked as SOW v3; Phase 0 started.**
+
 Write answers directly under each question (or reply in chat / PR comment). Once all four are answered and #51 is merged, the scope is locked and Phase 0 starts.
 
 ---
@@ -19,7 +21,7 @@ When you send a commercial risk to a carrier, MGA, or wholesaler to get a quote,
 - **B. Carrier portals** - you re-key or upload into each market's website. (System generates the packet + a "mark as submitted" button with the artifact attached; no sending.)
 - **C. Both, depends on the market** *(my default assumption)* - each market in the registry gets flagged email vs portal and the submit step adapts.
 
-**ANSWER:**
+**ANSWER:** None of A/B/C as written. No automated market submission: **no market registry, no per-market email-vs-portal routing, no submission tracking.** Build ONE universal action: assemble the packet with a cover page, then either (1) one-click email - approval-gated and logged like the COI email - or (2) print / download as PDF. **Scope addition:** the commercial policy data must ALSO feed COI issuance for direct/admitted carriers (Nationwide etc.) through the existing COI path, not just E&S packets. The COI side is the bigger half of the value.
 
 ---
 
@@ -39,9 +41,9 @@ Your commercial book already includes E&S paper (Burlington, USLI, and Bass Unde
 - **A. Yes, we keep declination records** - the system replaces that process.
 - **B. Not consistently** - the system introduces it (this is the E&O win; it changes nothing about what I build, just confirms the gap is real).
 
-**ANSWER 2a:**
+**ANSWER 2a:** A - ACORD forms are primarily for surplus lines placed through a wholesaler who is the agent of record and handles the FSLSO filing and tax. The system documents diligent effort + insured disclosures only. Direct-carrier work is COI-only (admitted, no diligent effort needed).
 
-**ANSWER 2b:**
+**ANSWER 2b:** B - declinations are not documented consistently today. **Build it as a feature** - it is the E&O record over each E&S placement.
 
 ---
 
@@ -56,7 +58,7 @@ The single biggest speed lever in the plan is a client intake portal: you send t
 - **B. Yes, but later** - keep it in the plan, move it to a later phase; Phase 2 focuses on document extraction + Canopy.
 - **C. No** - agent-only entry; drop the portal from scope.
 
-**ANSWER:**
+**ANSWER:** A - build the intake portal.
 
 ---
 
@@ -71,7 +73,9 @@ Each line ships as its own complete phase (data + intake UI + ACORD form + bind)
 - **B. GL, Property, Auto, Excess, WC** - the order from your original request, if that reflects where new business is coming from.
 - **C. Another order** - write it in.
 
-**ANSWER:**
+**ANSWER:** C - **GL, then Property, then WC, then Excess, then Business Auto.** Deliberate: Landen knows Business Auto is the largest commercial segment (~24 policies) and is putting it last anyway, and accepts that a 131 umbrella over a commercial-auto underlier will need manual underlying-schedule entry until Business Auto ships.
+
+**Defaults (ACORD 75 binder, Coterie live quoting, /acord-forms fallback):** all accepted as written.
 
 ---
 
