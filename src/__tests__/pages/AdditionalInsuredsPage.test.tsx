@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type {
   AdditionalInsuredListRow,
   AdditionalInsuredCohorts,
@@ -140,14 +141,18 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Render harness. Only MemoryRouter is needed (the page's subtree touches
-// react-router); the hand-rolled hook is mocked, so no QueryClientProvider.
+// Render harness. MemoryRouter (the page's subtree touches react-router) plus
+// a QueryClientProvider: the AdditionalInsuredDrawer invalidates the
+// holder-requirements query after a save, so it calls useQueryClient at render.
 // ---------------------------------------------------------------------------
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <AdditionalInsuredsPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AdditionalInsuredsPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

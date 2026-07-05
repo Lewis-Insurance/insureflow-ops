@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
 import {
   useAdditionalInsuredSearch,
@@ -170,7 +171,8 @@ const REQ_LINE_OPTIONS: Array<{ value: Acord25LineKey; label: string }> = [
   { value: 'umbrella', label: 'Umbrella / Excess' },
   { value: 'wc', label: 'Workers Compensation' },
   { value: 'property', label: 'Property' },
-  { value: 'other', label: 'Other' },
+  // 'other' removed: the generator never selects an OTHER line, so a required
+  // 'other' could never be satisfied on a standard certificate (review fix).
 ];
 
 /**
@@ -679,8 +681,12 @@ export function AdditionalInsuredDrawer({
   const [saving, setSaving] = useState(false);
   // Requirements editor state (edit mode only). Loaded on open via
   // get_additional_insured_requirements; persisted via set_..._requirements.
+  const queryClient = useQueryClient();
   const [reqForm, setReqForm] = useState<RequirementsFormState>(EMPTY_REQUIREMENTS);
   const [reqLoading, setReqLoading] = useState(false);
+  // Load failure must BLOCK the requirements write: saving the empty default
+  // over an existing profile would erase it (review fix, PR #42).
+  const [reqLoadFailed, setReqLoadFailed] = useState(false);
 
   // Seed the form each time the drawer opens (edit row, seeded name, or blank).
   useEffect(() => {
@@ -701,6 +707,7 @@ export function AdditionalInsuredDrawer({
     }
     let cancelled = false;
     setReqLoading(true);
+    setReqLoadFailed(false);
     setReqForm(EMPTY_REQUIREMENTS);
     (async () => {
       const { data, error } = await supabase.rpc('get_additional_insured_requirements', {
@@ -709,6 +716,7 @@ export function AdditionalInsuredDrawer({
       if (cancelled) return;
       if (error) {
         logger.error('additional insured requirements load error', error);
+        setReqLoadFailed(true);
         setReqLoading(false);
         return;
       }
@@ -819,19 +827,33 @@ export function AdditionalInsuredDrawer({
     // Persist holder requirements alongside the base record (edit mode). The
     // onSaved row shape is unchanged; requirements are stored on the holder and
     // fetched by the generator with the holder pick, not returned here.
-    const { error: reqError } = await supabase.rpc('set_additional_insured_requirements', {
-      p_id: initial.id,
-      p_requirements: formToRequirementsPayload(reqForm),
-      p_requirements_notes: reqForm.notes.trim() || null,
-    });
-    if (reqError) {
+    // NEVER write when the load failed: reqForm is still the empty default and
+    // saving it would erase the holder's existing profile (review fix).
+    if (reqLoadFailed) {
       toast({
-        title: 'Could not save requirements',
-        description: reqError.message,
+        title: 'Holder saved; requirements NOT saved',
+        description: 'The existing requirements could not be loaded, so they were left untouched. Reopen the holder to edit them.',
         variant: 'destructive',
       });
-      setSaving(false);
-      return;
+    } else {
+      const { error: reqError } = await supabase.rpc('set_additional_insured_requirements', {
+        p_id: initial.id,
+        p_requirements: formToRequirementsPayload(reqForm),
+        p_requirements_notes: reqForm.notes.trim() || null,
+      });
+      if (reqError) {
+        // The identity fields above already saved - say so explicitly.
+        toast({
+          title: 'Holder saved, but requirements were NOT saved',
+          description: reqError.message,
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
+      // The generator caches requirements for 60s; refresh it so the
+      // compliance strip reflects this edit immediately (review fix).
+      queryClient.invalidateQueries({ queryKey: ['holder-requirements', initial.id] });
     }
     const saved = await hydrateSavedRow(initial.id);
     setSaving(false);
@@ -841,7 +863,8 @@ export function AdditionalInsuredDrawer({
 
   const nameEntered = form.name.trim().length > 0;
   // In create mode a selected match takes over the primary action.
-  const primaryDisabled = saving || !nameEntered;
+  // reqLoading gate: saving mid-load would push the empty default (review fix).
+  const primaryDisabled = saving || !nameEntered || reqLoading;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

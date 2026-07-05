@@ -886,7 +886,7 @@ function CertificateGenerator({
                   <Button
                     data-primary
                     onClick={onGenerateClick}
-                    disabled={hasErrors || preview.building || issueMutation.isPending || !preview.previewSha256}
+                    disabled={hasErrors || preview.building || issueMutation.isPending || !preview.previewSha256 || (state.holder != null && requirementsQuery.data === undefined && !requirementsQuery.isError)}
                     aria-describedby={hasErrors ? 'cert-validation' : undefined}
                     className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
                   >
@@ -948,6 +948,7 @@ function CertificateGenerator({
                 setStaleConfirmOpen(false);
                 proceedToIssue();
               }}
+              disabled={!preview.previewSha256 || preview.building}
               className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
             >
               Generate
@@ -995,6 +996,7 @@ function CertificateGenerator({
                 setRequirementsConfirmOpen(false);
                 void doIssue(true);
               }}
+              disabled={!preview.previewSha256 || preview.building}
               className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
             >
               Generate anyway

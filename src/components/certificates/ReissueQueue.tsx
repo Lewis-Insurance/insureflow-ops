@@ -202,6 +202,7 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
     if (targets.length === 0) return;
 
     setRunning(true);
+    try {
     setResult(null);
 
     const reissued: CertificateNeedingReissue[] = [];
@@ -254,7 +255,9 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
     await refetch();
 
     setSelected(new Set());
-    setRunning(false);
+    } finally {
+      setRunning(false);
+    }
     setResult({ reissued, blocked });
 
     if (blocked.length === 0) {
