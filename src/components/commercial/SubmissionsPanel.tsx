@@ -459,7 +459,13 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const addQuote = useAddSubmissionQuote();
   const bindQuote = useBindSubmissionQuote();
   // Reuse the app-wide policies query (review fix: no duplicate cache entry).
-  const { data: policies = [] } = usePoliciesByAccount(accountId);
+  // usePoliciesByAccount does not filter soft-deleted rows; the bind server
+  // check would reject one anyway - keep them out of the picker (review fix).
+  const { data: allPolicies = [] } = usePoliciesByAccount(accountId);
+  const policies = useMemo(
+    () => allPolicies.filter((p: { deleted_at?: string | null }) => !p.deleted_at),
+    [allPolicies],
+  );
 
   const closed = ['bound', 'lost', 'abandoned'].includes(submission.status);
 

@@ -948,7 +948,7 @@ function CertificateGenerator({
                 setStaleConfirmOpen(false);
                 proceedToIssue();
               }}
-              disabled={!preview.previewSha256 || preview.building}
+              disabled={!preview.previewSha256 || preview.building || (state.holder != null && requirementsQuery.data === undefined && !requirementsQuery.isError)}
               className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
             >
               Generate

@@ -255,8 +255,10 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
     ]);
     await refetch();
 
-    setSelected(new Set());
     } finally {
+      // Every selected row was attempted - clear the selection even if the
+      // cache invalidation/refetch above threw (review fix).
+      setSelected(new Set());
       setRunning(false);
     }
     // Always report what completed, even if invalidation/refetch threw above.
