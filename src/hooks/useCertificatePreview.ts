@@ -108,6 +108,13 @@ export function useCertificatePreview(args: {
     const myId = buildIdRef.current + 1;
     buildIdRef.current = myId;
 
+    // A pending rebuild invalidates the current hash immediately: null it now so
+    // Generate is gated during the 500ms debounce window (doIssue early-returns on
+    // a null previewSha256, and the button's disabled expr includes !previewSha256)
+    // instead of letting a click fire a stale hash the server would 409. `building`
+    // is left to the timeout so the preview bar does not flash on every keystroke.
+    setPreviewSha256(null);
+
     const handle = setTimeout(() => {
       void (async () => {
         const result = buildRef.current();
