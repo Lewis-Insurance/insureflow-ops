@@ -146,9 +146,18 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
   };
 
   const handleSave = () => {
+    // Sunbiz-applied fields (not re-edited since) save as src='extracted'.
+    const sources = Object.fromEntries(
+      [...machineSourced.current].map((k) => [k, 'extracted' as const]),
+    );
     saveMutation.mutate(
-      { accountId, existing: profile ?? null, changes: form },
-      { onSuccess: () => setEditing(false) },
+      { accountId, existing: profile ?? null, changes: form, sources },
+      {
+        onSuccess: () => {
+          machineSourced.current.clear();
+          setEditing(false);
+        },
+      },
     );
   };
 
@@ -198,7 +207,20 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="cp-legal" className="text-cc-text-secondary">Legal name</Label>
-              <Input id="cp-legal" value={(form.legal_name as string) ?? ''} onChange={(e) => set('legal_name', e.target.value)} />
+              <div className="flex gap-2">
+                <Input id="cp-legal" value={(form.legal_name as string) ?? ''} onChange={(e) => set('legal_name', e.target.value)} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleSunbizSearch}
+                  disabled={sunbizSearch.isPending}
+                  className="shrink-0 text-cc-text-secondary hover:text-cc-text-primary"
+                  title="Look up on FL Sunbiz"
+                >
+                  <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  {sunbizSearch.isPending ? 'Searching' : 'Sunbiz'}
+                </Button>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cp-dba" className="text-cc-text-secondary">DBA</Label>
@@ -262,6 +284,40 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
           </div>
         </div>
       )}
+
+      {/* Sunbiz candidates: pick one, its detail fills the form for review. */}
+      <Dialog open={sunbizOpen} onOpenChange={setSunbizOpen}>
+        <DialogContent className="bg-cc-surface-raised">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">Sunbiz matches</DialogTitle>
+            <DialogDescription className="text-cc-text-muted">
+              FL Division of Corporations results. Picking one fills the form; nothing
+              saves until you review and hit Save.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+            {sunbizCandidates.map((c) => (
+              <li key={c.detail_url}>
+                <button
+                  type="button"
+                  onClick={() => applySunbizCandidate(c)}
+                  disabled={sunbizDetail.isPending}
+                  className="flex w-full flex-wrap items-center gap-2.5 rounded-cc-md border border-cc-border-subtle px-3 py-2.5 text-left transition-colors duration-fast hover:border-cc-border-interactive disabled:opacity-60"
+                >
+                  <span className="text-sm text-cc-text-primary">{c.name}</span>
+                  {c.document_number && (
+                    <span className="cc-num text-xs text-cc-text-muted [font-variant-numeric:tabular-nums]">{c.document_number}</span>
+                  )}
+                  {c.status && <span className="text-xs text-cc-text-muted">{c.status}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {sunbizDetail.isPending && (
+            <p className="text-sm text-cc-text-muted">Fetching entity detail...</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
