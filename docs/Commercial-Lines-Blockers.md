@@ -51,6 +51,17 @@
 
 ---
 
+## 2b. ANTHROPIC_API_KEY - policy-upload extraction (found 2026-07-05)
+
+**Blocked:** the entire policy-upload extraction feeder (Phase 2's headline). The 9 extract-* edge fns require `ANTHROPIC_API_KEY` + the two Azure Document Intelligence secrets. **Verified: the Azure secrets ARE set in prod; `ANTHROPIC_API_KEY` is NOT.** Every extraction call fails at the key check until it exists.
+
+**To unblock (Landen, ~5 minutes):** add an Anthropic API key as a Supabase edge secret:
+- Dashboard: project `lrqajzwcmdwahnjyidgv` -> Settings -> Edge Functions -> Secrets -> `ANTHROPIC_API_KEY`
+- Or CLI: `supabase secrets set ANTHROPIC_API_KEY=<key> --project-ref lrqajzwcmdwahnjyidgv`
+No deploy needed. First real extraction after that verifies the whole path (upload a GL policy on a commercial policy record -> Extract GL Details).
+
+---
+
 ## 3. RESEND_API_KEY - COI email delivery (carryover from the COI module)
 
 **Blocked:** actually delivering certificate emails (and, later, the Phase 1b one-click packet send, which uses the same provider). Everything up to the provider call is live and Fence-gated; a send today returns a 502 at Resend.
