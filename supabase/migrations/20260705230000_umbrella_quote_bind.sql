@@ -31,7 +31,7 @@ declare
   v_quote_id uuid;
   v_lob public.line_of_business;
 begin
-  if p_line not in ('gl','property','wc') then raise exception 'unsupported line %', p_line; end if;
+  if p_line not in ('gl','property','wc','umbrella') then raise exception 'unsupported line %', p_line; end if;
   -- Module line key -> enum label ('wc' is 'workers_comp' in the enum).
   v_lob := (case p_line when 'wc' then 'workers_comp' else p_line end)::public.line_of_business;
 
@@ -173,7 +173,7 @@ begin
         'property_details.coi_summary.limit_description', btrim(p_property_description)
       );
     end if;
-  else
+  elsif p_line = 'wc' then
     -- All three EL limits are the WC line's required_for_ready trio.
     if p_el_each_accident is null or p_el_disease_each_employee is null or p_el_disease_policy_limit is null then
       raise exception 'all three WC employers liability limits are required to bind';
@@ -183,6 +183,18 @@ begin
       'wc_details.coverage.part_two_employers_liability.disease_each_employee', p_el_disease_each_employee,
       'wc_details.coverage.part_two_employers_liability.disease_policy_limit', p_el_disease_policy_limit
     );
+  else
+    -- Umbrella: per-occurrence is the line's only required_for_ready field;
+    -- the aggregate is written too when provided.
+    if p_umb_per_occurrence is null then
+      raise exception 'the umbrella per occurrence limit is required to bind';
+    end if;
+    v_updates := jsonb_build_object(
+      'umbrella_details.limits.per_occurrence', p_umb_per_occurrence
+    );
+    if p_umb_aggregate is not null then
+      v_updates := v_updates || jsonb_build_object('umbrella_details.limits.aggregate', p_umb_aggregate);
+    end if;
   end if;
 
   v_save := public.save_master_coi_fields(p_policy_id, v_updates);
