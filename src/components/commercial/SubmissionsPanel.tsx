@@ -652,8 +652,9 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <DialogTitle className="text-cc-text-primary">Bind quote</DialogTitle>
             <DialogDescription className="text-cc-text-muted">
               {bindTarget ? `${quoteCarrierName(bindTarget)}${bindTarget.premium != null ? `, ${money(bindTarget.premium)}` : ''}. ` : ''}
-              Pick the policy record this bind becomes. The GL limits below are written to that
-              policy through the Master COI write path, so it is certificate-ready immediately.
+              Pick the policy record this bind becomes. The {lineMode === 'gl' ? 'GL limits' : 'property limit'} below
+              {lineMode === 'gl' ? ' are' : ' is'} written to that policy through the Master COI write path,
+              so it is certificate-ready immediately.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

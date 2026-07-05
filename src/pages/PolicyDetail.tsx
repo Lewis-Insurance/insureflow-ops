@@ -169,8 +169,10 @@ export default function PolicyDetail() {
   // EPLI. Exclude every line this page already types plus umbrella/excess/
   // professional so the GL extraction can never write cgl_details onto a
   // non-GL policy (review fix).
+  // BOP is the GL+Property pairing: it must light up BOTH sections.
+  const isBOP = lob.includes('bop') || lob.includes('business owner');
   const isCGL =
-    isCGLPolicy(policy?.line_of_business) &&
+    (isCGLPolicy(policy?.line_of_business) || isBOP) &&
     !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO &&
     !lob.includes('umbrella') && !lob.includes('excess') && !lob.includes('professional') && !lob.includes('epli');
   // Property (Phase 3): the helper matches 'bop' too, so a BOP shows BOTH the

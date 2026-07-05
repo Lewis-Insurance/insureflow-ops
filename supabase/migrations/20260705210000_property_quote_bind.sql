@@ -106,6 +106,11 @@ begin
   end if;
   if v_sub.status = 'bound' then raise exception 'submission is already bound'; end if;
   if v_quote.status <> 'open' then raise exception 'quote is % - only open quotes can bind', v_quote.status; end if;
+  -- The bind line is derived from the QUOTE, not trusted from the client: a
+  -- mismatch would write the wrong line's COI paths (review fix).
+  if v_quote.line_of_business::text <> p_line then
+    raise exception 'quote is a % quote - cannot bind it as %', v_quote.line_of_business, p_line;
+  end if;
   if not exists (
     select 1 from public.policies p
     where p.id = p_policy_id and p.account_id = v_sub.account_id and p.deleted_at is null
