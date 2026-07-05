@@ -183,3 +183,6 @@ verify_jwt = true
 # gateway. Matches the live posture (deployed verify_jwt=false).
 [functions.send-coi-email]
 verify_jwt = false
+
+[functions.commercial-intake]
+verify_jwt = false
