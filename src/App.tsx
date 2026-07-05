@@ -103,6 +103,7 @@ const ExtractionAnalyticsPage = lazyWithRetry(() => import("./pages/ExtractionAn
 const PrismAIPage = lazyWithRetry(() => import("./pages/PrismAIPage"));
 const SMSPage = lazyWithRetry(() => import("./pages/SMSPage"));
 const DocumentCollectionPortal = lazyWithRetry(() => import("./pages/DocumentCollectionPortal"));
+const CommercialIntakePortal = lazyWithRetry(() => import("./pages/CommercialIntakePortal"));
 const ModuleBuilderPage = lazyWithRetry(() => import("./pages/ModuleBuilderPage"));
 const LewisAIHub = lazyWithRetry(() => import("./pages/ai/LewisAIHub"));
 const AIModuleExecute = lazyWithRetry(() => import("./pages/ai/AIModuleExecute"));
@@ -744,6 +745,14 @@ const App = () => (
                   element={
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <DocumentCollectionPortal />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/portal/intake/:token"
+                  element={
+                    <ErrorBoundary level="page" resetOnPropsChange>
+                      <CommercialIntakePortal />
                     </ErrorBoundary>
                   }
                 />
