@@ -472,6 +472,13 @@ const money = (n: number | null | undefined): string =>
   n == null ? '' : `$${Number(n).toLocaleString('en-US')}`;
 
 function QuotesBlock({ accountId, submission }: { accountId: string; submission: CommercialSubmission }) {
+  // Line mode (Phase 3): GL when present, else property. Mixed GL+property
+  // submissions (BOP) capture the GL quote here; the property limit rides the
+  // packet phase.
+  const lineMode: 'gl' | 'property' =
+    submission.target_lines.includes('gl') ? 'gl'
+    : submission.target_lines.includes('property') ? 'property'
+    : 'gl';
   const { data: quotes = [] } = useSubmissionQuotes(submission.id);
   const addQuote = useAddSubmissionQuote();
   const bindQuote = useBindSubmissionQuote();
@@ -507,7 +514,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const openBind = (q: SubmissionQuote) => {
     setBindTarget(q);
     setBindPolicyId('');
-    const eo = coverageLimit(q, 'gl_each_occurrence');
+    const eo = coverageLimit(q, lineMode === 'gl' ? 'gl_each_occurrence' : 'property_limit');
     const ga = coverageLimit(q, 'gl_general_aggregate');
     setBindEachOcc(eo != null ? String(eo) : '');
     setBindGenAgg(ga != null ? String(ga) : '');
@@ -524,8 +531,10 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         submissionId: submission.id,
         carrierName: qCarrier,
         premium: numOrNull(qPremium),
-        eachOccurrence: numOrNull(qEachOcc),
-        generalAggregate: numOrNull(qGenAgg),
+        line: lineMode,
+        eachOccurrence: lineMode === 'gl' ? numOrNull(qEachOcc) : null,
+        generalAggregate: lineMode === 'gl' ? numOrNull(qGenAgg) : null,
+        propertyLimit: lineMode === 'property' ? numOrNull(qEachOcc) : null,
       },
       { onSuccess: () => { setQCarrier(''); setQPremium(''); setQEachOcc(''); setQGenAgg(''); } },
     );
@@ -539,9 +548,13 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
       toast.error('Pick the policy this bind becomes.');
       return;
     }
-    // Both COI-required limits must be present (the server enforces this too).
-    if (bindEo == null || bindGa == null) {
+    // Line-required limits must be present (the server enforces this too).
+    if (lineMode === 'gl' && (bindEo == null || bindGa == null)) {
       toast.error('Both GL limits are required to bind.');
+      return;
+    }
+    if (lineMode === 'property' && bindEo == null) {
+      toast.error('The property limit is required to bind.');
       return;
     }
     bindQuote.mutate(
@@ -550,8 +563,10 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         submissionId: submission.id,
         quoteId: bindTarget.id,
         policyId: bindPolicyId,
-        eachOccurrence: bindEo,
-        generalAggregate: bindGa,
+        line: lineMode,
+        eachOccurrence: lineMode === 'gl' ? bindEo : null,
+        generalAggregate: lineMode === 'gl' ? bindGa : null,
+        propertyLimit: lineMode === 'property' ? bindEo : null,
       },
       { onSuccess: () => setBindTarget(null) },
     );
@@ -560,7 +575,10 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-semibold text-cc-text-primary">
-        Quotes <span className="font-normal text-cc-text-muted">(GL limits feed the COI on bind)</span>
+        Quotes{' '}
+        <span className="font-normal text-cc-text-muted">
+          {lineMode === 'gl' ? '(GL limits feed the COI on bind)' : '(the property limit feeds the COI on bind)'}
+        </span>
       </h4>
 
       {quotes.length > 0 && (
@@ -587,6 +605,11 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
                   occ {money(coverageLimit(q, 'gl_each_occurrence'))}
                 </span>
               )}
+              {coverageLimit(q, 'property_limit') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  limit {money(coverageLimit(q, 'property_limit'))}
+                </span>
+              )}
               {coverageLimit(q, 'gl_general_aggregate') != null && (
                 <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
                   agg {money(coverageLimit(q, 'gl_general_aggregate'))}
@@ -607,8 +630,14 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_8rem_8rem_8rem_auto]">
           <Input placeholder="Quoting carrier" value={qCarrier} onChange={(e) => setQCarrier(e.target.value)} />
           <Input placeholder="Premium" inputMode="numeric" value={qPremium} onChange={(e) => setQPremium(e.target.value)} aria-label="Premium" />
-          <Input placeholder="Each occ" inputMode="numeric" value={qEachOcc} onChange={(e) => setQEachOcc(e.target.value)} aria-label="Each occurrence limit" />
-          <Input placeholder="Gen agg" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="General aggregate limit" />
+          <Input
+            placeholder={lineMode === 'gl' ? 'Each occ' : 'Prop limit'}
+            inputMode="numeric" value={qEachOcc} onChange={(e) => setQEachOcc(e.target.value)}
+            aria-label={lineMode === 'gl' ? 'Each occurrence limit' : 'Property limit'}
+          />
+          {lineMode === 'gl' && (
+            <Input placeholder="Gen agg" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="General aggregate limit" />
+          )}
           <Button variant="ghost" onClick={handleRecord} disabled={addQuote.isPending}
             className="text-cc-text-secondary hover:text-cc-text-primary">
             Record
@@ -623,8 +652,9 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <DialogTitle className="text-cc-text-primary">Bind quote</DialogTitle>
             <DialogDescription className="text-cc-text-muted">
               {bindTarget ? `${quoteCarrierName(bindTarget)}${bindTarget.premium != null ? `, ${money(bindTarget.premium)}` : ''}. ` : ''}
-              Pick the policy record this bind becomes. The GL limits below are written to that
-              policy through the Master COI write path, so it is certificate-ready immediately.
+              Pick the policy record this bind becomes. The {lineMode === 'gl' ? 'GL limits' : 'property limit'} below
+              {lineMode === 'gl' ? ' are' : ' is'} written to that policy through the Master COI write path,
+              so it is certificate-ready immediately.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -650,13 +680,17 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="bind-eo" className="text-cc-text-secondary">Each occurrence</Label>
+                <Label htmlFor="bind-eo" className="text-cc-text-secondary">
+                  {lineMode === 'gl' ? 'Each occurrence' : 'Property limit'}
+                </Label>
                 <Input id="bind-eo" inputMode="numeric" value={bindEachOcc} onChange={(e) => setBindEachOcc(e.target.value)} />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bind-ga" className="text-cc-text-secondary">General aggregate</Label>
-                <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
-              </div>
+              {lineMode === 'gl' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="bind-ga" className="text-cc-text-secondary">General aggregate</Label>
+                  <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -665,7 +699,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             </Button>
             <Button
               onClick={handleBind}
-              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || bindGa == null}
+              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || (lineMode === 'gl' && bindGa == null)}
             >
               {bindQuote.isPending ? 'Binding' : 'Bind quote'}
             </Button>
