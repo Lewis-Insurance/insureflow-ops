@@ -101,10 +101,23 @@ export function useUpdateSubmission() {
       if (error) throw error;
       return data as unknown as CommercialSubmission;
     },
-    onSuccess: (_d, v) => {
+    // Optimistic patch (review fix): without it the status select snaps back
+    // to the old value until the refetch lands.
+    onMutate: async (v) => {
+      await queryClient.cancelQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
+      const prev = queryClient.getQueryData<CommercialSubmission[]>(SUBMISSIONS_KEY(v.accountId));
+      queryClient.setQueryData<CommercialSubmission[]>(SUBMISSIONS_KEY(v.accountId), (old) =>
+        old?.map((s) => (s.id === v.submissionId ? ({ ...s, ...v.changes } as CommercialSubmission) : s)) ?? old,
+      );
+      return { prev };
+    },
+    onError: (error: Error, v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(SUBMISSIONS_KEY(v.accountId), ctx.prev);
+      toast.error(`Could not update the submission: ${error.message}`);
+    },
+    onSettled: (_d, _e, v) => {
       queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
     },
-    onError: (error: Error) => toast.error(`Could not update the submission: ${error.message}`),
   });
 }
 

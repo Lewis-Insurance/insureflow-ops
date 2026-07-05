@@ -116,7 +116,8 @@ export interface CommercialLocation extends CommercialRowBase {
 }
 
 export interface CommercialVehicle extends CommercialRowBase {
-  unit_number: number | null;
+  /** Text: fleet unit labels are alphanumeric (mirrors canopy vocabulary). */
+  unit_number: string | null;
   vin: string | null;
   year: number | null;
   make: string | null;
