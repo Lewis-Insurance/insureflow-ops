@@ -305,7 +305,9 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
         <p className="text-sm text-cc-text-muted">
           Certificates whose printed policy dates went stale after a renewal. Select the ready
           ones and reissue them in a batch. Each reissue supersedes the original and writes a
-          fresh certificate from current policy data.
+          fresh certificate from current policy data. "Ready" means the policy data is current;
+          endorsement and template checks still run at reissue, so a row can occasionally be
+          blocked and reported below.
         </p>
       </header>
 

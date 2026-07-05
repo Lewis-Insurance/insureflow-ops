@@ -724,13 +724,16 @@ function CertificateGenerator({
       const selected = snapshot.lines.map((l) => l.line_key).filter((k): k is LineKey =>
         CERT_LINES.includes(k as LineKey),
       );
+      // Seed every hydrated line OFF (matching the setHolder/toggleLine invariant),
+      // NOT from the snapshot's printed Y/N. The endorsement-defaults effect below
+      // re-enables ON only where the CURRENT resolution is 'endorsed', so an
+      // endorsement demoted since issue can never re-print a stale Y. Seeding from
+      // the snapshot risked a stale Y surviving when resolution is unavailable
+      // (policy since deleted, or the endorsement query errors/stays pending).
       const perLine: Partial<Record<LineKey, PerLineIntent>> = {};
       for (const l of snapshot.lines) {
         if (!CERT_LINES.includes(l.line_key as LineKey)) continue;
-        perLine[l.line_key as LineKey] = {
-          addlInsd: l.addl_insd === 'Y',
-          subrWvd: l.subr_wvd === 'Y',
-        };
+        perLine[l.line_key as LineKey] = { addlInsd: false, subrWvd: false };
       }
       const holderAddress = [
         snapshot.holder.address.line1,
@@ -757,8 +760,9 @@ function CertificateGenerator({
         },
       });
       setReissueBanner(certificate.certificate_number);
-      // Force the endorsement query to re-apply R3 clamps against the current
-      // holder resolution (an endorsement demoted since issue must not re-print Y).
+      // Force the endorsement-defaults effect to re-run against the CURRENT holder
+      // resolution: it turns the OFF-seeded lines back ON only where still endorsed,
+      // so a lapsed endorsement prints N by construction rather than a stale Y.
       lastResolutionKeyRef.current = null;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -882,7 +886,7 @@ function CertificateGenerator({
                   <Button
                     data-primary
                     onClick={onGenerateClick}
-                    disabled={hasErrors || preview.building || issueMutation.isPending}
+                    disabled={hasErrors || preview.building || issueMutation.isPending || !preview.previewSha256}
                     aria-describedby={hasErrors ? 'cert-validation' : undefined}
                     className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
                   >
