@@ -12,12 +12,16 @@
 // en dashes.
 // ============================================================================
 
-import { useEffect, useState } from 'react';
-import { Building2, Pencil } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Building2, Pencil, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -27,6 +31,7 @@ import {
   useSaveCommercialProfile,
   type CommercialProfileInput,
 } from '@/hooks/useCommercialProfile';
+import { useSunbizDetail, useSunbizSearch, type SunbizCandidate } from '@/hooks/useSunbizLookup';
 
 const ENTITY_TYPES = [
   'individual', 'partnership', 'corporation', 'llc', 'joint_venture', 'trust', 'other',
@@ -55,6 +60,15 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<CommercialProfileInput>({});
 
+  // Sunbiz lookup (feeder #6): fills the FORM only; the agent reviews + saves.
+  // Fields applied from Sunbiz save with provenance src='extracted' unless the
+  // agent edits them again before saving (then they are 'manual').
+  const sunbizSearch = useSunbizSearch();
+  const sunbizDetail = useSunbizDetail();
+  const [sunbizOpen, setSunbizOpen] = useState(false);
+  const [sunbizCandidates, setSunbizCandidates] = useState<SunbizCandidate[]>([]);
+  const machineSourced = useRef<Set<keyof CommercialProfileInput>>(new Set());
+
   // Seed the form each time editing opens (or the profile refreshes underneath).
   useEffect(() => {
     if (editing) {
@@ -75,8 +89,54 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  const set = (key: keyof CommercialProfileInput, value: unknown) =>
+  const set = (key: keyof CommercialProfileInput, value: unknown) => {
+    machineSourced.current.delete(key); // a manual edit reclaims the field
     setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const handleSunbizSearch = () => {
+    const q = ((form.legal_name as string) || '').trim();
+    if (q.length < 3) {
+      toast.error('Type at least part of the legal name first.');
+      return;
+    }
+    sunbizSearch.mutate(q, {
+      onSuccess: (candidates) => {
+        if (candidates.length === 0) {
+          toast.info('No Sunbiz matches for that name.');
+          return;
+        }
+        setSunbizCandidates(candidates);
+        setSunbizOpen(true);
+      },
+    });
+  };
+
+  const applySunbizCandidate = (candidate: SunbizCandidate) => {
+    sunbizDetail.mutate(candidate.detail_url, {
+      onSuccess: (detail) => {
+        setForm((f) => {
+          const next = { ...f };
+          const apply = (key: keyof CommercialProfileInput, value: unknown) => {
+            if (value == null || value === '') return;
+            (next as Record<string, unknown>)[key] = value;
+            machineSourced.current.add(key);
+          };
+          apply('legal_name', detail.legal_name);
+          apply('entity_type', detail.entity_type);
+          apply('fein', detail.fei_ein);
+          // Years in business from the filing year, only when not already set.
+          const filedYear = detail.date_filed ? Number(/(\d{4})/.exec(detail.date_filed)?.[1]) : NaN;
+          if (Number.isFinite(filedYear) && (f.years_in_business == null)) {
+            apply('years_in_business', new Date().getFullYear() - filedYear);
+          }
+          return next;
+        });
+        setSunbizOpen(false);
+        toast.success('Sunbiz details applied. Review, then save.');
+      },
+    });
+  };
 
   const numOrNull = (raw: string): number | null => {
     const trimmed = raw.trim();
@@ -86,9 +146,18 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
   };
 
   const handleSave = () => {
+    // Sunbiz-applied fields (not re-edited since) save as src='extracted'.
+    const sources = Object.fromEntries(
+      [...machineSourced.current].map((k) => [k, 'extracted' as const]),
+    );
     saveMutation.mutate(
-      { accountId, existing: profile ?? null, changes: form },
-      { onSuccess: () => setEditing(false) },
+      { accountId, existing: profile ?? null, changes: form, sources },
+      {
+        onSuccess: () => {
+          machineSourced.current.clear();
+          setEditing(false);
+        },
+      },
     );
   };
 
@@ -138,7 +207,20 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="cp-legal" className="text-cc-text-secondary">Legal name</Label>
-              <Input id="cp-legal" value={(form.legal_name as string) ?? ''} onChange={(e) => set('legal_name', e.target.value)} />
+              <div className="flex gap-2">
+                <Input id="cp-legal" value={(form.legal_name as string) ?? ''} onChange={(e) => set('legal_name', e.target.value)} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleSunbizSearch}
+                  disabled={sunbizSearch.isPending}
+                  className="shrink-0 text-cc-text-secondary hover:text-cc-text-primary"
+                  title="Look up on FL Sunbiz"
+                >
+                  <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  {sunbizSearch.isPending ? 'Searching' : 'Sunbiz'}
+                </Button>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cp-dba" className="text-cc-text-secondary">DBA</Label>
@@ -202,6 +284,40 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
           </div>
         </div>
       )}
+
+      {/* Sunbiz candidates: pick one, its detail fills the form for review. */}
+      <Dialog open={sunbizOpen} onOpenChange={setSunbizOpen}>
+        <DialogContent className="bg-cc-surface-raised">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">Sunbiz matches</DialogTitle>
+            <DialogDescription className="text-cc-text-muted">
+              FL Division of Corporations results. Picking one fills the form; nothing
+              saves until you review and hit Save.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+            {sunbizCandidates.map((c) => (
+              <li key={c.detail_url}>
+                <button
+                  type="button"
+                  onClick={() => applySunbizCandidate(c)}
+                  disabled={sunbizDetail.isPending}
+                  className="flex w-full flex-wrap items-center gap-2.5 rounded-cc-md border border-cc-border-subtle px-3 py-2.5 text-left transition-colors duration-fast hover:border-cc-border-interactive disabled:opacity-60"
+                >
+                  <span className="text-sm text-cc-text-primary">{c.name}</span>
+                  {c.document_number && (
+                    <span className="cc-num text-xs text-cc-text-muted [font-variant-numeric:tabular-nums]">{c.document_number}</span>
+                  )}
+                  {c.status && <span className="text-xs text-cc-text-muted">{c.status}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {sunbizDetail.isPending && (
+            <p className="text-sm text-cc-text-muted">Fetching entity detail...</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

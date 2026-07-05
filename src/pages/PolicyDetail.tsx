@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 import { WCPolicyDetailsView } from '@/components/policies/WCPolicyDetails';
 import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
+import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
+import { CGLPolicyDetailsView } from '@/components/policies/CGLPolicyDetails';
 import { InlandMarinePolicyDetails } from '@/components/policies/InlandMarinePolicyDetails';
 import { useExtractInlandMarinePolicy, isInlandMarinePolicy } from '@/hooks/useInlandMarineExtraction';
 import { CyberPolicyDetails } from '@/components/policies/CyberPolicyDetails';
@@ -47,6 +49,11 @@ export default function PolicyDetail() {
 
   // Extraction hooks
   const extractWC = useExtractWCPolicy();
+  const extractCGL = useExtractCGLPolicy();
+  const queryClient = useQueryClient();
+  // Which line's extraction should run after the next document upload. Set by
+  // the per-line "Extract details" buttons; consumed once by onUploaded.
+  const pendingExtractLine = useRef<'gl' | 'wc' | null>(null);
   const extractIM = useExtractInlandMarinePolicy();
   const extractCyber = useExtractCyberPolicy();
   const extractCrime = useExtractCrimePolicy();
@@ -147,6 +154,7 @@ export default function PolicyDetail() {
   // Check policy line of business
   const lob = (policy?.line_of_business || '').toLowerCase();
   const isWorkersComp = lob.includes('work') && lob.includes('comp');
+  const isCGL = isCGLPolicy(policy?.line_of_business);
   const isInlandMarine = isInlandMarinePolicy(policy?.line_of_business);
   const isCyber = isCyberPolicy(policy?.line_of_business);
   const isCrime = isCrimePolicy(policy?.line_of_business);
@@ -531,9 +539,12 @@ export default function PolicyDetail() {
                     variant="outline"
                     className="w-full justify-start"
                     onClick={() => {
+                      // Arm the post-upload extraction (the upload alone never
+                      // extracted anything before this wiring).
+                      pendingExtractLine.current = 'wc';
                       toast({
                         title: 'Extract WC Details',
-                        description: 'Upload a WC document to extract details automatically.',
+                        description: 'Upload the WC policy document; extraction runs automatically after upload.',
                       });
                       setUploadDocOpen(true);
                     }}
@@ -545,6 +556,28 @@ export default function PolicyDetail() {
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
                     Extract WC Details
+                  </Button>
+                )}
+                {isCGL && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      pendingExtractLine.current = 'gl';
+                      toast({
+                        title: 'Extract GL Details',
+                        description: 'Upload the GL policy or dec page; extraction runs automatically after upload.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractCGL.isPending}
+                  >
+                    {extractCGL.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Extract GL Details
                   </Button>
                 )}
                 {isInlandMarine && (
@@ -673,6 +706,16 @@ export default function PolicyDetail() {
           <WCPolicyDetailsView
             policyId={policyId!}
             wcDetails={wcDetails}
+          />
+        )}
+
+        {/* General Liability details: extraction target + the blob get_master_coi
+            reads (cgl_details), so a populated section here = COI-ready limits. */}
+        {isCGL && policyId && (
+          <CGLPolicyDetailsView
+            policyId={policyId}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cglDetails={((policy as any)?.cgl_details as any) ?? null}
           />
         )}
 
@@ -833,9 +876,31 @@ export default function PolicyDetail() {
           />
           <UploadDocModal
             open={uploadDocOpen}
-            onOpenChange={setUploadDocOpen}
+            onOpenChange={(open) => {
+              // Closing without an upload disarms any pending extraction.
+              if (!open) pendingExtractLine.current = null;
+              setUploadDocOpen(open);
+            }}
             accountId={policy.account.id}
             policyId={policy.id}
+            onUploaded={(documentId) => {
+              // Fire the armed line extraction against the fresh document. The
+              // hooks own their toasts + cgl/wc invalidations; we add the
+              // Master COI readiness refresh (limits may have just landed).
+              const line = pendingExtractLine.current;
+              pendingExtractLine.current = null;
+              if (!line || !policyId) return;
+              const invalidateMasterCoi = () => {
+                if (policy?.account?.id) {
+                  queryClient.invalidateQueries({ queryKey: ['master-coi', policy.account.id] });
+                }
+              };
+              if (line === 'gl') {
+                extractCGL.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
+              } else if (line === 'wc') {
+                extractWC.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
+              }
+            }}
             onSuccess={() => {
               toast({
                 title: "Document Uploaded",

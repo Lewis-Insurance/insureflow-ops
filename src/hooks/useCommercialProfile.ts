@@ -16,7 +16,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { CommercialProfile, FieldProvenance } from '@/types/commercial';
+import type { CommercialProfile, FieldProvenance, ProvenanceSource } from '@/types/commercial';
 
 /** The manually editable columns (mirrors migration 20260705160000). */
 export type CommercialProfileInput = Partial<
@@ -72,6 +72,11 @@ export function useSaveCommercialProfile() {
       accountId: string;
       existing: CommercialProfile | null;
       changes: CommercialProfileInput;
+      /**
+       * Per-field provenance override for machine-fed values (e.g. Sunbiz
+       * applies 'extracted'). Fields absent here stamp 'manual'.
+       */
+      sources?: Partial<Record<keyof CommercialProfileInput, ProvenanceSource>>;
     }) => {
       const changedKeys = (Object.keys(input.changes) as (keyof CommercialProfileInput)[]).filter(
         (k) => (input.existing?.[k] ?? null) !== (input.changes[k] ?? null),
@@ -80,7 +85,7 @@ export function useSaveCommercialProfile() {
 
       const now = new Date().toISOString();
       const provenance: FieldProvenance = { ...(input.existing?.field_provenance ?? {}) };
-      for (const k of changedKeys) provenance[k] = { src: 'manual', at: now };
+      for (const k of changedKeys) provenance[k] = { src: input.sources?.[k] ?? 'manual', at: now };
 
       const payload = { ...input.changes, field_provenance: provenance };
 
