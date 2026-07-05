@@ -2,9 +2,9 @@
 // REMARKET HELPERS (Commercial Lines SOW v3, feeder #5 - Phase 2)
 // ============================================================================
 // Pure functions for the one-click remarket clone: which commercial lines a
-// policy contributes (client-side mirror of master_coi_lines' label
-// crosswalk - the blob branch is irrelevant here because remarket targets the
-// LINE, not the stored detail), and the prefilled submission fields.
+// policy contributes (client-side mirror of master_coi_lines in full: detail
+// blobs authoritative, then the label crosswalk), and the prefilled
+// submission fields.
 // ============================================================================
 
 import type { CommercialLineKey } from '@/types/commercial';
