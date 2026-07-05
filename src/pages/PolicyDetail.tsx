@@ -21,6 +21,8 @@ import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
 import { useExtractPropertyPolicy, isPropertyPolicy } from '@/hooks/usePropertyExtraction';
+import { useExtractUmbrellaPolicy, isUmbrellaPolicy } from '@/hooks/useUmbrellaExtraction';
+import { UmbrellaPolicyDetailsView } from '@/components/policies/UmbrellaPolicyDetails';
 import { PropertyPolicyDetailsView } from '@/components/policies/PropertyPolicyDetails';
 import { useCreateSubmission } from '@/hooks/useCommercialSubmissions';
 import { commercialLinesForPolicy, remarketNote } from '@/lib/commercial/remarket';
@@ -55,11 +57,12 @@ export default function PolicyDetail() {
   const extractWC = useExtractWCPolicy();
   const extractCGL = useExtractCGLPolicy();
   const extractProperty = useExtractPropertyPolicy();
+  const extractUmbrella = useExtractUmbrellaPolicy();
   const createSubmission = useCreateSubmission();
   const queryClient = useQueryClient();
   // Which line's extraction should run after the next document upload. Set by
   // the per-line "Extract details" buttons; consumed once by onUploaded.
-  const pendingExtractLine = useRef<'gl' | 'wc' | 'property' | null>(null);
+  const pendingExtractLine = useRef<'gl' | 'wc' | 'property' | 'umbrella' | null>(null);
   const extractIM = useExtractInlandMarinePolicy();
   const extractCyber = useExtractCyberPolicy();
   const extractCrime = useExtractCrimePolicy();
@@ -179,6 +182,9 @@ export default function PolicyDetail() {
   // GL and Property sections - which is exactly the GL+Property pairing.
   const isProperty =
     isPropertyPolicy(policy?.line_of_business) &&
+    !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO;
+  const isUmbrella =
+    isUmbrellaPolicy(policy?.line_of_business) &&
     !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO;
 
   // Parse WC details from the policy's wc_details JSON field
@@ -666,6 +672,28 @@ export default function PolicyDetail() {
                     Extract Property Details
                   </Button>
                 )}
+                {isUmbrella && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      pendingExtractLine.current = 'umbrella';
+                      toast({
+                        title: 'Extract Umbrella Details',
+                        description: 'Upload the umbrella/excess policy or dec page; extraction runs automatically after upload.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractUmbrella.isPending}
+                  >
+                    {extractUmbrella.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Extract Umbrella Details
+                  </Button>
+                )}
                 {isInlandMarine && (
                   <Button
                     variant="outline"
@@ -812,6 +840,16 @@ export default function PolicyDetail() {
             policyId={policyId}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             propertyDetails={((policy as any)?.property_details as any) ?? null}
+          />
+        )}
+
+        {/* Umbrella details (Phase 5): the blob get_master_coi reads for the
+            umbrella line; extraction target for uploaded umbrella policies. */}
+        {isUmbrella && policyId && (
+          <UmbrellaPolicyDetailsView
+            policyId={policyId}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            umbrellaDetails={((policy as any)?.umbrella_details as any) ?? null}
           />
         )}
 
@@ -1009,6 +1047,8 @@ export default function PolicyDetail() {
                 extractWC.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
               } else if (line === 'property') {
                 extractProperty.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
+              } else if (line === 'umbrella') {
+                extractUmbrella.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
               }
             }}
             onSuccess={() => {
