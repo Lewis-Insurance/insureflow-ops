@@ -76,17 +76,22 @@ export function useAddSubmissionQuote() {
       submissionId: string;
       carrierName: string;
       premium: number | null;
+      /** Which line this quote is for; defaults to GL. */
+      line?: 'gl' | 'property';
       eachOccurrence: number | null;
       generalAggregate: number | null;
+      propertyLimit?: number | null;
     }) => {
       // Atomic server-side capture (quote + coverages + status advance in one
-      // txn) - review fix: the prior client sequence could orphan a quote row.
+      // txn), line-aware since Phase 3.
       const { data, error } = await supabase.rpc('add_submission_quote', {
         p_submission_id: input.submissionId,
         p_carrier_name: input.carrierName.trim(),
         p_premium: input.premium,
         p_each_occurrence: input.eachOccurrence,
         p_general_aggregate: input.generalAggregate,
+        p_line: input.line ?? 'gl',
+        p_property_limit: input.propertyLimit ?? null,
       });
       if (error) throw error;
       return data;
@@ -109,10 +114,15 @@ export function useBindSubmissionQuote() {
       quoteId: string;
       /** The policy the win becomes; limits are written to ITS cgl_details. */
       policyId: string;
-      /** BOTH limits required by the server: an empty-limit bind would close
-       *  the file without the COI values the feature exists to propagate. */
-      eachOccurrence: number;
-      generalAggregate: number;
+      /** Which line binds; defaults to GL. */
+      line?: 'gl' | 'property';
+      /** GL: BOTH limits required by the server. Property: propertyLimit
+       *  required instead. An empty-limit bind would close the file without
+       *  the COI values the feature exists to propagate. */
+      eachOccurrence: number | null;
+      generalAggregate: number | null;
+      propertyLimit?: number | null;
+      propertyDescription?: string | null;
     }) => {
       // Atomic server-side bind (review fix): tenancy validated, both GL
       // limits required, save_master_coi_fields rejections FAIL the bind,
@@ -124,6 +134,9 @@ export function useBindSubmissionQuote() {
         p_policy_id: input.policyId,
         p_each_occurrence: input.eachOccurrence,
         p_general_aggregate: input.generalAggregate,
+        p_line: input.line ?? 'gl',
+        p_property_limit: input.propertyLimit ?? null,
+        p_property_description: input.propertyDescription ?? null,
       });
       if (error) throw error;
       return data;

@@ -20,6 +20,8 @@ import { WCPolicyDetailsView } from '@/components/policies/WCPolicyDetails';
 import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
+import { useExtractPropertyPolicy, isPropertyPolicy } from '@/hooks/usePropertyExtraction';
+import { PropertyPolicyDetailsView } from '@/components/policies/PropertyPolicyDetails';
 import { useCreateSubmission } from '@/hooks/useCommercialSubmissions';
 import { commercialLinesForPolicy, remarketNote } from '@/lib/commercial/remarket';
 import { CGLPolicyDetailsView } from '@/components/policies/CGLPolicyDetails';
@@ -52,11 +54,12 @@ export default function PolicyDetail() {
   // Extraction hooks
   const extractWC = useExtractWCPolicy();
   const extractCGL = useExtractCGLPolicy();
+  const extractProperty = useExtractPropertyPolicy();
   const createSubmission = useCreateSubmission();
   const queryClient = useQueryClient();
   // Which line's extraction should run after the next document upload. Set by
   // the per-line "Extract details" buttons; consumed once by onUploaded.
-  const pendingExtractLine = useRef<'gl' | 'wc' | null>(null);
+  const pendingExtractLine = useRef<'gl' | 'wc' | 'property' | null>(null);
   const extractIM = useExtractInlandMarinePolicy();
   const extractCyber = useExtractCyberPolicy();
   const extractCrime = useExtractCrimePolicy();
@@ -170,6 +173,11 @@ export default function PolicyDetail() {
     isCGLPolicy(policy?.line_of_business) &&
     !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO &&
     !lob.includes('umbrella') && !lob.includes('excess') && !lob.includes('professional') && !lob.includes('epli');
+  // Property (Phase 3): the helper matches 'bop' too, so a BOP shows BOTH the
+  // GL and Property sections - which is exactly the GL+Property pairing.
+  const isProperty =
+    isPropertyPolicy(policy?.line_of_business) &&
+    !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO;
 
   // Parse WC details from the policy's wc_details JSON field
   const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
@@ -634,6 +642,28 @@ export default function PolicyDetail() {
                     Extract GL Details
                   </Button>
                 )}
+                {isProperty && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      pendingExtractLine.current = 'property';
+                      toast({
+                        title: 'Extract Property Details',
+                        description: 'Upload the property policy or dec page; extraction runs automatically after upload.',
+                      });
+                      setUploadDocOpen(true);
+                    }}
+                    disabled={extractProperty.isPending}
+                  >
+                    {extractProperty.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Extract Property Details
+                  </Button>
+                )}
                 {isInlandMarine && (
                   <Button
                     variant="outline"
@@ -770,6 +800,16 @@ export default function PolicyDetail() {
             policyId={policyId}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cglDetails={((policy as any)?.cgl_details as any) ?? null}
+          />
+        )}
+
+        {/* Property details (Phase 3): the blob get_master_coi reads for the
+            property line; extraction target for uploaded property policies. */}
+        {isProperty && policyId && (
+          <PropertyPolicyDetailsView
+            policyId={policyId}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            propertyDetails={((policy as any)?.property_details as any) ?? null}
           />
         )}
 
@@ -965,6 +1005,8 @@ export default function PolicyDetail() {
                 extractCGL.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
               } else if (line === 'wc') {
                 extractWC.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
+              } else if (line === 'property') {
+                extractProperty.mutate({ documentId, policyId }, { onSuccess: invalidateMasterCoi });
               }
             }}
             onSuccess={() => {
