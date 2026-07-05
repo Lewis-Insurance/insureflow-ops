@@ -12,6 +12,7 @@ import {
   isLikelyVin,
   normalizeVinValue,
   parseGvwrPounds,
+  pickVinError,
   pickVinFields,
 } from '@/lib/commercial/vinDecode';
 
@@ -116,5 +117,23 @@ describe('pickVinFields', () => {
 
   it('is not an empty decode when any field landed', () => {
     expect(isEmptyDecode(pickVinFields({ Make: 'FORD' }))).toBe(false);
+  });
+});
+
+describe('pickVinError', () => {
+  it('treats a clean row as code 0 with no text', () => {
+    expect(pickVinError({ ErrorCode: '0', ErrorText: '0 - VIN decoded clean.' })).toEqual({
+      code: '0',
+      text: '0 - VIN decoded clean.',
+    });
+  });
+
+  it('takes the primary code when vPIC packs several', () => {
+    expect(pickVinError({ ErrorCode: '6,14', ErrorText: 'Incomplete VIN; unable to verify.' }).code).toBe('6');
+  });
+
+  it('defaults a missing or empty code to 0', () => {
+    expect(pickVinError({}).code).toBe('0');
+    expect(pickVinError({ ErrorCode: '', ErrorText: '' })).toEqual({ code: '0', text: null });
   });
 });

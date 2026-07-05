@@ -11,7 +11,7 @@
 // figures, no em or en dashes, content-shaped loading.
 // ============================================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, Pencil, Plus, Sparkles, Trash2, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -59,8 +59,19 @@ export function FleetCard({ accountId }: { accountId: string }) {
   // save with provenance src='extracted' so a later manual edit reclaims.
   const [decodedFields, setDecodedFields] = useState<Set<string>>(new Set());
   const [decoding, setDecoding] = useState(false);
+  // Race guards (review fix): a synchronous busy ref (disabled= is state and
+  // lags a tick), a sequence token so a decode from a closed or switched
+  // dialog can never apply, and a live VIN mirror so a response only applies
+  // while the input still shows the VIN it was requested for.
+  const decodeBusyRef = useRef(false);
+  const decodeSeqRef = useRef(0);
+  const vinRef = useRef('');
 
   useEffect(() => {
+    // Any dialog transition invalidates in-flight decodes.
+    decodeSeqRef.current += 1;
+    decodeBusyRef.current = false;
+    setDecoding(false);
     if (!dialogOpen) return;
     const v = editing;
     const f: Record<string, string> = {};
@@ -79,10 +90,19 @@ export function FleetCard({ accountId }: { accountId: string }) {
     }
     setForm(f);
     setDecodedFields(new Set());
+    vinRef.current = f.vin ?? '';
   }, [dialogOpen, editing]);
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
+    if (k === 'vin') {
+      vinRef.current = v;
+      // Changing the VIN orphans any earlier decode: the filled identity
+      // fields are no longer machine-verified for THIS vin, so they lose
+      // their src='extracted' mark and would save as manual (review fix).
+      setDecodedFields(new Set());
+      return;
+    }
     // A manual keystroke on a decoded field reclaims it for src='manual'.
     setDecodedFields((prev) => {
       if (!prev.has(k)) return prev;
@@ -93,37 +113,57 @@ export function FleetCard({ accountId }: { accountId: string }) {
   };
 
   const handleDecode = async () => {
-    const vin = (form.vin ?? '').trim();
+    if (decodeBusyRef.current) return;
+    const vin = (form.vin ?? '').trim().toUpperCase();
     if (!isLikelyVin(vin)) {
       toast.error('Enter the full 17-character VIN first.');
       return;
     }
+    decodeBusyRef.current = true;
+    const seq = ++decodeSeqRef.current;
     setDecoding(true);
     try {
-      const decoded = await decodeVin(vin);
-      if (isEmptyDecode(decoded)) {
+      const { fields, warning } = await decodeVin(vin);
+      // Stale responses never apply: the dialog closed or switched vehicles
+      // (seq moved on) or the user retyped the VIN while we were fetching.
+      if (seq !== decodeSeqRef.current) return;
+      if (vinRef.current.trim().toUpperCase() !== vin) {
+        toast.info('The VIN changed while decoding; nothing was filled.');
+        return;
+      }
+      if (isEmptyDecode(fields)) {
         toast.info('The VIN decoded to nothing usable; enter the details manually.');
         return;
       }
       const filled = new Set<string>();
+      const fill = (k: string, val: string | number | null) => {
+        if (val != null) filled.add(k);
+      };
+      fill('year', fields.year); fill('make', fields.make); fill('model', fields.model);
+      fill('body_type', fields.body_type); fill('vehicle_type', fields.vehicle_type);
+      fill('gvwr', fields.gvwr);
       setForm((f) => {
         const next = { ...f };
-        const fill = (k: string, val: string | number | null) => {
-          if (val == null) return;
-          next[k] = String(val);
-          filled.add(k);
-        };
-        fill('year', decoded.year); fill('make', decoded.make); fill('model', decoded.model);
-        fill('body_type', decoded.body_type); fill('vehicle_type', decoded.vehicle_type);
-        fill('gvwr', decoded.gvwr);
+        for (const k of filled) {
+          const val = fields[k as keyof typeof fields];
+          if (val != null) next[k] = String(val);
+        }
         return next;
       });
       setDecodedFields((prev) => new Set([...prev, ...filled]));
-      toast.success('VIN decoded; review the filled fields.');
+      if (warning) toast.info(`VIN decoded with a NHTSA note: ${warning}. Review the filled fields.`);
+      else toast.success('VIN decoded; review the filled fields.');
     } catch (e) {
-      toast.error(`VIN decode failed: ${e instanceof Error ? e.message : 'network error'}`);
+      if (seq === decodeSeqRef.current) {
+        toast.error(`VIN decode failed: ${e instanceof Error ? e.message : 'network error'}`);
+      }
     } finally {
-      setDecoding(false);
+      // Only this request's own session releases the throttle; a stale
+      // fetch must not unlock (or re-lock) a newer dialog session.
+      if (seq === decodeSeqRef.current) {
+        decodeBusyRef.current = false;
+        setDecoding(false);
+      }
     }
   };
 

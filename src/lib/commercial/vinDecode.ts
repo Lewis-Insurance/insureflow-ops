@@ -73,12 +73,36 @@ export function isEmptyDecode(fields: DecodedVinFields): boolean {
   return Object.values(fields).every((v) => v == null);
 }
 
-export async function decodeVin(vin: string): Promise<DecodedVinFields> {
+/**
+ * vPIC's error signal for a result row. ErrorCode packs multiple codes
+ * ("6,14"); the primary (first) code decides: '0' is a clean decode,
+ * anything else is a warning or failure explained by ErrorText.
+ */
+export function pickVinError(result: Record<string, unknown>): { code: string; text: string | null } {
+  const codeRaw = normalizeVinValue(result['ErrorCode']) ?? '0';
+  return { code: codeRaw.split(',')[0].trim(), text: normalizeVinValue(result['ErrorText']) };
+}
+
+export interface VinDecodeResult {
+  fields: DecodedVinFields;
+  /** Non-null when vPIC decoded WITH a warning; the fields are still shown
+   *  for human review rather than trusted silently. */
+  warning: string | null;
+}
+
+export async function decodeVin(vin: string): Promise<VinDecodeResult> {
   const clean = vin.trim().toUpperCase();
   const res = await fetch(`${VPIC_URL}/${encodeURIComponent(clean)}?format=json`);
   if (!res.ok) throw new Error(`VIN lookup failed (${res.status})`);
   const data = (await res.json()) as { Results?: Record<string, unknown>[] };
   const row = data.Results?.[0];
   if (!row) throw new Error('VIN lookup returned no result');
-  return pickVinFields(row);
+  const fields = pickVinFields(row);
+  const err = pickVinError(row);
+  // A failed decode with nothing usable surfaces vPIC's own reason instead
+  // of silently filling nothing; a warning WITH data flows through flagged.
+  if (err.code !== '0' && isEmptyDecode(fields)) {
+    throw new Error(err.text ?? 'The VIN did not decode');
+  }
+  return { fields, warning: err.code !== '0' ? (err.text ?? 'decoded with warnings') : null };
 }
