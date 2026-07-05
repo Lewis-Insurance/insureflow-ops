@@ -87,7 +87,8 @@ export function LossRunRequestDialog({
       due.setDate(due.getDate() + 14);
       // Dedupe key makes retries safe: a re-log after a partial failure can
       // never create a second follow-up task for the same carrier+submission.
-      const dedupeKey = `loss_run:${submissionId}:${carrier.trim().toLowerCase()}`;
+      // Years included: a different lookback window is a distinct request.
+      const dedupeKey = `loss_run:${submissionId}:${carrier.trim().toLowerCase()}:${years}`;
       const { error: taskError } = await supabase.from('tasks').insert({
         account_id: accountId,
         title: `Loss runs: follow up with ${carrier.trim()}`,
@@ -112,8 +113,10 @@ export function LossRunRequestDialog({
           .select('id, metadata')
           .eq('submission_id', submissionId)
           .eq('action', 'loss_run_requested');
-        writeEvent = !((existingEvents as Array<{ metadata?: { carrier?: string } }> | null) ?? []).some(
-          (e) => (e.metadata?.carrier ?? '').toLowerCase() === carrier.trim().toLowerCase(),
+        writeEvent = !((existingEvents as Array<{ metadata?: { carrier?: string; years_back?: number } }> | null) ?? []).some(
+          (e) =>
+            (e.metadata?.carrier ?? '').toLowerCase() === carrier.trim().toLowerCase() &&
+            e.metadata?.years_back === Number(years),
         );
       }
       if (writeEvent) {
