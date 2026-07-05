@@ -18,6 +18,7 @@ import { CommercialProfileCard } from '@/components/commercial/CommercialProfile
 import { SubmissionsPanel } from '@/components/commercial/SubmissionsPanel';
 import { ClientIntakeCard } from '@/components/commercial/ClientIntakeCard';
 import { LocationsCard } from '@/components/commercial/LocationsCard';
+import { WorkersCompCard } from '@/components/commercial/WorkersCompCard';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
@@ -487,6 +488,7 @@ export default function CustomerDetail() {
           <section id="commercial" className="scroll-mt-20 space-y-4">
             <CommercialProfileCard accountId={account.id} />
             <LocationsCard accountId={account.id} />
+            <WorkersCompCard accountId={account.id} />
             <ClientIntakeCard accountId={account.id} />
             <SubmissionsPanel accountId={account.id} accountName={account.name} />
           </section>
