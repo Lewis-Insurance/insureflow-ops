@@ -546,12 +546,24 @@ export default function PolicyDetail() {
                         onClick={() => {
                           // Remarket clone (SOW v3 feeder #5): open a prefilled
                           // submission targeting this policy's line and x-date.
+                          const targetLines = commercialLinesForPolicy(policy as any);
+                          if (targetLines.length === 0) {
+                            toast({
+                              title: 'Could not determine the coverage line',
+                              description: 'Start the submission from the customer record and pick the lines manually.',
+                            });
+                            return;
+                          }
                           createSubmission.mutate(
                             {
                               accountId: policy.account!.id,
-                              targetLines: commercialLinesForPolicy(policy as any),
+                              targetLines,
                               effectiveDate: (policy as any).expiration_date ?? null,
-                              notes: remarketNote(policy as any),
+                              // Carrier may live only on the joined carrier_info row.
+                              notes: remarketNote({
+                                ...(policy as any),
+                                carrier: (policy as any).carrier || (policy as any).carrier_info?.name || null,
+                              }),
                               remarketOfPolicyId: policy.id,
                             },
                             {

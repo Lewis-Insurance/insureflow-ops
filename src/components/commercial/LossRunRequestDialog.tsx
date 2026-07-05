@@ -21,6 +21,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { composeLossRunLetter } from '@/lib/commercial/lossRunLetter';
 
@@ -44,6 +45,7 @@ export function LossRunRequestDialog({
   const [policyNumbers, setPolicyNumbers] = useState('');
   const [years, setYears] = useState('5');
   const [logging, setLogging] = useState(false);
+  const queryClient = useQueryClient();
 
   const letter = useMemo(
     () =>
@@ -83,6 +85,9 @@ export function LossRunRequestDialog({
     try {
       const due = new Date();
       due.setDate(due.getDate() + 14);
+      // Dedupe key makes retries safe: a re-log after a partial failure can
+      // never create a second follow-up task for the same carrier+submission.
+      const dedupeKey = `loss_run:${submissionId}:${carrier.trim().toLowerCase()}`;
       const { error: taskError } = await supabase.from('tasks').insert({
         account_id: accountId,
         title: `Loss runs: follow up with ${carrier.trim()}`,
@@ -90,8 +95,12 @@ export function LossRunRequestDialog({
         status: 'pending',
         priority: 'medium',
         due_at: due.toISOString(),
-      });
-      if (taskError) throw taskError;
+        dedupe_key: dedupeKey,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      // 23505 = the follow-up already exists from a prior attempt; that is
+      // success for our purposes (proceed to the audit event).
+      if (taskError && (taskError as { code?: string }).code !== '23505') throw taskError;
       const { error: eventError } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('submission_events' as any)
@@ -101,6 +110,9 @@ export function LossRunRequestDialog({
           metadata: { carrier: carrier.trim(), years_back: Number(years) },
         });
       if (eventError) throw eventError;
+      // Surface the new task on the customer record without a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-tasks', accountId] });
       toast.success('Request logged; follow-up task created (due in 14 days).');
       setCarrier(''); setPolicyNumbers('');
       onOpenChange(false);
