@@ -154,11 +154,19 @@ export default function PolicyDetail() {
   // Check policy line of business
   const lob = (policy?.line_of_business || '').toLowerCase();
   const isWorkersComp = lob.includes('work') && lob.includes('comp');
-  const isCGL = isCGLPolicy(policy?.line_of_business);
   const isInlandMarine = isInlandMarinePolicy(policy?.line_of_business);
   const isCyber = isCyberPolicy(policy?.line_of_business);
   const isCrime = isCrimePolicy(policy?.line_of_business);
   const isEO = isEOPolicy(policy?.line_of_business);
+  // isCGLPolicy's fallback ("liability" and not auto/professional) is too
+  // broad on its own - it matches Cyber Liability, Umbrella Liability, E&O,
+  // EPLI. Exclude every line this page already types plus umbrella/excess/
+  // professional so the GL extraction can never write cgl_details onto a
+  // non-GL policy (review fix).
+  const isCGL =
+    isCGLPolicy(policy?.line_of_business) &&
+    !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO &&
+    !lob.includes('umbrella') && !lob.includes('excess') && !lob.includes('professional') && !lob.includes('epli');
 
   // Parse WC details from the policy's wc_details JSON field
   const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
@@ -883,13 +891,23 @@ export default function PolicyDetail() {
             }}
             accountId={policy.account.id}
             policyId={policy.id}
-            onUploaded={(documentId) => {
+            onUploaded={(documentId, associatedPolicyId) => {
               // Fire the armed line extraction against the fresh document. The
               // hooks own their toasts + cgl/wc invalidations; we add the
               // Master COI readiness refresh (limits may have just landed).
               const line = pendingExtractLine.current;
               pendingExtractLine.current = null;
               if (!line || !policyId) return;
+              // Review fix: the modal lets the user re-associate the upload to
+              // a different policy (or none). Only extract when the document
+              // is actually associated with THIS policy.
+              if (associatedPolicyId !== policyId) {
+                toast({
+                  title: 'Extraction skipped',
+                  description: 'The document was associated with a different policy, so details were not extracted here.',
+                });
+                return;
+              }
               const invalidateMasterCoi = () => {
                 if (policy?.account?.id) {
                   queryClient.invalidateQueries({ queryKey: ['master-coi', policy.account.id] });

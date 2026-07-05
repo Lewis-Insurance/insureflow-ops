@@ -23,7 +23,7 @@ interface UploadDocModalProps {
    * onSuccess). Lets callers chain document-scoped work, e.g. policy-detail
    * extraction on PolicyDetail. Optional and non-breaking.
    */
-  onUploaded?: (documentId: string) => void | Promise<void>;
+  onUploaded?: (documentId: string, associatedPolicyId: string | null) => void | Promise<void>;
 }
 
 export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSuccess, onUploaded }: UploadDocModalProps) {
@@ -101,6 +101,9 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
         account_id: accountId,
         uploaded_by: user.id,
         storage_path: filePath,
+        // Some readers (extract-wc-policy) resolve the file via file_path; keep
+        // both in sync so freshly uploaded docs are extractable (review fix).
+        file_path: filePath,
         storage_bucket: 'documents',
         file_missing: false,
         filename: file.name,
@@ -180,7 +183,10 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
       // Chain document-scoped follow-up work (e.g. policy-detail extraction).
       if (document?.id && onUploaded) {
         try {
-          await onUploaded(document.id);
+          await onUploaded(
+            document.id,
+            associationType === 'policy' && selectedPolicyId ? selectedPolicyId : null,
+          );
         } catch (error) {
           console.error('onUploaded follow-up failed:', error);
         }
@@ -209,7 +215,15 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // Review fix: closing mid-upload let the in-flight upload finish while
+        // the caller's armed follow-up (e.g. extraction) was already disarmed.
+        if (!nextOpen && loading) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
@@ -367,7 +381,7 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
             <Button onClick={handleUpload} disabled={loading || !file}>

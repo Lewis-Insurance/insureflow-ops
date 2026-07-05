@@ -501,9 +501,17 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
     );
   };
 
+  const bindEo = numOrNull(bindEachOcc);
+  const bindGa = numOrNull(bindGenAgg);
+
   const handleBind = () => {
     if (!bindTarget || !bindPolicyId) {
       toast.error('Pick the policy this bind becomes.');
+      return;
+    }
+    // Both COI-required limits must be present (the server enforces this too).
+    if (bindEo == null || bindGa == null) {
+      toast.error('Both GL limits are required to bind.');
       return;
     }
     bindQuote.mutate(
@@ -512,8 +520,8 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         submissionId: submission.id,
         quoteId: bindTarget.id,
         policyId: bindPolicyId,
-        eachOccurrence: numOrNull(bindEachOcc),
-        generalAggregate: numOrNull(bindGenAgg),
+        eachOccurrence: bindEo,
+        generalAggregate: bindGa,
       },
       { onSuccess: () => setBindTarget(null) },
     );
@@ -625,7 +633,10 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <Button variant="ghost" onClick={() => setBindTarget(null)} disabled={bindQuote.isPending}>
               Cancel
             </Button>
-            <Button onClick={handleBind} disabled={bindQuote.isPending || !bindPolicyId}>
+            <Button
+              onClick={handleBind}
+              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || bindGa == null}
+            >
               {bindQuote.isPending ? 'Binding' : 'Bind quote'}
             </Button>
           </DialogFooter>

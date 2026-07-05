@@ -78,16 +78,24 @@ export function useSaveCommercialProfile() {
        */
       sources?: Partial<Record<keyof CommercialProfileInput, ProvenanceSource>>;
     }) => {
+      // Normalize before comparing (review fix): the form seeds '' for null
+      // DB values; treating '' as a change stamped provenance and persisted
+      // empty strings for untouched fields.
+      const norm = (v: unknown): unknown => (v === '' || v === undefined ? null : v);
       const changedKeys = (Object.keys(input.changes) as (keyof CommercialProfileInput)[]).filter(
-        (k) => (input.existing?.[k] ?? null) !== (input.changes[k] ?? null),
+        (k) => norm(input.existing?.[k]) !== norm(input.changes[k]),
       );
-      if (changedKeys.length === 0) return input.existing;
+      if (changedKeys.length === 0) {
+        return { profile: input.existing, changed: false as const };
+      }
 
       const now = new Date().toISOString();
       const provenance: FieldProvenance = { ...(input.existing?.field_provenance ?? {}) };
       for (const k of changedKeys) provenance[k] = { src: input.sources?.[k] ?? 'manual', at: now };
 
-      const payload = { ...input.changes, field_provenance: provenance };
+      // Write ONLY the changed fields, normalized (null, never '').
+      const payload: Record<string, unknown> = { field_provenance: provenance };
+      for (const k of changedKeys) payload[k] = norm(input.changes[k]);
 
       if (input.existing) {
         const { data, error } = await supabase
@@ -98,7 +106,7 @@ export function useSaveCommercialProfile() {
           .select('*')
           .single();
         if (error) throw error;
-        return data as unknown as CommercialProfile;
+        return { profile: data as unknown as CommercialProfile, changed: true as const };
       }
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,11 +115,15 @@ export function useSaveCommercialProfile() {
         .select('*')
         .single();
       if (error) throw error;
-      return data as unknown as CommercialProfile;
+      return { profile: data as unknown as CommercialProfile, changed: true as const };
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ['commercial-profile', variables.accountId] });
-      toast.success('Business profile saved');
+      if (result?.changed === false) {
+        toast.info('No changes to save');
+      } else {
+        toast.success('Business profile saved');
+      }
     },
     onError: (error: Error) => {
       toast.error(`Could not save the business profile: ${error.message}`);

@@ -82,52 +82,17 @@ export function useAddSubmissionQuote() {
       eachOccurrence: number | null;
       generalAggregate: number | null;
     }) => {
-      const { data: quote, error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('quotes' as any)
-        .insert({
-          account_id: input.accountId,
-          submission_id: input.submissionId,
-          line_of_business: 'gl',
-          premium: input.premium,
-          status: 'open',
-          quoted_at: new Date().toISOString(),
-          options: { carrier_name: input.carrierName.trim() },
-        })
-        .select('id')
-        .single();
+      // Atomic server-side capture (quote + coverages + status advance in one
+      // txn) - review fix: the prior client sequence could orphan a quote row.
+      const { data, error } = await supabase.rpc('add_submission_quote', {
+        p_submission_id: input.submissionId,
+        p_carrier_name: input.carrierName.trim(),
+        p_premium: input.premium,
+        p_each_occurrence: input.eachOccurrence,
+        p_general_aggregate: input.generalAggregate,
+      });
       if (error) throw error;
-
-      const coverageRows = [
-        input.eachOccurrence != null && {
-          quote_id: (quote as { id: string }).id,
-          coverage_type: 'gl_each_occurrence',
-          limit_amount: input.eachOccurrence,
-        },
-        input.generalAggregate != null && {
-          quote_id: (quote as { id: string }).id,
-          coverage_type: 'gl_general_aggregate',
-          limit_amount: input.generalAggregate,
-        },
-      ].filter(Boolean);
-      if (coverageRows.length > 0) {
-        const { error: covError } = await supabase
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .from('quote_coverages' as any)
-          .insert(coverageRows);
-        if (covError) throw covError;
-      }
-
-      // First quote moves a pre-quote submission into 'quoted'.
-      const { error: subError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('commercial_submissions' as any)
-        .update({ status: 'quoted' })
-        .eq('id', input.submissionId)
-        .in('status', ['draft', 'intake', 'packet_ready', 'signing', 'submitted']);
-      if (subError) throw subError;
-
-      return quote;
+      return data;
     },
     onSuccess: (_d, v) => {
       queryClient.invalidateQueries({ queryKey: ['submission-quotes', v.submissionId] });
@@ -147,54 +112,24 @@ export function useBindSubmissionQuote() {
       quoteId: string;
       /** The policy the win becomes; limits are written to ITS cgl_details. */
       policyId: string;
-      eachOccurrence: number | null;
-      generalAggregate: number | null;
+      /** BOTH limits required by the server: an empty-limit bind would close
+       *  the file without the COI values the feature exists to propagate. */
+      eachOccurrence: number;
+      generalAggregate: number;
     }) => {
-      // 1) Winner won, open siblings lost.
-      const { error: winError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('quotes' as any)
-        .update({ status: 'won' })
-        .eq('id', input.quoteId);
-      if (winError) throw winError;
-      const { error: loseError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('quotes' as any)
-        .update({ status: 'lost' })
-        .eq('submission_id', input.submissionId)
-        .neq('id', input.quoteId)
-        .eq('status', 'open');
-      if (loseError) throw loseError;
-
-      // 2) Write the bound GL limits to the policy through the COI write path
-      //    (registry-whitelisted; stamps the manual-write provenance ledger).
-      const updates: Record<string, number> = {};
-      if (input.eachOccurrence != null) updates[GL_EACH_OCCURRENCE_PATH] = input.eachOccurrence;
-      if (input.generalAggregate != null) updates[GL_GENERAL_AGGREGATE_PATH] = input.generalAggregate;
-      if (Object.keys(updates).length > 0) {
-        const { error: saveError } = await supabase.rpc('save_master_coi_fields', {
-          p_policy_id: input.policyId,
-          p_updates: updates,
-        });
-        if (saveError) throw saveError;
-      }
-
-      // 3) Audit event, then the submission closes as bound.
-      const { error: eventError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('submission_events' as any)
-        .insert({
-          submission_id: input.submissionId,
-          action: 'bound',
-          metadata: { quote_id: input.quoteId, policy_id: input.policyId, ...updates },
-        });
-      if (eventError) throw eventError;
-      const { error: subError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('commercial_submissions' as any)
-        .update({ status: 'bound' })
-        .eq('id', input.submissionId);
-      if (subError) throw subError;
+      // Atomic server-side bind (review fix): tenancy validated, both GL
+      // limits required, save_master_coi_fields rejections FAIL the bind,
+      // quote won + siblings lost + event + bound in one transaction under a
+      // submission row lock - a failure leaves everything open and retryable,
+      // and concurrent binds cannot produce two winners.
+      const { data, error } = await supabase.rpc('bind_submission_quote', {
+        p_quote_id: input.quoteId,
+        p_policy_id: input.policyId,
+        p_each_occurrence: input.eachOccurrence,
+        p_general_aggregate: input.generalAggregate,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: (_d, v) => {
       queryClient.invalidateQueries({ queryKey: ['submission-quotes', v.submissionId] });

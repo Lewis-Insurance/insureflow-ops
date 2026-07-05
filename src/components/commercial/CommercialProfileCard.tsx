@@ -69,9 +69,12 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
   const [sunbizCandidates, setSunbizCandidates] = useState<SunbizCandidate[]>([]);
   const machineSourced = useRef<Set<keyof CommercialProfileInput>>(new Set());
 
-  // Seed the form each time editing opens (or the profile refreshes underneath).
+  // Seed the form each time editing opens. The Edit button is disabled while
+  // the profile query loads, so the seed always sees settled data; the stale
+  // Sunbiz-provenance set is cleared with every fresh seed (review fix).
   useEffect(() => {
     if (editing) {
+      machineSourced.current.clear();
       setForm({
         legal_name: profile?.legal_name ?? '',
         dba: profile?.dba ?? '',
@@ -173,6 +176,7 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
             variant="ghost"
             size="sm"
             onClick={() => setEditing(true)}
+            disabled={isLoading}
             className="text-cc-text-secondary hover:text-cc-text-primary"
           >
             <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
@@ -198,6 +202,7 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
           <ReadField label="Employees" value={profile?.employee_count != null ? String(profile.employee_count) : null} num />
           <ReadField label="Annual revenue" value={profile?.annual_revenue != null ? `$${Number(profile.annual_revenue).toLocaleString('en-US')}` : null} num />
           <ReadField label="WC experience mod" value={profile?.wc_experience_mod != null ? String(profile.wc_experience_mod) : null} num />
+          <ReadField label="Website" value={profile?.website ?? null} />
           <div className="col-span-2 md:col-span-3">
             <ReadField label="Description of operations" value={profile?.description_of_operations ?? null} />
           </div>
