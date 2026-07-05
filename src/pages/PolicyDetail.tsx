@@ -121,7 +121,7 @@ export default function PolicyDetail() {
   // this policy. The section renders whenever there are holders; it is
   // emphasized (warning-toned header) when the policy is cancelled/non_renewed.
   // The child component shares this query by key, so this is a single fetch.
-  const { holders: cancellationHolders } = useCancellationHolders(policyId ?? null);
+  const { holders: cancellationHolders, isLoading: cancellationHoldersLoading } = useCancellationHolders(policyId ?? null);
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return 'N/A';
@@ -792,7 +792,9 @@ export default function PolicyDetail() {
         {/* Certificate holders (07 §5.2): shown whenever active cert holders
             reference this policy. Emphasized (warning-toned) when the policy is
             cancelled or non-renewed, because those holders were promised notice. */}
-        {policyId && hasCancellationHolders && (
+        {/* Review fix: on a cancelled/non-renewed policy the notify prompt must
+            not vanish while the holder list is still loading. */}
+        {policyId && (hasCancellationHolders || (isCancelledOrNonRenewed && cancellationHoldersLoading)) && (
           <Card
             className={
               isCancelledOrNonRenewed

@@ -45,9 +45,6 @@ export interface SubmissionQuote {
   quote_coverages?: SubmissionQuoteCoverage[];
 }
 
-export const GL_EACH_OCCURRENCE_PATH = 'cgl_details.limits.each_occurrence';
-export const GL_GENERAL_AGGREGATE_PATH = 'cgl_details.limits.general_aggregate';
-
 export function quoteCarrierName(q: SubmissionQuote): string {
   const fromOptions = q.options && typeof q.options === 'object' ? q.options['carrier_name'] : null;
   return (typeof fromOptions === 'string' && fromOptions.trim()) || q.competitor_carrier || 'Unknown carrier';
@@ -139,34 +136,5 @@ export function useBindSubmissionQuote() {
       toast.success('Bound. The policy is COI-ready once its line details pass readiness.');
     },
     onError: (error: Error) => toast.error(`Bind failed: ${error.message}`),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Account policy picker (bind target).
-// ---------------------------------------------------------------------------
-
-export interface BindablePolicy {
-  id: string;
-  policy_number: string | null;
-  carrier: string | null;
-  line_of_business: string | null;
-  status: string | null;
-}
-
-export function useAccountPolicies(accountId: string | null) {
-  return useQuery({
-    queryKey: ['account-policies-lite', accountId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('policies')
-        .select('id, policy_number, carrier, line_of_business, status')
-        .eq('account_id', accountId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data as unknown as BindablePolicy[]) ?? [];
-    },
-    enabled: !!accountId,
   });
 }

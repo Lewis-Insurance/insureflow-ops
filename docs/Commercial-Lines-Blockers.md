@@ -53,7 +53,7 @@
 
 ## 2b. ANTHROPIC_API_KEY - policy-upload extraction (found 2026-07-05)
 
-**Blocked:** the entire policy-upload extraction feeder (Phase 2's headline). The 9 extract-* edge fns require `ANTHROPIC_API_KEY` + the two Azure Document Intelligence secrets. **Verified: the Azure secrets ARE set in prod; `ANTHROPIC_API_KEY` is NOT.** Every extraction call fails at the key check until it exists.
+**Blocked:** the entire policy-upload extraction feeder (Phase 2's headline). The 9 extract-* edge fns require `ANTHROPIC_API_KEY` + the two Azure Document Intelligence secrets. **Verified (re-checked 2026-07-05 late): the Azure secrets ARE set in prod; `ANTHROPIC_API_KEY` is still NOT in the Supabase EDGE-FUNCTION secrets** (if it was set in Netlify or GitHub env, those do not reach edge functions - it must be a Supabase edge secret). Every extraction call fails at the key check until it exists.
 
 **To unblock (Landen, ~5 minutes):** add an Anthropic API key as a Supabase edge secret:
 - Dashboard: project `lrqajzwcmdwahnjyidgv` -> Settings -> Edge Functions -> Secrets -> `ANTHROPIC_API_KEY`
@@ -62,7 +62,7 @@ No deploy needed. First real extraction after that verifies the whole path (uplo
 
 ---
 
-## 3. RESEND_API_KEY - COI email delivery (carryover from the COI module)
+## 3. ~~RESEND_API_KEY~~ - DONE (verified set in edge secrets 2026-07-05)
 
 **Blocked:** actually delivering certificate emails (and, later, the Phase 1b one-click packet send, which uses the same provider). Everything up to the provider call is live and Fence-gated; a send today returns a 502 at Resend.
 

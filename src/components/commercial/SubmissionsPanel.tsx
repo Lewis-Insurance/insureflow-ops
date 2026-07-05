@@ -38,12 +38,12 @@ import {
 } from '@/hooks/useCommercialSubmissions';
 import {
   quoteCarrierName,
-  useAccountPolicies,
   useAddSubmissionQuote,
   useBindSubmissionQuote,
   useSubmissionQuotes,
   type SubmissionQuote,
 } from '@/hooks/useSubmissionQuotes';
+import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
 import type {
   CommercialLineKey, CommercialSubmission, OfferCoverage, SubmissionStatus,
 } from '@/types/commercial';
@@ -221,7 +221,9 @@ export function SubmissionsPanel({ accountId, accountName }: { accountId: string
                       checked={newLines.includes(l.key)}
                       onCheckedChange={(v) =>
                         setNewLines((prev) =>
-                          v === true ? [...prev, l.key] : prev.filter((k) => k !== l.key),
+                          v === true
+                            ? prev.includes(l.key) ? prev : [...prev, l.key]
+                            : prev.filter((k) => k !== l.key),
                         )
                       }
                     />
@@ -306,7 +308,11 @@ function SubmissionDetail({
       {
         submissionId: submission.id,
         carrierName: decCarrier,
-        declinedAt: decDate || new Date().toISOString().slice(0, 10),
+        // LOCAL calendar date, not UTC: an evening entry must not log
+        // tomorrow's date on the E&O declination record (review fix).
+        declinedAt:
+          decDate ||
+          `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
         reason: decReason,
       },
       { onSuccess: () => { setDecCarrier(''); setDecDate(''); setDecReason(''); } },
@@ -452,7 +458,14 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const { data: quotes = [] } = useSubmissionQuotes(submission.id);
   const addQuote = useAddSubmissionQuote();
   const bindQuote = useBindSubmissionQuote();
-  const { data: policies = [] } = useAccountPolicies(accountId);
+  // Reuse the app-wide policies query (review fix: no duplicate cache entry).
+  // usePoliciesByAccount does not filter soft-deleted rows; the bind server
+  // check would reject one anyway - keep them out of the picker (review fix).
+  const { data: allPolicies = [] } = usePoliciesByAccount(accountId);
+  const policies = useMemo(
+    () => allPolicies.filter((p: { deleted_at?: string | null }) => !p.deleted_at),
+    [allPolicies],
+  );
 
   const closed = ['bound', 'lost', 'abandoned'].includes(submission.status);
 
