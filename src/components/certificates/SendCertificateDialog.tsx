@@ -8,6 +8,11 @@
 // The edge function is authoritative for the attachment, holder name, and
 // certificate number; this dialog sends only ids and the free-text note.
 //
+// Client-facing send: guarded by the repo-wide Fence. handleSend first mints a
+// one-time, server-verified named-human approval over the exact send payload
+// (createClientSendApproval), then passes it in the body -- same pattern as the
+// SMS and signature surfaces. send-coi-email consumes and re-hashes it.
+//
 // Calm Command: cc-* tokens, both themes, no em/en dashes. The dialog is its own
 // surface; its confirm is the standard primary action.
 
@@ -26,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
+import { createClientSendApproval } from '@/lib/clientSendApproval';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import type { CertificateListItem } from '@/types/certificates';
@@ -100,13 +106,20 @@ export function SendCertificateDialog({
 
     setSending(true);
     try {
+      // Build the send payload ONCE; the Fence approval is minted over this exact
+      // object so the server's consume-side hash matches (canonicalPayload keys on
+      // { certificate_id, to, cc, note }).
+      const sendPayload = {
+        certificate_id: certificate.id,
+        to: toTrimmed,
+        cc: finalCc.length > 0 ? finalCc : undefined,
+        note: note.trim() ? note.trim() : undefined,
+      };
+      // Fence: a client-facing send requires a one-time, server-minted named-human
+      // approval reference (throws if the mint is refused).
+      const client_send_approval = await createClientSendApproval('send-coi-email', sendPayload);
       const { error } = await supabase.functions.invoke('send-coi-email', {
-        body: {
-          certificate_id: certificate.id,
-          to: toTrimmed,
-          cc: finalCc.length > 0 ? finalCc : undefined,
-          note: note.trim() ? note.trim() : undefined,
-        },
+        body: { ...sendPayload, client_send_approval },
       });
       if (error) {
         logger.error('send certificate email failed', error);

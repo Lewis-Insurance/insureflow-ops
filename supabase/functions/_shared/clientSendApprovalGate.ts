@@ -145,12 +145,18 @@ function canonicalPayload(surface: ClientSendSurface, payload: unknown): Record<
     }) as Record<string, unknown>;
   }
   if (surface === 'send-coi-email') {
+    // Bind the approval to the exact send: which certificate, to whom, cc'd whom.
+    // Keys mirror the send-coi-email request body { certificate_id, to, cc, note }
+    // so the mint (client-send-approval-create) and the consume (send-coi-email)
+    // hash identically. (Previously keyed on certificate_number/url/holder_name,
+    // none of which are in the body, so every one resolved to undefined and the
+    // hash collapsed to { to } -- the approval bound only to the recipient, not to
+    // a specific certificate.)
     return sortObject({
-      to: normalized.to ?? normalized.recipientEmail,
-      certificate_number: normalized.certificateNumber ?? normalized.certificate_number,
-      certificate_url: normalized.certificateUrl ?? normalized.certificate_url,
-      holder_name: normalized.holderName ?? normalized.holder_name,
-      coi_ref: normalized.coi_id ?? normalized.coiId ?? normalized.coiRef ?? normalized.certificateNumber ?? null,
+      certificate_id: normalized.certificate_id ?? normalized.certificateId ?? null,
+      to: normalized.to ?? normalized.recipientEmail ?? null,
+      cc: normalized.cc ?? null,
+      note: normalized.note ?? null,
     }) as Record<string, unknown>;
   }
   if (surface === 'send-id-card-email') {
