@@ -54,9 +54,12 @@ const surfaceCases: SurfaceCase[] = [
     tamperedPayload: { to_number: '+155****4567', body: 'Changed SMS body.', account_id: 'account-ref-001', contact_id: 'contact-ref-001' },
   },
   {
+    // The approval binds to the exact send: { certificate_id, to, cc, note } (the
+    // send-coi-email request body). Tampering the certificate_id -- sending a
+    // DIFFERENT certificate under the same approval -- must be a content mismatch.
     surface: 'send-coi-email',
-    payload: { to: 'holder@example.invalid', certificateNumber: 'COI-2026-0001', certificateUrl: 'https://example.invalid/coi.pdf', holderName: 'Certificate Holder' },
-    tamperedPayload: { to: 'holder@example.invalid', certificateNumber: 'COI-2026-0001', certificateUrl: 'https://example.invalid/changed.pdf', holderName: 'Certificate Holder' },
+    payload: { certificate_id: 'cert-0000-0000-0001', to: 'holder@example.invalid', cc: ['broker@example.invalid'], note: 'Please find the certificate attached.' },
+    tamperedPayload: { certificate_id: 'cert-0000-0000-0002', to: 'holder@example.invalid', cc: ['broker@example.invalid'], note: 'Please find the certificate attached.' },
   },
   {
     surface: 'esign-create-request',

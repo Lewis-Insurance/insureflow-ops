@@ -73,7 +73,7 @@ async function toIssueError(error: unknown): Promise<IssueCertificateError> {
         // shapes used { error: string } / { issues }. Handle all three.
         error?:
           | string
-          | { code?: string; message?: string; errors?: Array<{ line_key?: string; code?: string; message?: string }> };
+          | { code?: string; message?: string; errors?: Array<{ line_key?: string; code?: string; message?: string; severity?: 'error' | 'warning' }> };
         message?: string;
       };
       if (typeof body.error === 'object' && body.error !== null) {
@@ -81,7 +81,9 @@ async function toIssueError(error: unknown): Promise<IssueCertificateError> {
         if (Array.isArray(body.error.errors)) {
           issues = body.error.errors.map((e) => ({
             code: e.code ?? '',
-            severity: 'error' as const,
+            // Respect a server-tagged severity; default to 'error' (the 422
+            // blockers today are all errors, but a warning must not disable Generate).
+            severity: e.severity ?? ('error' as const),
             message: e.message ?? 'Requirement not met.',
             lineKey: e.line_key,
           }));
