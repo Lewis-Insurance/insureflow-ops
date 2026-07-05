@@ -242,7 +242,9 @@ function requirementsToForm(
     flags: parsed.flags.map((f) => ({ ...f })),
     required_endorsement_forms: [...parsed.required_endorsement_forms],
     notice_days: parsed.notice_days != null ? String(parsed.notice_days) : '',
-    required_lines: [...parsed.required_lines],
+    // Drop a legacy stored 'other' (no longer offered; the generator can
+    // never satisfy it) so the next save clears it instead of echoing it.
+    required_lines: parsed.required_lines.filter((l) => l !== 'other'),
     notes: notes ?? '',
   };
 }
@@ -703,6 +705,10 @@ export function AdditionalInsuredDrawer({
   useEffect(() => {
     if (!open || !initial) {
       setReqForm(EMPTY_REQUIREMENTS);
+      // Reset the transient flags: a load cancelled mid-flight must not leave
+      // reqLoading stuck and block create-mode saves (round-2 review fix).
+      setReqLoading(false);
+      setReqLoadFailed(false);
       return;
     }
     let cancelled = false;
@@ -1108,7 +1114,7 @@ export function AdditionalInsuredDrawer({
               {!isEdit && selectedMatch && (
                 <Button
                   variant="ghost"
-                  disabled={saving || !nameEntered}
+                  disabled={saving || !nameEntered || reqLoading}
                   onClick={() => {
                     setSelectedMatch(null);
                     handleCreate();

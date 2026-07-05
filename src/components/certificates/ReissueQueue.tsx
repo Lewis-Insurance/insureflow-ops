@@ -202,11 +202,12 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
     if (targets.length === 0) return;
 
     setRunning(true);
-    try {
     setResult(null);
-
+    // Declared OUTSIDE the try so the post-batch result render can see them
+    // (round-2 review fix: the first try/finally scoped these away).
     const reissued: CertificateNeedingReissue[] = [];
     const blocked: BatchBlocked[] = [];
+    try {
 
     for (const cert of targets) {
       // Reissue mode: the server derives holder/lines/print-intent/DOO/remarks
@@ -258,6 +259,7 @@ export function ReissueQueue({ accountId, onDone }: ReissueQueueProps) {
     } finally {
       setRunning(false);
     }
+    // Always report what completed, even if invalidation/refetch threw above.
     setResult({ reissued, blocked });
 
     if (blocked.length === 0) {
