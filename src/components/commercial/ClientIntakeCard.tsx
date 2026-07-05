@@ -8,7 +8,7 @@
 // Calm Command: cc-* tokens, NO lime, tabular figures, no em or en dashes.
 // ============================================================================
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Link2, UserRoundCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,16 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
     [links],
   );
   const pending = useMemo(() => staged.filter((s) => s.status === 'pending'), [staged]);
+
+  // Review fix (stale diff baseline): the field comparison below renders from
+  // the cached profile while apply diffs against a refetched row. Refresh the
+  // cache whenever there is something to review so the strikethrough cues and
+  // the apply comparison read the same baseline (residual gap: only a
+  // concurrent edit landing between this refetch and the Apply click).
+  useEffect(() => {
+    if (pending.length > 0) void profileQuery.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending.length]);
 
   const handleCreate = () => {
     createLink.mutate(
