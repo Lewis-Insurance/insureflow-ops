@@ -472,13 +472,16 @@ const money = (n: number | null | undefined): string =>
   n == null ? '' : `$${Number(n).toLocaleString('en-US')}`;
 
 function QuotesBlock({ accountId, submission }: { accountId: string; submission: CommercialSubmission }) {
-  // Line mode (Phase 3): GL when present, else property. Mixed GL+property
-  // submissions (BOP) capture the GL quote here; the property limit rides the
-  // packet phase.
-  const lineMode: 'gl' | 'property' =
-    submission.target_lines.includes('gl') ? 'gl'
-    : submission.target_lines.includes('property') ? 'property'
-    : 'gl';
+  // Quotable lines on this submission; when more than one, the user picks
+  // which line this quote covers (review fix: a fixed priority locked
+  // property+wc submissions out of property quotes).
+  const quotableLines = useMemo(
+    () => (['gl', 'wc', 'property'] as const).filter((l) => submission.target_lines.includes(l)),
+    [submission.target_lines],
+  );
+  const [lineChoice, setLineChoice] = useState<'gl' | 'wc' | 'property' | null>(null);
+  const lineMode: 'gl' | 'wc' | 'property' =
+    lineChoice && quotableLines.includes(lineChoice) ? lineChoice : (quotableLines[0] ?? 'gl');
   const { data: quotes = [] } = useSubmissionQuotes(submission.id);
   const addQuote = useAddSubmissionQuote();
   const bindQuote = useBindSubmissionQuote();
@@ -497,11 +500,13 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const [qPremium, setQPremium] = useState('');
   const [qEachOcc, setQEachOcc] = useState('');
   const [qGenAgg, setQGenAgg] = useState('');
+  const [qThird, setQThird] = useState('');
 
   const [bindTarget, setBindTarget] = useState<SubmissionQuote | null>(null);
   const [bindPolicyId, setBindPolicyId] = useState('');
   const [bindEachOcc, setBindEachOcc] = useState('');
   const [bindGenAgg, setBindGenAgg] = useState('');
+  const [bindThird, setBindThird] = useState('');
 
   const numOrNull = (raw: string): number | null => {
     const n = Number(raw.replace(/[$,\s]/g, ''));
@@ -514,10 +519,15 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const openBind = (q: SubmissionQuote) => {
     setBindTarget(q);
     setBindPolicyId('');
-    const eo = coverageLimit(q, lineMode === 'gl' ? 'gl_each_occurrence' : 'property_limit');
-    const ga = coverageLimit(q, 'gl_general_aggregate');
+    const eo = coverageLimit(
+      q,
+      lineMode === 'gl' ? 'gl_each_occurrence' : lineMode === 'wc' ? 'wc_el_each_accident' : 'property_limit',
+    );
+    const ga = coverageLimit(q, lineMode === 'wc' ? 'wc_el_disease_each_employee' : 'gl_general_aggregate');
+    const th = coverageLimit(q, 'wc_el_disease_policy_limit');
     setBindEachOcc(eo != null ? String(eo) : '');
     setBindGenAgg(ga != null ? String(ga) : '');
+    setBindThird(th != null ? String(th) : '');
   };
 
   const handleRecord = () => {
@@ -535,13 +545,17 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         eachOccurrence: lineMode === 'gl' ? numOrNull(qEachOcc) : null,
         generalAggregate: lineMode === 'gl' ? numOrNull(qGenAgg) : null,
         propertyLimit: lineMode === 'property' ? numOrNull(qEachOcc) : null,
+        elEachAccident: lineMode === 'wc' ? numOrNull(qEachOcc) : null,
+        elDiseaseEachEmployee: lineMode === 'wc' ? numOrNull(qGenAgg) : null,
+        elDiseasePolicyLimit: lineMode === 'wc' ? numOrNull(qThird) : null,
       },
-      { onSuccess: () => { setQCarrier(''); setQPremium(''); setQEachOcc(''); setQGenAgg(''); } },
+      { onSuccess: () => { setQCarrier(''); setQPremium(''); setQEachOcc(''); setQGenAgg(''); setQThird(''); } },
     );
   };
 
   const bindEo = numOrNull(bindEachOcc);
   const bindGa = numOrNull(bindGenAgg);
+  const bindTh = numOrNull(bindThird);
 
   const handleBind = () => {
     if (!bindTarget || !bindPolicyId) {
@@ -557,6 +571,10 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
       toast.error('The property limit is required to bind.');
       return;
     }
+    if (lineMode === 'wc' && (bindEo == null || bindGa == null || bindTh == null)) {
+      toast.error('All three WC employers liability limits are required to bind.');
+      return;
+    }
     bindQuote.mutate(
       {
         accountId,
@@ -567,6 +585,9 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         eachOccurrence: lineMode === 'gl' ? bindEo : null,
         generalAggregate: lineMode === 'gl' ? bindGa : null,
         propertyLimit: lineMode === 'property' ? bindEo : null,
+        elEachAccident: lineMode === 'wc' ? bindEo : null,
+        elDiseaseEachEmployee: lineMode === 'wc' ? bindGa : null,
+        elDiseasePolicyLimit: lineMode === 'wc' ? bindTh : null,
       },
       { onSuccess: () => setBindTarget(null) },
     );
@@ -574,12 +595,30 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-cc-text-primary">
-        Quotes{' '}
-        <span className="font-normal text-cc-text-muted">
-          {lineMode === 'gl' ? '(GL limits feed the COI on bind)' : '(the property limit feeds the COI on bind)'}
-        </span>
-      </h4>
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold text-cc-text-primary">
+          Quotes{' '}
+          <span className="font-normal text-cc-text-muted">
+            {lineMode === 'gl'
+              ? '(GL limits feed the COI on bind)'
+              : lineMode === 'wc'
+                ? '(EL limits feed the COI on bind)'
+                : '(the property limit feeds the COI on bind)'}
+          </span>
+        </h4>
+        {quotableLines.length > 1 && (
+          <Select value={lineMode} onValueChange={(v) => setLineChoice(v as 'gl' | 'wc' | 'property')}>
+            <SelectTrigger className="h-7 w-36" aria-label="Quote line">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {quotableLines.map((l) => (
+                <SelectItem key={l} value={l}>{lineLabel(l)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
 
       {quotes.length > 0 && (
         <ul className="space-y-1.5">
@@ -610,6 +649,21 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
                   limit {money(coverageLimit(q, 'property_limit'))}
                 </span>
               )}
+              {coverageLimit(q, 'wc_el_each_accident') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  EL {money(coverageLimit(q, 'wc_el_each_accident'))}
+                </span>
+              )}
+              {coverageLimit(q, 'wc_el_disease_each_employee') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  dis/empl {money(coverageLimit(q, 'wc_el_disease_each_employee'))}
+                </span>
+              )}
+              {coverageLimit(q, 'wc_el_disease_policy_limit') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  dis/policy {money(coverageLimit(q, 'wc_el_disease_policy_limit'))}
+                </span>
+              )}
               {coverageLimit(q, 'gl_general_aggregate') != null && (
                 <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
                   agg {money(coverageLimit(q, 'gl_general_aggregate'))}
@@ -631,12 +685,18 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
           <Input placeholder="Quoting carrier" value={qCarrier} onChange={(e) => setQCarrier(e.target.value)} />
           <Input placeholder="Premium" inputMode="numeric" value={qPremium} onChange={(e) => setQPremium(e.target.value)} aria-label="Premium" />
           <Input
-            placeholder={lineMode === 'gl' ? 'Each occ' : 'Prop limit'}
+            placeholder={lineMode === 'gl' ? 'Each occ' : lineMode === 'wc' ? 'EL accident' : 'Prop limit'}
             inputMode="numeric" value={qEachOcc} onChange={(e) => setQEachOcc(e.target.value)}
-            aria-label={lineMode === 'gl' ? 'Each occurrence limit' : 'Property limit'}
+            aria-label={lineMode === 'gl' ? 'Each occurrence limit' : lineMode === 'wc' ? 'EL each accident limit' : 'Property limit'}
           />
           {lineMode === 'gl' && (
             <Input placeholder="Gen agg" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="General aggregate limit" />
+          )}
+          {lineMode === 'wc' && (
+            <>
+              <Input placeholder="EL disease/empl" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="EL disease each employee limit" />
+              <Input placeholder="EL disease policy" inputMode="numeric" value={qThird} onChange={(e) => setQThird(e.target.value)} aria-label="EL disease policy limit" />
+            </>
           )}
           <Button variant="ghost" onClick={handleRecord} disabled={addQuote.isPending}
             className="text-cc-text-secondary hover:text-cc-text-primary">
@@ -652,8 +712,8 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <DialogTitle className="text-cc-text-primary">Bind quote</DialogTitle>
             <DialogDescription className="text-cc-text-muted">
               {bindTarget ? `${quoteCarrierName(bindTarget)}${bindTarget.premium != null ? `, ${money(bindTarget.premium)}` : ''}. ` : ''}
-              Pick the policy record this bind becomes. The {lineMode === 'gl' ? 'GL limits' : 'property limit'} below
-              {lineMode === 'gl' ? ' are' : ' is'} written to that policy through the Master COI write path,
+              Pick the policy record this bind becomes. The {lineMode === 'gl' ? 'GL limits' : lineMode === 'wc' ? 'EL limits' : 'property limit'} below
+              {lineMode === 'property' ? ' is' : ' are'} written to that policy through the Master COI write path,
               so it is certificate-ready immediately.
             </DialogDescription>
           </DialogHeader>
@@ -681,7 +741,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="bind-eo" className="text-cc-text-secondary">
-                  {lineMode === 'gl' ? 'Each occurrence' : 'Property limit'}
+                  {lineMode === 'gl' ? 'Each occurrence' : lineMode === 'wc' ? 'EL each accident' : 'Property limit'}
                 </Label>
                 <Input id="bind-eo" inputMode="numeric" value={bindEachOcc} onChange={(e) => setBindEachOcc(e.target.value)} />
               </div>
@@ -691,6 +751,18 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
                   <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
                 </div>
               )}
+              {lineMode === 'wc' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bind-ga" className="text-cc-text-secondary">EL disease each employee</Label>
+                    <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bind-th" className="text-cc-text-secondary">EL disease policy limit</Label>
+                    <Input id="bind-th" inputMode="numeric" value={bindThird} onChange={(e) => setBindThird(e.target.value)} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -699,7 +771,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             </Button>
             <Button
               onClick={handleBind}
-              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || (lineMode === 'gl' && bindGa == null)}
+              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || (lineMode === 'gl' && bindGa == null) || (lineMode === 'wc' && (bindGa == null || bindTh == null))}
             >
               {bindQuote.isPending ? 'Binding' : 'Bind quote'}
             </Button>
