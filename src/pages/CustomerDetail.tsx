@@ -14,6 +14,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
 import { MasterCOISection } from '@/components/customers/MasterCOISection';
+import { CommercialProfileCard } from '@/components/commercial/CommercialProfileCard';
+import { SubmissionsPanel } from '@/components/commercial/SubmissionsPanel';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
@@ -103,7 +105,7 @@ const STATUS_OPTIONS = ['active', 'lead', 'prospect', 'inactive'];
 
 // Sections are now always-visible panels (no tabs). A legacy ?tab= deep link
 // (e.g. a renewal's "already added" prompt) scrolls to the matching section.
-const SECTION_IDS = ['contact', 'policies', 'master-coi', 'relationships', 'documents', 'notes', 'activity'];
+const SECTION_IDS = ['contact', 'policies', 'master-coi', 'commercial', 'relationships', 'documents', 'notes', 'activity'];
 
 // Error boundary so a failing Document Collection never blanks the record.
 class ErrorBoundaryWrapper extends React.Component<
@@ -477,6 +479,14 @@ export default function CustomerDetail() {
         <section id="master-coi" className="scroll-mt-20 space-y-4">
           <MasterCOISection accountId={account.id} accountName={account.name} />
         </section>
+
+        {/* ===================== Commercial (business accounts) ===================== */}
+        {isBusiness && (
+          <section id="commercial" className="scroll-mt-20 space-y-4">
+            <CommercialProfileCard accountId={account.id} />
+            <SubmissionsPanel accountId={account.id} accountName={account.name} />
+          </section>
+        )}
 
         {/* ===================== Documents ===================== */}
         <section id="documents" className="scroll-mt-20 space-y-4">
