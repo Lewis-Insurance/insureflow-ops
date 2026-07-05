@@ -548,10 +548,14 @@ export default function PolicyDetail() {
                           // submission targeting this policy's line and x-date.
                           const targetLines = commercialLinesForPolicy(policy as any);
                           if (targetLines.length === 0) {
+                            // Unmapped commercial labels (e.g. 'commercial_policy',
+                            // Inland Marine): land the user where they can pick
+                            // lines manually instead of dead-ending (Codex).
                             toast({
-                              title: 'Could not determine the coverage line',
-                              description: 'Start the submission from the customer record and pick the lines manually.',
+                              title: 'Pick the coverage lines manually',
+                              description: 'This policy\'s line could not be mapped automatically; opening the commercial section.',
                             });
+                            navigate(`/customers/${policy.account!.id}?tab=commercial`);
                             return;
                           }
                           createSubmission.mutate(
