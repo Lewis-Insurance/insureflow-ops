@@ -36,6 +36,14 @@ import {
   useSubmissionDeclinations,
   useUpdateSubmission,
 } from '@/hooks/useCommercialSubmissions';
+import {
+  quoteCarrierName,
+  useAccountPolicies,
+  useAddSubmissionQuote,
+  useBindSubmissionQuote,
+  useSubmissionQuotes,
+  type SubmissionQuote,
+} from '@/hooks/useSubmissionQuotes';
 import type {
   CommercialLineKey, CommercialSubmission, OfferCoverage, SubmissionStatus,
 } from '@/types/commercial';
@@ -367,6 +375,9 @@ function SubmissionDetail({
         </p>
       </div>
 
+      {/* Quotes + bind */}
+      <QuotesBlock accountId={accountId} submission={submission} />
+
       {/* Offer / rejection log */}
       <div className="space-y-2">
         <h4 className="text-sm font-semibold text-cc-text-primary">
@@ -424,6 +435,202 @@ function SubmissionDetail({
           <Textarea readOnly rows={2} value={submission.notes} className="text-sm" />
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quotes + bind (GL v1). Record carrier quotes with the two COI-required GL
+// limits; bind picks the policy the win becomes and writes those limits to it
+// through save_master_coi_fields, so the bound policy is COI-ready (Path A).
+// ---------------------------------------------------------------------------
+
+const money = (n: number | null | undefined): string =>
+  n == null ? '' : `$${Number(n).toLocaleString('en-US')}`;
+
+function QuotesBlock({ accountId, submission }: { accountId: string; submission: CommercialSubmission }) {
+  const { data: quotes = [] } = useSubmissionQuotes(submission.id);
+  const addQuote = useAddSubmissionQuote();
+  const bindQuote = useBindSubmissionQuote();
+  const { data: policies = [] } = useAccountPolicies(accountId);
+
+  const closed = ['bound', 'lost', 'abandoned'].includes(submission.status);
+
+  const [qCarrier, setQCarrier] = useState('');
+  const [qPremium, setQPremium] = useState('');
+  const [qEachOcc, setQEachOcc] = useState('');
+  const [qGenAgg, setQGenAgg] = useState('');
+
+  const [bindTarget, setBindTarget] = useState<SubmissionQuote | null>(null);
+  const [bindPolicyId, setBindPolicyId] = useState('');
+  const [bindEachOcc, setBindEachOcc] = useState('');
+  const [bindGenAgg, setBindGenAgg] = useState('');
+
+  const numOrNull = (raw: string): number | null => {
+    const n = Number(raw.replace(/[$,\s]/g, ''));
+    return raw.trim() !== '' && Number.isFinite(n) ? n : null;
+  };
+
+  const coverageLimit = (q: SubmissionQuote, type: string): number | null =>
+    q.quote_coverages?.find((c) => c.coverage_type === type)?.limit_amount ?? null;
+
+  const openBind = (q: SubmissionQuote) => {
+    setBindTarget(q);
+    setBindPolicyId('');
+    const eo = coverageLimit(q, 'gl_each_occurrence');
+    const ga = coverageLimit(q, 'gl_general_aggregate');
+    setBindEachOcc(eo != null ? String(eo) : '');
+    setBindGenAgg(ga != null ? String(ga) : '');
+  };
+
+  const handleRecord = () => {
+    if (!qCarrier.trim()) {
+      toast.error('Enter the quoting carrier.');
+      return;
+    }
+    addQuote.mutate(
+      {
+        accountId,
+        submissionId: submission.id,
+        carrierName: qCarrier,
+        premium: numOrNull(qPremium),
+        eachOccurrence: numOrNull(qEachOcc),
+        generalAggregate: numOrNull(qGenAgg),
+      },
+      { onSuccess: () => { setQCarrier(''); setQPremium(''); setQEachOcc(''); setQGenAgg(''); } },
+    );
+  };
+
+  const handleBind = () => {
+    if (!bindTarget || !bindPolicyId) {
+      toast.error('Pick the policy this bind becomes.');
+      return;
+    }
+    bindQuote.mutate(
+      {
+        accountId,
+        submissionId: submission.id,
+        quoteId: bindTarget.id,
+        policyId: bindPolicyId,
+        eachOccurrence: numOrNull(bindEachOcc),
+        generalAggregate: numOrNull(bindGenAgg),
+      },
+      { onSuccess: () => setBindTarget(null) },
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-semibold text-cc-text-primary">
+        Quotes <span className="font-normal text-cc-text-muted">(GL limits feed the COI on bind)</span>
+      </h4>
+
+      {quotes.length > 0 && (
+        <ul className="space-y-1.5">
+          {quotes.map((q) => (
+            <li key={q.id} className="flex flex-wrap items-center gap-2.5 text-sm">
+              <span
+                className={`inline-flex items-center rounded-pill px-2.5 py-0.5 text-xs font-medium ${
+                  q.status === 'won'
+                    ? 'bg-success/10 text-success'
+                    : q.status === 'lost'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-cc-surface-overlay text-cc-text-secondary'
+                }`}
+              >
+                {q.status}
+              </span>
+              <span className="text-cc-text-primary">{quoteCarrierName(q)}</span>
+              {q.premium != null && (
+                <span className="cc-num text-cc-text-primary [font-variant-numeric:tabular-nums]">{money(q.premium)}</span>
+              )}
+              {coverageLimit(q, 'gl_each_occurrence') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  occ {money(coverageLimit(q, 'gl_each_occurrence'))}
+                </span>
+              )}
+              {coverageLimit(q, 'gl_general_aggregate') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  agg {money(coverageLimit(q, 'gl_general_aggregate'))}
+                </span>
+              )}
+              {!closed && q.status === 'open' && (
+                <Button variant="ghost" size="sm" onClick={() => openBind(q)}
+                  className="text-cc-text-secondary hover:text-cc-text-primary">
+                  Bind
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!closed && (
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_8rem_8rem_8rem_auto]">
+          <Input placeholder="Quoting carrier" value={qCarrier} onChange={(e) => setQCarrier(e.target.value)} />
+          <Input placeholder="Premium" inputMode="numeric" value={qPremium} onChange={(e) => setQPremium(e.target.value)} aria-label="Premium" />
+          <Input placeholder="Each occ" inputMode="numeric" value={qEachOcc} onChange={(e) => setQEachOcc(e.target.value)} aria-label="Each occurrence limit" />
+          <Input placeholder="Gen agg" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="General aggregate limit" />
+          <Button variant="ghost" onClick={handleRecord} disabled={addQuote.isPending}
+            className="text-cc-text-secondary hover:text-cc-text-primary">
+            Record
+          </Button>
+        </div>
+      )}
+
+      {/* Bind dialog: pick the policy, confirm the limits that flow to the COI. */}
+      <Dialog open={!!bindTarget} onOpenChange={(open) => { if (!open) setBindTarget(null); }}>
+        <DialogContent className="bg-cc-surface-raised">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">Bind quote</DialogTitle>
+            <DialogDescription className="text-cc-text-muted">
+              {bindTarget ? `${quoteCarrierName(bindTarget)}${bindTarget.premium != null ? `, ${money(bindTarget.premium)}` : ''}. ` : ''}
+              Pick the policy record this bind becomes. The GL limits below are written to that
+              policy through the Master COI write path, so it is certificate-ready immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-cc-text-secondary">Policy</Label>
+              <Select value={bindPolicyId || undefined} onValueChange={setBindPolicyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={policies.length === 0 ? 'No policies on this account yet' : 'Select the policy'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {policies.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {[p.policy_number || '(no number)', p.carrier, p.line_of_business, p.status].filter(Boolean).join(' - ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {policies.length === 0 && (
+                <p className="text-xs text-cc-text-muted">
+                  Add the policy on this customer first (Policies section), then bind.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="bind-eo" className="text-cc-text-secondary">Each occurrence</Label>
+                <Input id="bind-eo" inputMode="numeric" value={bindEachOcc} onChange={(e) => setBindEachOcc(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bind-ga" className="text-cc-text-secondary">General aggregate</Label>
+                <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBindTarget(null)} disabled={bindQuote.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={handleBind} disabled={bindQuote.isPending || !bindPolicyId}>
+              {bindQuote.isPending ? 'Binding' : 'Bind quote'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
