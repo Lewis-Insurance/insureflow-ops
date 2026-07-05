@@ -98,18 +98,35 @@ export function LossRunRequestDialog({
         dedupe_key: dedupeKey,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
-      // 23505 = the follow-up already exists from a prior attempt; that is
-      // success for our purposes (proceed to the audit event).
-      if (taskError && (taskError as { code?: string }).code !== '23505') throw taskError;
-      const { error: eventError } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('submission_events' as any)
-        .insert({
-          submission_id: submissionId,
-          action: 'loss_run_requested',
-          metadata: { carrier: carrier.trim(), years_back: Number(years) },
-        });
-      if (eventError) throw eventError;
+      // 23505 = the follow-up already exists from a prior attempt.
+      const taskAlreadyExisted = (taskError as { code?: string } | null)?.code === '23505';
+      if (taskError && !taskAlreadyExisted) throw taskError;
+      // Append the audit event, but never duplicate it: when the task already
+      // existed, only write the event if a prior attempt failed to (covers
+      // retry-after-partial without double-logging a re-submitted carrier).
+      let writeEvent = true;
+      if (taskAlreadyExisted) {
+        const { data: existingEvents } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from('submission_events' as any)
+          .select('id, metadata')
+          .eq('submission_id', submissionId)
+          .eq('action', 'loss_run_requested');
+        writeEvent = !((existingEvents as Array<{ metadata?: { carrier?: string } }> | null) ?? []).some(
+          (e) => (e.metadata?.carrier ?? '').toLowerCase() === carrier.trim().toLowerCase(),
+        );
+      }
+      if (writeEvent) {
+        const { error: eventError } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from('submission_events' as any)
+          .insert({
+            submission_id: submissionId,
+            action: 'loss_run_requested',
+            metadata: { carrier: carrier.trim(), years_back: Number(years) },
+          });
+        if (eventError) throw eventError;
+      }
       // Surface the new task on the customer record without a manual refresh.
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['customer-tasks', accountId] });

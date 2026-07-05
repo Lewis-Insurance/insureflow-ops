@@ -19,6 +19,21 @@ describe('commercialLinesForPolicy', () => {
     expect(commercialLinesForPolicy({ line_of_business: 'bop' })).toEqual(['gl', 'property']);
   });
 
+  it('non-empty detail blobs are authoritative over labels', () => {
+    expect(
+      commercialLinesForPolicy({
+        line_canonical: 'Commercial (unspecified)',
+        line_of_business: 'commercial_policy',
+        cgl_details: { limits: { each_occurrence: 1000000 } },
+        wc_details: { coverage: {} },
+      }),
+    ).toEqual(['gl', 'wc']);
+    // Empty objects do NOT prove a line (mirrors master_coi_lines).
+    expect(
+      commercialLinesForPolicy({ line_of_business: 'gl', cgl_details: {} }),
+    ).toEqual(['gl']);
+  });
+
   it('canonical wins over line_of_business; unknown maps to empty', () => {
     expect(
       commercialLinesForPolicy({ line_canonical: 'Commercial Auto', line_of_business: 'gl' }),

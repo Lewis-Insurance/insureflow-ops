@@ -9,15 +9,34 @@
 
 import type { CommercialLineKey } from '@/types/commercial';
 
+const hasBlob = (v: unknown): boolean =>
+  v != null && typeof v === 'object' && Object.keys(v as object).length > 0;
+
 /**
- * Map a policy's line labels to commercial submission lines. Mirrors the
- * label branches of public.master_coi_lines (line_canonical crosswalk first,
- * then raw line_of_business patterns). Returns [] when nothing matches.
+ * Map a policy's lines to commercial submission lines. Mirrors ALL of
+ * public.master_coi_lines: non-empty detail blobs are authoritative first,
+ * then the line_canonical crosswalk, then raw line_of_business patterns.
+ * Returns [] when nothing matches.
  */
 export function commercialLinesForPolicy(policy: {
   line_canonical?: string | null;
   line_of_business?: string | null;
+  cgl_details?: unknown;
+  bap_details?: unknown;
+  umbrella_details?: unknown;
+  wc_details?: unknown;
+  property_details?: unknown;
 }): CommercialLineKey[] {
+  // Detail blobs prove the line regardless of how weak the labels are.
+  const blobLines: CommercialLineKey[] = [
+    hasBlob(policy.cgl_details) ? ('gl' as const) : null,
+    hasBlob(policy.bap_details) ? ('auto' as const) : null,
+    hasBlob(policy.umbrella_details) ? ('umbrella' as const) : null,
+    hasBlob(policy.wc_details) ? ('wc' as const) : null,
+    hasBlob(policy.property_details) ? ('property' as const) : null,
+  ].filter((l): l is CommercialLineKey => l !== null);
+  if (blobLines.length > 0) return blobLines;
+
   const canonical = (policy.line_canonical ?? '').trim();
   switch (canonical) {
     case 'General Liability': return ['gl'];
