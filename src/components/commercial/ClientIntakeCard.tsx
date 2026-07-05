@@ -49,7 +49,8 @@ const isoToUs = (iso: string): string => {
 export function ClientIntakeCard({ accountId }: { accountId: string }) {
   const { data: links = [] } = useIntakeLinks(accountId);
   const { data: staged = [] } = useIntakeSubmissions(accountId);
-  const { data: profile } = useCommercialProfile(accountId);
+  const profileQuery = useCommercialProfile(accountId);
+  const profile = profileQuery.data ?? null;
   const createLink = useCreateIntakeLink();
   const revokeLink = useRevokeIntakeLink();
   const setStatus = useSetIntakeSubmissionStatus();
@@ -74,12 +75,15 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
     );
   };
 
-  const handleApply = (row: IntakeStagedSubmission) => {
+  const handleApply = async (row: IntakeStagedSubmission) => {
     setApplyingId(row.id);
     const changes = row.payload as CommercialProfileInput;
     const sources = Object.fromEntries(Object.keys(row.payload).map((k) => [k, 'client' as const]));
+    // Review fix (stale profile): applying two submissions back-to-back must
+    // diff against the CURRENT row, not the pre-first-apply cache.
+    const fresh = (await profileQuery.refetch()).data ?? profile;
     saveProfile.mutate(
-      { accountId, existing: profile ?? null, changes, sources },
+      { accountId, existing: fresh ?? null, changes, sources },
       {
         onSuccess: () =>
           setStatus.mutate(
@@ -177,7 +181,7 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
                 <div className="flex gap-1.5">
                   <Button
                     size="sm"
-                    onClick={() => handleApply(row)}
+                    onClick={() => void handleApply(row)}
                     disabled={applyingId === row.id || saveProfile.isPending}
                   >
                     {applyingId === row.id ? 'Applying' : 'Apply all'}
@@ -185,7 +189,7 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
                   <Button
                     variant="ghost" size="sm"
                     onClick={() => setStatus.mutate({ accountId, stagedId: row.id, status: 'dismissed' })}
-                    disabled={setStatus.isPending}
+                    disabled={setStatus.isPending || applyingId === row.id}
                     className="text-cc-text-muted hover:text-cc-text-primary"
                   >
                     Dismiss

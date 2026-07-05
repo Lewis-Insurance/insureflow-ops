@@ -81,6 +81,16 @@ serve(async (req) => {
       return json({ error: "Invalid request" }, 400);
     }
 
+    // Review fix (no-enumeration): validate the ACTION before the token lookup
+    // so an unknown-action probe returns 400 regardless of token validity. The
+    // remaining response differentiation on the submit path (empty payload,
+    // rate limit) requires a well-formed request against a live link; with
+    // 192-bit server-minted tokens, enumeration via those paths is not a
+    // practical oracle.
+    if (body.action !== "fetch" && body.action !== "submit") {
+      return json({ error: "Unknown action" }, 400);
+    }
+
     const token = typeof body.token === "string" ? body.token.trim() : "";
     // Tokens are 48 hex chars; anything else is invalid without a lookup.
     if (!/^[a-f0-9]{40,64}$/i.test(token)) return json({ error: LINK_ERROR }, 404);
