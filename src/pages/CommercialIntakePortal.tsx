@@ -46,7 +46,9 @@ export default function CommercialIntakePortal() {
       for (const [k, v] of Object.entries(data.prefill)) {
         if (v != null) seeded[k] = String(v);
       }
-      setForm((prev) => (Object.keys(prev).length === 0 ? seeded : prev));
+      // Merge UNDER anything the client already typed (their keys win) so an
+      // early edit never discards the rest of the prefill (review fix).
+      setForm((prev) => ({ ...seeded, ...prev }));
     }
   }, [data]);
 
@@ -123,6 +125,10 @@ export default function CommercialIntakePortal() {
               <div>
                 <label htmlFor="in-fein" className={labelClass}>FEIN (tax ID)</label>
                 <input id="in-fein" className={inputClass} placeholder="12-3456789" autoComplete="off" value={form.fein ?? ''} onChange={(e) => set('fein', e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="in-naics" className={labelClass}>Industry / NAICS code (if known)</label>
+                <input id="in-naics" className={inputClass} value={form.naics_code ?? ''} onChange={(e) => set('naics_code', e.target.value)} />
               </div>
               <div>
                 <label htmlFor="in-years" className={labelClass}>Years in business</label>
