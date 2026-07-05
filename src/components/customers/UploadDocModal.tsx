@@ -18,9 +18,15 @@ interface UploadDocModalProps {
   accountId: string;
   policyId?: string;
   onSuccess?: () => void;
+  /**
+   * Called with the new documents.id after a successful upload (before
+   * onSuccess). Lets callers chain document-scoped work, e.g. policy-detail
+   * extraction on PolicyDetail. Optional and non-breaking.
+   */
+  onUploaded?: (documentId: string) => void | Promise<void>;
 }
 
-export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSuccess }: UploadDocModalProps) {
+export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSuccess, onUploaded }: UploadDocModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [associationType, setAssociationType] = useState<'none' | 'policy' | 'quote'>(policyId ? 'policy' : 'none');
@@ -168,6 +174,15 @@ export function UploadDocModal({ open, onOpenChange, accountId, policyId, onSucc
         } catch (error) {
           // Silent fail - don't interrupt user flow
           console.error('Auto-classification/routing failed:', error);
+        }
+      }
+
+      // Chain document-scoped follow-up work (e.g. policy-detail extraction).
+      if (document?.id && onUploaded) {
+        try {
+          await onUploaded(document.id);
+        } catch (error) {
+          console.error('onUploaded follow-up failed:', error);
         }
       }
 

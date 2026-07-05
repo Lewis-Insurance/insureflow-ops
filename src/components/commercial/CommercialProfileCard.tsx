@@ -12,12 +12,16 @@
 // en dashes.
 // ============================================================================
 
-import { useEffect, useState } from 'react';
-import { Building2, Pencil } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Building2, Pencil, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -27,6 +31,7 @@ import {
   useSaveCommercialProfile,
   type CommercialProfileInput,
 } from '@/hooks/useCommercialProfile';
+import { useSunbizDetail, useSunbizSearch, type SunbizCandidate } from '@/hooks/useSunbizLookup';
 
 const ENTITY_TYPES = [
   'individual', 'partnership', 'corporation', 'llc', 'joint_venture', 'trust', 'other',
@@ -55,6 +60,15 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<CommercialProfileInput>({});
 
+  // Sunbiz lookup (feeder #6): fills the FORM only; the agent reviews + saves.
+  // Fields applied from Sunbiz save with provenance src='extracted' unless the
+  // agent edits them again before saving (then they are 'manual').
+  const sunbizSearch = useSunbizSearch();
+  const sunbizDetail = useSunbizDetail();
+  const [sunbizOpen, setSunbizOpen] = useState(false);
+  const [sunbizCandidates, setSunbizCandidates] = useState<SunbizCandidate[]>([]);
+  const machineSourced = useRef<Set<keyof CommercialProfileInput>>(new Set());
+
   // Seed the form each time editing opens (or the profile refreshes underneath).
   useEffect(() => {
     if (editing) {
@@ -75,8 +89,54 @@ export function CommercialProfileCard({ accountId }: { accountId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  const set = (key: keyof CommercialProfileInput, value: unknown) =>
+  const set = (key: keyof CommercialProfileInput, value: unknown) => {
+    machineSourced.current.delete(key); // a manual edit reclaims the field
     setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const handleSunbizSearch = () => {
+    const q = ((form.legal_name as string) || '').trim();
+    if (q.length < 3) {
+      toast.error('Type at least part of the legal name first.');
+      return;
+    }
+    sunbizSearch.mutate(q, {
+      onSuccess: (candidates) => {
+        if (candidates.length === 0) {
+          toast.info('No Sunbiz matches for that name.');
+          return;
+        }
+        setSunbizCandidates(candidates);
+        setSunbizOpen(true);
+      },
+    });
+  };
+
+  const applySunbizCandidate = (candidate: SunbizCandidate) => {
+    sunbizDetail.mutate(candidate.detail_url, {
+      onSuccess: (detail) => {
+        setForm((f) => {
+          const next = { ...f };
+          const apply = (key: keyof CommercialProfileInput, value: unknown) => {
+            if (value == null || value === '') return;
+            (next as Record<string, unknown>)[key] = value;
+            machineSourced.current.add(key);
+          };
+          apply('legal_name', detail.legal_name);
+          apply('entity_type', detail.entity_type);
+          apply('fein', detail.fei_ein);
+          // Years in business from the filing year, only when not already set.
+          const filedYear = detail.date_filed ? Number(/(\d{4})/.exec(detail.date_filed)?.[1]) : NaN;
+          if (Number.isFinite(filedYear) && (f.years_in_business == null)) {
+            apply('years_in_business', new Date().getFullYear() - filedYear);
+          }
+          return next;
+        });
+        setSunbizOpen(false);
+        toast.success('Sunbiz details applied. Review, then save.');
+      },
+    });
+  };
 
   const numOrNull = (raw: string): number | null => {
     const trimmed = raw.trim();
