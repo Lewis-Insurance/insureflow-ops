@@ -44,6 +44,7 @@ import {
   type SubmissionQuote,
 } from '@/hooks/useSubmissionQuotes';
 import { usePoliciesByAccount } from '@/hooks/usePoliciesByAccount';
+import { LossRunRequestDialog } from './LossRunRequestDialog';
 import type {
   CommercialLineKey, CommercialSubmission, OfferCoverage, SubmissionStatus,
 } from '@/types/commercial';
@@ -275,6 +276,7 @@ function SubmissionDetail({
 }) {
   const { data: declinations = [] } = useSubmissionDeclinations(submission.id);
   const addDeclination = useAddDeclination();
+  const [lossRunOpen, setLossRunOpen] = useState(false);
   const { data: offers = [] } = useOfferRejections(accountId);
   const recordOffer = useRecordOffer();
 
@@ -335,7 +337,22 @@ function SubmissionDetail({
         {submission.wholesaler_email && (
           <span className="text-sm text-cc-text-muted">{submission.wholesaler_email}</span>
         )}
+        <Button
+          variant="ghost" size="sm"
+          onClick={() => setLossRunOpen(true)}
+          className="ml-auto text-cc-text-secondary hover:text-cc-text-primary"
+        >
+          Request loss runs
+        </Button>
       </div>
+
+      <LossRunRequestDialog
+        open={lossRunOpen}
+        onOpenChange={setLossRunOpen}
+        accountId={accountId}
+        submissionId={submission.id}
+        insuredName={accountName}
+      />
 
       {/* Diligent effort: declination log */}
       <div className="space-y-2">

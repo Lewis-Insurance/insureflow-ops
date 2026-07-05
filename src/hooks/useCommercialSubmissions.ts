@@ -53,6 +53,8 @@ export function useCreateSubmission() {
       wholesalerName?: string;
       wholesalerEmail?: string;
       notes?: string;
+      /** Remarket clone: the bound/expiring policy this submission renews away from. */
+      remarketOfPolicyId?: string | null;
     }) => {
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,6 +66,7 @@ export function useCreateSubmission() {
           wholesaler_name: input.wholesalerName?.trim() || null,
           wholesaler_email: input.wholesalerEmail?.trim() || null,
           notes: input.notes?.trim() || null,
+          remarket_of_policy_id: input.remarketOfPolicyId ?? null,
         })
         .select('*')
         .single();
