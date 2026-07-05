@@ -1,140 +1,156 @@
-# Commercial Lines Module - Quote-to-Bind Plan
+# Commercial Lines Module - Scope of Work (v2)
 
-**Status:** PLAN FOR REVIEW (not locked)
+**Status:** SCOPE OF WORK FOR REVIEW (v2 - supersedes the v1 plan on this branch)
 **Date:** 2026-07-05
-**Owner decisions locked (Landen):** full-lifecycle v1; phased build, one line per phase; ACORD blanks sourced in parallel; prefill = policy-document extraction + Canopy commercial pull + manual entry + agent-speed extras.
-**Prior art:** the COI/ACORD 25 module (docs/COI Module/coi-module/, Phases 0-6 shipped 2026-07). This plan deliberately reuses its architecture: canonical read models, typed form engines with Deno parity, immutable outputs, provenance-tracked prefill, one branch + one PR per phase.
+**What changed from v1:** v1 was a data + forms plan. v2 adds the layers that make it an agency-grade system: the FL compliance/E&O spine (surplus lines diligent effort, rejection documentation, e-signatures), the client-facing side (intake portal, proposals), market intelligence (appetite registry), post-bind rigor (policy checking), and workflow cadence. Phases re-cut accordingly.
+**Owner decisions locked (Landen):** full-lifecycle v1; phased vertical slices; ACORD blanks sourced in parallel; prefill = policy-document extraction + Canopy pull + manual + agent-speed extras.
+**Prior art:** the COI/ACORD 25 module (shipped 2026-07). Same discipline throughout: canonical read models, typed form engines with Deno parity, immutable artifacts, provenance-tracked prefill, suggest-then-confirm for every machine write, one branch + one PR per phase.
 
 ---
 
-## 1. Verified current state (all facts checked against prod 2026-07-05)
+## 1. Verified current state (prod, 2026-07-05)
 
-**The book.** 2,179 policies; **57 commercial** (2.6%): Commercial Auto 23, GL/CGL 15, WC 5, BOP 2, Property 1, Inland Marine 1, other 5, **Excess/Umbrella 0**. 81 business accounts. Top commercial carriers: Progressive (22), Coterie (7), Southern-Owners (5), Auto-Owners, Burlington, Attune, Bass Underwriting, Pie, USLI.
-
-**Quotes.** 3 quote rows in prod, all personal auto, status `open` only. The `quotes` table already carries the scoring engine (price/coverage/carrier/deductible/value/limit-adequacy scores + weight profiles) and a `quote_coverages` child table (coverage_type, limit, deductible, premium) - both essentially unused. No structured commercial detail anywhere in quoting.
-
-**Canopy commercial.** Schema is fully built and empty: `canopy_business_locations`, `canopy_commercial_vehicles`, `canopy_payroll`, `canopy_business_operations`, `canopy_drivers`, `canopy_named_insureds`, `canopy_policy_coverages` - **0 rows each** (no commercial pull has ever run). `get_canopy_commercial_prefill(pull_id)` exists on prod and already returns **ACORD-shaped JSONB keyed acord_125 / acord_126 / acord_127 / acord_130 / acord_140**.
-
-**ACORD templates.** `acord_templates` has 6 rows. The 25 is the real, licensed, onboarded blank (129 extracted fields, pinned sha, license notes). The 125/126/127/130/140 rows are **Dec-2024 metadata stubs with field_count 0** - they are NOT usable blanks and must be superseded by genuine licensed PDFs onboarded through the 25's ingestion pipeline. **No 131 row at all.**
-
-**Form infrastructure.** The Dec-2024 pages survive (`/acord-forms`, AcordTemplates.tsx, AcordFormEdit.tsx, pdfFiller.ts, templateIngestion.ts) and the ingestion pipeline is form-number-agnostic (XFA detection, AcroForm extraction, versioning, is_current pinning). The ACORD 25 engine (`src/lib/acord/acord25/`: typed field map, deterministic builder, validator, preview hash, masking pipeline, Deno parity port via `scripts/acord25/sync-deno-port.ts`) is the proven pattern to replicate per form. The preview masking pipeline was built form-agnostic and is a no-op for the 25; forms 125/127/130 carry real PII (FEIN, driver license numbers, DOBs) and will exercise it for real.
-
-**Coterie.** Mock-only integration (BOP/GL/PL quote shapes, `coterie_quotes` table, approval gates with separation of duties) - no live API, not wired to any client-facing flow.
-
-**Policies.** `policies` already has per-line commercial detail columns (`cgl_details`, `bap_details`, `wc_details`, `property_details`, `umbrella_details` JSONB + `*_field_evidence` provenance) which `get_master_coi` reads. Bound results that land here are immediately COI-ready.
-
-**Doc intake.** OCR + extraction pipeline exists (`process-document-tasks`, `document_insights` human-confirm loop, PII redaction before AI, `extract-*-policy` edge fns) - the chassis for policy-upload prefill.
+- **Book:** 2,179 policies; **57 commercial** (Auto 23, GL 15, WC 5, BOP 2, Property 1, Excess 0). 81 business accounts. Commercial carriers include **E&S/wholesale paper: Burlington, USLI, Bass Underwriting** - surplus lines compliance is not hypothetical, it is already how this agency places business.
+- **ACORD templates:** the 25 is real (129 fields, licensed, pinned). The 125/126/127/130/140 rows are **Dec-2024 stubs with 0 extracted fields** - unusable. **No 131.** All six commercial blanks need licensed sourcing (parallel track).
+- **Canopy commercial:** full schema, **0 rows** (never pulled). `get_canopy_commercial_prefill()` live and ACORD-shaped. Unproven end to end.
+- **Quotes:** 3 rows, all personal auto. Scoring engine + `quote_coverages` exist, unused. No commercial structure.
+- **Already-owned machinery this plan reuses:** doc-intake OCR + human-confirm pipeline, Dropbox Sign (`esign-create-request` live), public tokenized `DocumentCollectionPortal`, payments module, tasks engine, communications log, relationship graph (affiliated-business edges), retention scoring, CEO digest, `policies.cgl/bap/wc/property/umbrella_details` JSONB that `get_master_coi` reads (bind -> COI-ready same day), Coterie mock integration with approval gates.
 
 ---
 
-## 2. Target golden path (v1, full lifecycle)
+## 2. Target golden path (v2)
 
 ```
-INTAKE                     SUBMIT                    QUOTE                     BIND
-Prefill sources ->    ACORD packet (125 +      Record carrier quotes    Winning quote ->
-canonical risk        line sections) filled    against the submission,  policy row (commercial
-profile, agent        from the risk profile,   structured limits in     detail JSONs written
-confirms/completes    validated, emailed to    quote_coverages,         through), bind event,
-in the intake UI      carrier/MGA (Fence-      scored + compared        risk profile linked;
-                      gated send)                                       COI-ready on day one
-                                                                        (get_master_coi)
-        ^                                                                      |
-        +------------------- renewal / remarket prefills from the bound book <-+
+PROSPECT/RENEWAL          INTAKE                      PACKET + SIGN               MARKET
+x-date or renewal    Prefill (doc extraction,   ACORD 125 + line sections   Appetite registry
+timeline opens a     Canopy, Sunbiz, client     built from frozen risk      suggests eligible
+submission           portal, book clone) ->     snapshot -> validated ->    markets; E&S requires
+                     agent confirms into the    INSURED E-SIGNS (Dropbox    documented admitted
+                     canonical risk store       Sign) -> signed packet      declinations
+                                                stored                      (diligent effort)
+                                                                                  |
+BIND + AFTER                        PRESENT                    QUOTE               v
+policy write-through (COI-ready),   Branded PROPOSAL w/    Track per-market   Submit packet,
+billing capture, offer/rejection    disclaimers + SL       responses, quotes  follow-up cadence,
+forms signed (UM, umbrella, WC      notices; client        w/ structured      quote due dates
+exemption), then POLICY CHECKING    decision recorded      coverages, scored
+(issued policy diffed vs bound)     
+        |
+        +-> renewal timeline (90/60/30) reopens the loop with everything prefilled
 ```
 
-Every arrow is human-confirmed. Machine sources (extraction, Canopy, AI) only ever stage suggestions (Invariant 4).
+Every machine write is staged and human-confirmed (Invariant 4). Every client-facing send is Fence-gated. Every step lands in the account's activity timeline - the E&O file assembles itself.
 
 ---
 
 ## 3. Architecture
 
-### 3.1 Canonical commercial risk store (the spine)
+### 3.1 Canonical commercial risk store
 
-One set of account-scoped, workspace-RLS'd tables that everything downstream reads. Canopy tables are a **source**, not the store.
+Account-scoped, workspace-RLS'd, per-field provenance `src = manual | extracted | canopy | client | book` (manual never machine-overwritten; the COI Section 7 pattern).
 
-- `commercial_profiles` - one per business account: legal name, DBA, FEIN, entity type, SIC/NAICS, years in business, description of operations, annual revenue, employee counts, subcontractor use, website/contacts.
-- `commercial_locations` - address + COPE (construction, occupancy, protection, exposure: year built, sq ft, stories, sprinkler, alarm, roof/wiring/plumbing/HVAC update years, building/BPP/BI values, deductibles incl. wind/hail - Florida matters, flood zone).
-- `commercial_vehicles` + `commercial_drivers` - fleet (VIN, GVW, radius, use, cost new, coverages, lienholder) and drivers (license, DOB, MVR summary), account-level (NOT the personal-lines `lead_auto_*`).
-- `commercial_wc_classes` - per state/location: class code, description, employee count, payroll, x-mod + effective date.
-- `commercial_loss_history` - per line: date, carrier, description, amount paid/reserved, open/closed, source (loss run doc).
-- Every field-bearing row carries **provenance** per the COI Section 7 pattern: `src` in `manual | extracted | canopy | book`, with `manual` never overwritten by machine writes.
+- `commercial_profiles` - legal name, DBA, FEIN, entity type, SIC/NAICS, years in business, description of operations, revenue, employee counts, subcontractor use + cost, website. **Named-insured schedule** seeded by relationship-graph suggestions (affiliated_business/owns edges -> "should these be named insureds?").
+- `commercial_locations` - address + full COPE, FL-weighted: wind/hail deductible, flood zone, roof age, sprinkler/alarm, building/BPP/BI values.
+- `commercial_vehicles` + `commercial_drivers` - fleet (VIN + **VIN-decode enrichment**, GVWR, radius, use, coverages, lienholder) and drivers (license, DOB, MVR summary). Account-level; distinct from personal-lines `lead_auto_*`.
+- `commercial_wc_classes` - state/location, class code, payroll, employee counts, x-mod + effective date, **FL exemption records** (who holds a DWC exemption, expiry).
+- `commercial_loss_history` - per line/policy year: carrier, claims, paid/reserved, open/closed, valuation date, source doc.
+- Column vocabulary mirrors the existing `canopy_*` tables (already ACORD-designed) so the Canopy feeder is a near-straight mapping.
 
-Schema note: mirror the `canopy_*` column vocabulary where it exists (it was already designed against the ACORD forms) so the Canopy feeder is nearly a straight mapping.
+### 3.2 Submission spine + market intelligence
 
-### 3.2 Submission spine
+- `commercial_submissions` - account, target lines[], effective date, status (`draft -> intake -> packet_ready -> signing -> marketing -> quoted -> proposed -> bound / lost / abandoned`), producer + CSR assignment, **immutable risk snapshot** frozen at packet generation, renewal linkage (remarket-of).
+- `markets` (the appetite registry) - every carrier/MGA/wholesaler the agency can access: lines written, **admitted vs surplus**, appetite class codes, submission email/portal, contacts, appointment status. Intake matches class code + line -> eligible markets. (Absorbs the future-features "Carrier Appointment Tracker".)
+- `submission_markets` - one row per market approached: sent_at (Fence-gated email w/ packet, or marked "portal-submitted" with the packet artifact), response (`pending / declined / quoted / blocked`), **declination reason + date (the diligent-effort evidence)**, quote due date, follow-up task hooks.
+- **Diligent effort record** - for any E&S placement, the system assembles the declination trail from `submission_markets` into a signed-off diligent-effort artifact attached to the submission. (Filing with FSLSO is normally the wholesaler's duty; documenting the effort is the retail agent's - this makes it automatic.)
+- **Offer-and-rejection log** - structured record per submission of coverages offered and declined (umbrella offered/rejected, limits offered vs chosen, FL commercial auto **UM/UIM written rejection**, WC exemption elections). Each generates a signable form routed through e-sign; signed artifacts attach to the account.
+- Follow-up cadence: quote due dates, x-date countdowns, and a **90/60/30 renewal timeline** for bound commercial policies, all emitted as tasks through the existing engine (dedupe-keyed, the cancellation-trigger lesson applied).
 
-- `commercial_submissions` - account + workspace + target lines[] + status (`draft -> packet_ready -> submitted -> quoting -> bound / lost / abandoned`) + an immutable **risk snapshot** frozen at packet generation (same discipline as certificate snapshots: what you sent the carrier is what you can prove you sent).
-- `submission_carriers` - one row per market approached: carrier/MGA, sent_at (Fence-gated email with the packet attached), response status, decline reason.
-- Quotes gain `submission_id` (nullable FK; personal-lines quotes unaffected). Structured limits go in the existing `quote_coverages`. Scoring engine reused as-is.
-- **Bind** promotes the winning quote: writes the policy row with the line detail JSONs (`cgl_details` etc.) populated from the risk snapshot + quote, links `submission_id`, logs a bind event, marks siblings lost. Because it writes the same columns `get_master_coi` reads, **a policy bound today can issue a COI today**.
+### 3.3 Documents out: form engines, e-sign, proposals
 
-### 3.3 Form engines (one per ACORD form, the 25's pattern)
+- **Per-form ACORD engines** for 125, 126, 140, 127, 130, 131 - the acord25 pattern each time: typed field map from the real blank's extracted inventory, deterministic builder from the risk snapshot, validator, preview hash, shared fill, Deno parity port. PII masking schemas are mandatory and real (FEIN on 125/130, DL/DOB on 127): masked in preview, never in the artifact, redacted before any AI touch.
+- **Packet generation** - `generate-submission-packet` edge fn fills 125 + selected sections against the frozen snapshot, stores artifacts in a private bucket, logs events.
+- **E-signature** - packet routes to the insured via the existing Dropbox Sign integration; signed packet is the submission artifact. Rejection forms (UM, umbrella, exemptions) ride the same rail.
+- **Proposal generation** - client-facing branded proposal from the quote set: coverage comparison, premium breakdown incl. E&S taxes/fees where applicable, required disclaimers ("coverage not bound until carrier confirmation"), **surplus lines disclosures** when any option is E&S. Fence-gated delivery. The client's choice is recorded on the submission.
+- The old `/acord-forms` pages remain the generic viewer/instance store; engine-backed forms generate through the new builders; stub template rows superseded (never deleted) at real onboarding.
 
-For each of 125, 126, 140, 127, 130, 131: `src/lib/acord/acord<N>/` with typed field map (from the real blank's extracted inventory), deterministic `build<N>FieldValues` (risk profile -> field values), `validate<N>` (form-specific rules), shared preview hash, shared fill (`fillAcordPdf`), Deno parity port (extend `sync-deno-port.ts`). PII masking schemas are **mandatory and real** for 125 (FEIN), 127 (driver DL/DOB), 130 (FEIN, payroll): mask in preview, never in the generated artifact, redact before any AI touch.
+### 3.4 Data in: prefill feeders
 
-Packet generation = one server-side edge fn (`generate-submission-packet`) that fills 125 + the selected line sections against the frozen snapshot, stores artifacts in a private bucket, logs events - the `generate-certificate` shape, minus the per-certificate immutability chain (packets are per-submission-revision instead).
+All feeders stage suggestions -> agent confirms -> risk store, provenance recorded:
 
-The old `/acord-forms` pages remain the generic viewer/instance store (`acord_forms`); generation for engine-backed forms routes through the new builders. The stub template rows get superseded, not deleted (version history).
+1. **Policy/dec/loss-run upload extraction** - existing OCR chassis + commercial extractor prompts, evidence-linked suggestions, review screen. PII redaction before AI.
+2. **Canopy commercial pull** - map `get_canopy_commercial_prefill` output through the same staging. (First step: verify the plan actually returns commercial payloads - 0 rows ever.)
+3. **Client intake portal** - tokenized public link (DocumentCollectionPortal pattern): the insured completes business info, location/vehicle/driver schedules, payroll, and uploads docs; lands as `src='client'` staged suggestions. The single biggest speed lever in the plan.
+4. **Manual entry** - the intake UI, Calm Command, masked PII inputs, class-code fuzzy pickers (NCCI/GL reference tables), typeable DateFields.
+5. **Book/remarket clone** - one click from a bound policy or renewal row: new submission prefilled from the risk store + `get_master_coi`.
+6. **FL Sunbiz lookup** - entity name, type, principals, registered agent, document number -> the error-prone 125 fields.
+7. **VIN decode** - free NHTSA vPIC API: VIN -> year/make/model/GVWR/body class on fleet entry.
+8. **Loss-run requests** - generated LOA + request letter to prior carriers, tracked as tasks; returned loss runs feed feeder #1.
+9. *(Later)* AI drafting assists (description of operations, NAICS suggestion) and property enrichment (county appraiser COPE data) - suggestion-only.
 
-### 3.4 Prefill feeders (the speed-and-accuracy layer)
+### 3.5 Post-bind rigor
 
-All feeders write **staged suggestions -> agent confirms -> canonical store**, field-level provenance recorded:
+- **Bind write-through** - winning quote -> policy row with line detail JSONs populated from snapshot + quote (immediately COI-ready via `get_master_coi`), siblings marked lost, bind event logged, billing captured (agency/direct bill, premium-finance yes/no + finance company, down payment via the existing payments module).
+- **Policy checking** - when the carrier-issued policy arrives (upload or Canopy), the extraction pipeline diffs it against the bound quote/binder: limits, deductibles, forms, named insureds, mortgagee/loss-payee. Discrepancy report -> task. Few agencies this size do this; the machinery already exists here.
+- **Renewal loop** - bound policies enter the 90/60/30 timeline; remarket clones carry the whole risk profile forward.
+- *(Enhancement track)* WC/GL premium-audit season support (audit notice -> doc collection -> payroll/sales package), mid-term endorsement request tracking, ACORD 75 binder issuance, inbound COI tracking for insureds who hire subcontractors.
 
-1. **Policy/dec-page upload extraction** (Landen: "100% needs"): upload expiring policy, dec page, loss run, or expiring ACORD app -> existing OCR chassis + new commercial extractor prompts -> staged field suggestions with source-page evidence -> review screen -> accept into the risk store. PII redaction before AI per the standing policy.
-2. **Canopy commercial pull** (Landen: "100% needs"): run the existing commercial pull for the account, map `get_canopy_commercial_prefill` output into the same staging flow. (Verify the Canopy plan actually returns commercial payloads - tables have 0 rows today, so this path is untested end to end.)
-3. **Manual entry**: the intake UI itself, Calm Command, per-line sections, DateField/masked SSN-FEIN inputs, tabular figures.
-4. **Existing book / Master COI** (my add): renewals and remarketing start from the bound policy + `get_master_coi` - one click "remarket this policy" clones a submission prefilled from what we already know.
-5. **FL Sunbiz lookup** (my add): entity search against the FL Division of Corporations for legal name, entity type, principal address, officers, registered agent, document number - kills the most error-prone 125 fields. Server-side fetch + confirm.
-6. **Class-code helpers** (my add): reference tables for WC class codes and GL class codes with fuzzy search, so agents pick codes instead of typing them.
-7. **AI drafting assists** (my add, later): description-of-operations drafts, NAICS suggestions from the website/description - suggestion-only, always confirmed.
-8. **Property enrichment** (my add, enhancement track): FL county property appraiser / third-party data for COPE fields (year built, construction, sq ft) keyed off the address.
+### 3.6 Measurement
 
-### 3.5 What pulls in where (the reuse map)
+Submission pipeline dashboard (by stage, aging, effective-date risk), **hit ratios by market/line/class code**, quoted-vs-bound premium, declination reasons, E&S vs admitted mix. Feeds the existing CEO digest.
+
+---
+
+## 4. Reuse map (what pulls in where)
 
 | Source | Feeds | Mechanism |
 |---|---|---|
-| Uploaded policy/dec/loss-run | Risk store (all lines) | OCR -> extractor -> staged confirm |
-| Canopy commercial pull | Risk store (ops, locations, fleet, drivers, payroll, coverages) | `get_canopy_commercial_prefill` -> staged confirm |
-| Bound book + Master COI | New submissions (renewal/remarket) | clone-with-prefill |
-| Risk store snapshot | ACORD 125/126/140/127/130/131 | per-form builders |
-| Risk store + quote | Bound policy detail JSONs | bind write-through |
-| Bound policy | ACORD 25 / COI module | `get_master_coi` (existing, unchanged) |
-| Risk store contacts/holders | Additional Insureds directory | existing module, unchanged |
+| Uploaded policy/dec/loss-run | Risk store | OCR -> extractor -> staged confirm |
+| Canopy commercial pull | Risk store | prefill fn -> staged confirm |
+| Client portal | Risk store | tokenized intake -> staged confirm (`src='client'`) |
+| Sunbiz / VIN decode / class refs | Risk store field-level | lookup -> confirm |
+| Bound book + Master COI | New submissions | remarket clone |
+| Relationship graph | Named-insured schedule | edge suggestions -> confirm |
+| Risk snapshot | ACORD 125/126/140/127/130/131 + rejection forms | per-form builders -> e-sign |
+| Quote set | Proposal | proposal builder -> Fence-gated send |
+| Winning quote + snapshot | Policy detail JSONs | bind write-through |
+| Bound policy | COI module | `get_master_coi` (unchanged) |
+| Issued policy doc | Policy checking | extraction -> diff vs bound |
+| Submissions + quotes | Analytics / CEO digest | pipeline views |
 
 ---
 
-## 4. Phase plan
+## 5. Phase plan (v2)
 
-Vertical-slice strategy: **Phase 1 proves the entire lifecycle on GL alone** (smallest end-to-end loop), then each later phase adds a line to a working pipeline. One branch + one PR per phase; gates per phase: build green, lint green, vitest green (typecheck not a gate, add zero new errors), migrations applied via MCP `apply_migration`, rolled-back prod validation for RPCs, Calm Command acceptance for UI.
+Vertical slices; Phase 1 proves the entire lifecycle on GL. Gates per phase: build/lint/vitest green (typecheck not a gate, zero new errors), migrations via MCP `apply_migration`, rolled-back prod validation for RPCs, Calm Command acceptance, PII re-check.
 
-**Parallel track (Landen/Brian, starts now): source the six licensed blanks** from the ACORD portal - 125, 126, 140, 127, 130, 131, current editions, fillable AcroForm, FL-appropriate. Same handling as the 25: drop on Desktop, never committed to git, verified genuine + field-inventoried at onboarding. Each phase that needs a blank has a stated fallback (build engine against the extracted inventory the moment the blank lands; data layer and UI never block on it).
+**Parallel track (Landen/Brian, starts now):** source licensed blanks - **125, 126, 140, 127, 130, 131** (current editions, fillable AcroForm) plus, pending decision 2, **ACORD 75** and the **FL UM rejection form** current edition. Same handling as the 25: Desktop drop, never committed, verified + inventoried at onboarding. No phase's data layer or UI blocks on a blank; only the fill step does.
 
-- **Phase 0 - Foundations.** Canonical risk store schema + RLS + provenance; `commercial_submissions` + `submission_carriers`; `quotes.submission_id`; supersede-stub handling in template onboarding; class-code reference tables. No UI beyond stubs. *(No blanks needed.)*
-- **Phase 1 - GL vertical slice.** Intake UI (profile + GL exposures + locations-lite), 125 + 126 engines + packet generation + Fence-gated packet email, quote capture with structured `quote_coverages` + scoring, compare view, bind -> policy write-through (`cgl_details`) -> COI-ready. *(Needs 125 + 126 blanks; everything but the fill ships without them.)*
-- **Phase 2 - Prefill feeders.** Policy-upload extraction (commercial extractor + staged-confirm UI) and Canopy commercial pull wiring, both into the Phase 0 store; Sunbiz lookup; book/remarket clone. *(No blanks needed - highest-leverage phase for the speed goal.)*
-- **Phase 3 - Commercial Auto.** Fleet + drivers store UI, 127 engine, packet integration, bind -> `bap_details`. Biggest book segment (23 policies). *(Needs 127.)*
-- **Phase 4 - Workers Comp.** Class/payroll/x-mod UI, 130 engine, bind -> `wc_details`. FEIN/payroll masking exercised for real. *(Needs 130.)*
-- **Phase 5 - Property.** Full COPE locations UI (FL wind/flood emphasis), 140 engine, bind -> `property_details`. *(Needs 140.)*
-- **Phase 6 - Excess/Umbrella + polish.** 131 engine, underlying-schedule auto-build from bound lines, packet completion, renewal remarket loop hardening, backfill sweep of the 57-policy commercial book into risk profiles (small: one afternoon of confirms). *(Needs 131.)*
-- **Enhancement track (post-v1, separately approved):** Coterie live quoting (BOP/GL, behind the existing approval gates), property enrichment, loss-run analytics, ACORD 75 binder generation.
-
-Suggested order rationale: GL first because it is the submission workhorse and the COI anchor; Auto second because it is the largest actual book segment; WC third (small but always paired with GL for contractors); Property fourth (one policy today); Excess last (zero today, and 131 depends on the other lines' data for the underlying schedule).
+- **Phase 0 - Foundations.** Risk store schema + RLS + provenance; submission spine + `markets` + `submission_markets` + offer/rejection log; `quotes.submission_id`; class-code reference tables; stub-supersede handling. Seed the markets registry from the live carrier list (admitted/E&S flags - Burlington/USLI/Bass marked E&S). *(No blanks.)*
+- **Phase 1 - GL vertical slice, compliance-complete.** Intake UI (profile + GL + locations-lite), 125+126 engines, packet generation + **e-sign**, market selection from appetite + Fence-gated submission send, **declination capture + diligent-effort record** (GL is where E&S shows up first), quote capture w/ structured coverages + scoring, **proposal v1** w/ disclaimers + SL disclosures, bind -> `cgl_details` write-through + billing capture-lite -> COI-ready. *(Needs 125+126 for the fill; all else ships without.)*
+- **Phase 2 - Prefill at full strength.** Doc extraction (commercial extractor + staged-confirm UI), Canopy pull wiring (after plan verification), **client intake portal**, Sunbiz lookup, book/remarket clone, loss-run LOA workflow. *(No blanks. Highest-leverage phase for speed+accuracy.)*
+- **Phase 3 - Commercial Auto.** Fleet/driver store + UI, VIN decode, 127 engine, **FL UM/UIM written-rejection flow** (e-sign), bind -> `bap_details`. Biggest book segment. *(Needs 127.)*
+- **Phase 4 - Workers Comp.** Class/payroll/x-mod UI, **FL exemption tracking**, 130 engine, bind -> `wc_details`. FEIN/payroll masking exercised for real. *(Needs 130.)*
+- **Phase 5 - Property (+BOP).** Full COPE locations UI (FL wind/flood emphasis), 140 engine, BOP handled as GL+Property packet, bind -> `property_details`. *(Needs 140.)*
+- **Phase 6 - Excess + post-bind rigor.** 131 engine w/ underlying-schedule auto-build, **policy checking**, renewal 90/60/30 timeline + remarket loop, pipeline analytics + hit ratios, umbrella offer/rejection defaults on every submission, backfill of the 57-policy commercial book (one afternoon of confirms). *(Needs 131.)*
+- **Enhancement track (post-v1, separately approved):** Coterie live quoting behind the existing approval gates; premium finance + invoicing w/ E&S tax/fee calc; WC/GL premium-audit support; mid-term endorsement tracking; ACORD 75 binder; property enrichment; inbound COI tracking for insureds with subcontractors; commission tracking.
 
 ---
 
-## 5. Risks and dependencies
+## 6. Risks and dependencies
 
-1. **Blank sourcing is the only hard external dependency.** Mitigated by the parallel track + per-phase fallbacks. The 131 has no stub row at all.
-2. **Canopy commercial pull is unproven** (0 rows ever). Phase 2 must first verify the agency's Canopy plan returns commercial payloads; if not, the feeder degrades gracefully to extraction + manual.
-3. **PII surface grows materially** (FEIN, DLs, DOBs, payroll). Mitigations already built: masking pipeline, redaction-before-AI, workspace RLS, private buckets; each phase's review re-checks them.
-4. **Form editions change.** The template versioning/pinning system handles supersession; builders pin to a template sha exactly like the 25 (V9 gate).
-5. **Old form pages ambiguity.** Decision below; default is coexist-then-converge, no demolition in v1.
+1. **Blank sourcing** - only hard external dependency; per-phase fallbacks stated. 131 and (if in scope) 75 + UM form have no existing rows at all.
+2. **Canopy commercial unproven** (0 rows ever) - Phase 2 verifies before relying; degrades to extraction + portal + manual.
+3. **Compliance correctness** - diligent-effort and rejection-form requirements must be validated against current FL statute/FSLSO guidance during Phase 1 build (I verify against primary sources; Brian confirms agency practice). The system makes documentation automatic; it does not practice law.
+4. **PII surface** (FEIN, DLs, DOBs, payroll, now also client-submitted) - masking, redaction-before-AI, RLS, private buckets, tokenized portal with expiry; re-checked every phase.
+5. **Scope discipline** - v2 is wider than v1; the vertical-slice cut keeps each phase shippable. Anything that slips lands in the enhancement track, not in a half-built phase.
 6. **Typecheck debt** unchanged: not a gate, zero new errors per phase.
 
-## 6. Open decisions (need answers, none block Phase 0)
+## 7. Open decisions (defaults chosen; correct me where wrong)
 
-1. **Packet delivery**: email to carrier/MGA from inside the app (Fence-gated, like COI email) - confirm this is how you actually submit today (vs. carrier portals, where the deliverable is just the PDF download).
-2. **ACORD 75 (binder)** in scope for the bind step, or out for v1? (Currently: out.)
-3. **Coterie live**: enhancement track (current plan) or pulled into v1?
-4. **Old `/acord-forms` UI**: keep as generic fallback (current plan) or retire once all six engines exist?
-5. **Phase order confirmation**: GL -> Auto -> WC -> Property -> Excess (proposed above; trivially reorderable).
+1. **Packet delivery** - default: both. Fence-gated email per market where you email submissions; "mark portal-submitted" with artifact attach where you use carrier portals.
+2. **ACORD 75 binder** - default: enhancement track, revisit at Phase 6. Pull forward if you issue binders routinely at bind.
+3. **Coterie live** - default: enhancement track (approval-gated), not v1.
+4. **Old `/acord-forms` UI** - default: coexist through v1, converge after all six engines exist.
+5. **Phase order** - default: GL -> Auto -> WC -> Property -> Excess (book-weighted; GL is the E&S + COI anchor).
+6. **Surplus lines path** - default assumption: E&S placements go through wholesalers (Bass et al.) who handle FSLSO filing; the system documents diligent effort and disclosures regardless. Confirm this matches practice.
+7. **Client portal exposure** - default: tokenized per-submission links (no login), expiring, PII-masked review before commit. Confirm you are comfortable with client self-entry at all; it can ship later without blocking anything.
