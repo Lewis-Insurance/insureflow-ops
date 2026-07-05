@@ -391,27 +391,33 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Section 8 step 1: staff check via a JWT-scoped client (respects the caller's identity).
+    // Section 8 step 1: staff check. Interactive callers carry a real staff JWT, so
+    // is_staff() (auth.uid()-based) works via a JWT-scoped client. The Floor service
+    // release invokes with an anon-key Authorization (no user JWT) -> auth.uid() is
+    // null there, so its staff+workspace authorization is done post-cert-load against
+    // the approving human via the service-role is_staff_member_of() below.
     const authHeader = req.headers.get('Authorization') ?? '';
     const callerClient = createClient(supabaseUrl, supabaseServiceKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: isStaff, error: isStaffError } = await callerClient.rpc('is_staff');
-    if (isStaffError) {
-      console.error('is_staff check failed:', isStaffError);
-      return jsonResponse(
-        { success: false, error: 'Authorization check failed' },
-        403,
-        corsHeaders
-      );
-    }
-    if (isStaff !== true) {
-      return jsonResponse(
-        { success: false, error: 'Forbidden: staff access required' },
-        403,
-        corsHeaders
-      );
+    if (!isFloorServiceRelease) {
+      const { data: isStaff, error: isStaffError } = await callerClient.rpc('is_staff');
+      if (isStaffError) {
+        console.error('is_staff check failed:', isStaffError);
+        return jsonResponse(
+          { success: false, error: 'Authorization check failed' },
+          403,
+          corsHeaders
+        );
+      }
+      if (isStaff !== true) {
+        return jsonResponse(
+          { success: false, error: 'Forbidden: staff access required' },
+          403,
+          corsHeaders
+        );
+      }
     }
 
     // Section 8 step 1: load the certificate row (service role). 404 if not found.
@@ -440,25 +446,52 @@ const handler = async (req: Request): Promise<Response> => {
     }
     const cert = certData as CertificateRow;
 
-    // Section 8 step 1: workspace membership check for the caller.
-    const { data: isMember, error: isMemberError } = await callerClient.rpc(
-      'is_agency_member',
-      { p_agency_id: cert.agency_workspace_id }
-    );
-    if (isMemberError) {
-      console.error('is_agency_member check failed:', isMemberError);
-      return jsonResponse(
-        { success: false, error: 'Authorization check failed' },
-        403,
-        corsHeaders
+    // Section 8 step 1: workspace authorization, scoped to THIS certificate's workspace.
+    if (isFloorServiceRelease) {
+      // Floor path: auth.uid() is null under the anon-key invocation, so verify the
+      // approving human (from the floor approval marker) is an active staff member of
+      // the certificate's workspace, via the service-role is_staff_member_of(). This
+      // is the Floor path's real authority (cron secret + marker alone did not bind
+      // the human to the certificate's workspace).
+      const { data: floorOk, error: floorAuthError } = await supabase.rpc(
+        'is_staff_member_of',
+        { p_user_id: user.id, p_agency_id: cert.agency_workspace_id }
       );
-    }
-    if (isMember !== true) {
-      return jsonResponse(
-        { success: false, error: 'Forbidden: not a member of this workspace' },
-        403,
-        corsHeaders
+      if (floorAuthError) {
+        console.error('is_staff_member_of check failed:', floorAuthError);
+        return jsonResponse(
+          { success: false, error: 'Authorization check failed' },
+          403,
+          corsHeaders
+        );
+      }
+      if (floorOk !== true) {
+        return jsonResponse(
+          { success: false, error: 'Forbidden: Floor approver is not an active staff member of this workspace' },
+          403,
+          corsHeaders
+        );
+      }
+    } else {
+      const { data: isMember, error: isMemberError } = await callerClient.rpc(
+        'is_agency_member',
+        { p_agency_id: cert.agency_workspace_id }
       );
+      if (isMemberError) {
+        console.error('is_agency_member check failed:', isMemberError);
+        return jsonResponse(
+          { success: false, error: 'Authorization check failed' },
+          403,
+          corsHeaders
+        );
+      }
+      if (isMember !== true) {
+        return jsonResponse(
+          { success: false, error: 'Forbidden: not a member of this workspace' },
+          403,
+          corsHeaders
+        );
+      }
     }
 
     // Section 8 step 2: status guard. Only issued/sent are emailable.
