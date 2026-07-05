@@ -76,6 +76,10 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
   };
 
   const handleApply = async (row: IntakeStagedSubmission) => {
+    // One apply at a time: during the refetch await, saveProfile.isPending is
+    // still false, so this guard (plus disabling every row's buttons while
+    // applyingId is set) is what prevents interleaved applies (review fix).
+    if (applyingId !== null) return;
     setApplyingId(row.id);
     const changes = row.payload as CommercialProfileInput;
     const sources = Object.fromEntries(Object.keys(row.payload).map((k) => [k, 'client' as const]));
@@ -182,14 +186,14 @@ export function ClientIntakeCard({ accountId }: { accountId: string }) {
                   <Button
                     size="sm"
                     onClick={() => void handleApply(row)}
-                    disabled={applyingId === row.id || saveProfile.isPending}
+                    disabled={applyingId !== null || saveProfile.isPending}
                   >
                     {applyingId === row.id ? 'Applying' : 'Apply all'}
                   </Button>
                   <Button
                     variant="ghost" size="sm"
                     onClick={() => setStatus.mutate({ accountId, stagedId: row.id, status: 'dismissed' })}
-                    disabled={setStatus.isPending || applyingId === row.id}
+                    disabled={setStatus.isPending || applyingId !== null}
                     className="text-cc-text-muted hover:text-cc-text-primary"
                   >
                     Dismiss
