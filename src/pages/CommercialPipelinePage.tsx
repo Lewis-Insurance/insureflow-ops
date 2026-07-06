@@ -60,7 +60,9 @@ export default function CommercialPipelinePage() {
   const { data: submissions = [], isLoading: subsLoading } = usePipelineSubmissions();
   const { data: quotes = [], isLoading: quotesLoading } = usePipelineQuotes();
   const { data: policies = [], isLoading: runwayLoading } = useCommercialRunwayPolicies();
-  const { data: boundTimes = {} } = usePipelineBoundTimes();
+  // Loading gate includes bound-times: rendering before it lands would show
+  // the updated_at-fallback cycle time (the inflated number) for a moment.
+  const { data: boundTimes = {}, isLoading: boundTimesLoading } = usePipelineBoundTimes();
 
   const funnel = useMemo(() => funnelCounts(submissions), [submissions]);
   const carriers = useMemo(() => carrierHitRatio(quotes), [quotes]);
@@ -70,7 +72,7 @@ export default function CommercialPipelinePage() {
     [policies],
   );
 
-  const loading = subsLoading || quotesLoading || runwayLoading;
+  const loading = subsLoading || quotesLoading || runwayLoading || boundTimesLoading;
   const activeFunnel = funnel.filter((f) => !['lost', 'abandoned'].includes(f.stage));
   const closedFunnel = funnel.filter((f) => ['lost', 'abandoned'].includes(f.stage));
 
