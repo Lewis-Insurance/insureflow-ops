@@ -122,7 +122,7 @@ export function getDefaultModel(provider: AIProvider): string {
     case 'openai':
       return 'gpt-5-mini'; // Updated to GPT-5-mini (released August 2025)
     case 'anthropic':
-      return 'claude-3-haiku-20240307';
+      return 'claude-haiku-4-5-20251001';
     default:
       return 'gpt-5-mini';
   }
@@ -283,7 +283,7 @@ async function callAnthropic(
   tools?: Tool[],
   options?: AIClientOptions
 ): Promise<AIResponse> {
-  const model = options?.model || 'claude-3-haiku-20240307';
+  const model = options?.model || 'claude-haiku-4-5-20251001';
 
   // Extract system message
   const systemMessage = messages.find(m => m.role === 'system')?.content || '';

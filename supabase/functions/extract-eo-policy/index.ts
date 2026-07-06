@@ -18,7 +18,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
+import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
@@ -157,6 +157,7 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
+        llm_model: 'claude-sonnet-5',
       })
       .select()
       .single();
@@ -236,7 +237,7 @@ serve(async (req) => {
     const userPrompt = buildEOUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -245,7 +246,7 @@ serve(async (req) => {
     const extractionLatency = Date.now() - extractionStart;
 
     // Parse response
-    const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
+    const responseText = anthropicResponseText(response);
     const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || [null, responseText];
     const extractedData = JSON.parse(jsonMatch[1] || responseText);
 

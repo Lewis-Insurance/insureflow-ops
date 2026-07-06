@@ -570,7 +570,7 @@ async function callLLMMapper(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-5',
       max_tokens: 4096,
       messages: [
         {
@@ -586,7 +586,7 @@ async function callLLMMapper(
   }
 
   const data = await response.json();
-  const content = data.content[0]?.text || '';
+  const content = ((data.content ?? []).filter((b: { type?: string; text?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('\n'));
 
   // Parse JSON response
   const jsonMatch = content.match(/\{[\s\S]*\}/);

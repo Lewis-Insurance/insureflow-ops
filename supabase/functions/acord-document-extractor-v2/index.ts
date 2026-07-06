@@ -375,7 +375,7 @@ ${matchedTemplate ? `MATCHED TEMPLATE: ${matchedTemplate.template_name} (${match
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-sonnet-5',
           max_tokens: 4096,
           messages: [
             {
@@ -388,7 +388,7 @@ ${matchedTemplate ? `MATCHED TEMPLATE: ${matchedTemplate.template_name} (${match
 
       if (claudeResponse.ok) {
         const claudeData = await claudeResponse.json();
-        const claudeContent = claudeData.content[0]?.text || '';
+        const claudeContent = ((claudeData.content ?? []).filter((b: { type?: string; text?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('\n'));
 
         try {
           const jsonMatch = claudeContent.match(/\{[\s\S]*\}/);
