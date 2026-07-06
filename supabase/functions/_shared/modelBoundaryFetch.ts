@@ -76,6 +76,16 @@ export interface AnthropicBoundaryResponse {
   [key: string]: unknown;
 }
 
+/**
+ * The response's TEXT content, order-independent: Claude 5 models with
+ * adaptive thinking may prepend non-text blocks, so content[0] is not
+ * guaranteed to be the text block (Bugbot on PR #72).
+ */
+export function anthropicResponseText(response: AnthropicBoundaryResponse): string {
+  const block = response.content?.find((b) => b?.type === 'text');
+  return block?.text ?? '';
+}
+
 export async function anthropicBoundaryCreate(
   credential: string,
   body: Record<string, unknown>,

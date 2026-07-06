@@ -10,7 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
+import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
@@ -434,7 +434,7 @@ serve(async (req) => {
       messages: [{ role: "user", content: userPrompt }],
     });
 
-    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    const responseText = anthropicResponseText(response);
     let cyberDetails: any;
 
     try {

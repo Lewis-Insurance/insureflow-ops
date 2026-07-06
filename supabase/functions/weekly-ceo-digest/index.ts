@@ -314,7 +314,7 @@ Remember: Output ONLY valid JSON matching the schema. Do not include any text ou
         }
 
         const data = await response.json();
-        const content = data.content[0]?.text || '';
+        const content = (data.content?.find((b: { type?: string }) => b?.type === 'text')?.text ?? '');
 
         // Parse JSON from response
         const jsonMatch = content.match(/\{[\s\S]*\}/);
