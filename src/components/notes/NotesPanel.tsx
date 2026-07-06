@@ -40,7 +40,7 @@ export function NotesPanel({
   className,
 }: NotesPanelProps) {
   const { toast } = useToast();
-  const { data: notes = [], isLoading } = useAccountNotes(accountId);
+  const { data: notes = [], isLoading, isError, refetch } = useAccountNotes(accountId);
   const addNote = useAddAccountNote(accountId);
   const updateNote = useUpdateAccountNote(accountId);
   const deleteNote = useDeleteAccountNote(accountId);
@@ -156,6 +156,15 @@ export function NotesPanel({
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-12 animate-pulse rounded-cc-md bg-cc-surface-overlay" />
           ))}
+        </div>
+      ) : isError ? (
+        // Notes are the E&O trail: a failed fetch must never masquerade as an
+        // empty record.
+        <div className="py-6 text-center">
+          <p className="text-sm text-destructive">Notes could not be loaded.</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>
+            Retry
+          </Button>
         </div>
       ) : notes.length === 0 ? (
         <p className="py-6 text-center text-sm text-cc-text-muted">

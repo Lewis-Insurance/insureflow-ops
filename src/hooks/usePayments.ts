@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import type {
   PremiumPayment,
   PaymentFilters,
@@ -40,9 +41,6 @@ export function usePayments(filters: PaymentFilters = {}) {
       if (filters.status?.length) {
         query = query.in('status', filters.status);
       }
-      if (filters.payment_method_type?.length) {
-        query = query.in('payment_method.type', filters.payment_method_type);
-      }
       if (filters.date_from) {
         query = query.gte('received_date', filters.date_from);
       }
@@ -65,18 +63,29 @@ export function usePayments(filters: PaymentFilters = {}) {
         query = query.lte('amount', filters.max_amount);
       }
       if (filters.search) {
+        // Sanitized: raw commas/parens break the PostgREST .or() filter string.
         query = query.or(
-          `payer_name.ilike.%${filters.search}%,` +
-          `check_number.ilike.%${filters.search}%,` +
-          `reference_number.ilike.%${filters.search}%,` +
-          `receipt_number.ilike.%${filters.search}%`
+          sanitizeMultiFieldSearch(filters.search, [
+            'payer_name',
+            'check_number',
+            'reference_number',
+            'receipt_number',
+          ])
         );
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as PremiumPayment[];
+
+      // Method-type filtering happens client-side: an .in() on the embedded
+      // payment_method without !inner does not exclude parents in PostgREST -
+      // it just nulls the embed, silently returning every payment.
+      let rows = data as PremiumPayment[];
+      if (filters.payment_method_type?.length) {
+        rows = rows.filter((p) => p.payment_method && filters.payment_method_type!.includes(p.payment_method.type));
+      }
+      return rows;
     },
   });
 }

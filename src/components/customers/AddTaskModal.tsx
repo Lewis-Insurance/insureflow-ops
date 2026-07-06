@@ -13,9 +13,11 @@ interface AddTaskModalProps {
   onOpenChange: (open: boolean) => void;
   accountId: string;
   policyId?: string;
+  /** Called after a successful create (hosts using useState-based task lists refetch here). */
+  onSuccess?: () => void;
 }
 
-export function AddTaskModal({ open, onOpenChange, accountId, policyId }: AddTaskModalProps) {
+export function AddTaskModal({ open, onOpenChange, accountId, policyId, onSuccess }: AddTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -74,6 +76,7 @@ export function AddTaskModal({ open, onOpenChange, accountId, policyId }: AddTas
       setDescription('');
       setDueAt('');
       onOpenChange(false);
+      onSuccess?.();
     } catch (error) {
       toast({
         title: 'Error',

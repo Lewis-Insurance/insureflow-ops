@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Building2, Home, Search, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -48,10 +49,16 @@ function CustomerSearchDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  // Debounced: one query per pause, not per keystroke (50-row payloads).
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   // Fetch accounts for searching
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['accounts-merge-search', search],
+    queryKey: ['accounts-merge-search', debouncedSearch],
     queryFn: async () => {
       let query = supabase
         .from('accounts')
@@ -59,9 +66,10 @@ function CustomerSearchDropdown({
         .is('deleted_at', null)
         .order('name');
 
-      if (search.trim()) {
-        const searchTerm = `%${search.trim()}%`;
-        query = query.or(`name.ilike.${searchTerm},email.ilike.${searchTerm}`);
+      if (debouncedSearch.trim()) {
+        // Sanitized + quoted: a raw comma ("Smith, John") breaks the PostgREST
+        // .or() grammar and silently returned "No customers found".
+        query = query.or(sanitizeMultiFieldSearch(debouncedSearch.trim(), ['name', 'email']));
       }
 
       const { data, error } = await query.limit(50);

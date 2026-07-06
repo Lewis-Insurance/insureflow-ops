@@ -190,10 +190,42 @@ function normalizeColumnName(header: string): string {
 }
 
 /**
+ * Split CSV content into logical records, respecting quoted fields that span
+ * physical lines (multi-line addresses are common in AMS exports; a naive
+ * split('\n') cut those rows in half and imported garbage).
+ */
+function splitCSVRecords(content: string): string[] {
+  const records: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    if (char === '"') {
+      // A doubled quote inside a quoted field is an escaped quote, not a close.
+      if (inQuotes && content[i + 1] === '"') {
+        current += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && content[i + 1] === '\n') i++;
+      if (current.trim()) records.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) records.push(current);
+  return records;
+}
+
+/**
  * Parse CSV content into array of records
  */
 function parseCSV(content: string): Record<string, unknown>[] {
-  const lines = content.split('\n').filter(line => line.trim());
+  const lines = splitCSVRecords(content);
   if (lines.length < 2) return [];
 
   // Parse header row and normalize column names

@@ -43,9 +43,11 @@ interface CustomerAccount {
 interface CustomerContactInfoProps {
   account: CustomerAccount;
   onSendEmail?: () => void;
+  /** Refresh the account row after an edit (avoids a full-page reload of the whole record). */
+  onAccountUpdated?: () => void;
 }
 
-export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInfoProps) {
+export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: CustomerContactInfoProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [smsModalOpen, setSmsModalOpen] = useState(false);
 
@@ -256,7 +258,7 @@ export function CustomerContactInfo({ account, onSendEmail }: CustomerContactInf
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         account={account}
-        onSuccess={() => window.location.reload()}
+        onSuccess={() => (onAccountUpdated ? onAccountUpdated() : window.location.reload())}
       />
 
       {account.phone && (

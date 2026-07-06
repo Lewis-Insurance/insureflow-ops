@@ -58,6 +58,8 @@ export interface RecordPaymentFormProps {
   policyId?: string;
   /** When provided, the form edits this payment instead of creating one. Customer and policy are locked. */
   payment?: PremiumPayment | null;
+  /** Default Day Sheet Date for NEW payments (e.g. the sheet being viewed); falls back to today. */
+  defaultDaySheetDate?: string;
   onSuccess?: () => void;
   /** Render a Cancel button (used inside dialogs). */
   onCancel?: () => void;
@@ -77,6 +79,7 @@ export function RecordPaymentForm({
   customerName,
   policyId,
   payment,
+  defaultDaySheetDate,
   onSuccess,
   onCancel,
 }: RecordPaymentFormProps) {
@@ -111,7 +114,7 @@ export function RecordPaymentForm({
     payment_date: payment?.received_date || todayLocalDate(),
     // Day Sheet Date drives which day sheet the payment lands on. It is
     // independent of Payment Date and defaults to today for new payments.
-    day_sheet_date: payment?.day_sheet_date || todayLocalDate(),
+    day_sheet_date: payment?.day_sheet_date || defaultDaySheetDate || todayLocalDate(),
     check_number: payment?.check_number || '',
     reference_number: payment?.reference_number || '',
     payer_name: payment?.payer_name || customerName || '',
@@ -140,8 +143,17 @@ export function RecordPaymentForm({
         .eq('is_active', true)
         .is('deleted_at', null)
         .order('display_order');
-      if (!error) setPaymentMethods(data || []);
+      if (!error) {
+        setPaymentMethods(data || []);
+      } else {
+        toast({
+          title: 'Could not load payment methods',
+          description: 'Check number validation is unavailable; retry before saving.',
+          variant: 'destructive',
+        });
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load policies whenever the selected customer changes.
@@ -267,6 +279,10 @@ export function RecordPaymentForm({
       toast({ title: 'Error', description: 'Please enter a valid payment amount', variant: 'destructive' });
       return;
     }
+    if (!formData.payment_date) {
+      toast({ title: 'Error', description: 'Please enter the payment date', variant: 'destructive' });
+      return;
+    }
     if (!formData.day_sheet_date) {
       toast({ title: 'Error', description: 'Please choose a day sheet date', variant: 'destructive' });
       return;
@@ -290,11 +306,25 @@ export function RecordPaymentForm({
 
     setLoading(true);
     try {
-      const amount = parseFloat(formData.amount);
+      // Round to cents: step=0.01 is UI-only and float artifacts otherwise flow
+      // into day-sheet totals.
+      const amount = Math.round(parseFloat(formData.amount) * 100) / 100;
       // Method-appropriate instrument fields: checks carry a check number,
-      // card/ACH carry a reference; never both.
-      const checkNumber = isCheck ? formData.check_number.trim() || null : null;
-      const referenceNumber = isCardOrAch ? formData.reference_number.trim() || null : null;
+      // card/ACH carry a reference; never both. If the payment's method is not
+      // in the loaded active list (fetch in flight/failed, or the method was
+      // deactivated since), editing must PRESERVE the existing values rather
+      // than silently nulling them.
+      const methodUnknown = !selectedMethod && isEdit && payment?.payment_method_id === formData.payment_method_id;
+      const checkNumber = methodUnknown
+        ? formData.check_number.trim() || null
+        : isCheck
+          ? formData.check_number.trim() || null
+          : null;
+      const referenceNumber = methodUnknown
+        ? formData.reference_number.trim() || null
+        : isCardOrAch
+          ? formData.reference_number.trim() || null
+          : null;
 
       if (isEdit && payment) {
         const { error } = await supabase
