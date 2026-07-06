@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,6 +80,7 @@ interface EditPolicyModalProps {
 }
 
 export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditPolicyModalProps) {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     policy_number: '',
     carrier: '',
@@ -201,6 +203,13 @@ export function EditPolicyModal({ open, onOpenChange, policy, onSuccess }: EditP
         title: 'Success',
         description: 'Policy updated successfully',
       });
+
+      // The modal writes directly (no mutation hook), so it owns the cache
+      // refresh: the detail page, the lists, and the commercial pipeline's
+      // renewal runway (x-date/status/premium edits move its rows).
+      queryClient.invalidateQueries({ queryKey: ['policy', policy.id] });
+      queryClient.invalidateQueries({ queryKey: ['policies'] });
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
 
       onOpenChange(false);
       onSuccess?.();

@@ -151,6 +151,13 @@ describe('carrierHitRatio', () => {
     expect(rows.find((r) => r.carrier === 'USLI')?.ratio).toBeNull();
   });
 
+  it('expired quotes close as non-wins instead of pending forever', () => {
+    const rows = carrierHitRatio([q('Bass', 'expired'), q('Bass', 'won')]);
+    expect(rows.find((r) => r.carrier === 'Bass')).toMatchObject({ quoted: 2, won: 1, ratio: 0.5 });
+    // A carrier whose only quotes expired resolves to 0%, not 'open'.
+    expect(carrierHitRatio([q('USLI', 'expired')]).find((r) => r.carrier === 'USLI')?.ratio).toBe(0);
+  });
+
   it('falls back to competitor_carrier and sorts by volume', () => {
     const rows = carrierHitRatio([
       q('Bass', 'won', false), q('Bass', 'won', false), q('USLI', 'lost'),
