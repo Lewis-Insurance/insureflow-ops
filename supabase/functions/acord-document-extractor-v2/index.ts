@@ -388,7 +388,7 @@ ${matchedTemplate ? `MATCHED TEMPLATE: ${matchedTemplate.template_name} (${match
 
       if (claudeResponse.ok) {
         const claudeData = await claudeResponse.json();
-        const claudeContent = (claudeData.content?.find((b: { type?: string }) => b?.type === 'text')?.text ?? '');
+        const claudeContent = ((claudeData.content ?? []).filter((b: { type?: string; text?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('\n'));
 
         try {
           const jsonMatch = claudeContent.match(/\{[\s\S]*\}/);

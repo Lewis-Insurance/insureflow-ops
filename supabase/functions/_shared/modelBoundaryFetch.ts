@@ -77,13 +77,18 @@ export interface AnthropicBoundaryResponse {
 }
 
 /**
- * The response's TEXT content, order-independent: Claude 5 models with
- * adaptive thinking may prepend non-text blocks, so content[0] is not
- * guaranteed to be the text block (Bugbot on PR #72).
+ * The response's TEXT content, order- and block-count-independent: Claude 5
+ * models with adaptive thinking may prepend non-text blocks AND split prose
+ * across multiple text blocks (preamble + answer), so neither content[0] nor
+ * the first text block is guaranteed to carry the JSON (Bugbot on PR #72).
+ * Concatenating every text block lets downstream JSON regexes find the
+ * payload wherever it lives.
  */
 export function anthropicResponseText(response: AnthropicBoundaryResponse): string {
-  const block = response.content?.find((b) => b?.type === 'text');
-  return block?.text ?? '';
+  return (response.content ?? [])
+    .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text)
+    .join('\n');
 }
 
 export async function anthropicBoundaryCreate(

@@ -586,7 +586,7 @@ async function callLLMMapper(
   }
 
   const data = await response.json();
-  const content = (data.content?.find((b: { type?: string }) => b?.type === 'text')?.text ?? '');
+  const content = ((data.content ?? []).filter((b: { type?: string; text?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('\n'));
 
   // Parse JSON response
   const jsonMatch = content.match(/\{[\s\S]*\}/);

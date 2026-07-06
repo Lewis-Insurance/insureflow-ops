@@ -323,7 +323,7 @@ TARGET ACORD FORM: ${target_form_number || 'Any (125, 126, 127, 130, 140)'}
     }
 
     const claudeData = await claudeResponse.json();
-    const claudeContent = (claudeData.content?.find((b: { type?: string }) => b?.type === 'text')?.text ?? '');
+    const claudeContent = ((claudeData.content ?? []).filter((b: { type?: string; text?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('\n'));
 
     // Parse Claude's JSON response
     let mappingResult;
