@@ -1,0 +1,1187 @@
+[
+  {
+    "pdfField": "F[0].P1[0].Text1[0]",
+    "page": 0,
+    "rect": [
+      411,
+      753,
+      184,
+      13
+    ],
+    "label": "AGENCY CUSTOMER ID:",
+    "labelXY": [
+      315.2,
+      758.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text2[0]",
+    "page": 0,
+    "rect": [
+      525,
+      726,
+      56,
+      15
+    ],
+    "label": "DATE (MM/DD/YYYY)",
+    "labelXY": [
+      521.2,
+      742.3
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text3[0]",
+    "page": 0,
+    "rect": [
+      18,
+      702,
+      287,
+      13
+    ],
+    "label": "AGENCY",
+    "labelXY": [
+      21.5,
+      718.0
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text5[0]",
+    "page": 0,
+    "rect": [
+      248,
+      678,
+      56,
+      15
+    ],
+    "label": "EFFECTIVE DATE",
+    "labelXY": [
+      252.1,
+      694.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text8[0]",
+    "page": 0,
+    "rect": [
+      306,
+      678,
+      287,
+      13
+    ],
+    "label": "APPLICANT / FIRST NAMED INSURED",
+    "labelXY": [
+      309.5,
+      693.7
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check2[0]",
+    "page": 0,
+    "rect": [
+      37,
+      643,
+      10,
+      10
+    ],
+    "label": "CLAIMS MADE",
+    "labelXY": [
+      50.3,
+      644.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check3[0]",
+    "page": 0,
+    "rect": [
+      124,
+      643,
+      10,
+      10
+    ],
+    "label": "OCCURRENCE",
+    "labelXY": [
+      140.3,
+      644.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check11[0]",
+    "page": 0,
+    "rect": [
+      304,
+      643,
+      10,
+      10
+    ],
+    "label": "POLICY",
+    "labelXY": [
+      320.3,
+      643.7
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check12[0]",
+    "page": 0,
+    "rect": [
+      304,
+      631,
+      10,
+      10
+    ],
+    "label": "PROJECT",
+    "labelXY": [
+      320.3,
+      631.8
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check13[0]",
+    "page": 0,
+    "rect": [
+      355,
+      643,
+      10,
+      10
+    ],
+    "label": "LOCATION",
+    "labelXY": [
+      370.7,
+      643.7
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text14[0]",
+    "page": 0,
+    "rect": [
+      406,
+      651,
+      55,
+      14
+    ],
+    "label": "GENERAL AGGREGATE",
+    "labelXY": [
+      233.9,
+      656.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text16[0]",
+    "page": 0,
+    "rect": [
+      406,
+      616,
+      86,
+      14
+    ],
+    "label": "PRODUCTS & COMPLETED OPERATIONS AGGREGATE",
+    "labelXY": [
+      233.9,
+      620.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text17[0]",
+    "page": 0,
+    "rect": [
+      407,
+      604,
+      86,
+      14
+    ],
+    "label": "PERSONAL & ADVERTISING INJURY",
+    "labelXY": [
+      233.9,
+      608.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text18[0]",
+    "page": 0,
+    "rect": [
+      407,
+      592,
+      86,
+      14
+    ],
+    "label": "EACH OCCURRENCE",
+    "labelXY": [
+      234.7,
+      597.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text19[0]",
+    "page": 0,
+    "rect": [
+      407,
+      580,
+      86,
+      14
+    ],
+    "label": "DAMAGE TO RENTED PREMISES (each occurrence)",
+    "labelXY": [
+      233.9,
+      584.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text20[0]",
+    "page": 0,
+    "rect": [
+      407,
+      568,
+      86,
+      14
+    ],
+    "label": "MEDICAL EXPENSE (Any one person)",
+    "labelXY": [
+      233.9,
+      572.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check6[0]",
+    "page": 0,
+    "rect": [
+      21,
+      594,
+      10,
+      10
+    ],
+    "label": "PROPERTY DAMAGE",
+    "labelXY": [
+      35.9,
+      596.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text10[0]",
+    "page": 0,
+    "rect": [
+      124,
+      590,
+      55,
+      14
+    ],
+    "label": "PROPERTY DAMAGE $",
+    "labelXY": [
+      35.9,
+      596.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check7[0]",
+    "page": 0,
+    "rect": [
+      21,
+      583,
+      10,
+      10
+    ],
+    "label": "BODILY INJURY",
+    "labelXY": [
+      35.9,
+      584.3
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text11[0]",
+    "page": 0,
+    "rect": [
+      124,
+      580,
+      55,
+      14
+    ],
+    "label": "BODILY INJURY $",
+    "labelXY": [
+      35.9,
+      584.3
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check9[0]",
+    "page": 0,
+    "rect": [
+      182,
+      583,
+      10,
+      10
+    ],
+    "label": "PER CLAIM",
+    "labelXY": [
+      205.8,
+      584.4
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Check10[0]",
+    "page": 0,
+    "rect": [
+      182,
+      571,
+      10,
+      10
+    ],
+    "label": "PER OCCURRENCE",
+    "labelXY": [
+      196.8,
+      572.4
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text32[0]",
+    "page": 0,
+    "rect": [
+      180,
+      424,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text33[0]",
+    "page": 0,
+    "rect": [
+      230,
+      424,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text34[0]",
+    "page": 0,
+    "rect": [
+      281,
+      424,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text35[0]",
+    "page": 0,
+    "rect": [
+      367,
+      424,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text36[0]",
+    "page": 0,
+    "rect": [
+      397,
+      424,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text38[0]",
+    "page": 0,
+    "rect": [
+      482,
+      424,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text43[0]",
+    "page": 0,
+    "rect": [
+      180,
+      402,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text44[0]",
+    "page": 0,
+    "rect": [
+      230,
+      402,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text45[0]",
+    "page": 0,
+    "rect": [
+      281,
+      402,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text46[0]",
+    "page": 0,
+    "rect": [
+      367,
+      402,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text47[0]",
+    "page": 0,
+    "rect": [
+      397,
+      402,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text49[0]",
+    "page": 0,
+    "rect": [
+      482,
+      402,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text54[0]",
+    "page": 0,
+    "rect": [
+      180,
+      377,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text55[0]",
+    "page": 0,
+    "rect": [
+      230,
+      377,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text56[0]",
+    "page": 0,
+    "rect": [
+      281,
+      377,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text57[0]",
+    "page": 0,
+    "rect": [
+      367,
+      377,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text58[0]",
+    "page": 0,
+    "rect": [
+      397,
+      377,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text60[0]",
+    "page": 0,
+    "rect": [
+      482,
+      377,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text65[0]",
+    "page": 0,
+    "rect": [
+      180,
+      353,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text66[0]",
+    "page": 0,
+    "rect": [
+      230,
+      353,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text67[0]",
+    "page": 0,
+    "rect": [
+      281,
+      353,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text68[0]",
+    "page": 0,
+    "rect": [
+      367,
+      353,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text69[0]",
+    "page": 0,
+    "rect": [
+      397,
+      353,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text71[0]",
+    "page": 0,
+    "rect": [
+      482,
+      353,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text76[0]",
+    "page": 0,
+    "rect": [
+      180,
+      330,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text77[0]",
+    "page": 0,
+    "rect": [
+      230,
+      330,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text78[0]",
+    "page": 0,
+    "rect": [
+      281,
+      330,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text79[0]",
+    "page": 0,
+    "rect": [
+      367,
+      330,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text80[0]",
+    "page": 0,
+    "rect": [
+      397,
+      330,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text82[0]",
+    "page": 0,
+    "rect": [
+      482,
+      330,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text87[0]",
+    "page": 0,
+    "rect": [
+      180,
+      305,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text88[0]",
+    "page": 0,
+    "rect": [
+      230,
+      305,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text89[0]",
+    "page": 0,
+    "rect": [
+      281,
+      305,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text90[0]",
+    "page": 0,
+    "rect": [
+      367,
+      305,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text91[0]",
+    "page": 0,
+    "rect": [
+      397,
+      305,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text93[0]",
+    "page": 0,
+    "rect": [
+      482,
+      305,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text98[0]",
+    "page": 0,
+    "rect": [
+      180,
+      282,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text99[0]",
+    "page": 0,
+    "rect": [
+      230,
+      282,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text100[0]",
+    "page": 0,
+    "rect": [
+      281,
+      282,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text101[0]",
+    "page": 0,
+    "rect": [
+      367,
+      282,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text102[0]",
+    "page": 0,
+    "rect": [
+      397,
+      282,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text104[0]",
+    "page": 0,
+    "rect": [
+      482,
+      282,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text109[0]",
+    "page": 0,
+    "rect": [
+      180,
+      257,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text110[0]",
+    "page": 0,
+    "rect": [
+      230,
+      257,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text111[0]",
+    "page": 0,
+    "rect": [
+      281,
+      257,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text112[0]",
+    "page": 0,
+    "rect": [
+      367,
+      257,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text113[0]",
+    "page": 0,
+    "rect": [
+      397,
+      257,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text115[0]",
+    "page": 0,
+    "rect": [
+      482,
+      257,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text120[0]",
+    "page": 0,
+    "rect": [
+      180,
+      232,
+      50,
+      14
+    ],
+    "label": "CLASS CODE",
+    "labelXY": [
+      195.0,
+      455.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text121[0]",
+    "page": 0,
+    "rect": [
+      230,
+      232,
+      50,
+      14
+    ],
+    "label": "PREMIUM BASIS",
+    "labelXY": [
+      241.5,
+      456.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text122[0]",
+    "page": 0,
+    "rect": [
+      281,
+      232,
+      85,
+      14
+    ],
+    "label": "EXPOSURE",
+    "labelXY": [
+      307.5,
+      454.1
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text123[0]",
+    "page": 0,
+    "rect": [
+      367,
+      232,
+      30,
+      14
+    ],
+    "label": "TERR",
+    "labelXY": [
+      373.5,
+      454.6
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text124[0]",
+    "page": 0,
+    "rect": [
+      397,
+      232,
+      42,
+      14
+    ],
+    "label": "RATE PREM/OPS",
+    "labelXY": [
+      402.0,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P1[0].Text126[0]",
+    "page": 0,
+    "rect": [
+      482,
+      232,
+      57,
+      14
+    ],
+    "label": "PREMIUM PREM/OPS",
+    "labelXY": [
+      495.6,
+      446.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P2[0].Text1[0]",
+    "page": 1,
+    "rect": [
+      412,
+      753,
+      182,
+      15
+    ],
+    "label": "AGENCY CUSTOMER ID:",
+    "labelXY": [
+      315.2,
+      758.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P3[0].Text1[0]",
+    "page": 2,
+    "rect": [
+      412,
+      754,
+      182,
+      15
+    ],
+    "label": "AGENCY CUSTOMER ID:",
+    "labelXY": [
+      315.2,
+      758.2
+    ]
+  },
+  {
+    "pdfField": "F[0].P4[0].Text1[0]",
+    "page": 3,
+    "rect": [
+      411,
+      752,
+      182,
+      15
+    ],
+    "label": "AGENCY CUSTOMER ID:",
+    "labelXY": [
+      315.2,
+      758.2
+    ]
+  }
+]
