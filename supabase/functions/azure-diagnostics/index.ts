@@ -62,7 +62,7 @@ serve(async (req) => {
     if (envVars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT && envVars.AZURE_DOCUMENT_INTELLIGENCE_KEY) {
       try {
         const endpoint = envVars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT.replace(/\/$/, '');
-        const response = await modelBoundaryFetch(`${endpoint}/documentintelligence/documentModels?api-version=2024-02-29-preview`, {
+        const response = await modelBoundaryFetch(`${endpoint}/documentintelligence/documentModels?api-version=2024-11-30`, {
           method: 'GET',
           headers: {
             'Ocp-Apim-Subscription-Key': envVars.AZURE_DOCUMENT_INTELLIGENCE_KEY,

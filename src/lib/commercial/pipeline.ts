@@ -48,7 +48,9 @@ const carrierOf = (q: PipelineQuote): string => {
   return (typeof fromOptions === 'string' && fromOptions.trim()) || q.competitor_carrier || 'Unknown carrier';
 };
 
-/** Hit ratio by carrier, most-quoted first. Open quotes count as quoted only. */
+/** Hit ratio by carrier, most-quoted first. Open quotes count as quoted
+ *  only; the full closed vocabulary is won | lost | expired (the enum's
+ *  fourth label) - an expired quote is a resolved non-win, not pending. */
 export function carrierHitRatio(quotes: PipelineQuote[]): CarrierHitRow[] {
   const rows = new Map<string, { quoted: number; won: number; closed: number }>();
   for (const q of quotes) {
@@ -56,7 +58,7 @@ export function carrierHitRatio(quotes: PipelineQuote[]): CarrierHitRow[] {
     const r = rows.get(c) ?? { quoted: 0, won: 0, closed: 0 };
     r.quoted += 1;
     if (q.status === 'won') { r.won += 1; r.closed += 1; }
-    else if (q.status === 'lost') r.closed += 1;
+    else if (q.status === 'lost' || q.status === 'expired') r.closed += 1;
     rows.set(c, r);
   }
   return [...rows.entries()]

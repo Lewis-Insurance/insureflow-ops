@@ -71,6 +71,10 @@ export function useSaveMasterCoiFields() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['master-coi', variables.accountId] });
       queryClient.invalidateQueries({ queryKey: ['policies'] });
+      // The policy DETAIL cache holds the *_details blob this save just
+      // changed; the Bound terms card diffs against it, so a stale copy
+      // would show false matches or miss drift (review fix).
+      queryClient.invalidateQueries({ queryKey: ['policy', variables.policyId] });
       toast.success('Coverage line saved');
     },
     onError: (error: Error) => {

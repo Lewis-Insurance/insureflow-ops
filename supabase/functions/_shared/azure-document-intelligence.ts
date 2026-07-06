@@ -102,7 +102,7 @@ export async function callAzureDocumentIntelligence(
   
   // Clean endpoint
   const cleanEndpoint = azureEndpoint.replace(/\/$/, '');
-  const analyzeUrl = `${cleanEndpoint}/documentintelligence/documentModels/${modelId}:analyze?api-version=2024-02-29-preview&pages=${pages}`;
+  const analyzeUrl = `${cleanEndpoint}/documentintelligence/documentModels/${modelId}:analyze?api-version=2024-11-30&pages=${pages}`;
 
   let requestBody: any;
   let contentType: string;

@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Briefcase, CalendarClock, Target } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
 import {
   useCommercialRunwayPolicies,
   usePipelineBoundTimes,
@@ -90,6 +91,7 @@ export default function CommercialPipelinePage() {
   const closedFunnel = funnel.filter((f) => ['lost', 'abandoned'].includes(f.stage));
 
   return (
+    <AppLayout>
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex items-center gap-3">
         <Briefcase className="h-5 w-5 text-cc-text-muted" aria-hidden="true" />
@@ -254,5 +256,6 @@ export default function CommercialPipelinePage() {
         </>
       )}
     </div>
+    </AppLayout>
   );
 }
