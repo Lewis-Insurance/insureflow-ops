@@ -31,6 +31,7 @@ import {
   useAddDeclination,
   useCommercialSubmissions,
   useCreateSubmission,
+  useGenerateSubmissionPacket,
   useOfferRejections,
   useRecordOffer,
   useSubmissionDeclinations,
@@ -276,9 +277,13 @@ function SubmissionDetail({
 }) {
   const { data: declinations = [] } = useSubmissionDeclinations(submission.id);
   const addDeclination = useAddDeclination();
+  const generatePacket = useGenerateSubmissionPacket();
   const [lossRunOpen, setLossRunOpen] = useState(false);
   const { data: offers = [] } = useOfferRejections(accountId);
   const recordOffer = useRecordOffer();
+
+  // Closed files take no packet or send actions (mirrors the quotes form).
+  const closed = ['bound', 'lost', 'abandoned'].includes(submission.status);
 
   const [decCarrier, setDecCarrier] = useState('');
   const [decDate, setDecDate] = useState('');
@@ -337,13 +342,25 @@ function SubmissionDetail({
         {submission.wholesaler_email && (
           <span className="text-sm text-cc-text-muted">{submission.wholesaler_email}</span>
         )}
-        <Button
-          variant="ghost" size="sm"
-          onClick={() => setLossRunOpen(true)}
-          className="ml-auto text-cc-text-secondary hover:text-cc-text-primary"
-        >
-          Request loss runs
-        </Button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {!closed && (
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => generatePacket.mutate({ accountId, submissionId: submission.id })}
+              disabled={generatePacket.isPending}
+              className="text-cc-text-secondary hover:text-cc-text-primary"
+            >
+              {generatePacket.isPending ? 'Generating packet' : 'Generate packet'}
+            </Button>
+          )}
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => setLossRunOpen(true)}
+            className="text-cc-text-secondary hover:text-cc-text-primary"
+          >
+            Request loss runs
+          </Button>
+        </div>
       </div>
 
       <LossRunRequestDialog

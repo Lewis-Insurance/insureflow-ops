@@ -5,29 +5,80 @@
 // The ONE deterministic transform that turns a browser-side pure module into its
 // Deno counterpart is: append `.ts` to every RELATIVE import/export specifier
 // (`from './format'` -> `from './format.ts'`). Node/Deno both resolve the source
-// verbatim otherwise because the acord25 modules are runtime-free.
+// verbatim otherwise because the ported modules are runtime-free. Cross-form
+// relative imports survive unchanged because the directory layout is mirrored:
+// src/lib/acord/acord125/x.ts importing '../acord25/format' becomes
+// _shared/acord125/x.ts importing '../acord25/format.ts', which exists.
 
 import * as path from 'node:path';
 
-// The pure modules copied verbatim (Section 2.2). validationRules.ts is NOT
-// ported (client/onboarding only).
-export const PORTED_MODULES = [
-  'fieldMap.ts',
-  'types.ts',
-  'format.ts',
-  'buildAcord25FieldValues.ts',
-  'validateAcord25.ts',
-  'fromMasterCoi.ts',
-  'requirements.ts',
-  'previewHash.ts',
-] as const;
+/** One ported form directory: src/lib/acord/<dir> -> _shared/<dir>. */
+export interface PortedForm {
+  /** Directory name under BOTH src/lib/acord/ and supabase/functions/_shared/. */
+  dir: string;
+  /** The pure modules copied verbatim (basenames inside dir). */
+  modules: readonly string[];
+  /**
+   * Basenames that import `@/types/master-coi` and therefore need that
+   * specifier rewritten to the Deno mirror (see rewriteMasterCoiImport).
+   */
+  masterCoiImporters: readonly string[];
+}
 
-// Modules that import `@/types/master-coi` and therefore need the master-coi
-// import specifier rewritten to the Deno mirror (see rewriteMasterCoiImport).
-const MASTER_COI_IMPORTERS = new Set<string>(['fromMasterCoi.ts', 'requirements.ts']);
+// The per-form ported sets. acord25 is the original Section 2.2 list
+// (validationRules.ts is NOT ported: client/onboarding only). acord125 and
+// acord126 are the Phase 1b submission-packet engines plus their risk-store
+// adapters; their builders import '../acord25/format', which the mirrored
+// layout resolves (see header comment).
+export const PORTED_FORMS: readonly PortedForm[] = [
+  {
+    dir: 'acord25',
+    modules: [
+      'fieldMap.ts',
+      'types.ts',
+      'format.ts',
+      'buildAcord25FieldValues.ts',
+      'validateAcord25.ts',
+      'fromMasterCoi.ts',
+      'requirements.ts',
+      'previewHash.ts',
+    ],
+    masterCoiImporters: ['fromMasterCoi.ts', 'requirements.ts'],
+  },
+  {
+    dir: 'acord125',
+    modules: [
+      'fieldMap.ts',
+      'types.ts',
+      'buildAcord125FieldValues.ts',
+      'validateAcord125.ts',
+      'fromRiskStore.ts',
+    ],
+    masterCoiImporters: [],
+  },
+  {
+    dir: 'acord126',
+    modules: [
+      'fieldMap.ts',
+      'types.ts',
+      'buildAcord126FieldValues.ts',
+      'validateAcord126.ts',
+      'fromRiskStore.ts',
+    ],
+    masterCoiImporters: [],
+  },
+];
 
-export const SRC_DIR = path.resolve('src/lib/acord/acord25');
-export const DENO_DIR = path.resolve('supabase/functions/_shared/acord25');
+export const ACORD_SRC_ROOT = path.resolve('src/lib/acord');
+export const SHARED_DENO_ROOT = path.resolve('supabase/functions/_shared');
+
+export function srcDirFor(form: PortedForm): string {
+  return path.join(ACORD_SRC_ROOT, form.dir);
+}
+
+export function denoDirFor(form: PortedForm): string {
+  return path.join(SHARED_DENO_ROOT, form.dir);
+}
 
 // src/types/master-coi.ts mirrors to supabase/functions/_shared/master-coi-types.ts
 // (doc 02 declares it, fromMasterCoi consumes it).
@@ -55,10 +106,10 @@ export function appendTsToRelativeImports(source: string): string {
 }
 
 /**
- * Modules that import `@/types/master-coi` (fromMasterCoi.ts, requirements.ts)
- * become the mirror `../master-coi-types.ts` in Deno. The mirror lives in _shared/
- * (one level up from _shared/acord25/, where those modules sit), so the specifier
- * is '../'. Applied only to the MASTER_COI_IMPORTERS.
+ * Modules that import `@/types/master-coi` (per-form masterCoiImporters)
+ * become the mirror `../master-coi-types.ts` in Deno. The mirror lives in
+ * _shared/ (one level up from _shared/<form>/, where those modules sit), so
+ * the specifier is '../'.
  */
 export function rewriteMasterCoiImport(source: string): string {
   return source.replace(
@@ -67,10 +118,10 @@ export function rewriteMasterCoiImport(source: string): string {
   );
 }
 
-/** Full transform for a given source basename. */
-export function transformModule(basename: string, source: string): string {
+/** Full transform for a given form + source basename. */
+export function transformModule(form: PortedForm, basename: string, source: string): string {
   let out = source;
-  if (MASTER_COI_IMPORTERS.has(basename)) {
+  if (form.masterCoiImporters.includes(basename)) {
     out = rewriteMasterCoiImport(out);
   }
   out = appendTsToRelativeImports(out);
