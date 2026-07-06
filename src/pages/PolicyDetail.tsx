@@ -22,7 +22,7 @@ import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
 import { useExtractPropertyPolicy, isPropertyPolicy } from '@/hooks/usePropertyExtraction';
 import { useExtractUmbrellaPolicy, isUmbrellaPolicy } from '@/hooks/useUmbrellaExtraction';
-import { useExtractBAPPolicy, isCommercialAutoPolicy } from '@/hooks/useBAPExtraction';
+import { useExtractBAPPolicy, isCommercialAutoPolicy, useBAPVehicles, useBAPDrivers, useBAPInterests } from '@/hooks/useBAPExtraction';
 import { UmbrellaPolicyDetailsView } from '@/components/policies/UmbrellaPolicyDetails';
 import { BAPPolicyDetailsView } from '@/components/policies/BAPPolicyDetails';
 import { PropertyPolicyDetailsView } from '@/components/policies/PropertyPolicyDetails';
@@ -195,6 +195,12 @@ export default function PolicyDetail() {
   const isAuto =
     isCommercialAutoPolicy(policy?.line_of_business) &&
     !isWorkersComp && !isInlandMarine && !isCyber && !isCrime && !isEO;
+  // BAP schedules live in policy_bap_* tables written by extraction; the
+  // details view is presentational and needs them passed (review fix). The
+  // undefined arg keeps these queries off for the personal-auto book.
+  const { data: bapVehicles = [] } = useBAPVehicles(isAuto && policyId ? policyId : undefined);
+  const { data: bapDrivers = [] } = useBAPDrivers(isAuto && policyId ? policyId : undefined);
+  const { data: bapInterests = [] } = useBAPInterests(isAuto && policyId ? policyId : undefined);
 
   // Parse WC details from the policy's wc_details JSON field
   const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
@@ -891,6 +897,9 @@ export default function PolicyDetail() {
             policyId={policyId}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             bapDetails={((policy as any)?.bap_details as any) ?? null}
+            vehicles={bapVehicles}
+            drivers={bapDrivers}
+            interests={bapInterests}
           />
         )}
 

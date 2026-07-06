@@ -57,15 +57,19 @@ export function FleetCard({ accountId }: { accountId: string }) {
   const [form, setForm] = useState<Record<string, string>>({});
   // Fields the VIN decode filled and the user has not retyped since: those
   // save with provenance src='extracted' so a later manual edit reclaims.
-  const [decodedFields, setDecodedFields] = useState<Set<string>>(new Set());
+  // A ref, not state - it is never rendered, and ref mutations are
+  // synchronous so decode responses landing mid-flight read it accurately.
+  const decodedFieldsRef = useRef<Set<string>>(new Set());
   const [decoding, setDecoding] = useState(false);
   // Race guards (review fix): a synchronous busy ref (disabled= is state and
   // lags a tick), a sequence token so a decode from a closed or switched
-  // dialog can never apply, and a live VIN mirror so a response only applies
-  // while the input still shows the VIN it was requested for.
+  // dialog can never apply, a live VIN mirror so a response only applies
+  // while the input still shows the VIN it was requested for, and a full
+  // form mirror so fill decisions see keystrokes made during the fetch.
   const decodeBusyRef = useRef(false);
   const decodeSeqRef = useRef(0);
   const vinRef = useRef('');
+  const formRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     // Any dialog transition invalidates in-flight decodes.
@@ -89,27 +93,24 @@ export function FleetCard({ accountId }: { accountId: string }) {
       put('garaging_location_id', v.garaging_location_id);
     }
     setForm(f);
-    setDecodedFields(new Set());
+    formRef.current = f;
+    decodedFieldsRef.current = new Set();
     vinRef.current = f.vin ?? '';
   }, [dialogOpen, editing]);
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
+    formRef.current = { ...formRef.current, [k]: v };
     if (k === 'vin') {
       vinRef.current = v;
       // Changing the VIN orphans any earlier decode: the filled identity
       // fields are no longer machine-verified for THIS vin, so they lose
       // their src='extracted' mark and would save as manual (review fix).
-      setDecodedFields(new Set());
+      decodedFieldsRef.current = new Set();
       return;
     }
     // A manual keystroke on a decoded field reclaims it for src='manual'.
-    setDecodedFields((prev) => {
-      if (!prev.has(k)) return prev;
-      const next = new Set(prev);
-      next.delete(k);
-      return next;
-    });
+    decodedFieldsRef.current.delete(k);
   };
 
   const handleDecode = async () => {
@@ -135,22 +136,27 @@ export function FleetCard({ accountId }: { accountId: string }) {
         toast.info('The VIN decoded to nothing usable; enter the details manually.');
         return;
       }
-      const filled = new Set<string>();
-      const fill = (k: string, val: string | number | null) => {
-        if (val != null) filled.add(k);
+      // Manual values are never machine-overwritten (module rule): a decode
+      // only fills fields that are empty or still carry its own earlier
+      // fill. The form mirror sees keystrokes made during the fetch.
+      const current = formRef.current;
+      const canFill = (k: string) =>
+        !(current[k] ?? '').trim() || decodedFieldsRef.current.has(k);
+      const filled: Record<string, string> = {};
+      const consider = (k: string, val: string | number | null) => {
+        if (val != null && canFill(k)) filled[k] = String(val);
       };
-      fill('year', fields.year); fill('make', fields.make); fill('model', fields.model);
-      fill('body_type', fields.body_type); fill('vehicle_type', fields.vehicle_type);
-      fill('gvwr', fields.gvwr);
-      setForm((f) => {
-        const next = { ...f };
-        for (const k of filled) {
-          const val = fields[k as keyof typeof fields];
-          if (val != null) next[k] = String(val);
-        }
-        return next;
-      });
-      setDecodedFields((prev) => new Set([...prev, ...filled]));
+      consider('year', fields.year); consider('make', fields.make);
+      consider('model', fields.model); consider('body_type', fields.body_type);
+      consider('vehicle_type', fields.vehicle_type); consider('gvwr', fields.gvwr);
+      const keys = Object.keys(filled);
+      if (keys.length === 0) {
+        toast.info('Every identity field already has a manual value; nothing was overwritten.');
+        return;
+      }
+      setForm((f) => ({ ...f, ...filled }));
+      formRef.current = { ...formRef.current, ...filled };
+      for (const k of keys) decodedFieldsRef.current.add(k);
       if (warning) toast.info(`VIN decoded with a NHTSA note: ${warning}. Review the filled fields.`);
       else toast.success('VIN decoded; review the filled fields.');
     } catch (e) {
@@ -190,7 +196,7 @@ export function FleetCard({ accountId }: { accountId: string }) {
         ? form.garaging_location_id : null,
     };
     const sources: Partial<Record<keyof CommercialVehicleInput, 'extracted'>> = {};
-    for (const k of decodedFields) sources[k as keyof CommercialVehicleInput] = 'extracted';
+    for (const k of decodedFieldsRef.current) sources[k as keyof CommercialVehicleInput] = 'extracted';
     saveMutation.mutate(
       { accountId, existing: editing, changes, sources },
       { onSuccess: () => { setDialogOpen(false); setEditing(null); } },

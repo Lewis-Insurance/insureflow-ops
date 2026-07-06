@@ -514,12 +514,15 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   // quote anyway - this keeps the client honest with it.
   const [bindLine, setBindLine] = useState<'gl' | 'wc' | 'property' | 'umbrella' | 'auto'>('gl');
 
-  // Enum labels normalize to module keys ('workers_comp' -> 'wc',
-  // 'commercial_auto' -> 'auto'); anything unmappable falls back to the
-  // selector with the server guard as the backstop.
+  // Enum labels normalize to module keys EXACTLY like the server does:
+  // 'workers_comp' -> 'wc', 'commercial_auto' -> 'auto', and the enum's
+  // bare 'auto' (PERSONAL auto) -> 'personal_auto' so it can never route
+  // into the commercial bind dialog (review fix). Anything unmappable
+  // falls back to the selector with the server guard as the backstop.
   const quoteLineOf = (q: SubmissionQuote): 'gl' | 'wc' | 'property' | 'umbrella' | 'auto' | null => {
     const mapped = q.line_of_business === 'workers_comp' ? 'wc'
       : q.line_of_business === 'commercial_auto' ? 'auto'
+      : q.line_of_business === 'auto' ? 'personal_auto'
       : q.line_of_business;
     return (['gl', 'wc', 'property', 'umbrella', 'auto'] as const).find((l) => l === mapped) ?? null;
   };
