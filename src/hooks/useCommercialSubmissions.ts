@@ -218,8 +218,19 @@ export function useGenerateSubmissionPacket() {
       queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
       // packet_ready moves the pipeline funnel workspace-wide.
       queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
-      if (data.signed_url) window.open(data.signed_url, '_blank', 'noopener,noreferrer');
-      toast.success('Submission packet generated (ACORD 125 + 126)');
+      // window.open fires after an async gap, so popup blockers routinely eat
+      // it (review fix): the toast always carries an Open action as the
+      // reliable path to the packet, whether or not the tab opened.
+      const opened = data.signed_url
+        ? window.open(data.signed_url, '_blank', 'noopener,noreferrer')
+        : null;
+      toast.success(
+        opened ? 'Submission packet generated (ACORD 125 + 126)'
+               : 'Packet generated. Your browser blocked the tab - use Open packet.',
+        data.signed_url
+          ? { action: { label: 'Open packet', onClick: () => window.open(data.signed_url, '_blank', 'noopener,noreferrer') }, duration: 15000 }
+          : undefined,
+      );
     },
     onError: (error) => {
       const blocking = error.issues.filter((i) => i.severity === 'error');

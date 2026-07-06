@@ -406,6 +406,20 @@ async function handle(req: Request): Promise<Response> {
       throw fail(502, 'UPLOAD_FAILED', 'packet storage upload failed');
     }
 
+    // --- Step 9b: closed-race re-check (review fix). The CLOSED gate ran at
+    // load; a colleague can bind/lose the submission during the fill. Re-read
+    // before the event so a just-closed file does not gain a packet - and
+    // compensate the upload we already made.
+    const { data: statusNow } = await admin
+      .from('commercial_submissions')
+      .select('status')
+      .eq('id', submission.id)
+      .maybeSingle();
+    if (statusNow && ['bound', 'lost', 'abandoned'].includes(statusNow.status)) {
+      await admin.storage.from(PACKET_BUCKET).remove([storagePath]);
+      throw fail(422, 'CLOSED', `submission was closed (${statusNow.status}) while the packet was generating`);
+    }
+
     // --- Step 10: audit event (append-only); compensate the upload on failure --
     const { error: eventErr } = await admin.from('submission_events').insert({
       submission_id: submission.id,
