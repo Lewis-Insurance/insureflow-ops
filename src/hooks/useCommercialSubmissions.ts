@@ -133,6 +133,121 @@ export const SUBMISSION_STATUSES: SubmissionStatus[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Packet generation (ACORD 125 + 126 fill pipeline, Phase 1b)
+// ---------------------------------------------------------------------------
+
+/** One structured issue from the server's 422 VALIDATION body (form-tagged). */
+export interface PacketIssue {
+  form: '125' | '126';
+  code: string;
+  severity: 'error' | 'warning';
+  message: string;
+}
+
+/** A typed failure preserving the server's error code and issue list. */
+export class PacketGenerationError extends Error {
+  readonly code: string | null;
+  readonly issues: PacketIssue[];
+
+  constructor(message: string, code: string | null, issues: PacketIssue[]) {
+    super(message);
+    this.name = 'PacketGenerationError';
+    this.code = code;
+    this.issues = issues;
+  }
+}
+
+interface GeneratePacketResponse {
+  success: boolean;
+  storage_path: string;
+  signed_url: string;
+  forms: string[];
+}
+
+/**
+ * supabase-js FunctionsHttpError carries the raw Response on `context`; parse
+ * the { error: { code, message, issues } } body (the useIssueCertificate
+ * pattern) so the UI can list exactly what data is missing.
+ */
+async function toPacketError(error: unknown): Promise<PacketGenerationError> {
+  const ctx = (error as { context?: unknown } | null)?.context;
+  const response = ctx instanceof Response ? ctx : null;
+
+  let code: string | null = null;
+  let issues: PacketIssue[] = [];
+  let message = error instanceof Error ? error.message : 'Packet generation failed.';
+
+  if (response) {
+    try {
+      const body = (await response.clone().json()) as {
+        error?: string | { code?: string; message?: string; issues?: PacketIssue[] };
+      };
+      if (typeof body.error === 'object' && body.error !== null) {
+        if (body.error.code) code = body.error.code;
+        if (body.error.message) message = body.error.message;
+        if (Array.isArray(body.error.issues)) issues = body.error.issues;
+      } else if (typeof body.error === 'string') {
+        message = body.error;
+      }
+    } catch {
+      // Body was not JSON; keep the default message.
+    }
+  }
+
+  return new PacketGenerationError(message, code, issues);
+}
+
+/**
+ * Generate the ACORD 125 + 126 submission packet on the server
+ * (generate-submission-packet), then open the signed URL in a new tab and
+ * refresh the submission (its status may have advanced to packet_ready).
+ */
+export function useGenerateSubmissionPacket() {
+  const queryClient = useQueryClient();
+  return useMutation<GeneratePacketResponse, PacketGenerationError, { accountId: string; submissionId: string }>({
+    mutationFn: async (input) => {
+      const { data, error } = await supabase.functions.invoke<GeneratePacketResponse>(
+        'generate-submission-packet',
+        { body: { submission_id: input.submissionId } },
+      );
+      if (error) throw await toPacketError(error);
+      if (!data?.success) throw new PacketGenerationError('The server returned no packet.', null, []);
+      return data;
+    },
+    onSuccess: (data, v) => {
+      queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
+      // packet_ready moves the pipeline funnel workspace-wide.
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
+      // window.open fires after an async gap, so popup blockers routinely eat
+      // it (review fix): with a URL, the toast always carries an Open action
+      // as the reliable path. A MISSING url is a different situation (server
+      // stored the packet but returned no link) - say that, never blame a
+      // popup blocker (review fix round 2).
+      if (data.signed_url) {
+        const opened = window.open(data.signed_url, '_blank', 'noopener,noreferrer');
+        toast.success(
+          opened ? 'Submission packet generated (ACORD 125 + 126)'
+                 : 'Packet generated. Your browser blocked the tab - use Open packet.',
+          { action: { label: 'Open packet', onClick: () => window.open(data.signed_url, '_blank', 'noopener,noreferrer') }, duration: 15000 },
+        );
+      } else {
+        toast.success('Submission packet generated and stored. Open it from the submission shortly.');
+      }
+    },
+    onError: (error) => {
+      const blocking = error.issues.filter((i) => i.severity === 'error');
+      if (error.code === 'VALIDATION' && blocking.length > 0) {
+        const shown = blocking.slice(0, 3).map((i) => i.message).join(' ');
+        const more = blocking.length > 3 ? ` (+${blocking.length - 3} more)` : '';
+        toast.error(`The packet needs more data: ${shown}${more}`);
+      } else {
+        toast.error(`Could not generate the packet: ${error.message}`);
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Declinations (diligent-effort record; append-only by design)
 // ---------------------------------------------------------------------------
 

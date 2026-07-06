@@ -1,9 +1,10 @@
 // check-deno-port-sync.ts
 //
-// CI guard: recompute the deterministic transform over each source module and
-// byte-compare against the committed Deno copy. Exits nonzero on ANY drift (or a
-// missing Deno copy), so a change to a pure client module that was not re-synced
-// fails the build. Also checks the master-coi types mirror.
+// CI guard: recompute the deterministic transform over each source module of
+// every ported form (acord25, acord125, acord126; see PORTED_FORMS) and
+// byte-compare against the committed Deno copy. Exits nonzero on ANY drift (or
+// a missing Deno copy), so a change to a pure client module that was not
+// re-synced fails the build. Also checks the master-coi types mirror.
 //
 // Operator/CI tool: run via `npx tsx scripts/acord25/check-deno-port-sync.ts`.
 // Excluded from Vite/vitest.
@@ -11,11 +12,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  PORTED_MODULES,
-  SRC_DIR,
-  DENO_DIR,
+  PORTED_FORMS,
   MASTER_COI_SRC,
   MASTER_COI_DENO,
+  srcDirFor,
+  denoDirFor,
   transformModule,
   appendTsToRelativeImports,
 } from './deno-port-transform';
@@ -34,14 +35,19 @@ function drifted(label: string, expected: string, denoPath: string, problems: st
 function main(): void {
   const problems: string[] = [];
 
-  for (const basename of PORTED_MODULES) {
-    const srcPath = path.join(SRC_DIR, basename);
-    if (!fs.existsSync(srcPath)) {
-      problems.push(`missing source module: ${path.relative(process.cwd(), srcPath)}`);
-      continue;
+  for (const form of PORTED_FORMS) {
+    const srcDir = srcDirFor(form);
+    const denoDir = denoDirFor(form);
+
+    for (const basename of form.modules) {
+      const srcPath = path.join(srcDir, basename);
+      if (!fs.existsSync(srcPath)) {
+        problems.push(`missing source module: ${path.relative(process.cwd(), srcPath)}`);
+        continue;
+      }
+      const expected = transformModule(form, basename, fs.readFileSync(srcPath, 'utf8'));
+      drifted(`${form.dir}/${basename}`, expected, path.join(denoDir, basename), problems);
     }
-    const expected = transformModule(basename, fs.readFileSync(srcPath, 'utf8'));
-    drifted(basename, expected, path.join(DENO_DIR, basename), problems);
   }
 
   if (fs.existsSync(MASTER_COI_SRC)) {

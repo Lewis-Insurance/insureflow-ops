@@ -24,7 +24,7 @@
 // the validateAcord25 V2-V10 pattern and land with the fill pipeline; malformed
 // ISO dates already surface as DATE_INVALID errors from the builder.
 
-import type { Acord125Input, Acord125Issue } from './types';
+import type { Acord125Input, Acord125Issue } from './types.ts';
 
 export interface ValidateAcord125Options {
   /**
