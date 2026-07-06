@@ -1,38 +1,49 @@
 # Commercial Lines - What Is Blocked and How to Unblock It
 
-**Date:** 2026-07-05 (update as items clear)
+**Date:** 2026-07-06 (update as items clear)
 **Context:** SOW v3 (`docs/Commercial-Lines-Quote-to-Bind-Plan.md`). Everything not listed here is unblocked and either shipped or in progress. Every item below is external - it needs Landen or Brian, not code.
 
 ---
 
-## 1. Licensed ACORD blanks - THE critical path
+## 1. Licensed ACORD blanks - ~~THE critical path~~ RESOLVED 2026-07-06 (one straggler)
 
-**Blocked:** every form engine and packet step. Phase 1b (125+126 engines, packet with cover page, e-sign, one-click send), and the form half of Phases 3-6.
-**Not blocked by this:** everything else - intake, submissions, diligent effort, offers, quotes, bind, COIs (the 25 is already onboarded), prefill (Phase 2).
+**ALL SIX application blanks are verified fillable and onboarded** (Desktop drop
+2026-07-06 + the 130 recovered from the Dec-2024 bucket upload, which was a real
+encrypted portal download all along). Editions, field counts, and hash pins live
+in `src/lib/acord/blanks/README.md`; inventories are committed alongside. The
+portal downloads ship encrypted + hybrid-XFA; normalization is `qpdf --decrypt`
+(also repaired the 125's damaged xref). Engines pin the normalized bytes.
 
-**What to get** (ACORD Advantage portal, agency's license - same as the 25):
-
-| Form | Name | Unblocks | Priority |
+| Form | Edition | Fields | Status |
 |---|---|---|---|
-| **125** | Commercial Insurance Application | Phase 1b packet core | **NOW** |
-| **126** | Commercial General Liability Section | Phase 1b (GL packet) | **NOW** |
-| 140 | Property Section | Phase 3 | next |
-| 130 | Workers Compensation Application | Phase 4 | next |
-| 131 | Umbrella / Excess Section | Phase 5 | later |
-| 127 | Business Auto Section | Phase 6 | later |
+| 125 | 2016/03 | 603 | onboarded |
+| 126 | 2009/08 | 279 | onboarded (generic names - coordinate map) |
+| 127 | 2015/12 | 636 | onboarded |
+| 130 | 2010/05 | 486 | onboarded (generic names - coordinate map) |
+| 140 | 2014/12 | 355 | onboarded |
+| 131 | 2009/10 | 405 | onboarded (generic names - coordinate map) |
 
-**Requirements for each PDF:** current edition, **fillable AcroForm** (not a flat scan, not XFA-only), FL-appropriate where state editions exist. The 2024/01 editions referenced by the old stub rows are fine if still current on the portal.
+**The one straggler - FL UM/UIM supplement:** the `ACORD_61_FL_-_UM_Supplement.pdf`
+on the Desktop is a PRINT-ONLY version (0 form fields). Re-download the
+**fillable** ACORD 61 FL from the portal (same Desktop drop drill). Until then
+the UM decision log + signed-document linkage work; only the machine-filled
+printable waits.
 
-**Handoff (same drill as the 25):**
-1. Download from the ACORD portal.
-2. Drop on the Mac Desktop (`~/Desktop`), tell me the filename.
-3. **Never** commit, email, or move into the repo - the onboarding pipeline verifies it is genuine, extracts + pins the field inventory, stores it in the private template bucket, and supersedes the Dec-2024 stub row.
+**ACORD 75 (Insurance Binder):** still optional, enhancement track.
 
-**What happens the same day a blank lands:** I onboard it, build that form's typed engine (the acord25 pattern), and wire it into the packet. 125+126 together = the GL packet ships end to end.
+---
 
-**Also grab while in the portal (smaller, later):**
-- **FL UM/UIM selection/rejection form** (current edition) - unblocks the signed UM rejection flow (Phase 6, Business Auto).
-- **ACORD 75 (Insurance Binder)** - only if you decide binders are in scope (currently enhancement track).
+## 1b. ANTHROPIC_API_KEY - present but the VALUE is malformed
+
+The secret now EXISTS in the edge-function store (good), but its value is
+**403 characters** - a real key is ~108 (`sk-ant-api03-`, one line). Whatever
+was pasted includes ~300 characters of extra content, so Anthropic rejects the
+call ("x-api-key header is required"). **Re-set it with exactly the key and
+nothing else** (dashboard: Edge Functions -> Secrets -> `ANTHROPIC_API_KEY`, or
+`supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref lrqajzwcmdwahnjyidgv`).
+The Azure OCR leg of extraction is already fixed and proven (retired API version
+migrated across all nine extract functions, 2026-07-06); the moment the key
+value is clean, extraction is fully live.
 
 ---
 

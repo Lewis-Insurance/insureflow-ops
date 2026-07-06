@@ -418,7 +418,7 @@ async function callAzureDocumentIntelligence(
   azureEndpoint: string,
   azureKey: string
 ): Promise<any> {
-  const analyzeUrl = `${azureEndpoint}/documentintelligence/documentModels/prebuilt-document:analyze?api-version=2024-02-29-preview`;
+  const analyzeUrl = `${azureEndpoint}/documentintelligence/documentModels/prebuilt-layout:analyze?api-version=2024-11-30&features=keyValuePairs`;
 
   // Start analysis
   const startResponse = await fetch(analyzeUrl, {
