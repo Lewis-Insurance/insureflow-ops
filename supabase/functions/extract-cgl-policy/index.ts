@@ -241,7 +241,7 @@ serve(async (req) => {
     const userPrompt = buildCGLUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

@@ -305,7 +305,7 @@ TARGET ACORD FORM: ${target_form_number || 'Any (125, 126, 127, 130, 140)'}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-5',
         max_tokens: 4096,
         messages: [
           {

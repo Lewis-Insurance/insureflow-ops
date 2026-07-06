@@ -428,7 +428,7 @@ serve(async (req) => {
     console.log("[extract-cyber] Calling Claude...");
 
     const response = await anthropicBoundaryCreate(anthropicKey, {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 8000,
       system: CYBER_EXTRACTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],

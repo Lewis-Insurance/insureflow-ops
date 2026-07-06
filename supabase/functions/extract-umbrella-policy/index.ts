@@ -246,7 +246,7 @@ serve(async (req) => {
     const userPrompt = buildUmbrellaUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 10000, // Umbrella can have many underlying policies
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

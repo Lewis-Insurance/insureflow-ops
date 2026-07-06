@@ -287,7 +287,7 @@ Remember: Output ONLY valid JSON matching the schema. Do not include any text ou
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-5',
             max_tokens: 4096,
             system: AI_SYSTEM_PROMPT,
             messages: [{ role: 'user', content: userPrompt }],
@@ -325,7 +325,7 @@ Remember: Output ONLY valid JSON matching the schema. Do not include any text ou
         const output = JSON.parse(jsonMatch[0]) as AIOutput;
         const tokens = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
 
-        return { output, model: 'claude-3-5-sonnet-20241022', tokens };
+        return { output, model: 'claude-sonnet-5', tokens };
       } else {
         // Default to OpenAI
         const apiKey = Deno.env.get('OPENAI_API_KEY');

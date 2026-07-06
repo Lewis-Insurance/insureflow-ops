@@ -450,7 +450,7 @@ serve(async (req) => {
         document_id,
         status: "pending",
         azure_model_id: "prebuilt-document",
-        llm_model: "claude-sonnet-4-20250514",
+        llm_model: "claude-sonnet-5",
       })
       .select("id")
       .single();
@@ -554,7 +554,7 @@ serve(async (req) => {
 
     const llmStartTime = Date.now();
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 8000,
       system: WC_EXTRACTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],

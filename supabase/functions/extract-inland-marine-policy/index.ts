@@ -516,7 +516,7 @@ serve(async (req) => {
 
     const llmStartTime = Date.now();
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 8000,
       system: IM_EXTRACTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],

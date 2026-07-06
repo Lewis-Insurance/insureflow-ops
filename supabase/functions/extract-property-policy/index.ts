@@ -262,7 +262,7 @@ serve(async (req) => {
     const userPrompt = buildPropertyUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 12000, // Property can have many buildings/locations
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
