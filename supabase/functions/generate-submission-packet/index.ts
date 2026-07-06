@@ -480,31 +480,28 @@ async function handle(req: Request): Promise<Response> {
       forms: ['125', '126'],
       template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
     };
-    // The freeze decision uses statusNow (the post-upload re-read), not the
-    // stale load (review fix): a submission advanced past intake DURING the
-    // fill would otherwise upload + event-log with the guarded update
-    // no-opping - a packet with no snapshot ever.
-    const freezeEligible = statusNow ? ['draft', 'intake'].includes(statusNow.status) : true;
-    if (freezeEligible) {
-      const { error: freezeErr } = await admin
-        .from('commercial_submissions')
-        .update({
-          status: 'packet_ready',
-          risk_snapshot: riskSnapshot,
-          snapshot_frozen_at: capturedAt,
-        })
-        .eq('id', submission.id)
-        .in('status', ['draft', 'intake']);
-      if (freezeErr) {
-        logger.warn('risk snapshot freeze + status advance failed', {
-          submission_id: submission.id,
-          error: freezeErr.message,
-        });
-      }
-    } else {
-      // Past intake already (raced or regenerated late): never move status,
-      // but a FIRST packet racing an advance must still leave a snapshot -
-      // backfill only where none exists, preserving immutability.
+    // The freeze decision comes from the WRITE result, never a read (review
+    // fix round 3): any read-then-branch leaves a TOCTOU window where the
+    // guarded update silently no-ops and a packet persists with no snapshot.
+    // Attempt the freeze+advance; if it touched zero rows (status moved past
+    // intake at any point), backfill the snapshot only where none exists -
+    // status untouched, immutability preserved, no window left.
+    const { data: frozenRows, error: freezeErr } = await admin
+      .from('commercial_submissions')
+      .update({
+        status: 'packet_ready',
+        risk_snapshot: riskSnapshot,
+        snapshot_frozen_at: capturedAt,
+      })
+      .eq('id', submission.id)
+      .in('status', ['draft', 'intake'])
+      .select('id');
+    if (freezeErr) {
+      logger.warn('risk snapshot freeze + status advance failed', {
+        submission_id: submission.id,
+        error: freezeErr.message,
+      });
+    } else if (!frozenRows || frozenRows.length === 0) {
       const { error: backfillErr } = await admin
         .from('commercial_submissions')
         .update({ risk_snapshot: riskSnapshot, snapshot_frozen_at: capturedAt })
