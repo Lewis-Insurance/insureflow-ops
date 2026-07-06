@@ -48,8 +48,21 @@ export function redactRequestInitForModelBoundary(input: RequestInfo | URL, init
   return init;
 }
 
-export function modelBoundaryFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  return fetch(input, redactRequestInitForModelBoundary(input, init));
+export async function modelBoundaryFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, redactRequestInitForModelBoundary(input, init));
+  } catch (error) {
+    // A malformed credential (e.g. a secret saved with extra lines) makes
+    // fetch throw "Invalid header value: <the entire value>" - propagating
+    // that would echo the SECRET into client-visible error responses and
+    // function logs (observed live 2026-07-06). Report the shape problem
+    // only; never a header value.
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/header (value|name)/i.test(msg)) {
+      throw new Error('model call failed: a request header is malformed (check the provider API key secret for extra characters or line breaks)');
+    }
+    throw error;
+  }
 }
 
 export interface AnthropicBoundaryContentBlock {
