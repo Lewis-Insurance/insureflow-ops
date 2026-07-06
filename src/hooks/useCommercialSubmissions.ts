@@ -75,6 +75,8 @@ export function useCreateSubmission() {
     },
     onSuccess: (_d, v) => {
       queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
+      // The pipeline page aggregates submissions workspace-wide.
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
       toast.success('Submission created');
     },
     onError: (error: Error) => toast.error(`Could not create the submission: ${error.message}`),
@@ -120,6 +122,8 @@ export function useUpdateSubmission() {
     },
     onSettled: (_d, _e, v) => {
       queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
+      // Status moves change the pipeline funnel workspace-wide.
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
     },
   });
 }

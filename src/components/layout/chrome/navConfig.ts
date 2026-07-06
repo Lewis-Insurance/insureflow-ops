@@ -114,6 +114,7 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'Executive', to: '/executive', icon: Target },
   { label: 'Analytics', to: '/analytics', icon: TrendingUp },
   { label: 'Retention', to: '/retention', icon: Shield },
+  { label: 'Commercial Pipeline', to: '/commercial-pipeline', icon: Briefcase },
   { label: 'Financial', to: '/financial', icon: DollarSign },
   { label: 'AI Brain', to: '/ai-brain', icon: Brain },
   { label: 'Prism AI', to: '/prism-ai', icon: Sparkles },
