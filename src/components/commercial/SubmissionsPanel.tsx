@@ -476,11 +476,11 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   // which line this quote covers (review fix: a fixed priority locked
   // property+wc submissions out of property quotes).
   const quotableLines = useMemo(
-    () => (['gl', 'wc', 'property', 'umbrella'] as const).filter((l) => submission.target_lines.includes(l)),
+    () => (['gl', 'wc', 'property', 'umbrella', 'auto'] as const).filter((l) => submission.target_lines.includes(l)),
     [submission.target_lines],
   );
-  const [lineChoice, setLineChoice] = useState<'gl' | 'wc' | 'property' | 'umbrella' | null>(null);
-  const lineMode: 'gl' | 'wc' | 'property' | 'umbrella' =
+  const [lineChoice, setLineChoice] = useState<'gl' | 'wc' | 'property' | 'umbrella' | 'auto' | null>(null);
+  const lineMode: 'gl' | 'wc' | 'property' | 'umbrella' | 'auto' =
     lineChoice && quotableLines.includes(lineChoice) ? lineChoice : (quotableLines[0] ?? 'gl');
   const { data: quotes = [] } = useSubmissionQuotes(submission.id);
   const addQuote = useAddSubmissionQuote();
@@ -507,6 +507,25 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
   const [bindEachOcc, setBindEachOcc] = useState('');
   const [bindGenAgg, setBindGenAgg] = useState('');
   const [bindThird, setBindThird] = useState('');
+  // The bind dialog keys off the QUOTE's own line, never the record-form
+  // selector (review fix): on a multi-line submission, Bind on an auto quote
+  // while the selector shows GL must still prefill the CSL, validate the
+  // CSL rule, and send line 'auto'. The server derives the line from the
+  // quote anyway - this keeps the client honest with it.
+  const [bindLine, setBindLine] = useState<'gl' | 'wc' | 'property' | 'umbrella' | 'auto'>('gl');
+
+  // Enum labels normalize to module keys EXACTLY like the server does:
+  // 'workers_comp' -> 'wc', 'commercial_auto' -> 'auto', and the enum's
+  // bare 'auto' (PERSONAL auto) -> 'personal_auto' so it can never route
+  // into the commercial bind dialog (review fix). Anything unmappable
+  // falls back to the selector with the server guard as the backstop.
+  const quoteLineOf = (q: SubmissionQuote): 'gl' | 'wc' | 'property' | 'umbrella' | 'auto' | null => {
+    const mapped = q.line_of_business === 'workers_comp' ? 'wc'
+      : q.line_of_business === 'commercial_auto' ? 'auto'
+      : q.line_of_business === 'auto' ? 'personal_auto'
+      : q.line_of_business;
+    return (['gl', 'wc', 'property', 'umbrella', 'auto'] as const).find((l) => l === mapped) ?? null;
+  };
 
   const numOrNull = (raw: string): number | null => {
     const n = Number(raw.replace(/[$,\s]/g, ''));
@@ -517,19 +536,22 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
     q.quote_coverages?.find((c) => c.coverage_type === type)?.limit_amount ?? null;
 
   const openBind = (q: SubmissionQuote) => {
+    const line = quoteLineOf(q) ?? lineMode;
+    setBindLine(line);
     setBindTarget(q);
     setBindPolicyId('');
     const eo = coverageLimit(
       q,
-      lineMode === 'gl' ? 'gl_each_occurrence'
-        : lineMode === 'wc' ? 'wc_el_each_accident'
-        : lineMode === 'umbrella' ? 'umbrella_per_occurrence'
+      line === 'gl' ? 'gl_each_occurrence'
+        : line === 'wc' ? 'wc_el_each_accident'
+        : line === 'umbrella' ? 'umbrella_per_occurrence'
+        : line === 'auto' ? 'auto_csl'
         : 'property_limit',
     );
     const ga = coverageLimit(
       q,
-      lineMode === 'wc' ? 'wc_el_disease_each_employee'
-        : lineMode === 'umbrella' ? 'umbrella_aggregate'
+      line === 'wc' ? 'wc_el_disease_each_employee'
+        : line === 'umbrella' ? 'umbrella_aggregate'
         : 'gl_general_aggregate',
     );
     const th = coverageLimit(q, 'wc_el_disease_policy_limit');
@@ -558,6 +580,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         elDiseasePolicyLimit: lineMode === 'wc' ? numOrNull(qThird) : null,
         umbPerOccurrence: lineMode === 'umbrella' ? numOrNull(qEachOcc) : null,
         umbAggregate: lineMode === 'umbrella' ? numOrNull(qGenAgg) : null,
+        autoCsl: lineMode === 'auto' ? numOrNull(qEachOcc) : null,
       },
       { onSuccess: () => { setQCarrier(''); setQPremium(''); setQEachOcc(''); setQGenAgg(''); setQThird(''); } },
     );
@@ -573,20 +596,24 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
       return;
     }
     // Line-required limits must be present (the server enforces this too).
-    if (lineMode === 'gl' && (bindEo == null || bindGa == null)) {
+    if (bindLine === 'gl' && (bindEo == null || bindGa == null)) {
       toast.error('Both GL limits are required to bind.');
       return;
     }
-    if (lineMode === 'property' && bindEo == null) {
+    if (bindLine === 'property' && bindEo == null) {
       toast.error('The property limit is required to bind.');
       return;
     }
-    if (lineMode === 'wc' && (bindEo == null || bindGa == null || bindTh == null)) {
+    if (bindLine === 'wc' && (bindEo == null || bindGa == null || bindTh == null)) {
       toast.error('All three WC employers liability limits are required to bind.');
       return;
     }
-    if (lineMode === 'umbrella' && bindEo == null) {
+    if (bindLine === 'umbrella' && bindEo == null) {
       toast.error('The umbrella per occurrence limit is required to bind.');
+      return;
+    }
+    if (bindLine === 'auto' && bindEo == null) {
+      toast.error('The combined single limit is required to bind.');
       return;
     }
     bindQuote.mutate(
@@ -595,15 +622,16 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
         submissionId: submission.id,
         quoteId: bindTarget.id,
         policyId: bindPolicyId,
-        line: lineMode,
-        eachOccurrence: lineMode === 'gl' ? bindEo : null,
-        generalAggregate: lineMode === 'gl' ? bindGa : null,
-        propertyLimit: lineMode === 'property' ? bindEo : null,
-        elEachAccident: lineMode === 'wc' ? bindEo : null,
-        elDiseaseEachEmployee: lineMode === 'wc' ? bindGa : null,
-        elDiseasePolicyLimit: lineMode === 'wc' ? bindTh : null,
-        umbPerOccurrence: lineMode === 'umbrella' ? bindEo : null,
-        umbAggregate: lineMode === 'umbrella' ? bindGa : null,
+        line: bindLine,
+        eachOccurrence: bindLine === 'gl' ? bindEo : null,
+        generalAggregate: bindLine === 'gl' ? bindGa : null,
+        propertyLimit: bindLine === 'property' ? bindEo : null,
+        elEachAccident: bindLine === 'wc' ? bindEo : null,
+        elDiseaseEachEmployee: bindLine === 'wc' ? bindGa : null,
+        elDiseasePolicyLimit: bindLine === 'wc' ? bindTh : null,
+        umbPerOccurrence: bindLine === 'umbrella' ? bindEo : null,
+        umbAggregate: bindLine === 'umbrella' ? bindGa : null,
+        autoCsl: bindLine === 'auto' ? bindEo : null,
       },
       { onSuccess: () => setBindTarget(null) },
     );
@@ -621,11 +649,13 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
                 ? '(EL limits feed the COI on bind)'
                 : lineMode === 'umbrella'
                   ? '(the umbrella limits feed the COI on bind)'
-                  : '(the property limit feeds the COI on bind)'}
+                  : lineMode === 'auto'
+                    ? '(the CSL feeds the COI on bind)'
+                    : '(the property limit feeds the COI on bind)'}
           </span>
         </h4>
         {quotableLines.length > 1 && (
-          <Select value={lineMode} onValueChange={(v) => setLineChoice(v as 'gl' | 'wc' | 'property' | 'umbrella')}>
+          <Select value={lineMode} onValueChange={(v) => setLineChoice(v as 'gl' | 'wc' | 'property' | 'umbrella' | 'auto')}>
             <SelectTrigger className="h-7 w-36" aria-label="Quote line">
               <SelectValue />
             </SelectTrigger>
@@ -692,6 +722,11 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
                   agg {money(coverageLimit(q, 'umbrella_aggregate'))}
                 </span>
               )}
+              {coverageLimit(q, 'auto_csl') != null && (
+                <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
+                  CSL {money(coverageLimit(q, 'auto_csl'))}
+                </span>
+              )}
               {coverageLimit(q, 'gl_general_aggregate') != null && (
                 <span className="cc-num text-cc-text-muted [font-variant-numeric:tabular-nums]">
                   agg {money(coverageLimit(q, 'gl_general_aggregate'))}
@@ -713,9 +748,9 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
           <Input placeholder="Quoting carrier" value={qCarrier} onChange={(e) => setQCarrier(e.target.value)} />
           <Input placeholder="Premium" inputMode="numeric" value={qPremium} onChange={(e) => setQPremium(e.target.value)} aria-label="Premium" />
           <Input
-            placeholder={lineMode === 'gl' ? 'Each occ' : lineMode === 'wc' ? 'EL accident' : lineMode === 'umbrella' ? 'Per occ' : 'Prop limit'}
+            placeholder={lineMode === 'gl' ? 'Each occ' : lineMode === 'wc' ? 'EL accident' : lineMode === 'umbrella' ? 'Per occ' : lineMode === 'auto' ? 'CSL' : 'Prop limit'}
             inputMode="numeric" value={qEachOcc} onChange={(e) => setQEachOcc(e.target.value)}
-            aria-label={lineMode === 'gl' ? 'Each occurrence limit' : lineMode === 'wc' ? 'EL each accident limit' : lineMode === 'umbrella' ? 'Umbrella per occurrence limit' : 'Property limit'}
+            aria-label={lineMode === 'gl' ? 'Each occurrence limit' : lineMode === 'wc' ? 'EL each accident limit' : lineMode === 'umbrella' ? 'Umbrella per occurrence limit' : lineMode === 'auto' ? 'Combined single limit' : 'Property limit'}
           />
           {lineMode === 'umbrella' && (
             <Input placeholder="Aggregate" inputMode="numeric" value={qGenAgg} onChange={(e) => setQGenAgg(e.target.value)} aria-label="Umbrella aggregate limit" />
@@ -743,8 +778,8 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <DialogTitle className="text-cc-text-primary">Bind quote</DialogTitle>
             <DialogDescription className="text-cc-text-muted">
               {bindTarget ? `${quoteCarrierName(bindTarget)}${bindTarget.premium != null ? `, ${money(bindTarget.premium)}` : ''}. ` : ''}
-              Pick the policy record this bind becomes. The {lineMode === 'gl' ? 'GL limits' : lineMode === 'wc' ? 'EL limits' : lineMode === 'umbrella' ? 'umbrella limits' : 'property limit'} below
-              {lineMode === 'property' ? ' is' : ' are'} written to that policy through the Master COI write path,
+              Pick the policy record this bind becomes. The {bindLine === 'gl' ? 'GL limits' : bindLine === 'wc' ? 'EL limits' : bindLine === 'umbrella' ? 'umbrella limits' : bindLine === 'auto' ? 'combined single limit' : 'property limit'} below
+              {bindLine === 'property' || bindLine === 'auto' ? ' is' : ' are'} written to that policy through the Master COI write path,
               so it is certificate-ready immediately.
             </DialogDescription>
           </DialogHeader>
@@ -772,23 +807,23 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="bind-eo" className="text-cc-text-secondary">
-                  {lineMode === 'gl' ? 'Each occurrence' : lineMode === 'wc' ? 'EL each accident' : lineMode === 'umbrella' ? 'Per occurrence' : 'Property limit'}
+                  {bindLine === 'gl' ? 'Each occurrence' : bindLine === 'wc' ? 'EL each accident' : bindLine === 'umbrella' ? 'Per occurrence' : bindLine === 'auto' ? 'Combined single limit' : 'Property limit'}
                 </Label>
                 <Input id="bind-eo" inputMode="numeric" value={bindEachOcc} onChange={(e) => setBindEachOcc(e.target.value)} />
               </div>
-              {lineMode === 'gl' && (
+              {bindLine === 'gl' && (
                 <div className="space-y-1.5">
                   <Label htmlFor="bind-ga" className="text-cc-text-secondary">General aggregate</Label>
                   <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
                 </div>
               )}
-              {lineMode === 'umbrella' && (
+              {bindLine === 'umbrella' && (
                 <div className="space-y-1.5">
                   <Label htmlFor="bind-ga" className="text-cc-text-secondary">Aggregate (optional)</Label>
                   <Input id="bind-ga" inputMode="numeric" value={bindGenAgg} onChange={(e) => setBindGenAgg(e.target.value)} />
                 </div>
               )}
-              {lineMode === 'wc' && (
+              {bindLine === 'wc' && (
                 <>
                   <div className="space-y-1.5">
                     <Label htmlFor="bind-ga" className="text-cc-text-secondary">EL disease each employee</Label>
@@ -808,7 +843,7 @@ function QuotesBlock({ accountId, submission }: { accountId: string; submission:
             </Button>
             <Button
               onClick={handleBind}
-              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || (lineMode === 'gl' && bindGa == null) || (lineMode === 'wc' && (bindGa == null || bindTh == null))}
+              disabled={bindQuote.isPending || !bindPolicyId || bindEo == null || (bindLine === 'gl' && bindGa == null) || (bindLine === 'wc' && (bindGa == null || bindTh == null))}
             >
               {bindQuote.isPending ? 'Binding' : 'Bind quote'}
             </Button>

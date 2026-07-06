@@ -77,7 +77,7 @@ export function useAddSubmissionQuote() {
       carrierName: string;
       premium: number | null;
       /** Which line this quote is for; defaults to GL. */
-      line?: 'gl' | 'property' | 'wc' | 'umbrella';
+      line?: 'gl' | 'property' | 'wc' | 'umbrella' | 'auto';
       eachOccurrence: number | null;
       generalAggregate: number | null;
       propertyLimit?: number | null;
@@ -86,6 +86,7 @@ export function useAddSubmissionQuote() {
       elDiseasePolicyLimit?: number | null;
       umbPerOccurrence?: number | null;
       umbAggregate?: number | null;
+      autoCsl?: number | null;
     }) => {
       // Atomic server-side capture (quote + coverages + status advance in one
       // txn), line-aware since Phase 3.
@@ -102,6 +103,7 @@ export function useAddSubmissionQuote() {
         p_el_disease_policy_limit: input.elDiseasePolicyLimit ?? null,
         p_umb_per_occurrence: input.umbPerOccurrence ?? null,
         p_umb_aggregate: input.umbAggregate ?? null,
+        p_auto_csl: input.autoCsl ?? null,
       });
       if (error) throw error;
       return data;
@@ -125,7 +127,7 @@ export function useBindSubmissionQuote() {
       /** The policy the win becomes; limits are written to ITS cgl_details. */
       policyId: string;
       /** Which line binds; defaults to GL. */
-      line?: 'gl' | 'property' | 'wc' | 'umbrella';
+      line?: 'gl' | 'property' | 'wc' | 'umbrella' | 'auto';
       /** GL: BOTH limits required by the server. Property: propertyLimit
        *  required instead. An empty-limit bind would close the file without
        *  the COI values the feature exists to propagate. */
@@ -138,6 +140,7 @@ export function useBindSubmissionQuote() {
       elDiseasePolicyLimit?: number | null;
       umbPerOccurrence?: number | null;
       umbAggregate?: number | null;
+      autoCsl?: number | null;
     }) => {
       // Atomic server-side bind (review fix): tenancy validated, both GL
       // limits required, save_master_coi_fields rejections FAIL the bind,
@@ -157,6 +160,7 @@ export function useBindSubmissionQuote() {
         p_el_disease_policy_limit: input.elDiseasePolicyLimit ?? null,
         p_umb_per_occurrence: input.umbPerOccurrence ?? null,
         p_umb_aggregate: input.umbAggregate ?? null,
+        p_auto_csl: input.autoCsl ?? null,
       });
       if (error) throw error;
       return data;
