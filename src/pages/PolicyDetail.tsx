@@ -25,6 +25,7 @@ import { useExtractUmbrellaPolicy, isUmbrellaPolicy } from '@/hooks/useUmbrellaE
 import { useExtractBAPPolicy, isCommercialAutoPolicy, useBAPVehicles, useBAPDrivers, useBAPInterests } from '@/hooks/useBAPExtraction';
 import { UmbrellaPolicyDetailsView } from '@/components/policies/UmbrellaPolicyDetails';
 import { BAPPolicyDetailsView } from '@/components/policies/BAPPolicyDetails';
+import { BoundTermsCard } from '@/components/policies/BoundTermsCard';
 import { PropertyPolicyDetailsView } from '@/components/policies/PropertyPolicyDetails';
 import { useCreateSubmission } from '@/hooks/useCommercialSubmissions';
 import { commercialLinesForPolicy, remarketNote } from '@/lib/commercial/remarket';
@@ -851,6 +852,16 @@ export default function PolicyDetail() {
             </Card>
           </div>
         </div>
+
+        {/* Bound terms check (closing rigor): renders only when this policy
+            has a 'bound' submission event; diffs what was bound against the
+            live blob values so issued-policy drift gets caught. */}
+        {policyId && (
+          <BoundTermsCard
+            policyId={policyId}
+            policy={(policy as unknown as Record<string, unknown>) ?? null}
+          />
+        )}
 
         {/* Workers' Comp Details Section */}
         {isWorkersComp && (
