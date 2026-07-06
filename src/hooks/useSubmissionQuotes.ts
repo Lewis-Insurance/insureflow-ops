@@ -111,6 +111,8 @@ export function useAddSubmissionQuote() {
     onSuccess: (_d, v) => {
       queryClient.invalidateQueries({ queryKey: ['submission-quotes', v.submissionId] });
       queryClient.invalidateQueries({ queryKey: ['commercial-submissions', v.accountId] });
+      // The pipeline page aggregates submissions + quotes workspace-wide.
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
       toast.success('Quote recorded');
     },
     onError: (error: Error) => toast.error(`Could not record the quote: ${error.message}`),
@@ -170,9 +172,15 @@ export function useBindSubmissionQuote() {
       queryClient.invalidateQueries({ queryKey: ['commercial-submissions', v.accountId] });
       queryClient.invalidateQueries({ queryKey: ['master-coi', v.accountId] });
       queryClient.invalidateQueries({ queryKey: ['policies'] });
+      // The bind wrote the policy's *_details blob - the DETAIL page cache
+      // (singular key) must refresh too, or the Bound terms card diffs
+      // against a stale blob right after binding (review fix).
+      queryClient.invalidateQueries({ queryKey: ['policy', v.policyId] });
       // The Bound terms card reads the bind event - a cached empty result
       // must not survive the bind that just created one (review fix).
       queryClient.invalidateQueries({ queryKey: ['policy-bound-events', v.policyId] });
+      // The pipeline page aggregates submissions + quotes + bound times.
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
       toast.success('Bound. The policy is COI-ready once its line details pass readiness.');
     },
     onError: (error: Error) => toast.error(`Bind failed: ${error.message}`),

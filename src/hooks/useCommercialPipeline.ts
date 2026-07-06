@@ -82,6 +82,30 @@ export function useCommercialRunwayPolicies() {
   });
 }
 
+/** submission_id -> bound-event timestamp; the precise cycle-time source. */
+export function usePipelineBoundTimes() {
+  return useQuery({
+    queryKey: ['commercial-pipeline', 'bound-times'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('submission_events' as any)
+        .select('submission_id, created_at')
+        .eq('action', 'bound')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      // Ascending order: the FIRST bound event per submission wins (a re-run
+      // of a bind logs another row; the original bind is the cycle end).
+      for (const row of (data as unknown as { submission_id: string; created_at: string }[]) ?? []) {
+        if (!(row.submission_id in map)) map[row.submission_id] = row.created_at;
+      }
+      return map;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Bound events for one policy (the Bound terms card)
 // ---------------------------------------------------------------------------

@@ -69,11 +69,23 @@ export function carrierHitRatio(quotes: PipelineQuote[]): CarrierHitRow[] {
     .sort((a, b) => b.quoted - a.quoted || a.carrier.localeCompare(b.carrier));
 }
 
-/** Median whole days from created to last update on bound submissions. */
-export function medianDaysToBind(submissions: PipelineSubmission[]): number | null {
+/**
+ * Median whole days from created to BOUND on bound submissions. The bound
+ * moment is the 'bound' submission event's timestamp (passed in as a map by
+ * submission id) - updated_at is only the fallback, because any later touch
+ * to a bound row moves it and would silently inflate the metric.
+ */
+export function medianDaysToBind(
+  submissions: PipelineSubmission[],
+  boundAtBySubmission: Record<string, string> = {},
+): number | null {
   const days = submissions
-    .filter((s) => s.status === 'bound' && s.updated_at)
-    .map((s) => (new Date(s.updated_at as string).getTime() - new Date(s.created_at).getTime()) / 86_400_000)
+    .filter((s) => s.status === 'bound')
+    .map((s) => {
+      const boundAt = boundAtBySubmission[s.id] ?? s.updated_at;
+      if (!boundAt) return NaN;
+      return (new Date(boundAt).getTime() - new Date(s.created_at).getTime()) / 86_400_000;
+    })
     .filter((d) => Number.isFinite(d) && d >= 0)
     .sort((a, b) => a - b);
   if (days.length === 0) return null;

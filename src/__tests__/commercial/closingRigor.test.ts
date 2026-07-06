@@ -164,13 +164,17 @@ describe('medianDaysToBind', () => {
   it('is null with no bound submissions', () => {
     expect(medianDaysToBind([sub('draft', '2026-01-01')])).toBeNull();
   });
-  it('takes the median over bound submissions', () => {
+  it('takes the median over bound submissions (updated_at fallback)', () => {
     expect(medianDaysToBind([
       sub('bound', '2026-01-01T00:00:00Z', '2026-01-05T00:00:00Z'),   // 4d
       sub('bound', '2026-01-01T00:00:00Z', '2026-01-11T00:00:00Z'),   // 10d
       sub('bound', '2026-01-01T00:00:00Z', '2026-01-07T00:00:00Z'),   // 6d
       sub('draft', '2026-01-01T00:00:00Z'),
     ])).toBe(6);
+  });
+  it('prefers the bound-event time; later touches to the row do not inflate it', () => {
+    const s = sub('bound', '2026-01-01T00:00:00Z', '2026-03-01T00:00:00Z'); // touched 59d later
+    expect(medianDaysToBind([s], { [s.id]: '2026-01-04T00:00:00Z' })).toBe(3);
   });
 });
 

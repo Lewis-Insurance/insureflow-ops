@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { Briefcase, CalendarClock, Target } from 'lucide-react';
 import {
   useCommercialRunwayPolicies,
+  usePipelineBoundTimes,
   usePipelineQuotes,
   usePipelineSubmissions,
 } from '@/hooks/useCommercialPipeline';
@@ -59,10 +60,11 @@ export default function CommercialPipelinePage() {
   const { data: submissions = [], isLoading: subsLoading } = usePipelineSubmissions();
   const { data: quotes = [], isLoading: quotesLoading } = usePipelineQuotes();
   const { data: policies = [], isLoading: runwayLoading } = useCommercialRunwayPolicies();
+  const { data: boundTimes = {} } = usePipelineBoundTimes();
 
   const funnel = useMemo(() => funnelCounts(submissions), [submissions]);
   const carriers = useMemo(() => carrierHitRatio(quotes), [quotes]);
-  const cycleDays = useMemo(() => medianDaysToBind(submissions), [submissions]);
+  const cycleDays = useMemo(() => medianDaysToBind(submissions, boundTimes), [submissions, boundTimes]);
   const runway = useMemo(
     () => renewalRunway(policies, localDateIso(new Date())),
     [policies],
