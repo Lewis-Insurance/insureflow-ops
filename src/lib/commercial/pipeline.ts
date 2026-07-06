@@ -7,8 +7,10 @@
 // fetching; today is always passed in so every calc is deterministic.
 // ============================================================================
 
+// The submission spine's full status vocabulary (verified against the live
+// CHECK constraint) - dropping a stage here silently undercounts the funnel.
 export const FUNNEL_STAGES = [
-  'draft', 'intake', 'packet_ready', 'signing', 'submitted', 'quoted', 'bound', 'lost', 'abandoned',
+  'draft', 'intake', 'packet_ready', 'signing', 'submitted', 'quoted', 'proposed', 'bound', 'lost', 'abandoned',
 ] as const;
 export type FunnelStage = (typeof FUNNEL_STAGES)[number];
 
@@ -95,6 +97,14 @@ export interface RunwayRow<T extends RunwayPolicy> {
   policy: T;
   daysOut: number;
   bucket: RunwayBucket;
+}
+
+/** The LOCAL calendar date as YYYY-MM-DD. toISOString() is UTC and rolls to
+ *  tomorrow during the local evening, shifting every runway bucket a day. */
+export function localDateIso(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 /** Whole days from today (local midnight semantics: date-only math). */

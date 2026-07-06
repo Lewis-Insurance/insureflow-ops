@@ -22,6 +22,7 @@ import {
   FUNNEL_STAGES,
   carrierHitRatio,
   funnelCounts,
+  localDateIso,
   medianDaysToBind,
   renewalRunway,
   type RunwayBucket,
@@ -34,6 +35,7 @@ const STAGE_LABELS: Record<(typeof FUNNEL_STAGES)[number], string> = {
   signing: 'Signing',
   submitted: 'Submitted',
   quoted: 'Quoted',
+  proposed: 'Proposed',
   bound: 'Bound',
   lost: 'Lost',
   abandoned: 'Abandoned',
@@ -62,7 +64,7 @@ export default function CommercialPipelinePage() {
   const carriers = useMemo(() => carrierHitRatio(quotes), [quotes]);
   const cycleDays = useMemo(() => medianDaysToBind(submissions), [submissions]);
   const runway = useMemo(
-    () => renewalRunway(policies, new Date().toISOString()),
+    () => renewalRunway(policies, localDateIso(new Date())),
     [policies],
   );
 

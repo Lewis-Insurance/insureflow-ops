@@ -14,9 +14,11 @@ import {
   readPolicyPath,
 } from '@/lib/commercial/boundCheck';
 import {
+  FUNNEL_STAGES,
   carrierHitRatio,
   daysUntil,
   funnelCounts,
+  localDateIso,
   medianDaysToBind,
   renewalRunway,
   runwayBucket,
@@ -110,6 +112,23 @@ describe('funnelCounts', () => {
     expect(rows[0]).toEqual({ stage: 'draft', count: 1 });
     expect(rows.find((r) => r.stage === 'bound')?.count).toBe(2);
     expect(rows.find((r) => r.stage === 'quoted')?.count).toBe(0);
+  });
+
+  it('covers the FULL live status vocabulary (a dropped stage undercounts silently)', () => {
+    // Mirrors the commercial_submissions CHECK constraint, verified live.
+    expect([...FUNNEL_STAGES].sort()).toEqual(
+      ['abandoned', 'bound', 'draft', 'intake', 'lost', 'packet_ready', 'proposed', 'quoted', 'signing', 'submitted'].sort(),
+    );
+    expect(funnelCounts([sub('proposed', '2026-01-01')]).find((r) => r.stage === 'proposed')?.count).toBe(1);
+  });
+});
+
+describe('localDateIso', () => {
+  it('formats the LOCAL calendar date, zero-padded', () => {
+    // Local-time constructor: 9 Feb 2026 23:30 local stays 2026-02-09
+    // regardless of what UTC says at that moment.
+    expect(localDateIso(new Date(2026, 1, 9, 23, 30))).toBe('2026-02-09');
+    expect(localDateIso(new Date(2026, 0, 1, 0, 0))).toBe('2026-01-01');
   });
 });
 

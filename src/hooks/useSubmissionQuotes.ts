@@ -170,6 +170,9 @@ export function useBindSubmissionQuote() {
       queryClient.invalidateQueries({ queryKey: ['commercial-submissions', v.accountId] });
       queryClient.invalidateQueries({ queryKey: ['master-coi', v.accountId] });
       queryClient.invalidateQueries({ queryKey: ['policies'] });
+      // The Bound terms card reads the bind event - a cached empty result
+      // must not survive the bind that just created one (review fix).
+      queryClient.invalidateQueries({ queryKey: ['policy-bound-events', v.policyId] });
       toast.success('Bound. The policy is COI-ready once its line details pass readiness.');
     },
     onError: (error: Error) => toast.error(`Bind failed: ${error.message}`),
