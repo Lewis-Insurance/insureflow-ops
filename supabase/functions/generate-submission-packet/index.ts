@@ -437,6 +437,23 @@ async function handle(req: Request): Promise<Response> {
       throw fail(422, 'CLOSED', `submission was closed (${statusNow.status}) while the packet was generating`);
     }
 
+    // The snapshot this packet PRINTED FROM. It rides in two places with two
+    // meanings: the append-only event below pairs THIS packet with THIS data
+    // permanently (race-immune - review fix round 4: concurrent generations
+    // each keep their own pairing), while the row's risk_snapshot holds the
+    // latest-while-draft/intake capture the workflow reads.
+    const riskSnapshot = {
+      captured_at: capturedAt,
+      producer,
+      profile: profile ?? null,
+      // The rows the packet printed from: mailing address (row 1) plus the
+      // blank's 4 premises rows (the adapter's truncation boundary).
+      locations: (locations ?? []).slice(0, 4),
+      gl_limits: glLimits,
+      forms: ['125', '126'],
+      template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
+    };
+
     // --- Step 10: audit event (append-only); compensate the upload on failure --
     const { error: eventErr } = await admin.from('submission_events').insert({
       submission_id: submission.id,
@@ -447,6 +464,7 @@ async function handle(req: Request): Promise<Response> {
         forms: ['125', '126'],
         template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
         validation: 'passed',
+        risk_snapshot: riskSnapshot,
       },
     });
     if (eventErr) {
@@ -469,17 +487,6 @@ async function handle(req: Request): Promise<Response> {
     // is event-logged, and because the SAME statement carries freeze + advance
     // a failed write leaves the row in draft/intake so the next generation
     // retries the freeze.
-    const riskSnapshot = {
-      captured_at: capturedAt,
-      producer,
-      profile: profile ?? null,
-      // The rows the packet printed from: mailing address (row 1) plus the
-      // blank's 4 premises rows (the adapter's truncation boundary).
-      locations: (locations ?? []).slice(0, 4),
-      gl_limits: glLimits,
-      forms: ['125', '126'],
-      template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
-    };
     // The freeze decision comes from the WRITE result, never a read (review
     // fix round 3): any read-then-branch leaves a TOCTOU window where the
     // guarded update silently no-ops and a packet persists with no snapshot.
