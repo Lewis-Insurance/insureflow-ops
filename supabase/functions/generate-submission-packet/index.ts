@@ -86,7 +86,15 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 }
 
 function numOrNull(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  // cgl_details.limits values arrive as numbers OR numeric strings (manual
+  // saves and extraction both write strings sometimes; the Bound-terms diff
+  // has the same duality) - coerce, never drop a real limit (review fix).
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v.replace(/[$,\s]/g, ''));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 async function uploadWithRetry(
@@ -329,7 +337,16 @@ async function handle(req: Request): Promise<Response> {
     // One clock read: the form completion date and the risk snapshot's
     // captured_at come from the same instant.
     const capturedAt = new Date().toISOString();
-    const completionDateIso = capturedAt.slice(0, 10);
+    // The printed form date is the BUSINESS day, not the UTC day (review
+    // fix): edge functions run in UTC, so an evening generation would date
+    // the application tomorrow. Single-state FL agency -> America/New_York
+    // (en-CA gives YYYY-MM-DD directly).
+    const completionDateIso = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
 
     const input125 = buildAcord125InputFromRiskStore({
       submission: {
@@ -452,18 +469,23 @@ async function handle(req: Request): Promise<Response> {
     // is event-logged, and because the SAME statement carries freeze + advance
     // a failed write leaves the row in draft/intake so the next generation
     // retries the freeze.
-    if (submission.status === 'draft' || submission.status === 'intake') {
-      const riskSnapshot = {
-        captured_at: capturedAt,
-        producer,
-        profile: profile ?? null,
-        // The rows the packet printed from: mailing address (row 1) plus the
-        // blank's 4 premises rows (the adapter's truncation boundary).
-        locations: (locations ?? []).slice(0, 4),
-        gl_limits: glLimits,
-        forms: ['125', '126'],
-        template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
-      };
+    const riskSnapshot = {
+      captured_at: capturedAt,
+      producer,
+      profile: profile ?? null,
+      // The rows the packet printed from: mailing address (row 1) plus the
+      // blank's 4 premises rows (the adapter's truncation boundary).
+      locations: (locations ?? []).slice(0, 4),
+      gl_limits: glLimits,
+      forms: ['125', '126'],
+      template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
+    };
+    // The freeze decision uses statusNow (the post-upload re-read), not the
+    // stale load (review fix): a submission advanced past intake DURING the
+    // fill would otherwise upload + event-log with the guarded update
+    // no-opping - a packet with no snapshot ever.
+    const freezeEligible = statusNow ? ['draft', 'intake'].includes(statusNow.status) : true;
+    if (freezeEligible) {
       const { error: freezeErr } = await admin
         .from('commercial_submissions')
         .update({
@@ -477,6 +499,21 @@ async function handle(req: Request): Promise<Response> {
         logger.warn('risk snapshot freeze + status advance failed', {
           submission_id: submission.id,
           error: freezeErr.message,
+        });
+      }
+    } else {
+      // Past intake already (raced or regenerated late): never move status,
+      // but a FIRST packet racing an advance must still leave a snapshot -
+      // backfill only where none exists, preserving immutability.
+      const { error: backfillErr } = await admin
+        .from('commercial_submissions')
+        .update({ risk_snapshot: riskSnapshot, snapshot_frozen_at: capturedAt })
+        .eq('id', submission.id)
+        .is('risk_snapshot', null);
+      if (backfillErr) {
+        logger.warn('risk snapshot backfill failed', {
+          submission_id: submission.id,
+          error: backfillErr.message,
         });
       }
     }
