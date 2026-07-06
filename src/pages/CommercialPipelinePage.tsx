@@ -10,7 +10,7 @@
 // tabular figures, no em or en dashes, content-shaped loading.
 // ============================================================================
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Briefcase, CalendarClock, Target } from 'lucide-react';
 import {
@@ -64,12 +64,25 @@ export default function CommercialPipelinePage() {
   // the updated_at-fallback cycle time (the inflated number) for a moment.
   const { data: boundTimes = {}, isLoading: boundTimesLoading } = usePipelineBoundTimes();
 
+  // The runway's "today" tracks the calendar (review fix): an ops console
+  // left open across midnight must not keep yesterday's buckets. The tick
+  // only updates state when the date string actually flips, so it causes
+  // exactly one re-render per day.
+  const [todayIso, setTodayIso] = useState(() => localDateIso(new Date()));
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = localDateIso(new Date());
+      setTodayIso((cur) => (cur === next ? cur : next));
+    }, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const funnel = useMemo(() => funnelCounts(submissions), [submissions]);
   const carriers = useMemo(() => carrierHitRatio(quotes), [quotes]);
   const cycleDays = useMemo(() => medianDaysToBind(submissions, boundTimes), [submissions, boundTimes]);
   const runway = useMemo(
-    () => renewalRunway(policies, localDateIso(new Date())),
-    [policies],
+    () => renewalRunway(policies, todayIso),
+    [policies, todayIso],
   );
 
   const loading = subsLoading || quotesLoading || runwayLoading || boundTimesLoading;
