@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type ClientSendSurface = 'email-send' | 'send-sms' | 'send-coi-email' | 'esign-create-request';
+export type ClientSendSurface = 'email-send' | 'send-sms' | 'send-coi-email' | 'send-submission-packet' | 'esign-create-request';
 
 export interface ClientSendApprovalMarker {
   approval_ref: string;

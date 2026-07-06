@@ -14,7 +14,7 @@ import {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-type TestedSurface = 'email-send' | 'send-sms' | 'send-coi-email' | 'esign-create-request';
+type TestedSurface = 'email-send' | 'send-sms' | 'send-coi-email' | 'send-submission-packet' | 'esign-create-request';
 
 interface SurfaceCase {
   surface: TestedSurface;
@@ -60,6 +60,15 @@ const surfaceCases: SurfaceCase[] = [
     surface: 'send-coi-email',
     payload: { certificate_id: 'cert-0000-0000-0001', to: 'holder@example.invalid', cc: ['broker@example.invalid'], note: 'Please find the certificate attached.' },
     tamperedPayload: { certificate_id: 'cert-0000-0000-0002', to: 'holder@example.invalid', cc: ['broker@example.invalid'], note: 'Please find the certificate attached.' },
+  },
+  {
+    // The approval binds to the exact send: { submission_id, to, cc, note } (the
+    // send-submission-packet request body; cc is a comma-separated string).
+    // Tampering the submission_id -- sending a DIFFERENT submission's packet
+    // under the same approval -- must be a content mismatch.
+    surface: 'send-submission-packet',
+    payload: { submission_id: 'sub-0000-0000-0001', to: 'underwriting@wholesaler.invalid', cc: 'broker@example.invalid', note: 'Target effective date is firm.' },
+    tamperedPayload: { submission_id: 'sub-0000-0000-0002', to: 'underwriting@wholesaler.invalid', cc: 'broker@example.invalid', note: 'Target effective date is firm.' },
   },
   {
     surface: 'esign-create-request',
@@ -389,6 +398,7 @@ describe('server-verified client send approval gate', () => {
       ['email-send', 'supabase/functions/email-send/index.ts'],
       ['send-sms', 'supabase/functions/send-sms/index.ts'],
       ['send-coi-email', 'supabase/functions/send-coi-email/index.ts'],
+      ['send-submission-packet', 'supabase/functions/send-submission-packet/index.ts'],
       ['esign-create-request', 'supabase/functions/esign-create-request/index.ts'],
     ];
 

@@ -8,6 +8,7 @@ const ALLOWED_SURFACES = new Set<ClientSendSurface>([
   'email-send',
   'send-sms',
   'send-coi-email',
+  'send-submission-packet',
   'esign-create-request',
 ]);
 

@@ -159,6 +159,19 @@ function canonicalPayload(surface: ClientSendSurface, payload: unknown): Record<
       note: normalized.note ?? null,
     }) as Record<string, unknown>;
   }
+  if (surface === 'send-submission-packet') {
+    // Bind the approval to the exact send: which submission, to whom, cc'd whom.
+    // Keys mirror the send-submission-packet request body
+    // { submission_id, to, cc, note } so the mint (client-send-approval-create)
+    // and the consume (send-submission-packet) hash identically - the
+    // send-coi-email shape, with cc a comma-separated string instead of an array.
+    return sortObject({
+      submission_id: normalized.submission_id ?? normalized.submissionId ?? null,
+      to: normalized.to ?? null,
+      cc: normalized.cc ?? null,
+      note: normalized.note ?? null,
+    }) as Record<string, unknown>;
+  }
   if (surface === 'send-id-card-email') {
     return sortObject({
       to: normalized.to ?? normalized.recipientEmail,

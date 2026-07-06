@@ -1,8 +1,9 @@
 // generate-submission-packet: the GL submission-packet fill pipeline
 // (Commercial Lines SOW v3, Phase 1b).
 //
-// submission data -> filled ACORD 125 + 126 -> flattened, merged, stored,
-// signed URL. Clones the generate-certificate issuance conventions: staff auth
+// submission data -> branded cover page + filled ACORD 125 + 126 -> flattened,
+// merged (cover, 125, 126), stored, signed URL.
+// Clones the generate-certificate issuance conventions: staff auth
 // + workspace gate, template download with byte pin, server-side field_values
 // build via the _shared Deno ports, fill via _shared/acord-fill.ts, upload with
 // retry + compensating cleanup, createSignedUrl(3600).
@@ -16,7 +17,8 @@
 // service client, after the caller's staff + workspace membership is proven.
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1';
+import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
+import type { PDFFont } from 'https://esm.sh/pdf-lib@1.17.1';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { createLogger } from '../_shared/logger.ts';
@@ -171,6 +173,153 @@ async function fillOrFail(
 }
 
 // ---------------------------------------------------------------------------
+// Cover page (generated, not template-filled)
+// ---------------------------------------------------------------------------
+// A branded first page drawn directly with pdf-lib on US Letter. Typography is
+// Helvetica + Helvetica-Bold only, black plus ONE gray, sizes 9-22, generous
+// whitespace - no other colors, no rules borrowed from the ACORD blanks.
+
+const COVER_BLACK = rgb(0, 0, 0);
+const COVER_GRAY = rgb(0.45, 0.45, 0.45);
+
+/** target_lines vocabulary -> the cover page's formal line labels. */
+const COVER_LINE_LABELS: Record<string, string> = {
+  gl: 'General Liability',
+  property: 'Commercial Property',
+  wc: 'Workers Compensation',
+  umbrella: 'Commercial Umbrella / Excess',
+  auto: 'Business Auto',
+};
+
+/** 'YYYY-MM-DD' -> 'MM/DD/YYYY' (string slice only; '' when not ISO). */
+function isoToUsDate(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+  return m ? `${m[2]}/${m[3]}/${m[1]}` : '';
+}
+
+/**
+ * The standard-14 Helvetica encodes WinAnsi (Latin-1) only; drawText throws on
+ * anything outside it. DB-sourced names occasionally carry stray unicode, so
+ * clamp instead of failing the whole packet.
+ */
+function winAnsiSafe(text: string): string {
+  return text.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
+}
+
+/** Greedy word wrap by measured width (a too-long single word gets its own line). */
+function wrapCoverText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (!line || font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      line = candidate;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) {
+    lines.push(line);
+  }
+  return lines;
+}
+
+interface CoverPageData {
+  /** Header: the agency (producer) name. */
+  agencyName: string;
+  /** Insured legal name resolved by the built 125 input. */
+  applicant: string;
+  /** Formal line labels, in target_lines order. */
+  linesRequested: string[];
+  /** 'MM/DD/YYYY' or '' (prints TBD when empty). */
+  effectiveDateUs: string;
+  /** Free-text market; the row is omitted when empty. */
+  wholesalerName: string;
+  /** Producer phone/email for the footer contact line (either may be ''). */
+  producerPhone: string;
+  producerEmail: string;
+  /** 'MM/DD/YYYY' ET business day, same clock as the form completion date. */
+  generatedUs: string;
+}
+
+/** Prepend the branded cover as the merged packet's first page. */
+async function addCoverPage(merged: PDFDocument, data: CoverPageData): Promise<void> {
+  const helvetica = await merged.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await merged.embedFont(StandardFonts.HelveticaBold);
+  const page = merged.addPage([612, 792]); // US Letter portrait
+  const marginX = 72;
+  const labelX = marginX;
+  const valueX = 216;
+  const valueWidth = 612 - marginX - valueX;
+
+  // Header: agency name + a hairline rule.
+  page.drawText(winAnsiSafe(data.agencyName), {
+    x: marginX, y: 718, size: 11, font: helveticaBold, color: COVER_BLACK,
+  });
+  page.drawLine({
+    start: { x: marginX, y: 708 }, end: { x: 612 - marginX, y: 708 },
+    thickness: 0.5, color: COVER_GRAY,
+  });
+
+  // Title.
+  page.drawText('COMMERCIAL INSURANCE SUBMISSION', {
+    x: marginX, y: 632, size: 22, font: helveticaBold, color: COVER_BLACK,
+  });
+
+  // Details block: gray uppercase labels, black values, wrapped to the column.
+  let y = 572;
+  const drawRow = (label: string, value: string) => {
+    page.drawText(label.toUpperCase(), {
+      x: labelX, y, size: 9, font: helveticaBold, color: COVER_GRAY,
+    });
+    const lines = wrapCoverText(winAnsiSafe(value), helvetica, 12, valueWidth);
+    lines.forEach((line, i) => {
+      page.drawText(line, { x: valueX, y: y - i * 16, size: 12, font: helvetica, color: COVER_BLACK });
+    });
+    y -= Math.max(lines.length, 1) * 16 + 14;
+  };
+
+  drawRow('Applicant', data.applicant || '(not set)');
+  drawRow('Lines Requested', data.linesRequested.join(', ') || '(none)');
+  drawRow('Proposed Effective Date', data.effectiveDateUs || 'TBD');
+  if (data.wholesalerName) {
+    drawRow('Submitted To', data.wholesalerName);
+  }
+
+  // Contents list.
+  y -= 12;
+  page.drawText('CONTENTS', { x: labelX, y, size: 9, font: helveticaBold, color: COVER_GRAY });
+  const contents = [
+    'ACORD 125 Commercial Insurance Application (2016/03)',
+    'ACORD 126 Commercial General Liability Section (2009/08)',
+  ];
+  for (const item of contents) {
+    const lines = wrapCoverText(item, helvetica, 11, valueWidth);
+    lines.forEach((line, i) => {
+      page.drawText(line, { x: valueX, y: y - i * 15, size: 11, font: helvetica, color: COVER_BLACK });
+    });
+    y -= lines.length * 15 + 2;
+  }
+
+  // Footer: hairline, producer contact line (phone/email when set), generated date.
+  page.drawLine({
+    start: { x: marginX, y: 104 }, end: { x: 612 - marginX, y: 104 },
+    thickness: 0.5, color: COVER_GRAY,
+  });
+  const contactParts = [data.agencyName, data.producerPhone, data.producerEmail]
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  page.drawText(winAnsiSafe(contactParts.join('  |  ')), {
+    x: marginX, y: 90, size: 9, font: helvetica, color: COVER_GRAY,
+  });
+  page.drawText(`Generated ${data.generatedUs}`, {
+    x: marginX, y: 76, size: 9, font: helvetica, color: COVER_GRAY,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // The handler
 // ---------------------------------------------------------------------------
 
@@ -225,7 +374,7 @@ async function handle(req: Request): Promise<Response> {
     // --- Step 2: load submission + account + profile + locations -------------
     const { data: submission, error: subErr } = await admin
       .from('commercial_submissions')
-      .select('id, account_id, status, target_lines, effective_date, remarket_of_policy_id')
+      .select('id, account_id, status, target_lines, effective_date, remarket_of_policy_id, wholesaler_name')
       .eq('id', body.submission_id)
       .is('deleted_at', null)
       .maybeSingle();
@@ -393,13 +542,28 @@ async function handle(req: Request): Promise<Response> {
     const template125 = await downloadPinnedTemplate(admin, '125');
     const template126 = await downloadPinnedTemplate(admin, '126');
 
-    // --- Step 8: fill each (flattened by default), then merge 125 + 126 --------
+    // --- Step 8: fill each (flattened by default), then merge cover + 125 + 126
     const filled125 = await fillOrFail('125', template125, build125.fieldValues);
     const filled126 = await fillOrFail('126', template126, build126.fieldValues);
 
     let packetBytes: Uint8Array;
     try {
       const merged = await PDFDocument.create();
+      // The branded cover page leads the packet (drawn, not template-filled).
+      // Names resolve from the SAME built 125 input the forms printed from, so
+      // the cover can never disagree with the application behind it.
+      await addCoverPage(merged, {
+        agencyName: producer.name,
+        applicant: input125.namedInsured.name,
+        linesRequested: ((submission.target_lines ?? []) as string[])
+          .map((line) => COVER_LINE_LABELS[line])
+          .filter((label): label is string => Boolean(label)),
+        effectiveDateUs: isoToUsDate(submission.effective_date),
+        wholesalerName: (submission.wholesaler_name ?? '').trim(),
+        producerPhone: producer.phone,
+        producerEmail: producer.email,
+        generatedUs: isoToUsDate(completionDateIso),
+      });
       const doc125 = await PDFDocument.load(filled125);
       const doc126 = await PDFDocument.load(filled126);
       const pages125 = await merged.copyPages(doc125, doc125.getPageIndices());
@@ -462,6 +626,7 @@ async function handle(req: Request): Promise<Response> {
       metadata: {
         storage_path: storagePath,
         forms: ['125', '126'],
+        cover: true,
         template_shas: { '125': TEMPLATES['125'].sha256, '126': TEMPLATES['126'].sha256 },
         validation: 'passed',
         risk_snapshot: riskSnapshot,

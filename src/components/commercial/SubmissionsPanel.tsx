@@ -5,8 +5,9 @@
 // wholesaler free text - NO market registry by design), status flow, the
 // diligent-effort declination log (append-only, with a copyable summary),
 // and the offer-and-rejection E&O log.
-// Packet generation / e-sign / universal send arrive with the 125+126 form
-// engines (Phase 1b, blank-dependent); this panel is the workflow they mount on.
+// Phase 1b actions: Generate packet (cover + ACORD 125 + 126), Download packet
+// (fresh signed link), and the ONE universal send - a Fence-gated email of the
+// packet to the wholesaler (send-submission-packet). E-sign arrives later.
 //
 // Calm Command: cc-* tokens both themes, NO lime in this panel, tabular
 // figures on dates/numbers, no em or en dashes, content-shaped loading.
@@ -34,7 +35,9 @@ import {
   useGenerateSubmissionPacket,
   useOfferRejections,
   useRecordOffer,
+  useSendSubmissionPacket,
   useSubmissionDeclinations,
+  useSubmissionPacketLink,
   useUpdateSubmission,
 } from '@/hooks/useCommercialSubmissions';
 import {
@@ -85,6 +88,8 @@ const isoToUs = (iso: string | null): string => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   return m ? `${m[2]}/${m[3]}/${m[1]}` : '';
 };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const OFFER_COVERAGES: { key: OfferCoverage; label: string }[] = [
   { key: 'umbrella', label: 'Umbrella / excess' },
@@ -278,6 +283,8 @@ function SubmissionDetail({
   const { data: declinations = [] } = useSubmissionDeclinations(submission.id);
   const addDeclination = useAddDeclination();
   const generatePacket = useGenerateSubmissionPacket();
+  const packetLink = useSubmissionPacketLink();
+  const sendPacket = useSendSubmissionPacket();
   const [lossRunOpen, setLossRunOpen] = useState(false);
   const { data: offers = [] } = useOfferRejections(accountId);
   const recordOffer = useRecordOffer();
@@ -289,6 +296,43 @@ function SubmissionDetail({
   const [decDate, setDecDate] = useState('');
   const [decReason, setDecReason] = useState('');
   const [offerCoverage, setOfferCoverage] = useState<OfferCoverage>('umbrella');
+
+  // The universal send dialog (To prefills from the submission's wholesaler).
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendTo, setSendTo] = useState('');
+  const [sendCc, setSendCc] = useState('');
+  const [sendNote, setSendNote] = useState('');
+
+  const openSendDialog = () => {
+    setSendTo(submission.wholesaler_email ?? '');
+    setSendCc('');
+    setSendNote('');
+    setSendOpen(true);
+  };
+
+  const handleSendPacket = () => {
+    const toTrimmed = sendTo.trim();
+    if (!EMAIL_RE.test(toTrimmed)) {
+      toast.error('Enter a valid recipient email address.');
+      return;
+    }
+    const ccEntries = sendCc.split(',').map((s) => s.trim()).filter(Boolean);
+    const badCc = ccEntries.filter((addr) => !EMAIL_RE.test(addr));
+    if (badCc.length > 0) {
+      toast.error(`Invalid Cc address: ${badCc.join(', ')}`);
+      return;
+    }
+    sendPacket.mutate(
+      {
+        accountId,
+        submissionId: submission.id,
+        to: toTrimmed,
+        cc: ccEntries.join(', '),
+        note: sendNote,
+      },
+      { onSuccess: () => setSendOpen(false) },
+    );
+  };
 
   const submissionOffers = offers.filter((o) => o.submission_id === submission.id);
 
@@ -344,14 +388,31 @@ function SubmissionDetail({
         )}
         <div className="ml-auto flex items-center gap-1.5">
           {!closed && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => generatePacket.mutate({ accountId, submissionId: submission.id })}
-              disabled={generatePacket.isPending}
-              className="text-cc-text-secondary hover:text-cc-text-primary"
-            >
-              {generatePacket.isPending ? 'Generating packet' : 'Generate packet'}
-            </Button>
+            <>
+              <Button
+                variant="ghost" size="sm"
+                onClick={() => generatePacket.mutate({ accountId, submissionId: submission.id })}
+                disabled={generatePacket.isPending}
+                className="text-cc-text-secondary hover:text-cc-text-primary"
+              >
+                {generatePacket.isPending ? 'Generating packet' : 'Generate packet'}
+              </Button>
+              <Button
+                variant="ghost" size="sm"
+                onClick={() => packetLink.mutate({ submissionId: submission.id })}
+                disabled={packetLink.isPending}
+                className="text-cc-text-secondary hover:text-cc-text-primary"
+              >
+                {packetLink.isPending ? 'Fetching packet' : 'Download packet'}
+              </Button>
+              <Button
+                variant="ghost" size="sm"
+                onClick={openSendDialog}
+                className="text-cc-text-secondary hover:text-cc-text-primary"
+              >
+                Send to wholesaler
+              </Button>
+            </>
           )}
           <Button
             variant="ghost" size="sm"
@@ -370,6 +431,68 @@ function SubmissionDetail({
         submissionId={submission.id}
         insuredName={accountName}
       />
+
+      {/* The universal send: email the latest packet to the wholesaler (Fence-gated). */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="bg-cc-surface-raised">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">Send to wholesaler</DialogTitle>
+            <DialogDescription className="text-cc-text-muted">
+              Email the latest generated packet for {accountName} as a PDF attachment
+              (cover page + ACORD 125 + 126).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="send-packet-to" className="text-cc-text-secondary">To</Label>
+              <Input
+                id="send-packet-to"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                placeholder="underwriting@wholesaler.com"
+                value={sendTo}
+                onChange={(e) => setSendTo(e.target.value)}
+                disabled={sendPacket.isPending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="send-packet-cc" className="text-cc-text-secondary">
+                Cc <span className="text-cc-text-muted">(optional, comma separated)</span>
+              </Label>
+              <Input
+                id="send-packet-cc"
+                inputMode="email"
+                autoComplete="off"
+                value={sendCc}
+                onChange={(e) => setSendCc(e.target.value)}
+                disabled={sendPacket.isPending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="send-packet-note" className="text-cc-text-secondary">
+                Note <span className="text-cc-text-muted">(optional)</span>
+              </Label>
+              <Textarea
+                id="send-packet-note"
+                rows={3}
+                placeholder="A short message included in the email body."
+                value={sendNote}
+                onChange={(e) => setSendNote(e.target.value)}
+                disabled={sendPacket.isPending}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSendOpen(false)} disabled={sendPacket.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendPacket} disabled={sendPacket.isPending || !sendTo.trim()}>
+              {sendPacket.isPending ? 'Sending' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diligent effort: declination log */}
       <div className="space-y-2">

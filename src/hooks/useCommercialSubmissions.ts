@@ -11,6 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { createClientSendApproval, type ClientSendApprovalMarker } from '@/lib/clientSendApproval';
 import { toast } from 'sonner';
 import type {
   CommercialLineKey,
@@ -181,13 +182,20 @@ async function toPacketError(error: unknown): Promise<PacketGenerationError> {
     try {
       const body = (await response.clone().json()) as {
         error?: string | { code?: string; message?: string; issues?: PacketIssue[] };
+        message?: string;
       };
       if (typeof body.error === 'object' && body.error !== null) {
         if (body.error.code) code = body.error.code;
         if (body.error.message) message = body.error.message;
         if (Array.isArray(body.error.issues)) issues = body.error.issues;
       } else if (typeof body.error === 'string') {
-        message = body.error;
+        if (typeof body.message === 'string' && body.message) {
+          // The Fence approval gate shape: { error: <code>, message: <human> }.
+          code = body.error;
+          message = body.message;
+        } else {
+          message = body.error;
+        }
       }
     } catch {
       // Body was not JSON; keep the default message.
@@ -242,6 +250,115 @@ export function useGenerateSubmissionPacket() {
         toast.error(`The packet needs more data: ${shown}${more}`);
       } else {
         toast.error(`Could not generate the packet: ${error.message}`);
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The universal send (Fence-gated email to the wholesaler) + download link
+// ---------------------------------------------------------------------------
+
+interface SendPacketResponse {
+  success: boolean;
+  resend_id: string;
+  to: string;
+}
+
+/**
+ * Email the latest generated packet to the wholesaler via send-submission-packet.
+ *
+ * Fence: mints a one-time, server-verified named-human approval over the EXACT
+ * send payload ({ submission_id, to, cc, note }, empty optionals omitted - the
+ * SendCertificateDialog normalization), then invokes with the marker in the
+ * body. The edge function re-hashes the body minus the marker and consumes the
+ * approval; any drift between the minted payload and the request is a 403.
+ */
+export function useSendSubmissionPacket() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    SendPacketResponse,
+    PacketGenerationError,
+    { accountId: string; submissionId: string; to: string; cc?: string; note?: string }
+  >({
+    mutationFn: async (input) => {
+      // Build the send payload ONCE; the approval is minted over this exact
+      // object so the server's consume-side hash matches.
+      const sendPayload = {
+        submission_id: input.submissionId,
+        to: input.to.trim(),
+        cc: input.cc?.trim() ? input.cc.trim() : undefined,
+        note: input.note?.trim() ? input.note.trim() : undefined,
+      };
+      let approval: ClientSendApprovalMarker;
+      try {
+        approval = await createClientSendApproval('send-submission-packet', sendPayload);
+      } catch (error) {
+        throw await toPacketError(error);
+      }
+      const { data, error } = await supabase.functions.invoke<SendPacketResponse>(
+        'send-submission-packet',
+        { body: { ...sendPayload, client_send_approval: approval } },
+      );
+      if (error) throw await toPacketError(error);
+      if (!data?.success) throw new PacketGenerationError('The server did not confirm the send.', null, []);
+      return data;
+    },
+    onSuccess: (data, v) => {
+      // packet_ready/signing -> submitted moves the pipeline funnel workspace-wide.
+      queryClient.invalidateQueries({ queryKey: SUBMISSIONS_KEY(v.accountId) });
+      queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
+      toast.success(`${data.to} - packet sent`);
+    },
+    onError: (error) => {
+      if (error.code === 'NO_PACKET') {
+        toast.error('No packet to send yet. Generate the packet first.');
+      } else {
+        toast.error(`Could not send the packet: ${error.message}`);
+      }
+    },
+  });
+}
+
+interface PacketLinkResponse {
+  success: boolean;
+  signed_url: string;
+  storage_path: string;
+}
+
+/**
+ * Fetch a fresh one-hour signed URL for the latest generated packet
+ * (get-submission-packet-link) and open it in a new tab.
+ */
+export function useSubmissionPacketLink() {
+  return useMutation<PacketLinkResponse, PacketGenerationError, { submissionId: string }>({
+    mutationFn: async (input) => {
+      const { data, error } = await supabase.functions.invoke<PacketLinkResponse>(
+        'get-submission-packet-link',
+        { body: { submission_id: input.submissionId } },
+      );
+      if (error) throw await toPacketError(error);
+      if (!data?.success || !data.signed_url) {
+        throw new PacketGenerationError('The server returned no packet link.', null, []);
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      // window.open fires after an async gap, so popup blockers routinely eat
+      // it: with a URL, the toast always carries an Open action as the
+      // reliable path (the useGenerateSubmissionPacket handling).
+      const opened = window.open(data.signed_url, '_blank', 'noopener,noreferrer');
+      toast.success(
+        opened ? 'Submission packet opened'
+               : 'Packet ready. Your browser blocked the tab - use Open packet.',
+        { action: { label: 'Open packet', onClick: () => window.open(data.signed_url, '_blank', 'noopener,noreferrer') }, duration: 15000 },
+      );
+    },
+    onError: (error) => {
+      if (error.code === 'NO_PACKET') {
+        toast.error('No packet yet. Generate the packet first.');
+      } else {
+        toast.error(`Could not fetch the packet: ${error.message}`);
       }
     },
   });
