@@ -398,6 +398,20 @@ async function handle(req: Request): Promise<Response> {
     }
     const pdfBytes = new Uint8Array(await fileBlob.arrayBuffer());
 
+    // --- Step 6b: closed-race re-check, LAST thing before the email ------------
+    // The email is the one un-compensatable action here: a submission
+    // bound/lost by a colleague between load and this point must not reach
+    // the wholesaler (review fix - the generate fn's closed-race lesson,
+    // applied at the tightest point a non-transactional action allows).
+    const { data: statusNow } = await admin
+      .from('commercial_submissions')
+      .select('status')
+      .eq('id', body.submission_id)
+      .maybeSingle();
+    if (statusNow && CLOSED_STATUSES.includes(statusNow.status)) {
+      throw fail(422, 'CLOSED', `submission was closed (${statusNow.status}) before the send completed; nothing was emailed`);
+    }
+
     // --- Step 7: Resend send ----------------------------------------------------
     const senderEmail = Deno.env.get('FROM_EMAIL') || DEFAULT_SENDER_EMAIL;
     const from = `${SENDER_NAME} <${senderEmail}>`;
