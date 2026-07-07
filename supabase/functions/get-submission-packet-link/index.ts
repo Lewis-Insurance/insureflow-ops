@@ -104,7 +104,7 @@ async function handle(req: Request): Promise<Response> {
 
     const { data: account, error: acctErr } = await admin
       .from('accounts')
-      .select('id, agency_workspace_id')
+      .select('id, agency_workspace_id, merged_into_id')
       .eq('id', submission.account_id)
       .maybeSingle();
     if (acctErr) {
@@ -112,6 +112,11 @@ async function handle(req: Request): Promise<Response> {
     }
     if (!account) {
       throw fail(404, 'NOT_FOUND', 'account not found');
+    }
+    // Parity with generate/send: no artifact URL on a merged-away account
+    // (review fix - the link is a read but still names the wrong insured).
+    if (account.merged_into_id) {
+      throw fail(422, 'ACCOUNT_MERGED', 'account has been merged; use the surviving account');
     }
 
     // Workspace membership (against the account's workspace).
