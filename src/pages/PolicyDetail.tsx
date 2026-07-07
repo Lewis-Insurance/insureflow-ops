@@ -16,20 +16,15 @@ import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
 import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
-import { WCPolicyDetailsView } from '@/components/policies/WCPolicyDetails';
 import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
 import { useExtractPropertyPolicy, isPropertyPolicy } from '@/hooks/usePropertyExtraction';
 import { useExtractUmbrellaPolicy, isUmbrellaPolicy } from '@/hooks/useUmbrellaExtraction';
 import { useExtractBAPPolicy, isCommercialAutoPolicy, useBAPVehicles, useBAPDrivers, useBAPInterests } from '@/hooks/useBAPExtraction';
-import { UmbrellaPolicyDetailsView } from '@/components/policies/UmbrellaPolicyDetails';
-import { BAPPolicyDetailsView } from '@/components/policies/BAPPolicyDetails';
 import { BoundTermsCard } from '@/components/policies/BoundTermsCard';
-import { PropertyPolicyDetailsView } from '@/components/policies/PropertyPolicyDetails';
 import { useCreateSubmission } from '@/hooks/useCommercialSubmissions';
 import { commercialLinesForPolicy, remarketNote } from '@/lib/commercial/remarket';
-import { CGLPolicyDetailsView } from '@/components/policies/CGLPolicyDetails';
 import { InlandMarinePolicyDetails } from '@/components/policies/InlandMarinePolicyDetails';
 import { useExtractInlandMarinePolicy, isInlandMarinePolicy } from '@/hooks/useInlandMarineExtraction';
 import { CyberPolicyDetails } from '@/components/policies/CyberPolicyDetails';
@@ -45,9 +40,7 @@ import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget
 import { CancellationHolderList } from '@/components/certificates/CancellationHolderList';
 import { useCancellationHolders } from '@/hooks/useCancellationHolders';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
-import { CoverageLineDrawer } from '@/components/master-coi/CoverageLineDrawer';
-import { useMasterCoi } from '@/hooks/useMasterCoi';
-import type { COILineKey } from '@/types/master-coi';
+import { PolicyCoveragePanel } from '@/components/policies/PolicyCoveragePanel';
 
 export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
@@ -57,7 +50,6 @@ export default function PolicyDetail() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
-  const [coiDrawerOpen, setCoiDrawerOpen] = useState(false);
   const [manualDetailsOpen, setManualDetailsOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
@@ -208,21 +200,16 @@ export default function PolicyDetail() {
   const { data: bapDrivers = [] } = useBAPDrivers(isAuto && policyId ? policyId : undefined);
   const { data: bapInterests = [] } = useBAPInterests(isAuto && policyId ? policyId : undefined);
 
-  // COI coverage editor: the ONE writer to the *_details blob get_master_coi
-  // reads. Map this policy's line to a COI line key and reuse the exact drawer
-  // the Master COI panel uses, so limits edited here reach the certificate
-  // (unlike Manual Details, which writes policies.coverage and never prints).
-  const coiLineKey: Exclude<COILineKey, 'other'> | null =
-    isCGL ? 'gl'
-      : isAuto ? 'auto'
-      : isUmbrella ? 'umbrella'
-      : isWorkersComp ? 'wc'
-      : isProperty ? 'property'
-      : null;
   const coiAccountId = policy?.account?.id ?? null;
-  const { data: coiMasterData } = useMasterCoi(
-    coiLineKey && coiAccountId ? coiAccountId : '',
-  );
+  // Arm the per-line document extraction, then open the upload modal. The coverage
+  // panel's "Fill from document" button routes through here, reusing the existing
+  // post-upload extraction wiring (pendingExtractLine).
+  const armCoverageExtract = (
+    line: 'gl' | 'auto' | 'umbrella' | 'wc' | 'property',
+  ) => {
+    pendingExtractLine.current = line;
+    setUploadDocOpen(true);
+  };
 
   // Parse WC details from the policy's wc_details JSON field
   const wcDetails: WCPolicyDetails | null = policy?.wc_details as WCPolicyDetails | null;
@@ -311,26 +298,8 @@ export default function PolicyDetail() {
               <Edit className="h-4 w-4 mr-2" />
               Edit Policy
             </Button>
-            {coiLineKey && coiAccountId && (
-              <Button variant="outline" onClick={() => setCoiDrawerOpen(true)}>
-                <Shield className="h-4 w-4 mr-2" />
-                Edit COI details
-              </Button>
-            )}
           </div>
         </div>
-
-        {coiLineKey && coiAccountId && (
-          <ErrorBoundary level="component" resetOnPropsChange>
-            <CoverageLineDrawer
-              accountId={coiAccountId}
-              open={coiDrawerOpen}
-              lineKey={coiLineKey}
-              masterCoi={coiMasterData}
-              onClose={() => setCoiDrawerOpen(false)}
-            />
-          </ErrorBoundary>
-        )}
 
         {/* Policy Details */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -903,62 +872,65 @@ export default function PolicyDetail() {
         )}
 
         {/* Workers' Comp Details Section */}
-        {isWorkersComp && (
+        {isWorkersComp && policyId && coiAccountId && (
           <ErrorBoundary level="component" resetOnPropsChange>
-            <WCPolicyDetailsView
-              policyId={policyId!}
-              wcDetails={wcDetails}
+            <PolicyCoveragePanel
+              accountId={coiAccountId}
+              policyId={policyId}
+              lineKey="wc"
+              onFillFromDocument={() => armCoverageExtract('wc')}
             />
           </ErrorBoundary>
         )}
 
         {/* General Liability details: extraction target + the blob get_master_coi
             reads (cgl_details), so a populated section here = COI-ready limits. */}
-        {isCGL && policyId && (
+        {isCGL && policyId && coiAccountId && (
           <ErrorBoundary level="component" resetOnPropsChange>
-            <CGLPolicyDetailsView
+            <PolicyCoveragePanel
+              accountId={coiAccountId}
               policyId={policyId}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              cglDetails={((policy as any)?.cgl_details as any) ?? null}
+              lineKey="gl"
+              onFillFromDocument={() => armCoverageExtract('gl')}
             />
           </ErrorBoundary>
         )}
 
         {/* Property details (Phase 3): the blob get_master_coi reads for the
             property line; extraction target for uploaded property policies. */}
-        {isProperty && policyId && (
+        {isProperty && policyId && coiAccountId && (
           <ErrorBoundary level="component" resetOnPropsChange>
-            <PropertyPolicyDetailsView
+            <PolicyCoveragePanel
+              accountId={coiAccountId}
               policyId={policyId}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              propertyDetails={((policy as any)?.property_details as any) ?? null}
+              lineKey="property"
+              onFillFromDocument={() => armCoverageExtract('property')}
             />
           </ErrorBoundary>
         )}
 
         {/* Umbrella details (Phase 5): the blob get_master_coi reads for the
             umbrella line; extraction target for uploaded umbrella policies. */}
-        {isUmbrella && policyId && (
+        {isUmbrella && policyId && coiAccountId && (
           <ErrorBoundary level="component" resetOnPropsChange>
-            <UmbrellaPolicyDetailsView
+            <PolicyCoveragePanel
+              accountId={coiAccountId}
               policyId={policyId}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              umbrellaDetails={((policy as any)?.umbrella_details as any) ?? null}
+              lineKey="umbrella"
+              onFillFromDocument={() => armCoverageExtract('umbrella')}
             />
           </ErrorBoundary>
         )}
 
         {/* Commercial Auto details (Phase 6): the blob get_master_coi reads
             for the auto line; extraction target for uploaded BAP policies. */}
-        {isAuto && policyId && (
+        {isAuto && policyId && coiAccountId && (
           <ErrorBoundary level="component" resetOnPropsChange>
-            <BAPPolicyDetailsView
+            <PolicyCoveragePanel
+              accountId={coiAccountId}
               policyId={policyId}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              bapDetails={((policy as any)?.bap_details as any) ?? null}
-              vehicles={bapVehicles}
-              drivers={bapDrivers}
-              interests={bapInterests}
+              lineKey="auto"
+              onFillFromDocument={() => armCoverageExtract('auto')}
             />
           </ErrorBoundary>
         )}
