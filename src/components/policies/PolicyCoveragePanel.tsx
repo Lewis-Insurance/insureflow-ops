@@ -19,7 +19,7 @@
 // / "Not on file", never fabricated. No em or en dashes.
 
 import * as React from 'react';
-import { ShieldCheck, FileUp, Pencil } from 'lucide-react';
+import { ShieldCheck, FileUp, Pencil, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { usePolicyAdditionalCoverages } from '@/hooks/usePolicyAdditionalCoverages';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { useMasterCoi, useSaveMasterCoiFields } from '@/hooks/useMasterCoi';
 import { LINE_LABEL, formatCurrency } from '@/components/master-coi/lineDisplay';
@@ -315,6 +323,7 @@ export function PolicyCoveragePanel({
                 ),
               )}
             </dl>
+            <AdditionalCoveragesSection policyId={policyId} lineKey={lineKey} />
           </div>
         )}
       </div>
@@ -505,4 +514,153 @@ function EditableFieldRow({
 /** Map a stored bool-ish value ("true"/"false"/boolean string) to the Select key. */
 function boolToSelectValue(value: string): string {
   return value === 'true' || value === 'yes' ? 'yes' : 'no';
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverages: custom write-in rows (name + amount) for this policy
+// line. These are the ACORD 25 blank coverage rows - the clean replacement for
+// the old Manual Details modal. Add/remove commit immediately through
+// usePolicyAdditionalCoverages (RLS-scoped table), independent of the panel's
+// Edit toggle for the standard fields.
+// ---------------------------------------------------------------------------
+
+function AdditionalCoveragesSection({
+  policyId,
+  lineKey,
+}: {
+  policyId: string;
+  lineKey: string;
+}) {
+  const { coverages, add, remove } = usePolicyAdditionalCoverages(
+    policyId,
+    lineKey,
+  );
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [amount, setAmount] = React.useState('');
+
+  const closeDialog = () => {
+    setAddOpen(false);
+    setName('');
+    setAmount('');
+  };
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed || add.isPending) return;
+    add.mutate(
+      { name: trimmed, amount: parseCurrencyInput(amount) },
+      { onSuccess: closeDialog },
+    );
+  };
+
+  // Rendered as a continuation of the coverage list (ACORD 25 blank rows): any
+  // write-in coverages follow the standard limits, then the Add button sits under
+  // the last coverage row.
+  return (
+    <>
+      {coverages.length > 0 && (
+        <dl className="divide-y divide-cc-border-subtle border-t border-cc-border-subtle">
+          {coverages.map((coverage) => (
+            <div
+              key={coverage.id}
+              className="flex items-center justify-between gap-4 py-2"
+            >
+              <dt className="break-words text-sm text-cc-text-primary">
+                {coverage.name}
+              </dt>
+              <dd className="flex items-center gap-3">
+                <span className="cc-num text-right text-sm text-cc-text-primary">
+                  {coverage.amount == null ? '' : formatCurrency(coverage.amount)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => remove.mutate(coverage.id)}
+                  disabled={remove.isPending}
+                  aria-label={`Remove ${coverage.name}`}
+                  className="text-cc-text-muted transition-colors hover:text-cc-danger"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <div className="pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAddOpen(true)}
+          className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add
+        </Button>
+      </div>
+
+      <Dialog
+        open={addOpen}
+        onOpenChange={(next) => (next ? setAddOpen(true) : closeDialog())}
+      >
+        <DialogContent className="bg-cc-surface">
+          <DialogHeader>
+            <DialogTitle className="text-cc-text-primary">
+              Add coverage
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-cc-text-secondary">
+                Coverage name
+              </Label>
+              <Input
+                value={name}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Hired / Non-Owned Auto"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-cc-text-secondary">
+                Coverage amount
+              </Label>
+              <Input
+                value={amount}
+                inputMode="numeric"
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="e.g. 1,000,000"
+                className="cc-num text-right"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submit();
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={closeDialog}
+              className="rounded-cc-md text-cc-text-secondary hover:text-cc-text-primary"
+            >
+              Cancel
+            </Button>
+            <Button
+              data-primary
+              size="sm"
+              disabled={!name.trim() || add.isPending}
+              onClick={submit}
+              className="gap-2 rounded-cc-md font-semibold"
+            >
+              {add.isPending ? 'Adding...' : 'Add coverage'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }

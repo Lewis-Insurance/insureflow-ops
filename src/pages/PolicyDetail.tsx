@@ -33,7 +33,6 @@ import { CrimePolicyDetails } from '@/components/policies/CrimePolicyDetails';
 import { useExtractCrimePolicy, isCrimePolicy } from '@/hooks/useCrimeExtraction';
 import { EOPolicyDetails } from '@/components/policies/EOPolicyDetails';
 import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
-import { PolicyManualDetailsModal } from '@/components/policies/PolicyManualDetailsModal';
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
@@ -50,7 +49,6 @@ export default function PolicyDetail() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
-  const [manualDetailsOpen, setManualDetailsOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // Extraction hooks
@@ -848,14 +846,6 @@ export default function PolicyDetail() {
                   <FileText className="h-4 w-4 mr-2" />
                   Upload Document
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setManualDetailsOpen(true)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Manual Details
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -1160,18 +1150,6 @@ export default function PolicyDetail() {
               payment_type: policy.payment_type
             } : null}
             onSuccess={refetch}
-          />
-          <PolicyManualDetailsModal
-            open={manualDetailsOpen}
-            onOpenChange={setManualDetailsOpen}
-            policyId={policy.id}
-            isWorkersComp={isWorkersComp}
-            lineOfBusiness={policy.line_of_business || ''}
-            initialCoverage={policy.coverage}
-            initialCustom={policy.custom}
-            initialInsuredItems={policy.insured_items}
-            initialWcDetails={(policy as any).wc_details}
-            onSaved={refetch}
           />
           <RecordPaymentModal
             open={paymentModalOpen}

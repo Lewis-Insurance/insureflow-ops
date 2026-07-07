@@ -1,19 +1,16 @@
 // Per-line ACORD-25 coverage-field spec for the policy detail coverage panel.
 //
 // One pure helper. Given a line key and the matching line object from the Master
-// COI read-model (src/types/master-coi.ts), it returns the ordered ACORD-25
-// coverage fields to render for that line: the coverage-attribute cells
-// (occurrence/claims-made, aggregate basis, limit type, umbrella-or-excess, the
-// ded/retention kind, WC per-statute, Property label/description) plus the money
-// limit rows. The money limit rows REUSE limitCellsFor from lineDisplay.ts so
-// there is one source of truth for limit ordering and labels; this helper only
-// adds the coverage-attribute cells that limitCellsFor omits.
+// COI read-model (src/types/master-coi.ts), it returns the ordered coverage
+// fields to render for that line, labeled with the EXACT ACORD 25 (2016/03) form
+// wording (e.g. "DAMAGE TO RENTED PREMISES (Ea occurrence)", "E.L. DISEASE - EA
+// EMPLOYEE"). Cells are read directly off the read-model line so this file owns
+// the labels independently of the Master COI panel's own display helpers.
 //
 // Each field is editable IFF its `cell.path` is non-null (the registry write
 // path); enum `enumOptions` are consumed only in edit mode. Renames nothing from
 // the read-model. No runtime UI here, no currency formatting (the panel formats).
 
-import { limitCellsFor } from '@/components/master-coi/lineDisplay';
 import type {
   COICell,
   COILineAuto,
@@ -37,10 +34,11 @@ export interface CoverageFieldOption {
 }
 
 /**
- * One ordered ACORD-25 coverage field for a line. `cell` is the read-model cell
- * (undefined when the underlying line-specific cell is absent, e.g. a line that
- * returns only its base fields while present:false). A field is editable IFF
- * `cell?.path` is non-null. `enumOptions` are used only when `kind === 'enum'`.
+ * One ordered coverage field for a line, labeled with exact ACORD 25 wording.
+ * `cell` is the read-model cell (undefined when the underlying line-specific cell
+ * is absent, e.g. a line that returns only its base fields while present:false).
+ * A field is editable IFF `cell?.path` is non-null. `enumOptions` are used only
+ * when `kind === 'enum'`.
  */
 export interface CoverageField {
   label: string;
@@ -61,18 +59,18 @@ type AnyCoverageLine =
 type CoverageLineKey = 'gl' | 'auto' | 'umbrella' | 'wc' | 'property';
 
 // ---------------------------------------------------------------------------
-// Per-line enum vocabularies (ACORD 25)
+// Per-line enum vocabularies, option labels in exact ACORD 25 form wording
 // ---------------------------------------------------------------------------
 
-const OCCURRENCE_OR_CLAIMS_MADE: CoverageFieldOption[] = [
-  { value: 'occurrence', label: 'Occurrence' },
-  { value: 'claims_made', label: 'Claims-Made' },
+const OCCUR_OR_CLAIMS_MADE: CoverageFieldOption[] = [
+  { value: 'occurrence', label: 'OCCUR' },
+  { value: 'claims_made', label: 'CLAIMS-MADE' },
 ];
 
 const AGGREGATE_APPLIES_PER: CoverageFieldOption[] = [
-  { value: 'policy', label: 'Policy' },
-  { value: 'project', label: 'Project' },
-  { value: 'location', label: 'Loc' },
+  { value: 'policy', label: 'POLICY' },
+  { value: 'project', label: 'PROJECT' },
+  { value: 'location', label: 'LOC' },
 ];
 
 const AUTO_LIMIT_TYPE: CoverageFieldOption[] = [
@@ -81,13 +79,13 @@ const AUTO_LIMIT_TYPE: CoverageFieldOption[] = [
 ];
 
 const UMBRELLA_OR_EXCESS: CoverageFieldOption[] = [
-  { value: 'umbrella', label: 'Umbrella' },
-  { value: 'excess', label: 'Excess' },
+  { value: 'umbrella', label: 'UMBRELLA LIAB' },
+  { value: 'excess', label: 'EXCESS LIAB' },
 ];
 
 const DED_OR_RETENTION_KIND: CoverageFieldOption[] = [
-  { value: 'deductible', label: 'Deductible' },
-  { value: 'retention', label: 'Retention' },
+  { value: 'deductible', label: 'DED' },
+  { value: 'retention', label: 'RETENTION' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,18 +94,8 @@ const DED_OR_RETENTION_KIND: CoverageFieldOption[] = [
 
 /**
  * The ordered ACORD-25 coverage fields for one line, keyed off the line key.
- * Money limit rows come from `limitCellsFor`; the coverage-attribute cells that
- * `limitCellsFor` omits are added here in ACORD 25 form order.
- *
- * Ordering per line:
- *  - GL: occurrence/claims-made, aggregate-applies-per, then the 6 GL limits.
- *  - Auto: limit type, then the CSL or split BI/PD limits (limitCellsFor already
- *    returns the correct set for the current limit_type).
- *  - Umbrella: umbrella-or-excess, occurrence/claims-made, then each-occurrence
- *    and aggregate, then the ded/retention kind immediately before its amount.
- *  - WC: per-statute (bool), then the three Employers Liability money limits
- *    (the duplicate per-statute row that limitCellsFor emits is dropped here).
- *  - Property: label (text), limit amount (money), limit description (text).
+ * Labels are the exact ACORD 25 (2016/03) form wording; ordering mirrors the
+ * form top-to-bottom per section.
  */
 export function policyCoverageFields(
   lineKey: CoverageLineKey,
@@ -118,91 +106,135 @@ export function policyCoverageFields(
   switch (lineKey) {
     case 'gl': {
       const gl = line as COILineGL;
-      const limits = limitCellsFor('gl', gl).map(toMoneyField);
+      const limits = gl.limits;
       return [
         {
-          label: 'Coverage form',
+          label: 'Occurrence / Claims-Made',
           cell: gl.occurrence_or_claims_made,
           kind: 'enum',
-          enumOptions: OCCURRENCE_OR_CLAIMS_MADE,
+          enumOptions: OCCUR_OR_CLAIMS_MADE,
         },
         {
-          label: 'General aggregate applies per',
+          label: "Gen'l Aggregate Limit Applies Per",
           cell: gl.aggregate_applies_per,
           kind: 'enum',
           enumOptions: AGGREGATE_APPLIES_PER,
         },
-        ...limits,
+        { label: 'EACH OCCURRENCE', cell: limits?.each_occurrence, kind: 'money' },
+        {
+          label: 'DAMAGE TO RENTED PREMISES (Ea occurrence)',
+          cell: limits?.damage_to_rented_premises,
+          kind: 'money',
+        },
+        {
+          label: 'MED EXP (Any one person)',
+          cell: limits?.medical_expense,
+          kind: 'money',
+        },
+        {
+          label: 'PERSONAL & ADV INJURY',
+          cell: limits?.personal_advertising_injury,
+          kind: 'money',
+        },
+        {
+          label: 'GENERAL AGGREGATE',
+          cell: limits?.general_aggregate,
+          kind: 'money',
+        },
+        {
+          label: 'PRODUCTS - COMP/OP AGG',
+          cell: limits?.products_completed_ops_aggregate,
+          kind: 'money',
+        },
       ];
     }
 
     case 'auto': {
       const auto = line as COILineAuto;
-      // limitCellsFor('auto') already returns CSL when limit_type.v === 'csl',
-      // else the split BI-per-person / BI-per-accident / PD-per-accident rows.
-      const limits = limitCellsFor('auto', auto).map(toMoneyField);
+      const isCsl = auto.limit_type?.v === 'csl';
+      const limitRows: CoverageField[] = isCsl
+        ? [
+            {
+              label: 'COMBINED SINGLE LIMIT (Ea accident)',
+              cell: auto.csl,
+              kind: 'money',
+            },
+          ]
+        : [
+            {
+              label: 'BODILY INJURY (Per person)',
+              cell: auto.bi_per_person,
+              kind: 'money',
+            },
+            {
+              label: 'BODILY INJURY (Per accident)',
+              cell: auto.bi_per_accident,
+              kind: 'money',
+            },
+            {
+              label: 'PROPERTY DAMAGE (Per accident)',
+              cell: auto.pd_per_accident,
+              kind: 'money',
+            },
+          ];
       return [
         {
-          label: 'Limit type',
+          label: 'Limit Type',
           cell: auto.limit_type,
           kind: 'enum',
           enumOptions: AUTO_LIMIT_TYPE,
         },
-        ...limits,
+        ...limitRows,
       ];
     }
 
     case 'umbrella': {
       const umb = line as COILineUmbrella;
-      // limitCellsFor('umbrella') returns each-occurrence, aggregate, then the
-      // ded/retention amount (labeled by its kind). Split it so the ded/retention
-      // KIND enum sits immediately before the ded/retention amount row.
-      const limits = limitCellsFor('umbrella', umb).map(toMoneyField);
-      const amountRow = limits[limits.length - 1];
-      const leadingLimits = limits.slice(0, Math.max(0, limits.length - 1));
       return [
         {
-          label: 'Umbrella or excess',
+          label: 'Umbrella / Excess',
           cell: umb.umbrella_or_excess,
           kind: 'enum',
           enumOptions: UMBRELLA_OR_EXCESS,
         },
         {
-          label: 'Coverage form',
+          label: 'Occurrence / Claims-Made',
           cell: umb.occurrence_or_claims_made,
           kind: 'enum',
-          enumOptions: OCCURRENCE_OR_CLAIMS_MADE,
+          enumOptions: OCCUR_OR_CLAIMS_MADE,
         },
-        ...leadingLimits,
+        { label: 'EACH OCCURRENCE', cell: umb.each_occurrence, kind: 'money' },
+        { label: 'AGGREGATE', cell: umb.aggregate, kind: 'money' },
         {
-          label: 'Deductible or retention',
+          label: 'DED / RETENTION',
           cell: umb.ded_or_retention?.kind,
           kind: 'enum',
           enumOptions: DED_OR_RETENTION_KIND,
         },
-        ...(amountRow ? [amountRow] : []),
+        {
+          label: 'DED / RETENTION $',
+          cell: umb.ded_or_retention?.amount,
+          kind: 'money',
+        },
       ];
     }
 
     case 'wc': {
       const wc = line as COILineWC;
-      // limitCellsFor('wc') leads with a per-statute row then the three EL
-      // limits; render per-statute as a bool here and the three EL cells as
-      // money directly, so the per-statute row is not duplicated.
       return [
-        { label: 'Per statute', cell: wc.per_statute, kind: 'bool' },
+        { label: 'Per Statute', cell: wc.per_statute, kind: 'bool' },
         {
-          label: 'E.L. each accident',
+          label: 'E.L. EACH ACCIDENT',
           cell: wc.el_each_accident,
           kind: 'money',
         },
         {
-          label: 'E.L. disease (each employee)',
+          label: 'E.L. DISEASE - EA EMPLOYEE',
           cell: wc.el_disease_each_employee,
           kind: 'money',
         },
         {
-          label: 'E.L. disease (policy limit)',
+          label: 'E.L. DISEASE - POLICY LIMIT',
           cell: wc.el_disease_policy_limit,
           kind: 'money',
         },
@@ -214,38 +246,11 @@ export function policyCoverageFields(
       return [
         { label: 'Coverage', cell: prop.label, kind: 'text' },
         { label: 'Limit', cell: prop.limit_amount, kind: 'money' },
-        {
-          label: 'Limit description',
-          cell: prop.limit_description,
-          kind: 'text',
-        },
+        { label: 'Description', cell: prop.limit_description, kind: 'text' },
       ];
     }
 
     default:
       return [];
   }
-}
-
-// ---------------------------------------------------------------------------
-// Internal: adapt a limitCellsFor LimitCell into a CoverageField
-// ---------------------------------------------------------------------------
-
-/**
- * A limitCellsFor row is a labeled cell with a 'currency' | 'text' format. Money
- * rows become 'money' coverage fields; the rare 'text' limit rows (Property's
- * label / description) become 'text' fields. Property is handled explicitly
- * above, so in practice every limit row routed through here is currency, but the
- * mapping stays honest for either format.
- */
-function toMoneyField(limit: {
-  label: string;
-  cell: COICell | undefined;
-  format: 'currency' | 'text';
-}): CoverageField {
-  return {
-    label: limit.label,
-    cell: limit.cell,
-    kind: limit.format === 'currency' ? 'money' : 'text',
-  };
 }
