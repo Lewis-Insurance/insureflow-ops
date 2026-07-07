@@ -23,7 +23,7 @@ function walkTsFiles(dir: string): string[] {
 }
 
 function relative(path: string): string {
-  return path.replace(`${repoRoot}/`, '');
+  return path.slice(repoRoot.length + 1).split(/[\\/]/).join('/');
 }
 
 function containsClientSendInvoke(source: string): boolean {
