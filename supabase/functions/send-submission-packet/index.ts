@@ -478,14 +478,19 @@ async function handle(req: Request): Promise<Response> {
     }
 
     // --- Step 9: advance the status from the WRITE result ----------------------
-    // packet_ready/signing -> submitted, one conditional write. Zero rows is
-    // fine (already submitted, quoted, or beyond) - a later status never
-    // regresses. Warn-only on failure: the send happened and is event-logged.
+    // Every PRE-submitted status -> submitted, one conditional write. draft
+    // and intake are included (review fix): a packet whose generate-side
+    // freeze/advance failed can still be sent, and a sent submission is by
+    // definition submitted - it must not linger in draft. Zero rows is fine
+    // (already submitted, quoted, proposed, or beyond) - the .in() list is
+    // exactly the pre-submitted set, so a later status never regresses; the
+    // pre-email closed re-check already excluded bound/lost/abandoned.
+    // Warn-only on failure: the send happened and is event-logged.
     const { error: advanceErr } = await admin
       .from('commercial_submissions')
       .update({ status: 'submitted' })
       .eq('id', submission.id)
-      .in('status', ['packet_ready', 'signing'])
+      .in('status', ['draft', 'intake', 'packet_ready', 'signing'])
       .select('id');
     if (advanceErr) {
       logger.warn('status advance to submitted failed', {
