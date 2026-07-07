@@ -59,6 +59,7 @@ const RetentionPage = lazyWithRetry(() => import("./pages/RetentionPage"));
 const FinancialPage = lazyWithRetry(() => import("./pages/FinancialPage"));
 const AIInsightsPage = lazyWithRetry(() => import("./pages/AIInsightsPage"));
 const Certificates = lazyWithRetry(() => import("./pages/Certificates"));
+const MasterCOIPage = lazyWithRetry(() => import("./pages/MasterCOIPage"));
 const AcordTemplates = lazyWithRetry(() => import("./pages/AcordTemplates"));
 const IntakeTemplates = lazyWithRetry(() => import("./pages/IntakeTemplates"));
 const IntakeBuilder = lazyWithRetry(() => import("./pages/IntakeBuilder"));
@@ -713,6 +714,16 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <Certificates />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/master-coi/:accountId"
+                  element={
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <MasterCOIPage />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

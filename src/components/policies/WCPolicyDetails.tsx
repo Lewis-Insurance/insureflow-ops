@@ -183,7 +183,7 @@ export function WCPolicyDetailsView({
 }: WCPolicyDetailsProps) {
   const [activeTab, setActiveTab] = useState<WCPolicyTab>('overview');
 
-  if (!wcDetails) {
+  if (!wcDetails || Object.keys(wcDetails).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">

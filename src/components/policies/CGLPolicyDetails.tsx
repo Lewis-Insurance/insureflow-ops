@@ -220,7 +220,7 @@ export function CGLPolicyDetailsView({
 }: CGLPolicyDetailsProps) {
   const [activeTab, setActiveTab] = useState<CGLPolicyTab>('overview');
 
-  if (!cglDetails) {
+  if (!cglDetails || Object.keys(cglDetails).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
