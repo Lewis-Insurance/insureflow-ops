@@ -126,7 +126,7 @@ export function EOPolicyDetails({ policyId, onUpdate, isEditing = false }: EOPol
     );
   }
 
-  if (!details) {
+  if (!details || Object.keys(details).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">

@@ -78,7 +78,7 @@ export function PropertyPolicyDetailsView({
 }: PropertyPolicyDetailsProps) {
   const [activeTab, setActiveTab] = useState<PropertyPolicyTab>('overview');
 
-  if (!propertyDetails) {
+  if (!propertyDetails || Object.keys(propertyDetails).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">

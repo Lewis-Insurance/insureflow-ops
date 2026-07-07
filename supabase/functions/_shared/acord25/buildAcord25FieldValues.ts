@@ -437,6 +437,38 @@ export function buildAcord25FieldValues(input: Acord25BuildInput): BuildAcord25R
   // emitted per-line above; usedLetters kept for potential future cross-checks.
   void usedLetters;
 
+  // ----- per-section write-in coverages (Section 0.1 write-in rows) -----
+  // gl/auto/umbrella each own a dedicated write-in NAME + LIMIT AMOUNT pair. Emit
+  // a line's native write-in only when that line was actually selected/printed
+  // (mirror the standard line-field gating), and only when the resolved write-in
+  // is present. Deterministic: iterate a fixed key order, skip when absent.
+  const selectedWriteInLines = new Set<'gl' | 'auto' | 'umbrella'>();
+  for (const cl of input.lines ?? []) {
+    if (cl.line === 'gl' || cl.line === 'auto' || cl.line === 'umbrella') {
+      selectedWriteInLines.add(cl.line);
+    }
+  }
+  const WRITE_IN_KEYS: Array<{
+    line: 'gl' | 'auto' | 'umbrella';
+    descKey: Acord25LogicalKey;
+    amountKey: Acord25LogicalKey;
+  }> = [
+    { line: 'gl', descKey: 'gl_writeInDesc', amountKey: 'gl_writeInAmount' },
+    { line: 'auto', descKey: 'auto_writeInDesc', amountKey: 'auto_writeInAmount' },
+    { line: 'umbrella', descKey: 'umb_writeInDesc', amountKey: 'umb_writeInAmount' },
+  ];
+  for (const { line, descKey, amountKey } of WRITE_IN_KEYS) {
+    if (!selectedWriteInLines.has(line)) {
+      continue;
+    }
+    const writeIn = input.writeInCoverages?.[line];
+    if (!writeIn) {
+      continue;
+    }
+    setText(descKey, writeIn.name ?? '');
+    setLimit(amountKey, writeIn.amount ?? null);
+  }
+
   // ----- description of operations + remarks join (Section 4.6, D18) -----
   const doo = (input.descriptionOfOperations ?? '').trim();
   const rem = (input.remarks ?? '').trim();

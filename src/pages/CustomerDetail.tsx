@@ -13,7 +13,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/u
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CustomerContactInfo } from '@/components/customers/CustomerContactInfo';
 import { CustomerPoliciesSection } from '@/components/customers/CustomerPoliciesSection';
-import { MasterCOISection } from '@/components/customers/MasterCOISection';
+import { MasterCOISummaryCard } from '@/components/customers/MasterCOISummaryCard';
 import { CommercialProfileCard } from '@/components/commercial/CommercialProfileCard';
 import { SubmissionsPanel } from '@/components/commercial/SubmissionsPanel';
 import { ClientIntakeCard } from '@/components/commercial/ClientIntakeCard';
@@ -452,7 +452,7 @@ export default function CustomerDetail() {
 
         {/* ===================== Master COI ===================== */}
         <section id="master-coi" className="scroll-mt-20 space-y-4">
-          <MasterCOISection accountId={account.id} accountName={account.name} />
+          <MasterCOISummaryCard accountId={account.id} accountName={account.name} />
         </section>
 
         {/* ===================== Commercial (business accounts) ===================== */}

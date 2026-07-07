@@ -87,6 +87,9 @@ export type Acord25LogicalKey =
   | 'gl_personalAdvInjury'
   | 'gl_generalAggregate'
   | 'gl_productsCompOpAgg'
+  // GL per-section write-in coverage (custom coverage name + limit amount)
+  | 'gl_writeInDesc'
+  | 'gl_writeInAmount'
   // Auto row
   | 'auto_insrLtr'
   | 'auto_policyNumber'
@@ -103,6 +106,9 @@ export type Acord25LogicalKey =
   | 'auto_biPerPerson'
   | 'auto_biPerAccident'
   | 'auto_propertyDamage'
+  // Auto per-section write-in coverage (custom coverage name + limit amount)
+  | 'auto_writeInDesc'
+  | 'auto_writeInAmount'
   // Umbrella/Excess row
   | 'umb_insrLtr'
   | 'umb_policyNumber'
@@ -119,6 +125,9 @@ export type Acord25LogicalKey =
   | 'umb_dedRetAmount'
   | 'umb_eachOccurrence'
   | 'umb_aggregate'
+  // Umbrella/Excess per-section write-in coverage (custom coverage name + limit amount)
+  | 'umb_writeInDesc'
+  | 'umb_writeInAmount'
   // WC row (no ADDL INSD column on the 25)
   | 'wc_insrLtr'
   | 'wc_policyNumber'
@@ -232,6 +241,18 @@ export const ACORD25_FIELD_MAP: Record<Acord25LogicalKey, Acord25FieldMapEntry> 
     kind: 'limit',
     dollarPrefixOnForm: true,
   },
+  // GL per-section write-in coverage. The narrow (w~83pt) description box takes a
+  // custom coverage name; the amount box sits in the preprinted-$ LIMITS column.
+  gl_writeInDesc: {
+    pdfField: 'GeneralLiability_OtherCoverageLimitDescription_A',
+    kind: 'multilineText',
+    softCharLimit: 40,
+  },
+  gl_writeInAmount: {
+    pdfField: 'GeneralLiability_OtherCoverageLimitAmount_A',
+    kind: 'limit',
+    dollarPrefixOnForm: true,
+  },
 
   // ----- Auto row -----
   auto_insrLtr: { pdfField: 'Vehicle_InsurerLetterCode_A', kind: 'text' },
@@ -253,6 +274,17 @@ export const ACORD25_FIELD_MAP: Record<Acord25LogicalKey, Acord25FieldMapEntry> 
   auto_biPerPerson: { pdfField: 'Vehicle_BodilyInjury_PerPersonLimitAmount_A', kind: 'limit', dollarPrefixOnForm: true },
   auto_biPerAccident: { pdfField: 'Vehicle_BodilyInjury_PerAccidentLimitAmount_A', kind: 'limit', dollarPrefixOnForm: true },
   auto_propertyDamage: { pdfField: 'Vehicle_PropertyDamage_PerAccidentLimitAmount_A', kind: 'limit', dollarPrefixOnForm: true },
+  // Auto per-section write-in coverage (narrow description box + preprinted-$ amount).
+  auto_writeInDesc: {
+    pdfField: 'Vehicle_OtherCoverage_CoverageDescription_A',
+    kind: 'multilineText',
+    softCharLimit: 40,
+  },
+  auto_writeInAmount: {
+    pdfField: 'Vehicle_OtherCoverage_LimitAmount_A',
+    kind: 'limit',
+    dollarPrefixOnForm: true,
+  },
 
   // ----- Umbrella / Excess row -----
   umb_insrLtr: { pdfField: 'ExcessUmbrella_InsurerLetterCode_A', kind: 'text' },
@@ -274,6 +306,17 @@ export const ACORD25_FIELD_MAP: Record<Acord25LogicalKey, Acord25FieldMapEntry> 
   },
   umb_eachOccurrence: { pdfField: 'ExcessUmbrella_Umbrella_EachOccurrenceAmount_A', kind: 'limit', dollarPrefixOnForm: true },
   umb_aggregate: { pdfField: 'ExcessUmbrella_Umbrella_AggregateAmount_A', kind: 'limit', dollarPrefixOnForm: true },
+  // Umbrella/Excess per-section write-in coverage (narrow description box + preprinted-$ amount).
+  umb_writeInDesc: {
+    pdfField: 'ExcessUmbrella_OtherCoverageDescription_A',
+    kind: 'multilineText',
+    softCharLimit: 40,
+  },
+  umb_writeInAmount: {
+    pdfField: 'ExcessUmbrella_OtherCoverageLimitAmount_A',
+    kind: 'limit',
+    dollarPrefixOnForm: true,
+  },
 
   // ----- WC row -----
   wc_insrLtr: { pdfField: 'WorkersCompensationEmployersLiability_InsurerLetterCode_A', kind: 'text' },

@@ -422,6 +422,50 @@ describe('description of operations + remarks join (D18)', () => {
 // OTHER row conflict + no-lines guard
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Per-section write-in coverages (Section 0.1 write-in rows)
+// ---------------------------------------------------------------------------
+
+describe('per-section write-in coverages', () => {
+  it('fills the GL write-in description + amount when GL is selected', () => {
+    const input = oneLineInput(glLine(), {
+      writeInCoverages: { gl: { name: 'Hired/Non-Owned Auto', amount: 1000000 } },
+    });
+    const build = buildAcord25FieldValues(input);
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInDesc.pdfField]).toBe('Hired/Non-Owned Auto');
+    // Amount column has a preprinted $, so no leading '$'; comma-grouped.
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInAmount.pdfField]).toBe('1,000,000');
+    expect(build.ok).toBe(true);
+  });
+
+  it('emits nothing for a write-in whose line is not selected', () => {
+    // Only GL is selected; an auto write-in must NOT print (line gating, R5).
+    const input = oneLineInput(glLine(), {
+      writeInCoverages: { auto: { name: 'Rental Reimbursement', amount: 50000 } },
+    });
+    const build = buildAcord25FieldValues(input);
+    expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInDesc.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInAmount.pdfField]).toBe('');
+  });
+
+  it('a null write-in amount emits an empty amount field, never "0"', () => {
+    const input = oneLineInput(glLine(), {
+      writeInCoverages: { gl: { name: 'Blanket Additional Insured', amount: null } },
+    });
+    const build = buildAcord25FieldValues(input);
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInDesc.pdfField]).toBe('Blanket Additional Insured');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInAmount.pdfField]).toBe('');
+  });
+
+  it('absent writeInCoverages leaves all write-in fields at totality default', () => {
+    const build = buildAcord25FieldValues(oneLineInput(glLine()));
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInDesc.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInAmount.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInDesc.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.umb_writeInDesc.pdfField]).toBe('');
+  });
+});
+
 describe('structural guards', () => {
   it('no selected lines -> NO_LINES_SELECTED error', () => {
     const build = buildAcord25FieldValues(oneLineInput(glLine(), { lines: [] }));

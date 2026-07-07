@@ -225,7 +225,7 @@ export function UmbrellaPolicyDetailsView({
 }: UmbrellaPolicyDetailsProps) {
   const [activeTab, setActiveTab] = useState<UmbrellaPolicyTab>('overview');
 
-  if (!umbrellaDetails) {
+  if (!umbrellaDetails || Object.keys(umbrellaDetails).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">

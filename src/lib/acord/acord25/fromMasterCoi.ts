@@ -55,6 +55,21 @@ export interface FromMasterCoiArgs {
   holderResolution: HolderEndorsementResolution[] | null;
   /** UI per-line toggles. */
   printIntents: Partial<Record<Acord25LineKey, { addlInsd: boolean; subrWvd: boolean }>>;
+  /**
+   * User-added write-in coverages per policy line (policy_additional_coverages).
+   * For each of gl/auto/umbrella that is actually selected/printed on this cert,
+   * the FIRST matching row (input order) fills that line's native write-in
+   * NAME + LIMIT AMOUNT fields. Every other row spills into
+   * descriptionOfOperations: the 2nd+ rows for gl/auto/umbrella, and ALL wc and
+   * property rows (which have no native amount-bearing write-in slot on the 25).
+   * Rows for an unselected/absent line spill entirely. Ordering is preserved so
+   * the client preview hash matches the server rebuild.
+   */
+  additionalCoverages?: Array<{
+    line: 'gl' | 'auto' | 'umbrella' | 'wc' | 'property';
+    name: string;
+    amount: number | null;
+  }>;
   descriptionOfOperations: string;
   remarks: string;
   certificateDate: string;
@@ -78,6 +93,36 @@ function num(cell: COICell<number> | undefined | null): number | null {
 
 function bool(cell: COICell<boolean> | undefined | null): boolean {
   return cell?.v === true;
+}
+
+// Line labels for the descriptionOfOperations spill of write-in coverages that do
+// not land in a native NAME/AMOUNT slot (Section 4.6 DOO composition).
+function writeInLineLabel(line: 'gl' | 'auto' | 'umbrella' | 'wc' | 'property'): string {
+  switch (line) {
+    case 'gl':
+      return 'General Liability';
+    case 'auto':
+      return 'Automobile Liability';
+    case 'umbrella':
+      return 'Umbrella/Excess Liability';
+    case 'wc':
+      return "Workers Compensation and Employers' Liability";
+    case 'property':
+      return 'Property';
+  }
+}
+
+// Format one spilled write-in as "{Line label} - {name}: {formatted amount}",
+// omitting the amount cleanly when null: "{Line label} - {name}".
+function formatWriteInSpill(
+  line: 'gl' | 'auto' | 'umbrella' | 'wc' | 'property',
+  name: string,
+  amount: number | null,
+): string {
+  const label = writeInLineLabel(line);
+  const trimmedName = (name ?? '').trim();
+  const head = `${label} - ${trimmedName}`;
+  return amount !== null && amount !== undefined ? `${head}: $${formatLimit(amount)}` : head;
 }
 
 // Display names for the OTHER row (property/other), from the 02 mapping table.
@@ -389,6 +434,50 @@ export function toAcord25BuildInput(args: FromMasterCoiArgs): Acord25BuildInput 
     .map((a) => ({ ...a, lines: a.lines.filter((l) => selected.has(l)) }))
     .filter((a) => a.lines.length > 0);
 
+  // ----- write-in coverages: native slot vs description-of-operations spill -----
+  // A gl/auto/umbrella line has a native NAME/AMOUNT slot only when it is actually
+  // printed on this cert (it appears in `lines` above). For each such printed line
+  // the FIRST additionalCoverages row (input order) fills the native slot; every
+  // other row (2nd+ for gl/auto/umbrella, and all wc/property, and any row whose
+  // line is not printed) spills to descriptionOfOperations in input order. Purely
+  // a function of the args, so the client preview and server rebuild agree.
+  const printedWriteInLines = new Set<'gl' | 'auto' | 'umbrella'>();
+  for (const l of lines) {
+    if (l.line === 'gl' || l.line === 'auto' || l.line === 'umbrella') {
+      printedWriteInLines.add(l.line);
+    }
+  }
+  const writeInCoverages: Partial<
+    Record<'gl' | 'auto' | 'umbrella', { name: string; amount: number | null }>
+  > = {};
+  const nativeClaimed = new Set<'gl' | 'auto' | 'umbrella'>();
+  const spillLines: string[] = [];
+  for (const cov of args.additionalCoverages ?? []) {
+    const isNativeCapable =
+      cov.line === 'gl' || cov.line === 'auto' || cov.line === 'umbrella';
+    if (
+      isNativeCapable &&
+      printedWriteInLines.has(cov.line) &&
+      !nativeClaimed.has(cov.line)
+    ) {
+      // First row for a printed native-capable line: fill its native slot.
+      writeInCoverages[cov.line] = { name: cov.name, amount: cov.amount };
+      nativeClaimed.add(cov.line);
+    } else {
+      // Everything else spills to the description of operations.
+      spillLines.push(formatWriteInSpill(cov.line, cov.name, cov.amount));
+    }
+  }
+
+  // Append the spill to the description of operations deterministically. The
+  // builder joins descriptionOfOperations with remarks (Section 4.6); the spill
+  // rides on descriptionOfOperations so it precedes remarks in the printed block.
+  const baseDoo = args.descriptionOfOperations ?? '';
+  const descriptionOfOperations =
+    spillLines.length > 0
+      ? (baseDoo.trim().length > 0 ? `${baseDoo}\n${spillLines.join('\n')}` : spillLines.join('\n'))
+      : baseDoo;
+
   return {
     certificateDate: args.certificateDate,
     certificateNumber: args.certificateNumber ?? null,
@@ -397,7 +486,8 @@ export function toAcord25BuildInput(args: FromMasterCoiArgs): Acord25BuildInput 
     insured,
     lines,
     letterAssignments,
-    descriptionOfOperations: args.descriptionOfOperations,
+    writeInCoverages,
+    descriptionOfOperations,
     remarks: args.remarks,
     holder: args.holder,
     authorizedRepName: args.authorizedRepName,

@@ -118,6 +118,19 @@ export interface Acord25BuildInput {
   lines: Acord25CoverageLine[];
   /** FROM get_master_coi, never computed here (R7). */
   letterAssignments: InsurerAssignment[];
+  /**
+   * Resolved per-line native write-in coverage, at most one per line that owns a
+   * dedicated write-in NAME + LIMIT AMOUNT pair on the 25 (gl, auto, umbrella).
+   * The adapter (toAcord25BuildInput) picks the FIRST additionalCoverages row for
+   * each such line and spills the rest into descriptionOfOperations; wc/property
+   * have no native slot and are spilled entirely. The builder prints a line's
+   * write-in only when that line is among the selected/printed lines. Absent (or
+   * an absent per-line entry) means the write-in fields stay at their totality
+   * default ('').
+   */
+  writeInCoverages?: Partial<
+    Record<'gl' | 'auto' | 'umbrella', { name: string; amount: number | null }>
+  >;
   /** TWO separate inputs per R18 ... */
   descriptionOfOperations: string;
   /** ... joined deterministically at print time (Section 4.6). */

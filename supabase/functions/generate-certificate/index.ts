@@ -668,6 +668,46 @@ async function handle(req: Request): Promise<Response> {
       printIntents[l.line_key] = { addlInsd: f.addl === 'Y', subrWvd: f.subr === 'Y' };
     }
 
+    // Custom write-in coverages for the selected (line, policy) pairs
+    // (policy_additional_coverages). Ordered by created_at so this server rebuild
+    // matches the client preview byte-for-byte (preview-hash gate R9).
+    const selectedLinePolicyPairs = new Set(
+      body.lines.map((l) => `${l.line_key}|${l.policy_id}`),
+    );
+    const additionalCoverages: Array<{
+      line: LineKey;
+      name: string;
+      amount: number | null;
+    }> = [];
+    {
+      const { data: acRows, error: acErr } = await admin
+        .from('policy_additional_coverages')
+        .select('policy_id, line, name, amount')
+        .in('policy_id', policyIds)
+        .order('created_at', { ascending: true });
+      if (acErr) {
+        throw fail(
+          500,
+          'INTERNAL_ERROR',
+          `additional coverages read failed: ${acErr.message}`,
+        );
+      }
+      for (const r of (acRows ?? []) as Array<{
+        policy_id: string;
+        line: string;
+        name: string;
+        amount: number | null;
+      }>) {
+        if (selectedLinePolicyPairs.has(`${r.line}|${r.policy_id}`)) {
+          additionalCoverages.push({
+            line: r.line as LineKey,
+            name: r.name,
+            amount: r.amount,
+          });
+        }
+      }
+    }
+
     const buildInput = toAcord25BuildInput({
       masterCoi: mc,
       selectedLines: [...selectedLineKeys] as LineKey[],
@@ -676,6 +716,7 @@ async function handle(req: Request): Promise<Response> {
       printIntents,
       descriptionOfOperations: body.description_of_operations ?? '',
       remarks: body.remarks ?? '',
+      additionalCoverages,
       certificateDate: certDate,
       certificateNumber: null, // reserved later; header field excluded from preview hash
       authorizedRepName: cellStr(mc.producer.contact_name),

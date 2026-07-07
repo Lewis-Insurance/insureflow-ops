@@ -489,6 +489,48 @@ function CertificateGenerator({
     [requirementsEvaluation],
   );
 
+  // Custom write-in coverages for the selected lines' policies
+  // (policy_additional_coverages). Fetched with the same read + created_at order
+  // the server uses at issue, then filtered to the printed (line, policy) pairs,
+  // so the client preview and the server rebuild produce the same field values
+  // (preview-hash gate R9).
+  const additionalCoveragePolicyIds = useMemo(
+    () => selectedPolicyIds(masterCoi, state.selectedLineKeys).sort(),
+    [masterCoi, state.selectedLineKeys],
+  );
+  const { data: additionalCoverageRows = [] } = useQuery({
+    queryKey: ['cert-additional-coverages', additionalCoveragePolicyIds],
+    enabled: additionalCoveragePolicyIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('policy_additional_coverages' as never)
+        .select('policy_id, line, name, amount')
+        .in('policy_id', additionalCoveragePolicyIds)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        policy_id: string;
+        line: LineKey;
+        name: string;
+        amount: number | null;
+      }>;
+    },
+  });
+  const additionalCoverages = useMemo(() => {
+    if (!masterCoi) {
+      return [] as Array<{ line: LineKey; name: string; amount: number | null }>;
+    }
+    // Keep only rows for a selected line on that line's selected policy.
+    const pairs = new Set<string>();
+    for (const key of state.selectedLineKeys) {
+      const pid = (masterCoi.lines[key] as COILineBase | undefined)?.policy_id;
+      if (pid) pairs.add(`${key}|${pid}`);
+    }
+    return additionalCoverageRows
+      .filter((r) => pairs.has(`${r.line}|${r.policy_id}`))
+      .map((r) => ({ line: r.line, name: r.name, amount: r.amount }));
+  }, [additionalCoverageRows, masterCoi, state.selectedLineKeys]);
+
   // -----------------------------------------------------------------------
   // The deterministic build (used by preview AND to validate before issue).
   // -----------------------------------------------------------------------
@@ -513,12 +555,13 @@ function CertificateGenerator({
       printIntents: state.perLine,
       descriptionOfOperations: state.descriptionOfOperations,
       remarks: state.remarks,
+      additionalCoverages,
       certificateDate: todayIso(),
       certificateNumber: null,
       authorizedRepName,
     });
     return buildAcord25FieldValues(input);
-  }, [masterCoi, state.selectedLineKeys, state.holder, state.perLine, state.descriptionOfOperations, state.remarks, endorsementByLine]);
+  }, [masterCoi, state.selectedLineKeys, state.holder, state.perLine, state.descriptionOfOperations, state.remarks, endorsementByLine, additionalCoverages]);
 
   const preview = useCertificatePreview({
     templateBytes,
@@ -531,6 +574,7 @@ function CertificateGenerator({
       state.descriptionOfOperations,
       state.remarks,
       endorsementByLine,
+      additionalCoverages,
     ],
   });
 

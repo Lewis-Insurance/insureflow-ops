@@ -355,3 +355,75 @@ describe('fromMasterCoi holder endorsement resolution across lines', () => {
     expect(build.fieldValues[ACORD25_FIELD_MAP.auto_addlInsd.pdfField]).toBe('N');
   });
 });
+
+describe('fromMasterCoi write-in coverages: native slot vs DOO spill', () => {
+  it('first GL row fills the native GL write-in; 2nd GL row and a WC row spill to DOO', () => {
+    const input = toAcord25BuildInput({
+      masterCoi: masterCoi(),
+      selectedLines: ['gl', 'auto'],
+      holder: null,
+      holderResolution: null,
+      printIntents: {},
+      additionalCoverages: [
+        { line: 'gl', name: 'Hired/Non-Owned Auto', amount: 1000000 },
+        { line: 'gl', name: 'Employee Benefits Liability', amount: 500000 },
+        { line: 'wc', name: 'Stop Gap / Employers Liability', amount: 1000000 },
+      ],
+      descriptionOfOperations: 'Base narrative.',
+      remarks: '',
+      certificateDate: '2026-07-01',
+      authorizedRepName: 'Dana Producer',
+    });
+
+    // First GL row -> native slot on the build input.
+    expect(input.writeInCoverages?.gl).toEqual({
+      name: 'Hired/Non-Owned Auto',
+      amount: 1000000,
+    });
+
+    // The 2nd GL row and the WC row spilled into descriptionOfOperations, in order.
+    expect(input.descriptionOfOperations).toContain(
+      'General Liability - Employee Benefits Liability: $500,000',
+    );
+    expect(input.descriptionOfOperations).toContain(
+      "Workers Compensation and Employers' Liability - Stop Gap / Employers Liability: $1,000,000",
+    );
+    // The GL native row is NOT duplicated into the spill.
+    expect(input.descriptionOfOperations).not.toContain('General Liability - Hired/Non-Owned Auto');
+
+    const build = buildAcord25FieldValues(input);
+
+    // The native GL write-in prints in its dedicated fields.
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInDesc.pdfField]).toBe('Hired/Non-Owned Auto');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_writeInAmount.pdfField]).toBe('1,000,000');
+    // Spill rode DOO through the builder (base narrative preserved, spill appended).
+    const printedDoo = build.fieldValues[ACORD25_FIELD_MAP.descriptionOfOperations.pdfField] as string;
+    expect(printedDoo).toContain('Base narrative.');
+    expect(printedDoo).toContain('General Liability - Employee Benefits Liability: $500,000');
+    expect(build.ok).toBe(true);
+  });
+
+  it('a write-in for an unselected line spills to DOO and never fills a native slot', () => {
+    // Auto is NOT selected here, so its write-in has no native slot and must spill.
+    const input = toAcord25BuildInput({
+      masterCoi: masterCoi(),
+      selectedLines: ['gl'],
+      holder: null,
+      holderResolution: null,
+      printIntents: {},
+      additionalCoverages: [{ line: 'auto', name: 'Rental Reimbursement', amount: null }],
+      descriptionOfOperations: '',
+      remarks: '',
+      certificateDate: '2026-07-01',
+      authorizedRepName: 'Dana Producer',
+    });
+
+    expect(input.writeInCoverages?.auto).toBeUndefined();
+    // Amount null -> spilled label carries no ": $..." suffix.
+    expect(input.descriptionOfOperations).toBe('Automobile Liability - Rental Reimbursement');
+
+    const build = buildAcord25FieldValues(input);
+    expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInDesc.pdfField]).toBe('');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.auto_writeInAmount.pdfField]).toBe('');
+  });
+});

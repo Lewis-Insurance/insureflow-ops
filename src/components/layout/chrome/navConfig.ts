@@ -57,6 +57,9 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       { label: 'Calls', to: '/calls', icon: Phone },
       { label: 'SMS', to: '/sms', icon: MessageSquare },
       { label: 'Leads', to: '/leads', icon: TrendingUp },
+      // COI workflow: certificate generator + the certificate-holder directory.
+      { label: 'Generate COI', to: '/certificates', icon: Award },
+      { label: 'Additional Insureds', to: '/additional-insureds', icon: Building2 },
       // Contacts maps to the CRM accounts/contacts hub (no dedicated /contacts route).
       { label: 'Contacts', to: '/crm', icon: Contact },
       // Payments (formerly the standalone "Accounting" page) + its Day Sheets shortcut.
@@ -125,13 +128,11 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'Predictive Analytics', to: '/predictive-analytics', icon: TrendingUp },
   { label: 'Merge Customers', to: '/merge-customers', icon: GitMerge },
   { label: 'Duplicate review', to: '/duplicates', icon: GitMerge },
-  { label: 'Additional Insureds', to: '/additional-insureds', icon: Building2 },
   { label: 'Customization', to: '/customization', icon: Sliders },
   { label: 'Carriers', to: '/carriers', icon: Building2 },
   { label: 'MGAs', to: '/mgas', icon: Briefcase },
   { label: 'ACORD Templates', to: '/acord-templates', icon: ScrollText },
   { label: 'Intake Templates', to: '/intake-templates', icon: ClipboardList },
-  { label: 'Certificates', to: '/certificates', icon: Award },
   { label: 'Carrier Templates', to: '/carrier-templates', icon: FileStack },
   { label: 'Extraction Review', to: '/extraction-review', icon: Eye },
   { label: 'Extraction Analytics', to: '/extraction-analytics', icon: Activity },

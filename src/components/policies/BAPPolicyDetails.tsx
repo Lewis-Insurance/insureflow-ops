@@ -205,7 +205,7 @@ export function BAPPolicyDetailsView({
 }: BAPPolicyDetailsProps) {
   const [activeTab, setActiveTab] = useState<BAPPolicyTab>('overview');
 
-  if (!bapDetails) {
+  if (!bapDetails || Object.keys(bapDetails).length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
