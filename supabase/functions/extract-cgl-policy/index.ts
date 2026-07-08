@@ -118,11 +118,15 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
 
+  let supabase: ReturnType<typeof createClient> | null = null;
+  let jobId: string | null = null;
+  const startedAt = Date.now();
+
   try {
     // Initialize clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Require authentication
     const authResult = await requireAuth(req, supabase, corsHeaders);
@@ -159,12 +163,13 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-sonnet-4-20250514',
+        llm_model: 'claude-haiku-4-5-20251001',
       })
       .select()
       .single();
 
     if (jobError) throw jobError;
+    jobId = job.id;
 
     // Get document URL
     const { data: document, error: docError } = await supabase
@@ -239,7 +244,7 @@ serve(async (req) => {
     const userPrompt = buildCGLUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -473,12 +478,23 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('CGL extraction error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+
+    // Record the failure on the job so it is never stuck at "extracting" and
+    // the actual error is visible for diagnosis.
+    if (supabase && jobId) {
+      try {
+        await supabase
+          .from('policy_cgl_extraction_jobs')
+          .update({ status: 'failed', error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500) })
+          .eq('id', jobId);
+      } catch (_e) {
+        // best effort - do not mask the original error
+      }
+    }
 
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
+      JSON.stringify({ success: false, error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

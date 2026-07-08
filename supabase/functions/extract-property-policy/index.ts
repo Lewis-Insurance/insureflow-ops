@@ -232,7 +232,7 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-sonnet-4-20250514',
+        llm_model: 'claude-haiku-4-5-20251001',
       })
       .select()
       .single();
@@ -320,7 +320,7 @@ serve(async (req) => {
     // leaves the process (the wrapper JSON-round-trips + recursively redacts
     // the whole body; the schema strings carry no PII).
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 12000, // Property can have many buildings/locations
       system: PROPERTY_EXTRACTION_SYSTEM_PROMPT,
       tools: [

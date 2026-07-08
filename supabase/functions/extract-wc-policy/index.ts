@@ -433,7 +433,7 @@ serve(async (req) => {
         // The OCR call uses the prebuilt-layout model (see callAzureDocumentIntelligence);
         // record that exact model id, not the stale 'prebuilt-document' label.
         azure_model_id: "prebuilt-layout",
-        llm_model: "claude-sonnet-4-20250514",
+        llm_model: "claude-haiku-4-5-20251001",
       })
       .select("id")
       .single();
@@ -541,7 +541,7 @@ serve(async (req) => {
     // prompt (evidence catalog) before it leaves the process. Same calling
     // convention as extract-bap-policy; no modelBoundaryFetch change needed.
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 8000,
       system: WC_EXTRACTION_SYSTEM_PROMPT,
       tools: [
