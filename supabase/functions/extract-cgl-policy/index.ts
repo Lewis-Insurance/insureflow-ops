@@ -349,9 +349,18 @@ serve(async (req) => {
       await supabase.from('policy_cgl_additional_insureds').delete().eq('policy_id', policy_id);
 
       for (const ai of extractedData.additional_insureds) {
+        // A blanket AI / waiver / P&NC endorsement applies to anyone required by
+        // written contract, so it has no specific named party. Label it clearly
+        // from its flags/form instead of the confusing "Unknown".
+        const aiName = (ai.name && String(ai.name).trim())
+          ? String(ai.name).trim()
+          : ((ai.waiver_of_subrogation ? 'Blanket Waiver of Subrogation'
+              : ai.primary_noncontributory ? 'Blanket Primary & Non-Contributory'
+              : 'Blanket Additional Insured')
+             + (ai.endorsement_form ? ` (${ai.endorsement_form})` : ''));
         const aiData = {
           policy_id,
-          name: ai.name || 'Unknown',
+          name: aiName,
           street: ai.address?.street,
           city: ai.address?.city,
           state: ai.address?.state,
