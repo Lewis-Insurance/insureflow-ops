@@ -34,13 +34,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   useAdditionalInsuredSearch,
   type AdditionalInsuredSavedRow,
 } from '@/hooks/useAdditionalInsureds';
@@ -59,29 +52,6 @@ export interface PolicyEndorsementsSectionProps {
   lineKey: EndorsementLineKey;
 }
 
-const STATUS_LABEL: Record<EndorsementStatus, string> = {
-  endorsed: 'Endorsed',
-  requested: 'Requested',
-  none: 'Not endorsed',
-};
-
-/** Small resolved-state chip; endorsed reads as active, requested as pending. */
-function StatusChip({ status }: { status: EndorsementStatus }) {
-  const tone =
-    status === 'endorsed'
-      ? 'border-cc-success/40 bg-cc-success/10 text-cc-success'
-      : status === 'requested'
-        ? 'border-cc-warning/40 bg-cc-warning/10 text-cc-warning'
-        : 'border-cc-border-subtle bg-cc-surface-raised text-cc-text-muted';
-  return (
-    <span
-      className={`inline-flex items-center rounded-cc-sm border px-1.5 py-0.5 text-xs font-medium ${tone}`}
-    >
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
-
 export function PolicyEndorsementsSection({
   accountId,
   policyId,
@@ -98,8 +68,9 @@ export function PolicyEndorsementsSection({
   const blanketAiOn = !isWc && !!blanket; // a blanket row on a non-WC line carries the AI signature
   const blanketWaiverOn = !!blanket && blanket.subr_wvd;
   const blanketWcOn = isWc && !!blanket;
-  const blanketStatus: EndorsementStatus =
-    blanket && blanket.status !== 'none' ? blanket.status : 'endorsed';
+  // No pending/requested concept in the editor anymore: an endorsement the user
+  // manages here is always endorsed (prints Y on the certificate).
+  const blanketStatus: EndorsementStatus = 'endorsed';
 
   const busy =
     setBlanket.isPending ||
@@ -136,28 +107,6 @@ export function PolicyEndorsementsSection({
       });
     }
   };
-  const onBlanketStatus = (status: EndorsementStatus) => {
-    if (!blanket) return;
-    setRow.mutate({ rowId: blanket.row_id, status });
-  };
-  const onBlanketForm = (form: string) => {
-    if (!blanket) return;
-    const next = form.trim() || null;
-    // Route through setBlanket, not setRow: GL requires a CG2033/CG2038 form to
-    // resolve as blanket, and setBlanket coalesces an empty/invalid GL form to
-    // the default. setRow would let a cleared form silently break resolution.
-    if (isWc) {
-      setBlanket.mutate({ addlInsd: false, subrWvd: true, status: blanketStatus, form: next });
-    } else {
-      setBlanket.mutate({
-        addlInsd: true,
-        subrWvd: blanketWaiverOn,
-        status: blanketStatus,
-        form: next,
-      });
-    }
-  };
-
   const title = isWc ? 'Subrogation waivers' : 'Additional insureds and waivers';
 
   return (
@@ -228,39 +177,6 @@ export function PolicyEndorsementsSection({
               </span>
             </label>
 
-            {/* Status + form for the active blanket row. */}
-            {blanket && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-cc-border-subtle pt-3">
-                <Select
-                  value={blanketStatus}
-                  onValueChange={(v) => onBlanketStatus(v as EndorsementStatus)}
-                  disabled={busy}
-                >
-                  <SelectTrigger className="h-8 w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="endorsed">Endorsed</SelectItem>
-                    <SelectItem value="requested">Requested (pending)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  defaultValue={blanket.endorsement_form ?? ''}
-                  onBlur={(e) => {
-                    const next = e.target.value.trim();
-                    if (next !== (blanket.endorsement_form ?? '').trim()) {
-                      onBlanketForm(next);
-                    }
-                  }}
-                  placeholder={isWc ? 'WC 00 03 13' : 'CG 20 33'}
-                  aria-label="Endorsement form number"
-                  className="h-8 w-32 cc-num"
-                />
-                <span className="text-xs text-cc-text-muted">
-                  Only Endorsed prints Y on a certificate.
-                </span>
-              </div>
-            )}
           </div>
 
           {/* ---- Scheduled / specific ---- */}
@@ -277,7 +193,6 @@ export function PolicyEndorsementsSection({
                     row={row}
                     isWc={isWc}
                     busy={busy}
-                    onStatus={(status) => setRow.mutate({ rowId: row.row_id, status })}
                     onWaiver={(subrWvd) => setRow.mutate({ rowId: row.row_id, subrWvd })}
                     onRemove={() => removeRow.mutate({ rowId: row.row_id })}
                   />
@@ -307,14 +222,12 @@ function ScheduledRow({
   row,
   isWc,
   busy,
-  onStatus,
   onWaiver,
   onRemove,
 }: {
   row: ScheduledEndorsement;
   isWc: boolean;
   busy: boolean;
-  onStatus: (status: EndorsementStatus) => void;
   onWaiver: (subrWvd: boolean) => void;
   onRemove: () => void;
 }) {
@@ -326,7 +239,6 @@ function ScheduledRow({
             <span className="break-words text-sm font-medium text-cc-text-primary">
               {row.name}
             </span>
-            <StatusChip status={row.status} />
             {row.is_manual && !row.has_evidence && (
               <span className="rounded-cc-sm border border-cc-warning/40 bg-cc-warning/10 px-1.5 py-0.5 text-xs text-cc-warning">
                 Manual
@@ -346,19 +258,6 @@ function ScheduledRow({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Select
-            value={row.status === 'none' ? 'requested' : row.status}
-            onValueChange={(v) => onStatus(v as EndorsementStatus)}
-            disabled={busy}
-          >
-            <SelectTrigger className="h-8 w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="endorsed">Endorsed</SelectItem>
-              <SelectItem value="requested">Requested (pending)</SelectItem>
-            </SelectContent>
-          </Select>
           <button
             type="button"
             onClick={onRemove}
