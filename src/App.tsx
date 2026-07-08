@@ -25,7 +25,6 @@ const PolicyDetail = lazyWithRetry(() => import("./pages/PolicyDetail"));
 const CommercialPipelinePage = lazyWithRetry(() => import("./pages/CommercialPipelinePage"));
 const CustomersPage = lazyWithRetry(() => import("./pages/CustomersPage"));
 const CustomerDetail = lazyWithRetry(() => import("./pages/CustomerDetail"));
-const CustomerEdit = lazyWithRetry(() => import("./pages/CustomerEdit"));
 const PoliciesPage = lazyWithRetry(() => import("./pages/PoliciesPage"));
 const RenewalsPage = lazyWithRetry(() => import("./pages/RenewalsPage"));
 const RenewalIntelligencePage = lazyWithRetry(() => import("./pages/RenewalIntelligencePage"));
@@ -274,16 +273,6 @@ const App = () => (
                     <ProtectedRoute>
                       <ErrorBoundary level="page" resetOnPropsChange>
                         <CustomerDetail />
-                      </ErrorBoundary>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/customers/:id/edit"
-                  element={
-                    <ProtectedRoute>
-                      <ErrorBoundary level="page" resetOnPropsChange>
-                        <CustomerEdit />
                       </ErrorBoundary>
                     </ProtectedRoute>
                   }

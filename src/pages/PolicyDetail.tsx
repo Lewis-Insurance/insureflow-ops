@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
+import { humanizeAccountType } from '@/lib/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -534,7 +535,7 @@ export default function PolicyDetail() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Type</label>
-                      <p>{policy.account.type}</p>
+                      <p>{humanizeAccountType(policy.account.type)}</p>
                     </div>
                     {policy.account.email && (
                       <div>

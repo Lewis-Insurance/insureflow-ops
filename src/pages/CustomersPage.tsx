@@ -11,13 +11,12 @@ import { useUnifiedCustomers } from '@/hooks/useUnifiedCustomers';
 import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
 import { useTags } from '@/hooks/useTags';
 import { StatusPill, Chip, SectionLabel, NextRenewal, TriageTile, SkeletonRow } from '@/components/cc';
+import { humanizeAccountType } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 type Cohort = 'all' | 'renewals_30d' | 'overdue' | 'no_active_policy' | 'new_30d';
 type TypeFilter = 'all' | 'household' | 'business';
-
-const isBusiness = (t?: string) => /business|commercial|organization|org/i.test(t ?? '');
 
 // Dense table column template (md+). Renewal replaces the structurally-null
 // balance/last-contact columns; the real signal in this book is policy renewal.
@@ -170,7 +169,7 @@ export default function CustomersPage() {
                     : 'text-cc-text-muted hover:text-cc-text-secondary',
                 )}
               >
-                {t === 'all' ? 'All' : t}
+                {t === 'all' ? 'All' : t === 'household' ? 'Personal' : 'Commercial'}
               </button>
             ))}
           </div>
@@ -266,7 +265,7 @@ export default function CustomersPage() {
                   </div>
 
                   <div className="hidden md:block">
-                    <Chip>{isBusiness(customer.type) ? 'Business' : 'Household'}</Chip>
+                    <Chip>{humanizeAccountType(customer.type)}</Chip>
                   </div>
 
                   <div className="hidden md:block">

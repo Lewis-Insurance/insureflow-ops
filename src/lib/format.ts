@@ -16,6 +16,16 @@ export function humanizeStatus(value?: string | null): string {
   return humanizeEnum(value);
 }
 
+/**
+ * Customer account-type label. The stored enum is household / commercial_business
+ * (account_type_v2), but staff read the book as Personal vs Commercial lines.
+ * Anything business / commercial-shaped reads Commercial; everything else Personal.
+ * Display only - never write this string back; the stored enum is unchanged.
+ */
+export function humanizeAccountType(value?: string | null): string {
+  return /business|commercial|organization|org/i.test(value ?? '') ? 'Commercial' : 'Personal';
+}
+
 /** Line of business. Prefer the already-humanized line_canonical; humanize raw enums. */
 export function humanizeLine(value?: string | null): string {
   if (!value) return '';

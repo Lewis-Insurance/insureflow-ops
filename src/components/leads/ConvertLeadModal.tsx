@@ -517,13 +517,13 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                           <SelectItem value="household">
                             <div className="flex items-center gap-2">
                               <Home className="h-4 w-4" />
-                              Household (Personal)
+                              Personal
                             </div>
                           </SelectItem>
                           <SelectItem value="commercial_business">
                             <div className="flex items-center gap-2">
                               <Building2 className="h-4 w-4" />
-                              Commercial Business
+                              Commercial
                             </div>
                           </SelectItem>
                         </SelectContent>

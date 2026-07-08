@@ -1,12 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, Phone, MapPin, FileText, User, Edit, MessageSquare, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, FileText, Edit, MessageSquare, Send } from 'lucide-react';
 import { EditContactInfoModal } from './EditContactInfoModal';
 import { useState } from 'react';
 import { SMSComposerModal } from '@/components/communications/SMSComposerModal';
-import { formatInsuredDisplay } from '@/lib/insuredNames';
-import { Chip, maskDob } from '@/components/cc';
-import { humanizeEnum, humanizeStatus } from '@/lib/format';
+import { humanizeEnum, humanizeLine } from '@/lib/format';
+import { usePolicies } from '@/hooks/usePolicies';
 
 interface CustomerAccount {
   id: string;
@@ -51,23 +49,21 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [smsModalOpen, setSmsModalOpen] = useState(false);
 
-  // Format primary insured display (may include trust/estate)
-  const primaryInsuredDisplay = formatInsuredDisplay({
-    personName: account.name || null,
-    entityType: account.primary_entity_type || null,
-    entityName: account.primary_entity_name || null,
-    trusteeName: account.trustee_name || null,
-  });
+  // Active-policy bubbles in the contact header row. Same React Query key as the
+  // Policies section, so this shares that fetch rather than issuing a second one.
+  const { data: allPolicies = [] } = usePolicies({ accountId: account.id });
+  const activePolicies = allPolicies.filter(
+    (p) => p.account_id === account.id && ['active', 'bound', 'pending'].includes((p.status ?? 'active').toLowerCase()),
+  );
 
-  // Format secondary insured display (may include trust/estate)
-  const secondaryInsuredDisplay = (account.spouse_name || account.secondary_entity_name)
-    ? formatInsuredDisplay({
-        personName: account.spouse_name || null,
-        entityType: account.secondary_entity_type || null,
-        entityName: account.secondary_entity_name || null,
-        trusteeName: null,
-      })
-    : null;
+  /** Jump from a policy bubble to that policy's card below and flash it. */
+  const scrollToPolicy = (policyId: string) => {
+    const el = document.getElementById(`policy-${policyId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('cc-flash-target');
+    window.setTimeout(() => el.classList.remove('cc-flash-target'), 1400);
+  };
 
   const formatAddress = () => {
     const parts = [
@@ -81,49 +77,33 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
   };
 
   return (
-    <Card className="col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Customer Information
-        </CardTitle>
-        <Button size="sm" variant="outline" onClick={() => setEditModalOpen(true)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Identity: name (wide) + account type */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <label className="text-xs font-medium text-cc-text-muted">
-              {account.type === 'household' && secondaryInsuredDisplay ? 'Named Insureds' : 'Customer Name'}
-            </label>
-            <p className="text-sm font-semibold">
-              {primaryInsuredDisplay}
-              {account.date_of_birth && (
-                <span className="text-cc-text-muted font-normal text-xs ml-2 cc-num">
-                  (DOB: {maskDob(account.date_of_birth)})
-                </span>
-              )}
-              {account.type === 'household' && secondaryInsuredDisplay && (
-                <>
-                  <span className="text-cc-text-muted font-normal"> &amp; {secondaryInsuredDisplay}</span>
-                  {account.spouse_date_of_birth && (
-                    <span className="text-cc-text-muted font-normal text-xs ml-1 cc-num">
-                      (DOB: {maskDob(account.spouse_date_of_birth)})
-                    </span>
-                  )}
-                </>
-              )}
-            </p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-cc-text-muted">Account Type</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              <Chip>{humanizeEnum(account.type) || 'Individual'}</Chip>
-              {account.account_status && <Chip>{humanizeStatus(account.account_status)}</Chip>}
-            </div>
+    <>
+      <div className="mt-5 space-y-4 border-t border-cc-border-subtle pt-5">
+        {/* Header: "Contact" label with the active-policy bubbles + Edit grouped on
+            the right (bubbles left of Edit). No name field - the customer name lives
+            in the identity panel above. */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-cc-text-muted">Contact</span>
+          <div className="flex min-w-0 items-center gap-2">
+            {activePolicies.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {activePolicies.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => scrollToPolicy(p.id)}
+                    title={`Go to ${humanizeLine(p.line_of_business) || 'policy'}`}
+                    className="rounded-pill border border-cc-border-interactive bg-cc-surface-raised px-2.5 py-1 text-xs font-medium text-cc-text-secondary transition-colors duration-fast hover:border-cc-accent hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+                  >
+                    {humanizeLine(p.line_of_business) || 'Policy'}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setEditModalOpen(true)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
           </div>
         </div>
 
@@ -212,35 +192,29 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
           </div>
         </div>
 
-        {/* Meta: business + timestamps, compact 3-up grid */}
-        <div className="grid gap-x-4 gap-y-3 border-t border-cc-border-subtle pt-4 sm:grid-cols-2 lg:grid-cols-3">
-          {account.tin_last4 && (
-            <div>
-              <label className="text-xs font-medium text-cc-text-muted">TIN (Last 4)</label>
-              <p className="text-sm cc-num">****{account.tin_last4}</p>
-            </div>
-          )}
-          {account.source && (
-            <div>
-              <label className="text-xs font-medium text-cc-text-muted">Lead Source</label>
-              <p className="text-sm">{humanizeEnum(account.source)}</p>
-            </div>
-          )}
-          {account.lead_source_detail && (
-            <div>
-              <label className="text-xs font-medium text-cc-text-muted">Source Details</label>
-              <p className="text-sm">{account.lead_source_detail}</p>
-            </div>
-          )}
-          <div>
-            <label className="text-xs font-medium text-cc-text-muted">Created</label>
-            <p className="text-sm cc-num">{new Date(account.created_at).toLocaleDateString()}</p>
+        {/* Meta: TIN + lead source, only when present */}
+        {(account.tin_last4 || account.source || account.lead_source_detail) && (
+          <div className="grid gap-x-4 gap-y-3 border-t border-cc-border-subtle pt-4 sm:grid-cols-2 lg:grid-cols-3">
+            {account.tin_last4 && (
+              <div>
+                <label className="text-xs font-medium text-cc-text-muted">TIN (Last 4)</label>
+                <p className="text-sm cc-num">****{account.tin_last4}</p>
+              </div>
+            )}
+            {account.source && (
+              <div>
+                <label className="text-xs font-medium text-cc-text-muted">Lead Source</label>
+                <p className="text-sm">{humanizeEnum(account.source)}</p>
+              </div>
+            )}
+            {account.lead_source_detail && (
+              <div>
+                <label className="text-xs font-medium text-cc-text-muted">Source Details</label>
+                <p className="text-sm">{account.lead_source_detail}</p>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="text-xs font-medium text-cc-text-muted">Last Updated</label>
-            <p className="text-sm cc-num">{new Date(account.updated_at).toLocaleDateString()}</p>
-          </div>
-        </div>
+        )}
 
         {/* Notes */}
         {account.notes && (
@@ -252,8 +226,8 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
             <p className="text-sm bg-cc-surface-raised p-3 rounded-cc-md border border-cc-border-subtle">{account.notes}</p>
           </div>
         )}
-      </CardContent>
-      
+      </div>
+
       <EditContactInfoModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
@@ -270,6 +244,6 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
           defaultPhone={account.phone}
         />
       )}
-    </Card>
+    </>
   );
 }

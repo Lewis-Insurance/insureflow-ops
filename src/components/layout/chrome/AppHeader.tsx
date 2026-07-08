@@ -67,8 +67,7 @@ function matchRecord(pathname: string): RecordMatch | null {
     renewals: { label: 'Renewals', to: '/renewals' },
   };
 
-  // /customers/:id  (but not /customers/:id/edit being treated specially —
-  // the customer record still resolves; edit is a sub-view of the record)
+  // /customers/:id and any sub-path still resolve to the record.
   let m = pathname.match(/^\/(customers|policies|leads)\/([^/]+)(?:\/.*)?$/);
   if (m && m[2] !== 'new') {
     const entity = m[1] as RecordEntity;

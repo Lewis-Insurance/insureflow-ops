@@ -185,7 +185,7 @@ export function CustomerSearchSelect({
                         )}
                         <span className="font-medium truncate">{account.name}</span>
                         <Badge variant="outline" className="text-xs shrink-0">
-                          {account.type === 'commercial_business' ? 'Business' : 'Household'}
+                          {account.type === 'commercial_business' ? 'Commercial' : 'Personal'}
                         </Badge>
                       </div>
                       {account.spouse_name && (
