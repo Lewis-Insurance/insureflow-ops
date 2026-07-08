@@ -1,6 +1,7 @@
 // src/components/leads/LeadCard.tsx
 import { memo } from 'react';
 import { Lead } from '@/types/leads';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -99,7 +100,7 @@ export const LeadCard = memo(function LeadCard({
           {lead.phone && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Phone className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{lead.phone}</span>
+              <span className="truncate">{formatPhoneForDisplay(lead.phone)}</span>
             </div>
           )}
           {lead.city && lead.state && (

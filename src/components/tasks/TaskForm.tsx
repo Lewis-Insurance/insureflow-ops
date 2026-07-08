@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -299,7 +300,7 @@ export function TaskForm({ open, onOpenChange, task, accountId, onSubmit }: Task
                                   <div>
                                     <div className="font-medium">{customer.name}</div>
                                     <div className="text-sm text-muted-foreground">
-                                      {customer.email || customer.phone}
+                                      {customer.email || formatPhoneForDisplay(customer.phone)}
                                     </div>
                                   </div>
                                 </CommandItem>

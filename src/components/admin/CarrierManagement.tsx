@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Shield, Phone, Mail, Globe } from 'lucide-react';
@@ -452,13 +453,13 @@ export function CarrierManagement() {
                       {carrier.main_phone && (
                         <div className="flex items-center gap-1 text-sm">
                           <Phone className="h-3 w-3" />
-                          {carrier.main_phone}
+                          {formatPhoneForDisplay(carrier.main_phone)}
                         </div>
                       )}
                       {carrier.claims_phone && (
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Phone className="h-3 w-3" />
-                          Claims: {carrier.claims_phone}
+                          Claims: {formatPhoneForDisplay(carrier.claims_phone)}
                         </div>
                       )}
                     </div>

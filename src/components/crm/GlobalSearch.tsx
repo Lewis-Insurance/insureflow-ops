@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, Building2, User, FileText } from 'lucide-react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -165,7 +166,7 @@ export function GlobalSearch({
                               <span className="mr-3">{result.email}</span>
                             )}
                             {result.phone && (
-                              <span>{result.phone}</span>
+                              <span>{formatPhoneForDisplay(result.phone)}</span>
                             )}
                           </div>
                         </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { StatusPill, Chip, SectionLabel } from '@/components/cc';
 import {
   GitMerge,
@@ -113,7 +114,7 @@ function GroupCard({
                 <span className="cc-num">{m.usage_count} certs</span>
                 {(m.city || m.state) && <span>{[m.city, m.state].filter(Boolean).join(', ')}</span>}
                 {m.email && <span className="truncate">{m.email}</span>}
-                {m.phone && <span className="cc-num">{m.phone}</span>}
+                {m.phone && <span className="cc-num">{formatPhoneForDisplay(m.phone)}</span>}
               </div>
             </div>
           );

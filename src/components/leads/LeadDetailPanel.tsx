@@ -1,5 +1,6 @@
 // src/components/leads/LeadDetailPanel.tsx
 import { Lead } from '@/types/leads';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -194,7 +195,7 @@ export function LeadDetailPanel({ lead, open, onOpenChange }: LeadDetailPanelPro
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <a href={`tel:${lead.phone}`} className="text-primary hover:underline">
-                    {lead.phone}
+                    {formatPhoneForDisplay(lead.phone)}
                   </a>
                 </div>
               )}

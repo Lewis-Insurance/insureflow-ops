@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import {
   Dialog,
   DialogContent,
@@ -174,7 +175,7 @@ export function ReviewRequestModal({
               {customer.phone && (
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  {customer.phone}
+                  {formatPhoneForDisplay(customer.phone)}
                 </p>
               )}
               {!hasEmail && !hasPhone && (

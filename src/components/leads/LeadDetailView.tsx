@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { formatPhoneForDisplay } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -299,7 +300,7 @@ export const LeadDetailView = ({ leadId, open, onOpenChange }: LeadDetailViewPro
                           href={`tel:${lead.phone}`}
                           className="text-sm text-primary hover:underline"
                         >
-                          {lead.phone}
+                          {formatPhoneForDisplay(lead.phone)}
                         </a>
                       </div>
                     </div>

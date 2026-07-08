@@ -61,3 +61,35 @@ export function humanizeCarrier(value?: string | null): string {
   // generic cleanup: underscores to spaces, trim trailing corporate suffix noise
   return v.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 }
+
+/**
+ * US phone number for display. Every number in the book is American, so the +1
+ * country code is noise: strip it and render as `386-755-0050`. Handles E.164
+ * (`+13867550050`), 11-digit (`13867550050`), bare 10-digit (`3867550050`), and
+ * already-punctuated (`(386) 755-0050`) inputs, and preserves a trailing
+ * extension (`x123`). Genuinely non-US or malformed numbers are returned as-is
+ * rather than mangled. Display only - never write this back; stored values and
+ * `tel:` dial links keep their raw/E.164 form so dialing stays reliable.
+ */
+export function formatPhoneForDisplay(value?: string | null): string {
+  if (value == null) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  // Peel off a trailing extension first (x123, ext. 123, extension 123).
+  const extMatch = raw.match(/\s*(?:x|ext\.?|extension)\s*(\d+)\s*$/i);
+  const ext = extMatch?.[1] ?? '';
+  const base = extMatch ? raw.slice(0, extMatch.index).trim() : raw;
+
+  let digits = base.replace(/\D/g, '');
+  // Drop a leading US country code: 1XXXXXXXXXX -> XXXXXXXXXX.
+  if (digits.length === 11 && digits.startsWith('1')) {
+    digits = digits.slice(1);
+  }
+
+  // Only reformat a clean 10-digit US number; leave anything else untouched.
+  if (digits.length !== 10) return raw;
+
+  const formatted = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return ext ? `${formatted} x${ext}` : formatted;
+}

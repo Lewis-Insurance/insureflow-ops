@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -294,7 +295,7 @@ export function TelephonyDashboard() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Twilio Phone Number</label>
-                <p className="text-sm text-muted-foreground">{settings.twilio_phone_number}</p>
+                <p className="text-sm text-muted-foreground">{formatPhoneForDisplay(settings.twilio_phone_number)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium">Forward Number</label>

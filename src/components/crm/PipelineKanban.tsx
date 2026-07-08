@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Mail, Phone, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, formatPhoneForDisplay } from '@/lib/format';
 
 const STAGES = [
   { id: 'new', label: 'New', color: 'bg-blue-500' },
@@ -71,7 +71,7 @@ function DraggableLeadCard({ lead, onClick }: Omit<LeadCardProps, 'isDragging'>)
           {lead.phone && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="h-3 w-3 shrink-0" />
-              <span className="truncate">{lead.phone}</span>
+              <span className="truncate">{formatPhoneForDisplay(lead.phone)}</span>
             </div>
           )}
           {lead.current_premium && (
@@ -153,7 +153,7 @@ function LeadCard({ lead, isDragging, onClick }: LeadCardProps) {
           {lead.phone && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="h-3 w-3 shrink-0" />
-              <span className="truncate">{lead.phone}</span>
+              <span className="truncate">{formatPhoneForDisplay(lead.phone)}</span>
             </div>
           )}
           {lead.current_premium && (
