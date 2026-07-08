@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -234,7 +235,7 @@ export default function Profile() {
                         <div>
                           <p className="text-sm font-medium">Phone</p>
                           <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground">{profile.phone}</p>
+                            <p className="text-sm text-muted-foreground">{formatPhoneForDisplay(profile.phone)}</p>
                             {profile.phone_verified && (
                               <Badge variant="default" className="bg-success text-success-foreground text-xs">
                                 Verified

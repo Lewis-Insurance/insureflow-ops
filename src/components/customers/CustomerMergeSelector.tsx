@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Building2, Home, Search, AlertCircle } from 'lucide-react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { sanitizeMultiFieldSearch } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
@@ -207,7 +208,7 @@ function CustomerSearchDropdown({
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                           {account.email && <span className="truncate">{account.email}</span>}
-                          {account.phone && <span>{account.phone}</span>}
+                          {account.phone && <span>{formatPhoneForDisplay(account.phone)}</span>}
                         </div>
                       </div>
                     </CommandItem>

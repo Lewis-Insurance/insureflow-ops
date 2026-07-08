@@ -34,7 +34,7 @@ import { Loader2, Search, Filter, Download, Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { LeadDetailView } from './LeadDetailView';
 import { LeadCaptureForm } from './LeadCaptureForm';
-import { humanizeEnum, humanizeStatus } from '@/lib/format';
+import { humanizeEnum, humanizeStatus, formatPhoneForDisplay } from '@/lib/format';
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New', color: 'bg-blue-500' },
@@ -243,7 +243,7 @@ export function LeadList() {
                     <div className="space-y-1 text-sm">
                       {lead.email && <div className="truncate max-w-[200px]">{lead.email}</div>}
                       {lead.phone && (
-                        <div className="text-muted-foreground">{lead.phone}</div>
+                        <div className="text-muted-foreground">{formatPhoneForDisplay(lead.phone)}</div>
                       )}
                       {!lead.email && !lead.phone && (
                         <span className="text-muted-foreground">No contact info</span>

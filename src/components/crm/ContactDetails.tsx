@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Edit, Phone, Mail, MapPin, Calendar, User } from 'lucide-react';
 import { SSNReveal } from './SSNReveal';
 import { PermissionGuard } from '@/components/common/PermissionGuard';
@@ -32,9 +33,9 @@ export function ContactDetails({ contact, onEdit, className = "" }: ContactDetai
 
   const getPreferredContact = () => {
     const methods = [];
-    if (contact.phone_mobile) methods.push(`Mobile: ${contact.phone_mobile}`);
-    if (contact.phone_home) methods.push(`Home: ${contact.phone_home}`);
-    if (contact.phone_work) methods.push(`Work: ${contact.phone_work}`);
+    if (contact.phone_mobile) methods.push(`Mobile: ${formatPhoneForDisplay(contact.phone_mobile)}`);
+    if (contact.phone_home) methods.push(`Home: ${formatPhoneForDisplay(contact.phone_home)}`);
+    if (contact.phone_work) methods.push(`Work: ${formatPhoneForDisplay(contact.phone_work)}`);
     return methods.join(' • ');
   };
 

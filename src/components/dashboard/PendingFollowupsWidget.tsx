@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatPhoneForDisplay } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -228,7 +229,7 @@ export function PendingFollowupsWidget() {
                     <div>Email: {currentConfirmation.lead_email}</div>
                   )}
                   {currentConfirmation.lead_phone && (
-                    <div>Phone: {currentConfirmation.lead_phone}</div>
+                    <div>Phone: {formatPhoneForDisplay(currentConfirmation.lead_phone)}</div>
                   )}
                   {currentConfirmation.insurance_types && currentConfirmation.insurance_types.length > 0 && (
                     <div>

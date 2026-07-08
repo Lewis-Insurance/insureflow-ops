@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStatus } from '@/types/leads';
+import { formatPhoneForDisplay } from '@/lib/format';
 import {
   useReactTable,
   getCoreRowModel,
@@ -217,7 +218,7 @@ export function LeadListView() {
               {lead.phone && (
                 <div className="flex items-center gap-1 text-sm">
                   <Phone className="h-3 w-3 text-muted-foreground" />
-                  <span>{lead.phone}</span>
+                  <span>{formatPhoneForDisplay(lead.phone)}</span>
                 </div>
               )}
               {lead.city && lead.state && (

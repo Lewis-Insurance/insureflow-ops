@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { 
   Phone, 
   PhoneOutgoing, 
@@ -236,7 +237,7 @@ export function CallClientConnection() {
                       )}
                       {call.client_phone && (
                         <p className="text-sm">
-                          <strong>Phone:</strong> {call.client_phone}
+                          <strong>Phone:</strong> {formatPhoneForDisplay(call.client_phone)}
                         </p>
                       )}
                       <div className="flex items-center gap-2 mt-2">

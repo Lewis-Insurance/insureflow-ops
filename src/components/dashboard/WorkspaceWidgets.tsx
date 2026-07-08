@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Calendar, FileText, Users } from 'lucide-react';
@@ -65,7 +66,7 @@ export function CustomerSearchWidget() {
                 onClick={() => navigate(`/customers/${customer.id}`)}
               >
                 <div className="font-medium">{customer.name}</div>
-                <div className="text-sm text-muted-foreground">{customer.email || customer.phone}</div>
+                <div className="text-sm text-muted-foreground">{customer.email || formatPhoneForDisplay(customer.phone)}</div>
               </div>
             ))}
           </div>

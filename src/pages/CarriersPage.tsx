@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -272,7 +273,7 @@ export default function CarriersPage() {
                             {carrier.underwriting_contact_phone && (
                               <div className="flex items-center gap-1 text-muted-foreground">
                                 <Phone className="h-3 w-3" />
-                                {carrier.underwriting_contact_phone}
+                                {formatPhoneForDisplay(carrier.underwriting_contact_phone)}
                               </div>
                             )}
                           </div>
@@ -283,7 +284,7 @@ export default function CarriersPage() {
                             {carrier.marketing_contact_phone && (
                               <div className="flex items-center gap-1 text-muted-foreground">
                                 <Phone className="h-3 w-3" />
-                                {carrier.marketing_contact_phone}
+                                {formatPhoneForDisplay(carrier.marketing_contact_phone)}
                               </div>
                             )}
                           </div>

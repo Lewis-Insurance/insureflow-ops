@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Plus, Building2, Home, Search } from 'lucide-react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -195,7 +196,7 @@ export function CustomerSearchSelect({
                       )}
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                         {account.email && <span className="truncate">{account.email}</span>}
-                        {account.phone && <span>{account.phone}</span>}
+                        {account.phone && <span>{formatPhoneForDisplay(account.phone)}</span>}
                       </div>
                     </div>
                   </CommandItem>
