@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,7 +89,7 @@ export function SMSComposerModal({
         entity_id: accountId,
         type: 'sms',
         direction: 'outbound',
-        subject: `SMS to ${phone}`,
+        subject: `SMS to ${formatPhoneForDisplay(phone)}`,
         content: message.trim(),
         status: 'sent',
         external_id: data?.message_sid || null,
@@ -101,7 +102,7 @@ export function SMSComposerModal({
 
       toast({
         title: 'Message Sent',
-        description: `SMS sent to ${phone}`,
+        description: `SMS sent to ${formatPhoneForDisplay(phone)}`,
       });
 
       // Reset and close

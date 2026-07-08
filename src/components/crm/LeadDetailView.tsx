@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
+import { formatPhoneForDisplay } from "@/lib/format";
 import { Lead, LeadStatus } from "@/types/leads";
 import {
   Sheet,
@@ -405,7 +406,7 @@ export function LeadDetailView({ lead, open, onOpenChange }: LeadDetailViewProps
                         />
                       ) : (
                         <a href={`tel:${lead.phone}`} className="text-primary hover:underline">
-                          {lead.phone}
+                          {formatPhoneForDisplay(lead.phone)}
                         </a>
                       )}
                     </div>

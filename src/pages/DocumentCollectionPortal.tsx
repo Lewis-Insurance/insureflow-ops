@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -312,7 +313,7 @@ function PortalLayout({
                   className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-white text-sm font-medium transition-all backdrop-blur-sm border border-white/20"
                 >
                   <Phone className="h-4 w-4" />
-                  <span className="hidden sm:inline">{contactPhone}</span>
+                  <span className="hidden sm:inline">{formatPhoneForDisplay(contactPhone)}</span>
                 </a>
               )}
               {contactEmail && (

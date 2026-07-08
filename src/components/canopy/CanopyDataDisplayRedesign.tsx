@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -411,7 +412,7 @@ export function CanopyDataDisplayRedesign({ pullId, leadId }: CanopyDataDisplayR
             <h1 className="text-2xl font-bold">{customerName}</h1>
             <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-sm text-muted-foreground">
               {pullData?.consumer_email && <span>{pullData.consumer_email}</span>}
-              {(pullData?.phone || pullData?.mobile_phone) && <span>{pullData.mobile_phone || pullData.phone}</span>}
+              {(pullData?.phone || pullData?.mobile_phone) && <span>{formatPhoneForDisplay(pullData.mobile_phone || pullData.phone)}</span>}
             </div>
             {/* Key policy summary */}
             {policies && policies.length > 0 && (

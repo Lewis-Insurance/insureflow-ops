@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Clock, User, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -140,7 +141,7 @@ export function RecentlyAccessed() {
                       <span className="truncate">{item.email}</span>
                     )}
                     {item.phone && (
-                      <span>{item.phone}</span>
+                      <span>{formatPhoneForDisplay(item.phone)}</span>
                     )}
                   </div>
                 </div>

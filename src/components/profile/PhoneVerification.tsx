@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -228,7 +229,7 @@ export function PhoneVerification() {
                 maxLength={6}
               />
               <p className="text-xs text-muted-foreground">
-                Enter the 6-digit code sent to {phoneNumber}
+                Enter the 6-digit code sent to {formatPhoneForDisplay(phoneNumber)}
               </p>
             </div>
 

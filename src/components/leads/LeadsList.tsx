@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLeads, type LeadFilters } from '@/hooks/useLeads';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { useLeadSources } from '@/integrations/supabase/hooks/useLeadSources';
 import {
   Table,
@@ -233,7 +234,7 @@ export function LeadsList({ onLeadSelect, onCreateLead }: LeadsListProps) {
                         {lead.phone && (
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <Phone className="h-3 w-3" />
-                            {lead.phone}
+                            {formatPhoneForDisplay(lead.phone)}
                           </div>
                         )}
                         {lead.city && lead.state && (

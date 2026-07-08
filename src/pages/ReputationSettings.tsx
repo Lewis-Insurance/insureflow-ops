@@ -16,6 +16,7 @@ import {
   useReviewStats,
 } from '@/hooks/useReputation';
 import { supabase } from '@/integrations/supabase/client';
+import { formatPhoneForDisplay } from '@/lib/format';
 import {
   Star,
   ExternalLink,
@@ -369,7 +370,7 @@ export default function ReputationSettings() {
                         {request.first_name} {request.last_name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {request.email || request.phone}
+                        {request.email || formatPhoneForDisplay(request.phone)}
                       </p>
                     </div>
                     <div className="text-right">

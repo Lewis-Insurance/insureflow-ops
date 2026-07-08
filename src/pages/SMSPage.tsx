@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -263,7 +264,7 @@ export default function SMSPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium truncate">
-                              {conv.contact_name || conv.phone_number}
+                              {conv.contact_name || formatPhoneForDisplay(conv.phone_number)}
                             </h4>
                             <span className="text-xs text-muted-foreground">
                               {formatDistanceToNow(new Date(conv.last_message.created_at), { addSuffix: true })}
@@ -324,11 +325,11 @@ export default function SMSPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold">
-                        {selectedConversation.contact_name || selectedConversation.phone_number}
+                        {selectedConversation.contact_name || formatPhoneForDisplay(selectedConversation.phone_number)}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Phone className="h-3 w-3" />
-                        {selectedConversation.phone_number}
+                        {formatPhoneForDisplay(selectedConversation.phone_number)}
                         {selectedConversation.account_name && (
                           <>
                             <span>•</span>
@@ -452,7 +453,7 @@ export default function SMSPage() {
           <DialogHeader>
             <DialogTitle>Link to Customer</DialogTitle>
             <DialogDescription>
-              Link all messages from {selectedConversation?.phone_number} to a customer account.
+              Link all messages from {formatPhoneForDisplay(selectedConversation?.phone_number)} to a customer account.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

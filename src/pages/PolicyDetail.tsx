@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
-import { humanizeAccountType } from '@/lib/format';
+import { humanizeAccountType, formatPhoneForDisplay } from '@/lib/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -528,7 +528,7 @@ export default function PolicyDetail() {
                     {policy.account.phone && (
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                        <p>{policy.account.phone}</p>
+                        <p>{formatPhoneForDisplay(policy.account.phone)}</p>
                       </div>
                     )}
                   </div>

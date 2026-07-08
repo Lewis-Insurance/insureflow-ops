@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState } from 'react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -240,7 +241,7 @@ function IDCardItem({
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-muted-foreground" />
               <a href={`tel:${card_data.claims_phone}`} className="text-cc-link hover:text-cc-link-hover hover:underline">
-                {card_data.claims_phone}
+                {formatPhoneForDisplay(card_data.claims_phone)}
               </a>
             </div>
           )}
