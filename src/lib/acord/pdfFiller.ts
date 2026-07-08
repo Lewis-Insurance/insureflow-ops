@@ -29,6 +29,20 @@ export interface FillFormOptions extends Partial<PdfFillOptions> {
   fieldValues: Record<string, FillFieldValue | string | boolean | number | null | undefined>;
   addAddendum?: boolean;
   addendumContent?: string[];
+  /**
+   * PDF field names to render at {@link smallFontSize} instead of the global
+   * fontSize (e.g. the ACORD 25 POLICY EFF / POLICY EXP date columns, which are
+   * narrow). Opt-in: forms that omit it are unaffected.
+   */
+  smallFields?: string[];
+  /** Font size for {@link smallFields}. Default 8. */
+  smallFontSize?: number;
+  /**
+   * PDF field names to render in an italic font (e.g. the ACORD 25 authorized
+   * representative, styled as a signature). Applied after the global appearance
+   * pass and before flatten. Opt-in.
+   */
+  italicFields?: string[];
 }
 
 // ============================================
@@ -48,7 +62,12 @@ export async function fillAcordPdf(
     fontSize = 10,
     addAddendum = false,
     addendumContent = [],
+    smallFields = [],
+    smallFontSize = 8,
+    italicFields = [],
   } = options;
+
+  const smallFieldSet = new Set(smallFields);
 
   const errors: string[] = [];
   const skippedFields: string[] = [];
@@ -61,6 +80,8 @@ export async function fillAcordPdf(
 
     // Embed font for text fields
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // Italic standard font for signature-styled fields (no fontkit / no asset).
+    const italicFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
 
     // Get all form fields
     const fields = form.getFields();
@@ -106,7 +127,8 @@ export async function fillAcordPdf(
 
         // Fill based on field type
         if (field instanceof PDFTextField) {
-          await fillTextField(field, transformedValue, font, fontSize);
+          const sizeForField = smallFieldSet.has(fieldName) ? smallFontSize : fontSize;
+          await fillTextField(field, transformedValue, font, sizeForField);
           filledFieldCount++;
         } else if (field instanceof PDFCheckBox) {
           fillCheckboxField(field, transformedValue);
@@ -133,6 +155,17 @@ export async function fillAcordPdf(
     // Update appearances for consistent rendering
     if (updateAppearances) {
       form.updateFieldAppearances(font);
+    }
+
+    // Signature-style pass: re-render the italic fields (e.g. the authorized
+    // representative) with the italic font. Done AFTER the global appearance pass
+    // (which uses one font for every field) and BEFORE flatten so the italic look
+    // is baked into the flattened content.
+    for (const italicName of italicFields) {
+      const italicField = form.getFieldMaybe(italicName);
+      if (italicField instanceof PDFTextField) {
+        italicField.updateAppearances(italicFont);
+      }
     }
 
     // Flatten the form (removes editability, ensures field values render correctly)

@@ -282,19 +282,21 @@ export function validateAcord25(
   }
 
   // V10: dates. Two assertions per Section 5.2: (1) every non-empty emitted date
-  // field matches MM/DD/YYYY; (2) per selected line, expiration >= effective,
-  // compared over the raw ISO inputs the builder carries in build.lineDates.
+  // field matches M/D/YYYY (month and day may be 1 or 2 digits; the builder emits
+  // them without a leading zero so the narrow date columns fit); (2) per selected
+  // line, expiration >= effective, compared over the raw ISO inputs the builder
+  // carries in build.lineDates.
   for (const key of Object.keys(ACORD25_FIELD_MAP) as Acord25LogicalKey[]) {
     const e = ACORD25_FIELD_MAP[key];
     if (e.kind !== 'date') {
       continue;
     }
     const value = build.fieldValues[e.pdfField];
-    if (typeof value === 'string' && value.length > 0 && !/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    if (typeof value === 'string' && value.length > 0 && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
       issues.push({
         code: 'DATE_INVALID',
         severity: 'error',
-        message: `The date field "${e.pdfField}" is not formatted as MM/DD/YYYY (got "${value}").`,
+        message: `The date field "${e.pdfField}" is not formatted as M/D/YYYY (got "${value}").`,
         logicalKeys: [key],
       });
     }

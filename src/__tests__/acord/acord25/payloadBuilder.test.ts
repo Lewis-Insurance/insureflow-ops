@@ -186,13 +186,16 @@ type MatrixCase = {
   severity: 'error' | 'warning' | null;
 };
 
+// Print intent is authoritative: Y whenever the toggle is on, N when off. A Y
+// with no confirmed endorsement prints Y and records a NON-BLOCKING MANUAL
+// advisory (never an error); toggling off is a clean N with no issue.
 const MATRIX: MatrixCase[] = [
   { resolved: 'endorsed', printIntent: true, printed: 'Y', code: null, severity: null },
   { resolved: 'endorsed', printIntent: false, printed: 'N', code: null, severity: null },
-  { resolved: 'requested', printIntent: false, printed: 'N', code: 'PENDING', severity: 'warning' },
-  { resolved: 'requested', printIntent: true, printed: 'N', code: 'NOT_PERMITTED', severity: 'error' },
+  { resolved: 'requested', printIntent: false, printed: 'N', code: null, severity: null },
+  { resolved: 'requested', printIntent: true, printed: 'Y', code: 'MANUAL', severity: 'warning' },
   { resolved: 'none', printIntent: false, printed: 'N', code: null, severity: null },
-  { resolved: 'none', printIntent: true, printed: 'N', code: 'NOT_PERMITTED', severity: 'error' },
+  { resolved: 'none', printIntent: true, printed: 'Y', code: 'MANUAL', severity: 'warning' },
 ];
 
 // Rows that carry an ADDL INSD column (WC does not).
@@ -326,15 +329,18 @@ describe('SUBR WVD print-flag matrix, all rows including WC (Section 4.4)', () =
     }
   }
 
-  it('never emits Y unless endorsed AND printIntent, even on an error row', () => {
+  it('prints a manual Y with only a non-blocking advisory (build still ok)', () => {
     const line = glLine({
-      additionalInsured: { resolved: 'none', printIntent: true }, // NOT_PERMITTED
-      waiverOfSubrogation: { resolved: 'requested', printIntent: true }, // NOT_PERMITTED
+      additionalInsured: { resolved: 'none', printIntent: true }, // manual
+      waiverOfSubrogation: { resolved: 'requested', printIntent: true }, // manual
     });
     const build = buildAcord25FieldValues(oneLineInput(line));
-    expect(build.ok).toBe(false);
-    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_addlInsd.pdfField]).toBe('N');
-    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_subrWvd.pdfField]).toBe('N');
+    // Manual assertions never block issuance: warnings only.
+    expect(build.ok).toBe(true);
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_addlInsd.pdfField]).toBe('Y');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_subrWvd.pdfField]).toBe('Y');
+    expect(build.issues.find((i) => i.code === 'ADDL_INSD_MANUAL')?.severity).toBe('warning');
+    expect(build.issues.find((i) => i.code === 'SUBR_WVD_MANUAL')?.severity).toBe('warning');
   });
 });
 
@@ -343,9 +349,9 @@ describe('SUBR WVD print-flag matrix, all rows including WC (Section 4.4)', () =
 // ---------------------------------------------------------------------------
 
 describe('dates (Section 4.6)', () => {
-  it('formats ISO YYYY-MM-DD to MM/DD/YYYY', () => {
+  it('formats ISO YYYY-MM-DD to M/D/YYYY (no leading zeros)', () => {
     const build = buildAcord25FieldValues(oneLineInput(glLine({ effectiveDate: '2026-07-01' })));
-    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_effDate.pdfField]).toBe('07/01/2026');
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_effDate.pdfField]).toBe('7/1/2026');
   });
 
   it('empty date -> empty string, no issue', () => {

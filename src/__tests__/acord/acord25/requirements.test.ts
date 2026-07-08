@@ -313,9 +313,26 @@ describe('evaluateHolderRequirements: flags via holderResolution', () => {
     });
 
     expect(evaluation.results[0].pass).toBe(false);
-    expect(evaluation.results[0].actual).toBe('none');
+    expect(evaluation.results[0].actual).toBe('not listed');
     expect(evaluation.all_pass).toBe(false);
     expect(evaluation.failure_count).toBe(1);
+  });
+
+  it('a manual print choice (printedFlags) satisfies the requirement despite no endorsement', () => {
+    const evaluation = evaluateHolderRequirements({
+      requirements,
+      masterCoi: masterCoi(2000000),
+      selectedLineKeys: ['gl'],
+      holderResolution: [
+        { line_key: 'gl', addl_insd_resolved: 'none', subr_wvd_resolved: 'none', basis: null },
+      ],
+      printedFlags: { gl: { addlInsd: true, subrWvd: false } },
+    });
+
+    expect(evaluation.results[0].kind).toBe('flag_ai');
+    expect(evaluation.results[0].pass).toBe(true);
+    expect(evaluation.results[0].actual).toBe('listed');
+    expect(evaluation.all_pass).toBe(true);
   });
 
   it('requires_waiver passes only on endorsed', () => {

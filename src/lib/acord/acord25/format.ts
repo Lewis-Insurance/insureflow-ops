@@ -12,6 +12,9 @@
  * ISO 'YYYY-MM-DD' to ACORD 'MM/DD/YYYY'. Pure string slicing, never new Date(),
  * so there is no timezone drift. Throws RangeError on a non-ISO input; the
  * builder catches it and emits a DATE_INVALID issue naming the field.
+ *
+ * Zero-padded. Used by ACORD 125 and 126 (whose date columns have room). The
+ * ACORD 25 builder uses formatAcordDateShort instead.
  */
 export function formatAcordDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -19,6 +22,20 @@ export function formatAcordDate(iso: string): string {
     throw new RangeError(`Not an ISO date: ${iso}`);
   }
   return `${m[2]}/${m[3]}/${m[1]}`;
+}
+
+/**
+ * ISO 'YYYY-MM-DD' to ACORD 'M/D/YYYY' with NO leading zero on month or day
+ * (6/5/2026, not 06/05/2026). Used only by the ACORD 25 builder so the narrow
+ * POLICY EFF / POLICY EXP columns fit; the 4-digit year is preserved. Same
+ * pure-string-slice contract as formatAcordDate (no new Date(), no locale).
+ */
+export function formatAcordDateShort(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) {
+    throw new RangeError(`Not an ISO date: ${iso}`);
+  }
+  return `${Number(m[2])}/${Number(m[3])}/${m[1]}`;
 }
 
 /**

@@ -34,16 +34,28 @@ describe('validateAcord25 happy path', () => {
 // ---------------------------------------------------------------------------
 
 describe('V1 build error passthrough', () => {
-  it('a builder NOT_PERMITTED error blocks the validator in both modes', () => {
+  it('a builder error (malformed date) blocks the validator in both modes', () => {
     const input = buildSampleInput();
-    input.lines[0].additionalInsured = { resolved: 'none', printIntent: true }; // NOT_PERMITTED
+    input.lines[0].effectiveDate = 'not-a-date'; // DATE_INVALID (builder error)
     const build = buildAcord25FieldValues(input);
     expect(build.ok).toBe(false);
     for (const mode of ['preview', 'issue'] as const) {
       const res = validateAcord25(build, { mode, template: buildTemplateInfo() });
       expect(res.valid).toBe(false);
-      expect(res.issues.some((i) => i.code === 'ADDL_INSD_NOT_PERMITTED')).toBe(true);
+      expect(res.issues.some((i) => i.code === 'DATE_INVALID')).toBe(true);
     }
+  });
+
+  it('a manually asserted endorsement Y is a warning, never a block', () => {
+    const input = buildSampleInput();
+    input.lines[0].additionalInsured = { resolved: 'none', printIntent: true }; // manual Y
+    const build = buildAcord25FieldValues(input);
+    expect(build.ok).toBe(true);
+    const res = validateAcord25(build, { mode: 'issue', template: buildTemplateInfo() });
+    expect(res.valid).toBe(true);
+    expect(
+      res.issues.some((i) => i.code === 'ADDL_INSD_MANUAL' && i.severity === 'warning'),
+    ).toBe(true);
   });
 });
 
@@ -274,11 +286,11 @@ describe('V10 date format', () => {
     expect(res.valid).toBe(false);
   });
 
-  it('accepts a correctly formatted MM/DD/YYYY date', () => {
+  it('accepts a correctly formatted M/D/YYYY date (no leading zeros)', () => {
     const build = goodBuild();
     const res = validateAcord25(build, { mode: 'preview', template: buildTemplateInfo() });
-    // The sample GL effective date is 01/01/2026 after formatting.
-    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_effDate.pdfField]).toBe('01/01/2026');
+    // The sample GL effective date is 1/1/2026 after formatting (no leading zeros).
+    expect(build.fieldValues[ACORD25_FIELD_MAP.gl_effDate.pdfField]).toBe('1/1/2026');
     expect(res.issues.some((i) => i.code === 'DATE_INVALID')).toBe(false);
   });
 

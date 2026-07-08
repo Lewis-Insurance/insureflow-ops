@@ -287,6 +287,14 @@ export interface EvaluateHolderRequirementsArgs {
     subr_wvd_resolved: string;
     basis: string | null;
   }>;
+  /**
+   * What the certificate being generated will actually PRINT per line (the staff
+   * toggle choices). When supplied, the additional-insured / waiver flag checks
+   * evaluate against THIS - so a manual Y satisfies the holder's requirement even
+   * with no confirmed endorsement (the manual assertion is warned about
+   * elsewhere). Omitted (older callers) -> fall back to the policy resolution.
+   */
+  printedFlags?: Partial<Record<Acord25LineKey, { addlInsd: boolean; subrWvd: boolean }>>;
 }
 
 function emptyEvaluation(): RequirementsEvaluation {
@@ -391,42 +399,46 @@ function findResolution(
 function evaluateFlags(
   flags: HolderRequirementsFlag[],
   holderResolution: EvaluateHolderRequirementsArgs['holderResolution'],
+  printedFlags: EvaluateHolderRequirementsArgs['printedFlags'],
 ): RequirementResult[] {
   const out: RequirementResult[] = [];
   for (const flag of flags) {
     const res = findResolution(holderResolution, flag.line_key);
+    const printed = printedFlags?.[flag.line_key];
 
     if (flag.requires_additional_insured) {
-      const resolved = res ? res.addl : 'none';
-      const pass = resolved === 'endorsed';
+      // Pass when the CERTIFICATE lists the holder as additional insured on this
+      // line (the staff print choice), whether that Y is a confirmed endorsement
+      // or a manual assertion. Fall back to the policy resolution when no print
+      // choice is supplied.
+      const willPrint = printed ? printed.addlInsd : (res ? res.addl === 'endorsed' : false);
       out.push({
         kind: 'flag_ai',
         line_key: flag.line_key,
         label: `${lineLabel(flag.line_key)} additional insured`,
-        pass,
+        pass: willPrint,
         severity: 'fail',
-        expected: 'endorsed',
-        actual: resolved,
-        message: pass
-          ? `${lineLabel(flag.line_key)} additional insured is endorsed for this holder.`
-          : `Holder requires additional insured on ${lineLabel(flag.line_key)} but it is ${resolved}, not endorsed.`,
+        expected: 'listed',
+        actual: willPrint ? 'listed' : 'not listed',
+        message: willPrint
+          ? `${lineLabel(flag.line_key)} additional insured is listed on this certificate.`
+          : `Holder requires additional insured on ${lineLabel(flag.line_key)} but this certificate does not list it.`,
       });
     }
 
     if (flag.requires_waiver) {
-      const resolved = res ? res.subr : 'none';
-      const pass = resolved === 'endorsed';
+      const willPrint = printed ? printed.subrWvd : (res ? res.subr === 'endorsed' : false);
       out.push({
         kind: 'flag_waiver',
         line_key: flag.line_key,
         label: `${lineLabel(flag.line_key)} waiver of subrogation`,
-        pass,
+        pass: willPrint,
         severity: 'fail',
-        expected: 'endorsed',
-        actual: resolved,
-        message: pass
-          ? `${lineLabel(flag.line_key)} waiver of subrogation is endorsed for this holder.`
-          : `Holder requires waiver of subrogation on ${lineLabel(flag.line_key)} but it is ${resolved}, not endorsed.`,
+        expected: 'listed',
+        actual: willPrint ? 'listed' : 'not listed',
+        message: willPrint
+          ? `${lineLabel(flag.line_key)} waiver of subrogation is listed on this certificate.`
+          : `Holder requires waiver of subrogation on ${lineLabel(flag.line_key)} but this certificate does not list it.`,
       });
     }
   }
@@ -498,7 +510,7 @@ function evaluateNoticeDays(noticeDays: number | null): RequirementResult[] {
 export function evaluateHolderRequirements(
   args: EvaluateHolderRequirementsArgs,
 ): RequirementsEvaluation {
-  const { requirements, masterCoi, selectedLineKeys, holderResolution } = args;
+  const { requirements, masterCoi, selectedLineKeys, holderResolution, printedFlags } = args;
 
   if (requirements == null) {
     return emptyEvaluation();
@@ -509,7 +521,7 @@ export function evaluateHolderRequirements(
   const results: RequirementResult[] = [
     ...evaluateRequiredLines(requirements.required_lines, selected),
     ...evaluateMinLimits(requirements.min_limits, masterCoi, selected),
-    ...evaluateFlags(requirements.flags, holderResolution),
+    ...evaluateFlags(requirements.flags, holderResolution, printedFlags),
     ...evaluateEndorsementForms(requirements.required_endorsement_forms, holderResolution),
     ...evaluateNoticeDays(requirements.notice_days),
   ];

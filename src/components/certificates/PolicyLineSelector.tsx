@@ -3,10 +3,12 @@
 // One uniform row per PRESENT coverage line from get_master_coi. A readiness
 // blocker targeting a line DISABLES its checkbox and shows the blocker's canonical
 // message (R6); the server 422s those lines anyway, so disabling prevents the
-// failure. Each CHECKED line grows the two E&O toggles (ADDL INSD, SUBR WVD),
-// gated by useHolderEndorsementStatus: DEFAULT ON only when endorsed,
-// downgrade-only, locked otherwise (R2 + R3). Checked rows use AccentSpine active
-// (a 2px lime LEFT BORDER, legal under the one-lime-fill budget).
+// failure. Each CHECKED line grows the two E&O toggles (ADDL INSD, SUBR WVD).
+// useHolderEndorsementStatus DEFAULTS them ON when the policy is endorsed and OFF
+// otherwise, but they are always selectable once a holder is chosen: staff may
+// manually set Y whatever the policy shows, with a standing warning when nothing
+// backs it. Checked rows use AccentSpine active (a 2px lime LEFT BORDER, legal
+// under the one-lime-fill budget).
 //
 // Calm Command: cc-* tokens both themes, StatusPill (shared vocabulary), Chip for
 // carrier, cc-num tabular figures on policy number / date, no em or en dashes.
@@ -287,10 +289,14 @@ function EndorsementToggle({
 }) {
   const masterCoiLink = `/customers/${accountId}?tab=master-coi`;
 
-  // Enabled (downgrade-only) only when the holder is chosen AND the line resolves
-  // 'endorsed'. requested / none / holder-not-chosen all lock the toggle OFF.
-  const endorsed = holderChosen && resolved === 'endorsed';
-  const disabled = !endorsed;
+  // The toggle is holder-specific, so a holder must be chosen. It is NOT locked on
+  // the policy endorsement: staff may manually set Y for this certificate whatever
+  // the policy record shows (defaults ON when endorsed, OFF otherwise). The note
+  // still warns when nothing on the policy backs a manual Y, and 05's builder
+  // emits a matching non-blocking advisory into the ValidationStrip (E&O trail).
+  const disabled = !holderChosen;
+  // A manual Y with no confirmed endorsement behind it: warn on the toggle.
+  const manualUnbacked = holderChosen && checked && resolved !== 'endorsed';
 
   let note: React.ReactNode = null;
   if (!holderChosen) {
@@ -306,15 +312,27 @@ function EndorsementToggle({
       <span className="inline-flex items-start gap-1.5 text-cc-warning">
         <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
         <span className="text-cc-text-secondary">
-          Endorsement requested, not yet confirmed. The box stays unchecked until it is on file.
+          Endorsement requested but not yet confirmed on the policy.{' '}
+          <Link
+            to={masterCoiLink}
+            className="underline underline-offset-2 hover:text-cc-text-primary"
+          >
+            Manage in Master COI
+          </Link>
         </span>
       </span>
     );
   } else {
     // 'none' or unresolved (holder chosen but no row for this line).
     note = (
-      <span className="inline-flex items-start gap-1.5 text-cc-text-muted">
-        <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+      <span
+        className={`inline-flex items-start gap-1.5 ${manualUnbacked ? 'text-cc-warning' : 'text-cc-text-muted'}`}
+      >
+        {manualUnbacked ? (
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+        ) : (
+          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+        )}
         <span className="text-cc-text-secondary">
           No endorsement on this line covers this holder.{' '}
           <Link
@@ -338,13 +356,9 @@ function EndorsementToggle({
       </div>
       <Switch
         id={idBase}
-        checked={checked && endorsed}
+        checked={checked}
         disabled={disabled}
-        onCheckedChange={(v) => {
-          // Belt-and-suspenders: can only set true when endorsed (switch is disabled otherwise).
-          if (v && !endorsed) return;
-          onChange(v);
-        }}
+        onCheckedChange={(v) => onChange(v)}
         aria-label={label}
       />
     </div>
