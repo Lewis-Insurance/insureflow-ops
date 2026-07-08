@@ -1,0 +1,17 @@
+#!/bin/sh
+# Block any push that would update the remote 'main' branch.
+# This machine works on winpc/* branches and opens PRs. See NEW-PC-SETUP-WINDOWS.md section 8.
+protected="refs/heads/main"
+while read local_ref local_sha remote_ref remote_sha
+do
+  if [ "$remote_ref" = "$protected" ]; then
+    echo "" >&2
+    echo "BLOCKED: direct push to 'main' is not allowed from this machine." >&2
+    echo "Work on a branch and open a PR instead:" >&2
+    echo "    git switch -c winpc/<task> origin/main" >&2
+    echo "    git push -u origin winpc/<task>" >&2
+    echo "    gh pr create --base main --fill" >&2
+    exit 1
+  fi
+done
+exit 0
