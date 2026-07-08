@@ -18,6 +18,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
 import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import {
@@ -31,6 +32,9 @@ import {
   type RawUmbrellaExtraction,
   type UmbrellaDetails,
 } from './shape.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // UMBRELLA FIELD PATTERNS FOR EVIDENCE MATCHING
@@ -176,8 +180,6 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
 
-  let jobId: string | null = null;
-
   try {
     // Initialize clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -204,11 +206,17 @@ serve(async (req) => {
     const azureKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
 
     if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!azureEndpoint || !azureKey) {
-      throw new Error('Azure Document Intelligence not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Azure Document Intelligence not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Create extraction job
@@ -218,14 +226,28 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-haiku-4-5-20251001',
+        llm_model: 'claude-sonnet-5',
       })
       .select()
       .single();
 
-    if (jobError) throw jobError;
-    jobId = job.id;
+    if (jobError || !job) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || 'unknown error'}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const jobId = job.id;
+    const startedAt = Date.now();
+
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on 'completed' or 'failed' - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document URL
     const { data: document, error: docError } = await supabase
       .from('documents')
@@ -312,8 +334,8 @@ serve(async (req) => {
     const extractionStart = Date.now();
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 10000, // Umbrella can have many underlying policies
+      model: 'claude-sonnet-5',
+      max_tokens: 16384, // Umbrella can have many underlying policies
       system: UMBRELLA_EXTRACTION_SYSTEM_PROMPT,
       tools: [
         {
@@ -325,7 +347,7 @@ serve(async (req) => {
       ],
       tool_choice: { type: 'tool', name: UMBRELLA_EXTRACTION_TOOL_NAME },
       messages: [{ role: 'user', content: userPrompt }],
-    });
+    }, 110000);
 
     const extractionLatency = Date.now() - extractionStart;
     console.log(`[extract-umbrella-policy] Claude completed in ${extractionLatency}ms`);
@@ -347,6 +369,20 @@ serve(async (req) => {
     // umbrella_field_evidence that get_master_coi / coi_build_line read.
     const nowIso = new Date().toISOString();
     const { umbrellaDetails, fieldEvidence } = shapeUmbrellaDetails(rawExtraction, nowIso);
+
+    // Resolve the extracted carrier to the agency's canonical carrier (clean
+    // rating/parenthetical suffixes -> resolve_carrier). The COI reads the blob
+    // identity.carrier_name / identity.carrier_naic, so patch the shaped blob
+    // (NOT the policies scalar columns). Never fatal: on no-match we keep the
+    // cleaned (or raw) name and any NAIC the model already extracted.
+    const rawCarrierName = rawExtraction.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    umbrellaDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    umbrellaDetails.identity.carrier_naic =
+      carrierRes?.naic ?? umbrellaDetails.identity.carrier_naic ?? null;
+    (umbrellaDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (umbrellaDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
 
     // Update policy with umbrella details (like extract-cgl-policy L438-446).
     await supabase
@@ -420,36 +456,38 @@ serve(async (req) => {
       })
       .eq('id', job.id);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error) => {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[extract-umbrella-policy] Error (background):', error);
+        try {
+          await supabase
+            .from('policy_umbrella_extraction_jobs')
+            .update({
+              status: 'failed',
+              error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500),
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        job_id: job.id,
-        underlying_count: underlyingExtracted,
-        additional_insureds_count: additionalInsuredsExtracted,
-        endorsements_count: endorsementsExtracted,
-        compliance_issues_count: complianceIssues.length,
-        confidence: umbrellaDetails.extraction_confidence,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, job_id: jobId, status: 'processing' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('[extract-umbrella-policy] Error:', error);
-
-    if (jobId) {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-      await supabase
-        .from('policy_umbrella_extraction_jobs')
-        .update({
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', jobId);
-    }
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error('[extract-umbrella-policy] Error (sync phase):', error);
     return new Response(
       JSON.stringify({
         success: false,

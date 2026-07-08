@@ -20,8 +20,12 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
 import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // CGL FIELD PATTERNS FOR EVIDENCE MATCHING
@@ -118,15 +122,11 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
 
-  let supabase: ReturnType<typeof createClient> | null = null;
-  let jobId: string | null = null;
-  const startedAt = Date.now();
-
   try {
     // Initialize clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Require authentication
     const authResult = await requireAuth(req, supabase, corsHeaders);
@@ -148,13 +148,18 @@ serve(async (req) => {
     const azureKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
 
     if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!azureEndpoint || !azureKey) {
-      throw new Error('Azure Document Intelligence not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Azure Document Intelligence not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
 
     // Create extraction job
     const { data: job, error: jobError } = await supabase
@@ -163,14 +168,28 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-haiku-4-5-20251001',
+        llm_model: 'claude-sonnet-5',
       })
       .select()
       .single();
 
-    if (jobError) throw jobError;
-    jobId = job.id;
+    if (jobError || !job) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || 'unknown error'}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const jobId = job.id;
+    const startedAt = Date.now();
+
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on 'completed' or 'failed' - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document URL
     const { data: document, error: docError } = await supabase
       .from('documents')
@@ -244,18 +263,22 @@ serve(async (req) => {
     const userPrompt = buildCGLUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 8192,
+      model: 'claude-sonnet-5',
+      max_tokens: 16384,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    });
+    }, 110000);
 
     const extractionLatency = Date.now() - extractionStart;
 
-    // Parse response
+    // Parse response - Claude usually wraps the JSON in a ```json ... ``` fence.
+    // Strip it robustly, tolerating a missing closing fence (truncated response).
     const responseText = anthropicResponseText(response);
-    const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || [null, responseText];
-    const extractedData = nullifyRedactedTokens(JSON.parse(jsonMatch[1] || responseText));
+    const jsonText = responseText.trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const extractedData = nullifyRedactedTokens(JSON.parse(jsonText));
 
     // Store evidence catalog
     await supabase.from('policy_cgl_evidence_catalog').upsert({
@@ -424,6 +447,20 @@ serve(async (req) => {
       extracted_at: new Date().toISOString(),
     };
 
+    // Resolve the extracted carrier name to the agency's canonical carrier
+    // (clean rating/parenthetical suffixes -> resolve_carrier). Writing the
+    // canonical name + NAIC into the blob identity is what makes the COI
+    // correct (get_master_coi reads identity.carrier_name / identity.carrier_naic).
+    // Never fatal: on no-match we keep the cleaned (or raw) name.
+    const rawCarrierName = extractedData.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    cglDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    cglDetails.identity.carrier_naic =
+      carrierRes?.naic ?? cglDetails.identity.carrier_naic ?? null;
+    (cglDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (cglDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
+
     // Build field evidence mapping
     const fieldEvidence = buildFieldEvidenceMapping(extractedData);
 
@@ -464,35 +501,35 @@ serve(async (req) => {
       })
       .eq('id', job.id);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error) => {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('CGL extraction error (background):', error);
+        try {
+          await supabase
+            .from('policy_cgl_extraction_jobs')
+            .update({ status: 'failed', error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500) })
+            .eq('id', jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        job_id: job.id,
-        locations_count: locationsExtracted,
-        classifications_count: classificationsExtracted,
-        additional_insureds_count: additionalInsuredsExtracted,
-        endorsements_count: endorsementsExtracted,
-        confidence: cglDetails.extraction_confidence,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, job_id: jobId, status: 'processing' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('CGL extraction error:', error);
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error('CGL extraction error (sync phase):', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
-
-    // Record the failure on the job so it is never stuck at "extracting" and
-    // the actual error is visible for diagnosis.
-    if (supabase && jobId) {
-      try {
-        await supabase
-          .from('policy_cgl_extraction_jobs')
-          .update({ status: 'failed', error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500) })
-          .eq('id', jobId);
-      } catch (_e) {
-        // best effort - do not mask the original error
-      }
-    }
-
     return new Response(
       JSON.stringify({ success: false, error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

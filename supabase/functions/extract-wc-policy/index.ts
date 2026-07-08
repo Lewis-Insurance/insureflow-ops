@@ -16,6 +16,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
 import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 import {
@@ -29,6 +30,9 @@ import {
   shapeSubrogationWaiverRows,
   type RawWcExtraction,
 } from './shape.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // WC EXTRACTION SYSTEM PROMPT - Evidence-Based
@@ -391,7 +395,6 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin);
 
   const jobStartTime = Date.now();
-  let jobId: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -399,8 +402,6 @@ serve(async (req) => {
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     const azureEndpoint = Deno.env.get("AZURE_DI_ENDPOINT");
     const azureKey = Deno.env.get("AZURE_DI_KEY");
-
-    if (!anthropicApiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -418,8 +419,21 @@ serve(async (req) => {
       use_azure_di = true,
     } = body;
 
-    if (!policy_id) throw new Error("policy_id is required");
-    if (!document_id) throw new Error("document_id is required");
+    if (!policy_id || !document_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: "document_id and policy_id are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Azure DI is OPTIONAL for WC (falls back to stored ocr_text); only the
+    // Anthropic key is strictly required, so validate it synchronously.
+    if (!anthropicApiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     console.log(`[extract-wc-policy] Starting extraction for policy ${policy_id}, document ${document_id}`);
 
@@ -433,17 +447,26 @@ serve(async (req) => {
         // The OCR call uses the prebuilt-layout model (see callAzureDocumentIntelligence);
         // record that exact model id, not the stale 'prebuilt-document' label.
         azure_model_id: "prebuilt-layout",
-        llm_model: "claude-haiku-4-5-20251001",
+        llm_model: "claude-sonnet-5",
       })
       .select("id")
       .single();
 
-    if (jobError) {
-      console.warn("Failed to create job record:", jobError);
-    } else {
-      jobId = jobData.id;
+    if (jobError || !jobData) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || "unknown error"}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+    const jobId = jobData.id;
 
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on "completed" or "failed" - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document info
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -541,8 +564,8 @@ serve(async (req) => {
     // prompt (evidence catalog) before it leaves the process. Same calling
     // convention as extract-bap-policy; no modelBoundaryFetch change needed.
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 8000,
+      model: "claude-sonnet-5",
+      max_tokens: 16384,
       system: WC_EXTRACTION_SYSTEM_PROMPT,
       tools: [
         {
@@ -553,7 +576,7 @@ serve(async (req) => {
       ],
       tool_choice: { type: "tool", name: WC_EXTRACTION_TOOL_NAME },
       messages: [{ role: "user", content: userPrompt }],
-    });
+    }, 110000);
 
     const llmTime = Date.now() - llmStartTime;
     console.log(`[extract-wc-policy] Claude completed in ${llmTime}ms`);
@@ -576,6 +599,20 @@ serve(async (req) => {
     // L914-936). The three EL limits + part_one_wc are what the COI WC section needs.
     const nowIso = new Date().toISOString();
     const { wcDetails, fieldEvidence } = shapeWcDetails(rawExtraction, nowIso);
+
+    // Resolve the extracted carrier to the agency's canonical carrier (clean
+    // rating/parenthetical suffixes -> resolve_carrier). The COI reads the blob
+    // identity.carrier_name / identity.carrier_naic, so patch the shaped blob
+    // (NOT the policies scalar columns). Never fatal: on no-match we keep the
+    // cleaned (or raw) name and any NAIC the model already extracted.
+    const rawCarrierName = rawExtraction.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    wcDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    wcDetails.identity.carrier_naic =
+      carrierRes?.naic ?? wcDetails.identity.carrier_naic ?? null;
+    (wcDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (wcDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
 
     // Update policy with WC details.
     const { error: updateError } = await supabase
@@ -672,45 +709,41 @@ serve(async (req) => {
 
     console.log(`[extract-wc-policy] Successfully extracted WC details for policy ${policy_id}`);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error: any) => {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        console.error("[extract-wc-policy] Error (background):", error);
+        try {
+          await supabase
+            .from("policy_wc_extraction_jobs")
+            .update({
+              status: "failed",
+              error_message: `${msg} | ${Date.now() - jobStartTime}ms`.slice(0, 500),
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        policy_id,
-        job_id: jobId,
-        extraction_method: evidenceCatalog ? "azure_di_claude" : "ocr_text_claude",
-        evidence_entries: evidenceCatalog?.stats.totalEntries || 0,
-        wc_details: wcDetails,
-        classifications_count: classificationsCount,
-        officers_count: officersCount,
-        states_count: statesCount,
-        experience_mods_count: experienceModsCount,
-        subrogation_waivers_count: subrogationWaiversCount,
-        processing_time_ms: Date.now() - jobStartTime,
-      }),
+      JSON.stringify({ success: true, job_id: jobId, status: "processing" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
+        status: 202,
       }
     );
   } catch (error: any) {
-    console.error("[extract-wc-policy] Error:", error);
-
-    // Update job as failed
-    if (jobId) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-      await supabase
-        .from("policy_wc_extraction_jobs")
-        .update({
-          status: "failed",
-          error_message: error.message,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", jobId);
-    }
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error("[extract-wc-policy] Error (sync phase):", error);
     return new Response(
       JSON.stringify({
         success: false,
