@@ -1,0 +1,42 @@
+#!/bin/sh
+# Guard against the #1 Windows-PC merge hazard: an accidental package-lock.json
+# commit. Refreshing the lockfile on Windows silently prunes Linux-only optional
+# packages, which breaks the Linux CI runner (npm ci) even though the Mac and
+# Netlify builds pass. See NEW-PC-SETUP-WINDOWS.md section 8.
+#
+# Rule: package-lock.json may only be committed alongside a package.json change
+# (i.e. a real dependency add/remove). A lockfile-only change is almost always
+# an unwanted "refresh" and is blocked.
+#
+# Escape hatch for the rare legit lockfile-only change:
+#   ALLOW_LOCKFILE_ONLY=1 git commit ...
+
+staged=$(git diff --cached --name-only)
+
+echo "$staged" | grep -qx "package-lock.json"
+lock_staged=$?
+
+echo "$staged" | grep -qx "package.json"
+pkg_staged=$?
+
+if [ "$lock_staged" -eq 0 ] && [ "$pkg_staged" -ne 0 ]; then
+  if [ "${ALLOW_LOCKFILE_ONLY:-0}" = "1" ]; then
+    echo "pre-commit: allowing lockfile-only commit (ALLOW_LOCKFILE_ONLY=1)." >&2
+  else
+    echo "" >&2
+    echo "BLOCKED: package-lock.json is staged but package.json is not." >&2
+    echo "" >&2
+    echo "On this Windows PC a lockfile 'refresh' drops Linux-only packages and" >&2
+    echo "breaks CI. If you did NOT intentionally add/remove a dependency, drop it:" >&2
+    echo "" >&2
+    echo "    git restore --staged package-lock.json" >&2
+    echo "    git checkout -- package-lock.json" >&2
+    echo "" >&2
+    echo "If you DID change dependencies, stage package.json too, or override with:" >&2
+    echo "    ALLOW_LOCKFILE_ONLY=1 git commit ..." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+exit 0
