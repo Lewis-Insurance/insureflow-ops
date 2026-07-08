@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { usePolicyAdditionalCoverages } from '@/hooks/usePolicyAdditionalCoverages';
+import { PolicyEndorsementsSection } from '@/components/policies/PolicyEndorsementsSection';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { useMasterCoi, useSaveMasterCoiFields } from '@/hooks/useMasterCoi';
 import { LINE_LABEL, formatCurrency } from '@/components/master-coi/lineDisplay';
@@ -326,6 +327,12 @@ export function PolicyCoveragePanel({
             <AdditionalCoveragesSection policyId={policyId} lineKey={lineKey} />
           </div>
         )}
+
+        <PolicyEndorsementsSection
+          accountId={accountId}
+          policyId={policyId}
+          lineKey={lineKey}
+        />
       </div>
     </PanelShell>
   );
