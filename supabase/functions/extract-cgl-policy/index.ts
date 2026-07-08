@@ -19,6 +19,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
+import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
@@ -63,10 +64,6 @@ const CGL_FIELD_PATTERNS: Record<string, RegExp[]> = {
   // Deductible
   Deductible: [/deductible/i, /ded/i],
   SIR: [/self.insured\s*retention/i, /s\.?i\.?r\.?/i],
-
-  // Premium
-  TotalPremium: [/total\s*premium/i, /annual\s*premium/i, /policy\s*premium/i],
-  Premium: [/premium/i],
 };
 
 // =============================================================================
@@ -253,7 +250,7 @@ serve(async (req) => {
     // Parse response
     const responseText = anthropicResponseText(response);
     const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || [null, responseText];
-    const extractedData = JSON.parse(jsonMatch[1] || responseText);
+    const extractedData = nullifyRedactedTokens(JSON.parse(jsonMatch[1] || responseText));
 
     // Store evidence catalog
     await supabase.from('policy_cgl_evidence_catalog').upsert({
@@ -304,7 +301,7 @@ serve(async (req) => {
           exposure_basis: cls.exposure_basis?.value,
           exposure_amount: cls.exposure_amount?.value,
           rate: cls.rate?.value,
-          premium: cls.premium?.value,
+          // premium intentionally NOT captured (agency rule: premium never captured, any line, any doc)
           is_products_completed_ops: cls.is_products_completed_ops?.value || false,
           location_number: cls.location_number?.value,
           evidence_ids: collectEvidenceIds(cls),
@@ -385,7 +382,6 @@ serve(async (req) => {
           zip: extractedData.identity?.mailing_address?.zip?.value,
         },
         fein: extractedData.identity?.fein?.value,
-        producer: extractedData.identity?.producer?.value,
       },
       dates: {
         effective_date: extractedData.dates?.effective_date?.value,
@@ -418,13 +414,6 @@ serve(async (req) => {
             property_damage: extractedData.deductible?.property_damage?.value,
           }
         : undefined,
-      premium: {
-        total_premium: extractedData.premium?.total_premium?.value,
-        premises_operations_premium: extractedData.premium?.premises_operations_premium?.value,
-        products_completed_ops_premium: extractedData.premium?.products_completed_ops_premium?.value,
-        policy_fee: extractedData.premium?.policy_fee?.value,
-        terrorism_premium: extractedData.premium?.terrorism_premium?.value,
-      },
       extraction_source: 'azure_di_claude',
       extraction_confidence: calculateOverallConfidence(extractedData),
       extracted_at: new Date().toISOString(),
@@ -834,8 +823,7 @@ Extract CGL policy data. For each field include:
       "state": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
       "zip": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" }
     },
-    "fein": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "producer": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+    "fein": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
   },
   "dates": {
     "effective_date": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
@@ -867,14 +855,7 @@ Extract CGL policy data. For each field include:
   "locations": [],
   "classifications": [],
   "additional_insureds": [],
-  "endorsements": [],
-  "premium": {
-    "total_premium": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "premises_operations_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "products_completed_ops_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "policy_fee": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "terrorism_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  }
+  "endorsements": []
 }
 \`\`\`
 
