@@ -159,7 +159,7 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-sonnet-5',
+        llm_model: 'claude-sonnet-4-20250514',
       })
       .select()
       .single();
@@ -239,7 +239,7 @@ serve(async (req) => {
     const userPrompt = buildCGLUserPrompt(evidenceCatalog, document_type, policyData);
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

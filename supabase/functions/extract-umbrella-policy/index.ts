@@ -218,7 +218,7 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: 'pending',
-        llm_model: 'claude-sonnet-5',
+        llm_model: 'claude-sonnet-4-20250514',
       })
       .select()
       .single();
@@ -312,7 +312,7 @@ serve(async (req) => {
     const extractionStart = Date.now();
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 10000, // Umbrella can have many underlying policies
       system: UMBRELLA_EXTRACTION_SYSTEM_PROMPT,
       tools: [

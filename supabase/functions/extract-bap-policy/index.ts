@@ -372,7 +372,7 @@ serve(async (req) => {
     // Create job record
     const { data: jobData } = await supabase
       .from("policy_bap_extraction_jobs")
-      .insert({ policy_id, document_id, status: "pending", llm_model: "claude-sonnet-5" })
+      .insert({ policy_id, document_id, status: "pending", llm_model: "claude-sonnet-4-20250514" })
       .select("id")
       .single();
     if (jobData) jobId = jobData.id;
@@ -456,7 +456,7 @@ serve(async (req) => {
     // needed NO change: it JSON-round-trips and recursively redacts the whole
     // body, and our schema strings carry no PII.
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: "claude-sonnet-5",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 8000,
       system: BAP_EXTRACTION_SYSTEM_PROMPT,
       tools: [
