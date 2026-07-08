@@ -24,8 +24,8 @@ export function PipelineFunnelChart({ data, isLoading }: PipelineFunnelChartProp
     }).format(value);
   };
 
-  const statusOrder = ["pending", "contacted", "quoted", "renewed", "lost", "cancelled"];
-  const activeStatuses = ["pending", "contacted", "quoted", "renewed"];
+  const statusOrder = ["pending", "quoted", "contacted", "renewed", "lost", "cancelled"];
+  const activeStatuses = ["pending", "quoted", "contacted", "renewed"];
   const inactiveStatuses = ["lost", "cancelled"];
 
   const sortedData = [...data].sort(
@@ -40,8 +40,8 @@ export function PipelineFunnelChart({ data, isLoading }: PipelineFunnelChartProp
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: "bg-info",
-      contacted: "bg-warning",
-      quoted: "bg-cc-accent",
+      quoted: "bg-warning",
+      contacted: "bg-cc-accent",
       renewed: "bg-success",
       lost: "bg-destructive",
       cancelled: "bg-muted-foreground",

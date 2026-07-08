@@ -23,31 +23,31 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
 
   const metrics = [
     {
-      title: "Pending → Contacted",
+      title: "Pending → Quoted",
       from: "Pending",
-      to: "Contacted",
-      rate: calculateConversion("pending", "contacted"),
+      to: "Quoted",
+      rate: calculateConversion("pending", "quoted"),
       fromCount: getStatusCount("pending"),
-      toCount: getStatusCount("contacted"),
+      toCount: getStatusCount("quoted"),
       color: "text-info",
       bgColor: "bg-info/10",
     },
     {
-      title: "Contacted → Quoted",
-      from: "Contacted",
-      to: "Quoted",
-      rate: calculateConversion("contacted", "quoted"),
-      fromCount: getStatusCount("contacted"),
-      toCount: getStatusCount("quoted"),
+      title: "Quoted → Contacted",
+      from: "Quoted",
+      to: "Contacted",
+      rate: calculateConversion("quoted", "contacted"),
+      fromCount: getStatusCount("quoted"),
+      toCount: getStatusCount("contacted"),
       color: "text-warning",
       bgColor: "bg-warning/10",
     },
     {
-      title: "Quoted → Renewed",
-      from: "Quoted",
+      title: "Contacted → Renewed",
+      from: "Contacted",
       to: "Renewed",
-      rate: calculateConversion("quoted", "renewed"),
-      fromCount: getStatusCount("quoted"),
+      rate: calculateConversion("contacted", "renewed"),
+      fromCount: getStatusCount("contacted"),
       toCount: getStatusCount("renewed"),
       color: "text-success",
       bgColor: "bg-success/10",
@@ -163,8 +163,8 @@ export function ConversionMetrics({ data, isLoading }: ConversionMetricsProps) {
             <div className="flex flex-col gap-2">
               {[
                 { label: "Pending", count: getStatusCount("pending"), width: "w-full", color: "bg-info" },
-                { label: "Contacted", count: getStatusCount("contacted"), width: "w-5/6", color: "bg-warning" },
-                { label: "Quoted", count: getStatusCount("quoted"), width: "w-4/6", color: "bg-cc-accent" },
+                { label: "Quoted", count: getStatusCount("quoted"), width: "w-5/6", color: "bg-warning" },
+                { label: "Contacted", count: getStatusCount("contacted"), width: "w-4/6", color: "bg-cc-accent" },
                 { label: "Renewed", count: getStatusCount("renewed"), width: "w-3/6", color: "bg-success" },
               ].map((stage) => (
                 <div key={stage.label} className="flex items-center gap-4">
