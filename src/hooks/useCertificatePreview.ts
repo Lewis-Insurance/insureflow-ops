@@ -81,8 +81,14 @@ export function useCertificatePreview(args: {
   deps: unknown[];
   /** Field schema for the masking pass; undefined/empty = no-op (form 25). */
   fieldSchema?: PreviewFieldSchemaEntry[];
+  /**
+   * Appearance-only styling forwarded to the fill (per-field font size / italic).
+   * Stable module constants from the caller; NOT a debounce dep. Appearance never
+   * affects previewSha256 (that hashes field VALUES).
+   */
+  fillStyle?: { smallFields?: string[]; smallFontSize?: number; italicFields?: string[] };
 }): UseCertificatePreviewResult {
-  const { templateBytes, build, deps, fieldSchema } = args;
+  const { templateBytes, build, deps, fieldSchema, fillStyle } = args;
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
@@ -142,6 +148,9 @@ export function useCertificatePreview(args: {
             fieldValues: masked,
             flatten: true,
             updateAppearances: true,
+            smallFields: fillStyle?.smallFields,
+            smallFontSize: fillStyle?.smallFontSize,
+            italicFields: fillStyle?.italicFields,
           });
           if (!fill.pdfBytes) {
             throw new Error('The preview fill produced no PDF bytes.');

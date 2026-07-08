@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Eye, Pencil, PlusSquare, StickyNote, Upload, FilePlus2, Send, Flag, MoreVertical } from 'lucide-react';
+import { Eye, PlusSquare, StickyNote, Upload, FilePlus2, Send, Flag, MoreVertical } from 'lucide-react';
 import { AddNoteModal } from './AddNoteModal';
 import { AddTaskModal } from './AddTaskModal';
 import { UploadDocModal } from './UploadDocModal';
@@ -36,9 +36,6 @@ export function ActionMenu({ account }: ActionMenuProps) {
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuItem onClick={() => navigate(`/customers/${account.id}`)}>
             <Eye className="mr-2 h-4 w-4"/>View Details
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate(`/customers/${account.id}/edit`)}>
-            <Pencil className="mr-2 h-4 w-4"/>Edit Customer
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setNoteOpen(true)}>
             <StickyNote className="mr-2 h-4 w-4"/>Add Note

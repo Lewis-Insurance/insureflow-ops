@@ -87,7 +87,7 @@ export function NamedInsuredBlock({ named, accountId }: NamedInsuredBlockProps) 
 
         <button
           type="button"
-          onClick={() => navigate(`/customers/${accountId}/edit`)}
+          onClick={() => navigate(`/customers/${accountId}`)}
           className="inline-flex shrink-0 items-center gap-1 rounded-cc-sm px-1.5 py-0.5 text-sm text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />

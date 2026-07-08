@@ -24,6 +24,7 @@ import { WorkersCompCard } from '@/components/commercial/WorkersCompCard';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { useTasks } from '@/hooks/useTasks';
+import { humanizeAccountType } from '@/lib/format';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { AddTaskModal } from '@/components/customers/AddTaskModal';
@@ -33,7 +34,6 @@ import { AddDocumentModal } from '@/components/customers/AddDocumentModal';
 import { AddCallLogModal } from '@/components/customers/AddCallLogModal';
 import { InviteToPortalButton } from '@/components/customers/InviteToPortalButton';
 import { ReviewRequestModal } from '@/components/customers/ReviewRequestModal';
-import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 import { EmailComposerModal, CommunicationHistory } from '@/components/communications';
 import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { DocumentCollectionBoard } from '@/components/documents/DocumentCollectionBoard';
@@ -291,9 +291,10 @@ export default function CustomerDetail() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1200px] space-y-6 p-6">
-        {/* ===================== Top bar: identity + actions ===================== */}
+        {/* ============= Top panel: identity + actions + contact (merged) ============= */}
         <section
-          className="relative overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card sm:p-6"
+          id="contact"
+          className="relative scroll-mt-20 overflow-hidden rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card sm:p-6"
           style={{ backgroundImage: 'var(--cc-hero-glow)' }}
         >
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -327,7 +328,7 @@ export default function CustomerDetail() {
               ))}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusPill status={account.account_status} />
-                <Chip>{isBusiness ? 'Business' : 'Household'}</Chip>
+                <Chip>{humanizeAccountType(account.type)}</Chip>
                 {location && <Chip>{location}</Chip>}
                 {!isBusiness && (
                   <GoesByEditor
@@ -355,21 +356,6 @@ export default function CustomerDetail() {
               >
                 <DollarSign className="h-4 w-4" />
                 Record Payment
-              </Button>
-              <DocumentAnalysisButton
-                accountId={account.id}
-                documentName={`Customer: ${account.name}`}
-                variant="outline"
-                size="default"
-                className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
-              />
-              <Button
-                variant="outline"
-                onClick={() => setEmailComposerOpen(true)}
-                className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
-              >
-                <Mail className="h-4 w-4" />
-                Email
               </Button>
 
               <Select value={account.account_status ?? 'active'} onValueChange={updateStatus}>
@@ -420,9 +406,6 @@ export default function CustomerDetail() {
                     <Star className="mr-2 h-4 w-4" /> Request review
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => navigate(`/customers/${account.id}/edit`)}>
-                    Edit customer
-                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => navigate(`/merge-customers?masterId=${account.id}`)}>
                     <GitMerge className="mr-2 h-4 w-4" /> Merge customers
                   </DropdownMenuItem>
@@ -430,16 +413,14 @@ export default function CustomerDetail() {
               </DropdownMenu>
             </div>
           </div>
-        </section>
 
-        {/* ===================== Customer information (was the Contact tab) ===================== */}
-        <section id="contact" className="scroll-mt-20 space-y-4">
+          {/* Contact details, merged up from the old Customer Information card */}
           <CustomerContactInfo
             account={account}
             onSendEmail={() => setEmailComposerOpen(true)}
             onAccountUpdated={refetchAccount}
           />
-          <div className="flex justify-start">
+          <div className="mt-4 flex justify-start">
             <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
           </div>
         </section>

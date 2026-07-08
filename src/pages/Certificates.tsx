@@ -19,7 +19,7 @@ import { ReissueQueue } from '@/components/certificates/ReissueQueue';
 import { useCertificatesNeedingReissue } from '@/hooks/useCertificatesNeedingReissue';
 import { PolicyLineSelector, type CertLineKey } from '@/components/certificates/PolicyLineSelector';
 import { HolderField } from '@/components/certificates/HolderField';
-import { fetchHolderById, type SelectedHolder } from '@/components/certificates/holderUtils';
+import { fetchHolderById, composePrintedOperations, type SelectedHolder } from '@/components/certificates/holderUtils';
 import { OperationsAndRemarksFields } from '@/components/certificates/OperationsAndRemarksFields';
 import { ValidationStrip, type ValidationIssue } from '@/components/certificates/ValidationStrip';
 import { ComplianceStrip } from '@/components/certificates/ComplianceStrip';
@@ -33,6 +33,7 @@ import { useCertificatePreview } from '@/hooks/useCertificatePreview';
 import { useIssueCertificate, IssueCertificateError } from '@/hooks/useIssueCertificate';
 import { toAcord25BuildInput } from '@/lib/acord/acord25/fromMasterCoi';
 import { buildAcord25FieldValues } from '@/lib/acord/acord25/buildAcord25FieldValues';
+import { ACORD25_DATE_COLUMN_FIELDS, ACORD25_SIGNATURE_FIELDS } from '@/lib/acord/acord25/fieldMap';
 import { validateAcord25 } from '@/lib/acord/acord25/validateAcord25';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
@@ -350,20 +351,17 @@ function CertificateGenerator({
     };
   }, [accountId]);
 
-  // Seed the description of operations + default remarks once (dirty flags).
+  // Seed the description of operations once. Remarks are no longer a separate
+  // field; any account default remarks are folded onto the BACK of the
+  // description (the same box they printed into), matching 05's composition rule.
   const seededDooRef = useRef(false);
   useEffect(() => {
     if (seededDooRef.current || !masterCoi) return;
-    const seed = cellStr(masterCoi.description_of_operations?.v);
-    if (seed) dispatch({ type: 'setDescriptionOfOperations', value: seed });
     seededDooRef.current = true;
-  }, [masterCoi]);
-
-  const seededRemarksRef = useRef(false);
-  useEffect(() => {
-    if (seededRemarksRef.current) return;
     let active = true;
     (async () => {
+      const doo = cellStr(masterCoi.description_of_operations?.v);
+      let defaultRemarks = '';
       // No account_coi_profiles reader exists in the repo (repo-vs-spec drift, see
       // return notes); read default_remarks directly. The table is not in the
       // generated types, so the .from() target is cast like useMasterCoi's saver.
@@ -374,18 +372,19 @@ function CertificateGenerator({
         .eq('account_id', accountId)
         .maybeSingle();
       if (!active) return;
-      seededRemarksRef.current = true;
       if (error) {
         logger.warn('certificates: default remarks lookup failed', error);
-        return;
+      } else {
+        defaultRemarks =
+          (data as unknown as { default_remarks: string | null } | null)?.default_remarks ?? '';
       }
-      const remarks = (data as unknown as { default_remarks: string | null } | null)?.default_remarks;
-      if (remarks) dispatch({ type: 'setRemarks', value: remarks });
+      const seed = composePrintedOperations(doo, defaultRemarks);
+      if (seed) dispatch({ type: 'setDescriptionOfOperations', value: seed });
     })();
     return () => {
       active = false;
     };
-  }, [accountId]);
+  }, [masterCoi, accountId]);
 
   // Preselect a coverage line from ?policyId= (once master COI resolves), if unblocked.
   const preselectedPolicyRef = useRef(false);
@@ -481,8 +480,11 @@ function CertificateGenerator({
         subr_wvd_resolved: row.subr_wvd_resolved,
         basis: typeof row.basis === 'string' ? row.basis : null,
       })),
+      // Evaluate against what THIS certificate will print (the per-line toggles),
+      // so a manual Y flips its requirement to pass in real time.
+      printedFlags: state.perLine,
     });
-  }, [masterCoi, holderRequirements, state.selectedLineKeys, endorsementByLine]);
+  }, [masterCoi, holderRequirements, state.selectedLineKeys, endorsementByLine, state.perLine]);
 
   const requirementFailures = useMemo(
     () => requirementsEvaluation.results.filter((r) => r.severity === 'fail' && !r.pass),
@@ -544,8 +546,11 @@ function CertificateGenerator({
         }
       : null;
 
-    const authorizedRepName =
-      cellStr(masterCoi.producer.contact_name?.v) || cellStr(masterCoi.producer.name?.v);
+    // The authorized representative is the agency's signer (Brian Lewis), not the
+    // producer contact. Fixed default for this single-agency deployment; must
+    // match the server (generate-certificate) verbatim or issuance 409s on the
+    // preview-hash bind.
+    const authorizedRepName = 'Brian Lewis';
 
     const input = toAcord25BuildInput({
       masterCoi,
@@ -576,6 +581,12 @@ function CertificateGenerator({
       endorsementByLine,
       additionalCoverages,
     ],
+    // Appearance only: shrink the narrow POLICY EFF/EXP date columns and render
+    // the authorized rep in italic (signature). Does not affect the preview hash.
+    fillStyle: {
+      smallFields: ACORD25_DATE_COLUMN_FIELDS,
+      italicFields: ACORD25_SIGNATURE_FIELDS,
+    },
   });
 
   // -----------------------------------------------------------------------
@@ -798,8 +809,14 @@ function CertificateGenerator({
             name: snapshot.holder.name,
             addressBlock: holderAddress,
           },
-          descriptionOfOperations: snapshot.description_of_operations,
-          remarks: snapshot.remarks ?? '',
+          // Remarks were merged into the description field; fold a superseded
+          // cert's separate remarks onto the back of its description so the
+          // reissued cert prints the same block.
+          descriptionOfOperations: composePrintedOperations(
+            snapshot.description_of_operations,
+            snapshot.remarks ?? '',
+          ),
+          remarks: '',
           supersedesCertificateId: certificate.id,
         },
       });
@@ -905,11 +922,9 @@ function CertificateGenerator({
 
                 <OperationsAndRemarksFields
                   descriptionOfOperations={state.descriptionOfOperations}
-                  remarks={state.remarks}
                   onChangeDescription={(value) =>
                     dispatch({ type: 'setDescriptionOfOperations', value })
                   }
-                  onChangeRemarks={(value) => dispatch({ type: 'setRemarks', value })}
                 />
 
                 <ValidationStrip issues={validationIssues} />

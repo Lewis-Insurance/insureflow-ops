@@ -202,7 +202,7 @@ function CustomerSearchDropdown({
                           )}
                           <span className="font-medium truncate">{account.name}</span>
                           <Badge variant="outline" className="text-xs shrink-0">
-                            {account.type === 'commercial_business' ? 'Business' : 'Household'}
+                            {account.type === 'commercial_business' ? 'Commercial' : 'Personal'}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">

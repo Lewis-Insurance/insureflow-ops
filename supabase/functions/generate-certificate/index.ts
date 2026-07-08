@@ -35,6 +35,8 @@ import type { RequirementsEvaluation } from '../_shared/acord25/requirements.ts'
 import {
   ACORD25_TEMPLATE_SHA256,
   ACORD25_FIELD_MAP,
+  ACORD25_DATE_COLUMN_FIELDS,
+  ACORD25_SIGNATURE_FIELDS,
 } from '../_shared/acord25/fieldMap.ts';
 import type {
   Acord25Issue,
@@ -569,7 +571,6 @@ async function handle(req: Request): Promise<Response> {
       resByLine.set(r.line_key as string, r);
     }
 
-    const intentErrors: StructuredError['errors'] = [];
     const printFlags = new Map<
       LineKey,
       {
@@ -585,35 +586,23 @@ async function handle(req: Request): Promise<Response> {
       const addlResolved = (r?.addl_insd_resolved ?? 'none') as 'endorsed' | 'requested' | 'none';
       const subrResolved = (r?.subr_wvd_resolved ?? 'none') as 'endorsed' | 'requested' | 'none';
 
-      let addl: 'Y' | 'N' = 'N';
-      if (l.per_line.addl_insd) {
-        if (addlResolved === 'endorsed') {
-          addl = 'Y';
-        } else {
-          intentErrors.push({
-            line_key: l.line_key,
-            message: `holder is not endorsed for additional insured on ${l.line_key}`,
-          });
-        }
-      }
-
-      let subr: 'Y' | 'N' = 'N';
-      if (l.per_line.subr_wvd) {
-        if (subrResolved === 'endorsed') {
-          subr = 'Y';
-        } else {
-          intentErrors.push({
-            line_key: l.line_key,
-            message: `holder has no confirmed waiver of subrogation on ${l.line_key}`,
-          });
-        }
-      }
+      // The print intent is authoritative: Y iff the staff toggle is on, whatever
+      // the resolution shows. A manual Y with no confirmed endorsement is allowed
+      // (the build records a non-blocking advisory); the snapshot keeps the intent
+      // and the resolution separately for the E&O trail. This must mirror the
+      // client's per-line intent exactly or the preview-hash bind (Step 7) 409s.
+      const addl: 'Y' | 'N' = l.per_line.addl_insd ? 'Y' : 'N';
+      const subr: 'Y' | 'N' = l.per_line.subr_wvd ? 'Y' : 'N';
 
       const basis = r && r.basis ? JSON.stringify(r.basis) : null;
       printFlags.set(l.line_key, { addl, addlResolved, subr, subrResolved, basis });
     }
-    if (intentErrors.length > 0) {
-      throw fail(422, 'ENDORSEMENT_NOT_PERMITTED', 'cannot print Y for an unconfirmed endorsement', intentErrors);
+
+    // Per-line printed flags = the staff intent. Reused for the requirements
+    // evaluation (5b) and the fromMasterCoi print intents (Step 6).
+    const printedFlags: Partial<Record<LineKey, { addlInsd: boolean; subrWvd: boolean }>> = {};
+    for (const [lineKey, f] of printFlags) {
+      printedFlags[lineKey] = { addlInsd: f.addl === 'Y', subrWvd: f.subr === 'Y' };
     }
 
     // --- Step 5b: holder-requirements re-evaluation (07 §4.4) -----------------
@@ -646,6 +635,9 @@ async function handle(req: Request): Promise<Response> {
         subr_wvd_resolved: r.subr_wvd_resolved as string,
         basis: r.basis != null ? JSON.stringify(r.basis) : null,
       })),
+      // Evaluate the additional-insured / waiver requirements against what THIS
+      // certificate prints (the staff toggles), so a manual Y satisfies them.
+      printedFlags,
     });
     const requirementsOverridden =
       requirementsEvaluation.has_requirements &&
@@ -660,13 +652,9 @@ async function handle(req: Request): Promise<Response> {
     const holderAddressLines = composeHolderAddress(holder);
     const certDate = formatIssueDate(asOf);
 
-    // Per-line print intents keyed for fromMasterCoi (downgrade-only already
-    // enforced above; here we pass the intent booleans through).
-    const printIntents: Partial<Record<LineKey, { addlInsd: boolean; subrWvd: boolean }>> = {};
-    for (const l of body.lines) {
-      const f = printFlags.get(l.line_key)!;
-      printIntents[l.line_key] = { addlInsd: f.addl === 'Y', subrWvd: f.subr === 'Y' };
-    }
+    // Per-line print intents for fromMasterCoi: the same staff toggles the
+    // requirements evaluation used above.
+    const printIntents = printedFlags;
 
     // Custom write-in coverages for the selected (line, policy) pairs
     // (policy_additional_coverages). Ordered by created_at so this server rebuild
@@ -719,7 +707,9 @@ async function handle(req: Request): Promise<Response> {
       additionalCoverages,
       certificateDate: certDate,
       certificateNumber: null, // reserved later; header field excluded from preview hash
-      authorizedRepName: cellStr(mc.producer.contact_name),
+      // Fixed agency signer; MUST match the client (Certificates.tsx) verbatim or
+      // the preview-hash bind (Step 7) 409s.
+      authorizedRepName: 'Brian Lewis',
     });
 
     const build = buildAcord25FieldValues(buildInput);
@@ -794,7 +784,13 @@ async function handle(req: Request): Promise<Response> {
       : undefined;
 
     // --- Step 9: fill + hash -------------------------------------------------
-    const fill = await fillAcord25Pdf(templateBytes, fieldValues);
+    // Appearance-only styling (must mirror the client preview fillStyle in
+    // Certificates.tsx): smaller POLICY EFF/EXP date columns + italic signature.
+    // These name fields, not values, so they never affect the preview hash.
+    const fill = await fillAcord25Pdf(templateBytes, fieldValues, {
+      smallFields: ACORD25_DATE_COLUMN_FIELDS,
+      italicFields: ACORD25_SIGNATURE_FIELDS,
+    });
     if (!fill.success || !fill.pdfBytes) {
       throw fail(422, 'FILL_FAILED', 'PDF fill failed', [
         { message: fill.errors.join('; ') || 'fill produced no bytes' },

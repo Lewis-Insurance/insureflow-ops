@@ -132,7 +132,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
     const isActive = variant === 'active';
 
     return (
-      <AccentSpine key={policy.id} active={isActive} className="p-4">
+      <AccentSpine key={policy.id} id={`policy-${policy.id}`} active={isActive} className="scroll-mt-24 p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Policy Basic Info */}
           <div className="md:col-span-2">

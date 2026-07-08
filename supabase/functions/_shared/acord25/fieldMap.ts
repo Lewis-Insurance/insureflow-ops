@@ -410,3 +410,28 @@ export const ACORD25_EXPECTED_FIELD_NAMES: string[] = [
   'Form_CompletionDate_A',
   'Producer_AuthorizedRepresentative_Signature_A',
 ];
+
+// ---------------------------------------------------------------------------
+// Appearance-styling field sets (consumed by the preview fill and the issue
+// fill). These name PDF FIELDS, not values, so they never touch the preview hash
+// - only how the flattened certificate looks.
+// ---------------------------------------------------------------------------
+
+/**
+ * The per-line POLICY EFF / POLICY EXP date columns. They are narrow, so the
+ * fillers render them a size smaller than the rest of the form. The header
+ * certificate date (Form_CompletionDate) is excluded; it has room.
+ */
+export const ACORD25_DATE_COLUMN_FIELDS: string[] = (
+  Object.keys(ACORD25_FIELD_MAP) as Acord25LogicalKey[]
+)
+  .filter((k) => ACORD25_FIELD_MAP[k].kind === 'date' && k !== 'certificateDate')
+  .map((k) => ACORD25_FIELD_MAP[k].pdfField);
+
+/**
+ * The authorized-representative signature field, rendered in an italic standard
+ * font so it reads as a signature.
+ */
+export const ACORD25_SIGNATURE_FIELDS: string[] = [
+  ACORD25_FIELD_MAP.authorizedRepName.pdfField,
+];

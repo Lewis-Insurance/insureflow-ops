@@ -67,8 +67,7 @@ function matchRecord(pathname: string): RecordMatch | null {
     renewals: { label: 'Renewals', to: '/renewals' },
   };
 
-  // /customers/:id  (but not /customers/:id/edit being treated specially —
-  // the customer record still resolves; edit is a sub-view of the record)
+  // /customers/:id and any sub-path still resolve to the record.
   let m = pathname.match(/^\/(customers|policies|leads)\/([^/]+)(?:\/.*)?$/);
   if (m && m[2] !== 'new') {
     const entity = m[1] as RecordEntity;
@@ -465,6 +464,10 @@ function RecordHeader({ record }: { record: RecordMatch }) {
       )}
 
       <span className="flex-1" />
+
+      {/* Global search — constant on every surface. Identical component, look and
+          behavior as the list/index header so it never disappears on a record. */}
+      <SearchField />
 
       {/* The record's single lime primary. Runs "Log contact" on this record via
           the chrome action bus; falls back to the palette if the page is not listening. */}

@@ -967,8 +967,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="household">Household (Personal)</SelectItem>
-                  <SelectItem value="commercial_business">Commercial Business</SelectItem>
+                  <SelectItem value="household">Personal</SelectItem>
+                  <SelectItem value="commercial_business">Commercial</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { type EntityType } from '@/lib/insuredNames';
@@ -13,6 +12,7 @@ import { z } from 'zod';
 
 const accountSchema = z.object({
   name: z.string().max(200, 'Name too long').optional().or(z.literal('')),
+  type: z.enum(['household', 'commercial_business']).optional(),
   date_of_birth: z.string().optional().or(z.literal('')),
   spouse_name: z.string().max(200, 'Spouse name too long').optional().or(z.literal('')),
   spouse_date_of_birth: z.string().optional().or(z.literal('')),
@@ -79,6 +79,7 @@ interface EditContactInfoModalProps {
 export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }: EditContactInfoModalProps) {
   const [formData, setFormData] = useState({
     name: '',
+    type: 'household',
     date_of_birth: '',
     spouse_name: '',
     spouse_date_of_birth: '',
@@ -115,6 +116,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
       setFormData({
         name: account.name || '',
+        type: /business|commercial/i.test(account.type ?? '') ? 'commercial_business' : 'household',
         date_of_birth: account.date_of_birth || '',
         spouse_name: account.spouse_name || '',
         spouse_date_of_birth: account.spouse_date_of_birth || '',
@@ -195,9 +197,10 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
     try {
       const updateData = {
         name: formData.name.trim() || null,
+        type: formData.type,
         date_of_birth: formData.date_of_birth || null,
-        spouse_name: account.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
-        spouse_date_of_birth: account.type === 'household' && formData.spouse_date_of_birth ? formData.spouse_date_of_birth : null,
+        spouse_name: formData.type === 'household' && formData.spouse_name.trim() ? formData.spouse_name.trim() : null,
+        spouse_date_of_birth: formData.type === 'household' && formData.spouse_date_of_birth ? formData.spouse_date_of_birth : null,
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
         phone_secondary: formData.phone_secondary.trim() || null,
@@ -216,8 +219,8 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
         trustee_name: formData.hasPrimaryEntity && formData.primary_entity_type === 'trust' && formData.trustee_name.trim() ? formData.trustee_name.trim() : null,
         trust_date: formData.hasPrimaryEntity && formData.primary_entity_type === 'trust' && formData.trust_date ? formData.trust_date : null,
         // Trust/Estate fields for secondary insured
-        secondary_entity_type: account.type === 'household' && formData.hasSecondaryEntity ? formData.secondary_entity_type : null,
-        secondary_entity_name: account.type === 'household' && formData.hasSecondaryEntity && formData.secondary_entity_name.trim() ? formData.secondary_entity_name.trim() : null,
+        secondary_entity_type: formData.type === 'household' && formData.hasSecondaryEntity ? formData.secondary_entity_type : null,
+        secondary_entity_name: formData.type === 'household' && formData.hasSecondaryEntity && formData.secondary_entity_name.trim() ? formData.secondary_entity_name.trim() : null,
       };
 
       const { error } = await supabase
@@ -261,19 +264,34 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Edit Customer Information</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-          <div className={account.type === 'household' ? 'grid grid-cols-2 gap-4' : ''}>
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2">
+          <div>
+            <Label htmlFor="type">Type</Label>
+            <Select
+              value={formData.type}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
+            >
+              <SelectTrigger id="type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="household">Personal</SelectItem>
+                <SelectItem value="commercial_business">Commercial</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className={formData.type === 'household' ? 'grid grid-cols-2 gap-4' : ''}>
             <div>
               <Label htmlFor="name">{formData.hasPrimaryEntity ? 'Individual Name (optional)' : 'Customer Name *'}</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder={account.type === 'household' ? "Primary Insured" : "Business Name"}
+                placeholder={formData.type === 'household' ? "Primary Insured" : "Business Name"}
                 className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && (
@@ -371,7 +389,7 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
                 </div>
               )}
             </div>
-            {account.type === 'household' && (
+            {formData.type === 'household' && (
               <div>
                 <Label htmlFor="spouse_name">{formData.hasSecondaryEntity ? 'Spouse Name (optional)' : 'Spouse / Co-Insured'}</Label>
                 <Input
@@ -536,57 +554,10 @@ export function EditContactInfoModal({ open, onOpenChange, account, onSuccess }:
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="tin_last4">TIN (Last 4 digits)</Label>
-              <Input
-                id="tin_last4"
-                value={formData.tin_last4}
-                onChange={(e) => handleInputChange('tin_last4', e.target.value)}
-                placeholder="1234"
-                maxLength={4}
-                className={errors.tin_last4 ? 'border-destructive' : ''}
-              />
-              {errors.tin_last4 && (
-                <p className="text-sm text-destructive mt-1">{errors.tin_last4}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="source">Lead Source</Label>
-              <Input
-                id="source"
-                value={formData.source}
-                onChange={(e) => handleInputChange('source', e.target.value)}
-                placeholder="Website, Referral, etc."
-              />
-            </div>
           </div>
 
-          <div>
-            <Label htmlFor="lead_source_detail">Source Details</Label>
-            <Input
-              id="lead_source_detail"
-              value={formData.lead_source_detail}
-              onChange={(e) => handleInputChange('lead_source_detail', e.target.value)}
-              placeholder="Specific campaign or referrer details"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="notes">Customer Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="Additional notes about this customer..."
-              className="min-h-[80px]"
-            />
-          </div>
-
-          </div>
-
-        {/* Sticky Footer with Buttons */}
-        <div className="flex justify-end gap-2 pt-4 border-t bg-background sticky bottom-0">
+        {/* Footer pinned to the very bottom; the form area above scrolls. */}
+        <div className="flex justify-end gap-2 pt-4 border-t bg-background shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

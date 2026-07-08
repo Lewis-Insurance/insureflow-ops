@@ -31,7 +31,7 @@ import type {
   BuildAcord25Result,
   InsurerAssignment,
 } from './types';
-import { formatAcordDate, formatLimit } from './format';
+import { formatAcordDateShort, formatLimit } from './format';
 
 // ---------------------------------------------------------------------------
 // Row logical-key prefixes per line key (Section 0.1). 'property' and 'other'
@@ -78,7 +78,13 @@ function lineDisplayName(line: Acord25LineKey): string {
 
 // ---------------------------------------------------------------------------
 // Y/N print semantics (Section 4.4). Returns the literal to print plus any issue.
-// Downgrade-only: 'Y' only when resolved==='endorsed' && printIntent===true.
+//
+// The print INTENT is authoritative: the certificate prints Y whenever the staff
+// user set the toggle on, and N when off, regardless of the policy endorsement
+// resolution. When Y is printed without a confirmed endorsement behind it, a
+// NON-BLOCKING advisory is recorded (an honest E&O trail); it never 422s the
+// issue, and the per-line UI toggle carries the matching "Manage in Master COI"
+// note. Setting the toggle off is always a clean N.
 // ---------------------------------------------------------------------------
 
 type YnColumn = 'ADDL_INSD' | 'SUBR_WVD';
@@ -93,58 +99,31 @@ function resolveYn(
   line: Acord25LineKey,
   logicalKey: Acord25LogicalKey,
 ): { printed: 'Y' | 'N'; issue: Acord25Issue | null } {
-  const label = columnLabel(col);
-  const lineName = lineDisplayName(line);
-  const pendingCode = col === 'ADDL_INSD' ? 'ADDL_INSD_PENDING' : 'SUBR_WVD_PENDING';
-  const notPermittedCode = col === 'ADDL_INSD' ? 'ADDL_INSD_NOT_PERMITTED' : 'SUBR_WVD_NOT_PERMITTED';
-
-  if (flag.resolved === 'endorsed') {
-    if (flag.printIntent) {
-      return { printed: 'Y', issue: null };
-    }
-    // Deliberate downgrade, allowed (R3), no issue.
+  // Off -> clean N, always.
+  if (!flag.printIntent) {
     return { printed: 'N', issue: null };
   }
 
-  if (flag.resolved === 'requested') {
-    if (flag.printIntent) {
-      return {
-        printed: 'N',
-        issue: {
-          code: notPermittedCode,
-          severity: 'error',
-          message: `Cannot print Y: this holder has no confirmed ${label} endorsement on ${lineName}.`,
-          lineKey: line,
-          logicalKeys: [logicalKey],
-        },
-      };
-    }
-    return {
-      printed: 'N',
-      issue: {
-        code: pendingCode,
-        severity: 'warning',
-        message: `The ${label} endorsement on ${lineName} is requested but not yet confirmed for this holder. The certificate will print N until it is confirmed in Master COI.`,
-        lineKey: line,
-        logicalKeys: [logicalKey],
-      },
-    };
+  // On + confirmed endorsement -> Y, no issue.
+  if (flag.resolved === 'endorsed') {
+    return { printed: 'Y', issue: null };
   }
 
-  // resolved === 'none'
-  if (flag.printIntent) {
-    return {
-      printed: 'N',
-      issue: {
-        code: notPermittedCode,
-        severity: 'error',
-        message: `Cannot print Y: this holder has no confirmed ${label} endorsement on ${lineName}.`,
-        lineKey: line,
-        logicalKeys: [logicalKey],
-      },
-    };
-  }
-  return { printed: 'N', issue: null };
+  // On + no confirmed endorsement -> Y by manual choice, with a non-blocking
+  // advisory so the certificate snapshot records the manual assertion.
+  const label = columnLabel(col);
+  const lineName = lineDisplayName(line);
+  const manualCode = col === 'ADDL_INSD' ? 'ADDL_INSD_MANUAL' : 'SUBR_WVD_MANUAL';
+  return {
+    printed: 'Y',
+    issue: {
+      code: manualCode,
+      severity: 'warning',
+      message: `${label} prints Y on ${lineName} by manual choice; no confirmed endorsement backs it for this holder. Confirm the policy carries it or manage it in Master COI.`,
+      lineKey: line,
+      logicalKeys: [logicalKey],
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +179,7 @@ export function buildAcord25FieldValues(input: Acord25BuildInput): BuildAcord25R
       return;
     }
     try {
-      setText(key, formatAcordDate(iso));
+      setText(key, formatAcordDateShort(iso));
     } catch {
       setText(key, '');
       issues.push({

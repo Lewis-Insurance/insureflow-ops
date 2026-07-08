@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
+import { humanizeAccountType } from '@/lib/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,14 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award, Hash, Briefcase, Loader2, Sparkles, Anchor, Shield as ShieldIcon, Lock } from 'lucide-react';
+import { Shield, Calendar, DollarSign, Building, Edit, ArrowLeft, FileText, Users, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { AddNoteModal } from '@/components/customers/AddNoteModal';
-import { NotesPanel } from '@/components/notes/NotesPanel';
-import { AddTaskModal } from '@/components/customers/AddTaskModal';
 import { EditPolicyModal } from '@/components/customers/EditPolicyModal';
 import { UploadDocModal } from '@/components/customers/UploadDocModal';
-import { DocumentAnalysisButton } from '@/components/ai/DocumentAnalysisButton';
 import type { WCPolicyDetails } from '@/types/workers-comp';
 import { useExtractWCPolicy } from '@/hooks/useWCExtraction';
 import { useExtractCGLPolicy, isCGLPolicy } from '@/hooks/useCGLExtraction';
@@ -33,9 +30,7 @@ import { CrimePolicyDetails } from '@/components/policies/CrimePolicyDetails';
 import { useExtractCrimePolicy, isCrimePolicy } from '@/hooks/useCrimeExtraction';
 import { EOPolicyDetails } from '@/components/policies/EOPolicyDetails';
 import { useExtractEOPolicy, isEOPolicy } from '@/hooks/useEOExtraction';
-import { DocumentsList } from '@/components/documents/DocumentsList';
 import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
-import { PaymentHistoryWidget } from '@/components/payments/PaymentHistoryWidget';
 import { CancellationHolderList } from '@/components/certificates/CancellationHolderList';
 import { useCancellationHolders } from '@/hooks/useCancellationHolders';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -45,8 +40,6 @@ export default function PolicyDetail() {
   const { policyId } = useParams<{ policyId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [addNoteOpen, setAddNoteOpen] = useState(false);
-  const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [editPolicyOpen, setEditPolicyOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -108,22 +101,8 @@ export default function PolicyDetail() {
     retry: 1,
   });
 
-  // Policy notes now come from the unified, account-scoped NotesPanel (customer_notes).
-
-  const { data: policyTasks = [] } = useQuery({
-    queryKey: ['policy-tasks', policyId],
-    queryFn: async () => {
-      if (!policyId) return [];
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('policy_id', policyId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!policyId,
-  });
+  // Notes, tasks, payments, and documents for this policy now live on the
+  // customer record; the policy page no longer duplicates those surfaces.
 
   // Cancellation notice (07 §5.2): active certificate holders that reference
   // this policy. The section renders whenever there are holders; it is
@@ -157,6 +136,40 @@ export default function PolicyDetail() {
 
   const handleEdit = () => {
     setEditPolicyOpen(true);
+  };
+
+  // Remarket clone (SOW v3 feeder #5): open a prefilled submission targeting
+  // this policy's line and x-date. Relocated from the removed Quick Actions
+  // panel to the page header; commercial policies only.
+  const handleRemarket = () => {
+    if (!policy?.account) return;
+    const targetLines = commercialLinesForPolicy(policy as any);
+    if (targetLines.length === 0) {
+      // Unmapped commercial labels (e.g. 'commercial_policy', Inland Marine):
+      // land the user where they can pick lines manually instead of dead-ending.
+      toast({
+        title: 'Pick the coverage lines manually',
+        description: "This policy's line could not be mapped automatically; opening the commercial section.",
+      });
+      navigate(`/customers/${policy.account.id}?tab=commercial`);
+      return;
+    }
+    createSubmission.mutate(
+      {
+        accountId: policy.account.id,
+        targetLines,
+        effectiveDate: (policy as any).expiration_date ?? null,
+        // Carrier may live only on the joined carrier_info row.
+        notes: remarketNote({
+          ...(policy as any),
+          carrier: (policy as any).carrier || (policy as any).carrier_info?.name || null,
+        }),
+        remarketOfPolicyId: policy.id,
+      },
+      {
+        onSuccess: () => navigate(`/customers/${policy.account!.id}?tab=commercial`),
+      },
+    );
   };
 
   // Check policy line of business
@@ -285,6 +298,16 @@ export default function PolicyDetail() {
                 New Certificate
               </Button>
             )}
+            {policy.account && (policy as any).line_category === 'commercial' && (
+              <Button
+                variant="outline"
+                disabled={createSubmission.isPending}
+                onClick={handleRemarket}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {createSubmission.isPending ? 'Creating...' : 'Remarket'}
+              </Button>
+            )}
             <Button
               className="bg-emerald-700 hover:bg-emerald-800 text-white"
               onClick={() => setPaymentModalOpen(true)}
@@ -299,177 +322,143 @@ export default function PolicyDetail() {
           </div>
         </div>
 
-        {/* Policy Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Policy Info */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Policy Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Named Insured Info */}
-              {(policy.named_insured || policy.dba || policy.fein) && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    {policy.named_insured && (
-                      <div className="col-span-2">
-                        <label className="text-sm font-medium text-muted-foreground">Named Insured</label>
-                        <p className="font-semibold">{policy.named_insured}</p>
-                      </div>
-                    )}
-                    {policy.dba && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">DBA</label>
-                        <p>{policy.dba}</p>
-                      </div>
-                    )}
-                    {policy.fein && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">FEIN</label>
-                        <p className="font-mono">{policy.fein}</p>
-                      </div>
-                    )}
+        {/* Policy + Account: one compact panel. Was a 2-col grid (policy card +
+            a tall Account/Quick Actions sidebar); merged and densified to cut
+            vertical space. */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>Policy Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Named Insured (when the policy carries its own insured identity) */}
+            {(policy.named_insured || policy.dba || policy.fein) && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
+                {policy.named_insured && (
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Named Insured</label>
+                    <p className="font-semibold">{policy.named_insured}</p>
                   </div>
-                  <Separator />
-                </>
-              )}
+                )}
+                {policy.dba && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">DBA</label>
+                    <p>{policy.dba}</p>
+                  </div>
+                )}
+                {policy.fein && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">FEIN</label>
+                    <p className="font-mono">{policy.fein}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Policy Number</label>
-                  <p className="font-mono">{policy.policy_number}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Line of Business</label>
-                  <p>{policy.line_of_business || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Carrier</label>
-                  <div className="flex items-center gap-2">
-                    <Building className="h-4 w-4" />
-                    {policy.carrier_info?.id ? (
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto font-normal"
-                        onClick={() => navigate(`/carriers?carrier=${policy.carrier_info!.id}`)}
-                      >
-                        {policy.carrier || policy.carrier_info.name}
-                      </Button>
-                    ) : (
-                      <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
-                    )}
-                  </div>
-                  {policy.carrier_naic && (
-                    <p className="text-xs text-muted-foreground mt-1">NAIC: {policy.carrier_naic}</p>
+            {/* All core policy fields in one dense grid (no per-group separators,
+                which is where most of the old height went). */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Policy Number</label>
+                <p className="font-mono">{policy.policy_number}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Line of Business</label>
+                <p>{policy.line_of_business || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Carrier</label>
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  {policy.carrier_info?.id ? (
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto font-normal"
+                      onClick={() => navigate(`/carriers?carrier=${policy.carrier_info!.id}`)}
+                    >
+                      {policy.carrier || policy.carrier_info.name}
+                    </Button>
+                  ) : (
+                    <span>{policy.carrier || policy.carrier_info?.name || 'N/A'}</span>
                   )}
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">MGA</label>
-                  <p>{policy.mga || 'N/A'}</p>
+                {policy.carrier_naic && (
+                  <p className="text-xs text-muted-foreground mt-1">NAIC: {policy.carrier_naic}</p>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">MGA</label>
+                <p>{policy.mga || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Issue Date</label>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{policy.issue_date ? new Date(policy.issue_date).toLocaleDateString() : 'N/A'}</span>
                 </div>
               </div>
-
-              <Separator />
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Issue Date</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {policy.issue_date
-                        ? new Date(policy.issue_date).toLocaleDateString()
-                        : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Effective Date</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {policy.effective_date
-                        ? formatLocalDateDisplay(policy.effective_date)
-                        : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Expiration Date</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {policy.expiration_date
-                        ? formatLocalDateDisplay(policy.expiration_date)
-                        : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Policy Term</label>
-                  <p>{policy.policy_term ? `${policy.policy_term} months` : 'N/A'}</p>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Effective Date</label>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{policy.effective_date ? formatLocalDateDisplay(policy.effective_date) : 'N/A'}</span>
                 </div>
               </div>
-
-              <Separator />
-
-              {/* Premium & Fees */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Expiration Date</label>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{policy.expiration_date ? formatLocalDateDisplay(policy.expiration_date) : 'N/A'}</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Policy Term</label>
+                <p>{policy.policy_term ? `${policy.policy_term} months` : 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Premium</label>
+                <div className="flex items-center gap-1 font-semibold">
+                  <DollarSign className="h-4 w-4" />
+                  <span>{formatCurrency(policy.premium)}</span>
+                </div>
+              </div>
+              {policy.agency_fee && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Premium</label>
-                  <div className="flex items-center gap-1 text-lg font-semibold">
+                  <label className="text-sm font-medium text-muted-foreground">Agency Fee</label>
+                  <p>{formatCurrency(policy.agency_fee)}</p>
+                </div>
+              )}
+              {policy.taxes_fees && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Taxes & Fees</label>
+                  <p>{formatCurrency(policy.taxes_fees)}</p>
+                </div>
+              )}
+              {policy.total_premium && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Total Premium</label>
+                  <div className="flex items-center gap-1 font-semibold text-success">
                     <DollarSign className="h-4 w-4" />
-                    <span>{formatCurrency(policy.premium)}</span>
+                    <span>{formatCurrency(policy.total_premium)}</span>
                   </div>
                 </div>
-                {policy.agency_fee && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Agency Fee</label>
-                    <p>{formatCurrency(policy.agency_fee)}</p>
-                  </div>
-                )}
-                {policy.taxes_fees && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Taxes & Fees</label>
-                    <p>{formatCurrency(policy.taxes_fees)}</p>
-                  </div>
-                )}
-                {policy.total_premium && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Total Premium</label>
-                    <div className="flex items-center gap-1 text-lg font-semibold text-success">
-                      <DollarSign className="h-4 w-4" />
-                      <span>{formatCurrency(policy.total_premium)}</span>
-                    </div>
-                  </div>
-                )}
+              )}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Billing Method</label>
+                <p className="capitalize">{policy.billing_method?.replace('_', ' ') || 'N/A'}</p>
               </div>
-
-              <Separator />
-
-              {/* Billing Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Billing Frequency</label>
+                <p className="capitalize">{policy.billing_frequency || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Status</label>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Billing Method</label>
-                  <p className="capitalize">{policy.billing_method?.replace('_', ' ') || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Billing Frequency</label>
-                  <p className="capitalize">{policy.billing_frequency || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Payment Type</label>
-                  <p className="capitalize">{policy.payment_type?.replace('_', ' ') || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Status</label>
                   <Badge variant={getStatusColor(policy.status || 'active')}>
                     {policy.status || 'Active'}
                   </Badge>
                 </div>
               </div>
+            </div>
 
               {/* Coverage Summary */}
               {policy.coverage && typeof policy.coverage === 'object' && Object.keys(policy.coverage).length > 0 && (
@@ -512,34 +501,28 @@ export default function PolicyDetail() {
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
 
-          {/* Account Info & Actions */}
-          <div className="space-y-6">
-            {/* Account Information */}
+            {/* Account (customer) folded in - was the separate sidebar Account
+                card; now a single dense row inside this panel. */}
             {policy.account && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Account
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Name</label>
-                      <p className="font-semibold">{policy.account.name}</p>
+              <>
+                <Separator />
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3 flex-1 min-w-0">
+                    <div className="min-w-0">
+                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" /> Customer
+                      </label>
+                      <p className="font-semibold truncate">{policy.account.name}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Type</label>
-                      <p>{policy.account.type}</p>
+                      <p>{humanizeAccountType(policy.account.type)}</p>
                     </div>
                     {policy.account.email && (
-                      <div>
+                      <div className="min-w-0">
                         <label className="text-sm font-medium text-muted-foreground">Email</label>
-                        <p>{policy.account.email}</p>
+                        <p className="truncate">{policy.account.email}</p>
                       </div>
                     )}
                     {policy.account.phone && (
@@ -548,308 +531,19 @@ export default function PolicyDetail() {
                         <p>{policy.account.phone}</p>
                       </div>
                     )}
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => navigate(`/customers/${policy.account!.id}`)}
-                    >
-                      View Customer
-                    </Button>
                   </div>
-                </CardContent>
-              </Card>
+                  <Button
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => navigate(`/customers/${policy.account!.id}`)}
+                  >
+                    View Customer
+                  </Button>
+                </div>
+              </>
             )}
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {policy.account && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => navigate(`/certificates?accountId=${policy.account!.id}&policyId=${policyId}`)}
-                    >
-                      <Award className="h-4 w-4 mr-2" />
-                      Generate Certificate
-                    </Button>
-                    {(policy as any).line_category === 'commercial' && (
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        disabled={createSubmission.isPending}
-                        onClick={() => {
-                          // Remarket clone (SOW v3 feeder #5): open a prefilled
-                          // submission targeting this policy's line and x-date.
-                          const targetLines = commercialLinesForPolicy(policy as any);
-                          if (targetLines.length === 0) {
-                            // Unmapped commercial labels (e.g. 'commercial_policy',
-                            // Inland Marine): land the user where they can pick
-                            // lines manually instead of dead-ending (Codex).
-                            toast({
-                              title: 'Pick the coverage lines manually',
-                              description: 'This policy\'s line could not be mapped automatically; opening the commercial section.',
-                            });
-                            navigate(`/customers/${policy.account!.id}?tab=commercial`);
-                            return;
-                          }
-                          createSubmission.mutate(
-                            {
-                              accountId: policy.account!.id,
-                              targetLines,
-                              effectiveDate: (policy as any).expiration_date ?? null,
-                              // Carrier may live only on the joined carrier_info row.
-                              notes: remarketNote({
-                                ...(policy as any),
-                                carrier: (policy as any).carrier || (policy as any).carrier_info?.name || null,
-                              }),
-                              remarketOfPolicyId: policy.id,
-                            },
-                            {
-                              onSuccess: () =>
-                                navigate(`/customers/${policy.account!.id}?tab=commercial`),
-                            },
-                          );
-                        }}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        {createSubmission.isPending ? 'Creating submission...' : 'Remarket this policy'}
-                      </Button>
-                    )}
-                    <DocumentAnalysisButton
-                      accountId={policy.account.id}
-                      variant="outline"
-                      size="default"
-                    />
-                  </>
-                )}
-                {isWorkersComp && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      // Arm the post-upload extraction (the upload alone never
-                      // extracted anything before this wiring).
-                      pendingExtractLine.current = 'wc';
-                      toast({
-                        title: 'Extract WC Details',
-                        description: 'Upload the WC policy document; extraction runs automatically after upload.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractWC.isPending}
-                  >
-                    {extractWC.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Extract WC Details
-                  </Button>
-                )}
-                {isCGL && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      pendingExtractLine.current = 'gl';
-                      toast({
-                        title: 'Extract GL Details',
-                        description: 'Upload the GL policy or dec page; extraction runs automatically after upload.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractCGL.isPending}
-                  >
-                    {extractCGL.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Extract GL Details
-                  </Button>
-                )}
-                {isProperty && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      pendingExtractLine.current = 'property';
-                      toast({
-                        title: 'Extract Property Details',
-                        description: 'Upload the property policy or dec page; extraction runs automatically after upload.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractProperty.isPending}
-                  >
-                    {extractProperty.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Extract Property Details
-                  </Button>
-                )}
-                {isUmbrella && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      pendingExtractLine.current = 'umbrella';
-                      toast({
-                        title: 'Extract Umbrella Details',
-                        description: 'Upload the umbrella/excess policy or dec page; extraction runs automatically after upload.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractUmbrella.isPending}
-                  >
-                    {extractUmbrella.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Extract Umbrella Details
-                  </Button>
-                )}
-                {isAuto && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      pendingExtractLine.current = 'auto';
-                      toast({
-                        title: 'Extract Commercial Auto Details',
-                        description: 'Upload the auto policy or dec page; extraction runs automatically after upload.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractBAP.isPending}
-                  >
-                    {extractBAP.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    Extract Commercial Auto Details
-                  </Button>
-                )}
-                {isInlandMarine && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      toast({
-                        title: 'Extract Inland Marine Details',
-                        description: 'Upload an IM document to extract scheduled items and coverages.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractIM.isPending}
-                  >
-                    {extractIM.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Anchor className="h-4 w-4 mr-2" />
-                    )}
-                    Extract IM Details
-                  </Button>
-                )}
-                {isCyber && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      toast({
-                        title: 'Extract Cyber Details',
-                        description: 'Upload a cyber policy to extract coverages and provisions.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractCyber.isPending}
-                  >
-                    {extractCyber.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Lock className="h-4 w-4 mr-2" />
-                    )}
-                    Extract Cyber Details
-                  </Button>
-                )}
-                {isCrime && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      toast({
-                        title: 'Extract Crime Details',
-                        description: 'Upload a crime policy to extract insuring agreements.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractCrime.isPending}
-                  >
-                    {extractCrime.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <ShieldIcon className="h-4 w-4 mr-2" />
-                    )}
-                    Extract Crime Details
-                  </Button>
-                )}
-                {isEO && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      toast({
-                        title: 'Extract E&O Details',
-                        description: 'Upload an E&O policy to extract claims-made details, ERP, and limits.',
-                      });
-                      setUploadDocOpen(true);
-                    }}
-                    disabled={extractEO.isPending}
-                  >
-                    {extractEO.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Briefcase className="h-4 w-4 mr-2" />
-                    )}
-                    Extract E&O Details
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setAddNoteOpen(true)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Add Note
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setAddTaskOpen(true)}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Add Task
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setUploadDocOpen(true)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Upload Document
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
         {/* Bound terms check (closing rigor): renders only when this policy
             has a 'bound' submission event; diffs what was bound against the
@@ -925,68 +619,6 @@ export default function PolicyDetail() {
           </ErrorBoundary>
         )}
 
-        {/* Policy Notes & Tasks */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {policy?.account?.id && (
-            <NotesPanel accountId={policy.account.id} policyId={policy.id} title="Notes" />
-          )}
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Policy Tasks ({policyTasks.length})
-              </CardTitle>
-              <Button size="sm" variant="outline" onClick={() => setAddTaskOpen(true)}>
-                Add Task
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {policyTasks.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-4">No policy tasks yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {policyTasks.slice(0, 6).map((task: any) => (
-                    <div key={task.id} className="flex items-start justify-between gap-3 p-3 border rounded-lg">
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">{task.title}</div>
-                        {task.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                            {task.description}
-                          </div>
-                        )}
-                        {task.due_at && (
-                          <div className="text-xs text-muted-foreground mt-2">
-                            Due: {new Date(task.due_at).toLocaleString()}
-                          </div>
-                        )}
-                      </div>
-                      {task.status && (
-                        <Badge variant="secondary" className="shrink-0">
-                          {String(task.status)}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                  {policyTasks.length > 6 && (
-                    <p className="text-xs text-muted-foreground">+{policyTasks.length - 6} more tasks</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Payment History Section */}
-        {policyId && (
-          <PaymentHistoryWidget
-            policyId={policyId}
-            title="Payment History"
-            maxItems={5}
-            showPolicyColumn={false}
-          />
-        )}
-
         {/* Certificate holders (07 §5.2): shown whenever active cert holders
             reference this policy. Emphasized (warning-toned) when the policy is
             cancelled or non-renewed, because those holders were promised notice. */}
@@ -1050,38 +682,11 @@ export default function PolicyDetail() {
           <EOPolicyDetails policyId={policyId} />
         )}
 
-        {/* Documents Section */}
-        {policyId && (
-          <DocumentsList
-            policyId={policyId}
-            title="Policy Documents"
-            onUploadClick={() => setUploadDocOpen(true)}
-            onAskAI={(doc) => {
-              toast({
-                title: 'AI Analysis',
-                description: `Opening AI analysis for ${doc.filename}...`,
-              });
-              // Navigate to AI analysis or open modal
-            }}
-          />
-        )}
       </div>
 
       {/* Modals */}
       {policy?.account && (
         <>
-          <AddNoteModal
-            open={addNoteOpen}
-            onOpenChange={setAddNoteOpen}
-            accountId={policy.account.id}
-            policyId={policy.id}
-          />
-          <AddTaskModal
-            open={addTaskOpen}
-            onOpenChange={setAddTaskOpen}
-            accountId={policy.account.id}
-            policyId={policy.id}
-          />
           <UploadDocModal
             open={uploadDocOpen}
             onOpenChange={(open) => {

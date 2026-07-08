@@ -67,7 +67,7 @@ function readTypeScriptFiles(dir: string): Array<{ path: string; source: string 
 
     if (entry.endsWith('.ts')) {
       files.push({
-        path: absolutePath.slice(repoRoot.length + 1),
+        path: absolutePath.slice(repoRoot.length + 1).split(/[\\/]/).join('/'),
         source: readFileSync(absolutePath, 'utf8'),
       });
     }

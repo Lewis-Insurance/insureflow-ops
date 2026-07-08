@@ -447,4 +447,18 @@ input[type="number"] {
       transform: translateY(0);
     }
   }
+
+  /* Momentary lime ring on a scroll-to target (e.g. a policy bubble jump). */
+  .cc-flash-target {
+    animation: ccFlash 1.4s ease-out;
+  }
+
+  @keyframes ccFlash {
+    0% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-accent) 60%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-accent) 0%, transparent);
+    }
+  }
 }

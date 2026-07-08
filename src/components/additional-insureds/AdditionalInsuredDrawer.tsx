@@ -214,8 +214,6 @@ const REQ_FIELD_OPTIONS: Record<Acord25LineKey, Array<{ value: string; label: st
 interface RequirementsFormState {
   min_limits: HolderRequirementsMinLimit[];
   flags: HolderRequirementsFlag[];
-  required_endorsement_forms: string[];
-  notice_days: string;
   required_lines: Acord25LineKey[];
   notes: string;
 }
@@ -223,8 +221,6 @@ interface RequirementsFormState {
 const EMPTY_REQUIREMENTS: RequirementsFormState = {
   min_limits: [],
   flags: [],
-  required_endorsement_forms: [],
-  notice_days: '',
   required_lines: [],
   notes: '',
 };
@@ -240,8 +236,6 @@ function requirementsToForm(
   return {
     min_limits: parsed.min_limits.map((m) => ({ ...m })),
     flags: parsed.flags.map((f) => ({ ...f })),
-    required_endorsement_forms: [...parsed.required_endorsement_forms],
-    notice_days: parsed.notice_days != null ? String(parsed.notice_days) : '',
     // Drop a legacy stored 'other' (no longer offered; the generator can
     // never satisfy it) so the next save clears it instead of echoing it.
     required_lines: parsed.required_lines.filter((l) => l !== 'other'),
@@ -267,18 +261,14 @@ function formToRequirementsPayload(form: RequirementsFormState): Record<string, 
       requires_waiver: !!f.requires_waiver,
     }));
 
-  const required_endorsement_forms = form.required_endorsement_forms
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
-  const noticeNum = Number.parseInt(form.notice_days, 10);
-  const notice_days = Number.isFinite(noticeNum) && noticeNum > 0 ? noticeNum : null;
-
   return {
     min_limits,
     flags,
-    required_endorsement_forms,
-    notice_days,
+    // Endorsement-form and notice-of-cancellation requirements were removed from
+    // the editor; always write them empty so the stored closed schema stays
+    // complete and the evaluator produces nothing for them.
+    required_endorsement_forms: [],
+    notice_days: null,
     required_lines: [...form.required_lines],
   };
 }
@@ -292,14 +282,11 @@ interface RequirementsSectionProps {
 /** The collapsed Requirements editor rendered inside the drawer (edit mode). */
 function RequirementsSection({ form, onChange, loading }: RequirementsSectionProps) {
   const [open, setOpen] = useState(false);
-  const [formInput, setFormInput] = useState('');
 
   const ruleCount =
     form.min_limits.length +
     form.flags.length +
-    form.required_endorsement_forms.length +
-    form.required_lines.length +
-    (form.notice_days.trim() ? 1 : 0);
+    form.required_lines.length;
 
   const flagFor = (line: Acord25LineKey): HolderRequirementsFlag =>
     form.flags.find((f) => f.line_key === line) ?? {
@@ -351,24 +338,6 @@ function RequirementsSection({ form, onChange, loading }: RequirementsSectionPro
       required_lines: has
         ? form.required_lines.filter((l) => l !== line)
         : [...form.required_lines, line],
-    });
-  };
-
-  const addForm = () => {
-    const value = formInput.trim();
-    if (!value) return;
-    if (form.required_endorsement_forms.some((f) => f.toLowerCase() === value.toLowerCase())) {
-      setFormInput('');
-      return;
-    }
-    onChange({ ...form, required_endorsement_forms: [...form.required_endorsement_forms, value] });
-    setFormInput('');
-  };
-
-  const removeForm = (value: string) => {
-    onChange({
-      ...form,
-      required_endorsement_forms: form.required_endorsement_forms.filter((f) => f !== value),
     });
   };
 
@@ -569,80 +538,6 @@ function RequirementsSection({ form, onChange, loading }: RequirementsSectionPro
                   );
                 })}
               </div>
-            </div>
-
-            {/* Required endorsement forms (chips) */}
-            <div className="space-y-2">
-              <label
-                htmlFor="req-form-input"
-                className="text-xs font-medium uppercase tracking-wide text-cc-text-muted"
-              >
-                Required endorsement forms
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="req-form-input"
-                  value={formInput}
-                  onChange={(e) => setFormInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addForm();
-                    }
-                  }}
-                  placeholder="e.g. CG 20 10"
-                  className="rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addForm}
-                  disabled={!formInput.trim()}
-                  className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add
-                </Button>
-              </div>
-              {form.required_endorsement_forms.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {form.required_endorsement_forms.map((f) => (
-                    <span
-                      key={f}
-                      className="inline-flex items-center gap-1 rounded-pill bg-cc-surface-overlay px-2.5 py-0.5 text-xs text-cc-text-secondary"
-                    >
-                      {f}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${f}`}
-                        onClick={() => removeForm(f)}
-                        className="text-cc-text-muted hover:text-cc-text-primary"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Notice days */}
-            <div className="space-y-2">
-              <label
-                htmlFor="req-notice-days"
-                className="text-xs font-medium uppercase tracking-wide text-cc-text-muted"
-              >
-                Notice of cancellation <span className="normal-case text-cc-text-faint">(days)</span>
-              </label>
-              <Input
-                id="req-notice-days"
-                inputMode="numeric"
-                value={form.notice_days}
-                onChange={(e) =>
-                  onChange({ ...form, notice_days: e.target.value.replace(/[^0-9]/g, '') })
-                }
-                placeholder="e.g. 30"
-                className="w-28 rounded-cc-md border-cc-border-subtle bg-cc-surface text-cc-text-primary [font-variant-numeric:tabular-nums]"
-              />
             </div>
 
             {/* Requirements notes (never evaluated) */}

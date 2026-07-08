@@ -61,6 +61,16 @@ export interface AcordFillOptions {
   updateAppearances?: boolean;
   /** Font size for text fields. Default 10 (matches pdfFiller.ts). */
   fontSize?: number;
+  /**
+   * PDF field names rendered at {@link smallFontSize} (the narrow POLICY EFF /
+   * POLICY EXP date columns). Mirrors pdfFiller.ts so the issued cert matches
+   * the client preview.
+   */
+  smallFields?: string[];
+  /** Font size for {@link smallFields}. Default 8. */
+  smallFontSize?: number;
+  /** PDF field names rendered italic (authorized representative signature). */
+  italicFields?: string[];
 }
 
 /**
@@ -78,7 +88,16 @@ export async function fillAcord25Pdf(
   fieldValues: Record<string, string | boolean>,
   options: AcordFillOptions = {},
 ): Promise<AcordFillResult> {
-  const { flatten = true, updateAppearances = true, fontSize = 10 } = options;
+  const {
+    flatten = true,
+    updateAppearances = true,
+    fontSize = 10,
+    smallFields = [],
+    smallFontSize = 8,
+    italicFields = [],
+  } = options;
+
+  const smallFieldSet = new Set(smallFields);
 
   const errors: string[] = [];
   const skippedFields: string[] = [];
@@ -91,6 +110,8 @@ export async function fillAcord25Pdf(
 
     // Embed the same standard font pdfFiller.ts uses so appearances match.
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // Italic standard font for signature-styled fields (mirrors pdfFiller.ts).
+    const italicFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
 
     for (const [fieldName, rawValue] of Object.entries(fieldValues)) {
       try {
@@ -122,7 +143,7 @@ export async function fillAcord25Pdf(
             ? text.substring(0, maxLength)
             : text;
           field.setText(finalText);
-          field.setFontSize(fontSize);
+          field.setFontSize(smallFieldSet.has(fieldName) ? smallFontSize : fontSize);
           filledFieldCount++;
         } else if (field instanceof PDFCheckBox) {
           // Export value is resolved by pdf-lib from the template's AcroForm;
@@ -148,6 +169,16 @@ export async function fillAcord25Pdf(
 
     if (updateAppearances) {
       form.updateFieldAppearances(font);
+    }
+
+    // Signature-style pass: re-render italic fields (authorized representative)
+    // with the italic font, after the global pass and before flatten. Mirrors
+    // pdfFiller.ts so the issued cert matches the client preview.
+    for (const italicName of italicFields) {
+      const italicField = form.getFieldMaybe(italicName);
+      if (italicField instanceof PDFTextField) {
+        italicField.updateAppearances(italicFont);
+      }
     }
 
     if (flatten) {
