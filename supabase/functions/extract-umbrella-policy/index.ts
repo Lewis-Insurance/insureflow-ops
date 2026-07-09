@@ -4,22 +4,37 @@
  * Extracts Umbrella/Excess policy data using:
  * 1. Azure Document Intelligence for OCR with bounding boxes
  * 2. Evidence catalog for click-to-highlight traceability
- * 3. Claude for intelligent field extraction with evidence IDs
+ * 3. Claude tool-use (structured output) for evidence-backed field extraction
  *
- * Umbrella extraction focuses on:
- * - Limits (per occurrence, aggregate, defense)
- * - Retention/SIR
- * - Underlying policy schedule (critical)
- * - Drop-down coverage
- * - High-impact endorsements/exclusions
- * - Compliance analysis
+ * House standard (mirrors extract-bap-policy / extract-cgl-policy):
+ * - All shaping decisions live in the PURE, unit-tested ./shape.ts module.
+ * - Claude returns a single tool_use block; its input is nullified for redaction
+ *   tokens, then shaped onto the EXACT umbrella_details paths + flat-dotted
+ *   umbrella_field_evidence keys that get_master_coi / coi_build_line read.
+ * - NO premium is ever captured.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
+import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
+import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import {
+  UMBRELLA_EXTRACTION_TOOL_NAME,
+  UMBRELLA_EXTRACTION_TOOL_SCHEMA,
+  shapeUmbrellaDetails,
+  shapeUnderlyingRows,
+  shapeRequirementsRow,
+  shapeAdditionalInsuredRows,
+  shapeEndorsementRows,
+  type RawUmbrellaExtraction,
+  type UmbrellaDetails,
+} from './shape.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // UMBRELLA FIELD PATTERNS FOR EVIDENCE MATCHING
@@ -37,6 +52,7 @@ const UMBRELLA_FIELD_PATTERNS: Record<string, RegExp[]> = {
   UmbrellaExcess: [/umbrella/i, /excess/i, /excess\s*liability/i],
   FollowForm: [/follow\s*form/i, /follows\s*form/i],
   StandAlone: [/stand.?alone/i, /independent/i],
+  Occurrence: [/occurrence/i, /claims.?made/i],
 
   // Limits
   PerOccurrence: [/per\s*occurrence/i, /each\s*occurrence/i, /occurrence\s*limit/i],
@@ -45,7 +61,7 @@ const UMBRELLA_FIELD_PATTERNS: Record<string, RegExp[]> = {
   Territory: [/territory/i, /worldwide/i, /u\.?s\.?\s*(?:and\s*)?canada/i],
 
   // Retention
-  Retention: [/retention/i, /s\.?i\.?r\.?/i, /self.?insured/i, /retained\s*limit/i],
+  Retention: [/retention/i, /s\.?i\.?r\.?/i, /self.?insured/i, /retained\s*limit/i, /deductible/i],
 
   // Underlying
   UnderlyingSchedule: [/underlying/i, /schedule.*insurance/i, /required\s*(?:underlying|primary)/i],
@@ -63,15 +79,12 @@ const UMBRELLA_FIELD_PATTERNS: Record<string, RegExp[]> = {
   // Additional Insureds
   AdditionalInsured: [/additional\s*insured/i, /add'?l\s*ins/i],
   Blanket: [/blanket/i, /automatic/i],
+  WaiverOfSubrogation: [/waiver\s*of\s*subrogation/i, /subrogation\s*waived/i],
 
   // Endorsements
   EndorsementForm: [/form\s*(?:no|number|#)/i, /endorsement/i],
   Exclusion: [/exclusion/i, /excluded/i, /except/i],
   Limitation: [/limitation/i, /limited/i, /restricted/i],
-
-  // Premium
-  TotalPremium: [/total\s*premium/i, /annual\s*premium/i, /policy\s*premium/i],
-  Premium: [/premium/i],
 };
 
 // =============================================================================
@@ -115,6 +128,47 @@ interface EvidenceCatalog {
 }
 
 // =============================================================================
+// UMBRELLA EXTRACTION SYSTEM PROMPT (tool-use, house standard)
+// =============================================================================
+
+const UMBRELLA_EXTRACTION_SYSTEM_PROMPT = `You are an expert Commercial Umbrella and Excess Liability insurance document analyst.
+
+You MUST return your extraction by calling the ${UMBRELLA_EXTRACTION_TOOL_NAME} tool. Do not answer in prose.
+
+## CRITICAL RULES
+1. ONLY extract values that appear in the evidence catalog provided. Cite the evidence IDs (E####) that support each value in that field's evidence_ids array.
+2. NEVER guess or infer. If a value is not in the evidence, return null for that field.
+3. NEVER fabricate an evidence ID — only use IDs that appear in the catalog.
+
+## Policy type (this drives the ACORD 25 umbrella row)
+- policy_type: "umbrella" (broadens coverage and may drop down) or "excess" (follows form of the underlying only).
+- coi_summary.occurrence_or_claims_made: whether the umbrella/excess is written on an OCCURRENCE or CLAIMS-MADE basis.
+- coi_summary.ded_or_retention_kind: the KIND of self-retained amount only — "deductible" (DED) or "retention" (RETENTION / SIR / self-insured retention). Put the dollar figure in retention.amount, not here.
+
+## Limits and retention
+- limits.per_occurrence: the headline each-occurrence limit ($1M, $2M, $5M, $10M common). limits.aggregate: the annual/policy aggregate.
+- retention.amount: the Self-Insured Retention / retained-limit / deductible dollar amount.
+
+## Underlying schedule (CRITICAL)
+- Extract ALL scheduled underlying policies into underlying_policies: type, carrier, policy number, dates, limits.
+- underlying_requirements: the minimum underlying limits the umbrella requires, if a schedule of required primary insurance is present.
+
+## Insurer NAIC
+- carrier_naic is the 5-digit INSURER (company) NAIC code. It is NOT an industry NAICS or SIC classification code. If the policy does not clearly show the insurer's NAIC number, return null — a name-to-NAIC lookup happens later.
+
+## Premium
+- Do NOT extract premium, fees, taxes, or any dollar amount that is not a coverage limit, retention, or deductible. Premium is never captured.
+
+## Additional Insured / Waiver of Subrogation (evidence only)
+- Capture BLANKET endorsements as EVIDENCE in additional_insured_evidence / waiver_of_subrogation_evidence:
+  { present, basis: "blanket" | "scheduled", form_numbers: [...], source_span }.
+- Name specifically-listed additional insureds in additional_insureds (ai_type "scheduled"; use "follow_underlying" only when the policy states AI status follows the underlying).
+- Do NOT assert a confirmed "Y" for any specific certificate holder. You are recording what the policy shows, not certifying an endorsement.
+
+## Dates
+- Dates as YYYY-MM-DD. Regulated PII may already be redacted — leave those null when so.`;
+
+// =============================================================================
 // MAIN HANDLER
 // =============================================================================
 
@@ -152,13 +206,18 @@ serve(async (req) => {
     const azureKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
 
     if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!azureEndpoint || !azureKey) {
-      throw new Error('Azure Document Intelligence not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Azure Document Intelligence not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
 
     // Create extraction job
     const { data: job, error: jobError } = await supabase
@@ -172,8 +231,23 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (jobError) throw jobError;
+    if (jobError || !job) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || 'unknown error'}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const jobId = job.id;
+    const startedAt = Date.now();
+
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on 'completed' or 'failed' - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document URL
     const { data: document, error: docError } = await supabase
       .from('documents')
@@ -203,7 +277,7 @@ serve(async (req) => {
       .eq('id', job.id);
 
     // Call Azure Document Intelligence
-    console.log('Calling Azure Document Intelligence...');
+    console.log('[extract-umbrella-policy] Calling Azure Document Intelligence...');
     const azureResult = await callAzureDocumentIntelligence(
       signedUrlData.signedUrl,
       azureEndpoint,
@@ -220,7 +294,7 @@ serve(async (req) => {
       .eq('id', job.id);
 
     // Build evidence catalog
-    console.log('Building evidence catalog...');
+    console.log('[extract-umbrella-policy] Building evidence catalog...');
     const evidenceCatalog = buildEvidenceCatalog(azureResult);
 
     // Update job status to extracting
@@ -231,34 +305,6 @@ serve(async (req) => {
         extraction_started_at: new Date().toISOString(),
       })
       .eq('id', job.id);
-
-    // Get existing policy data for context
-    const { data: policyData } = await supabase
-      .from('policies')
-      .select('carrier, policy_number, client:clients(company_name)')
-      .eq('id', policy_id)
-      .single();
-
-    // Call Claude for extraction
-    console.log('Calling Claude for Umbrella extraction...');
-    const extractionStart = Date.now();
-
-    const systemPrompt = getUmbrellaSystemPrompt();
-    const userPrompt = buildUmbrellaUserPrompt(evidenceCatalog, document_type, policyData);
-
-    const response = await anthropicBoundaryCreate(anthropicApiKey, {
-      model: 'claude-sonnet-5',
-      max_tokens: 10000, // Umbrella can have many underlying policies
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const extractionLatency = Date.now() - extractionStart;
-
-    // Parse response
-    const responseText = anthropicResponseText(response);
-    const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || [null, responseText];
-    const extractedData = JSON.parse(jsonMatch[1] || responseText);
 
     // Store evidence catalog
     await supabase.from('policy_umbrella_evidence_catalog').upsert({
@@ -271,172 +317,74 @@ serve(async (req) => {
       azure_page_count: evidenceCatalog.stats.pageCount,
     });
 
-    // Process and store underlying requirements
-    if (extractedData.underlying_requirements) {
-      await supabase.from('policy_umbrella_requirements').upsert({
-        policy_id,
-        gl_each_occurrence: extractedData.underlying_requirements.gl_each_occurrence?.value,
-        gl_general_aggregate: extractedData.underlying_requirements.gl_general_aggregate?.value,
-        auto_liability: extractedData.underlying_requirements.auto_liability?.value,
-        el_per_accident: extractedData.underlying_requirements.el_per_accident?.value,
-        el_disease_policy: extractedData.underlying_requirements.el_disease_policy?.value,
-        el_disease_employee: extractedData.underlying_requirements.el_disease_employee?.value,
-        evidence_ids: collectEvidenceIds(extractedData.underlying_requirements),
-        extraction_confidence: calculateAvgConfidence(extractedData.underlying_requirements),
-        extraction_status: determineStatus(extractedData.underlying_requirements),
-      });
-    }
+    // Get existing policy data for context
+    const { data: policyData } = await supabase
+      .from('policies')
+      .select('carrier, policy_number, client:clients(company_name)')
+      .eq('id', policy_id)
+      .single();
 
-    // Process and store underlying policies
-    let underlyingExtracted = 0;
-    if (extractedData.underlying_policies && Array.isArray(extractedData.underlying_policies)) {
-      // Delete existing underlying for this policy
-      await supabase.from('policy_umbrella_underlying').delete().eq('policy_id', policy_id);
+    // Build LLM prompt
+    const userPrompt = buildUmbrellaUserPrompt(evidenceCatalog, document_type, policyData);
 
-      for (const underlying of extractedData.underlying_policies) {
-        const underlyingData = {
-          policy_id,
-          underlying_type: underlying.type?.value || 'other',
-          carrier: underlying.carrier?.value || 'Unknown',
-          underlying_policy_number: underlying.policy_number?.value,
-          effective_date: underlying.effective_date?.value,
-          expiration_date: underlying.expiration_date?.value,
-          each_occurrence: underlying.limits?.each_occurrence?.value,
-          general_aggregate: underlying.limits?.general_aggregate?.value,
-          auto_csl: underlying.limits?.auto_csl?.value,
-          auto_bi_per_person: underlying.limits?.auto_bi_per_person?.value,
-          auto_bi_per_accident: underlying.limits?.auto_bi_per_accident?.value,
-          auto_pd: underlying.limits?.auto_pd?.value,
-          el_per_accident: underlying.limits?.el_per_accident?.value,
-          el_disease_policy: underlying.limits?.el_disease_policy?.value,
-          el_disease_employee: underlying.limits?.el_disease_employee?.value,
-          evidence_ids: collectEvidenceIds(underlying),
-          extraction_confidence: calculateAvgConfidence(underlying),
-          extraction_status: determineStatus(underlying),
-        };
+    // Call Claude for extraction (tool-use / structured output). `tools` +
+    // `tool_choice` pass through the boundary wrapper unchanged, so redactPII
+    // still redacts the evidence catalog before it leaves the process.
+    console.log('[extract-umbrella-policy] Calling Claude (tool-use)...');
+    const extractionStart = Date.now();
 
-        await supabase.from('policy_umbrella_underlying').insert(underlyingData);
-        underlyingExtracted++;
-      }
-    }
-
-    // Process and store additional insureds
-    let additionalInsuredsExtracted = 0;
-    if (extractedData.additional_insureds && Array.isArray(extractedData.additional_insureds)) {
-      // Delete existing AIs for this policy
-      await supabase.from('policy_umbrella_additional_insureds').delete().eq('policy_id', policy_id);
-
-      for (const ai of extractedData.additional_insureds) {
-        const aiData = {
-          policy_id,
-          name: ai.name?.value || 'Unknown',
-          street: ai.address?.street?.value,
-          city: ai.address?.city?.value,
-          state: ai.address?.state?.value,
-          zip: ai.address?.zip?.value,
-          ai_type: ai.ai_type?.value || 'blanket',
-          primary_noncontributory: ai.primary_noncontributory?.value || false,
-          waiver_of_subrogation: ai.waiver_of_subrogation?.value || false,
-          project_name: ai.project_name?.value,
-          evidence_ids: collectEvidenceIds(ai),
-          extraction_confidence: calculateAvgConfidence(ai),
-          extraction_status: determineStatus(ai),
-        };
-
-        await supabase.from('policy_umbrella_additional_insureds').insert(aiData);
-        additionalInsuredsExtracted++;
-      }
-    }
-
-    // Process and store endorsements
-    let endorsementsExtracted = 0;
-    if (extractedData.endorsements && Array.isArray(extractedData.endorsements)) {
-      // Delete existing endorsements for this policy
-      await supabase.from('policy_umbrella_endorsements').delete().eq('policy_id', policy_id);
-
-      for (const end of extractedData.endorsements) {
-        const endData = {
-          policy_id,
-          form_number: end.form_number?.value || 'Unknown',
-          title: end.title?.value || 'Endorsement',
-          edition_date: end.edition_date?.value,
-          effective_date: end.effective_date?.value,
-          category: end.category?.value,
-          is_limitation: end.is_limitation?.value || false,
-          is_enhancement: end.is_enhancement?.value || false,
-          impact_description: end.impact_description?.value,
-          evidence_ids: collectEvidenceIds(end),
-          extraction_confidence: calculateAvgConfidence(end),
-          extraction_status: determineStatus(end),
-        };
-
-        await supabase.from('policy_umbrella_endorsements').insert(endData);
-        endorsementsExtracted++;
-      }
-    }
-
-    // Build umbrella details object
-    const umbrellaDetails = {
-      identity: {
-        carrier_name: extractedData.identity?.carrier_name?.value,
-        carrier_naic: extractedData.identity?.carrier_naic?.value,
-        policy_number: extractedData.identity?.policy_number?.value,
-        transaction_type: extractedData.identity?.transaction_type?.value,
-        named_insured: extractedData.identity?.named_insured?.value,
-        dba: extractedData.identity?.dba?.value,
-        mailing_address: {
-          street: extractedData.identity?.mailing_address?.street?.value,
-          city: extractedData.identity?.mailing_address?.city?.value,
-          state: extractedData.identity?.mailing_address?.state?.value,
-          zip: extractedData.identity?.mailing_address?.zip?.value,
+    const response = await anthropicBoundaryCreate(anthropicApiKey, {
+      model: 'claude-sonnet-5',
+      max_tokens: 16384, // Umbrella can have many underlying policies
+      system: UMBRELLA_EXTRACTION_SYSTEM_PROMPT,
+      tools: [
+        {
+          name: UMBRELLA_EXTRACTION_TOOL_NAME,
+          description:
+            'Emit the structured Commercial Umbrella / Excess extraction. Every value must be backed by evidence IDs from the catalog; return null for anything not present.',
+          input_schema: UMBRELLA_EXTRACTION_TOOL_SCHEMA,
         },
-        producer: extractedData.identity?.producer?.value,
-      },
-      dates: {
-        effective_date: extractedData.dates?.effective_date?.value,
-        expiration_date: extractedData.dates?.expiration_date?.value,
-        issue_date: extractedData.dates?.issue_date?.value,
-      },
-      policy_type: extractedData.policy_type?.value || 'umbrella',
-      form_basis: extractedData.form_basis?.value || 'follow_form',
-      limits: {
-        per_occurrence: extractedData.limits?.per_occurrence?.value,
-        aggregate: extractedData.limits?.aggregate?.value,
-        products_completed_ops_aggregate: extractedData.limits?.products_completed_ops_aggregate?.value,
-        defense_costs: extractedData.limits?.defense_costs?.value || 'outside_limits',
-        territory: extractedData.limits?.territory?.value,
-      },
-      retention: extractedData.retention?.amount?.value
-        ? {
-            amount: extractedData.retention.amount.value,
-            applicability: extractedData.retention.applicability?.value,
-            notes: extractedData.retention.notes?.value,
-          }
-        : undefined,
-      drop_down: extractedData.drop_down?.is_available?.value != null
-        ? {
-            is_available: extractedData.drop_down.is_available.value,
-            conditions: extractedData.drop_down.conditions?.value,
-            exclusions: extractedData.drop_down.exclusions?.value,
-            who_is_insured: extractedData.drop_down.who_is_insured?.value,
-          }
-        : undefined,
-      premium: {
-        total_premium: extractedData.premium?.total_premium?.value,
-        base_premium: extractedData.premium?.base_premium?.value,
-        policy_fee: extractedData.premium?.policy_fee?.value,
-        terrorism_premium: extractedData.premium?.terrorism_premium?.value,
-        terrorism_rejected: extractedData.premium?.terrorism_rejected?.value,
-      },
-      extraction_source: 'azure_di_claude',
-      extraction_confidence: calculateOverallConfidence(extractedData),
-      extracted_at: new Date().toISOString(),
-    };
+      ],
+      tool_choice: { type: 'tool', name: UMBRELLA_EXTRACTION_TOOL_NAME },
+      messages: [{ role: 'user', content: userPrompt }],
+    }, 110000);
 
-    // Build field evidence mapping
-    const fieldEvidence = buildFieldEvidenceMapping(extractedData);
+    const extractionLatency = Date.now() - extractionStart;
+    console.log(`[extract-umbrella-policy] Claude completed in ${extractionLatency}ms`);
 
-    // Update policy with umbrella details
+    // Read the tool_use block from the response content (order-independent).
+    const contentBlocks = (response.content ?? []) as Array<Record<string, any>>;
+    const toolBlock = contentBlocks.find(
+      (b) => b?.type === 'tool_use' && b?.name === UMBRELLA_EXTRACTION_TOOL_NAME,
+    );
+    if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== 'object') {
+      throw new Error('Claude did not return the expected tool_use extraction block');
+    }
+
+    // Keep the redaction guard: a model shown redacted text echoes tokens like
+    // "[REDACTED_DOB]" into structured output; nullify pure-token strings.
+    const rawExtraction = nullifyRedactedTokens(toolBlock.input) as RawUmbrellaExtraction;
+
+    // Shape into the EXACT umbrella_details paths + flat-dotted
+    // umbrella_field_evidence that get_master_coi / coi_build_line read.
+    const nowIso = new Date().toISOString();
+    const { umbrellaDetails, fieldEvidence } = shapeUmbrellaDetails(rawExtraction, nowIso);
+
+    // Resolve the extracted carrier to the agency's canonical carrier (clean
+    // rating/parenthetical suffixes -> resolve_carrier). The COI reads the blob
+    // identity.carrier_name / identity.carrier_naic, so patch the shaped blob
+    // (NOT the policies scalar columns). Never fatal: on no-match we keep the
+    // cleaned (or raw) name and any NAIC the model already extracted.
+    const rawCarrierName = rawExtraction.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    umbrellaDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    umbrellaDetails.identity.carrier_naic =
+      carrierRes?.naic ?? umbrellaDetails.identity.carrier_naic ?? null;
+    (umbrellaDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (umbrellaDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
+
+    // Update policy with umbrella details (like extract-cgl-policy L438-446).
     await supabase
       .from('policies')
       .update({
@@ -444,34 +392,62 @@ serve(async (req) => {
         umbrella_field_evidence: fieldEvidence,
         extraction_source: 'azure_di_claude',
         extraction_confidence: umbrellaDetails.extraction_confidence,
+        extracted_from_document_id: document_id,
       })
       .eq('id', policy_id);
 
-    // Calculate stats
-    const stats = calculateExtractionStats(extractedData);
+    // ---- Child tables: DELETE-then-INSERT, only when rows were produced. ----
 
-    // Run compliance analysis
-    const complianceIssues = runComplianceAnalysis(
-      umbrellaDetails,
-      extractedData.underlying_requirements,
-      extractedData.underlying_policies || []
-    );
+    let underlyingExtracted = 0;
+    const underlyingRows = shapeUnderlyingRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (underlyingRows.length > 0) {
+      await supabase.from('policy_umbrella_underlying').delete().eq('policy_id', policy_id);
+      const { error } = await supabase.from('policy_umbrella_underlying').insert(underlyingRows);
+      if (!error) underlyingExtracted = underlyingRows.length;
+      else console.error('[extract-umbrella-policy] underlying insert error:', error.message);
+    }
+
+    // Requirements: single row per policy (UNIQUE(policy_id) -> upsert).
+    const requirementsRow = shapeRequirementsRow(rawExtraction);
+    if (requirementsRow) {
+      const { error } = await supabase
+        .from('policy_umbrella_requirements')
+        .upsert({ ...requirementsRow, policy_id }, { onConflict: 'policy_id' });
+      if (error) console.error('[extract-umbrella-policy] requirements upsert error:', error.message);
+    }
+
+    let additionalInsuredsExtracted = 0;
+    const aiRows = shapeAdditionalInsuredRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (aiRows.length > 0) {
+      await supabase.from('policy_umbrella_additional_insureds').delete().eq('policy_id', policy_id);
+      const { error } = await supabase.from('policy_umbrella_additional_insureds').insert(aiRows);
+      if (!error) additionalInsuredsExtracted = aiRows.length;
+      else console.error('[extract-umbrella-policy] additional_insureds insert error:', error.message);
+    }
+
+    let endorsementsExtracted = 0;
+    const endorsementRows = shapeEndorsementRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (endorsementRows.length > 0) {
+      await supabase.from('policy_umbrella_endorsements').delete().eq('policy_id', policy_id);
+      const { error } = await supabase.from('policy_umbrella_endorsements').insert(endorsementRows);
+      if (!error) endorsementsExtracted = endorsementRows.length;
+      else console.error('[extract-umbrella-policy] endorsements insert error:', error.message);
+    }
+
+    // Compliance analysis over the shaped rows.
+    const complianceIssues = runComplianceAnalysis(umbrellaDetails, requirementsRow, underlyingRows);
 
     // Update job as completed
+    const usage = (response as any).usage;
     await supabase
       .from('policy_umbrella_extraction_jobs')
       .update({
         status: 'completed',
         extraction_completed_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
-        llm_tokens_input: response.usage?.input_tokens,
-        llm_tokens_output: response.usage?.output_tokens,
+        llm_tokens_input: usage?.input_tokens,
+        llm_tokens_output: usage?.output_tokens,
         llm_latency_ms: extractionLatency,
-        fields_extracted: stats.fieldsExtracted,
-        fields_auto_applied: stats.fieldsAutoApplied,
-        fields_needs_review: stats.fieldsNeedsReview,
-        fields_not_found: stats.fieldsNotFound,
-        fields_conflict: stats.fieldsConflict,
         underlying_policies_extracted: underlyingExtracted,
         additional_insureds_extracted: additionalInsuredsExtracted,
         endorsements_extracted: endorsementsExtracted,
@@ -480,21 +456,38 @@ serve(async (req) => {
       })
       .eq('id', job.id);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error) => {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[extract-umbrella-policy] Error (background):', error);
+        try {
+          await supabase
+            .from('policy_umbrella_extraction_jobs')
+            .update({
+              status: 'failed',
+              error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500),
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        job_id: job.id,
-        underlying_count: underlyingExtracted,
-        additional_insureds_count: additionalInsuredsExtracted,
-        endorsements_count: endorsementsExtracted,
-        compliance_issues_count: complianceIssues.length,
-        confidence: umbrellaDetails.extraction_confidence,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, job_id: jobId, status: 'processing' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Umbrella extraction error:', error);
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error('[extract-umbrella-policy] Error (sync phase):', error);
     return new Response(
       JSON.stringify({
         success: false,
@@ -739,383 +732,109 @@ function matchFieldPatterns(label: string, value: string): string[] {
 }
 
 // =============================================================================
-// PROMPT BUILDERS
+// PROMPT BUILDER
 // =============================================================================
-
-function getUmbrellaSystemPrompt(): string {
-  return `You are an expert Commercial Umbrella and Excess Liability policy data extractor for insurance professionals.
-
-## YOUR ROLE
-Extract structured umbrella/excess policy data from quotes, binders, policies, and endorsements.
-Every extracted value MUST cite its source evidence ID(s) from the OCR catalog.
-
-## CRITICAL RULES
-
-### 1. EVIDENCE-BASED EXTRACTION ONLY
-- ONLY extract values that appear in the evidence catalog
-- NEVER guess, infer, or use industry defaults
-- If a field is not in the evidence, return status: "NOT_FOUND"
-- Each field MUST include evidence_ids array linking to source
-
-### 2. CONFIDENCE SCORING
-- 0.95-1.00: Exact match with clear label
-- 0.85-0.94: Strong match from context
-- 0.70-0.84: Reasonable inference
-- Below 0.70: Mark as NEEDS_REVIEW
-
-### 3. UMBRELLA-SPECIFIC KNOWLEDGE
-
-POLICY TYPES:
-- Umbrella: Provides broader coverage + may drop down
-- Excess: Follows form of underlying only
-
-LIMITS:
-- Per Occurrence: Headline limit ($1M, $2M, $5M, $10M common)
-- Aggregate: May equal or exceed occurrence
-- Defense: Usually outside limits
-
-RETENTION/SIR:
-- Amount insured pays when underlying doesn't respond
-- Look for "Self-Insured Retention" or "Retained Limit"
-
-UNDERLYING SCHEDULE (CRITICAL):
-Extract ALL scheduled underlying policies:
-- Type: GL, Auto, EL, WC, etc.
-- Carrier
-- Policy Number
-- Effective/Expiration Dates
-- Limits
-
-COMMON MINIMUM REQUIREMENTS:
-- GL: Usually $1M/$2M
-- Auto: Usually $1M CSL
-- EL: Usually $500K or $1M each
-
-### 4. LIMIT NORMALIZATION
-- "$1,000,000" → 1000000
-- "$1M" → 1000000
-- "$500K" → 500000
-
-## OUTPUT FORMAT
-Return valid JSON matching the schema.`;
-}
 
 function buildUmbrellaUserPrompt(
   evidenceCatalog: EvidenceCatalog,
   documentType: string,
   policyData: any
 ): string {
-  const catalogJson = JSON.stringify(evidenceCatalog.entries, null, 2);
+  const lines: string[] = [];
+  lines.push(`## Document Type: ${documentType.toUpperCase()}`);
+  lines.push('');
 
-  return `## DOCUMENT TYPE
-${documentType.toUpperCase()}
-
-${policyData ? `## EXISTING POLICY DATA
-Carrier: ${policyData.carrier || 'Unknown'}
-Policy Number: ${policyData.policy_number || 'Unknown'}
-Named Insured: ${policyData.client?.company_name || 'Unknown'}
-` : ''}
-
-## EVIDENCE CATALOG
-\`\`\`json
-${catalogJson}
-\`\`\`
-
-## EXTRACTION SCHEMA
-
-Extract Commercial Umbrella/Excess policy data. For each field include:
-- value: The extracted value (normalized)
-- evidence_ids: Array of evidence IDs
-- confidence: Score 0.0-1.0
-- status: "AUTO_APPLIED" | "NEEDS_REVIEW" | "LOW_CONFIDENCE" | "NOT_FOUND" | "CONFLICT"
-
-\`\`\`json
-{
-  "identity": {
-    "carrier_name": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "carrier_naic": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "policy_number": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "transaction_type": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "named_insured": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "dba": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "mailing_address": {
-      "street": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "city": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "state": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "zip": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" }
-    },
-    "producer": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "dates": {
-    "effective_date": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "expiration_date": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "issue_date": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "policy_type": { "value": "umbrella", "evidence_ids": [], "confidence": 0, "status": "" },
-  "form_basis": { "value": "follow_form", "evidence_ids": [], "confidence": 0, "status": "" },
-  "limits": {
-    "per_occurrence": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "aggregate": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "defense_costs": { "value": "outside_limits", "evidence_ids": [], "confidence": 0, "status": "" },
-    "territory": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "retention": {
-    "amount": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "applicability": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "underlying_requirements": {
-    "gl_each_occurrence": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "gl_general_aggregate": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "auto_liability": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "el_per_accident": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "underlying_policies": [],
-  "drop_down": {
-    "is_available": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "conditions": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  },
-  "additional_insureds": [],
-  "endorsements": [],
-  "premium": {
-    "total_premium": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "policy_fee": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "terrorism_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+  if (policyData) {
+    lines.push('## Existing Policy Context');
+    lines.push(`Carrier: ${policyData.carrier || 'Unknown'}`);
+    lines.push(`Policy Number: ${policyData.policy_number || 'Unknown'}`);
+    lines.push(`Named Insured: ${policyData.client?.company_name || 'Unknown'}`);
+    lines.push('');
   }
-}
-\`\`\`
 
-## EXTRACTION PRIORITY
+  lines.push('## Evidence Catalog');
+  lines.push(`Total entries: ${evidenceCatalog.stats.totalEntries}`);
+  lines.push(`Avg confidence: ${(evidenceCatalog.stats.avgConfidence * 100).toFixed(1)}%`);
+  lines.push('');
 
-1. **Limits**: Per occurrence (headline), aggregate, defense costs
-2. **Retention/SIR**: Amount and applicability
-3. **Underlying Schedule**: CRITICAL - extract ALL scheduled policies
-4. **Requirements**: Look for minimum underlying limits
-5. **Endorsements**: Flag all exclusions/limitations
+  const byPage: Record<number, EvidenceEntry[]> = {};
+  for (const e of Object.values(evidenceCatalog.entries)) {
+    if (!byPage[e.pageNumber]) byPage[e.pageNumber] = [];
+    byPage[e.pageNumber].push(e);
+  }
 
-REMEMBER: NO GUESSING. Only extract what's in the evidence.`;
+  for (const pageNum of Object.keys(byPage).map(Number).sort((a, b) => a - b)) {
+    lines.push(`### Page ${pageNum}`);
+    for (const e of byPage[pageNum]) {
+      const label = e.label ? `[${e.label}]` : '';
+      const conf = `(${(e.confidence * 100).toFixed(0)}%)`;
+      const tags = e.tags.length ? ` {${e.tags.join(', ')}}` : '';
+      const val = e.value.length > 120 ? e.value.substring(0, 120) + '...' : e.value;
+      lines.push(`- **${e.evidenceId}** ${label}: "${val}" ${conf}${tags}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## Extraction Task');
+  lines.push(
+    `Extract the Commercial Umbrella / Excess policy details and return them by calling the ${UMBRELLA_EXTRACTION_TOOL_NAME} tool.`,
+  );
+  lines.push('Cite evidence IDs for every value; return null for anything not present in the catalog.');
+  lines.push('Do not extract premium. Capture blanket AI / waiver of subrogation as evidence only.');
+
+  return lines.join('\n');
 }
 
 // =============================================================================
-// COMPLIANCE ANALYSIS
+// COMPLIANCE ANALYSIS (over the shaped rows)
 // =============================================================================
 
 function runComplianceAnalysis(
-  umbrellaDetails: any,
-  requirements: any,
-  underlyingPolicies: any[]
+  umbrellaDetails: UmbrellaDetails,
+  requirementsRow: Record<string, unknown> | null,
+  underlyingRows: Array<Record<string, unknown>>
 ): { type: string; severity: string; message: string }[] {
   const issues: { type: string; severity: string; message: string }[] = [];
 
-  if (!requirements || !underlyingPolicies.length) {
+  if (!requirementsRow || underlyingRows.length === 0) {
     return issues;
   }
 
-  const umbrellaEff = new Date(umbrellaDetails.dates?.effective_date);
-  const umbrellaExp = new Date(umbrellaDetails.dates?.expiration_date);
-
-  // Check for required underlying policies
-  if (requirements.gl_each_occurrence?.value) {
-    const glPolicy = underlyingPolicies.find(
-      (p: any) => p.type?.value === 'general_liability'
-    );
-    if (!glPolicy) {
-      issues.push({
-        type: 'missing_underlying',
-        severity: 'high',
-        message: 'Required General Liability underlying not scheduled',
-      });
-    }
+  // Required underlying lines must be scheduled.
+  if (requirementsRow.gl_each_occurrence != null &&
+      !underlyingRows.some((u) => u.underlying_type === 'general_liability')) {
+    issues.push({
+      type: 'missing_underlying',
+      severity: 'high',
+      message: 'Required General Liability underlying not scheduled',
+    });
   }
 
-  if (requirements.auto_liability?.value) {
-    const autoPolicy = underlyingPolicies.find(
-      (p: any) => p.type?.value === 'commercial_auto'
-    );
-    if (!autoPolicy) {
-      issues.push({
-        type: 'missing_underlying',
-        severity: 'high',
-        message: 'Required Commercial Auto underlying not scheduled',
-      });
-    }
+  if (requirementsRow.auto_liability != null &&
+      !underlyingRows.some((u) => u.underlying_type === 'commercial_auto')) {
+    issues.push({
+      type: 'missing_underlying',
+      severity: 'high',
+      message: 'Required Commercial Auto underlying not scheduled',
+    });
   }
 
-  // Check term alignment
-  for (const underlying of underlyingPolicies) {
-    if (underlying.expiration_date?.value) {
-      const underlyingExp = new Date(underlying.expiration_date.value);
-      if (underlyingExp < umbrellaExp) {
+  // Underlying must not expire before the umbrella.
+  const umbrellaExp = umbrellaDetails.dates.expiration_date
+    ? new Date(umbrellaDetails.dates.expiration_date)
+    : null;
+  if (umbrellaExp && !Number.isNaN(umbrellaExp.getTime())) {
+    for (const u of underlyingRows) {
+      const exp = u.expiration_date ? new Date(String(u.expiration_date)) : null;
+      if (exp && !Number.isNaN(exp.getTime()) && exp < umbrellaExp) {
         issues.push({
           type: 'term_mismatch',
           severity: 'high',
-          message: `${underlying.type?.value || 'Underlying'} expires before umbrella`,
+          message: `${u.underlying_type || 'Underlying'} expires before umbrella`,
         });
       }
     }
   }
 
   return issues;
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-function collectEvidenceIds(obj: any): string[] {
-  const ids: string[] = [];
-
-  function traverse(o: any) {
-    if (!o || typeof o !== 'object') return;
-    if (Array.isArray(o.evidence_ids)) {
-      ids.push(...o.evidence_ids);
-    }
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
-        traverse(o[key]);
-      }
-    }
-  }
-
-  traverse(obj);
-  return [...new Set(ids)];
-}
-
-function calculateAvgConfidence(obj: any): number {
-  const confidences: number[] = [];
-
-  function traverse(o: any) {
-    if (!o || typeof o !== 'object') return;
-    if (typeof o.confidence === 'number') {
-      confidences.push(o.confidence);
-    }
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
-        traverse(o[key]);
-      }
-    }
-  }
-
-  traverse(obj);
-  return confidences.length > 0
-    ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-    : 0;
-}
-
-function determineStatus(obj: any): string {
-  const statuses: string[] = [];
-
-  function traverse(o: any) {
-    if (!o || typeof o !== 'object') return;
-    if (typeof o.status === 'string') {
-      statuses.push(o.status);
-    }
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
-        traverse(o[key]);
-      }
-    }
-  }
-
-  traverse(obj);
-
-  if (statuses.includes('CONFLICT')) return 'CONFLICT';
-  if (statuses.includes('LOW_CONFIDENCE')) return 'LOW_CONFIDENCE';
-  if (statuses.includes('NEEDS_REVIEW')) return 'NEEDS_REVIEW';
-  if (statuses.every((s) => s === 'NOT_FOUND')) return 'NOT_FOUND';
-  return 'AUTO_APPLIED';
-}
-
-function calculateOverallConfidence(data: any): number {
-  const confidences: number[] = [];
-
-  function traverse(o: any) {
-    if (!o || typeof o !== 'object') return;
-    if (typeof o.confidence === 'number' && o.status !== 'NOT_FOUND') {
-      confidences.push(o.confidence);
-    }
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
-        traverse(o[key]);
-      }
-    }
-  }
-
-  traverse(data);
-  return confidences.length > 0
-    ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-    : 0;
-}
-
-function buildFieldEvidenceMapping(data: any): Record<string, string[]> {
-  const mapping: Record<string, string[]> = {};
-
-  function traverse(o: any, path: string) {
-    if (!o || typeof o !== 'object') return;
-
-    if (Array.isArray(o.evidence_ids) && o.evidence_ids.length > 0) {
-      mapping[path] = o.evidence_ids;
-    }
-
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object' && !Array.isArray(o[key])) {
-        traverse(o[key], path ? `${path}.${key}` : key);
-      }
-    }
-  }
-
-  traverse(data, '');
-  return mapping;
-}
-
-function calculateExtractionStats(data: any): {
-  fieldsExtracted: number;
-  fieldsAutoApplied: number;
-  fieldsNeedsReview: number;
-  fieldsNotFound: number;
-  fieldsConflict: number;
-} {
-  let fieldsExtracted = 0;
-  let fieldsAutoApplied = 0;
-  let fieldsNeedsReview = 0;
-  let fieldsNotFound = 0;
-  let fieldsConflict = 0;
-
-  function traverse(o: any) {
-    if (!o || typeof o !== 'object') return;
-
-    if (typeof o.status === 'string') {
-      fieldsExtracted++;
-      switch (o.status) {
-        case 'AUTO_APPLIED':
-          fieldsAutoApplied++;
-          break;
-        case 'NEEDS_REVIEW':
-        case 'LOW_CONFIDENCE':
-          fieldsNeedsReview++;
-          break;
-        case 'NOT_FOUND':
-          fieldsNotFound++;
-          break;
-        case 'CONFLICT':
-          fieldsConflict++;
-          break;
-      }
-    }
-
-    for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
-        traverse(o[key]);
-      }
-    }
-  }
-
-  traverse(data);
-
-  return {
-    fieldsExtracted,
-    fieldsAutoApplied,
-    fieldsNeedsReview,
-    fieldsNotFound,
-    fieldsConflict,
-  };
 }

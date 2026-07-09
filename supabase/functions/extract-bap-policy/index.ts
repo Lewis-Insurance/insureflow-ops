@@ -14,81 +14,66 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
+import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
+import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import {
+  BAP_EXTRACTION_TOOL_NAME,
+  BAP_EXTRACTION_TOOL_SCHEMA,
+  shapeBapDetails,
+  shapeVehicleRows,
+  shapeDriverRows,
+  shapeCoverageRows,
+  shapeInterestRows,
+  type RawBapExtraction,
+} from './shape.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // BAP EXTRACTION SYSTEM PROMPT
 // =============================================================================
 
-const BAP_EXTRACTION_SYSTEM_PROMPT = `You are an expert Commercial Auto insurance document analyst.
+const BAP_EXTRACTION_SYSTEM_PROMPT = `You are an expert Commercial Auto (Business Auto Policy) insurance document analyst.
+
+You MUST return your extraction by calling the ${BAP_EXTRACTION_TOOL_NAME} tool. Do not answer in prose.
 
 ## CRITICAL RULES
-1. **ONLY extract values that exist in the evidence catalog provided**
-2. **NEVER guess or infer values** - if evidence is not found, return NOT_FOUND
-3. **ALWAYS cite evidence IDs** for every extracted value
-4. **NEVER fabricate evidence IDs** - only use IDs from the catalog
+1. ONLY extract values that appear in the evidence catalog provided. Cite the evidence IDs (E####) that support each value in that field's evidence_ids array.
+2. NEVER guess or infer. If a value is not in the evidence, return null for that field.
+3. NEVER fabricate an evidence ID — only use IDs that appear in the catalog.
 
-## Commercial Auto Fields to Extract
+## Coverage (this drives the ACORD 25 auto section — get it right)
+- liability.limit_type: "csl" (Combined Single Limit) or "split" (separate BI/PD limits).
+- liability.csl_limit when csl; otherwise bodily_injury_per_person, bodily_injury_per_accident, property_damage.
+- coverage.covered_auto_symbols: the covered-auto SYMBOL CODES marked on the coverage grid. Legend:
+    1 = Any Auto
+    2 = Owned Autos Only (3-6 are owned subsets)
+    7 = Specifically Described Autos  (this is "SCHEDULED AUTOS" on the certificate)
+    8 = Hired Autos Only
+    9 = Non-Owned Autos Only
+  Return the integer codes you actually see. Do not convert them.
 
-### Policy Identity
-- carrier_name, carrier_naic (5-digit), policy_number
-- transaction_type (quote/bound/issued/renewal/endorsement/cancel)
-- named_insured, dba, fein
-- mailing_address (street, city, state, zip)
-- primary_garaging_address
+## Insurer NAIC
+- carrier_naic is the 5-digit INSURER (company) NAIC code. It is NOT an industry NAICS or SIC classification code. If the policy does not clearly show the insurer's NAIC number, return null — a name-to-NAIC lookup happens later.
 
-### Dates
-- effective_date, expiration_date, issue_date (YYYY-MM-DD format)
+## Premium
+- Do NOT extract premium, fees, taxes, or any dollar amount that is not a coverage limit or deductible. Premium is never captured.
 
-### Coverage Structure (CRITICAL - capture symbols!)
-For each coverage line:
-- coverage_name
-- symbols (1-9, 19) - ESSENTIAL
-- limit (CSL or split: bi_per_person, bi_per_accident, pd)
-- deductible
+## Additional Insured / Waiver of Subrogation (evidence only)
+- Capture blanket endorsements as EVIDENCE in additional_insured_evidence / waiver_of_subrogation_evidence:
+  { present, basis: "blanket" | "scheduled", form_numbers: [...], source_span }.
+- Name specifically-listed additional insureds / loss payees / lienholders in additional_interests.
+- Do NOT assert a confirmed "Y" for any specific certificate holder. You are recording what the policy shows, not certifying an endorsement.
 
-Symbol Reference:
-- 1 = Any Auto, 2 = Owned Autos, 7 = Specifically Described, 8 = Hired, 9 = Non-Owned
+## Vehicles
+- Full VINs are masked before you receive the document. Store whatever VIN fragment is present; never invent a VIN.
 
-### Vehicles (Extract ALL)
-For each: unit_number, vin (17 chars), year, make, model, body_type, gvw, use_type, garaging_zip/state, comp_ded, coll_ded
-
-### Drivers (Extract ALL)
-For each: name, dob, license_number/state, relationship, driver_type (rated/excluded/occasional), mvr_status
-
-### Additional Interests
-For each: name, address, interest_type (additional_insured/loss_payee/lienholder/lessor), vehicle_vins
-
-### Premium
-- total_premium, liability_premium, physical_damage_premium, um_uim_premium, hired_non_owned_premium
-- policy_fee, state_taxes, deposit_premium
-
-## Output Format
-{
-  "fields": {
-    "field_name": {
-      "value": "...",
-      "evidence_ids": ["E0001"],
-      "confidence": 0.95,
-      "status": "AUTO_APPLIED|NEEDS_REVIEW|LOW_CONFIDENCE|NOT_FOUND"
-    }
-  },
-  "coverages": [...],
-  "vehicles": [...],
-  "drivers": [...],
-  "additional_interests": [...],
-  "premium": {...},
-  "extraction_confidence": 0.0-1.0
-}
-
-## Confidence Guidelines
-- 0.95+: AUTO_APPLIED
-- 0.80-0.94: NEEDS_REVIEW
-- 0.70-0.79: NEEDS_VERIFICATION
-- <0.70: LOW_CONFIDENCE
-- No evidence: NOT_FOUND`;
+## Drivers / dates
+- Dates as YYYY-MM-DD. Regulated PII (dates of birth, license numbers) may already be redacted — leave those null when so.`;
 
 // =============================================================================
 // TYPES
@@ -151,7 +136,6 @@ const BAP_FIELD_PATTERNS: Record<string, RegExp[]> = {
   MedPayLimit: [/med\s*pay/i, /medical\s*payments/i],
   HiredAutoLimit: [/hired\s*auto/i],
   NonOwnedLimit: [/non-?owned/i],
-  TotalPremium: [/total\s*premium/i, /annual\s*premium/i],
   DriverName: [/driver\s*name/i],
   LicenseNumber: [/license\s*(number|no|#)/i, /dl\s*#/i],
   DateOfBirth: [/date\s*of\s*birth/i, /dob/i, /birth\s*date/i],
@@ -362,7 +346,6 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin);
 
   const jobStartTime = Date.now();
-  let jobId: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -370,8 +353,6 @@ serve(async (req) => {
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     const azureEndpoint = Deno.env.get("AZURE_DI_ENDPOINT");
     const azureKey = Deno.env.get("AZURE_DI_KEY");
-
-    if (!anthropicApiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -384,19 +365,45 @@ serve(async (req) => {
     const body: RequestBody = await req.json();
     const { document_id, policy_id, document_type = "policy", use_azure_di = true } = body;
 
-    if (!policy_id) throw new Error("policy_id is required");
-    if (!document_id) throw new Error("document_id is required");
+    if (!policy_id || !document_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: "document_id and policy_id are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Azure DI is OPTIONAL for BAP (falls back to stored ocr_text); only the
+    // Anthropic key is strictly required, so validate it synchronously.
+    if (!anthropicApiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     console.log(`[extract-bap-policy] Starting extraction for policy ${policy_id}`);
 
     // Create job record
-    const { data: jobData } = await supabase
+    const { data: jobData, error: jobError } = await supabase
       .from("policy_bap_extraction_jobs")
       .insert({ policy_id, document_id, status: "pending", llm_model: "claude-sonnet-5" })
       .select("id")
       .single();
-    if (jobData) jobId = jobData.id;
+    if (jobError || !jobData) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || "unknown error"}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const jobId = jobData.id;
 
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on "completed" or "failed" - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -465,44 +472,67 @@ serve(async (req) => {
     } else {
       throw new Error("No document content available");
     }
-    userPrompt += `\n## Extraction Task\nExtract ALL Commercial Auto policy details.\nCite evidence IDs for every field.\n`;
+    userPrompt += `\n## Extraction Task\nExtract the Commercial Auto policy details and return them by calling the ${BAP_EXTRACTION_TOOL_NAME} tool.\nCite evidence IDs for every value; return null for anything not present in the catalog.\nDo not extract premium. Capture blanket AI / waiver of subrogation as evidence only.\n`;
 
     console.log(`[extract-bap-policy] Calling Claude...`);
 
     const llmStart = Date.now();
+    // Claude tool-use / structured output. `tools` + `tool_choice` are passed
+    // through the boundary wrapper unchanged, so redactPII still redacts the
+    // user prompt (evidence catalog) before it leaves the process. The wrapper
+    // needed NO change: it JSON-round-trips and recursively redacts the whole
+    // body, and our schema strings carry no PII.
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
       model: "claude-sonnet-5",
-      max_tokens: 8000,
+      max_tokens: 16384,
       system: BAP_EXTRACTION_SYSTEM_PROMPT,
+      tools: [
+        {
+          name: BAP_EXTRACTION_TOOL_NAME,
+          description: "Emit the structured Commercial Auto (BAP) extraction. Every value must be backed by evidence IDs from the catalog; return null for anything not present.",
+          input_schema: BAP_EXTRACTION_TOOL_SCHEMA,
+        },
+      ],
+      tool_choice: { type: "tool", name: BAP_EXTRACTION_TOOL_NAME },
       messages: [{ role: "user", content: userPrompt }],
-    });
+    }, 110000);
     const llmTime = Date.now() - llmStart;
 
     console.log(`[extract-bap-policy] Claude completed in ${llmTime}ms`);
 
-    // Parse response
-    const responseText = anthropicResponseText(response);
-    let bapDetails: any;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) bapDetails = JSON.parse(jsonMatch[0]);
-      else throw new Error("No JSON found");
-    } catch {
-      throw new Error("Failed to parse extraction response");
+    // Read the tool_use block from the response content (order-independent).
+    const contentBlocks = (response.content ?? []) as Array<Record<string, any>>;
+    const toolBlock = contentBlocks.find(
+      (b) => b?.type === "tool_use" && b?.name === BAP_EXTRACTION_TOOL_NAME,
+    );
+    if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== "object") {
+      throw new Error("Claude did not return the expected tool_use extraction block");
     }
 
-    bapDetails.extraction_source = "azure_di_claude";
-    bapDetails.extracted_at = new Date().toISOString();
+    // Keep the redaction guard: a model shown redacted text echoes tokens like
+    // "[REDACTED_DOB]" into structured output; nullify pure-token strings.
+    const rawExtraction = nullifyRedactedTokens(toolBlock.input) as RawBapExtraction;
 
-    // Build field evidence mapping
-    const fieldEvidence: Record<string, string[]> = {};
-    if (bapDetails.fields) {
-      for (const [name, data] of Object.entries(bapDetails.fields as Record<string, any>)) {
-        if (data?.evidence_ids) fieldEvidence[name] = data.evidence_ids;
-      }
-    }
+    // Shape into the EXACT bap_details paths + flat-dotted bap_field_evidence
+    // that get_master_coi / coi_build_line read.
+    const nowIso = new Date().toISOString();
+    const { bapDetails, fieldEvidence } = shapeBapDetails(rawExtraction, nowIso);
 
-    // Update policy
+    // Resolve the extracted carrier to the agency's canonical carrier (clean
+    // rating/parenthetical suffixes -> resolve_carrier). The COI reads the blob
+    // identity.carrier_name / identity.carrier_naic, so patch the shaped blob
+    // (NOT the policies scalar columns). Never fatal: on no-match we keep the
+    // cleaned (or raw) name and any NAIC the model already extracted.
+    const rawCarrierName = rawExtraction.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    bapDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    bapDetails.identity.carrier_naic =
+      carrierRes?.naic ?? bapDetails.identity.carrier_naic ?? null;
+    (bapDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (bapDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
+
+    // Update policy (scalar columns written to `policies` are unchanged).
     await supabase.from("policies").update({
       bap_details: bapDetails,
       bap_field_evidence: fieldEvidence,
@@ -513,110 +543,48 @@ serve(async (req) => {
 
     let vehiclesCount = 0, driversCount = 0, coveragesCount = 0, interestsCount = 0;
 
-    // Insert vehicles
-    if (bapDetails.vehicles?.length > 0) {
+    // Child tables: DELETE-then-INSERT, only when the extraction produced rows.
+    const vehicleRows = shapeVehicleRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (vehicleRows.length > 0) {
       await supabase.from("policy_bap_vehicles").delete().eq("policy_id", policy_id);
-      const rows = bapDetails.vehicles.map((v: any) => ({
-        policy_id,
-        unit_number: v.unit_number,
-        vin: v.vin,
-        year: v.year,
-        make: v.make,
-        model: v.model,
-        body_type: v.body_type,
-        gvw: v.gvw,
-        use_type: v.use_type,
-        garaging_zip: v.garaging_zip,
-        garaging_state: v.garaging_state,
-        cost_new: v.cost_new,
-        stated_amount: v.stated_amount,
-        comprehensive_deductible: v.comprehensive_deductible || v.comp_deductible,
-        collision_deductible: v.collision_deductible || v.coll_deductible,
-        special_equipment_coverage: v.special_equipment_coverage,
-        primary_driver_name: v.primary_driver_name,
-        evidence_ids: v.evidence_ids || [],
-        extraction_confidence: v.confidence,
-        extraction_status: v.status || "AUTO_APPLIED",
-      }));
-      const { error } = await supabase.from("policy_bap_vehicles").insert(rows);
-      if (!error) vehiclesCount = rows.length;
+      const { error } = await supabase.from("policy_bap_vehicles").insert(vehicleRows);
+      if (!error) vehiclesCount = vehicleRows.length;
+      else console.error("[extract-bap-policy] vehicles insert error:", error.message);
     }
 
-    // Insert drivers
-    if (bapDetails.drivers?.length > 0) {
+    const driverRows = shapeDriverRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (driverRows.length > 0) {
       await supabase.from("policy_bap_drivers").delete().eq("policy_id", policy_id);
-      const rows = bapDetails.drivers.map((d: any) => ({
-        policy_id,
-        name: d.name,
-        date_of_birth: d.date_of_birth || d.dob,
-        license_number: d.license_number,
-        license_state: d.license_state,
-        relationship: d.relationship,
-        driver_type: d.driver_type,
-        violations_points: d.violations_points,
-        accidents_count: d.accidents_count,
-        mvr_status: d.mvr_status,
-        sr22_required: d.sr22_required,
-        evidence_ids: d.evidence_ids || [],
-        extraction_confidence: d.confidence,
-        extraction_status: d.status || "AUTO_APPLIED",
-      }));
-      const { error } = await supabase.from("policy_bap_drivers").insert(rows);
-      if (!error) driversCount = rows.length;
+      const { error } = await supabase.from("policy_bap_drivers").insert(driverRows);
+      if (!error) driversCount = driverRows.length;
+      else console.error("[extract-bap-policy] drivers insert error:", error.message);
     }
 
-    // Insert coverages
-    if (bapDetails.coverages?.length > 0) {
+    const coverageRows = shapeCoverageRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (coverageRows.length > 0) {
       await supabase.from("policy_bap_coverages").delete().eq("policy_id", policy_id);
-      const rows = bapDetails.coverages.map((c: any) => ({
-        policy_id,
-        coverage_name: c.coverage_name,
-        coverage_type: c.coverage_type || "other",
-        symbols: c.symbols || [],
-        limit_amount: c.limit || c.limit_amount,
-        limit_type: c.limit_type,
-        bi_per_person: c.bi_per_person,
-        bi_per_accident: c.bi_per_accident,
-        pd_per_accident: c.pd_per_accident || c.property_damage,
-        deductible: c.deductible,
-        is_stacked: c.is_stacked,
-        is_rejected: c.is_rejected,
-        evidence_ids: c.evidence_ids || [],
-        extraction_confidence: c.confidence,
-        extraction_status: c.status || "AUTO_APPLIED",
-      }));
-      const { error } = await supabase.from("policy_bap_coverages").insert(rows);
-      if (!error) coveragesCount = rows.length;
+      const { error } = await supabase.from("policy_bap_coverages").insert(coverageRows);
+      if (!error) coveragesCount = coverageRows.length;
+      else console.error("[extract-bap-policy] coverages insert error:", error.message);
     }
 
-    // Insert additional interests
-    if (bapDetails.additional_interests?.length > 0) {
+    const interestRows = shapeInterestRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (interestRows.length > 0) {
       await supabase.from("policy_bap_interests").delete().eq("policy_id", policy_id);
-      const rows = bapDetails.additional_interests.map((i: any) => ({
-        policy_id,
-        name: i.name,
-        address_street: i.address?.street,
-        address_city: i.address?.city,
-        address_state: i.address?.state,
-        address_zip: i.address?.zip,
-        interest_type: i.interest_type || "additional_interest",
-        vehicle_vins: i.vehicle_vins || [],
-        evidence_ids: i.evidence_ids || [],
-        extraction_confidence: i.confidence,
-        extraction_status: i.status || "AUTO_APPLIED",
-      }));
-      const { error } = await supabase.from("policy_bap_interests").insert(rows);
-      if (!error) interestsCount = rows.length;
+      const { error } = await supabase.from("policy_bap_interests").insert(interestRows);
+      if (!error) interestsCount = interestRows.length;
+      else console.error("[extract-bap-policy] interests insert error:", error.message);
     }
 
     // Update job as completed
     if (jobId) {
+      const usage = (response as any).usage;
       await supabase.from("policy_bap_extraction_jobs").update({
         status: "completed",
         extraction_completed_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
-        llm_tokens_input: response.usage?.input_tokens,
-        llm_tokens_output: response.usage?.output_tokens,
+        llm_tokens_input: usage?.input_tokens,
+        llm_tokens_output: usage?.output_tokens,
         llm_latency_ms: llmTime,
         vehicles_extracted: vehiclesCount,
         drivers_extracted: driversCount,
@@ -628,36 +596,35 @@ serve(async (req) => {
 
     console.log(`[extract-bap-policy] Success for policy ${policy_id}`);
 
-    return new Response(JSON.stringify({
-      success: true,
-      policy_id,
-      job_id: jobId,
-      extraction_method: evidenceCatalog ? "azure_di_claude" : "ocr_text_claude",
-      evidence_entries: evidenceCatalog?.stats.totalEntries || 0,
-      vehicles_count: vehiclesCount,
-      drivers_count: driversCount,
-      coverages_count: coveragesCount,
-      interests_count: interestsCount,
-      processing_time_ms: Date.now() - jobStartTime,
-    }), {
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error: any) => {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        console.error("[extract-bap-policy] Error (background):", error);
+        try {
+          await supabase.from("policy_bap_extraction_jobs").update({
+            status: "failed",
+            error_message: `${msg} | ${Date.now() - jobStartTime}ms`.slice(0, 500),
+            completed_at: new Date().toISOString(),
+          }).eq("id", jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
+    return new Response(JSON.stringify({ success: true, job_id: jobId, status: "processing" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 202,
     });
   } catch (error: any) {
-    console.error("[extract-bap-policy] Error:", error);
-
-    if (jobId) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-      await supabase.from("policy_bap_extraction_jobs").update({
-        status: "failed",
-        error_message: error.message,
-        completed_at: new Date().toISOString(),
-      }).eq("id", jobId);
-    }
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error("[extract-bap-policy] Error (sync phase):", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

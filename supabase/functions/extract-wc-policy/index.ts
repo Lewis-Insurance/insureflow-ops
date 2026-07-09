@@ -14,9 +14,25 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
+import { anthropicBoundaryCreate } from '../_shared/modelBoundaryFetch.ts';
+import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+import {
+  WC_EXTRACTION_TOOL_NAME,
+  WC_EXTRACTION_TOOL_SCHEMA,
+  shapeWcDetails,
+  shapeClassificationRows,
+  shapeOfficerRows,
+  shapeStateRows,
+  shapeExperienceModRows,
+  shapeSubrogationWaiverRows,
+  type RawWcExtraction,
+} from './shape.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // WC EXTRACTION SYSTEM PROMPT - Evidence-Based
@@ -24,74 +40,43 @@ import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
 
 const WC_EXTRACTION_SYSTEM_PROMPT = `You are an expert Workers' Compensation insurance document analyst.
 
+You MUST return your extraction by calling the ${WC_EXTRACTION_TOOL_NAME} tool. Do not answer in prose.
+
 ## CRITICAL RULES
-1. **ONLY extract values that exist in the evidence catalog provided**
-2. **NEVER guess or infer values** - if evidence is not found, return NOT_FOUND
-3. **ALWAYS cite evidence IDs** for every extracted value
-4. **NEVER fabricate evidence IDs** - only use IDs from the catalog
+1. ONLY extract values that appear in the evidence catalog provided. Cite the evidence IDs (E####) that support each value in that field's evidence_ids array.
+2. NEVER guess or infer. If a value is not in the evidence, return null for that field.
+3. NEVER fabricate an evidence ID — only use IDs that appear in the catalog.
 
-## Workers' Compensation Fields to Extract
+## Coverage (this drives the ACORD 25 Workers Comp section — get it right)
+- coverage.part_one_wc: "statutory" when Part One (Workers Compensation) provides statutory benefits (this checks the ACORD 25 "PER STATUTE" box); "other" otherwise. null if not shown.
+- coverage.part_two_employers_liability: the three Employers Liability limits printed on the certificate —
+    each_accident            (E.L. EACH ACCIDENT)
+    disease_each_employee    (E.L. DISEASE - EA EMPLOYEE)
+    disease_policy_limit     (E.L. DISEASE - POLICY LIMIT)
 
-### Policy Identity
-- carrier_name, carrier_naic (5-digit), policy_number, status
-- named_insured, dba, fein (XX-XXXXXXX format)
-- mailing_address (street, city, state, zip)
-- producer, agency
+## Officer / Owner Elections (drives ANY PROPRIETOR EXCLUDED)
+- For each officer/owner: name, title, ownership_percent, included, annual_remuneration, duties, type.
+- included=false means that officer/owner is EXCLUDED from coverage. Only set included=false when the document clearly shows an exclusion; otherwise set included=true (default). Never invent an exclusion.
 
-### Dates
-- effective_date, expiration_date, issue_date (YYYY-MM-DD format)
-- policy_term
+## Classifications & States
+- classifications: state, class_code, description, exposure_basis, estimated_payroll, is_governing_class, is_standard_exception. Do NOT extract rate or premium.
+- covered_states: state + type (item_3a for Item 3.A. states of operation, item_3c for Item 3.C. other states, monopolistic). Do NOT extract state premium.
 
-### Coverage
-- policy_type (standard, assigned_risk, peo, ghost)
-- item_3a_states (states of operation)
-- item_3c_states (other states)
-- employers_liability: each_accident, disease_each_employee, disease_policy_limit
-- deductible (type, amount)
+## Experience Rating
+- experience_mods: experience_mod (decimal, 0.850 = 15% credit / 1.150 = 15% debit) and effective_date (YYYY-MM-DD) are BOTH required for a row; also rating_bureau, schedule_rating_percent, schedule_rating_type (credit/debit).
 
-### Experience Rating (CRITICAL)
-- experience_mod: Format as decimal (0.850 for 15% credit, 1.150 for 15% debit)
-- experience_mod_effective_date
-- rating_bureau (NCCI, WCIRB, etc.)
-- schedule_rating_percent, merit_rating_percent
-- premium_discount
+## Waiver of Subrogation (WC has NO Additional Insured concept — SUBR WVD is the only holder flag)
+- subrogation_waivers: named/scheduled waivers where a specific organization or person is waived in favor of (name required).
+- waiver_of_subrogation_evidence: evidence of a BLANKET waiver endorsement (e.g. WC 00 03 13). Capture present, basis (blanket|scheduled), form_numbers, source_span. Do NOT assert a specific holder "Y".
 
-### Classifications (Extract ALL rows)
-For each: state, class_code (4 digits), description, estimated_payroll, rate, premium, is_governing_class
+## Insurer NAIC
+- carrier_naic is the 5-digit INSURER (company) NAIC code. It is NOT an industry NAICS or SIC classification code. If the insurer's NAIC number is not clearly shown, return null — a name-to-NAIC lookup happens later.
 
-### Premium
-- estimated_annual_premium, wc_premium_subtotal
-- expense_constant, state_assessments, terrorism_charge
-- deposit_premium, payment_plan
+## Premium
+- Do NOT extract premium, fees, taxes, rate, or any dollar amount that is not a coverage/EL limit. Premium is never captured.
 
-### Officer/Owner Elections (VERY IMPORTANT)
-For each: name, title, ownership_percent, included (true/false), annual_remuneration, duties
-
-## Output Format
-Return JSON with this structure:
-{
-  "fields": {
-    "field_name": {
-      "value": "extracted value",
-      "evidence_ids": ["E0001", "E0002"],
-      "confidence": 0.95,
-      "status": "AUTO_APPLIED|NEEDS_REVIEW|LOW_CONFIDENCE|NOT_FOUND",
-      "reasoning": "why this value was selected"
-    }
-  },
-  "classifications": [...],
-  "officers": [...],
-  "covered_states": [...],
-  "experience_rating": {...},
-  "extraction_confidence": 0.0-1.0
-}
-
-## Confidence Guidelines
-- 0.95+: Strong evidence, clear value, format-valid → AUTO_APPLIED
-- 0.80-0.94: Good evidence, minor uncertainty → NEEDS_REVIEW
-- 0.70-0.79: Plausible but uncertain → NEEDS_VERIFICATION
-- <0.70: Weak evidence → LOW_CONFIDENCE
-- No evidence found → NOT_FOUND (value should be null)`;
+## Confidence
+- Set each field's confidence 0-1 and status (AUTO_APPLIED for strong evidence, NEEDS_REVIEW / LOW_CONFIDENCE otherwise). Set extraction_confidence to the overall 0-1 confidence.`;
 
 // =============================================================================
 // TYPES
@@ -410,7 +395,6 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin);
 
   const jobStartTime = Date.now();
-  let jobId: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -418,8 +402,6 @@ serve(async (req) => {
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     const azureEndpoint = Deno.env.get("AZURE_DI_ENDPOINT");
     const azureKey = Deno.env.get("AZURE_DI_KEY");
-
-    if (!anthropicApiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -437,8 +419,21 @@ serve(async (req) => {
       use_azure_di = true,
     } = body;
 
-    if (!policy_id) throw new Error("policy_id is required");
-    if (!document_id) throw new Error("document_id is required");
+    if (!policy_id || !document_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: "document_id and policy_id are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Azure DI is OPTIONAL for WC (falls back to stored ocr_text); only the
+    // Anthropic key is strictly required, so validate it synchronously.
+    if (!anthropicApiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     console.log(`[extract-wc-policy] Starting extraction for policy ${policy_id}, document ${document_id}`);
 
@@ -449,18 +444,29 @@ serve(async (req) => {
         policy_id,
         document_id,
         status: "pending",
-        azure_model_id: "prebuilt-document",
+        // The OCR call uses the prebuilt-layout model (see callAzureDocumentIntelligence);
+        // record that exact model id, not the stale 'prebuilt-document' label.
+        azure_model_id: "prebuilt-layout",
         llm_model: "claude-sonnet-5",
       })
       .select("id")
       .single();
 
-    if (jobError) {
-      console.warn("Failed to create job record:", jobError);
-    } else {
-      jobId = jobData.id;
+    if (jobError || !jobData) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || "unknown error"}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+    const jobId = jobData.id;
 
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on "completed" or "failed" - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document info
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -546,55 +552,69 @@ serve(async (req) => {
       throw new Error("No document content available for extraction");
     }
 
-    userPrompt += `\n## Extraction Task\nExtract ALL Workers' Compensation policy details from the evidence above.\n`;
-    userPrompt += `CRITICAL: Only use values from the evidence catalog. Cite evidence IDs for every field.\n`;
-    userPrompt += `Return a complete JSON object with all WC fields, classifications, officers, and experience rating.`;
+    userPrompt += `\n## Extraction Task\nExtract the Workers' Compensation policy details from the evidence above and return them by calling the ${WC_EXTRACTION_TOOL_NAME} tool.\n`;
+    userPrompt += `Cite evidence IDs for every value; return null for anything not present in the catalog.\n`;
+    userPrompt += `Do not extract premium, rate, fees, or taxes. Capture blanket waiver of subrogation as evidence only.\n`;
 
     console.log(`[extract-wc-policy] Calling Claude for extraction...`);
 
     const llmStartTime = Date.now();
+    // Claude tool-use / structured output. `tools` + `tool_choice` are passed
+    // through the boundary wrapper unchanged, so redactPII still redacts the user
+    // prompt (evidence catalog) before it leaves the process. Same calling
+    // convention as extract-bap-policy; no modelBoundaryFetch change needed.
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
       model: "claude-sonnet-5",
-      max_tokens: 8000,
+      max_tokens: 16384,
       system: WC_EXTRACTION_SYSTEM_PROMPT,
+      tools: [
+        {
+          name: WC_EXTRACTION_TOOL_NAME,
+          description: "Emit the structured Workers' Compensation extraction. Every value must be backed by evidence IDs from the catalog; return null for anything not present.",
+          input_schema: WC_EXTRACTION_TOOL_SCHEMA,
+        },
+      ],
+      tool_choice: { type: "tool", name: WC_EXTRACTION_TOOL_NAME },
       messages: [{ role: "user", content: userPrompt }],
-    });
+    }, 110000);
 
     const llmTime = Date.now() - llmStartTime;
     console.log(`[extract-wc-policy] Claude completed in ${llmTime}ms`);
 
-    // Parse response
-    const responseText = anthropicResponseText(response);
-    let wcDetails: any;
-
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        wcDetails = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("No JSON found in response");
-      }
-    } catch (parseError) {
-      console.error("[extract-wc-policy] Failed to parse response:", parseError);
-      throw new Error("Failed to parse extraction response");
+    // Read the tool_use block from the response content (order-independent).
+    const contentBlocks = (response.content ?? []) as Array<Record<string, any>>;
+    const toolBlock = contentBlocks.find(
+      (b) => b?.type === "tool_use" && b?.name === WC_EXTRACTION_TOOL_NAME,
+    );
+    if (!toolBlock || !toolBlock.input || typeof toolBlock.input !== "object") {
+      throw new Error("Claude did not return the expected tool_use extraction block");
     }
 
-    // Add metadata
-    wcDetails.extraction_source = "azure_di_claude";
-    wcDetails.extracted_at = new Date().toISOString();
-    wcDetails.evidence_catalog_id = policy_id;
+    // Keep the redaction guard: a model shown redacted text echoes tokens like
+    // "[REDACTED_DOB]" into structured output; nullify pure-token strings.
+    const rawExtraction = nullifyRedactedTokens(toolBlock.input) as RawWcExtraction;
 
-    // Build field-level evidence mapping
-    const fieldEvidence: Record<string, string[]> = {};
-    if (wcDetails.fields) {
-      for (const [fieldName, fieldData] of Object.entries(wcDetails.fields as Record<string, any>)) {
-        if (fieldData?.evidence_ids) {
-          fieldEvidence[fieldName] = fieldData.evidence_ids;
-        }
-      }
-    }
+    // Shape into the EXACT wc_details paths + flat-dotted wc_field_evidence that
+    // get_master_coi / coi_build_line read (migration 20260702172000, WC cells
+    // L914-936). The three EL limits + part_one_wc are what the COI WC section needs.
+    const nowIso = new Date().toISOString();
+    const { wcDetails, fieldEvidence } = shapeWcDetails(rawExtraction, nowIso);
 
-    // Update policy with WC details
+    // Resolve the extracted carrier to the agency's canonical carrier (clean
+    // rating/parenthetical suffixes -> resolve_carrier). The COI reads the blob
+    // identity.carrier_name / identity.carrier_naic, so patch the shaped blob
+    // (NOT the policies scalar columns). Never fatal: on no-match we keep the
+    // cleaned (or raw) name and any NAIC the model already extracted.
+    const rawCarrierName = rawExtraction.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    wcDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    wcDetails.identity.carrier_naic =
+      carrierRes?.naic ?? wcDetails.identity.carrier_naic ?? null;
+    (wcDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (wcDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
+
+    // Update policy with WC details.
     const { error: updateError } = await supabase
       .from("policies")
       .update({
@@ -611,113 +631,60 @@ serve(async (req) => {
       throw updateError;
     }
 
-    // Count extracted items
+    // Child tables: DELETE-then-INSERT, only when the extraction produced rows.
+    // Each shaper defends the DB CHECK / NOT NULL constraints so one bad row
+    // cannot crash the batch. §NO-PREMIUM: no rate / premium / state_premium.
     let classificationsCount = 0;
     let officersCount = 0;
     let statesCount = 0;
+    let experienceModsCount = 0;
+    let subrogationWaiversCount = 0;
 
-    // Insert classifications with evidence
-    if (wcDetails.classifications && wcDetails.classifications.length > 0) {
-      await supabase
-        .from("policy_wc_classifications")
-        .delete()
-        .eq("policy_id", policy_id);
-
-      const rows = wcDetails.classifications.map((c: any) => ({
-        policy_id,
-        state: c.state,
-        class_code: c.class_code,
-        description: c.description,
-        exposure_basis: c.exposure_basis || "payroll",
-        estimated_payroll: c.estimated_payroll,
-        rate: c.rate,
-        premium: c.premium,
-        is_governing_class: c.is_governing_class || false,
-        is_standard_exception: c.is_standard_exception || false,
-        evidence_ids: c.evidence_ids || [],
-        extraction_confidence: c.confidence,
-        extraction_status: c.status || "AUTO_APPLIED",
-      }));
-
-      const { error: classError } = await supabase
-        .from("policy_wc_classifications")
-        .insert(rows);
-
-      if (!classError) {
-        classificationsCount = rows.length;
-      }
+    const classificationRows = shapeClassificationRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (classificationRows.length > 0) {
+      await supabase.from("policy_wc_classifications").delete().eq("policy_id", policy_id);
+      const { error } = await supabase.from("policy_wc_classifications").insert(classificationRows);
+      if (!error) classificationsCount = classificationRows.length;
+      else console.error("[extract-wc-policy] classifications insert error:", error.message);
     }
 
-    // Insert officers with evidence
-    if (wcDetails.officers && wcDetails.officers.length > 0) {
-      await supabase
-        .from("policy_wc_officers")
-        .delete()
-        .eq("policy_id", policy_id);
-
-      const rows = wcDetails.officers.map((o: any) => ({
-        policy_id,
-        name: o.name,
-        title: o.title,
-        ownership_percent: o.ownership_percent,
-        is_included: o.included,
-        annual_remuneration: o.annual_remuneration,
-        duties: o.duties,
-        officer_type: o.type || "officer",
-        evidence_ids: o.evidence_ids || [],
-        extraction_confidence: o.confidence,
-        extraction_status: o.status || "AUTO_APPLIED",
-      }));
-
-      const { error: officerError } = await supabase
-        .from("policy_wc_officers")
-        .insert(rows);
-
-      if (!officerError) {
-        officersCount = rows.length;
-      }
+    // Officers drive "ANY PROPRIETOR EXCLUDED" via NOT bool_or(is_included) in the RPC.
+    const officerRows = shapeOfficerRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (officerRows.length > 0) {
+      await supabase.from("policy_wc_officers").delete().eq("policy_id", policy_id);
+      const { error } = await supabase.from("policy_wc_officers").insert(officerRows);
+      if (!error) officersCount = officerRows.length;
+      else console.error("[extract-wc-policy] officers insert error:", error.message);
     }
 
-    // Insert covered states
-    if (wcDetails.covered_states && wcDetails.covered_states.length > 0) {
-      await supabase
-        .from("policy_wc_states")
-        .delete()
-        .eq("policy_id", policy_id);
-
-      const rows = wcDetails.covered_states.map((s: any) => ({
-        policy_id,
-        state: s.state,
-        coverage_type: s.type || "item_3a",
-        is_monopolistic: s.is_monopolistic || false,
-        evidence_ids: s.evidence_ids || [],
-        extraction_confidence: s.confidence,
-        extraction_status: s.status || "AUTO_APPLIED",
-      }));
-
-      const { error: stateError } = await supabase
-        .from("policy_wc_states")
-        .insert(rows);
-
-      if (!stateError) {
-        statesCount = rows.length;
-      }
+    const stateRows = shapeStateRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (stateRows.length > 0) {
+      await supabase.from("policy_wc_states").delete().eq("policy_id", policy_id);
+      const { error } = await supabase.from("policy_wc_states").insert(stateRows);
+      if (!error) statesCount = stateRows.length;
+      else console.error("[extract-wc-policy] states insert error:", error.message);
     }
 
-    // Insert experience mod
-    if (wcDetails.experience_rating?.experience_mod) {
-      const er = wcDetails.experience_rating;
-      await supabase.from("policy_wc_experience_mods").insert({
-        policy_id,
-        experience_mod: er.experience_mod,
-        effective_date: er.experience_mod_effective_date,
-        rating_bureau: er.rating_bureau || "NCCI",
-        schedule_rating_percent: er.schedule_rating_percent,
-        schedule_rating_type: er.schedule_rating_type,
-        evidence_ids: er.evidence_ids || [],
-        extraction_confidence: er.confidence,
-        extraction_status: er.status || "AUTO_APPLIED",
-      });
+    // DEFECT FIX: experience mods now DELETE-then-INSERT like the other child
+    // tables (was a bare insert that duplicated rows on every re-run).
+    const experienceModRows = shapeExperienceModRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (experienceModRows.length > 0) {
+      await supabase.from("policy_wc_experience_mods").delete().eq("policy_id", policy_id);
+      const { error } = await supabase.from("policy_wc_experience_mods").insert(experienceModRows);
+      if (!error) experienceModsCount = experienceModRows.length;
+      else console.error("[extract-wc-policy] experience mods insert error:", error.message);
+    }
+
+    // Waiver of subrogation (blanket + named/scheduled) -> policy_wc_subrogation_waivers.
+    // WC has no Additional Insured column; SUBR WVD is the only holder flag. Rows are
+    // written endorsement_status='requested' (never a fabricated 'endorsed'). The table's
+    // agency_workspace_id is derived server-side by a BEFORE INSERT trigger.
+    const waiverRows = shapeSubrogationWaiverRows(rawExtraction).map((r) => ({ ...r, policy_id }));
+    if (waiverRows.length > 0) {
+      await supabase.from("policy_wc_subrogation_waivers").delete().eq("policy_id", policy_id);
+      const { error } = await supabase.from("policy_wc_subrogation_waivers").insert(waiverRows);
+      if (!error) subrogationWaiversCount = waiverRows.length;
+      else console.error("[extract-wc-policy] subrogation waivers insert error:", error.message);
     }
 
     // Update job as completed
@@ -742,43 +709,41 @@ serve(async (req) => {
 
     console.log(`[extract-wc-policy] Successfully extracted WC details for policy ${policy_id}`);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error: any) => {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        console.error("[extract-wc-policy] Error (background):", error);
+        try {
+          await supabase
+            .from("policy_wc_extraction_jobs")
+            .update({
+              status: "failed",
+              error_message: `${msg} | ${Date.now() - jobStartTime}ms`.slice(0, 500),
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        policy_id,
-        job_id: jobId,
-        extraction_method: evidenceCatalog ? "azure_di_claude" : "ocr_text_claude",
-        evidence_entries: evidenceCatalog?.stats.totalEntries || 0,
-        wc_details: wcDetails,
-        classifications_count: classificationsCount,
-        officers_count: officersCount,
-        states_count: statesCount,
-        processing_time_ms: Date.now() - jobStartTime,
-      }),
+      JSON.stringify({ success: true, job_id: jobId, status: "processing" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
+        status: 202,
       }
     );
   } catch (error: any) {
-    console.error("[extract-wc-policy] Error:", error);
-
-    // Update job as failed
-    if (jobId) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-      await supabase
-        .from("policy_wc_extraction_jobs")
-        .update({
-          status: "failed",
-          error_message: error.message,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", jobId);
-    }
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error("[extract-wc-policy] Error (sync phase):", error);
     return new Response(
       JSON.stringify({
         success: false,

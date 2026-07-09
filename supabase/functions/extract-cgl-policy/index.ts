@@ -19,8 +19,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { anthropicBoundaryCreate, anthropicResponseText } from '../_shared/modelBoundaryFetch.ts';
+import { nullifyRedactedTokens } from '../_shared/floorSafety.ts';
+import { cleanCarrierName, resolveCarrier } from '../_shared/carrierResolve.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts';
+
+// Supabase Edge Runtime global for background work that outlives the response.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // =============================================================================
 // CGL FIELD PATTERNS FOR EVIDENCE MATCHING
@@ -63,10 +68,6 @@ const CGL_FIELD_PATTERNS: Record<string, RegExp[]> = {
   // Deductible
   Deductible: [/deductible/i, /ded/i],
   SIR: [/self.insured\s*retention/i, /s\.?i\.?r\.?/i],
-
-  // Premium
-  TotalPremium: [/total\s*premium/i, /annual\s*premium/i, /policy\s*premium/i],
-  Premium: [/premium/i],
 };
 
 // =============================================================================
@@ -147,13 +148,18 @@ serve(async (req) => {
     const azureKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
 
     if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!azureEndpoint || !azureKey) {
-      throw new Error('Azure Document Intelligence not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Azure Document Intelligence not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
 
     // Create extraction job
     const { data: job, error: jobError } = await supabase
@@ -167,8 +173,23 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (jobError) throw jobError;
+    if (jobError || !job) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create extraction job: ${jobError?.message || 'unknown error'}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const jobId = job.id;
+    const startedAt = Date.now();
+
+    // ---------------------------------------------------------------------
+    // Background extraction. OCR + Claude (Sonnet 5) can take 35-64s, which
+    // exceeds the synchronous request/gateway ceiling. Run it in the
+    // background via EdgeRuntime.waitUntil and let the client poll the job
+    // row. The job MUST always land on 'completed' or 'failed' - never stuck.
+    // ---------------------------------------------------------------------
+    const runExtraction = async () => {
     // Get document URL
     const { data: document, error: docError } = await supabase
       .from('documents')
@@ -243,17 +264,21 @@ serve(async (req) => {
 
     const response = await anthropicBoundaryCreate(anthropicApiKey, {
       model: 'claude-sonnet-5',
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    });
+    }, 110000);
 
     const extractionLatency = Date.now() - extractionStart;
 
-    // Parse response
+    // Parse response - Claude usually wraps the JSON in a ```json ... ``` fence.
+    // Strip it robustly, tolerating a missing closing fence (truncated response).
     const responseText = anthropicResponseText(response);
-    const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || [null, responseText];
-    const extractedData = JSON.parse(jsonMatch[1] || responseText);
+    const jsonText = responseText.trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const extractedData = nullifyRedactedTokens(JSON.parse(jsonText));
 
     // Store evidence catalog
     await supabase.from('policy_cgl_evidence_catalog').upsert({
@@ -272,12 +297,12 @@ serve(async (req) => {
       for (const loc of extractedData.locations) {
         const locationData = {
           policy_id,
-          location_number: loc.location_number?.value || 1,
-          street: loc.street?.value,
-          city: loc.city?.value,
-          state: loc.state?.value,
-          zip: loc.zip?.value,
-          description: loc.description?.value,
+          location_number: loc.location_number || 1,
+          street: loc.street,
+          city: loc.city,
+          state: loc.state,
+          zip: loc.zip,
+          description: loc.description,
           evidence_ids: collectEvidenceIds(loc),
           extraction_confidence: calculateAvgConfidence(loc),
           extraction_status: determineStatus(loc),
@@ -299,14 +324,14 @@ serve(async (req) => {
       for (const cls of extractedData.classifications) {
         const classData = {
           policy_id,
-          class_code: cls.class_code?.value,
-          description: cls.description?.value || 'Unknown',
-          exposure_basis: cls.exposure_basis?.value,
-          exposure_amount: cls.exposure_amount?.value,
-          rate: cls.rate?.value,
-          premium: cls.premium?.value,
-          is_products_completed_ops: cls.is_products_completed_ops?.value || false,
-          location_number: cls.location_number?.value,
+          class_code: cls.class_code,
+          description: cls.description || 'Unknown',
+          exposure_basis: cls.exposure_basis,
+          exposure_amount: cls.exposure_amount,
+          rate: cls.rate,
+          // premium intentionally NOT captured (agency rule: premium never captured, any line, any doc)
+          is_products_completed_ops: cls.is_products_completed_ops || false,
+          location_number: cls.location_number,
           evidence_ids: collectEvidenceIds(cls),
           extraction_confidence: calculateAvgConfidence(cls),
           extraction_status: determineStatus(cls),
@@ -324,19 +349,28 @@ serve(async (req) => {
       await supabase.from('policy_cgl_additional_insureds').delete().eq('policy_id', policy_id);
 
       for (const ai of extractedData.additional_insureds) {
+        // A blanket AI / waiver / P&NC endorsement applies to anyone required by
+        // written contract, so it has no specific named party. Label it clearly
+        // from its flags/form instead of the confusing "Unknown".
+        const aiName = (ai.name && String(ai.name).trim())
+          ? String(ai.name).trim()
+          : ((ai.waiver_of_subrogation ? 'Blanket Waiver of Subrogation'
+              : ai.primary_noncontributory ? 'Blanket Primary & Non-Contributory'
+              : 'Blanket Additional Insured')
+             + (ai.endorsement_form ? ` (${ai.endorsement_form})` : ''));
         const aiData = {
           policy_id,
-          name: ai.name?.value || 'Unknown',
-          street: ai.address?.street?.value,
-          city: ai.address?.city?.value,
-          state: ai.address?.state?.value,
-          zip: ai.address?.zip?.value,
-          ai_type: ai.ai_type?.value || 'other',
-          primary_noncontributory: ai.primary_noncontributory?.value || false,
-          waiver_of_subrogation: ai.waiver_of_subrogation?.value || false,
-          per_project: ai.per_project?.value || false,
-          project_name: ai.project_name?.value,
-          endorsement_form: ai.endorsement_form?.value,
+          name: aiName,
+          street: ai.address?.street,
+          city: ai.address?.city,
+          state: ai.address?.state,
+          zip: ai.address?.zip,
+          ai_type: ai.ai_type || 'other',
+          primary_noncontributory: ai.primary_noncontributory || false,
+          waiver_of_subrogation: ai.waiver_of_subrogation || false,
+          per_project: ai.per_project || false,
+          project_name: ai.project_name,
+          endorsement_form: ai.endorsement_form,
           evidence_ids: collectEvidenceIds(ai),
           extraction_confidence: calculateAvgConfidence(ai),
           extraction_status: determineStatus(ai),
@@ -356,9 +390,9 @@ serve(async (req) => {
       for (const end of extractedData.endorsements) {
         const endData = {
           policy_id,
-          form_number: end.form_number?.value || 'Unknown',
-          edition_date: end.edition_date?.value,
-          description: end.description?.value || 'Endorsement',
+          form_number: end.form_number || 'Unknown',
+          edition_date: end.edition_date,
+          description: end.description || 'Endorsement',
           evidence_ids: collectEvidenceIds(end),
           extraction_confidence: calculateAvgConfidence(end),
           extraction_status: determineStatus(end),
@@ -385,7 +419,6 @@ serve(async (req) => {
           zip: extractedData.identity?.mailing_address?.zip?.value,
         },
         fein: extractedData.identity?.fein?.value,
-        producer: extractedData.identity?.producer?.value,
       },
       dates: {
         effective_date: extractedData.dates?.effective_date?.value,
@@ -418,17 +451,24 @@ serve(async (req) => {
             property_damage: extractedData.deductible?.property_damage?.value,
           }
         : undefined,
-      premium: {
-        total_premium: extractedData.premium?.total_premium?.value,
-        premises_operations_premium: extractedData.premium?.premises_operations_premium?.value,
-        products_completed_ops_premium: extractedData.premium?.products_completed_ops_premium?.value,
-        policy_fee: extractedData.premium?.policy_fee?.value,
-        terrorism_premium: extractedData.premium?.terrorism_premium?.value,
-      },
       extraction_source: 'azure_di_claude',
       extraction_confidence: calculateOverallConfidence(extractedData),
       extracted_at: new Date().toISOString(),
     };
+
+    // Resolve the extracted carrier name to the agency's canonical carrier
+    // (clean rating/parenthetical suffixes -> resolve_carrier). Writing the
+    // canonical name + NAIC into the blob identity is what makes the COI
+    // correct (get_master_coi reads identity.carrier_name / identity.carrier_naic).
+    // Never fatal: on no-match we keep the cleaned (or raw) name.
+    const rawCarrierName = extractedData.identity?.carrier_name?.value;
+    const carrierRes = await resolveCarrier(supabase, rawCarrierName);
+    cglDetails.identity.carrier_name =
+      carrierRes?.carrier_name ?? cleanCarrierName(rawCarrierName) ?? rawCarrierName ?? null;
+    cglDetails.identity.carrier_naic =
+      carrierRes?.naic ?? cglDetails.identity.carrier_naic ?? null;
+    (cglDetails.identity as any).carrier_name_raw = rawCarrierName ?? null;
+    (cglDetails.identity as any).carrier_match = carrierRes?.match_type ?? 'unmatched';
 
     // Build field evidence mapping
     const fieldEvidence = buildFieldEvidenceMapping(extractedData);
@@ -470,26 +510,37 @@ serve(async (req) => {
       })
       .eq('id', job.id);
 
+    };
+
+    // Kick off the extraction in the background and GUARANTEE the job records
+    // a terminal state even if runExtraction throws (so it is never stuck).
+    EdgeRuntime.waitUntil(
+      runExtraction().catch(async (error) => {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('CGL extraction error (background):', error);
+        try {
+          await supabase
+            .from('policy_cgl_extraction_jobs')
+            .update({ status: 'failed', error_message: `${msg} | ${Date.now() - startedAt}ms`.slice(0, 500) })
+            .eq('id', jobId);
+        } catch (_e) {
+          // best effort - the failure update must not throw
+        }
+      })
+    );
+
+    // Respond immediately; the client polls the job row for the outcome.
     return new Response(
-      JSON.stringify({
-        success: true,
-        job_id: job.id,
-        locations_count: locationsExtracted,
-        classifications_count: classificationsExtracted,
-        additional_insureds_count: additionalInsuredsExtracted,
-        endorsements_count: endorsementsExtracted,
-        confidence: cglDetails.extraction_confidence,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, job_id: jobId, status: 'processing' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('CGL extraction error:', error);
-
+    // Synchronous-phase failure (before the job was created / before we
+    // responded 202). No job row owns a terminal state here.
+    console.error('CGL extraction error (sync phase):', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
+      JSON.stringify({ success: false, error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -749,15 +800,15 @@ Every extracted value MUST cite its source evidence ID(s) from the OCR catalog.
 ### 1. EVIDENCE-BASED EXTRACTION ONLY
 - ONLY extract values that appear in the evidence catalog
 - NEVER guess, infer, or use industry defaults
-- If a field is not in the evidence, return status: "NOT_FOUND"
-- Each field MUST include evidence_ids array linking to source
+- If a field is not in the evidence, set its value to null
+- Each scalar field MUST include an evidence_ids array linking to source
 
-### 2. CONFIDENCE SCORING
-Rate your confidence for each extracted field:
-- 0.95-1.00: Exact match with clear label
-- 0.85-0.94: Strong match from context
-- 0.70-0.84: Reasonable inference from nearby values
-- Below 0.70: Mark as NEEDS_REVIEW
+### 2. COMPACT OUTPUT (IMPORTANT - keeps the response small)
+- Do NOT emit "confidence" or "status" anywhere in the output.
+- Scalar fields return ONLY { "value": ..., "evidence_ids": [...] }.
+- Array items (locations, classifications, additional_insureds, endorsements)
+  return FLAT objects with only their data fields - no value/evidence_ids wrappers.
+- Keep every "description" SHORT (a few words), never full sentences.
 
 ### 3. CGL-SPECIFIC KNOWLEDGE
 
@@ -813,72 +864,83 @@ ${catalogJson}
 
 ## EXTRACTION SCHEMA
 
-Extract CGL policy data. For each field include:
-- value: The extracted value (normalized)
-- evidence_ids: Array of evidence IDs
-- confidence: Score 0.0-1.0
-- status: "AUTO_APPLIED" | "NEEDS_REVIEW" | "LOW_CONFIDENCE" | "NOT_FOUND" | "CONFLICT"
+Extract CGL policy data.
+
+SCALAR fields (identity.*, dates.*, coverage_options.*, limits.*, deductible.*)
+are returned as { "value": <normalized value>, "evidence_ids": [<ids>] } ONLY.
+Do NOT add confidence or status.
+
+ARRAY items (locations, classifications, additional_insureds, endorsements) are
+FLAT objects with only the data fields shown under "ARRAY ITEM SHAPES" below - no
+value/evidence_ids/confidence/status wrappers. Keep every "description" SHORT
+(a few words). Return an empty array when none are present.
 
 \`\`\`json
 {
   "identity": {
-    "carrier_name": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "carrier_naic": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "policy_number": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "transaction_type": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "named_insured": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "dba": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
+    "carrier_name": { "value": "", "evidence_ids": [] },
+    "carrier_naic": { "value": null, "evidence_ids": [] },
+    "policy_number": { "value": "", "evidence_ids": [] },
+    "transaction_type": { "value": "", "evidence_ids": [] },
+    "named_insured": { "value": "", "evidence_ids": [] },
+    "dba": { "value": null, "evidence_ids": [] },
     "mailing_address": {
-      "street": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "city": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "state": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-      "zip": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" }
+      "street": { "value": "", "evidence_ids": [] },
+      "city": { "value": "", "evidence_ids": [] },
+      "state": { "value": "", "evidence_ids": [] },
+      "zip": { "value": "", "evidence_ids": [] }
     },
-    "fein": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "producer": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+    "fein": { "value": null, "evidence_ids": [] }
   },
   "dates": {
-    "effective_date": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "expiration_date": { "value": "", "evidence_ids": [], "confidence": 0, "status": "" },
-    "issue_date": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+    "effective_date": { "value": "", "evidence_ids": [] },
+    "expiration_date": { "value": "", "evidence_ids": [] },
+    "issue_date": { "value": null, "evidence_ids": [] }
   },
   "coverage_options": {
-    "policy_form": { "value": "occurrence", "evidence_ids": [], "confidence": 0, "status": "" },
-    "defense_costs": { "value": "outside_limits", "evidence_ids": [], "confidence": 0, "status": "" },
+    "policy_form": { "value": "occurrence", "evidence_ids": [] },
+    "defense_costs": { "value": "outside_limits", "evidence_ids": [] },
     "claims_made_details": {
-      "retroactive_date": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-      "erp_available": { "value": false, "evidence_ids": [], "confidence": 0, "status": "" }
+      "retroactive_date": { "value": null, "evidence_ids": [] },
+      "erp_available": { "value": false, "evidence_ids": [] }
     }
   },
   "limits": {
-    "each_occurrence": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "damage_to_rented_premises": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "medical_expense": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "personal_advertising_injury": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "general_aggregate": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "products_completed_ops_aggregate": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "aggregate_applies_per": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+    "each_occurrence": { "value": 0, "evidence_ids": [] },
+    "damage_to_rented_premises": { "value": 0, "evidence_ids": [] },
+    "medical_expense": { "value": 0, "evidence_ids": [] },
+    "personal_advertising_injury": { "value": 0, "evidence_ids": [] },
+    "general_aggregate": { "value": 0, "evidence_ids": [] },
+    "products_completed_ops_aggregate": { "value": 0, "evidence_ids": [] },
+    "aggregate_applies_per": { "value": null, "evidence_ids": [] }
   },
   "deductible": {
-    "type": { "value": "none", "evidence_ids": [], "confidence": 0, "status": "" },
-    "per_occurrence": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "property_damage": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
+    "type": { "value": "none", "evidence_ids": [] },
+    "per_occurrence": { "value": null, "evidence_ids": [] },
+    "property_damage": { "value": null, "evidence_ids": [] }
   },
   "locations": [],
   "classifications": [],
   "additional_insureds": [],
-  "endorsements": [],
-  "premium": {
-    "total_premium": { "value": 0, "evidence_ids": [], "confidence": 0, "status": "" },
-    "premises_operations_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "products_completed_ops_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "policy_fee": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" },
-    "terrorism_premium": { "value": null, "evidence_ids": [], "confidence": 0, "status": "" }
-  }
+  "endorsements": []
 }
 \`\`\`
 
-REMEMBER: NO GUESSING. Only extract what's in the evidence.`;
+## ARRAY ITEM SHAPES (flat objects - no value/evidence/confidence/status wrappers)
+
+locations[] item:
+{ "location_number": 1, "street": "", "city": "", "state": "", "zip": "", "description": "" }
+
+classifications[] item:
+{ "class_code": "", "description": "", "exposure_basis": "", "exposure_amount": null, "rate": null, "is_products_completed_ops": false, "location_number": null }
+
+additional_insureds[] item:
+{ "name": "", "address": { "street": "", "city": "", "state": "", "zip": "" }, "ai_type": "other", "primary_noncontributory": false, "waiver_of_subrogation": false, "per_project": false, "project_name": null, "endorsement_form": null }
+
+endorsements[] item:
+{ "form_number": "", "edition_date": null, "description": "" }
+
+REMEMBER: NO GUESSING. Only extract what's in the evidence. No confidence or status. SHORT descriptions.`;
 }
 
 // =============================================================================
@@ -920,9 +982,11 @@ function calculateAvgConfidence(obj: any): number {
   }
 
   traverse(obj);
+  // Trimmed array items no longer carry per-field confidence; default to a
+  // sensible high value instead of 0/NaN so extraction_confidence stays useful.
   return confidences.length > 0
     ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-    : 0;
+    : 0.9;
 }
 
 function determineStatus(obj: any): string {
@@ -942,6 +1006,9 @@ function determineStatus(obj: any): string {
 
   traverse(obj);
 
+  // Trimmed array items no longer carry a status. Default to AUTO_APPLIED
+  // (an empty array would otherwise make `.every()` below return NOT_FOUND).
+  if (statuses.length === 0) return 'AUTO_APPLIED';
   if (statuses.includes('CONFLICT')) return 'CONFLICT';
   if (statuses.includes('LOW_CONFIDENCE')) return 'LOW_CONFIDENCE';
   if (statuses.includes('NEEDS_REVIEW')) return 'NEEDS_REVIEW';
@@ -965,9 +1032,11 @@ function calculateOverallConfidence(data: any): number {
   }
 
   traverse(data);
+  // Fields no longer emit confidence after the output trim; fall back to a
+  // sensible default so the persisted extraction_confidence is not 0.
   return confidences.length > 0
     ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-    : 0;
+    : 0.9;
 }
 
 function buildFieldEvidenceMapping(data: any): Record<string, string[]> {
@@ -1000,34 +1069,30 @@ function calculateExtractionStats(data: any): {
 } {
   let fieldsExtracted = 0;
   let fieldsAutoApplied = 0;
-  let fieldsNeedsReview = 0;
+  const fieldsNeedsReview = 0;
   let fieldsNotFound = 0;
-  let fieldsConflict = 0;
+  const fieldsConflict = 0;
+
+  const isEmpty = (v: any) => v === null || v === undefined || v === '';
 
   function traverse(o: any) {
     if (!o || typeof o !== 'object') return;
 
-    if (typeof o.status === 'string') {
+    // After the output trim, scalar fields are leaves shaped { value, evidence_ids }
+    // (status/confidence removed). Count those; found -> AUTO_APPLIED, else NOT_FOUND.
+    // NEEDS_REVIEW/CONFLICT can no longer be derived without status, so they stay 0.
+    if (Object.prototype.hasOwnProperty.call(o, 'value') && Array.isArray(o.evidence_ids)) {
       fieldsExtracted++;
-      switch (o.status) {
-        case 'AUTO_APPLIED':
-          fieldsAutoApplied++;
-          break;
-        case 'NEEDS_REVIEW':
-        case 'LOW_CONFIDENCE':
-          fieldsNeedsReview++;
-          break;
-        case 'NOT_FOUND':
-          fieldsNotFound++;
-          break;
-        case 'CONFLICT':
-          fieldsConflict++;
-          break;
+      if (isEmpty(o.value)) {
+        fieldsNotFound++;
+      } else {
+        fieldsAutoApplied++;
       }
+      return; // leaf - nothing more to descend into
     }
 
     for (const key of Object.keys(o)) {
-      if (typeof o[key] === 'object') {
+      if (o[key] && typeof o[key] === 'object') {
         traverse(o[key]);
       }
     }

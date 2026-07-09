@@ -94,16 +94,30 @@ export function anthropicResponseText(response: AnthropicBoundaryResponse): stri
 export async function anthropicBoundaryCreate(
   credential: string,
   body: Record<string, unknown>,
+  timeoutMs = 45000,
 ): Promise<AnthropicBoundaryResponse> {
-  const response = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': credential,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await modelBoundaryFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': credential,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`Anthropic API call timed out after ${timeoutMs}ms with no response`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const errorText = redactPII(await response.text()).redacted;
