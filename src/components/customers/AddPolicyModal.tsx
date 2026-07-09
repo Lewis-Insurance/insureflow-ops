@@ -3,34 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DuplicatePolicyDialog, type ExistingPolicyInfo } from './DuplicatePolicyDialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { EnumCombobox } from '@/components/ui/enum-combobox';
+import {
+  PolicyFormFields,
+  policySchema,
+  initialPolicyFormData,
+  applyPolicyFieldChange,
+  mapExtractedToPolicyForm,
+  buildPolicyInsert,
+  type PolicyFormData,
+} from './PolicyFormFields';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeForILike } from '@/lib/sanitize';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
 import { generateTasks } from '@/lib/taskAutomation';
-import { calcExpirationDate, parsePolicyTerm } from '@/lib/policyDates';
-import { mapLineOfBusiness, mapCarrier } from '@/lib/policyParserMap';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
-
-const policySchema = z.object({
-  policy_number: z.string().min(1, 'Policy number is required').max(50, 'Policy number too long'),
-  carrier: z.string().min(1, 'Carrier is required').max(100, 'Carrier name too long'),
-  line_of_business: z.string().min(1, 'Line of business is required').max(100, 'Line of business too long'),
-  premium: z.string().optional(),
-  effective_date: z.string().min(1, 'Effective date is required'),
-  expiration_date: z.string().min(1, 'Expiration date is required'),
-  billing_frequency: z.string().optional(),
-  policy_term: z.string().optional(),
-  status: z.string().min(1, 'Status is required'),
-});
 
 interface AddPolicyModalProps {
   open: boolean;
@@ -56,18 +46,7 @@ export function AddPolicyModal({
   currentCustomerName,
 }: AddPolicyModalProps) {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    policy_number: '',
-    carrier: '',
-    line_of_business: '',
-    premium: '',
-    effective_date: '',
-    expiration_date: '',
-    billing_frequency: 'semiannual', // Default to semi-annual
-    billing_method: 'direct_bill', // Default to direct bill
-    policy_term: 'semiannual', // Default to semi-annual
-    status: 'active',
-  });
+  const [formData, setFormData] = useState<PolicyFormData>(initialPolicyFormData);
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parseStatus, setParseStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -191,74 +170,9 @@ export function AddPolicyModal({
       const extracted = analysisResult?.analysis || analysisResult?.data || analysisResult?.extracted_data || {};
       console.log('Extracted data from document:', extracted);
 
-      // Auto-fill policy form
-      const newFormData = { ...formData };
-      const newNeedsConfirmation: Record<string, boolean> = {};
-
-      if (extracted.policy_number) newFormData.policy_number = extracted.policy_number;
-
-      // Carrier — best-effort match against the carriers lookup, but free-text is allowed
-      const carrierResult = mapCarrier(extracted.carrier, carriers);
-      if (carrierResult.value) newFormData.carrier = carrierResult.value;
-
-      // Line of Business — must match the canonical lookup; otherwise leave empty
-      // and flag for user confirmation rather than save a non-canonical value.
-      const lobResult = mapLineOfBusiness(
-        { line_of_business: extracted.line_of_business, document_type: extracted.document_type },
-        linesOfBusiness,
-      );
-      if (lobResult.value) {
-        newFormData.line_of_business = lobResult.value;
-      } else if (lobResult.needsConfirmation) {
-        newFormData.line_of_business = '';
-        newNeedsConfirmation.line_of_business = true;
-      }
-
-      if (extracted.effective_date) {
-        const date = new Date(extracted.effective_date);
-        if (!isNaN(date.getTime())) {
-          newFormData.effective_date = date.toISOString().split('T')[0];
-        }
-      }
-      if (extracted.expiration_date) {
-        const date = new Date(extracted.expiration_date);
-        if (!isNaN(date.getTime())) {
-          newFormData.expiration_date = date.toISOString().split('T')[0];
-        }
-      }
-
-      // Handle premium
-      const premiumValue = typeof extracted.premium === 'object'
-        ? extracted.premium?.total
-        : extracted.premium;
-      if (premiumValue) {
-        const premiumStr = String(premiumValue).replace(/[$,]/g, '');
-        const premiumNum = parseFloat(premiumStr);
-        if (!isNaN(premiumNum)) {
-          newFormData.premium = premiumNum.toString();
-        }
-      }
-
-      // Check for policy term from document
-      if (extracted.policy_term_months) {
-        const months = parseInt(extracted.policy_term_months);
-        if (months === 6) {
-          newFormData.policy_term = 'semiannual';
-        } else if (months === 12) {
-          newFormData.policy_term = 'annual';
-        }
-      }
-
-      // Auto-detect if this is auto insurance, default to semi-annual
-      // Use the mapped line_of_business which includes document_type mapping
-      const lob = (newFormData.line_of_business || extracted.line_of_business || '').toLowerCase();
-      const docType = (extracted.document_type || '').toLowerCase();
-      if (lob.includes('auto') || lob.includes('vehicle') || lob.includes('car') || docType.includes('auto')) {
-        if (!extracted.policy_term_months) {
-          newFormData.policy_term = 'semiannual';
-          newFormData.billing_frequency = 'semiannual';
-        }
-      }
+      // Auto-fill policy form (shared mapping used by both modals)
+      const { data: newFormData, needsConfirmation: newNeedsConfirmation } =
+        mapExtractedToPolicyForm(extracted, carriers, linesOfBusiness);
 
       setFormData(newFormData);
       setNeedsConfirmation(newNeedsConfirmation);
@@ -379,25 +293,7 @@ export function AddPolicyModal({
         return;
       }
 
-      // Parse premium - remove commas and convert to number, default to 0
-      const premiumValue = formData.premium
-        ? parseFloat(formData.premium.replace(/,/g, ''))
-        : 0;
-
-      const policyData = {
-        account_id: accountId,
-        insured_user_id: user.id,
-        policy_number: formData.policy_number.trim(),
-        carrier: formData.carrier.trim(),
-        line_of_business: formData.line_of_business.trim(),
-        premium: isNaN(premiumValue) ? 0 : premiumValue,
-        effective_date: formData.effective_date,
-        expiration_date: formData.expiration_date,
-        billing_frequency: formData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
-        billing_method: formData.billing_method as 'direct_bill' | 'agency_bill',
-        policy_term: formData.policy_term || null,
-        status: formData.status,
-      };
+      const policyData = buildPolicyInsert(formData, accountId, user.id);
 
       const { data: newPolicy, error } = await supabase
         .from('policies')
@@ -469,18 +365,7 @@ export function AddPolicyModal({
       });
 
       // Reset form
-      setFormData({
-        policy_number: '',
-        carrier: '',
-        line_of_business: '',
-        premium: '',
-        effective_date: '',
-        expiration_date: '',
-        billing_frequency: 'semiannual',
-        billing_method: 'direct_bill',
-        policy_term: 'semiannual',
-        status: 'active',
-      });
+      setFormData(initialPolicyFormData);
       setUploadedFile(null);
       setUploadedFilePath(null);
       setParseStatus('idle');
@@ -500,29 +385,12 @@ export function AddPolicyModal({
   }
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => applyPolicyFieldChange(prev, field, value));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
     if (needsConfirmation[field]) {
       setNeedsConfirmation(prev => ({ ...prev, [field]: false }));
-    }
-
-    // Auto-calculate expiration date when effective date or policy term changes
-    if (field === 'effective_date' || field === 'policy_term') {
-      const effectiveDate = field === 'effective_date' ? value : formData.effective_date;
-      const policyTerm = field === 'policy_term' ? value : formData.policy_term;
-
-      if (effectiveDate && policyTerm) {
-        // Parse date parts manually to avoid timezone issues
-        // new Date('2026-01-15') interprets as UTC midnight, which shifts in local timezone
-        const [year, month, day] = effectiveDate.split('-').map(Number);
-        const startDate = new Date(year, month - 1, day); // month is 0-indexed
-        const term = parsePolicyTerm(policyTerm);
-        const expirationDate = calcExpirationDate(startDate, term);
-        const formattedDate = format(expirationDate, 'yyyy-MM-dd');
-        setFormData(prev => ({ ...prev, [field]: value, expiration_date: formattedDate }));
-      }
     }
   };
 
@@ -615,169 +483,15 @@ export function AddPolicyModal({
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="policy_number">Policy Number *</Label>
-              <Input
-                id="policy_number"
-                value={formData.policy_number}
-                onChange={(e) => handleInputChange('policy_number', e.target.value)}
-                placeholder="POL-2024-001"
-                className={errors.policy_number ? 'border-destructive' : ''}
-              />
-              {errors.policy_number && (
-                <p className="text-sm text-destructive mt-1">{errors.policy_number}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="carrier">Carrier *</Label>
-              <Input
-                id="carrier"
-                list="carrier-list"
-                value={formData.carrier}
-                onChange={(e) => handleInputChange('carrier', e.target.value)}
-                placeholder="Type or select carrier"
-                className={errors.carrier ? 'border-destructive' : ''}
-              />
-              <datalist id="carrier-list">
-                {carriers.map(carrier => (
-                  <option key={carrier.id} value={carrier.name} />
-                ))}
-              </datalist>
-              {errors.carrier && (
-                <p className="text-sm text-destructive mt-1">{errors.carrier}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="line_of_business">Line of Business *</Label>
-            <EnumCombobox
-              id="line_of_business"
-              value={formData.line_of_business}
-              onChange={(v) => handleInputChange('line_of_business', v)}
-              options={linesOfBusiness.map(lob => ({ value: lob.name }))}
-              placeholder="Select line of business"
-              searchPlaceholder="Search lines of business..."
-              emptyText="No matching line of business."
-              loading={lobLoading}
-              error={!!errors.line_of_business}
-              needsConfirmation={!!needsConfirmation.line_of_business}
-            />
-            {errors.line_of_business && (
-              <p className="text-sm text-destructive mt-1">{errors.line_of_business}</p>
-            )}
-            {needsConfirmation.line_of_business && !errors.line_of_business && (
-              <p className="text-sm text-warning mt-1">
-                Couldn't auto-match the parsed line of business — please pick one.
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="premium">Premium Amount</Label>
-              <Input
-                id="premium"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.premium}
-                onChange={(e) => handleInputChange('premium', e.target.value)}
-                placeholder="1200.00"
-              />
-            </div>
-            <div>
-              <Label htmlFor="billing_frequency">Billing Frequency</Label>
-              <Select value={formData.billing_frequency} onValueChange={(value) => handleInputChange('billing_frequency', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semiannual">Semi-Annual</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="policy_term">Policy Term</Label>
-              <Select value={formData.policy_term} onValueChange={(value) => handleInputChange('policy_term', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semiannual">Semi-Annual (6 months)</SelectItem>
-                  <SelectItem value="annual">Annual (12 months)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="billing_method">Billing Method</Label>
-              <Select value={formData.billing_method} onValueChange={(value) => handleInputChange('billing_method', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="direct_bill">Direct Bill</SelectItem>
-                  <SelectItem value="agency_bill">Agency Bill</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="effective_date">Effective Date *</Label>
-              <Input
-                id="effective_date"
-                type="date"
-                value={formData.effective_date}
-                onChange={(e) => handleInputChange('effective_date', e.target.value)}
-                className={errors.effective_date ? 'border-destructive' : ''}
-              />
-              {errors.effective_date && (
-                <p className="text-sm text-destructive mt-1">{errors.effective_date}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="expiration_date">Expiration Date *</Label>
-              <Input
-                id="expiration_date"
-                type="date"
-                value={formData.expiration_date}
-                onChange={(e) => handleInputChange('expiration_date', e.target.value)}
-                className={errors.expiration_date ? 'border-destructive' : ''}
-              />
-              {errors.expiration_date && (
-                <p className="text-sm text-destructive mt-1">{errors.expiration_date}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="status">Status *</Label>
-            <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-              <SelectTrigger className={errors.status ? 'border-destructive' : ''}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="quoted">Quoted</SelectItem>
-                <SelectItem value="bound">Bound</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.status && (
-              <p className="text-sm text-destructive mt-1">{errors.status}</p>
-            )}
-          </div>
+          <PolicyFormFields
+            value={formData}
+            onChange={handleInputChange}
+            errors={errors}
+            needsConfirmation={needsConfirmation}
+            carriers={carriers}
+            linesOfBusiness={linesOfBusiness}
+            lobLoading={lobLoading}
+          />
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>

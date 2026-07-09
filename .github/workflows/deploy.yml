@@ -22,7 +22,17 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        # `npm ci` refuses a lockfile that is out of sync with package.json, so
+        # this step doubles as the lockfile-drift guard (it caught PR #78).
         run: npm ci --legacy-peer-deps
+
+      - name: Run tests
+        # Enforces the whole vitest suite, including the ACORD client/server
+        # parity test. A red test now blocks the merge instead of 409-ing in prod.
+        run: npm run test:run
+        env:
+          VITE_SUPABASE_URL: https://lrqajzwcmdwahnjyidgv.supabase.co
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Build application
         run: npm run build
@@ -40,4 +50,4 @@ jobs:
         run: echo "✅ Build successful! Netlify will deploy automatically."
 
 # Note: Netlify auto-deploys on push to main
-# This workflow just validates the build works
+# This workflow validates that tests pass and the build works.

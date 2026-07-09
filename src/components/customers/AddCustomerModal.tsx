@@ -11,7 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCarriers, useLinesOfBusiness } from '@/hooks/useLookupData';
-import { normalizePolicyType, getPolicyTypeLabel } from '@/lib/policyTypes';
+import { generateTasks } from '@/lib/taskAutomation';
+import {
+  PolicyFormFields,
+  policySchema,
+  initialPolicyFormData,
+  applyPolicyFieldChange,
+  mapExtractedToPolicyForm,
+  buildPolicyInsert,
+  type PolicyFormData,
+} from './PolicyFormFields';
 import { detectEntityFromName, parseCompoundInsuredName, type EntityType } from '@/lib/insuredNames';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
@@ -50,7 +59,6 @@ const customerSchema = z.object({
   city: z.string().max(100, 'City name too long').optional().or(z.literal('')),
   state: z.string().max(50, 'State name too long').optional().or(z.literal('')),
   zip_code: z.string().max(20, 'Zip code too long').optional().or(z.literal('')),
-  source: z.string().max(100, 'Source too long').optional().or(z.literal('')),
   notes: z.string().max(2000, 'Notes too long').optional().or(z.literal('')),
   // Trust/Estate fields
   hasPrimaryEntity: z.boolean().optional(),
@@ -75,21 +83,6 @@ const US_STATES = [
   'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
   'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-];
-
-const LEAD_SOURCES = [
-  'Referral',
-  'Website',
-  'Phone Call',
-  'Walk-in',
-  'Social Media',
-  'Google Ads',
-  'Facebook Ads',
-  'Direct Mail',
-  'Email Campaign',
-  'Partner',
-  'Dec Page Import',
-  'Other',
 ];
 
 // Helper function to parse a full address string into components
@@ -154,30 +147,6 @@ function parseFullAddress(fullAddress: string): {
   return result;
 }
 
-interface PolicyData {
-  policy_number: string;
-  carrier: string;
-  line_of_business: string;
-  policy_term: string;
-  premium: string;
-  effective_date: string;
-  expiration_date: string;
-  billing_frequency: string;
-  status: string;
-}
-
-const initialPolicyData: PolicyData = {
-  policy_number: '',
-  carrier: '',
-  line_of_business: '',
-  policy_term: 'semiannual', // 6-month term. Must match policies_policy_term_check (semiannual|annual)
-  premium: '',
-  effective_date: '',
-  expiration_date: '',
-  billing_frequency: 'semiannual',
-  status: 'active',
-};
-
 export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -191,7 +160,6 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
     city: '',
     state: '',
     zip_code: '',
-    source: '',
     notes: '',
     // Trust/Estate fields for primary insured
     hasPrimaryEntity: false,
@@ -204,7 +172,8 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
     secondary_entity_type: null as EntityType,
     secondary_entity_name: '',
   });
-  const [policyData, setPolicyData] = useState<PolicyData>(initialPolicyData);
+  const [policyData, setPolicyData] = useState<PolicyFormData>(initialPolicyFormData);
+  const [policyNeedsConfirmation, setPolicyNeedsConfirmation] = useState<Record<string, boolean>>({});
   const [includePolicy, setIncludePolicy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -213,12 +182,13 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [policyErrors, setPolicyErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch carriers and lines of business for policy
   const { data: carriers = [] } = useCarriers();
-  const { data: linesOfBusiness = [] } = useLinesOfBusiness();
+  const { data: linesOfBusiness = [], isLoading: lobLoading } = useLinesOfBusiness();
 
   const validateForm = () => {
     try {
@@ -249,6 +219,16 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       }
 
       setErrors({});
+      if (includePolicy) {
+        const parsed = policySchema.safeParse(policyData);
+        if (!parsed.success) {
+          const pErrs: Record<string, string> = {};
+          parsed.error.errors.forEach((e) => { if (e.path[0]) pErrs[e.path[0] as string] = e.message; });
+          setPolicyErrors(pErrs);
+          return false;
+        }
+      }
+      setPolicyErrors({});
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -418,52 +398,13 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         newFormData.type = 'commercial_business';
       }
 
-      newFormData.source = 'Dec Page Import';
       setFormData(newFormData);
 
-      // Auto-fill policy data
-      const newPolicyData = { ...policyData };
-      if (extracted.policy_number) newPolicyData.policy_number = extracted.policy_number;
-      // AI returns 'carrier' not 'carrier_name'
-      if (extracted.carrier) newPolicyData.carrier = extracted.carrier;
-
-      // Map line_of_business - use centralized normalizePolicyType helper
-      if (extracted.line_of_business) {
-        const normalizedType = normalizePolicyType(extracted.line_of_business);
-        newPolicyData.line_of_business = normalizedType
-          ? getPolicyTypeLabel(normalizedType)
-          : extracted.line_of_business;
-      } else if (extracted.document_type && extracted.document_type.toLowerCase() !== 'application') {
-        const normalizedType = normalizePolicyType(extracted.document_type);
-        if (normalizedType) {
-          newPolicyData.line_of_business = getPolicyTypeLabel(normalizedType);
-        }
-      }
-      if (extracted.effective_date) {
-        // Try to parse and format the date
-        const date = new Date(extracted.effective_date);
-        if (!isNaN(date.getTime())) {
-          newPolicyData.effective_date = date.toISOString().split('T')[0];
-        }
-      }
-      if (extracted.expiration_date) {
-        const date = new Date(extracted.expiration_date);
-        if (!isNaN(date.getTime())) {
-          newPolicyData.expiration_date = date.toISOString().split('T')[0];
-        }
-      }
-      // Premium can be an object {total, frequency} or a simple value
-      const premiumValue = typeof extracted.premium === 'object'
-        ? extracted.premium?.total
-        : extracted.premium;
-      if (premiumValue) {
-        const premiumStr = String(premiumValue).replace(/[$,]/g, '');
-        const premiumNum = parseFloat(premiumStr);
-        if (!isNaN(premiumNum)) {
-          newPolicyData.premium = premiumNum.toString();
-        }
-      }
+      // Auto-fill policy data (shared mapping used by both modals)
+      const { data: newPolicyData, needsConfirmation: newPolicyNeedsConfirmation } =
+        mapExtractedToPolicyForm(extracted, carriers, linesOfBusiness);
       setPolicyData(newPolicyData);
+      setPolicyNeedsConfirmation(newPolicyNeedsConfirmation);
 
       // Enable policy creation only if we have BOTH required fields
       // (matches save logic which requires both policy_number AND carrier)
@@ -549,7 +490,6 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         city: formData.city.trim() || null,
         state: formData.state || null,
         zip_code: formData.zip_code.trim() || null,
-        source: formData.source || null,
         notes: formData.notes.trim() || null,
         // Trust/Estate fields for primary insured
         primary_entity_type: formData.hasPrimaryEntity ? formData.primary_entity_type : null,
@@ -582,19 +522,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
 
       // Create policy if enabled and has required data
       if (includePolicy && policyData.policy_number && policyData.carrier) {
-        const policyInsertData = {
-          account_id: newCustomer.id,
-          insured_user_id: user?.id || null,
-          policy_number: policyData.policy_number.trim(),
-          carrier: policyData.carrier.trim(),
-          line_of_business: policyData.line_of_business.trim() || null,
-          policy_term: policyData.policy_term || null,
-          premium: policyData.premium ? parseFloat(policyData.premium.replace(/,/g, '')) : null,
-          effective_date: policyData.effective_date || null,
-          expiration_date: policyData.expiration_date || null,
-          billing_frequency: policyData.billing_frequency as 'annual' | 'monthly' | 'quarterly' | 'semiannual',
-          status: policyData.status,
-        };
+        const policyInsertData = buildPolicyInsert(policyData, newCustomer.id, user?.id ?? null);
 
         const { data: newPolicy, error: policyError } = await supabase
           .from('policies')
@@ -610,6 +538,10 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           });
         } else {
           createdPolicyId = newPolicy?.id || null;
+          // Auto-generate tasks for the new policy (parity with AddPolicyModal)
+          if (createdPolicyId) {
+            await generateTasks('policy_issued', newCustomer.id, 'policy', createdPolicyId);
+          }
         }
       }
 
@@ -678,7 +610,6 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         city: '',
         state: '',
         zip_code: '',
-        source: '',
         notes: '',
         hasPrimaryEntity: false,
         primary_entity_type: null,
@@ -689,7 +620,9 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
         secondary_entity_type: null,
         secondary_entity_name: '',
       });
-      setPolicyData(initialPolicyData);
+      setPolicyData(initialPolicyFormData);
+      setPolicyNeedsConfirmation({});
+      setPolicyErrors({});
       setIncludePolicy(false);
       setUploadedFile(null);
       setUploadedFilePath(null);
@@ -716,7 +649,13 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
   };
 
   const handlePolicyChange = (field: string, value: string) => {
-    setPolicyData(prev => ({ ...prev, [field]: value }));
+    setPolicyData(prev => applyPolicyFieldChange(prev, field, value));
+    if (policyErrors[field]) {
+      setPolicyErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (policyNeedsConfirmation[field]) {
+      setPolicyNeedsConfirmation(prev => ({ ...prev, [field]: false }));
+    }
   };
 
   return (
@@ -1058,21 +997,6 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
             </div>
           </div>
 
-          {/* Lead Source */}
-          <div>
-            <Label htmlFor="source">Lead Source</Label>
-            <Select value={formData.source} onValueChange={(value) => handleInputChange('source', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="How did they hear about you?" />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAD_SOURCES.map(source => (
-                  <SelectItem key={source} value={source}>{source}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Policy Toggle */}
           <div className="flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
@@ -1092,121 +1016,15 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
           {includePolicy && (
             <Card className="bg-muted/50">
               <CardContent className="pt-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="policy_number">Policy Number *</Label>
-                    <Input
-                      id="policy_number"
-                      value={policyData.policy_number}
-                      onChange={(e) => handlePolicyChange('policy_number', e.target.value)}
-                      placeholder="POL-2025-001"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="carrier">Carrier *</Label>
-                    <Input
-                      id="carrier"
-                      list="carrier-suggestions"
-                      value={policyData.carrier}
-                      onChange={(e) => handlePolicyChange('carrier', e.target.value)}
-                      placeholder="Type or select carrier"
-                    />
-                    <datalist id="carrier-suggestions">
-                      {carriers.map(carrier => (
-                        <option key={carrier.id} value={carrier.name} />
-                      ))}
-                    </datalist>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="line_of_business">Policy Type</Label>
-                    <Input
-                      id="line_of_business"
-                      list="lob-suggestions"
-                      value={policyData.line_of_business}
-                      onChange={(e) => handlePolicyChange('line_of_business', e.target.value)}
-                      placeholder="e.g., Auto, Home"
-                    />
-                    <datalist id="lob-suggestions">
-                      {linesOfBusiness.map(lob => (
-                        <option key={lob.id} value={lob.name} />
-                      ))}
-                    </datalist>
-                  </div>
-                  <div>
-                    <Label htmlFor="policy_term">Policy Term</Label>
-                    <Select value={policyData.policy_term} onValueChange={(value) => handlePolicyChange('policy_term', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select term" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="semiannual">6 Months (Semi-Annual)</SelectItem>
-                        <SelectItem value="annual">12 Months (Annual)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="premium">Premium</Label>
-                    <Input
-                      id="premium"
-                      type="number"
-                      step="0.01"
-                      value={policyData.premium}
-                      onChange={(e) => handlePolicyChange('premium', e.target.value)}
-                      placeholder="1200.00"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="effective_date">Effective Date</Label>
-                    <Input
-                      id="effective_date"
-                      type="date"
-                      value={policyData.effective_date}
-                      onChange={(e) => handlePolicyChange('effective_date', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="expiration_date">Expiration Date</Label>
-                    <Input
-                      id="expiration_date"
-                      type="date"
-                      value={policyData.expiration_date}
-                      onChange={(e) => handlePolicyChange('expiration_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="billing_frequency">Billing Frequency</Label>
-                    <Select value={policyData.billing_frequency} onValueChange={(value) => handlePolicyChange('billing_frequency', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="semiannual">Semi-Annual</SelectItem>
-                        <SelectItem value="annual">Annual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="policy_status">Status</Label>
-                    <Select value={policyData.status} onValueChange={(value) => handlePolicyChange('status', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="quoted">Quoted</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <PolicyFormFields
+                  value={policyData}
+                  onChange={handlePolicyChange}
+                  errors={policyErrors}
+                  needsConfirmation={policyNeedsConfirmation}
+                  carriers={carriers}
+                  linesOfBusiness={linesOfBusiness}
+                  lobLoading={lobLoading}
+                />
               </CardContent>
             </Card>
           )}

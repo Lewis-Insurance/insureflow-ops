@@ -1125,6 +1125,16 @@ insureflow-ops/
 
 ## Change Log
 
+### 2026-07-08 (Windows-PC workflow guardrails)
+Hardening from the 2026-07-09 merge handoff (`Merge-Process-And-Workflow-Handoff-2026-07-09.md`), whose one snag was a `package-lock.json` refresh done on Windows that pruned Linux-only deps and broke the Linux CI runner. All changes are tooling/config; no product code.
+- ✅ **Lockfile guard** (`.githooks/pre-commit`): blocks committing `package-lock.json` unless `package.json` is also staged (escape hatch `ALLOW_LOCKFILE_ONLY=1`). `core.hooksPath` was already `.githooks`. Verified across 4 cases.
+- ✅ **Line-ending normalization** (`.gitattributes`): `* text=auto eol=lf` + explicit LF for `*.sh`/`.githooks/*` + binary markers. Existing files are not renormalized in this change (no mass diff); they normalize as touched.
+- ✅ **ACORD parity test** (`src/__tests__/acord/acord25/parity.test.ts`): replaces the manual `diff -w`. Dynamically parity-checks all 8 mirrored client (`src/lib/acord/acord25`) ↔ server (`supabase/functions/_shared/acord25`) files, stripping import lines and normalizing CRLF. Proven to catch injected drift; a guard test fails loudly if the dirs move.
+- ✅ **CI now runs tests** (`.github/workflows/deploy.yml`, the active "Build & Test" check): added a `Run tests` step (`npm run test:run`) before build so the suite + parity test gate PRs. Full suite green (778 passed, 2 skipped). `npm ci --legacy-peer-deps` continues to double as the lockfile-drift guard.
+- ✅ **Windows workflow doc** (`NEW-PC-SETUP-WINDOWS.md`): created the doc both git hooks reference (was a dangling link). Branch-off-fresh-`main` → PR flow + definition of done.
+- ✅ **Release helper** (`scripts/release-coi.sh`): polls prod until the new front-end entry chunk is served, then deploys the matching edge function (the hash-bind ordering must be front-end-first).
+- **Not done here (needs the human, in GitHub settings):** make "Build & Test" a *required* status check in branch protection so a red CI blocks the merge button. **Deferred (bigger):** generate the Deno ACORD ports from the client files to remove the hand-mirroring entirely (parity test is the interim safety net).
+
 ### 2026-07-02 (Code-review remediation: security lockdown + renewals/payments/merge fixes)
 Full findings in `docs/code-review-2026-07-01.md` (review of everything shipped mid-June to July 1). All migrations applied to PROD via Supabase MCP.
 - ✅ **Security (CRITICAL, prod-verified fixed)**: 11 SECURITY DEFINER triage/search RPCs (`unified_customer_search`, `search_policies/leads/tasks/ao_renewals`, 6 count fns) were granted to PUBLIC+anon with no staff guard - the public anon key could dump the full book. All recreated with `is_staff()` guards, PUBLIC/anon revoked, `SET search_path=public` added to the payment/renewal definer trigger fns, `sync_policies_to_renewals` staff-gated. Verified: anon now gets 401/42501 via REST. (`20260702090000`)

@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountSearch } from '@/components/crm/AccountSearch';
 import { AccountList } from '@/components/crm/AccountList';
 import { AccountForm } from '@/components/crm/AccountForm';
+import { AddCustomerModal } from '@/components/customers/AddCustomerModal';
 import { SavedViewsManager } from '@/components/crm/SavedViewsManager';
 import { BulkActionsBar } from '@/components/crm/BulkActionsBar';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
@@ -30,8 +31,7 @@ import type {
   CRMFilters,
   SavedView,
   BulkAction,
-  Account,
-  CreateAccountData
+  Account
 } from '@/types/crm-enhanced-clean';
 
 // Top-level workspace switch. Accounts and Leads keep the exact same content
@@ -56,7 +56,6 @@ const CRMContent = memo(() => {
     loading,
     error,
     fetchAccounts,
-    createAccount,
     updateAccount,
     deleteAccount
   } = useCRMData();
@@ -80,16 +79,6 @@ const CRMContent = memo(() => {
   );
 
   // Memoized handlers with proper dependencies
-  const handleCreateAccount = useCallback(async (data: CreateAccountData) => {
-    setFormLoading(true);
-    try {
-      await createAccount(data);
-      setShowAccountForm(false);
-    } finally {
-      setFormLoading(false);
-    }
-  }, [createAccount]);
-
   const handleEditAccount = useCallback(async (data: any) => {
     if (!editingAccount) return;
 
@@ -474,19 +463,25 @@ const CRMContent = memo(() => {
           </div>
         )}
 
-        {/* Account Form Dialog */}
+        {/* Account Form Dialog (edit only) */}
         <ErrorBoundary level="component">
           <AccountForm
-            open={showAccountForm || !!editingAccount}
+            open={!!editingAccount}
             onOpenChange={(open) => {
-              setShowAccountForm(open);
               if (!open) setEditingAccount(null);
             }}
-            onSubmit={editingAccount ? (handleEditAccount) : (handleCreateAccount)}
+            onSubmit={handleEditAccount}
             account={editingAccount}
             loading={formLoading}
           />
         </ErrorBoundary>
+
+        {/* Canonical Add Customer modal (single app-wide entry point) */}
+        <AddCustomerModal
+          open={showAccountForm}
+          onOpenChange={setShowAccountForm}
+          onSuccess={() => fetchAccounts(filters)}
+        />
       </div>
     </AppLayout>
   );
