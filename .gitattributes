@@ -1,0 +1,20 @@
+# Normalize line endings across machines.
+# The Windows PC checks out CRLF by default, which can flip every line of a
+# diff and, worse, corrupt shell scripts and git hooks. Force LF everywhere.
+* text=auto eol=lf
+
+# Scripts and hooks MUST stay LF or they break when run on Linux/macOS.
+*.sh   text eol=lf
+.githooks/* text eol=lf
+
+# Binary assets: never touch, never diff.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary

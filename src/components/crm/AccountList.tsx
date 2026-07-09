@@ -9,7 +9,7 @@ import { Building2, Users, Phone, Mail, MapPin, MoreVertical, Edit, Trash2, Eye 
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { addToRecentlyAccessed } from '@/components/crm/RecentlyAccessed';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, formatPhoneForDisplay } from '@/lib/format';
 import type { Account } from '@/types/crm';
 
 interface AccountListProps {
@@ -186,7 +186,7 @@ export function AccountList({
               {account.phone && (
                 <div className="flex items-center space-x-2 text-sm">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{account.phone}</span>
+                  <span>{formatPhoneForDisplay(account.phone)}</span>
                 </div>
               )}
               

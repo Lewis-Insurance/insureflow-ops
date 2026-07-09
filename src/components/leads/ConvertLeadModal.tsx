@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -948,7 +949,7 @@ export function ConvertLeadModal({ open, onOpenChange, lead }: ConvertLeadModalP
                         )}
                         <div className="flex gap-4 text-sm text-muted-foreground">
                           {newCustomerData.email && <span>{newCustomerData.email}</span>}
-                          {newCustomerData.phone && <span>{newCustomerData.phone}</span>}
+                          {newCustomerData.phone && <span>{formatPhoneForDisplay(newCustomerData.phone)}</span>}
                         </div>
                         <Badge variant="outline" className="mt-2">
                           {newCustomerData.type === 'commercial_business'

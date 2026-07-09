@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { formatPhoneForDisplay } from "@/lib/format";
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -792,7 +793,7 @@ export default function LeadDetail() {
                           <dd className="cc-num text-sm">
                             {lead.phone ? (
                               <a href={`tel:${lead.phone}`} className="text-cc-link hover:text-cc-link-hover">
-                                {lead.phone}
+                                {formatPhoneForDisplay(lead.phone)}
                               </a>
                             ) : (
                               <span className="text-cc-text-muted">Not set</span>

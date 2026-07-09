@@ -76,6 +76,7 @@ import {
   useUpdateAORenewalStatus,
   useSetAORenewalFollowUp,
   type AORenewal,
+  type AORenewalOperationalMetrics,
   type AORenewalStatus,
   type AORenewalTerm,
 } from "@/hooks/useAORenewals";
@@ -110,8 +111,8 @@ function RenewalUrgencyBadge({ renewal }: { renewal: AORenewal }) {
 const getStatusBadge = (status: AORenewalStatus) => {
   const config: Record<AORenewalStatus, { label: string; className: string }> = {
     pending:   { label: "Pending",   className: "bg-cc-surface-overlay text-cc-text-secondary border-cc-border-subtle" },
-    contacted: { label: "Contacted", className: "bg-info/10 text-info border-info/30" },
     quoted:    { label: "Quoted",    className: "bg-warning/10 text-warning border-warning/30" },
+    contacted: { label: "Contacted", className: "bg-info/10 text-info border-info/30" },
     renewed:   { label: "Retained",  className: "bg-success/10 text-success border-success/30" },
     moved:     { label: "Moved",     className: "bg-info/10 text-info border-info/30" },
     lost:      { label: "Lost",      className: "bg-destructive/10 text-destructive border-destructive/30" },
@@ -119,6 +120,48 @@ const getStatusBadge = (status: AORenewalStatus) => {
   };
   return <Badge variant="outline" className={config[status].className}>{config[status].label}</Badge>;
 };
+
+/**
+ * The "Attention" cell tells the CSR what this file needs next, based on the
+ * Pending -> Quoted -> Contacted workflow (quote is built first, then we reach out).
+ * A scheduled follow-up that is past due always wins - that is what this column exists for.
+ */
+function AttentionCell({ renewal, metrics }: { renewal: AORenewal; metrics: AORenewalOperationalMetrics }) {
+  if (TERMINAL_STATUSES.includes(renewal.status)) {
+    return (
+      <div className="flex items-center gap-1.5 text-success" title="Handled, off your plate">
+        <CheckCircle className="h-4 w-4" />
+        <span className="text-xs capitalize text-success">{renewal.status}</span>
+      </div>
+    );
+  }
+
+  // Pending: no quote yet - warn based on how close the renewal is.
+  if (renewal.status === "pending") {
+    const d = metrics.daysUntilRenewal;
+    if (d < 0) return <Badge variant="destructive">Renewal passed</Badge>;
+    if (d === 0) return <Badge className="bg-warning hover:bg-warning text-warning-foreground">Renews today</Badge>;
+    if (d === 1) return <Badge className="bg-warning hover:bg-warning text-warning-foreground">Renews tomorrow</Badge>;
+    if (d <= 5) return <Badge className="bg-warning hover:bg-warning text-warning-foreground">Renews in {d}d</Badge>;
+    if (d <= 30) return <Badge className="bg-warning/80 hover:bg-warning/80 text-warning-foreground">Renews in {d}d</Badge>;
+    return <Badge variant="outline">Renews in {d}d</Badge>;
+  }
+
+  // Quoted: quote is done, next action is to contact the insured.
+  if (renewal.status === "quoted") {
+    if (metrics.isFollowUpOverdue) return <Badge variant="destructive">Follow up overdue</Badge>;
+    if (metrics.isCriticalWindow) return <Badge className="bg-warning hover:bg-warning text-warning-foreground">Contact now</Badge>;
+    return <Badge className="bg-info hover:bg-info text-info-foreground">Contact needed</Badge>;
+  }
+
+  // Contacted: quote is ready and the insured has been reached.
+  if (renewal.status === "contacted") {
+    if (metrics.isFollowUpOverdue) return <Badge variant="destructive">Follow up overdue</Badge>;
+    return <Badge className="bg-success hover:bg-success text-success-foreground">Quote Ready</Badge>;
+  }
+
+  return <Badge variant="outline">On track</Badge>;
+}
 
 const QUEUE_STATE_KEY = (uid: string) => `ao-renewals-queue-state-v1-${uid}`;
 
@@ -508,8 +551,8 @@ export default function AORenewalsPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="contacted">Contacted</SelectItem>
                               <SelectItem value="quoted">Quoted</SelectItem>
+                              <SelectItem value="contacted">Contacted</SelectItem>
                               {renewal.status === 'renewed' && (
                                 <SelectItem value="renewed" disabled>Retained (existing)</SelectItem>
                               )}
@@ -605,22 +648,7 @@ export default function AORenewalsPage() {
                         </TableCell>
                         {/* Attention badge */}
                         <TableCell>
-                          {(renewal.status === "moved" || renewal.status === "lost" || renewal.status === "cancelled" || renewal.status === "renewed") ? (
-                            <div className="flex items-center gap-1.5 text-success" title="Handled — off your plate">
-                              <CheckCircle className="h-4 w-4" />
-                              <span className="text-xs capitalize text-success">{renewal.status}</span>
-                            </div>
-                          ) : renewal.status === "pending" ? (
-                            <Badge className="bg-cc-surface-overlay text-cc-text-secondary hover:bg-cc-surface-overlay">No contact yet</Badge>
-                          ) : renewal.status === "contacted" ? (
-                            <Badge className="bg-info hover:bg-info text-info-foreground">Quote needed</Badge>
-                          ) : metrics.isFollowUpOverdue || metrics.staleReason ? (
-                            <Badge variant="destructive">Follow up overdue</Badge>
-                          ) : metrics.isCriticalWindow ? (
-                            <Badge className="bg-warning hover:bg-warning text-warning-foreground">Inside 5 days</Badge>
-                          ) : (
-                            <Badge variant="outline">On track</Badge>
-                          )}
+                          <AttentionCell renewal={renewal} metrics={metrics} />
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>

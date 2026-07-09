@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeads } from '@/hooks/useLeads';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -242,7 +243,7 @@ export function TimelineView() {
                               {event.leadPhone && (
                                 <div className="flex items-center gap-1 text-muted-foreground">
                                   <Phone className="h-3 w-3" />
-                                  <span>{event.leadPhone}</span>
+                                  <span>{formatPhoneForDisplay(event.leadPhone)}</span>
                                 </div>
                               )}
                             </div>

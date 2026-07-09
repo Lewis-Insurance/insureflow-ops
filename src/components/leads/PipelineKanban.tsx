@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatPhoneForDisplay } from "@/lib/format";
 import { useLeads, useMoveLeadToStage, type Lead } from "@/hooks/useLeads";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, Mail, Calendar, DollarSign, TrendingUp, Users, Target } from "lucide-react";
@@ -103,7 +104,7 @@ const LeadCard = memo(({
           {lead.phone && (
             <div className="flex items-center gap-2">
               <Phone className="h-3 w-3" />
-              <span>{lead.phone}</span>
+              <span>{formatPhoneForDisplay(lead.phone)}</span>
             </div>
           )}
           {lead.current_premium && (

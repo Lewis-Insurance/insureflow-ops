@@ -3,7 +3,7 @@ import { Mail, Phone, MapPin, FileText, Edit, MessageSquare, Send } from 'lucide
 import { EditContactInfoModal } from './EditContactInfoModal';
 import { useState } from 'react';
 import { SMSComposerModal } from '@/components/communications/SMSComposerModal';
-import { humanizeEnum, humanizeLine } from '@/lib/format';
+import { humanizeEnum, humanizeLine, formatPhoneForDisplay } from '@/lib/format';
 import { usePolicies } from '@/hooks/usePolicies';
 
 interface CustomerAccount {
@@ -152,14 +152,14 @@ export function CustomerContactInfo({ account, onSendEmail, onAccountUpdated }: 
                   <label className="text-xs font-medium text-cc-text-muted">Phone</label>
                   {account.phone ? (
                     <a href={`tel:${account.phone}`} className="block truncate text-sm font-semibold text-cc-text-primary hover:underline">
-                      {account.phone}
+                      {formatPhoneForDisplay(account.phone)}
                     </a>
                   ) : (
                     <p className="text-sm text-cc-text-muted italic">No phone on file</p>
                   )}
                   {account.phone_secondary && (
                     <a href={`tel:${account.phone_secondary}`} className="block truncate text-xs text-cc-text-muted hover:underline">
-                      {account.phone_secondary} (secondary)
+                      {formatPhoneForDisplay(account.phone_secondary)} (secondary)
                     </a>
                   )}
                 </div>

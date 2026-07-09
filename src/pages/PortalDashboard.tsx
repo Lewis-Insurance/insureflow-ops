@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState } from 'react';
+import { formatPhoneForDisplay } from '@/lib/format';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -179,7 +180,7 @@ export default function PortalDashboard() {
             <div className="flex items-center gap-4">
               {branding?.support_phone && (
                 <a href={`tel:${branding.support_phone}`} className="hover:underline">
-                  {branding.support_phone}
+                  {formatPhoneForDisplay(branding.support_phone)}
                 </a>
               )}
               {branding?.support_email && (

@@ -137,11 +137,18 @@ export function suggestStatusAdvance(
   currentStatus: AORenewalStatus,
 ): AORenewalStatus | null {
   if (COMPLETED_STATUSES.includes(currentStatus)) return null;
-  if (logType === "spoke_with_insured" && currentStatus === "pending") return "contacted";
+  // Workflow is Pending -> Quoted -> Contacted: the quote is prepared first,
+  // then we reach out. Presenting/sending the quote advances a pending file to "quoted".
   if (
     (logType === "quote_presented" || logType === "quote_sent") &&
-    (currentStatus === "pending" || currentStatus === "contacted")
+    currentStatus === "pending"
   ) return "quoted";
+  // We only contact the insured after the quote is done, so speaking with them
+  // advances to "contacted" (from pending or quoted).
+  if (
+    logType === "spoke_with_insured" &&
+    (currentStatus === "pending" || currentStatus === "quoted")
+  ) return "contacted";
   return null;
 }
 
@@ -178,12 +185,15 @@ export const getAORenewalOperationalMetrics = (
     ["contacted", "quoted"].includes(renewal.status) && daysUntilRenewal <= 5;
 
   let staleReason: string | null = null;
-  if (renewal.status === "contacted" && daysSinceContact !== null && daysSinceContact >= 5) {
-    staleReason = `No quote in ${daysSinceContact} days`;
-  } else if (renewal.status === "quoted" && daysSinceContact !== null && daysSinceContact >= 3) {
-    staleReason = `Quoted ${daysSinceContact} days ago, no follow-up`;
+  if (renewal.status === "quoted" && daysSinceContact !== null && daysSinceContact >= 3) {
+    // Quote is done but the insured has not been reached in a while.
+    staleReason = `Quoted ${daysSinceContact} days ago, not contacted`;
+  } else if (renewal.status === "contacted" && daysSinceContact !== null && daysSinceContact >= 5) {
+    // Quote presented and insured reached, but no movement since.
+    staleReason = `No update in ${daysSinceContact} days`;
   }
 
+  // A quoted file with no scheduled outreach still needs a follow-up planned.
   const missingFollowUp = renewal.status === "quoted" && !followUpDate;
 
   const needsAttention = Boolean(

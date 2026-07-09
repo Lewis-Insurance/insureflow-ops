@@ -54,14 +54,9 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       { label: 'Customers', to: '/customers', icon: Users },
       { label: 'Policies', to: '/policies', icon: FileText },
       { label: 'Renewals', to: '/renewals', icon: Calendar },
-      { label: 'Calls', to: '/calls', icon: Phone },
-      { label: 'SMS', to: '/sms', icon: MessageSquare },
-      { label: 'Leads', to: '/leads', icon: TrendingUp },
       // COI workflow: certificate generator + the certificate-holder directory.
       { label: 'Generate COI', to: '/certificates', icon: Award },
       { label: 'Additional Insureds', to: '/additional-insureds', icon: Building2 },
-      // Contacts maps to the CRM accounts/contacts hub (no dedicated /contacts route).
-      { label: 'Contacts', to: '/crm', icon: Contact },
       // Payments (formerly the standalone "Accounting" page) + its Day Sheets shortcut.
       { label: 'Payments', to: '/payments', icon: DollarSign },
       { label: 'Day Sheets', to: '/day-sheets', icon: Receipt },
@@ -101,6 +96,19 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       { label: 'Campaigns', to: '/campaigns', icon: Send },
       { label: 'Team', to: '/team-messaging', icon: UsersRound, isNew: true },
       { label: 'Command Center', to: '/command-center', icon: Radio },
+    ],
+  },
+  {
+    // Unfinished / unused modules parked out of the high-traffic CRM group.
+    key: 'more',
+    label: 'More',
+    defaultOpen: false,
+    items: [
+      { label: 'Calls', to: '/calls', icon: Phone },
+      { label: 'SMS', to: '/sms', icon: MessageSquare },
+      { label: 'Leads', to: '/leads', icon: TrendingUp },
+      // Contacts maps to the CRM accounts/contacts hub (no dedicated /contacts route).
+      { label: 'Contacts', to: '/crm', icon: Contact },
     ],
   },
 ];
