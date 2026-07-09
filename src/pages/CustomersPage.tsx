@@ -9,8 +9,9 @@ import { ActionMenu } from '@/components/customers/ActionMenu';
 import { AddCustomerModal } from '@/components/customers/AddCustomerModal';
 import { useUnifiedCustomers } from '@/hooks/useUnifiedCustomers';
 import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
+import { useRecentCustomers } from '@/hooks/useRecentCustomers';
 import { useTags } from '@/hooks/useTags';
-import { StatusPill, Chip, SectionLabel, NextRenewal, TriageTile, SkeletonRow } from '@/components/cc';
+import { StatusPill, Chip, SectionLabel, NextRenewal, SkeletonRow } from '@/components/cc';
 import { humanizeAccountType } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,81 @@ type TypeFilter = 'all' | 'household' | 'business';
 // never runs flush into the Renewal column header (was 72px -> collided).
 const COLS = 'md:grid-cols-[minmax(0,1fr)_104px_120px_104px_150px_44px]';
 
+// One row shape shared by the "Recently opened" group and the main list so the
+// two read as a single continuous list. Fields are passed in from either a live
+// UnifiedCustomer or a stored RecentCustomer snapshot.
+function CustomerRow({
+  id,
+  name,
+  secondary,
+  typeValue,
+  status,
+  policiesCount,
+  nextExpiration,
+  onOpen,
+}: {
+  id: string;
+  name: string;
+  secondary?: string;
+  typeValue?: string;
+  status?: string;
+  policiesCount?: number;
+  nextExpiration?: string | null;
+  onOpen: () => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={cn(
+        'flex cursor-pointer items-center justify-between gap-4 border-b border-cc-border-subtle px-4 py-3 transition-colors duration-fast last:border-b-0 hover:bg-cc-surface-raised',
+        'md:grid md:items-center',
+        COLS,
+      )}
+    >
+      {/* Customer (carries status inline on mobile) */}
+      <div className="min-w-0">
+        <div className="font-semibold text-cc-text-primary break-words">{name}</div>
+        {secondary && <div className="truncate text-xs text-cc-text-muted">{secondary}</div>}
+        <div className="mt-1.5 md:hidden">
+          <StatusPill status={status} />
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <Chip>{humanizeAccountType(typeValue)}</Chip>
+      </div>
+
+      <div className="hidden md:block">
+        <StatusPill status={status} />
+      </div>
+
+      <div className="cc-num hidden text-right text-sm text-cc-text-secondary md:block">
+        {policiesCount ?? 0}
+      </div>
+
+      <div className="hidden md:block">
+        <NextRenewal date={nextExpiration} />
+      </div>
+
+      <div
+        className="flex shrink-0 justify-end"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <ActionMenu account={{ id, name }} />
+      </div>
+    </div>
+  );
+}
+
 export default function CustomersPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +112,7 @@ export default function CustomersPage() {
 
   const { customers, loading, loadingMore, hasMore, fetchCustomers, fetchNextPage } = useUnifiedCustomers();
   const { counts } = useCustomerTriageCounts();
+  const { recent, recordOpen, clear: clearRecent } = useRecentCustomers();
   const { seedDefaultTags } = useTags();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,13 +144,49 @@ export default function CustomersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, cohort, typeFilter]);
 
-  const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
   const filtersActive = cohort !== 'all' || typeFilter !== 'all' || searchQuery.length > 0;
   const clearAll = () => {
     setCohort('all');
     setTypeFilter('all');
     setSearchQuery('');
   };
+
+  // Record the open (so it floats to the top next time) and navigate.
+  const openCustomer = useCallback(
+    (c: {
+      id: string;
+      name: string;
+      type?: string;
+      status?: string;
+      email?: string;
+      city?: string;
+      state?: string;
+      policies_count?: number;
+      next_expiration_at?: string | null;
+    }) => {
+      recordOpen({
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        status: c.status,
+        email: c.email,
+        city: c.city,
+        state: c.state,
+        policies_count: c.policies_count,
+        next_expiration_at: c.next_expiration_at,
+      });
+      navigate(`/customers/${c.id}`);
+    },
+    [recordOpen, navigate],
+  );
+
+  // Pin recently-opened customers to the top, but only in the default browse
+  // view. When searching or filtering by type the list should show real
+  // results, so the recent group steps aside. Rows already in the recent group
+  // are removed from the main list below to avoid showing them twice.
+  const showRecent = searchQuery.trim() === '' && typeFilter === 'all' && recent.length > 0;
+  const recentIds = showRecent ? new Set(recent.map((r) => r.id)) : new Set<string>();
+  const mainRows = showRecent ? customers.filter((c) => !recentIds.has(c.id)) : customers;
 
   return (
     <AppLayout>
@@ -106,41 +219,10 @@ export default function CustomersPage() {
           </div>
         </header>
 
-        {/* Triage strip: real renewal/policy cohorts, counted server-side */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <TriageTile
-            label="Renewals 30 days"
-            count={counts.renewals_30d}
-            sub="Renew now"
-            tone="warning"
-            active={cohort === 'renewals_30d'}
-            onClick={() => toggleCohort('renewals_30d')}
-          />
-          <TriageTile
-            label="Overdue renewals"
-            count={counts.overdue}
-            sub="Lapsed, act"
-            tone={counts.overdue > 0 ? 'danger' : 'neutral'}
-            active={cohort === 'overdue'}
-            onClick={() => toggleCohort('overdue')}
-          />
-          <TriageTile
-            label="No active policy"
-            count={counts.no_active_policy}
-            sub="Cross sell"
-            tone="neutral"
-            active={cohort === 'no_active_policy'}
-            onClick={() => toggleCohort('no_active_policy')}
-          />
-          <TriageTile
-            label="New this 30 days"
-            count={counts.new_30d}
-            sub="Onboard"
-            tone="info"
-            active={cohort === 'new_30d'}
-            onClick={() => toggleCohort('new_30d')}
-          />
-        </div>
+        {/* Triage tiles (Renewals 30d / Overdue / No active policy / New this 30d)
+            removed for now to keep this page focused on finding a customer. The
+            cohort state + useCustomerTriageCounts plumbing is kept so they can be
+            restored without rewiring the server-side counts/filter path. */}
 
         {/* Filter row */}
         <div className="flex flex-wrap items-center gap-3">
@@ -231,65 +313,70 @@ export default function CustomersPage() {
               )}
             </div>
           ) : (
-            customers.map((customer) => {
-              const name = customer.display_name || customer.name;
-              const secondary =
-                customer.email ||
-                customer.primary_email ||
-                [customer.city, customer.state].filter(Boolean).join(', ');
-              return (
-                <div
-                  key={customer.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/customers/${customer.id}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(`/customers/${customer.id}`);
+            <>
+              {showRecent && (
+                <>
+                  <div className="flex items-center justify-between border-b border-cc-border-subtle bg-cc-surface-raised/40 px-4 py-2">
+                    <SectionLabel>Recently opened</SectionLabel>
+                    <button
+                      type="button"
+                      onClick={clearRecent}
+                      className="text-xs text-cc-text-muted transition-colors hover:text-cc-text-secondary"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {recent.map((r) => (
+                    <CustomerRow
+                      key={`recent-${r.id}`}
+                      id={r.id}
+                      name={r.name}
+                      secondary={r.email || [r.city, r.state].filter(Boolean).join(', ')}
+                      typeValue={r.type}
+                      status={r.status}
+                      policiesCount={r.policies_count}
+                      nextExpiration={r.next_expiration_at ?? null}
+                      onOpen={() => openCustomer(r)}
+                    />
+                  ))}
+                  <div className="border-b border-cc-border-subtle bg-cc-surface-raised/40 px-4 py-2">
+                    <SectionLabel>All customers</SectionLabel>
+                  </div>
+                </>
+              )}
+              {mainRows.map((customer) => {
+                const name = customer.display_name || customer.name;
+                const secondary =
+                  customer.email ||
+                  customer.primary_email ||
+                  [customer.city, customer.state].filter(Boolean).join(', ');
+                return (
+                  <CustomerRow
+                    key={customer.id}
+                    id={customer.id}
+                    name={name}
+                    secondary={secondary}
+                    typeValue={customer.type}
+                    status={customer.status}
+                    policiesCount={customer.policies_count}
+                    nextExpiration={customer.next_expiration_at}
+                    onOpen={() =>
+                      openCustomer({
+                        id: customer.id,
+                        name,
+                        type: customer.type,
+                        status: customer.status,
+                        email: customer.email || customer.primary_email,
+                        city: customer.city,
+                        state: customer.state,
+                        policies_count: customer.policies_count,
+                        next_expiration_at: customer.next_expiration_at,
+                      })
                     }
-                  }}
-                  className={cn(
-                    'flex cursor-pointer items-center justify-between gap-4 border-b border-cc-border-subtle px-4 py-3 transition-colors duration-fast last:border-b-0 hover:bg-cc-surface-raised',
-                    'md:grid md:items-center',
-                    COLS,
-                  )}
-                >
-                  {/* Customer (carries status inline on mobile) */}
-                  <div className="min-w-0">
-                    <div className="font-semibold text-cc-text-primary break-words">{name}</div>
-                    {secondary && <div className="truncate text-xs text-cc-text-muted">{secondary}</div>}
-                    <div className="mt-1.5 md:hidden">
-                      <StatusPill status={customer.status} />
-                    </div>
-                  </div>
-
-                  <div className="hidden md:block">
-                    <Chip>{humanizeAccountType(customer.type)}</Chip>
-                  </div>
-
-                  <div className="hidden md:block">
-                    <StatusPill status={customer.status} />
-                  </div>
-
-                  <div className="cc-num hidden text-right text-sm text-cc-text-secondary md:block">
-                    {customer.policies_count ?? 0}
-                  </div>
-
-                  <div className="hidden md:block">
-                    <NextRenewal date={customer.next_expiration_at} />
-                  </div>
-
-                  <div
-                    className="flex shrink-0 justify-end"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <ActionMenu account={{ id: customer.id, name }} />
-                  </div>
-                </div>
-              );
-            })
+                  />
+                );
+              })}
+            </>
           )}
         </div>
 
