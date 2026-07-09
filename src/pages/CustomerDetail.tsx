@@ -24,6 +24,7 @@ import { WorkersCompCard } from '@/components/commercial/WorkersCompCard';
 import { CustomerDocumentsSection } from '@/components/customers/CustomerDocumentsSection';
 import { CustomerTasksSection } from '@/components/customers/CustomerTasksSection';
 import { useTasks } from '@/hooks/useTasks';
+import { useRecentCustomers } from '@/hooks/useRecentCustomers';
 import { humanizeAccountType } from '@/lib/format';
 import { AddNoteModal } from '@/components/customers/AddNoteModal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -162,6 +163,7 @@ export default function CustomerDetail() {
   // list (a second one-shot fetch froze the tile counts at mount time).
   const tasksApi = useTasks(id);
   const { tasks } = tasksApi;
+  const { recordOpen } = useRecentCustomers();
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
 
@@ -228,6 +230,23 @@ export default function CustomerDetail() {
     // Run once after the account resolves; the param is read fresh above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, account?.id]);
+
+  // Remember this open so the customer floats to the top of the user's list.
+  // Fires for every way of landing here (list click, search, Cmd-K, direct link).
+  useEffect(() => {
+    if (!account?.id) return;
+    recordOpen({
+      id: account.id,
+      name: account.name,
+      type: account.type,
+      status: account.account_status,
+      email: account.email,
+      city: account.city,
+      state: account.state,
+    });
+    // recordOpen is stable; record once per opened account.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.id]);
 
   const updateStatus = async (next: string) => {
     if (!account) return;
