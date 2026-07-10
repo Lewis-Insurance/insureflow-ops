@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeCarrier, humanizeStatus } from '@/lib/format';
 import { renewalPillStatus } from '@/lib/renewals/renewalTerm';
+import { isHiddenByAoMigration } from '@/lib/renewals/aoMigrationFilter';
 import { cn } from '@/lib/utils';
 
 // The general renewals worklist: EVERY policy renewal, every carrier. The
@@ -69,7 +70,17 @@ export default function RenewalsPage() {
   // Pull the whole book once (all carriers, ordered by renewal date). Cohort,
   // carrier and search are applied client-side so the tile counts stay accurate
   // and filtering is instant.
-  const { data: renewals = [], isLoading } = useRenewals();
+  const { data: renewalsRaw = [], isLoading } = useRenewals();
+
+  // Auto-Owners personal-auto renewals are worked in the dedicated AO Renewals
+  // migration queue (/ao-renewals) through Jan 30, 2027, so hide them here until
+  // then to avoid double-listing the same policy. Self-expires Feb 1, 2027 (see
+  // aoMigrationFilter). Everything downstream (counts, carriers, rows) reads this
+  // filtered book, so tiles and list stay consistent.
+  const renewals = useMemo(
+    () => renewalsRaw.filter((r) => !isHiddenByAoMigration(r)),
+    [renewalsRaw],
+  );
 
   // Keep the renewals table current with upcoming policies. Best-effort and
   // silent: a toast on every page load would be noise. Runs once per mount.
