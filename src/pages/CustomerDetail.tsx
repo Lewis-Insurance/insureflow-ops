@@ -41,6 +41,7 @@ import { DocumentCollectionBoard } from '@/components/documents/DocumentCollecti
 import { StatusPill, Chip, SectionLabel } from '@/components/cc';
 import { CustomerRelationshipsSection } from '@/components/relationships/CustomerRelationshipsSection';
 import { ClusterHub } from '@/components/relationships/ClusterHub';
+import { RelationshipBubbles } from '@/components/relationships/RelationshipBubbles';
 import { GoesByEditor } from '@/components/relationships/GoesByEditor';
 import {
   useAccountRelationships,
@@ -439,7 +440,17 @@ export default function CustomerDetail() {
             onSendEmail={() => setEmailComposerOpen(true)}
             onAccountUpdated={refetchAccount}
           />
-          <div className="mt-4 flex justify-start">
+          {/* Footer row of the top panel: relationship bubbles (moved up from the
+              old Relationships section) on the left, portal invite on the right.
+              One wrapping row so it stays in the hero without a stacked section. */}
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-cc-border-subtle pt-4">
+            <RelationshipBubbles
+              accountId={account.id}
+              accountName={account.name}
+              relationships={relationships}
+              loading={relationshipsLoading}
+              onRelationshipsChange={refetchRelationships}
+            />
             <InviteToPortalButton accountId={account.id} accountName={account.name} defaultEmail={account.email} />
           </div>
         </section>
@@ -470,9 +481,13 @@ export default function CustomerDetail() {
 
         {/* ===================== Documents ===================== */}
         <section id="documents" className="scroll-mt-20 space-y-4">
+          {/* [customers-declutter 2026-07-10] Document Collection board hidden for
+              now; may return later. Re-enable by uncommenting (import + ErrorBoundaryWrapper
+              are still in place). The plain documents list below stays.
           <ErrorBoundaryWrapper>
             <DocumentCollectionBoard accountId={account.id} />
           </ErrorBoundaryWrapper>
+          */}
           <CustomerDocumentsSection accountId={account.id} />
         </section>
 
@@ -482,7 +497,11 @@ export default function CustomerDetail() {
           <CustomerTasksSection accountId={account.id} tasksApi={tasksApi} />
         </section>
 
-        {/* ===================== Relationships (lower priority) ===================== */}
+        {/* ===================== Relationships ===================== */}
+        {/* [customers-declutter 2026-07-10] Relationships moved up into the top
+            panel as compact name bubbles (see RelationshipBubbles in the hero).
+            The full section - cross-sell hub, suggestions, edit/unlink - is kept
+            here commented for easy restore.
         <section id="relationships" className="scroll-mt-20 space-y-4">
           <ClusterHub accountId={account.id} cluster={cluster} rollup={rollup} loading={clusterLoading} />
           <CustomerRelationshipsSection
@@ -495,8 +514,12 @@ export default function CustomerDetail() {
             onRelationshipsChange={refetchRelationships}
           />
         </section>
+        */}
 
-        {/* ===================== Activity (lower priority) ===================== */}
+        {/* ===================== Activity ===================== */}
+        {/* [customers-declutter 2026-07-10] Activity feed hidden for now; may return
+            later. Re-enable by uncommenting (CommunicationHistory import + CheckCircle2
+            icon are still in place).
         <section id="activity" className="scroll-mt-20">
           <div className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
             <div className="mb-3 flex items-center gap-2">
@@ -506,8 +529,12 @@ export default function CustomerDetail() {
             <CommunicationHistory accountId={account.id} />
           </div>
         </section>
+        */}
 
-        {/* ===================== Quick actions + counters (out of the way, full width) ===================== */}
+        {/* ===================== Quick actions ===================== */}
+        {/* [customers-declutter 2026-07-10] Quick actions + task counters hidden for
+            now; may return later. Re-enable by uncommenting (StateTile helper,
+            scrollToSection, and openTasks/overdueTasks are still in place).
         <section className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
           <SectionLabel>Quick actions</SectionLabel>
           <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -546,6 +573,7 @@ export default function CustomerDetail() {
             </div>
           </div>
         </section>
+        */}
       </div>
 
       {/* Modals */}
