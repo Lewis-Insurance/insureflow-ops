@@ -18,7 +18,7 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useRenewals, useReopenRenewal, type Renewal } from '@/hooks/useRenewalWorkflow';
 import { supabase } from '@/integrations/supabase/client';
-import { StatusPill, Chip, SectionLabel, NextRenewal, LastContact, TriageTile, SkeletonRow } from '@/components/cc';
+import { StatusPill, Chip, SectionLabel, NextRenewal, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeCarrier, humanizeStatus } from '@/lib/format';
 import { renewalPillStatus } from '@/lib/renewals/renewalTerm';
 import { isHiddenByAoMigration } from '@/lib/renewals/aoMigrationFilter';
@@ -52,8 +52,8 @@ const COHORT_PREDICATE: Record<Exclude<Cohort, 'all'>, (r: Renewal) => boolean> 
 };
 
 // Dense table column template (md+). Same fields, same order, every row:
-// Client, policy, carrier, status, renewal countdown, last contact.
-const COLS = 'md:grid-cols-[minmax(0,1fr)_150px_140px_116px_120px_150px]';
+// Client, policy, carrier, status, renewal countdown (+ Reopen action on closed rows).
+const COLS = 'md:grid-cols-[minmax(0,1fr)_150px_140px_116px_auto]';
 
 export default function RenewalsPage() {
   const navigate = useNavigate();
@@ -281,7 +281,6 @@ export default function RenewalsPage() {
             <SectionLabel>Carrier</SectionLabel>
             <SectionLabel>Status</SectionLabel>
             <SectionLabel>Renewal</SectionLabel>
-            <SectionLabel>Last contact</SectionLabel>
           </div>
 
           {isLoading ? (
@@ -359,14 +358,10 @@ export default function RenewalsPage() {
                     />
                   </div>
 
-                  <div className="hidden md:block">
+                  {/* Renewal countdown; closed rows carry the Reopen action here. */}
+                  <div className="hidden md:flex md:items-center md:gap-2">
                     <NextRenewal date={r.renewal_date} emptyLabel="No renewal date" />
-                  </div>
-
-                  <div className="hidden md:block">
-                    {isOpen(r) ? (
-                      <LastContact date={r.last_contact_date} />
-                    ) : (
+                    {!isOpen(r) && (
                       <button
                         type="button"
                         onClick={(e) => {
