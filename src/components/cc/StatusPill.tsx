@@ -32,7 +32,7 @@ const VOCAB: Record<string, Entry> = {
   active: { label: 'Active', tone: 'success' },
   customer: { label: 'Active', tone: 'success' },
   client: { label: 'Active', tone: 'success' },
-  contacted: { label: 'Contacted', tone: 'info' },
+  contacted: { label: 'Contacted', tone: 'success' },
   pending: { label: 'Pending', tone: 'warning' },
   prospect: { label: 'Prospect', tone: 'info' },
   lead: { label: 'Lead', tone: 'warning' },

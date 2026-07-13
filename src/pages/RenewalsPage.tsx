@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 // Auto-Owners migration queue is a separate surface and lives at /ao-renewals.
 // Cohorts segment the open book by what needs attention; clicking a tile filters
 // the rows to it. Counts are computed over the whole book, not the filtered view.
-type Cohort = 'all' | 'overdue' | 'due_week' | 'high_risk' | 'quoted';
+type Cohort = 'all' | 'overdue' | 'due_week' | 'quoted';
 // View scope: the working (open) book, the closed outcomes (reopenable), or everything.
 type Scope = 'open' | 'closed' | 'all';
 
@@ -40,7 +40,6 @@ const isOpen = (r: Renewal) => OPEN_STATUSES.has(r.status);
 // Overdue / Due-this-week cohorts a day early in US timezones.
 const daysToRenewal = (r: Renewal) =>
   r.renewal_date ? differenceFromTodayInLocalDays(r.renewal_date) : null;
-const isHighRisk = (r: Renewal) => r.risk_level === 'high' || r.risk_level === 'critical';
 
 // Each cohort is a predicate over a renewal. 'all' is the unfiltered book.
 const COHORT_PREDICATE: Record<Exclude<Cohort, 'all'>, (r: Renewal) => boolean> = {
@@ -49,7 +48,6 @@ const COHORT_PREDICATE: Record<Exclude<Cohort, 'all'>, (r: Renewal) => boolean> 
     const d = daysToRenewal(r);
     return isOpen(r) && d !== null && d >= 0 && d <= 7;
   },
-  high_risk: (r) => isOpen(r) && isHighRisk(r),
   quoted: (r) => r.status === 'quoted',
 };
 
@@ -101,7 +99,6 @@ export default function RenewalsPage() {
       total: renewals.length,
       overdue: renewals.filter(COHORT_PREDICATE.overdue).length,
       due_week: renewals.filter(COHORT_PREDICATE.due_week).length,
-      high_risk: renewals.filter(COHORT_PREDICATE.high_risk).length,
       quoted: renewals.filter(COHORT_PREDICATE.quoted).length,
     }),
     [renewals],
@@ -191,7 +188,7 @@ export default function RenewalsPage() {
         </header>
 
         {/* Triage strip: open book segmented by what needs attention */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TriageTile
             label="Overdue"
             count={counts.overdue}
@@ -207,14 +204,6 @@ export default function RenewalsPage() {
             tone="warning"
             active={cohort === 'due_week'}
             onClick={() => toggleCohort('due_week')}
-          />
-          <TriageTile
-            label="High risk"
-            count={counts.high_risk}
-            sub="Prioritize"
-            tone="info"
-            active={cohort === 'high_risk'}
-            onClick={() => toggleCohort('high_risk')}
           />
           <TriageTile
             label="Quoted"

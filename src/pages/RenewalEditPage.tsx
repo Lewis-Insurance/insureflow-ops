@@ -6,13 +6,13 @@ import { RenewalTopBar } from '@/components/renewals/RenewalTopBar';
 import { UpdateRenewalWidget } from '@/components/renewals/UpdateRenewalWidget';
 import { RenewalPolicyInfoPanel } from '@/components/renewals/RenewalPolicyInfoPanel';
 import { RenewalQuotesPanel } from '@/components/renewals/RenewalQuotesPanel';
-import { RenewalContactPanel } from '@/components/renewals/RenewalContactPanel';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 
 /**
  * Renewal detail — three regions only: Top Bar (identity), Hero (Update Renewal), and the
- * read-only Policy Info rail (durable facts + shared quotes/contact). Editing a renewal here
- * writes through to the policy + customer page via the hero's terminal commits.
+ * read-only Policy Info rail (durable facts + shared quotes, plus account-scoped Notes).
+ * Editing a renewal here writes through to the policy + customer page via the hero's terminal
+ * commits.
  */
 export default function RenewalEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,7 +44,6 @@ export default function RenewalEditPage() {
               <div className="space-y-6">
                 <RenewalPolicyInfoPanel renewal={renewal} />
                 <RenewalQuotesPanel renewal={renewal} />
-                <RenewalContactPanel renewal={renewal} />
                 {renewal.account_id && (
                   <NotesPanel accountId={renewal.account_id} renewalId={renewal.id} title="Notes" />
                 )}

@@ -98,8 +98,8 @@ export function UpdateRenewalWidget({ renewal }: Props) {
   // ---- working draft state (seeded from the renewal, prior expiration = no off-by-one) ----
   const seededEffective = renewal.new_effective_date || renewal.expiration_date || '';
   const seededTerm = normalizePolicyTerm(renewal.policy_term);
-  const [workingStatus, setWorkingStatus] = useState<'pending' | 'quoted'>(
-    renewal.status === 'quoted' ? 'quoted' : 'pending',
+  const [workingStatus, setWorkingStatus] = useState<'pending' | 'contacted' | 'quoted'>(
+    renewal.status === 'quoted' ? 'quoted' : renewal.status === 'contacted' ? 'contacted' : 'pending',
   );
   const [policyNumber, setPolicyNumber] = useState(renewal.policy_number || '');
   const [premium, setPremium] = useState(
@@ -166,7 +166,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       saveDraft.mutate(
         {
           renewalId: renewal.id,
-          status: workingStatus === 'quoted' ? 'quoted' : 'upcoming',
+          status: workingStatus === 'quoted' ? 'quoted' : workingStatus === 'contacted' ? 'contacted' : 'upcoming',
           policy_number: policyNumber || null,
           renewal_premium: Number.isNaN(premiumNum) ? null : premiumNum,
           policy_term: term,
@@ -320,7 +320,7 @@ export function UpdateRenewalWidget({ renewal }: Props) {
       <div className="mt-4">
         <Label className="text-cc-text-muted">Status</Label>
         <div role="group" className="mt-1.5 inline-flex rounded-cc-md bg-cc-surface-raised p-0.5">
-          {(['pending', 'quoted'] as const).map((s) => (
+          {(['pending', 'contacted', 'quoted'] as const).map((s) => (
             <button
               key={s}
               type="button"

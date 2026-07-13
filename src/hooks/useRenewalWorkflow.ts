@@ -924,7 +924,7 @@ async function bestEffortRetention(policyId: string): Promise<void> {
  * Never touches the policy. The draft (new_effective_date/new_expiration_date/policy_term/
  * renewal_premium/policy_number) is pushed to the policy only by a terminal commit below.
  * Working status maps: "Pending" -> stored 'upcoming' (keeps policy->renewal sync live),
- * "Quoted" -> 'quoted'.
+ * "Contacted" -> 'contacted', "Quoted" -> 'quoted'.
  */
 export function useSaveRenewalDraft() {
   const queryClient = useQueryClient();
@@ -932,7 +932,7 @@ export function useSaveRenewalDraft() {
   return useMutation({
     mutationFn: async (params: {
       renewalId: string;
-      status?: 'upcoming' | 'quoted';
+      status?: 'upcoming' | 'contacted' | 'quoted';
       policy_number?: string | null;
       renewal_premium?: number | null;
       policy_term?: PolicyTerm | null;

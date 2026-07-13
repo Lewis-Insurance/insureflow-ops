@@ -29,12 +29,13 @@ export function normalizePolicyTerm(term: string | null | undefined): PolicyTerm
 }
 
 /**
- * Map a stored renewal status to a StatusPill vocabulary key. The working/open states
- * (upcoming/in_progress/contacted) all read as "Pending"; everything else passes through
- * to the shared status vocabulary (quoted, moved, lost, cancelled, non_renewed, lapsed).
+ * Map a stored renewal status to a StatusPill vocabulary key. The generic working states
+ * (upcoming/in_progress) read as "Pending"; 'contacted' keeps its own "Contacted" pill so
+ * the worked-but-not-yet-quoted step is visible. Everything else passes through to the shared
+ * status vocabulary (contacted, quoted, moved, lost, cancelled, non_renewed, lapsed).
  */
 export function renewalPillStatus(status: string | null | undefined): string {
-  if (status === 'upcoming' || status === 'in_progress' || status === 'contacted') return 'pending';
+  if (status === 'upcoming' || status === 'in_progress') return 'pending';
   return status || 'pending';
 }
 
