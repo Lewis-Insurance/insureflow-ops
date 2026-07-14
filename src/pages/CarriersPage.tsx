@@ -140,20 +140,47 @@ export default function CarriersPage() {
   });
 
   const deleteCarrierMutation = useMutation({
-    mutationFn: async (carrierId: string) => {
-      const { error } = await supabase
+    mutationFn: async (carrier: Carrier) => {
+      // Check references first (fast, index-backed) so we give instant, clear
+      // feedback instead of a slow foreign-key error. A carrier can't be deleted
+      // while policies or quotes still point at it.
+      const [policyRes, quoteRes] = await Promise.all([
+        supabase.from('policies').select('id').eq('carrier_id', carrier.id).limit(1),
+        supabase.from('quotes').select('id').eq('carrier_id', carrier.id).limit(1),
+      ]);
+      const linkedTo: string[] = [];
+      if ((policyRes.data?.length ?? 0) > 0) linkedTo.push('policies');
+      if ((quoteRes.data?.length ?? 0) > 0) linkedTo.push('quotes');
+      if (linkedTo.length > 0) {
+        throw new Error(`Can't delete ${carrier.name} because it's still linked to existing ${linkedTo.join(' and ')}. Reassign those to another carrier first.`);
+      }
+
+      const { data, error } = await supabase
         .from('carriers')
         .delete()
-        .eq('id', carrierId);
+        .eq('id', carrier.id)
+        .select('id');
       if (error) throw error;
+      // Under RLS, a delete matching no rows succeeds with empty data, so confirm
+      // a row was actually removed.
+      if (!data || data.length === 0) {
+        throw new Error(`Could not delete ${carrier.name}. It may no longer exist, or you may not have permission.`);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['carriers'] });
       setDeletingCarrier(null);
-      toast.success('Carrier deleted successfully');
+      toast.success('Carrier deleted');
     },
-    onError: (error) => {
-      toast.error('Failed to delete carrier: ' + error.message);
+    onError: (error: any) => {
+      // Backstop: a reference in another table/workspace still blocks the delete
+      // at the database level (Postgres 23503 = foreign key violation).
+      if (error?.code === '23503') {
+        toast.error(`Can't delete this carrier because it's still linked to existing policies, quotes, or commissions.`);
+      } else {
+        toast.error(error?.message ?? 'Failed to delete carrier.');
+      }
+      setDeletingCarrier(null);
     }
   });
 
@@ -200,7 +227,7 @@ export default function CarriersPage() {
 
   const confirmDelete = () => {
     if (deletingCarrier) {
-      deleteCarrierMutation.mutate(deletingCarrier.id);
+      deleteCarrierMutation.mutate(deletingCarrier);
     }
   };
 
@@ -267,7 +294,7 @@ export default function CarriersPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>NAIC</TableHead>
                       <TableHead>Agency Code</TableHead>
-                      <TableHead>Underwriting Contact</TableHead>
+                      <TableHead>Underwriting Phone</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -282,15 +309,14 @@ export default function CarriersPage() {
                         <TableCell>{carrier.naic || 'N/A'}</TableCell>
                         <TableCell>{carrier.agency_code || 'N/A'}</TableCell>
                         <TableCell>
-                          <div className="space-y-1 text-sm">
-                            <div className="font-medium">{carrier.underwriting_contact_name || 'N/A'}</div>
-                            {carrier.underwriting_contact_phone && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {formatPhoneForDisplay(carrier.underwriting_contact_phone)}
-                              </div>
-                            )}
-                          </div>
+                          {carrier.underwriting_contact_phone ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                              {formatPhoneForDisplay(carrier.underwriting_contact_phone)}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
