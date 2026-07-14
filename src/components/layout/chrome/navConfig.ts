@@ -57,6 +57,8 @@ export const RAIL_GROUPS: NavGroupDef[] = [
       // COI workflow: certificate generator + the certificate-holder directory.
       { label: 'Generate COI', to: '/certificates', icon: Award },
       { label: 'Additional Insureds', to: '/additional-insureds', icon: Building2 },
+      // Carrier directory: names, NAIC numbers, and contacts (moved out of Admin).
+      { label: 'Carriers', to: '/carriers', icon: Landmark },
       // Payments (formerly the standalone "Accounting" page) + its Day Sheets shortcut.
       { label: 'Payments', to: '/payments', icon: DollarSign },
       { label: 'Day Sheets', to: '/day-sheets', icon: Receipt },
@@ -137,7 +139,6 @@ export const EXTRA_DESTINATIONS: NavDest[] = [
   { label: 'Merge Customers', to: '/merge-customers', icon: GitMerge },
   { label: 'Duplicate review', to: '/duplicates', icon: GitMerge },
   { label: 'Customization', to: '/customization', icon: Sliders },
-  { label: 'Carriers', to: '/carriers', icon: Building2 },
   { label: 'MGAs', to: '/mgas', icon: Briefcase },
   { label: 'ACORD Templates', to: '/acord-templates', icon: ScrollText },
   { label: 'Intake Templates', to: '/intake-templates', icon: ClipboardList },

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -31,7 +30,6 @@ interface Carrier {
   city?: string;
   state?: string;
   zip_code?: string;
-  default_commission_rate?: number;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +48,6 @@ interface CarrierFormData {
   city: string;
   state: string;
   zip_code: string;
-  default_commission_rate: number;
 }
 
 const initialFormData: CarrierFormData = {
@@ -66,8 +63,7 @@ const initialFormData: CarrierFormData = {
   address_line1: '',
   city: '',
   state: '',
-  zip_code: '',
-  default_commission_rate: 0.10
+  zip_code: ''
 };
 
 export default function CarriersPage() {
@@ -175,8 +171,7 @@ export default function CarriersPage() {
       address_line1: carrier.address_line1 || '',
       city: carrier.city || '',
       state: carrier.state || '',
-      zip_code: carrier.zip_code || '',
-      default_commission_rate: carrier.default_commission_rate || 0.10
+      zip_code: carrier.zip_code || ''
     });
     setIsDialogOpen(true);
   };
@@ -213,7 +208,7 @@ export default function CarriersPage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Carrier Management</h2>
             <p className="text-muted-foreground">
-              Manage insurance carriers, commission rates, and contact information
+              Manage insurance carriers, NAIC numbers, and contact information
             </p>
           </div>
           <Button onClick={handleNewCarrier}>
@@ -246,7 +241,6 @@ export default function CarriersPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>NAIC</TableHead>
                       <TableHead>Agency Code</TableHead>
-                      <TableHead>Commission Rate</TableHead>
                       <TableHead>Underwriting Contact</TableHead>
                       <TableHead>Marketing Contact</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -262,11 +256,6 @@ export default function CarriersPage() {
                         <TableCell className="font-medium">{carrier.name}</TableCell>
                         <TableCell>{carrier.naic || 'N/A'}</TableCell>
                         <TableCell>{carrier.agency_code || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {((carrier.default_commission_rate || 0) * 100).toFixed(1)}%
-                          </Badge>
-                        </TableCell>
                         <TableCell>
                           <div className="space-y-1 text-sm">
                             <div className="font-medium">{carrier.underwriting_contact_name || 'N/A'}</div>
@@ -329,27 +318,26 @@ export default function CarriersPage() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Carrier Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Carrier Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
                 <div>
                   <Label htmlFor="naic">NAIC Code</Label>
                   <Input
                     id="naic"
                     value={formData.naic}
                     onChange={(e) => setFormData({ ...formData, naic: e.target.value })}
+                    placeholder="e.g. 25143"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="agency_code">Agency Code</Label>
                   <Input
@@ -357,19 +345,6 @@ export default function CarriersPage() {
                     value={formData.agency_code}
                     onChange={(e) => setFormData({ ...formData, agency_code: e.target.value })}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="default_commission_rate">Default Commission Rate</Label>
-                  <Input
-                    id="default_commission_rate"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="1"
-                    value={formData.default_commission_rate}
-                    onChange={(e) => setFormData({ ...formData, default_commission_rate: parseFloat(e.target.value) || 0 })}
-                  />
-                  <p className="text-sm text-muted-foreground">Enter as decimal (0.10 = 10%)</p>
                 </div>
               </div>
 
