@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/cc';
+import { Skeleton, SectionLabel } from '@/components/cc';
 import { CustomerPickerEmptyState } from '@/components/certificates/CustomerPickerEmptyState';
 import { PolicyLineSelector, type CertLineKey } from '@/components/certificates/PolicyLineSelector';
 import { HolderField } from '@/components/certificates/HolderField';
+import {
+  SelectMultipleHoldersDialog,
+  type SelectableHolder,
+} from '@/components/certificates/SelectMultipleHoldersDialog';
 import { fetchHolderById, composePrintedOperations, type SelectedHolder } from '@/components/certificates/holderUtils';
+import { fillAcordPdf } from '@/lib/acord/pdfFiller';
+import { createZipStore, type ZipEntry } from '@/lib/zipStore';
 import { OperationsAndRemarksFields } from '@/components/certificates/OperationsAndRemarksFields';
 import { ValidationStrip, type ValidationIssue } from '@/components/certificates/ValidationStrip';
 import { ComplianceStrip } from '@/components/certificates/ComplianceStrip';
@@ -305,6 +311,31 @@ function CertificateGenerator({
   const [state, dispatch] = useReducer(reducer, accountId, initialState);
 
   // -----------------------------------------------------------------------
+  // Multi-holder (batch) state. When multiHolders is non-empty the page is in
+  // "batch mode": one shared cert configuration (lines / toggles / operations)
+  // applied to every selected holder, previewed one at a time, downloaded as a
+  // zip of individual PDFs. The single-holder path (state.holder) is untouched.
+  // -----------------------------------------------------------------------
+  const [multiHolders, setMultiHolders] = useState<SelectableHolder[]>([]);
+  const [multiIndex, setMultiIndex] = useState(0);
+  const [multiDialogOpen, setMultiDialogOpen] = useState(false);
+  // Full row (with address block) for the CURRENTLY previewed batch holder.
+  const [currentMultiHolder, setCurrentMultiHolder] = useState<SelectedHolder | null>(null);
+  const [zipping, setZipping] = useState(false);
+  const [zipDone, setZipDone] = useState(0);
+  // Address-block cache so cycling / zipping never re-fetches the same holder.
+  const holderCacheRef = useRef<Map<string, SelectedHolder>>(new Map());
+
+  const isMulti = multiHolders.length > 0;
+
+  // The holder whose endorsements seed the shared per-line toggles. In batch mode
+  // this is FIXED to the first selected holder, so cycling the preview never
+  // re-seeds (and so blanket endorsements, which apply to everyone, are honored).
+  const resolutionHolderId = isMulti ? multiHolders[0]?.id ?? null : state.holder?.id ?? null;
+  // The holder rendered in the preview and used for a single-cert build.
+  const effectiveHolder = isMulti ? currentMultiHolder : state.holder;
+
+  // -----------------------------------------------------------------------
   // Data.
   // -----------------------------------------------------------------------
   const masterCoiQuery = useMasterCoi(accountId);
@@ -413,7 +444,7 @@ function CertificateGenerator({
   );
   const endorsementQuery = useHolderEndorsementStatus({
     accountId,
-    holderId: state.holder?.id ?? null,
+    holderId: resolutionHolderId,
     policyIds,
   });
   const endorsementByLine = endorsementQuery.data;
@@ -421,9 +452,9 @@ function CertificateGenerator({
   // Whenever fresh resolution returns, apply the R3 defaults (ON where endorsed).
   const lastResolutionKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!endorsementByLine || !state.holder) return;
+    if (!endorsementByLine || !resolutionHolderId) return;
     const resolutionKey = JSON.stringify({
-      holder: state.holder.id,
+      holder: resolutionHolderId,
       lines: [...state.selectedLineKeys].sort(),
       map: endorsementByLine,
     });
@@ -439,7 +470,7 @@ function CertificateGenerator({
       };
     }
     dispatch({ type: 'applyEndorsementDefaults', byLine });
-  }, [endorsementByLine, state.holder, state.selectedLineKeys]);
+  }, [endorsementByLine, resolutionHolderId, state.selectedLineKeys]);
 
   // -----------------------------------------------------------------------
   // Holder requirements evaluation (07 §4.4): advisory compliance strip.
@@ -448,7 +479,7 @@ function CertificateGenerator({
   // values and the holder-resolved endorsement rows. Failures never disable
   // Generate; they only surface the strip + the confirm dialog below.
   // -----------------------------------------------------------------------
-  const requirementsQuery = useHolderRequirements(state.holder?.id ?? null);
+  const requirementsQuery = useHolderRequirements(resolutionHolderId);
   const holderRequirements = requirementsQuery.data?.requirements ?? null;
 
   const requirementsEvaluation = useMemo(() => {
@@ -515,39 +546,53 @@ function CertificateGenerator({
   }, [additionalCoverageRows, masterCoi, state.selectedLineKeys]);
 
   // -----------------------------------------------------------------------
-  // The deterministic build (used by preview AND to validate before issue).
+  // The deterministic build (used by preview, validation, AND the batch zip).
+  // buildForHolder swaps ONLY the holder name/address; every other field (lines,
+  // toggles, resolution, operations) is shared, so the printed Y/N boxes are
+  // identical across a batch ("apply to all at once").
   // -----------------------------------------------------------------------
+  const buildForHolder = useCallback(
+    (holderArg: SelectedHolder | null): BuildAcord25Result | null => {
+      if (!masterCoi || state.selectedLineKeys.length === 0) return null;
+
+      const holder = holderArg
+        ? {
+            name: holderArg.name,
+            addressLines: holderArg.addressBlock.split('\n').filter((l) => l.length > 0),
+          }
+        : null;
+
+      // The authorized representative is the agency's signer (Brian Lewis), not the
+      // producer contact. Fixed default for this single-agency deployment; must
+      // match the server (generate-certificate) verbatim or issuance 409s on the
+      // preview-hash bind.
+      const authorizedRepName = 'Brian Lewis';
+
+      const input = toAcord25BuildInput({
+        masterCoi,
+        selectedLines: state.selectedLineKeys,
+        holder,
+        holderResolution: toResolutionArray(endorsementByLine),
+        printIntents: state.perLine,
+        descriptionOfOperations: state.descriptionOfOperations,
+        remarks: state.remarks,
+        additionalCoverages,
+        certificateDate: todayIso(),
+        certificateNumber: null,
+        authorizedRepName,
+      });
+      return buildAcord25FieldValues(input);
+    },
+    [masterCoi, state.selectedLineKeys, state.perLine, state.descriptionOfOperations, state.remarks, endorsementByLine, additionalCoverages],
+  );
+
+  // Preview build for the ACTIVE holder (single, or the currently-cycled batch
+  // holder). Waits for the batch holder's address to load rather than flashing a
+  // holder-less cert.
   const buildResult = useCallback((): BuildAcord25Result | null => {
-    if (!masterCoi || state.selectedLineKeys.length === 0) return null;
-
-    const holder = state.holder
-      ? {
-          name: state.holder.name,
-          addressLines: state.holder.addressBlock.split('\n').filter((l) => l.length > 0),
-        }
-      : null;
-
-    // The authorized representative is the agency's signer (Brian Lewis), not the
-    // producer contact. Fixed default for this single-agency deployment; must
-    // match the server (generate-certificate) verbatim or issuance 409s on the
-    // preview-hash bind.
-    const authorizedRepName = 'Brian Lewis';
-
-    const input = toAcord25BuildInput({
-      masterCoi,
-      selectedLines: state.selectedLineKeys,
-      holder,
-      holderResolution: toResolutionArray(endorsementByLine),
-      printIntents: state.perLine,
-      descriptionOfOperations: state.descriptionOfOperations,
-      remarks: state.remarks,
-      additionalCoverages,
-      certificateDate: todayIso(),
-      certificateNumber: null,
-      authorizedRepName,
-    });
-    return buildAcord25FieldValues(input);
-  }, [masterCoi, state.selectedLineKeys, state.holder, state.perLine, state.descriptionOfOperations, state.remarks, endorsementByLine, additionalCoverages]);
+    if (isMulti && !effectiveHolder) return null;
+    return buildForHolder(effectiveHolder);
+  }, [buildForHolder, effectiveHolder, isMulti]);
 
   const preview = useCertificatePreview({
     templateBytes,
@@ -555,7 +600,7 @@ function CertificateGenerator({
     deps: [
       masterCoi,
       state.selectedLineKeys,
-      state.holder?.id,
+      effectiveHolder?.id,
       state.perLine,
       state.descriptionOfOperations,
       state.remarks,
@@ -585,7 +630,8 @@ function CertificateGenerator({
     if (state.selectedLineKeys.length === 0) {
       issues.push({ code: 'NO_LINES_SELECTED', severity: 'error', message: 'Select at least one coverage line.' });
     }
-    if (!state.holder) {
+    const holderPresent = isMulti ? multiHolders.length > 0 : !!state.holder;
+    if (!holderPresent) {
       issues.push({ code: 'HOLDER_MISSING', severity: 'error', message: 'Add a certificate holder.' });
     }
 
@@ -618,7 +664,7 @@ function CertificateGenerator({
     }
 
     return issues;
-  }, [state.selectedLineKeys, state.holder, masterCoi, buildResult, templateInfo]);
+  }, [state.selectedLineKeys, state.holder, isMulti, multiHolders.length, masterCoi, buildResult, templateInfo]);
 
   const hasErrors = validationIssues.some((i) => i.severity === 'error');
 
@@ -629,6 +675,118 @@ function CertificateGenerator({
     const who = safeFilePart(state.holder?.name ?? accountName ?? 'certificate');
     downloadPdfBlob(preview.blobUrl, `ACORD 25 - ${who} - ${todayIso()}.pdf`);
   }, [preview.blobUrl, state.holder, accountName]);
+
+  // -----------------------------------------------------------------------
+  // Batch (multi-holder) helpers.
+  // -----------------------------------------------------------------------
+
+  // Cached fetch of a holder's full row (with the printed address block).
+  const resolveHolderRow = useCallback(async (h: SelectableHolder): Promise<SelectedHolder> => {
+    const cached = holderCacheRef.current.get(h.id);
+    if (cached) return cached;
+    const full = (await fetchHolderById(h.id)) ?? { id: h.id, name: h.name, addressBlock: '' };
+    holderCacheRef.current.set(h.id, full);
+    return full;
+  }, []);
+
+  // Keep the currently-previewed batch holder (with address) loaded as the index
+  // moves. Clearing batch mode drops it back to null.
+  useEffect(() => {
+    if (!isMulti) {
+      setCurrentMultiHolder(null);
+      return;
+    }
+    const cur = multiHolders[multiIndex];
+    if (!cur) return;
+    const cached = holderCacheRef.current.get(cur.id);
+    if (cached) {
+      setCurrentMultiHolder(cached);
+      return;
+    }
+    let active = true;
+    setCurrentMultiHolder(null);
+    void (async () => {
+      const full = await resolveHolderRow(cur);
+      if (active) setCurrentMultiHolder(full);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isMulti, multiIndex, multiHolders, resolveHolderRow]);
+
+  const confirmMultiHolders = useCallback((holders: SelectableHolder[]) => {
+    setMultiHolders(holders);
+    setMultiIndex(0);
+    setMultiDialogOpen(false);
+    // Batch mode owns the holder now; clear any single-holder selection so state is
+    // unambiguous. Toggles re-seed from the first batch holder's endorsements.
+    if (holders.length > 0) dispatch({ type: 'setHolder', holder: null });
+  }, []);
+
+  const clearMulti = useCallback(() => {
+    setMultiHolders([]);
+    setMultiIndex(0);
+    setCurrentMultiHolder(null);
+  }, []);
+
+  const goPrevHolder = useCallback(
+    () => setMultiIndex((i) => (i - 1 + multiHolders.length) % multiHolders.length),
+    [multiHolders.length],
+  );
+  const goNextHolder = useCallback(
+    () => setMultiIndex((i) => (i + 1) % multiHolders.length),
+    [multiHolders.length],
+  );
+
+  // Build every selected holder's cert in the browser, then download a single zip
+  // of individual PDFs. Same fill path as the preview; only the holder differs.
+  const downloadBatch = useCallback(async () => {
+    if (!templateBytes || multiHolders.length === 0) return;
+    setZipping(true);
+    setZipDone(0);
+    try {
+      const entries: ZipEntry[] = [];
+      const usedNames = new Set<string>();
+      for (let i = 0; i < multiHolders.length; i++) {
+        const holder = await resolveHolderRow(multiHolders[i]);
+        const built = buildForHolder(holder);
+        if (built) {
+          const fill = await fillAcordPdf(templateBytes, {
+            fieldValues: built.fieldValues,
+            flatten: true,
+            updateAppearances: true,
+            smallFields: ACORD25_DATE_COLUMN_FIELDS,
+            italicFields: ACORD25_SIGNATURE_FIELDS,
+          });
+          if (fill.pdfBytes) {
+            // Unique, filesystem-safe name per holder (duplicate names get a suffix).
+            const base = `ACORD 25 - ${safeFilePart(holder.name)} - ${todayIso()}`;
+            let name = `${base}.pdf`;
+            let n = 2;
+            while (usedNames.has(name.toLowerCase())) name = `${base} (${n++}).pdf`;
+            usedNames.add(name.toLowerCase());
+            entries.push({ name, data: new Uint8Array(fill.pdfBytes) });
+          }
+        }
+        setZipDone(i + 1);
+        // Yield so the progress count paints between fills.
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      if (entries.length === 0) return;
+      // STORE (no compression): PDFs are already compressed, so this is fast and small.
+      const zipped = createZipStore(entries);
+      const blob = new Blob([zipped], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      downloadPdfBlob(url, `ACORD 25 certificates - ${safeFilePart(accountName ?? 'certificates')} - ${todayIso()}.zip`);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (err) {
+      logger.error('batch certificate zip failed', err);
+    } finally {
+      setZipping(false);
+      setZipDone(0);
+    }
+  }, [templateBytes, multiHolders, resolveHolderRow, buildForHolder, accountName]);
 
   // Refresh the preview by re-reading the underlying data (Master COI +
   // endorsements); the debounced preview effect rebuilds from the fresh data.
@@ -686,7 +844,7 @@ function CertificateGenerator({
                   selectedLineKeys={state.selectedLineKeys}
                   perLine={state.perLine}
                   endorsementByLine={endorsementByLine}
-                  holderChosen={!!state.holder}
+                  holderChosen={!!resolutionHolderId}
                   onToggleLine={(lineKey, checked) => dispatch({ type: 'toggleLine', lineKey, checked })}
                   onTogglePerLine={(lineKey, key, value) =>
                     dispatch({ type: 'setPerLine', lineKey, key, value })
@@ -694,10 +852,62 @@ function CertificateGenerator({
                   accountId={accountId}
                 />
 
-                <HolderField
-                  value={state.holder}
-                  onChange={(holder) => dispatch({ type: 'setHolder', holder })}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <SectionLabel>Certificate holder</SectionLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMultiDialogOpen(true)}
+                      className="gap-1.5 border-cc-accent/40 bg-cc-accent/10 font-medium text-cc-accent hover:bg-cc-accent/20 hover:text-cc-accent"
+                    >
+                      <Users className="h-4 w-4" aria-hidden="true" />
+                      Select multiple
+                    </Button>
+                  </div>
+
+                  {isMulti ? (
+                    <div className="rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-cc-text-primary">
+                            <span className="[font-variant-numeric:tabular-nums]">
+                              {multiHolders.length}
+                            </span>{' '}
+                            additional insureds selected
+                          </p>
+                          <p className="mt-0.5 text-xs text-cc-text-muted">
+                            Each downloads as its own PDF in a single zip. Use Prev / Next by the
+                            preview to review each cert.
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-cc-text-muted hover:text-cc-text-primary"
+                          aria-label="Clear multiple selection"
+                          onClick={clearMulti}
+                        >
+                          <X className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMultiDialogOpen(true)}
+                        className="mt-2 text-xs text-cc-text-muted underline-offset-2 hover:text-cc-text-secondary hover:underline"
+                      >
+                        Edit selection
+                      </button>
+                    </div>
+                  ) : (
+                    <HolderField
+                      hideLabel
+                      value={state.holder}
+                      onChange={(holder) => dispatch({ type: 'setHolder', holder })}
+                    />
+                  )}
+                </div>
 
                 <OperationsAndRemarksFields
                   descriptionOfOperations={state.descriptionOfOperations}
@@ -711,15 +921,39 @@ function CertificateGenerator({
                 <ComplianceStrip evaluation={requirementsEvaluation} />
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    data-primary
-                    onClick={downloadCertificate}
-                    disabled={hasErrors || preview.building || !preview.blobUrl || !preview.previewSha256}
-                    aria-describedby={hasErrors ? 'cert-validation' : undefined}
-                    className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
-                  >
-                    Download certificate
-                  </Button>
+                  {isMulti ? (
+                    <Button
+                      data-primary
+                      onClick={downloadBatch}
+                      disabled={hasErrors || preview.building || zipping || !templateBytes}
+                      aria-describedby={hasErrors ? 'cert-validation' : undefined}
+                      className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+                    >
+                      {zipping ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          <span className="[font-variant-numeric:tabular-nums]">
+                            Generating {zipDone} of {multiHolders.length}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="[font-variant-numeric:tabular-nums]">
+                          Download {multiHolders.length}{' '}
+                          {multiHolders.length === 1 ? 'certificate' : 'certificates'}
+                        </span>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      data-primary
+                      onClick={downloadCertificate}
+                      disabled={hasErrors || preview.building || !preview.blobUrl || !preview.previewSha256}
+                      aria-describedby={hasErrors ? 'cert-validation' : undefined}
+                      className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
+                    >
+                      Download certificate
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     onClick={refreshPreview}
@@ -730,16 +964,58 @@ function CertificateGenerator({
                 </div>
               </div>
 
-              <CertificatePreview
-                blobUrl={preview.blobUrl}
-                building={preview.building}
-                error={preview.error}
-                hasLines={state.selectedLineKeys.length > 0}
-                hasTemplate={hasTemplate}
-              />
+              <div className="space-y-3">
+                {isMulti && (
+                  <div className="flex items-center justify-between gap-3 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised px-3 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={goPrevHolder}
+                      disabled={multiHolders.length < 2}
+                      className="gap-1 text-cc-text-secondary hover:text-cc-text-primary"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                      Prev
+                    </Button>
+                    <div className="min-w-0 text-center">
+                      <p className="[font-variant-numeric:tabular-nums] text-xs text-cc-text-muted">
+                        Certificate {multiIndex + 1} of {multiHolders.length}
+                      </p>
+                      <p className="truncate text-sm font-medium text-cc-text-primary">
+                        {currentMultiHolder?.name ?? multiHolders[multiIndex]?.name ?? ''}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={goNextHolder}
+                      disabled={multiHolders.length < 2}
+                      className="gap-1 text-cc-text-secondary hover:text-cc-text-primary"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                )}
+
+                <CertificatePreview
+                  blobUrl={preview.blobUrl}
+                  building={preview.building}
+                  error={preview.error}
+                  hasLines={state.selectedLineKeys.length > 0}
+                  hasTemplate={hasTemplate}
+                />
+              </div>
             </div>
           </>
         )}
+
+        <SelectMultipleHoldersDialog
+          open={multiDialogOpen}
+          onOpenChange={setMultiDialogOpen}
+          initialSelectedIds={multiHolders.map((h) => h.id)}
+          onConfirm={confirmMultiHolders}
+        />
       </div>
     </AppLayout>
   );
