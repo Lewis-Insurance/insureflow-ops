@@ -21,7 +21,10 @@ import { Label } from '@/components/ui/label';
 import { AccentSpine, Chip, SectionLabel, StatusPill } from '@/components/cc';
 import { lineLabel } from '@/components/master-coi/lineDisplay';
 import type { MasterCOI, COILineKey, COILineBase } from '@/types/master-coi';
-import type { HolderEndorsementStatusMap } from '@/hooks/useHolderEndorsementStatus';
+import type {
+  HolderEndorsementStatusMap,
+  HolderEndorsementLineStatus,
+} from '@/hooks/useHolderEndorsementStatus';
 
 /** The five ACORD certificate lines, in form order. */
 export type CertLineKey = Exclude<COILineKey, 'other'>;
@@ -231,9 +234,7 @@ function LineEndorsementToggles({
 }: {
   lineKey: CertLineKey;
   perLine: PerLineIntent | undefined;
-  status:
-    | { addl_insd_resolved: string; subr_wvd_resolved: string; basis: string }
-    | undefined;
+  status: HolderEndorsementLineStatus | undefined;
   holderChosen: boolean;
   accountId: string;
   onTogglePerLine: (lineKey: CertLineKey, key: 'addlInsd' | 'subrWvd', value: boolean) => void;
@@ -247,7 +248,7 @@ function LineEndorsementToggles({
           idBase={`addl-${lineKey}`}
           label="Additional insured (ADDL INSD)"
           resolved={status?.addl_insd_resolved}
-          basis={status?.basis}
+          basis={status?.addl_insd_basis}
           holderChosen={holderChosen}
           accountId={accountId}
           checked={perLine?.addlInsd ?? false}
@@ -258,7 +259,7 @@ function LineEndorsementToggles({
         idBase={`subr-${lineKey}`}
         label="Waiver of subrogation (SUBR WVD)"
         resolved={status?.subr_wvd_resolved}
-        basis={status?.basis}
+        basis={status?.subr_wvd_basis}
         holderChosen={holderChosen}
         accountId={accountId}
         checked={perLine?.subrWvd ?? false}

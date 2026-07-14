@@ -1,22 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Info, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Skeleton, TriageTile } from '@/components/cc';
+import { Skeleton } from '@/components/cc';
 import { CustomerPickerEmptyState } from '@/components/certificates/CustomerPickerEmptyState';
-import { ReissueQueue } from '@/components/certificates/ReissueQueue';
-import { useCertificatesNeedingReissue } from '@/hooks/useCertificatesNeedingReissue';
 import { PolicyLineSelector, type CertLineKey } from '@/components/certificates/PolicyLineSelector';
 import { HolderField } from '@/components/certificates/HolderField';
 import { fetchHolderById, composePrintedOperations, type SelectedHolder } from '@/components/certificates/holderUtils';
@@ -24,13 +13,11 @@ import { OperationsAndRemarksFields } from '@/components/certificates/Operations
 import { ValidationStrip, type ValidationIssue } from '@/components/certificates/ValidationStrip';
 import { ComplianceStrip } from '@/components/certificates/ComplianceStrip';
 import { CertificatePreview } from '@/components/certificates/CertificatePreview';
-import { CertificateIssuanceLog } from '@/components/certificates/CertificateIssuanceLog';
 import { useMasterCoi } from '@/hooks/useMasterCoi';
 import { useHolderEndorsementStatus } from '@/hooks/useHolderEndorsementStatus';
 import { useHolderRequirements } from '@/hooks/useHolderRequirements';
 import { evaluateHolderRequirements } from '@/lib/acord/acord25/requirements';
 import { useCertificatePreview } from '@/hooks/useCertificatePreview';
-import { useIssueCertificate, IssueCertificateError } from '@/hooks/useIssueCertificate';
 import { toAcord25BuildInput } from '@/lib/acord/acord25/fromMasterCoi';
 import { buildAcord25FieldValues } from '@/lib/acord/acord25/buildAcord25FieldValues';
 import { ACORD25_DATE_COLUMN_FIELDS, ACORD25_SIGNATURE_FIELDS } from '@/lib/acord/acord25/fieldMap';
@@ -39,13 +26,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import type { MasterCOI, COILineBase, HolderEndorsementResolution } from '@/types/master-coi';
 import type { Acord25TemplateInfo, BuildAcord25Result } from '@/lib/acord/acord25/types';
-import type {
-  CertificateListItem,
-  CertificateRecord,
-  CertificateSnapshot,
-  GenerateCertificateRequest,
-  GenerateCertificateRequestLine,
-} from '@/types/certificates';
 import type { HolderEndorsementStatusMap } from '@/hooks/useHolderEndorsementStatus';
 
 /**
@@ -247,12 +227,6 @@ function selectedPolicyIds(masterCoi: MasterCOI | undefined, selected: LineKey[]
   return Array.from(new Set(ids));
 }
 
-/** The insurer letter a line displays, from the authoritative letter map (R7). */
-function displayedLetter(masterCoi: MasterCOI, lineKey: LineKey): GenerateCertificateRequestLine['insurer_letter'] {
-  const ins = masterCoi.insurers.find((i) => i.lines.includes(lineKey));
-  const letter = ins?.letter as GenerateCertificateRequestLine['insurer_letter'] | undefined;
-  return letter ?? 'A';
-}
 
 /** Convert the endorsement-status map to the array shape fromMasterCoi expects. */
 function toResolutionArray(
@@ -268,6 +242,27 @@ function toResolutionArray(
       basis: row.basis,
     };
   });
+}
+
+/** Strip path separators and OS-illegal characters so a name is safe in a filename. */
+function safeFilePart(s: string): string {
+  return s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Download an already-built PDF (the client-side preview blob) to the user's
+ * machine. The Certificates page fills the completed ACORD 25 in the browser for
+ * the live preview; "Download certificate" simply saves that same file. No server
+ * issuance, no stored record: the button's only outcome is the downloaded PDF.
+ */
+function downloadPdfBlob(blobUrl: string, filename: string) {
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 // ---------------------------------------------------------------------------
@@ -303,20 +298,11 @@ function CertificateGenerator({
   accountId: string;
   navigateBack: () => void;
 }) {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectPolicyId = searchParams.get('policyId');
   const preselectHolderId = searchParams.get('holderId');
 
   const [state, dispatch] = useReducer(reducer, accountId, initialState);
-
-  // Which surface this view shows. Exactly ONE lime fill per view (Calm
-  // Command): the generator's lime is "Generate certificate"; the queue's lime
-  // is "Reissue selected". They are never on screen together (07 §3.5).
-  const [view, setView] = useState<'generator' | 'queue'>('generator');
-
-  // Reissue-cascade count for the "Needs reissue: N" triage tile (07 §3.5).
-  const { count: reissueCount } = useCertificatesNeedingReissue(accountId);
 
   // -----------------------------------------------------------------------
   // Data.
@@ -486,11 +472,6 @@ function CertificateGenerator({
     });
   }, [masterCoi, holderRequirements, state.selectedLineKeys, endorsementByLine, state.perLine]);
 
-  const requirementFailures = useMemo(
-    () => requirementsEvaluation.results.filter((r) => r.severity === 'fail' && !r.pass),
-    [requirementsEvaluation],
-  );
-
   // Custom write-in coverages for the selected lines' policies
   // (policy_additional_coverages). Fetched with the same read + created_at order
   // the server uses at issue, then filtered to the printed (line, policy) pairs,
@@ -592,8 +573,6 @@ function CertificateGenerator({
   // -----------------------------------------------------------------------
   // Validation strip issues (blueprint D Section 3.6).
   // -----------------------------------------------------------------------
-  const [serverIssues, setServerIssues] = useState<ValidationIssue[]>([]);
-
   const templateInfo: Acord25TemplateInfo | null = useMemo(() => {
     if (!template) return null;
     return { version: template.version, field_inventory: template.field_inventory };
@@ -638,197 +617,25 @@ function CertificateGenerator({
       }
     }
 
-    // Server 422 issues from the last failed Generate.
-    issues.push(...serverIssues);
-
     return issues;
-  }, [state.selectedLineKeys, state.holder, masterCoi, buildResult, templateInfo, serverIssues]);
+  }, [state.selectedLineKeys, state.holder, masterCoi, buildResult, templateInfo]);
 
   const hasErrors = validationIssues.some((i) => i.severity === 'error');
 
-  // -----------------------------------------------------------------------
-  // Generate flow (blueprint D Section 7).
-  // -----------------------------------------------------------------------
-  const issueMutation = useIssueCertificate();
-  const [reissueBanner, setReissueBanner] = useState<string | null>(null);
-  const [rePreviewBanner, setRePreviewBanner] = useState(false);
-  const [staleConfirmOpen, setStaleConfirmOpen] = useState(false);
-  const [requirementsConfirmOpen, setRequirementsConfirmOpen] = useState(false);
+  // The button's ONLY job: download the completed ACORD 25 the preview already
+  // built in the browser. No server issuance, no stored certificate record.
+  const downloadCertificate = useCallback(() => {
+    if (!preview.blobUrl) return;
+    const who = safeFilePart(state.holder?.name ?? accountName ?? 'certificate');
+    downloadPdfBlob(preview.blobUrl, `ACORD 25 - ${who} - ${todayIso()}.pdf`);
+  }, [preview.blobUrl, state.holder, accountName]);
 
+  // Refresh the preview by re-reading the underlying data (Master COI +
+  // endorsements); the debounced preview effect rebuilds from the fresh data.
   const refreshPreview = useCallback(() => {
-    setRePreviewBanner(false);
     masterCoiQuery.refetch();
     endorsementQuery.refetch();
   }, [masterCoiQuery, endorsementQuery]);
-
-  const doIssue = useCallback(async (requirementsOverridden = false) => {
-    if (!masterCoi || !state.holder || !preview.previewSha256) return;
-
-    const lines: GenerateCertificateRequestLine[] = state.selectedLineKeys.map((lineKey) => {
-      const line = masterCoi.lines[lineKey] as COILineBase;
-      const perLine = state.perLine[lineKey] ?? { addlInsd: false, subrWvd: false };
-      return {
-        policy_id: line.policy_id ?? '',
-        line_key: lineKey,
-        insurer_letter: displayedLetter(masterCoi, lineKey),
-        per_line: { addl_insd: perLine.addlInsd, subr_wvd: perLine.subrWvd },
-      };
-    });
-
-    const body: GenerateCertificateRequest = {
-      account_id: accountId,
-      holder_id: state.holder.id,
-      lines,
-      description_of_operations: state.descriptionOfOperations,
-      remarks: state.remarks || undefined,
-      preview_sha256: preview.previewSha256,
-      supersedes_certificate_id: state.supersedesCertificateId ?? undefined,
-      // 07 §4.4: advisory acknowledgment. The server re-runs the same evaluation
-      // and only records the override on its own (also-failing) result.
-      requirements_overridden: requirementsOverridden || undefined,
-    };
-
-    setServerIssues([]);
-    try {
-      const result = await issueMutation.mutateAsync(body);
-      toast.success('Certificate issued');
-      setReissueBanner(null);
-      setRePreviewBanner(false);
-      // Scroll to the log where the new row renders first.
-      document.getElementById('issuance-log')?.scrollIntoView({ behavior: 'smooth' });
-      // Download the fresh PDF from the returned signed URL.
-      if (result.signed_url) {
-        window.open(result.signed_url, '_blank', 'noopener,noreferrer');
-      }
-      if (result.warnings && result.warnings.length > 0) {
-        toast.warning(result.warnings.join(' '));
-      }
-    } catch (err) {
-      if (err instanceof IssueCertificateError) {
-        if (err.status === 422) {
-          setServerIssues(
-            err.issues.map((i) => ({
-              code: i.code,
-              severity: i.severity,
-              message: i.message,
-              lineKey: i.lineKey,
-            })),
-          );
-          toast.error(`Certificate not issued: ${err.issues.length} issues`);
-          return;
-        }
-        if (err.status === 409) {
-          setRePreviewBanner(true);
-          refreshPreview();
-          return;
-        }
-      }
-      toast.error('Certificate generation failed. Please try again.');
-    }
-  }, [
-    masterCoi,
-    state.holder,
-    state.selectedLineKeys,
-    state.perLine,
-    state.descriptionOfOperations,
-    state.remarks,
-    state.supersedesCertificateId,
-    preview.previewSha256,
-    accountId,
-    issueMutation,
-    refreshPreview,
-  ]);
-
-  // After any stale-review acknowledgment: if the holder's requirements fail,
-  // stop for the explicit override dialog (07 §4.4); otherwise issue normally.
-  const proceedToIssue = useCallback(() => {
-    if (requirementFailures.length > 0) {
-      setRequirementsConfirmOpen(true);
-      return;
-    }
-    void doIssue(false);
-  }, [requirementFailures.length, doIssue]);
-
-  const onGenerateClick = useCallback(() => {
-    if (masterCoi?.review?.stale) {
-      setStaleConfirmOpen(true);
-      return;
-    }
-    proceedToIssue();
-  }, [masterCoi, proceedToIssue]);
-
-  // -----------------------------------------------------------------------
-  // Reissue hydration (blueprint D Section 9).
-  // -----------------------------------------------------------------------
-  const prefillFromSnapshot = useCallback(
-    async (certificate: CertificateListItem) => {
-      // The list row carries no snapshot; fetch the full certificates row by id.
-      const { data, error } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('certificates' as any)
-        .select('*')
-        .eq('id', certificate.id)
-        .maybeSingle();
-      if (error || !data) {
-        toast.error('Could not load the certificate to reissue.');
-        return;
-      }
-      const record = data as unknown as CertificateRecord;
-      const snapshot: CertificateSnapshot = record.snapshot;
-
-      const selected = snapshot.lines.map((l) => l.line_key).filter((k): k is LineKey =>
-        CERT_LINES.includes(k as LineKey),
-      );
-      // Seed every hydrated line OFF (matching the setHolder/toggleLine invariant),
-      // NOT from the snapshot's printed Y/N. The endorsement-defaults effect below
-      // re-enables ON only where the CURRENT resolution is 'endorsed', so an
-      // endorsement demoted since issue can never re-print a stale Y. Seeding from
-      // the snapshot risked a stale Y surviving when resolution is unavailable
-      // (policy since deleted, or the endorsement query errors/stays pending).
-      const perLine: Partial<Record<LineKey, PerLineIntent>> = {};
-      for (const l of snapshot.lines) {
-        if (!CERT_LINES.includes(l.line_key as LineKey)) continue;
-        perLine[l.line_key as LineKey] = { addlInsd: false, subrWvd: false };
-      }
-      const holderAddress = [
-        snapshot.holder.address.line1,
-        [snapshot.holder.address.city, snapshot.holder.address.state]
-          .filter(Boolean)
-          .join(', ') + (snapshot.holder.address.zip ? ` ${snapshot.holder.address.zip}` : ''),
-      ]
-        .filter((l) => l && l.trim().length > 0)
-        .join('\n');
-
-      dispatch({
-        type: 'hydrateFromSnapshot',
-        state: {
-          selectedLineKeys: selected,
-          perLine,
-          holder: {
-            id: snapshot.holder.additional_insured_id,
-            name: snapshot.holder.name,
-            addressBlock: holderAddress,
-          },
-          // Remarks were merged into the description field; fold a superseded
-          // cert's separate remarks onto the back of its description so the
-          // reissued cert prints the same block.
-          descriptionOfOperations: composePrintedOperations(
-            snapshot.description_of_operations,
-            snapshot.remarks ?? '',
-          ),
-          remarks: '',
-          supersedesCertificateId: certificate.id,
-        },
-      });
-      setReissueBanner(certificate.certificate_number);
-      // Force the endorsement-defaults effect to re-run against the CURRENT holder
-      // resolution: it turns the OFF-seeded lines back ON only where still endorsed,
-      // so a lapsed endorsement prints N by construction rather than a stale Y.
-      lastResolutionKeyRef.current = null;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-    [],
-  );
 
   // -----------------------------------------------------------------------
   // Render.
@@ -861,11 +668,7 @@ function CertificateGenerator({
           </p>
         </header>
 
-        {view === 'queue' ? (
-          // Queue view: the single lime here is the queue's "Reissue selected".
-          // The generator (and its lime) is hidden; a ghost returns to it.
-          <ReissueQueue accountId={accountId} onDone={() => setView('generator')} />
-        ) : loadingCore || !masterCoi ? (
+        {loadingCore || !masterCoi ? (
           <div className="grid gap-6 lg:grid-cols-[minmax(400px,520px)_1fr]">
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -876,32 +679,8 @@ function CertificateGenerator({
           </div>
         ) : (
           <>
-            {reissueCount > 0 && (
-              <div className="flex flex-wrap items-start gap-3">
-                <TriageTile
-                  label="Needs reissue"
-                  count={reissueCount}
-                  tone="warning"
-                  onClick={() => setView('queue')}
-                />
-              </div>
-            )}
-
             <div className="grid gap-6 lg:grid-cols-[minmax(400px,520px)_1fr]">
               <div className="space-y-5">
-                {reissueBanner && (
-                  <div className="flex items-start gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3 text-sm text-cc-text-secondary">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-cc-text-muted" aria-hidden="true" />
-                    <span>
-                      Reissuing certificate{' '}
-                      <span className="[font-variant-numeric:tabular-nums] font-medium text-cc-text-primary">
-                        {reissueBanner}
-                      </span>
-                      . Generating will mark the original as superseded.
-                    </span>
-                  </div>
-                )}
-
                 <PolicyLineSelector
                   masterCoi={masterCoi}
                   selectedLineKeys={state.selectedLineKeys}
@@ -931,25 +710,15 @@ function CertificateGenerator({
 
                 <ComplianceStrip evaluation={requirementsEvaluation} />
 
-                {rePreviewBanner && (
-                  <div className="flex items-start gap-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3 text-sm text-cc-text-secondary">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-cc-info" aria-hidden="true" />
-                    <span>
-                      The data behind this certificate changed since your preview. The preview has
-                      been refreshed; review it and generate again.
-                    </span>
-                  </div>
-                )}
-
                 <div className="flex items-center gap-2">
                   <Button
                     data-primary
-                    onClick={onGenerateClick}
-                    disabled={hasErrors || preview.building || issueMutation.isPending || !preview.previewSha256 || (state.holder != null && requirementsQuery.data === undefined && !requirementsQuery.isError)}
+                    onClick={downloadCertificate}
+                    disabled={hasErrors || preview.building || !preview.blobUrl || !preview.previewSha256}
                     aria-describedby={hasErrors ? 'cert-validation' : undefined}
                     className="font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
                   >
-                    {issueMutation.isPending ? 'Generating' : 'Generate certificate'}
+                    Download certificate
                   </Button>
                   <Button
                     variant="ghost"
@@ -969,100 +738,9 @@ function CertificateGenerator({
                 hasTemplate={hasTemplate}
               />
             </div>
-
-            <section id="issuance-log" className="scroll-mt-20 space-y-3">
-              <h2 className="text-lg font-semibold text-cc-text-primary">Issued certificates</h2>
-              <CertificateIssuanceLog
-                accountId={accountId}
-                variant="full"
-                onReissue={(cert) => void prefillFromSnapshot(cert)}
-              />
-            </section>
           </>
         )}
       </div>
-
-      {/* Review-staleness acknowledgment (not a block). */}
-      <Dialog open={staleConfirmOpen} onOpenChange={setStaleConfirmOpen}>
-        <DialogContent className="bg-cc-surface-raised">
-          <DialogHeader>
-            <DialogTitle className="text-cc-text-primary">Policy data changed</DialogTitle>
-            <DialogDescription className="text-cc-text-muted">
-              Policy data changed since the last Master COI review. Generate anyway?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setStaleConfirmOpen(false);
-                navigate(`/customers/${accountId}?tab=master-coi`);
-              }}
-              className="text-cc-text-secondary hover:text-cc-text-primary"
-            >
-              Review first
-            </Button>
-            <Button
-              onClick={() => {
-                setStaleConfirmOpen(false);
-                proceedToIssue();
-              }}
-              disabled={!preview.previewSha256 || preview.building || (state.holder != null && requirementsQuery.data === undefined && !requirementsQuery.isError)}
-              className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
-            >
-              Generate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Holder requirements override (07 §4.4): advisory, never a block. */}
-      <Dialog open={requirementsConfirmOpen} onOpenChange={setRequirementsConfirmOpen}>
-        <DialogContent className="bg-cc-surface-raised">
-          <DialogHeader>
-            <DialogTitle className="text-cc-text-primary">Holder requirements not met</DialogTitle>
-            <DialogDescription className="text-cc-text-muted">
-              This certificate does not meet every requirement published by the holder. You can
-              still generate it; the override is recorded on the issued certificate.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
-            {requirementFailures.map((failure, i) => (
-              <li
-                key={`${failure.kind}-${failure.line_key ?? ''}-${failure.field ?? i}`}
-                className="flex items-start gap-2 text-sm"
-              >
-                <AlertTriangle
-                  className="mt-0.5 h-4 w-4 shrink-0 text-cc-warning"
-                  aria-hidden="true"
-                />
-                <span className="text-cc-text-secondary [font-variant-numeric:tabular-nums]">
-                  {failure.message}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setRequirementsConfirmOpen(false)}
-              className="text-cc-text-secondary hover:text-cc-text-primary"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setRequirementsConfirmOpen(false);
-                void doIssue(true);
-              }}
-              disabled={!preview.previewSha256 || preview.building}
-              className="border border-cc-border-interactive bg-cc-surface text-cc-text-primary hover:bg-cc-surface-overlay"
-            >
-              Generate anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }
