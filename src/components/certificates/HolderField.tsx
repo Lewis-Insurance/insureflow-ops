@@ -27,9 +27,11 @@ import { composeAddressBlock, fetchHolderById, type SelectedHolder } from './hol
 interface HolderFieldProps {
   value: SelectedHolder | null;
   onChange: (holder: SelectedHolder | null) => void;
+  /** Suppress the built-in "Certificate holder" label when the caller renders its own header. */
+  hideLabel?: boolean;
 }
 
-export function HolderField({ value, onChange }: HolderFieldProps) {
+export function HolderField({ value, onChange, hideLabel = false }: HolderFieldProps) {
   const { results, loading, search, clear } = useAdditionalInsuredSearch();
   const [query, setQuery] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -71,7 +73,7 @@ export function HolderField({ value, onChange }: HolderFieldProps) {
   if (value) {
     return (
       <div className="space-y-2">
-        <SectionLabel>Certificate holder</SectionLabel>
+        {!hideLabel && <SectionLabel>Certificate holder</SectionLabel>}
         <div className="rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
