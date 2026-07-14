@@ -26,11 +26,15 @@ import type {
   COILineKey,
 } from '@/types/master-coi';
 
-/** The per-line resolved state, keyed by canonical line key. Basis is the human string. */
+/** The per-line resolved state, keyed by canonical line key. */
 export interface HolderEndorsementLineStatus {
   addl_insd_resolved: COIHolderEndorsementResolved;
   subr_wvd_resolved: COIHolderEndorsementResolved;
-  /** e.g. 'blanket CG 20 10' or 'scheduled: matched by directory id'. */
+  /** Human basis for the ADDL INSD box, e.g. 'blanket CG 20 33'. Empty when none. */
+  addl_insd_basis: string;
+  /** Human basis for the SUBR WVD box, e.g. 'scheduled CG 20 10'. Empty when none. */
+  subr_wvd_basis: string;
+  /** Combined human basis (both boxes), used for holder endorsement-form matching. */
   basis: string;
 }
 
@@ -48,18 +52,42 @@ interface ResolveHolderEndorsementsRow {
 }
 
 /**
- * Coerce the RPC's `basis` (jsonb; string or object per 02 Section 4.7.3) into a
- * single human string for the inline toggle copy. Objects are stringified so the
- * caller always gets a printable value.
+ * Turn ONE basis entry (the `addl_insd` or `subr_wvd` sub-object the RPC returns)
+ * into a short human phrase for the inline toggle copy, e.g. 'blanket CG 20 33' or
+ * 'scheduled CG 20 10'. The endorsement form number is preserved so the holder
+ * requirements form-match in requirements.ts still works. Returns '' for kinds
+ * that carry no printable basis ('none', unresolved, follow_underlying_no_underlying).
  */
-function basisToString(basis: unknown): string {
-  if (typeof basis === 'string') return basis;
-  if (basis == null) return '';
-  try {
-    return JSON.stringify(basis);
-  } catch {
-    return '';
+function humanizeBasisEntry(entry: unknown): string {
+  if (!entry || typeof entry !== 'object') return '';
+  const o = entry as Record<string, unknown>;
+  const kind = typeof o.kind === 'string' ? o.kind : '';
+  const form = typeof o.endorsement_form === 'string' ? o.endorsement_form.trim() : '';
+  switch (kind) {
+    case 'blanket':
+      return form ? `blanket ${form}` : 'blanket endorsement';
+    case 'holder_match':
+      return form ? `scheduled ${form}` : 'scheduled endorsement';
+    case 'follow_underlying':
+      return 'follows underlying GL';
+    default:
+      return '';
   }
+}
+
+/**
+ * The RPC's `basis` jsonb is `{ addl_insd: {...}, subr_wvd: {...} }` (02 Section
+ * 4.7.3). Split it into the two per-box human phrases the toggles show. Older
+ * string-shaped bases (defensive) apply to both boxes.
+ */
+function splitBasis(basis: unknown): { addl: string; subr: string } {
+  if (typeof basis === 'string') return { addl: basis, subr: basis };
+  if (!basis || typeof basis !== 'object') return { addl: '', subr: '' };
+  const o = basis as Record<string, unknown>;
+  return {
+    addl: humanizeBasisEntry(o.addl_insd),
+    subr: humanizeBasisEntry(o.subr_wvd),
+  };
 }
 
 export function useHolderEndorsementStatus(args: {
@@ -85,10 +113,14 @@ export function useHolderEndorsementStatus(args: {
       const rows = (data || []) as unknown as ResolveHolderEndorsementsRow[];
       const map: HolderEndorsementStatusMap = {};
       for (const row of rows) {
+        const { addl, subr } = splitBasis(row.basis);
         map[row.line_key] = {
           addl_insd_resolved: row.addl_insd_resolved,
           subr_wvd_resolved: row.subr_wvd_resolved,
-          basis: basisToString(row.basis),
+          addl_insd_basis: addl,
+          subr_wvd_basis: subr,
+          // Both phrases (dedup identical) for endorsement-form matching downstream.
+          basis: Array.from(new Set([addl, subr].filter(Boolean))).join('; '),
         };
       }
       return map;
