@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Pencil, Plus, Building2, Trash2, Mail, Phone } from 'lucide-react';
+import { Pencil, Plus, Building2, Trash2, Mail, Phone, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Carrier {
@@ -74,6 +74,7 @@ export default function CarriersPage() {
   const [formData, setFormData] = useState<CarrierFormData>(initialFormData);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deletingCarrier, setDeletingCarrier] = useState<Carrier | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
 
   const { data: carriers, isLoading } = useQuery({
@@ -178,10 +179,12 @@ export default function CarriersPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Trim the name so stray leading/trailing whitespace never breaks sorting.
+    const payload = { ...formData, name: formData.name.trim() };
     if (editingCarrier) {
-      updateCarrierMutation.mutate({ id: editingCarrier.id, updates: formData });
+      updateCarrierMutation.mutate({ id: editingCarrier.id, updates: payload });
     } else {
-      createCarrierMutation.mutate(formData);
+      createCarrierMutation.mutate(payload);
     }
   };
 
@@ -200,6 +203,18 @@ export default function CarriersPage() {
       deleteCarrierMutation.mutate(deletingCarrier.id);
     }
   };
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredCarriers = (carriers ?? [])
+    .filter((carrier) => {
+      if (!normalizedQuery) return true;
+      return [carrier.name, carrier.naic, carrier.agency_code, carrier.underwriting_contact_name]
+        .some((value) => (value ?? '').toLowerCase().includes(normalizedQuery));
+    })
+    // Sort by name, ignoring case and any stray edge whitespace.
+    .sort((a, b) =>
+      (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), undefined, { sensitivity: 'base' })
+    );
 
   return (
     <AppLayout>
@@ -228,13 +243,24 @@ export default function CarriersPage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Insurance Carriers ({carriers?.length || 0})
-              </CardTitle>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Insurance Carriers ({filteredCarriers.length})
+                </CardTitle>
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search carriers..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {carriers && carriers.length > 0 ? (
+              {filteredCarriers.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -242,12 +268,11 @@ export default function CarriersPage() {
                       <TableHead>NAIC</TableHead>
                       <TableHead>Agency Code</TableHead>
                       <TableHead>Underwriting Contact</TableHead>
-                      <TableHead>Marketing Contact</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {carriers.map((carrier) => (
+                    {filteredCarriers.map((carrier) => (
                       <TableRow 
                         key={carrier.id}
                         id={`carrier-${carrier.id}`}
@@ -263,17 +288,6 @@ export default function CarriersPage() {
                               <div className="flex items-center gap-1 text-muted-foreground">
                                 <Phone className="h-3 w-3" />
                                 {formatPhoneForDisplay(carrier.underwriting_contact_phone)}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1 text-sm">
-                            <div className="font-medium">{carrier.marketing_contact_name || 'N/A'}</div>
-                            {carrier.marketing_contact_phone && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {formatPhoneForDisplay(carrier.marketing_contact_phone)}
                               </div>
                             )}
                           </div>
@@ -303,7 +317,9 @@ export default function CarriersPage() {
                 </Table>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  No carriers found. Click "Add Carrier" to get started.
+                  {normalizedQuery
+                    ? 'No carriers match your search.'
+                    : 'No carriers found. Click "Add Carrier" to get started.'}
                 </div>
               )}
             </CardContent>
