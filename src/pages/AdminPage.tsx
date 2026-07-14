@@ -5,7 +5,6 @@ import { Building2, Users, Shield, FileText } from 'lucide-react';
 // Temporarily comment out potentially problematic imports
 // import { CompanyManagement } from '@/components/admin/CompanyManagement';
 // import { CarrierManagement } from '@/components/admin/CarrierManagement';
-import { CarrierManagementTab } from '@/components/admin/CarrierManagementTab';
 import { MGAManagementTab } from '@/components/admin/MGAManagementTab';
 import { BusinessTypeManagement } from '@/components/admin/BusinessTypeManagement';
 import { LinesOfBusinessManagement } from '@/components/admin/LinesOfBusinessManagement';
@@ -48,7 +47,7 @@ export default function AdminPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Admin Settings</h1>
             <p className="text-muted-foreground">
-              Manage carriers, MGAs, business types, and system configuration
+              Manage MGAs, business types, and system configuration
             </p>
           </div>
         </div>
@@ -65,7 +64,7 @@ export default function AdminPage() {
             </TabsTrigger>
             <TabsTrigger value="contacts" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
-              Contacts
+              MGAs
             </TabsTrigger>
             <TabsTrigger value="policy-types" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -102,18 +101,7 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="contacts" className="space-y-6">
-            <Tabs defaultValue="mgas" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="mgas">MGAs</TabsTrigger>
-                <TabsTrigger value="carriers">Carriers</TabsTrigger>
-              </TabsList>
-              <TabsContent value="mgas">
-                <MGAManagementTab />
-              </TabsContent>
-              <TabsContent value="carriers">
-                <CarrierManagementTab />
-              </TabsContent>
-            </Tabs>
+            <MGAManagementTab />
           </TabsContent>
 
           <TabsContent value="policy-types" className="space-y-6">
