@@ -185,6 +185,14 @@ export function CommandPalette() {
         close();
       },
     });
+    list.push({
+      label: 'Add Policy',
+      icon: FileText,
+      run: () => {
+        navigate('/policies/new');
+        close();
+      },
+    });
     return list;
   }, [active, navigate, close]);
 

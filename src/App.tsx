@@ -26,6 +26,7 @@ const CommercialPipelinePage = lazyWithRetry(() => import("./pages/CommercialPip
 const CustomersPage = lazyWithRetry(() => import("./pages/CustomersPage"));
 const CustomerDetail = lazyWithRetry(() => import("./pages/CustomerDetail"));
 const PoliciesPage = lazyWithRetry(() => import("./pages/PoliciesPage"));
+const AddPolicyPage = lazyWithRetry(() => import("./pages/AddPolicyPage"));
 const RenewalsPage = lazyWithRetry(() => import("./pages/RenewalsPage"));
 const RenewalIntelligencePage = lazyWithRetry(() => import("./pages/RenewalIntelligencePage"));
 const RenewalEditPage = lazyWithRetry(() => import("./pages/RenewalEditPage"));
@@ -363,6 +364,16 @@ const App = () => (
                     <ErrorBoundary level="page" resetOnPropsChange>
                       <RenewalRateWatchPage />
                     </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/policies/new"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <AddPolicyPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
