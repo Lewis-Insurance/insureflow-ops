@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   PanelLeft,
   Search,
@@ -8,11 +8,10 @@ import {
   ChevronRight,
   ArrowRight,
   MoreHorizontal,
+  Plus,
 } from 'lucide-react';
 import { useChrome } from './ChromeContext';
 import { destForPath } from './navConfig';
-import { emitChromeAction, type ChromeActionType } from './chromeActions';
-import { useActiveRecord } from './useActiveRecord';
 import { NotificationCenter } from '@/components/tasks/NotificationCenter';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAIAssistantContext } from '@/contexts/AIAssistantContext';
@@ -361,7 +360,7 @@ function UtilityCluster() {
 /* ------------------------------------------------------------------ */
 
 function ListHeader({ pathname }: { pathname: string }) {
-  const { setPaletteOpen } = useChrome();
+  const navigate = useNavigate();
   const { dest, group } = destForPath(pathname);
   const meta = useMemo(() => listMetaFor(pathname), [pathname]);
   const count = useListCount(meta.countRpc);
@@ -394,22 +393,16 @@ function ListHeader({ pathname }: { pathname: string }) {
 
       <SearchField />
 
-      {/* The single lime primary. It runs the page's matching action via the
-          chrome action bus; if the page is not listening, it opens the palette. */}
+      {/* The single lime primary is a global "Add Policy" shortcut to the unified
+          intake page. Every list/index surface shows the same primary; each page
+          keeps its own in-body button for its own create flow. */}
       <Button
         data-primary
-        onClick={() => {
-          const actionByLabel: Record<string, ChromeActionType> = {
-            'New customer': 'new-customer',
-            'New policy': 'new-policy',
-            'New lead': 'new-lead',
-          };
-          const action = actionByLabel[meta.primaryLabel];
-          if (!action || !emitChromeAction(action)) setPaletteOpen(true);
-        }}
+        onClick={() => navigate('/policies/new')}
         className="shrink-0 gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
       >
-        {meta.primaryLabel}
+        <Plus className="h-4 w-4" />
+        Add Policy
       </Button>
 
       <UtilityCluster />
@@ -419,8 +412,8 @@ function ListHeader({ pathname }: { pathname: string }) {
 
 function RecordHeader({ record }: { record: RecordMatch }) {
   const { setPaletteOpen } = useChrome();
+  const navigate = useNavigate();
   const { recordName, nextStep, loading } = useRecordHeader(record);
-  const active = useActiveRecord();
 
   // Neutral placeholder while loading; once loaded, fall back to a neutral label
   // if the record has no resolvable name.
@@ -469,17 +462,16 @@ function RecordHeader({ record }: { record: RecordMatch }) {
           behavior as the list/index header so it never disappears on a record. */}
       <SearchField />
 
-      {/* The record's single lime primary. Runs "Log contact" on this record via
-          the chrome action bus; falls back to the palette if the page is not listening. */}
+      {/* The single lime primary is the global "Add Policy" shortcut, matching
+          every other surface. Record actions (Log contact, Email, status) live
+          in the page body and the overflow palette. */}
       <Button
         data-primary
-        onClick={() => {
-          const handled = emitChromeAction('log-contact', active ? { entity: active.entity, id: active.id } : {});
-          if (!handled) setPaletteOpen(true);
-        }}
+        onClick={() => navigate('/policies/new')}
         className="shrink-0 gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
       >
-        Log contact
+        <Plus className="h-4 w-4" />
+        Add Policy
       </Button>
 
       {/* Overflow ghost — Email / Text / status change live in the palette. */}
