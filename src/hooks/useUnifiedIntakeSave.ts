@@ -168,6 +168,11 @@ export function useUnifiedIntakeSave() {
   const ctxRef = useRef<Ctx>({ accountId: null, policyId: null, orgId: null, userId: null, insertedDocIds: new Set() });
   const statusRef = useRef(statuses);
   statusRef.current = statuses;
+  // Synchronous re-entrancy guard. `phase` is React state and lags a second
+  // invocation fired in the same tick, which let two runs interleave over these
+  // shared refs: run #2 reset ctxRef mid-flight, so run #1's policy step read an
+  // accountId of null and wrote an orphaned policy. Must be a ref, not state.
+  const runningRef = useRef(false);
 
   const setStep = useCallback((key: IntakeStepKey, status: IntakeStepStatus, error?: string) => {
     setStatuses((prev) => ({ ...prev, [key]: { status, error } }));
@@ -218,7 +223,13 @@ export function useUnifiedIntakeSave() {
     }
 
     if (key === 'policy') {
-      const base = buildPolicyInsert(input.policy, ctx.accountId as string, ctx.userId);
+      // Invariant: never write a policy without its customer. account_id is
+      // nullable, so a null here silently orphans the policy (it renders
+      // nowhere) instead of failing loudly.
+      if (!ctx.accountId) {
+        throw new Error('The customer was not saved before the policy. Nothing was written for this step; retry.');
+      }
+      const base = buildPolicyInsert(input.policy, ctx.accountId, ctx.userId);
       const row: Record<string, unknown> = { ...base };
       if (input.carrier) {
         row.carrier_id = input.carrier.id;
@@ -240,6 +251,9 @@ export function useUnifiedIntakeSave() {
     }
 
     if (key === 'documents') {
+      if (!ctx.accountId || !ctx.policyId) {
+        throw new Error('Missing the saved customer or policy for these documents; retry.');
+      }
       for (const doc of input.documents) {
         if (ctx.insertedDocIds.has(doc.id)) continue; // already inserted on a prior attempt
         const row = {
@@ -264,6 +278,9 @@ export function useUnifiedIntakeSave() {
     }
 
     if (key === 'payment') {
+      if (!ctx.accountId || !ctx.policyId) {
+        throw new Error('Missing the saved customer or policy for this payment; retry.');
+      }
       const p = input.payment!;
       if (!ctx.orgId) {
         const { data: orgId, error: orgErr } = await supabase.rpc('get_user_org_id');
@@ -294,6 +311,9 @@ export function useUnifiedIntakeSave() {
     }
 
     if (key === 'notes') {
+      if (!ctx.accountId) {
+        throw new Error('Missing the saved customer for this note; retry.');
+      }
       const { error } = await supabase.from('customer_notes').insert({
         customer_id: ctx.accountId,
         note_text: input.note.trim(),
@@ -334,41 +354,57 @@ export function useUnifiedIntakeSave() {
 
   const run = useCallback(
     async (input: IntakeInput) => {
-      inputRef.current = input;
-      const { data } = await supabase.auth.getUser();
-      ctxRef.current = {
-        accountId: null,
-        policyId: null,
-        orgId: null,
-        userId: data.user?.id ?? null,
-        insertedDocIds: new Set(),
-      };
-      setAccountId(null);
-      const reset = Object.fromEntries(ORDER.map((k) => [k, { status: 'pending' as IntakeStepStatus }])) as Record<
-        IntakeStepKey,
-        { status: IntakeStepStatus; error?: string }
-      >;
-      setStatuses(reset);
-      statusRef.current = reset;
-      await runFrom(0);
+      if (runningRef.current) return; // a run is already in flight; ignore
+      runningRef.current = true;
+      try {
+        // Reset every shared ref BEFORE the first await. Doing it after (as this
+        // used to) let a second call wipe an in-flight run's ctx mid-step.
+        inputRef.current = input;
+        ctxRef.current = {
+          accountId: null,
+          policyId: null,
+          orgId: null,
+          userId: null,
+          insertedDocIds: new Set(),
+        };
+        setAccountId(null);
+        const reset = Object.fromEntries(ORDER.map((k) => [k, { status: 'pending' as IntakeStepStatus }])) as Record<
+          IntakeStepKey,
+          { status: IntakeStepStatus; error?: string }
+        >;
+        setStatuses(reset);
+        statusRef.current = reset;
+
+        const { data } = await supabase.auth.getUser();
+        ctxRef.current.userId = data.user?.id ?? null;
+        await runFrom(0);
+      } finally {
+        runningRef.current = false;
+      }
     },
     [runFrom],
   );
 
   const retry = useCallback(
     async (input?: IntakeInput) => {
-      // Pick up edits made after the failure (e.g. a changed policy number).
-      // ctx is preserved, so already-saved steps are not repeated.
-      if (input) inputRef.current = input;
-      const idx = ORDER.findIndex((k) => {
-        const s = statusRef.current[k].status;
-        return s !== 'done' && s !== 'skipped';
-      });
-      if (idx === -1) {
-        setPhase('done');
-        return;
+      if (runningRef.current) return; // a run is already in flight; ignore
+      runningRef.current = true;
+      try {
+        // Pick up edits made after the failure (e.g. a changed policy number).
+        // ctx is preserved, so already-saved steps are not repeated.
+        if (input) inputRef.current = input;
+        const idx = ORDER.findIndex((k) => {
+          const s = statusRef.current[k].status;
+          return s !== 'done' && s !== 'skipped';
+        });
+        if (idx === -1) {
+          setPhase('done');
+          return;
+        }
+        await runFrom(idx);
+      } finally {
+        runningRef.current = false;
       }
-      await runFrom(idx);
     },
     [runFrom],
   );
