@@ -23,26 +23,27 @@ export interface DuplicateQuery {
 }
 
 /**
- * Near-exact duplicate lookup for the New Client flow on the unified Add Policy
- * page. Calls the read-only, staff-gated `find_duplicate_accounts` RPC:
- *   - commercial_business -> same normalized name
- *   - household (personal) -> same normalized name AND a shared email / phone / DOB
- * so it never nags on a common first or last name alone. The caller debounces.
+ * Duplicate lookup for the New Client flow on the unified Add Policy page. Calls
+ * the read-only, staff-gated `find_duplicate_accounts` RPC, which flags an exact
+ * normalized-name match within the same workspace and type -- for BOTH personal
+ * and commercial. A shared email / phone / DOB is no longer required; it only
+ * ranks a match higher. `check` returns the matches so the caller can gate on a
+ * fresh result (the New Client flow requires acknowledging a match before
+ * continuing). The caller debounces the live check.
  */
 export function useDuplicateAccounts() {
   const [matches, setMatches] = useState<DuplicateAccount[]>([]);
   const [checking, setChecking] = useState(false);
   const seq = useRef(0);
 
-  const check = useCallback(async (q: DuplicateQuery) => {
+  const check = useCallback(async (q: DuplicateQuery): Promise<DuplicateAccount[]> => {
     const mySeq = ++seq.current;
     const name = q.name?.trim();
-    const hasIdentifier = !!(q.email?.trim() || q.phone?.trim() || q.dob);
-    // Personal accounts need a second identifier for a near-exact hit; a bare
-    // "John Smith" must not flag every other John Smith.
-    if (!name || (q.type === 'household' && !hasIdentifier)) {
+    // Flag on the name alone. We accept the occasional false positive on a
+    // genuinely common name because the flow now makes the user acknowledge.
+    if (!name) {
       setMatches([]);
-      return;
+      return [];
     }
     setChecking(true);
     // find_duplicate_accounts is newer than the generated types; cast the call.
@@ -55,14 +56,13 @@ export function useDuplicateAccounts() {
       p_dob: q.dob || null,
       p_limit: 5,
     });
-    if (mySeq !== seq.current) return; // a newer check superseded this one
-    if (error) {
-      logger.error('find_duplicate_accounts error', error);
-      setMatches([]);
-    } else {
-      setMatches((data || []) as DuplicateAccount[]);
+    const result: DuplicateAccount[] = error ? [] : ((data || []) as DuplicateAccount[]);
+    if (mySeq === seq.current) {
+      if (error) logger.error('find_duplicate_accounts error', error);
+      setMatches(result);
+      setChecking(false);
     }
-    setChecking(false);
+    return result;
   }, []);
 
   const clear = useCallback(() => {
