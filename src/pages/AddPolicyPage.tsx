@@ -113,6 +113,10 @@ export default function AddPolicyPage() {
   const [loaded, setLoaded] = useState(false);
   const [selectedMode, setSelectedMode] = useState<'new' | 'existing' | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  // New Client duplicate-acknowledgement gate: a match must be confirmed
+  // "not a duplicate" before the form will proceed.
+  const [dupAck, setDupAck] = useState(false);
+  const [dupNudge, setDupNudge] = useState(false);
 
   // ----- customer -----
   const [customer, setCustomer] = useState<CustomerInput>(emptyCustomer());
@@ -169,6 +173,13 @@ export default function AddPolicyPage() {
     // otherwise setting matches re-triggers this effect in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientMode, loaded, customer.name, customer.type, customer.email, customer.phone, customer.date_of_birth, dup.check]);
+
+  // Changing any identifying field invalidates a prior "not a duplicate"
+  // acknowledgement, so the user must re-confirm against the fresh matches.
+  useEffect(() => {
+    setDupAck(false);
+    setDupNudge(false);
+  }, [customer.name, customer.type, customer.email, customer.phone]);
 
   // After a successful save, hand off to the new/updated customer record.
   useEffect(() => {
@@ -341,12 +352,29 @@ export default function AddPolicyPage() {
     setLoaded(true);
   };
 
-  const chooseNew = () => {
+  const proceedNew = async (acknowledged: boolean) => {
     if (!customer.name.trim()) {
       setCustomerErrors({ name: 'Enter a name first' });
       return;
     }
+    // Require acknowledgement: force a fresh duplicate check and, unless the user
+    // has confirmed this isn't a duplicate, stop and surface the matches. This
+    // also covers a fast click before the debounced check has run.
+    if (!acknowledged && !dupAck) {
+      const found = await dup.check({
+        name: customer.name,
+        type: customer.type,
+        email: customer.email,
+        phone: customer.phone,
+        dob: customer.date_of_birth || null,
+      });
+      if (found.length > 0) {
+        setDupNudge(true);
+        return;
+      }
+    }
     setCustomerErrors({});
+    setDupNudge(false);
     setSelectedMode('new');
     setSelectedAccountId(null);
     customerOriginalRef.current = '';
@@ -665,10 +693,14 @@ export default function AddPolicyPage() {
                   <div className="mt-4 max-w-[560px] rounded-cc-md border border-cc-warning bg-cc-surface-raised p-3.5">
                     <div className="mb-1.5 flex items-center gap-2 text-cc-warning">
                       <AlertTriangle className="h-4 w-4" />
-                      <span className="text-sm font-semibold">Possible duplicate found</span>
+                      <span className="text-sm font-semibold">
+                        {dup.matches.length === 1
+                          ? 'A customer with this name already exists'
+                          : 'Customers with this name already exist'}
+                      </span>
                     </div>
                     <p className="mb-3 text-xs text-cc-text-muted">
-                      A customer with a nearly identical name and matching contact details already exists.
+                      Open the existing record to add the policy there, or confirm this is a different person to continue.
                     </p>
                     {dup.matches.map((m) => (
                       <div
@@ -691,18 +723,35 @@ export default function AddPolicyPage() {
                         </Link>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={chooseNew}
-                      className="mt-1 text-xs text-cc-text-muted underline hover:text-cc-text-primary"
-                    >
-                      Not a duplicate, continue with new client
-                    </button>
+                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium text-cc-text-secondary">
+                      <input
+                        type="checkbox"
+                        checked={dupAck}
+                        onChange={(e) => {
+                          setDupAck(e.target.checked);
+                          if (e.target.checked) setDupNudge(false);
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      This is a different person, not a duplicate.
+                    </label>
                   </div>
                 )}
 
+                {dupNudge && (
+                  <p className="mt-3 flex items-center gap-1.5 text-xs text-cc-warning">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Confirm this isn't a duplicate above, or open the existing customer.
+                  </p>
+                )}
+
                 <div className="mt-4">
-                  <Button variant="outline" onClick={chooseNew} className="gap-2 rounded-cc-md">
+                  <Button
+                    variant="outline"
+                    onClick={() => proceedNew(false)}
+                    disabled={dup.checking || (dup.matches.length > 0 && !dupAck)}
+                    className="gap-2 rounded-cc-md"
+                  >
                     Continue with new client
                     <ArrowRight className="h-4 w-4" />
                   </Button>
