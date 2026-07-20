@@ -367,6 +367,9 @@ export function buildAcord25FieldValues(input: Acord25BuildInput): BuildAcord25R
 
     // Line-specific detail blocks.
     if (cl.line === 'gl' && cl.gl) {
+      // Agency rule: whenever GL coverage is on the certificate, the
+      // "COMMERCIAL GENERAL LIABILITY" policy-type box is always checked.
+      setBool('gl_commercialGeneralLiabilityCheckbox', true);
       setBool('gl_occurCheckbox', cl.gl.occurrence);
       setBool('gl_claimsMadeCheckbox', cl.gl.claimsMade);
       setBool('gl_aggPerPolicyCheckbox', cl.gl.aggregateAppliesPer === 'policy');

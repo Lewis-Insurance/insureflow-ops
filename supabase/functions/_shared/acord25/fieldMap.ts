@@ -76,6 +76,7 @@ export type Acord25LogicalKey =
   | 'gl_expDate'
   | 'gl_addlInsd'
   | 'gl_subrWvd'
+  | 'gl_commercialGeneralLiabilityCheckbox'
   | 'gl_occurCheckbox'
   | 'gl_claimsMadeCheckbox'
   | 'gl_aggPerPolicyCheckbox'
@@ -206,6 +207,10 @@ export const ACORD25_FIELD_MAP: Record<Acord25LogicalKey, Acord25FieldMapEntry> 
   gl_expDate: { pdfField: 'Policy_GeneralLiability_ExpirationDate_A', kind: 'date' },
   gl_addlInsd: { pdfField: 'CertificateOfInsurance_GeneralLiability_AdditionalInsuredCode_A', kind: 'ynText' },
   gl_subrWvd: { pdfField: 'Policy_GeneralLiability_SubrogationWaivedCode_A', kind: 'ynText' },
+  // The "COMMERCIAL GENERAL LIABILITY" policy-type box at the top of the GL
+  // section (top-left of the coverage-type column). Always checked when GL is on
+  // the certificate - see buildAcord25FieldValues.
+  gl_commercialGeneralLiabilityCheckbox: { pdfField: 'GeneralLiability_CoverageIndicator_A', kind: 'checkbox', exportValue: '1' },
   gl_occurCheckbox: { pdfField: 'GeneralLiability_OccurrenceIndicator_A', kind: 'checkbox', exportValue: '1' },
   gl_claimsMadeCheckbox: { pdfField: 'GeneralLiability_ClaimsMadeIndicator_A', kind: 'checkbox', exportValue: '1' },
   gl_aggPerPolicyCheckbox: {
