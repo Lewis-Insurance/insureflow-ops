@@ -19,8 +19,17 @@
 // / "Not on file", never fabricated. No em or en dashes.
 
 import * as React from 'react';
-import { ShieldCheck, FileUp, Pencil, Plus, X } from 'lucide-react';
+import {
+  ShieldCheck,
+  FileUp,
+  Pencil,
+  Plus,
+  X,
+  Car,
+  AlertTriangle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -47,6 +56,8 @@ import {
   type CoverageField,
 } from '@/components/policies/policyCoverageFields';
 import type {
+  COIAutoCheckboxes,
+  COICell,
   COIInsurer,
   COILineAuto,
   COILineBase,
@@ -382,6 +393,17 @@ export function PolicyCoveragePanel({
           </div>
         )}
 
+        {/* Covered autos (auto line only): the ACORD 25 "which autos are covered"
+            boxes. Multi-select, each toggle commits immediately - mirrors the
+            blanket additional-insured selections. */}
+        {lineKey === 'auto' && (
+          <CoveredAutosSection
+            accountId={accountId}
+            policyId={policyId}
+            autoLine={line as COILineAuto | undefined}
+          />
+        )}
+
         {/* Limits: the money amounts, then any custom write-in coverages. */}
         <div className="space-y-2 border-t border-cc-border-subtle pt-4">
           <div className="text-sm font-medium text-cc-text-primary">Limits</div>
@@ -576,6 +598,98 @@ function EditableFieldRow({
 /** Map a stored bool-ish value ("true"/"false"/boolean string) to the Select key. */
 function boolToSelectValue(value: string): string {
   return value === 'true' || value === 'yes' ? 'yes' : 'no';
+}
+
+// ---------------------------------------------------------------------------
+// Covered autos: the ACORD 25 Automobile Liability "covered autos" checkboxes
+// (ANY AUTO / OWNED / SCHEDULED / HIRED / NON-OWNED). They mirror the policy's
+// covered-auto symbols and are multi-select. Each toggle commits immediately
+// through save_master_coi_fields (the certificate source of truth), exactly like
+// the blanket additional-insured selections - no Edit mode. The values print on
+// the certificate's auto section (Vehicle_*Indicator_A), which the field map
+// already wires; the registry rows added in migration 20260720190000 are what
+// make them writable.
+// ---------------------------------------------------------------------------
+
+const COVERED_AUTO_ROWS: {
+  key: keyof COIAutoCheckboxes;
+  label: string;
+  path: string;
+}[] = [
+  { key: 'any_auto', label: 'ANY AUTO', path: 'bap_details.coverage.symbols.any_auto' },
+  { key: 'owned_autos', label: 'OWNED AUTOS ONLY', path: 'bap_details.coverage.symbols.owned_autos' },
+  { key: 'scheduled_autos', label: 'SCHEDULED AUTOS', path: 'bap_details.coverage.symbols.scheduled_autos' },
+  { key: 'hired_autos', label: 'HIRED AUTOS ONLY', path: 'bap_details.coverage.symbols.hired_autos' },
+  { key: 'non_owned_autos', label: 'NON-OWNED AUTOS ONLY', path: 'bap_details.coverage.symbols.non_owned_autos' },
+];
+
+/** A boolean cell is "checked" when its value is true (tolerating a string). */
+function isCheckboxOn(cell: COICell<boolean> | undefined): boolean {
+  const v = cell?.v;
+  return v === true || v === 'true';
+}
+
+function CoveredAutosSection({
+  accountId,
+  policyId,
+  autoLine,
+}: {
+  accountId: string;
+  policyId: string;
+  autoLine: COILineAuto | undefined;
+}) {
+  const saveFields = useSaveMasterCoiFields();
+  const checkboxes = autoLine?.checkboxes;
+
+  const toggle = (path: string, next: boolean) => {
+    if (saveFields.isPending) return;
+    saveFields.mutate({ accountId, policyId, updates: { [path]: next } });
+  };
+
+  const anyAutoOn = isCheckboxOn(checkboxes?.any_auto);
+  const specificOn = COVERED_AUTO_ROWS.slice(1).some((row) =>
+    isCheckboxOn(checkboxes?.[row.key]),
+  );
+
+  return (
+    <section className="space-y-3 border-t border-cc-border-subtle pt-4">
+      <div className="flex items-center gap-2">
+        <Car className="h-4 w-4 text-cc-text-muted" aria-hidden="true" />
+        <h4 className="text-sm font-medium text-cc-text-primary">Covered autos</h4>
+      </div>
+      <p className="text-xs text-cc-text-muted">
+        Check the categories that match the policy's covered-auto symbols. More
+        than one can apply.
+      </p>
+
+      {anyAutoOn && specificOn && (
+        <div
+          role="note"
+          className="flex items-start gap-2 rounded-cc-md border border-cc-warning/40 bg-cc-warning/10 p-3 text-sm text-cc-warning"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Any Auto already covers everything.</span>{' '}
+            The specific selections are redundant while Any Auto is checked.
+          </span>
+        </div>
+      )}
+
+      <div className="space-y-2 rounded-cc-md border border-cc-border-subtle bg-cc-surface-raised p-3">
+        {COVERED_AUTO_ROWS.map((row) => (
+          <label key={row.key} className="flex items-center gap-2">
+            <Checkbox
+              checked={isCheckboxOn(checkboxes?.[row.key])}
+              disabled={saveFields.isPending}
+              onCheckedChange={(v) => toggle(row.path, v === true)}
+              aria-label={row.label}
+            />
+            <span className="text-sm text-cc-text-primary">{row.label}</span>
+          </label>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 // ---------------------------------------------------------------------------

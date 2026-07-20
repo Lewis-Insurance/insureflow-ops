@@ -136,3 +136,94 @@ describe('PolicyCoveragePanel on an absent/empty line', () => {
     expect(arg.updates['cgl_details.limits.each_occurrence']).toBe(1000000);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Covered-autos checkbox group (auto line): immediate-commit multi-select,
+// mirroring the blanket selections. Values come from the read-model auto
+// checkboxes; each toggle writes one registry path via save_master_coi_fields.
+// ---------------------------------------------------------------------------
+
+const boolCell = (v: boolean | null) => ({
+  v,
+  src: v == null ? ('missing' as const) : ('manual' as const),
+  path: null,
+});
+
+const autoLine = {
+  present: true,
+  policy_id: 'pol-1',
+  insurer_letter: null,
+  status: 'active',
+  expired: false,
+  policy_number: { v: 'AUTO-1', src: 'manual' as const, path: null },
+  effective_date: missing(),
+  expiration_date: missing(),
+  candidates: [],
+  limit_type: { v: 'csl', src: 'manual' as const, path: 'bap_details.coverage.liability.limit_type' },
+  csl: { v: null, src: 'missing' as const, path: 'bap_details.coverage.liability.csl_limit' },
+  bi_per_person: missing(),
+  bi_per_accident: missing(),
+  pd_per_accident: missing(),
+  checkboxes: {
+    any_auto: boolCell(false),
+    owned_autos: boolCell(true),
+    scheduled_autos: boolCell(false),
+    hired_autos: boolCell(false),
+    non_owned_autos: boolCell(false),
+  },
+  additional_insureds: [],
+};
+
+const autoFixture = { lines: { auto: autoLine }, insurers: [] } as unknown as MasterCOI;
+
+function renderAutoPanel() {
+  vi.mocked(useMasterCoi).mockReturnValue({
+    data: autoFixture,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  } as never);
+  return render(
+    <PolicyCoveragePanel accountId="acc-1" policyId="pol-1" lineKey="auto" />,
+    { wrapper: Wrapper },
+  );
+}
+
+const COVERED_LABELS = [
+  'ANY AUTO',
+  'OWNED AUTOS ONLY',
+  'SCHEDULED AUTOS',
+  'HIRED AUTOS ONLY',
+  'NON-OWNED AUTOS ONLY',
+];
+
+describe('PolicyCoveragePanel covered-autos (auto line)', () => {
+  it('renders all 5 covered-auto checkboxes reflecting stored values', () => {
+    renderAutoPanel();
+    expect(screen.getByText('Covered autos')).toBeInTheDocument();
+    for (const label of COVERED_LABELS) {
+      expect(screen.getByRole('checkbox', { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('checkbox', { name: 'OWNED AUTOS ONLY' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'ANY AUTO' })).not.toBeChecked();
+  });
+
+  it('commits a single toggle immediately to the right registry path', () => {
+    const mutate = vi.fn();
+    vi.mocked(useSaveMasterCoiFields).mockReturnValue({ mutate, isPending: false } as never);
+    renderAutoPanel();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'HIRED AUTOS ONLY' }));
+    expect(mutate).toHaveBeenCalledTimes(1);
+    const arg = mutate.mock.calls[0][0];
+    expect(arg.policyId).toBe('pol-1');
+    expect(arg.updates).toEqual({ 'bap_details.coverage.symbols.hired_autos': true });
+  });
+
+  it('shows the ANY AUTO redundancy warning only when combined with a specific box', () => {
+    // Baseline fixture: ANY AUTO off -> no warning.
+    renderAutoPanel();
+    expect(
+      screen.queryByText(/Any Auto already covers everything/i),
+    ).not.toBeInTheDocument();
+  });
+});
