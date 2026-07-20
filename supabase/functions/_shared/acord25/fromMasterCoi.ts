@@ -292,7 +292,10 @@ function buildWC(wc: COILineWC, flags: ReturnType<typeof resolveFlags>): Acord25
     additionalInsured: null,
     waiverOfSubrogation: flags.waiverOfSubrogation,
     wc: {
-      perStatute: bool(wc.per_statute),
+      // Agency rule: the ACORD 25 WC section is always issued PER STATUTE (the
+      // OTHER box stays off). Not driven by policy data - every certificate marks
+      // the PER STATUTE box.
+      perStatute: true,
       other: false,
       proprietorExcluded,
       elEachAccident: num(wc.el_each_accident),

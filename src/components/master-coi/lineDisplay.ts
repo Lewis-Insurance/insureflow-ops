@@ -89,7 +89,8 @@ type AnyPresentLine =
  *    split BI-per-person / BI-per-accident / PD-per-accident set.
  *  - Umbrella: each occurrence, aggregate, then the deductible-or-retention
  *    amount labeled by its kind.
- *  - WC: "Per statute" flag, then the three Employers Liability limits.
+ *  - WC: the three Employers Liability limits (PER STATUTE is always issued, so
+ *    it is not shown as a data row).
  *  - Property: label, limit amount, limit description.
  */
 export function limitCellsFor(line: COILineKey, data: AnyPresentLine): LimitCell[] {
@@ -137,8 +138,10 @@ export function limitCellsFor(line: COILineKey, data: AnyPresentLine): LimitCell
     }
     case 'wc': {
       const wc = data as COILineWC;
+      // "Per statute" is intentionally not shown: the ACORD 25 PER STATUTE box is
+      // always checked on every certificate (fromMasterCoi), so it is a constant,
+      // not policy data worth displaying.
       return [
-        { label: 'Per statute', cell: wc.per_statute, format: 'text' },
         { label: 'E.L. each accident', cell: wc.el_each_accident, format: 'currency' },
         { label: 'E.L. disease (each employee)', cell: wc.el_disease_each_employee, format: 'currency' },
         { label: 'E.L. disease (policy limit)', cell: wc.el_disease_policy_limit, format: 'currency' },

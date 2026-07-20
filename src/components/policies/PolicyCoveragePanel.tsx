@@ -47,7 +47,6 @@ import {
   type CoverageField,
 } from '@/components/policies/policyCoverageFields';
 import type {
-  COICell,
   COIInsurer,
   COILineAuto,
   COILineBase,
@@ -82,6 +81,40 @@ function parseCurrencyInput(raw: string): number | null {
   if (!cleaned) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Format a raw edit value with thousands separators for display in a money input
+ * (e.g. "1000000" -> "1,000,000"). Blank/unparseable -> "". Limits are whole
+ * dollars, so we keep at most two fraction digits and never force any.
+ */
+function formatMoneyInput(raw: string): string {
+  const n = parseCurrencyInput(raw);
+  if (n == null) return '';
+  return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+/**
+ * A money input that shows live thousands separators while the operator types and
+ * emits the parsed number (or null when cleared). Right-aligned, tabular figures,
+ * matching every money field across GL / Auto / Umbrella / WC.
+ */
+function MoneyInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: number | null) => void;
+}) {
+  return (
+    <Input
+      value={formatMoneyInput(value)}
+      inputMode="numeric"
+      placeholder="0"
+      onChange={(e) => onChange(parseCurrencyInput(e.target.value))}
+      className="cc-num text-right"
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +181,22 @@ export function PolicyCoveragePanel({
   const line = data?.lines?.[lineKey] as AnyCoverageLine | undefined;
   const insurers: COIInsurer[] = data?.insurers ?? [];
 
-  const hasChanges = Object.keys(updates).length > 0;
+  // Fields are recomputed from the live edit map so a field whose visible set
+  // depends on another (Auto CSL vs Split) swaps immediately when its toggle
+  // changes, before any save round-trip. Tolerates an absent/undefined line.
+  const fields = policyCoverageFields(lineKey, line, updates);
+  const basisFields = fields.filter((f) => f.zone === 'basis');
+  const limitFields = fields.filter((f) => f.zone === 'limit');
+
+  // Only paths that are currently visible get saved, so a value typed under one
+  // branch (e.g. a CSL amount) never persists after switching to the other.
+  const activePaths = new Set(
+    fields.map((f) => f.path).filter((p): p is string => Boolean(p)),
+  );
+  const filteredUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([path]) => activePaths.has(path)),
+  );
+  const hasChanges = Object.keys(filteredUpdates).length > 0;
 
   const setField = (path: string | null, value: unknown) => {
     if (!path) return; // not editable here
@@ -169,7 +217,7 @@ export function PolicyCoveragePanel({
   const handleSave = () => {
     if (!hasChanges || saveFields.isPending) return;
     saveFields.mutate(
-      { accountId, policyId, updates },
+      { accountId, policyId, updates: filteredUpdates },
       {
         onSuccess: () => {
           // The hook already invalidates caches + toasts.
@@ -180,15 +228,29 @@ export function PolicyCoveragePanel({
     );
   };
 
-  // The edited value for a cell: a local edit wins, else the read-model value.
-  const currentValue = (cell: COICell | undefined): string => {
-    if (!cell) return '';
-    if (cell.path && cell.path in updates) {
-      const v = updates[cell.path];
+  // The edited value for a field: a local edit (keyed by the static registry
+  // path) wins, else the read-model cell value.
+  const currentValue = (field: CoverageField): string => {
+    if (field.path && field.path in updates) {
+      const v = updates[field.path];
       return v == null ? '' : String(v);
     }
-    return cell.v == null ? '' : String(cell.v);
+    return field.cell?.v == null ? '' : String(field.cell.v);
   };
+
+  // A row renders as an input in edit mode when it has a registry write path; any
+  // pathless (read-only) field would show its value plainly instead.
+  const renderRow = (field: CoverageField) =>
+    editing && field.path ? (
+      <EditableFieldRow
+        key={field.label}
+        field={field}
+        value={currentValue(field)}
+        onChange={(value) => setField(field.path, value)}
+      />
+    ) : (
+      <FieldRow key={field.label} field={field} />
+    );
 
   const title = LINE_LABEL[lineKey];
 
@@ -218,7 +280,7 @@ export function PolicyCoveragePanel({
               variant="outline"
               size="sm"
               onClick={enterEdit}
-              disabled={isLoading || Boolean(error) || !line}
+              disabled={isLoading || Boolean(error)}
               className="gap-2 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -264,8 +326,11 @@ export function PolicyCoveragePanel({
     );
   }
 
-  // Error / missing line state.
-  if (error || !line) {
+  // Hard error state. A missing line is NOT an error: get_master_coi returns an
+  // absent skeleton (or nothing) for a not-yet-classified policy, and we still
+  // want the operator to enter coverage from scratch, so we render the editable
+  // panel below rather than bailing out.
+  if (error) {
     return (
       <PanelShell>
         <div className="space-y-3">
@@ -278,8 +343,7 @@ export function PolicyCoveragePanel({
     );
   }
 
-  const fields = policyCoverageFields(lineKey, line);
-  const isEmptyLine = line.present === false;
+  const isEmptyLine = !line || line.present === false;
 
   return (
     <PanelShell>
@@ -304,29 +368,30 @@ export function PolicyCoveragePanel({
           </div>
         )}
 
-        {/* Coverage fields. */}
-        {fields.length > 0 && (
+        {/* Coverage basis: the form / type toggles - how the coverage is written
+            (occurrence vs claims-made, CSL vs split, umbrella vs excess, per
+            statute). Same treatment on every line. */}
+        {basisFields.length > 0 && (
           <div className="space-y-2 border-t border-cc-border-subtle pt-4">
             <div className="text-sm font-medium text-cc-text-primary">
-              Coverage
+              Coverage basis
             </div>
             <dl className="divide-y divide-cc-border-subtle">
-              {fields.map((field) =>
-                editing ? (
-                  <EditableFieldRow
-                    key={field.label}
-                    field={field}
-                    value={currentValue(field.cell)}
-                    onChange={(value) => setField(field.cell?.path ?? null, value)}
-                  />
-                ) : (
-                  <FieldRow key={field.label} field={field} />
-                ),
-              )}
+              {basisFields.map(renderRow)}
             </dl>
-            <AdditionalCoveragesSection policyId={policyId} lineKey={lineKey} />
           </div>
         )}
+
+        {/* Limits: the money amounts, then any custom write-in coverages. */}
+        <div className="space-y-2 border-t border-cc-border-subtle pt-4">
+          <div className="text-sm font-medium text-cc-text-primary">Limits</div>
+          {limitFields.length > 0 && (
+            <dl className="divide-y divide-cc-border-subtle">
+              {limitFields.map(renderRow)}
+            </dl>
+          )}
+          <AdditionalCoveragesSection policyId={policyId} lineKey={lineKey} />
+        </div>
 
         <PolicyEndorsementsSection
           accountId={accountId}
@@ -346,18 +411,19 @@ function ContextStrip({
   line,
   insurers,
 }: {
-  line: COILineBase;
+  line: COILineBase | undefined;
   insurers: COIInsurer[];
 }) {
-  const carrier =
-    insurers.find((i) => i.letter === line.insurer_letter) ?? null;
+  const carrier = line
+    ? insurers.find((i) => i.letter === line.insurer_letter) ?? null
+    : null;
   const carrierName = (carrier?.name?.v ?? '').trim();
   const naic = (carrier?.naic?.v ?? '').trim();
-  const policyNumber = (line.policy_number?.v ?? '').toString().trim();
-  const effective = line.effective_date?.v
+  const policyNumber = (line?.policy_number?.v ?? '').toString().trim();
+  const effective = line?.effective_date?.v
     ? formatLocalDateDisplay(String(line.effective_date.v))
     : '';
-  const expiration = line.expiration_date?.v
+  const expiration = line?.expiration_date?.v
     ? formatLocalDateDisplay(String(line.expiration_date.v))
     : '';
 
@@ -460,8 +526,6 @@ function EditableFieldRow({
   value: string;
   onChange: (value: unknown) => void;
 }) {
-  const editable = Boolean(field.cell?.path);
-
   return (
     <div className="grid grid-cols-1 gap-1.5 py-2 sm:grid-cols-2 sm:items-center sm:gap-4">
       <Label className="text-sm text-cc-text-secondary">{field.label}</Label>
@@ -470,7 +534,6 @@ function EditableFieldRow({
           <Select
             value={value || undefined}
             onValueChange={(next) => onChange(next)}
-            disabled={!editable}
           >
             <SelectTrigger>
               <SelectValue placeholder="Not selected" />
@@ -487,7 +550,6 @@ function EditableFieldRow({
           <Select
             value={value === '' ? undefined : boolToSelectValue(value)}
             onValueChange={(next) => onChange(next === 'yes')}
-            disabled={!editable}
           >
             <SelectTrigger>
               <SelectValue placeholder="Not selected" />
@@ -498,17 +560,10 @@ function EditableFieldRow({
             </SelectContent>
           </Select>
         ) : field.kind === 'money' ? (
-          <Input
-            value={value}
-            disabled={!editable}
-            inputMode="numeric"
-            onChange={(e) => onChange(parseCurrencyInput(e.target.value))}
-            className="cc-num text-right"
-          />
+          <MoneyInput value={value} onChange={onChange} />
         ) : (
           <Input
             value={value}
-            disabled={!editable}
             onChange={(e) => onChange(e.target.value || null)}
             className="cc-num"
           />

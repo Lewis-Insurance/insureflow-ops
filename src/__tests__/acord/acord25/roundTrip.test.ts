@@ -64,6 +64,8 @@ describe('round-trip: fill without flatten, then extract', () => {
     // A checked checkbox reads back true; an unchecked one false.
     expect(readBack[ACORD25_FIELD_MAP.gl_occurCheckbox.pdfField]).toBe(true);
     expect(readBack[ACORD25_FIELD_MAP.gl_claimsMadeCheckbox.pdfField]).toBe(false);
+    // The COMMERCIAL GENERAL LIABILITY box is always checked when GL is present.
+    expect(readBack[ACORD25_FIELD_MAP.gl_commercialGeneralLiabilityCheckbox.pdfField]).toBe(true);
     // ynText reads back as the literal.
     expect(readBack[ACORD25_FIELD_MAP.gl_addlInsd.pdfField]).toBe('Y');
     expect(readBack[ACORD25_FIELD_MAP.gl_subrWvd.pdfField]).toBe('N');
