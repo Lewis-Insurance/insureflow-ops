@@ -2,7 +2,7 @@
 
 **Scope:** Main renewals system only. The Auto-Owners "AO Renewals" subsystem (`ao_renewals`, `useAORenewals.ts`, `AORenewalsPage.tsx`, `AORenewalEdit.tsx`, `components/ao-renewals/*`, `AORenewalDocuments.tsx`) is **100% out of scope and untouched.**
 
-**Stack:** React + Vite + TypeScript + Supabase + shadcn/ui. Design law: `UI Overhall/zpk/design-system/` ("Calm Command" constitution).
+**Stack:** React + Vite + TypeScript + Supabase + shadcn/ui. Design law: `design-system/` ("Calm Command" constitution).
 
 ---
 
@@ -239,4 +239,4 @@ Regenerate `src/integrations/supabase/types.ts` after the migration. No edge-fun
 - `src/components/renewals/RenewalCompletionModal.tsx`
 - `src/pages/RenewalsPage.tsx`
 - `src/components/customers/CustomerPoliciesSection.tsx`
-- `UI Overhall/zpk/design-system/` (constitution — law)
+- `design-system/` (constitution — law)
