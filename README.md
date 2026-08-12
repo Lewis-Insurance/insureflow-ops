@@ -1,76 +1,84 @@
-# Welcome to your Lovable project
+# InsureFlow Ops
 
-## Project info
+Lewis Insurance Agency OS - the internal platform for running the agency, not a public quote site.
 
-**URL**: https://lovable.dev/projects/9d1dfa74-e144-4d00-88fc-4812573bfb81
+InsureFlow Ops includes:
 
-## How can I edit this code?
+- **Agency console** - CRM, renewals, policies, quotes, tasks, documents, and staff workflows
+- **Client portal** - customer-facing access to their account data
+- **Tokenized intake** - secure, link-based data collection for leads and onboarding
+- **The Floor** - autonomous agent layer for AI-assisted operations (tasks, documents, analytics)
 
-There are several ways of editing your application.
+Production: [lewisinsurance.ai](https://lewisinsurance.ai)
 
-**Use Lovable**
+## Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9d1dfa74-e144-4d00-88fc-4812573bfb81) and start prompting.
+| Layer | Technology |
+|-------|------------|
+| UI | React ^18.3.1, TypeScript ^5.8.3, Vite ^5.4.21 |
+| Styling | Tailwind ^3.4.17, shadcn/ui (Radix), Calm Command design system |
+| Backend | Supabase (`@supabase/supabase-js` ^2.106.0) |
+| Hosting | Netlify -> [lewisinsurance.ai](https://lewisinsurance.ai) |
+| Tests | Vitest ^4.1.6 |
 
-Changes made via Lovable will be committed automatically to this repo.
+## Local development
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+**Requirements:** Node.js and npm ([install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+git clone https://github.com/Lewis-Insurance/insureflow-ops.git
+cd insureflow-ops
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Create a `.env` file in the project root with your Supabase project credentials (no secrets are committed to the repo):
 
-# Step 3: Install the necessary dependencies.
-npm i
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Start the dev server:
+
+```sh
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Vite serves the app with hot reload. Open the URL shown in the terminal (typically `http://localhost:5173`).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## PR gates
 
-**Use GitHub Codespaces**
+Run all four before opening a PR. Each must exit 0:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+npm run typecheck
+npm run lint
+npm run build
+npm run test:run
+```
 
-## What technologies are used for this project?
+CI runs the same checks on every pull request via the **Build & Test** workflow.
 
-This project is built with:
+## Branch, PR, and deploy flow
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Do not work on `main` unless explicitly directed. See [REMOTE-WORKFLOW.md](./REMOTE-WORKFLOW.md) for the full process.
 
-## How can I deploy this project?
+1. Create a focused branch from `main` (`fix/...`, `feat/...`, `refactor/...`, or `chore/...`)
+2. Make changes and run the PR gates locally
+3. Push the branch and open a pull request to `main`
+4. CI runs **Build & Test**; Netlify deploys a preview URL for the PR
+5. Review the preview, get approval, then merge to `main`
+6. Netlify deploys production from `main`
 
-Simply open [Lovable](https://lovable.dev/projects/9d1dfa74-e144-4d00-88fc-4812573bfb81) and click on Share -> Publish.
+Keep one focused change per branch when practical. For risky database or automation changes, call out the risk in the PR before merge.
 
-## Can I connect a custom domain to my Lovable project?
+## Documentation
 
-Yes, you can!
+| Doc | Purpose |
+|-----|---------|
+| [CLAUDE.md](./CLAUDE.md) | Architecture, database, edge functions, deployment, invariants |
+| [AGENTS.md](./AGENTS.md) | Agent and orchestrator instructions for AI-assisted work |
+| [ORCHESTRATOR.md](./ORCHESTRATOR.md) | Delegation playbook and review protocol |
+| [design-system/constitution.md](./design-system/constitution.md) | Calm Command design rules (read before any UI work) |
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
-
-
-
+Additional workflow detail: [REMOTE-WORKFLOW.md](./REMOTE-WORKFLOW.md)
