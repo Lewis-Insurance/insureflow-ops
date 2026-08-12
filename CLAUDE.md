@@ -96,6 +96,30 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - Customer data scoped via `accounts.agency_workspace_id`
 - All operational tables (leads, policies, quotes, tasks) belong to an account, which belongs to a workspace
 
+**Isolation layers**
+
+Two nested boundaries — do not conflate them:
+
+1. **Workspace (tenant):** `agency_workspace_id` is the agency boundary. Staff reach workspace-scoped tables through `agency_workspace_memberships` (roles: `owner`, `admin`, `producer`, `csr`, plus `accounting`, `viewer` from the foundation migration).
+2. **Account (customer record):** `account_id` scopes customer-owned data inside a workspace. `account_memberships` grants **customer portal** access only — staff do **not** use this path.
+
+**Entity model**
+
+- **`accounts` is the canonical customer entity** (1:1 with `insured_profiles` on `insured_profiles.account_id`). The legacy `customers` table is abandoned — ignore it.
+- **Tags** live only on `insured_profiles.tags`.
+- **Three redundant type fields** are kept in sync by trigger `sync_account_types`: `accounts.account_type` (`account_type_new`: `individual` / `business` / `household`), `accounts.type` (`account_type_v2`: `household` / `commercial_business`), `insured_profiles.type`. See `20260628171836_batch1e_sync_account_types_fix.sql`.
+- **Durable commercial-vs-personal signal:** `policies.line_category = 'commercial'` (not the type enums alone).
+
+**Which layer applies**
+
+| Class | Examples | Staff path | Portal path |
+|-------|----------|------------|-------------|
+| Workspace-scoped | `tasks`, `communications`, `ceo_digest_*`, `leads` (`agency_workspace_id` — sec005), `accounts` (`accounts.agency_workspace_id` — batch1d) | `agency_workspace_memberships` | — |
+| Account-scoped child | `policies`, `quotes`, `renewals`, `notes`, `documents` | Workspace membership on parent account | `account_memberships` (optional) |
+| Portal only | — | Staff do **not** use `account_memberships` | `account_memberships` |
+
+**Schema source of truth:** Derive schema from `supabase/migrations/` and `docs/`. Do not ask for service role keys or query production directly.
+
 #### Agency Workspaces (Tenant)
 - `id` (UUID, primary key)
 - `name` (TEXT) - Agency name
@@ -108,7 +132,7 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - `id` (UUID, primary key)
 - `agency_workspace_id` (UUID, references agency_workspaces)
 - `user_id` (UUID, references auth.users)
-- `role` (TEXT) - owner, admin, producer, csr
+- `role` (TEXT) - owner, admin, producer, csr, accounting, viewer
 - `status` (TEXT) - active, invited, suspended
 - RLS: Users can only see memberships for workspaces they belong to
 
@@ -132,6 +156,7 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - `contact_count` (INTEGER) - Number of contact attempts
 - `email_opens` (INTEGER) - Email engagement tracking
 - `email_clicks` (INTEGER) - Email engagement tracking
+- `agency_workspace_id` (UUID, references agency_workspaces) - **Workspace isolation (sec005)**
 - `account_id` (UUID, references accounts)
 - `assigned_to` (UUID, references auth.users)
 - `created_at`, `updated_at` (TIMESTAMPTZ)
@@ -140,9 +165,12 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - `id` (UUID, primary key)
 - `agency_workspace_id` (UUID, references agency_workspaces) - **Tenant boundary**
 - `name` (TEXT)
-- `type` (TEXT) - individual, business
+- `account_type` (enum `account_type_new`) - individual, business, household
+- `type` (enum `account_type_v2`) - household, commercial_business (synced via `sync_account_types`)
 - `account_status` (TEXT) - active, inactive, suspended
 - `created_at`, `updated_at` (TIMESTAMPTZ)
+- **Related:** `insured_profiles` (1:1 on `account_id`) holds profile detail; **tags** live on `insured_profiles.tags` only
+- **Commercial vs personal:** prefer `policies.line_category = 'commercial'` over type enums alone
 
 #### Policies
 - `id` (UUID, primary key)
@@ -210,7 +238,7 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - `relation_to_insured` (TEXT)
 - `years_licensed` (INTEGER)
 - `accidents_violations` (JSONB)
-- RLS: Users can access drivers for their account's leads
+- RLS: Staff via lead's `agency_workspace_id` + `agency_workspace_memberships`; portal via `account_memberships` on the lead's account (migration policy names still say "account's leads")
 
 **lead_auto_vehicles:**
 - `id` (UUID, primary key)
@@ -222,7 +250,7 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 - `annual_mileage` (INTEGER)
 - `garage_address` (TEXT)
 - `safety_features` (JSONB)
-- RLS: Users can access vehicles for their account's leads
+- RLS: Same as `lead_auto_drivers` — staff path is workspace membership via the parent lead, not `account_memberships` alone
 
 #### Knowledge Base
 
@@ -293,33 +321,68 @@ Reusable primitives live in `src/components/cc/`. The app defaults to dark (`cla
 
 ## Row Level Security (RLS) Policies
 
-### Multi-Tenant Architecture
+### Two-layer model
 
-All data tables use RLS to enforce account-level isolation:
+RLS enforces **workspace isolation first**, then **account scoping** for customer-owned child data. Staff reach data through `agency_workspace_memberships`; `account_memberships` is the **customer portal** path only.
+
+**Helper functions** (see migrations cited in Multi-Tenancy Model above):
+
+| Function | Purpose | Source |
+|----------|---------|--------|
+| `is_agency_member(p_agency_id)` | Active membership in a workspace | `20251228000000_m0_agency_workspace_foundation.sql` |
+| `is_staff()` | Staff flag or role in admin/agent/producer/csr | `20260410000011_fix_is_staff_function.sql` |
+| `is_canopy_staff()` | Agency-wide Canopy table access | `20251226100002_canopy_rls_fix.sql` |
+
+**Merge lockdown:** `_do_account_merge` EXECUTE is granted to `postgres` and `service_role` only — never direct staff EXECUTE. Staff call gated wrappers (`merge_accounts_manual`, `relgraph_merge_duplicate_group`, `preview_merge`). See `20260629240000_relgraph_v2_merge_consolidation.sql`, `20260702171500_master_coi_merge_allowlist.sql`.
+
+**Example — leads SELECT** (`20260408100000_sec005_leads_workspace_isolation.sql`): both staff and portal paths:
 
 ```sql
--- Example: Leads table RLS
-CREATE POLICY "Users can view leads for their accounts"
-  ON leads FOR SELECT
+CREATE POLICY "leads_select_policy"
+  ON public.leads FOR SELECT TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM account_memberships am
-      WHERE am.account_id = leads.account_id
-        AND am.user_id = auth.uid()
+    deleted_at IS NULL AND (
+      -- Staff: active workspace membership
+      EXISTS (
+        SELECT 1 FROM public.agency_workspace_memberships awm
+        WHERE awm.agency_workspace_id = leads.agency_workspace_id
+          AND awm.user_id = auth.uid() AND awm.status = 'active'
+      )
+      -- Customer portal: explicit account membership
+      OR (account_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.account_memberships am
+        WHERE am.account_id = leads.account_id AND am.user_id = auth.uid()
+      ))
+      OR assigned_to = auth.uid()
     )
   );
 ```
 
-**Key Tables with RLS:**
-- leads
-- accounts
-- policies
-- quotes
-- tasks
-- communications
-- lead_auto_drivers
-- lead_auto_vehicles
-- knowledge_base_queries
+**Example — accounts SELECT** (`20260628172446_batch1d_accounts_rls_and_anon_revoke.sql`): workspace membership plus `is_staff` fallback:
+
+```sql
+CREATE POLICY accounts_select_scoped ON public.accounts FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL AND (
+      EXISTS (SELECT 1 FROM public.agency_workspace_memberships m
+              WHERE m.user_id = auth.uid() AND m.status = 'active'
+                AND m.agency_workspace_id = accounts.agency_workspace_id)
+      OR EXISTS (SELECT 1 FROM public.profiles pr
+                 WHERE pr.id = auth.uid() AND COALESCE(pr.is_staff, false) = true)
+    )
+  );
+```
+
+**Tables by isolation layer:**
+
+| Layer | Tables |
+|-------|--------|
+| Workspace (`agency_workspace_id` + memberships) | `leads`, `accounts`, `tasks`, `communications`, `ceo_digest_settings`, `ceo_digest_runs` |
+| Account child (staff via parent account's workspace) | `policies`, `quotes`, `renewals`, `notes`, `documents`, `lead_auto_drivers`, `lead_auto_vehicles` |
+| Portal (`account_memberships`) | Optional customer self-service — not the staff path |
+| Staff RPC gate (`is_staff()`) | Search/triage RPCs, many SECURITY DEFINER functions |
+| Canopy (`is_canopy_staff()`) | `canopy_*` tables |
+| Other RLS | `knowledge_base_queries`, `agency_workspace_memberships` (own workspace only) |
 
 ---
 
