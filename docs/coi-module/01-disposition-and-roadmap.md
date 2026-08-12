@@ -2,7 +2,7 @@
 
 Area owner: Disposition subsystem (resolves handoff open questions 1 and 3, defines the whole-module roadmap and rollout strategy).
 Repo: /Users/brianlewis/insureflow-ops
-Ground truth inputs: gt-legacy-coi, gt-acord-engine. Where the handoff (ACORD_COI_Module_Handoff.md) and ground truth disagree, ground truth wins. Every file:line below was re-verified against source on 2026-07-02.
+Ground truth inputs: gt-legacy-coi, gt-acord-engine. Where the handoff (`docs/archive/ACORD_COI_Module_Handoff.md`) and ground truth disagree, ground truth wins. Every file:line below was re-verified against source on 2026-07-02.
 
 This is the FINAL, reconciled version of the disposition design. It complies with the orchestrator resolutions R1 through R22; where those resolutions changed an earlier decision, this document reflects the resolved state and the sibling specs are cited by their final filenames. This document makes every disposition decision an implementing engineer would otherwise have to make: what dies, what lives, in what order, behind what migration, and what Brian can demo at each phase boundary.
 
@@ -471,7 +471,7 @@ Cross-cutting migration rules: every ADD CONSTRAINT is wrapped in a DO-block IF 
 
 - `CLAUDE.md`: remove the claim that `pdf-generation-worker` is the ACORD generation path; remove `coi-pdfs`/`certificates` from any bucket lists after Phase 6; add the module's golden path (Master COI -> Additional Insureds directory -> `/certificates` generator -> `generate-certificate` -> immutable snapshot in `public.certificates` -> Documents tab) and the new tables; document the `coi-certificates` bucket; note `send-coi-email` v2's contract with a pointer at 04-issuance-and-snapshots.md.
 - `docs/ACORD-IMPLEMENTATION-SPEC.md`: add a header note that Section 15 (queue-based generation) was never wired and its artifacts were removed in Phase 1; the doc remains as provenance.
-- `docs/coi-module/`: these six files are the implementation source of truth; the handoff (`ACORD_COI_Module_Handoff.md`) is superseded where they disagree.
+- `docs/coi-module/`: these six files are the implementation source of truth; the handoff (`docs/archive/ACORD_COI_Module_Handoff.md`) is superseded where they disagree.
 
 ---
 
