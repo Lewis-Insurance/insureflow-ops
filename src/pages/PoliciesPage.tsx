@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
 import { Search, Plus, MoreVertical, Download, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,14 @@ import { cn } from '@/lib/utils';
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 type Cohort = 'all' | 'expiring_30d' | 'lapsed' | 'no_renewal_date' | 'recently_bound';
 
+const POLICY_COHORTS = [
+  'all',
+  'expiring_30d',
+  'lapsed',
+  'no_renewal_date',
+  'recently_bound',
+] as const satisfies readonly Cohort[];
+
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -35,7 +44,7 @@ const COLS = 'md:grid-cols-[minmax(0,1fr)_140px_128px_120px_104px_96px_120px]';
 export default function PoliciesPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [cohort, setCohort] = useState<Cohort>('all');
+  const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(POLICY_COHORTS);
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
 
@@ -51,6 +60,9 @@ export default function PoliciesPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      if (cohort !== 'all') {
+        fetchPolicies(searchQuery, 'expiration_asc', cohort);
+      }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);

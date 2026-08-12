@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
 import { Search, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,14 @@ import { cn } from '@/lib/utils';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 type Cohort = 'all' | 'overdue' | 'due_this_week' | 'high_priority' | 'completed';
+
+const TASK_COHORTS = [
+  'all',
+  'overdue',
+  'due_this_week',
+  'high_priority',
+  'completed',
+] as const satisfies readonly Cohort[];
 
 // The secondary views are preserved unchanged behind a single segmented control.
 // 'list' is the Calm Command Index list and the default; it replaces the old
@@ -70,7 +79,7 @@ function dueBand(dueAt: string | null, completedAt: string | null): DueBand | nu
 export default function TasksPage() {
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cohort, setCohort] = useState<Cohort>('all');
+  const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(TASK_COHORTS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { tasks, loading, loadingMore, hasMore, fetchTasks, fetchNextPage, refetch } = useTaskSearch();
@@ -89,6 +98,9 @@ export default function TasksPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      if (cohort !== 'all') {
+        fetchTasks(searchQuery, sort, cohort);
+      }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
