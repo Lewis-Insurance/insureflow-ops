@@ -179,8 +179,8 @@ ls -la .env.production.template
 # Check deployment guides
 ls -la VERCEL_DEPLOYMENT_GUIDE.md
 ls -la HOSTINGER_DNS_SETUP.md
-ls -la SUPABASE_EDGE_FUNCTIONS_STATUS.md
-ls -la PRE_DEPLOYMENT_CHECKLIST.md
+ls -la docs/archive/SUPABASE_EDGE_FUNCTIONS_STATUS.md
+ls -la docs/archive/PRE_DEPLOYMENT_CHECKLIST.md
 ```
 
 **All files should exist:**
@@ -189,8 +189,8 @@ ls -la PRE_DEPLOYMENT_CHECKLIST.md
 - [ ] `.env.production.template`
 - [ ] `VERCEL_DEPLOYMENT_GUIDE.md`
 - [ ] `HOSTINGER_DNS_SETUP.md`
-- [ ] `SUPABASE_EDGE_FUNCTIONS_STATUS.md`
-- [ ] `PRE_DEPLOYMENT_CHECKLIST.md` (this file)
+- [ ] `docs/archive/SUPABASE_EDGE_FUNCTIONS_STATUS.md`
+- [ ] `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md` (this file)
 - [ ] `DEPLOY_MIGRATION.md` (existing)
 
 ---

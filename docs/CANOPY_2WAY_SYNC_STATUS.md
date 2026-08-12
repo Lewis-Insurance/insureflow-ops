@@ -339,7 +339,7 @@ canopy_payroll (id, pull_id, class_code, employee_count, annual_payroll, ...)
 | File | Purpose |
 |------|---------|
 | `docs/CANOPY-2WAY-SYNC-IMPLEMENTATION-PLAN.md` | Original implementation plan |
-| `docs/CANOPY_CONNECT_INTEGRATION_REVIEW.md` | Integration review notes |
+| `docs/archive/CANOPY_CONNECT_INTEGRATION_REVIEW.md` | Integration review notes |
 | `docs/CANOPY_2WAY_SYNC_STATUS.md` | This document |
 
 ---

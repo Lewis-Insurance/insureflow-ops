@@ -16,8 +16,8 @@ I've set up **everything** you need to deploy InsureFlow Ops to lewisinsurance.a
 ### 2. **Documentation Files** (4 comprehensive guides)
 - ✅ `VERCEL_DEPLOYMENT_GUIDE.md` - **START HERE** (Main deployment guide)
 - ✅ `HOSTINGER_DNS_SETUP.md` - DNS configuration for your domain
-- ✅ `SUPABASE_EDGE_FUNCTIONS_STATUS.md` - Edge functions reference
-- ✅ `PRE_DEPLOYMENT_CHECKLIST.md` - Pre-flight checks
+- ✅ `docs/archive/SUPABASE_EDGE_FUNCTIONS_STATUS.md` - Edge functions reference
+- ✅ `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md` - Pre-flight checks
 
 ### 3. **Existing Files** (Already created earlier)
 - ✅ `DEPLOY_MIGRATION.md` - Database migration guide
@@ -28,7 +28,7 @@ I've set up **everything** you need to deploy InsureFlow Ops to lewisinsurance.a
 ## 🎯 Your Step-by-Step Plan
 
 ### **STEP 1: Pre-Flight Check (5 minutes)**
-Open and complete: **`PRE_DEPLOYMENT_CHECKLIST.md`**
+Open and complete: **`docs/archive/PRE_DEPLOYMENT_CHECKLIST.md`**
 
 **What it does:**
 - Verifies you have all required access (GitHub, Supabase, Hostinger)
@@ -133,11 +133,11 @@ Test checklist (from VERCEL_DEPLOYMENT_GUIDE.md Part 7):
 | When You Need... | Open This File |
 |------------------|---------------|
 | To start deployment from scratch | `VERCEL_DEPLOYMENT_GUIDE.md` (Part 1) |
-| To check if you're ready | `PRE_DEPLOYMENT_CHECKLIST.md` |
+| To check if you're ready | `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md` |
 | Help with Hostinger DNS | `HOSTINGER_DNS_SETUP.md` |
 | Database migration SQL | `supabase/migrations/20251204_add_missing_schema_objects.sql` |
 | Database migration steps | `DEPLOY_MIGRATION.md` or VERCEL guide Part 3 |
-| Edge functions info | `SUPABASE_EDGE_FUNCTIONS_STATUS.md` |
+| Edge functions info | `docs/archive/SUPABASE_EDGE_FUNCTIONS_STATUS.md` |
 | Environment variables list | `.env.production.template` |
 | Troubleshooting | Each guide has troubleshooting section |
 
@@ -153,7 +153,7 @@ Test checklist (from VERCEL_DEPLOYMENT_GUIDE.md Part 7):
 - Success criteria checklist
 - Rollback procedures
 
-### PRE_DEPLOYMENT_CHECKLIST.md
+### docs/archive/PRE_DEPLOYMENT_CHECKLIST.md
 - 10 sections of pre-flight checks
 - Credentials collection guide
 - Local environment verification
@@ -167,7 +167,7 @@ Test checklist (from VERCEL_DEPLOYMENT_GUIDE.md Part 7):
 - Propagation checking tools
 - Troubleshooting DNS issues
 
-### SUPABASE_EDGE_FUNCTIONS_STATUS.md
+### docs/archive/SUPABASE_EDGE_FUNCTIONS_STATUS.md
 - Inventory of all 49 edge functions
 - Function categories and purposes
 - Required environment variables
@@ -283,7 +283,7 @@ Deployment is successful when:
 ## 🎯 Action Items - Start Here
 
 **Right Now:**
-1. ✅ Open `PRE_DEPLOYMENT_CHECKLIST.md`
+1. ✅ Open `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md`
 2. ✅ Gather all credentials (Supabase keys, etc.)
 3. ✅ Verify you have Hostinger, GitHub, Supabase access
 
@@ -342,7 +342,7 @@ Deployment is successful when:
 **Difficulty:** Easy if you follow the guides step-by-step
 **Result:** Fully functional production application
 
-**Start Here:** `PRE_DEPLOYMENT_CHECKLIST.md`
+**Start Here:** `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md`
 **Then:** `VERCEL_DEPLOYMENT_GUIDE.md`
 **Get Help:** Ask me if you get stuck
 
@@ -386,4 +386,4 @@ A: Supabase automatically backs up daily. The migration is also non-destructive 
 
 **Ready to deploy?** Let's do this! 💪
 
-Start with: `PRE_DEPLOYMENT_CHECKLIST.md`
+Start with: `docs/archive/PRE_DEPLOYMENT_CHECKLIST.md`

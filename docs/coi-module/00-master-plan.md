@@ -1,7 +1,7 @@
 # Master COI / Additional Insureds / ACORD 25 Module: Master Plan
 
 **Status:** Implementation-ready. **Date:** 2026-07-02.
-**Supersedes:** `ACORD_COI_Module_Handoff.md` (repo root) as the implementation source. The handoff remains useful background, but this plan corrects several of its factual claims against verified source (see "Ground truth corrections" below), and where they disagree, this plan wins.
+**Supersedes:** `docs/archive/ACORD_COI_Module_Handoff.md` (archived from repo root) as the implementation source. The handoff remains useful background, but this plan corrects several of its factual claims against verified source (see "Ground truth corrections" below), and where they disagree, this plan wins.
 
 **How this plan was produced:** a six-agent verification fleet re-checked every load-bearing handoff claim against actual source (migrations, hooks, pages, and live prod row counts); six subsystem designers produced the specs in this directory; three adversarial reviewers (certificate correctness and E&O, data model and RLS, scope and UX) attacked the combined design and surfaced 12 blockers and majors; 22 binding resolutions were applied in a reconciliation pass; a final gate verified every seam, every banned pattern, and every review finding closed.
 
