@@ -38,4 +38,4 @@ After orchestrator mode is confirmed, subagents should load project context from
 - [`.cursor/rules/`](./.cursor/rules/) — Cursor-specific rules including orchestrator
 - [`ORCHESTRATOR.md`](./ORCHESTRATOR.md) — delegation playbook and review protocol
 
-For Calm Command UI work, also read `UI Overhall/zpk/design-system/` (constitution is law).
+For Calm Command UI work, also read `design-system/` (constitution is law).

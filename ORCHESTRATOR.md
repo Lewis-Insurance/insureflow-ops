@@ -106,4 +106,4 @@ When a fork in the road appears:
 
 - `CLAUDE.md` — full InsureFlow Ops architecture, DB, deployment, invariants
 - `AGENTS.md` — agent entry point for this repo
-- Domain-specific rules in `.cursor/rules/` and `UI Overhall/zpk/design-system/` when doing UI work
+- Domain-specific rules in `.cursor/rules/` and `design-system/` when doing UI work
