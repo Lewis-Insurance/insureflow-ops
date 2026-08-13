@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ArrowRight } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { useNeedsMeToday } from '@/hooks/useNeedsMeToday';
+import { useMyNeedsMeToday } from '@/hooks/useMyNeedsMeToday';
 import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
 import { usePolicySearch } from '@/hooks/usePolicySearch';
 import { supabase } from '@/integrations/supabase/client';
+import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import {
   TriageTile,
   StatusPill,
@@ -33,63 +34,87 @@ function firstName(full?: string | null): string {
 }
 
 /**
- * "My tasks" module: the real tasks due this week assigned to the signed-in user
- * (or unassigned), shaped as compact cc rows. This is the same query the legacy
- * UpcomingTasksCard ran; it is inlined here as a cc-native list rather than
- * editing that off-palette component (Badges, emoji, blue/green fills).
+ * "My tasks" module: open tasks assigned to the signed-in user (or unassigned)
+ * that are overdue or due within 7 days, soonest first. Row click opens the edit
+ * modal instead of navigating away.
  */
 function MyTasksModule() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const overdue = (due?: string) => Boolean(due && new Date(due) < new Date());
+  const isOverdue = (due?: string | null) => Boolean(due && new Date(due) < new Date());
   const hasOverdueRows = tasks.some(
     (task) =>
       task.status !== 'completed' &&
-      overdue(task.due_at) &&
+      isOverdue(task.due_at) &&
       ['pending', 'in_progress'].includes(task.status ?? ''),
   );
-  const tasksHref = hasOverdueRows ? '/tasks?cohort=overdue' : '/tasks';
+  const tasksHref = hasOverdueRows
+    ? '/tasks?cohort=overdue&scope=mine'
+    : '/tasks?scope=mine';
+
+  const load = async () => {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const { data } = await supabase
+      .from('tasks')
+      .select(
+        `
+          *,
+          account:accounts(id, name),
+          policy:policies(id, policy_number, carrier, line_of_business)
+        `,
+      )
+      .lte('due_at', weekEnd.toISOString())
+      .in('status', ['pending', 'in_progress'])
+      .or(`assignee_id.eq.${user.id},assignee_id.is.null`)
+      .order('due_at', { ascending: true })
+      .limit(6);
+    setTasks((data as unknown as Task[]) || []);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        if (active) {
-          setTasks([]);
-          setLoading(false);
-        }
-        return;
-      }
-      // Open tasks due now or sooner, mine or unassigned, soonest first.
-      const weekEnd = new Date();
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      const { data } = await supabase
-        .from('tasks')
-        .select('id, title, status, priority, due_at, account:accounts(id, name)')
-        .lte('due_at', weekEnd.toISOString())
-        .in('status', ['pending', 'in_progress'])
-        .or(`assignee_id.eq.${user.id},assignee_id.is.null`)
-        .order('due_at', { ascending: true })
-        .limit(6);
-      if (active) {
-        setTasks((data as unknown as Task[]) || []);
-        setLoading(false);
-      }
-    };
     load();
     const onUpdated = () => load();
     window.addEventListener('tasks:updated', onUpdated as EventListener);
-    return () => {
-      active = false;
-      window.removeEventListener('tasks:updated', onUpdated as EventListener);
-    };
+    return () => window.removeEventListener('tasks:updated', onUpdated as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setModalOpen(true);
+  };
+
+  const handleTaskUpdate = async () => {
+    window.dispatchEvent(new CustomEvent('tasks:updated'));
+    await load();
+    setModalOpen(false);
+  };
+
+  const dueLabel = (dueAt?: string | null) => {
+    if (!dueAt) return null;
+    const due = new Date(dueAt);
+    if (isOverdue(dueAt)) {
+      const days = differenceInDays(new Date(), due);
+      const n = Math.max(days, 1);
+      return `${n} day${n === 1 ? '' : 's'} overdue`;
+    }
+    return `Due ${format(due, 'MMM d')}`;
+  };
 
   return (
     <section className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
@@ -133,13 +158,13 @@ function MyTasksModule() {
       ) : (
         <div className="-mx-2">
           {tasks.map((task) => {
-            const isOverdue = task.status !== 'completed' && overdue(task.due_at);
+            const overdue = task.status !== 'completed' && isOverdue(task.due_at);
             const account = (task as unknown as { account?: { name?: string } }).account;
             return (
               <button
                 key={task.id}
                 type="button"
-                onClick={() => navigate(tasksHref)}
+                onClick={() => handleTaskClick(task)}
                 className="flex w-full items-center justify-between gap-4 rounded-cc-md px-2 py-2.5 text-left transition-colors hover:bg-cc-surface-raised"
               >
                 <div className="min-w-0">
@@ -147,18 +172,27 @@ function MyTasksModule() {
                   <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-cc-text-muted">
                     {account?.name && <span className="truncate">{account.name}</span>}
                     {task.due_at && (
-                      <span className="cc-num whitespace-nowrap">
-                        Due {format(new Date(task.due_at), 'MMM d')}
+                      <span
+                        className={`cc-num whitespace-nowrap ${overdue ? 'text-cc-danger-pill-text font-medium' : ''}`}
+                      >
+                        {dueLabel(task.due_at)}
                       </span>
                     )}
                   </div>
                 </div>
-                <StatusPill status={isOverdue ? 'overdue' : task.status} />
+                <StatusPill status={overdue ? 'overdue' : task.status} />
               </button>
             );
           })}
         </div>
       )}
+
+      <TaskEditModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        task={selectedTask}
+        onTaskUpdate={handleTaskUpdate}
+      />
     </section>
   );
 }
@@ -253,7 +287,7 @@ function RenewalsModule() {
 export default function ProducerDashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { counts, loading } = useNeedsMeToday();
+  const { counts, loading } = useMyNeedsMeToday();
   const { counts: customerCounts } = useCustomerTriageCounts();
 
   const name = firstName(profile?.full_name);
@@ -289,10 +323,7 @@ export default function ProducerDashboard() {
           )}
         </header>
 
-        {/* Triage strip: what needs me today, scoped server-side from real signals.
-            While "needs me today" loads, show count-shaped skeleton tiles (designed
-            loading state, never a bare glyph or spinner). The Customers tile reads
-            from its own already-loaded total and routes into the book. */}
+        {/* Triage strip: producer-scoped counts (my work) except renewals (agency book). */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {loading ? (
             <>
@@ -319,16 +350,16 @@ export default function ProducerDashboard() {
               <TriageTile
                 label="Overdue tasks"
                 count={counts.overdue_tasks}
-                sub={counts.overdue_tasks > 0 ? 'Past due, act' : 'All clear'}
+                sub={counts.overdue_tasks > 0 ? 'Assigned to you' : 'All clear'}
                 tone={counts.overdue_tasks > 0 ? 'danger' : 'neutral'}
-                onClick={() => navigate('/tasks?cohort=overdue')}
+                onClick={() => navigate('/tasks?cohort=overdue&scope=mine')}
               />
               <TriageTile
                 label="New leads"
                 count={counts.new_leads}
                 sub="Reach out"
                 tone="info"
-                onClick={() => navigate('/leads?cohort=new')}
+                onClick={() => navigate('/leads?cohort=new&scope=mine')}
               />
             </>
           )}

@@ -171,7 +171,21 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue');
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', undefined);
+    });
+  });
+
+  it('TasksPage fetches with overdue and scope=mine when both are in the URL', async () => {
+    const fetchTasks = stubSearchHook(useTaskSearch, 'fetchTasks');
+
+    render(
+      <MemoryRouter initialEntries={['/tasks?cohort=overdue&scope=mine']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine');
     });
   });
 
@@ -185,7 +199,21 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchLeads).toHaveBeenCalledWith('', 'score_desc', 'new');
+      expect(fetchLeads).toHaveBeenCalledWith('', 'score_desc', 'new', undefined, undefined);
+    });
+  });
+
+  it('Leads fetches with scope=mine when scope is in the URL', async () => {
+    const fetchLeads = stubSearchHook(useLeadSearch, 'fetchLeads');
+
+    render(
+      <MemoryRouter initialEntries={['/leads?cohort=new&scope=mine']}>
+        <Leads />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(fetchLeads).toHaveBeenCalledWith('', 'score_desc', 'new', undefined, 'mine');
     });
   });
 

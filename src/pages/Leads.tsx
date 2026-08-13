@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Search, X, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { useLeadSearch } from '@/hooks/useLeadSearch';
 import { useLeadTriageCounts } from '@/hooks/useLeadTriageCounts';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
+import { useTriageCohortFromUrl, parseScopeFromUrl } from '@/hooks/useTriageCohortFromUrl';
 import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,8 @@ function scoreColor(score: number | null): string {
 export default function Leads() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const scope = parseScopeFromUrl(searchParams.get('scope'));
 
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,18 +79,21 @@ export default function Leads() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      if (cohort !== 'all') {
-        fetchLeads(searchQuery, 'score_desc', cohort);
+      if (cohort !== 'all' || scope) {
+        fetchLeads(searchQuery, 'score_desc', cohort !== 'all' ? cohort : undefined, undefined, scope);
       }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchLeads(searchQuery, 'score_desc', cohort), 250);
+    debounceRef.current = setTimeout(
+      () => fetchLeads(searchQuery, 'score_desc', cohort !== 'all' ? cohort : undefined, undefined, scope),
+      250,
+    );
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, cohort]);
+  }, [searchQuery, cohort, scope]);
 
   const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
   const filtersActive = cohort !== 'all' || searchQuery.length > 0;
