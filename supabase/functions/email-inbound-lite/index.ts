@@ -477,7 +477,11 @@ serve(async (req) => {
 
   try {
     const provided = req.headers.get('x-parse-secret') || req.headers.get('authorization')?.replace('Bearer ','');
-    if (PARSE_SECRET && provided !== PARSE_SECRET) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+    if (!PARSE_SECRET) {
+      console.error('INBOUND_PARSE_SECRET not configured - rejecting request');
+      return new Response('Server configuration error', { status: 500, headers: corsHeaders });
+    }
+    if (provided !== PARSE_SECRET) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
 
     const body = await jsonOrForm(req);
     const from = String(body.from || '').trim();
