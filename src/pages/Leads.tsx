@@ -14,6 +14,7 @@ import { useLeadSearch } from '@/hooks/useLeadSearch';
 import { useLeadTriageCounts } from '@/hooks/useLeadTriageCounts';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
 import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,8 @@ import { cn } from '@/lib/utils';
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 // 'hot' is lead_score >= 70 (see useLeadTriageCounts).
 type Cohort = 'all' | 'new' | 'hot' | 'qualified' | 'quoted';
+
+const LEAD_COHORTS = ['all', 'new', 'hot', 'qualified', 'quoted'] as const satisfies readonly Cohort[];
 
 // The secondary views are preserved unchanged behind a single segmented control.
 // 'list' is the Calm Command Index list and the default.
@@ -53,7 +56,7 @@ export default function Leads() {
 
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cohort, setCohort] = useState<Cohort>('all');
+  const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(LEAD_COHORTS);
 
   const { leads, loading, loadingMore, hasMore, fetchLeads, fetchNextPage } = useLeadSearch();
   const { counts } = useLeadTriageCounts();
@@ -74,6 +77,9 @@ export default function Leads() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      if (cohort !== 'all') {
+        fetchLeads(searchQuery, 'score_desc', cohort);
+      }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);

@@ -43,6 +43,15 @@ function MyTasksModule() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const overdue = (due?: string) => Boolean(due && new Date(due) < new Date());
+  const hasOverdueRows = tasks.some(
+    (task) =>
+      task.status !== 'completed' &&
+      overdue(task.due_at) &&
+      ['pending', 'in_progress'].includes(task.status ?? ''),
+  );
+  const tasksHref = hasOverdueRows ? '/tasks?cohort=overdue' : '/tasks';
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -82,15 +91,13 @@ function MyTasksModule() {
     };
   }, []);
 
-  const overdue = (due?: string) => Boolean(due && new Date(due) < new Date());
-
   return (
     <section className="rounded-cc-xl border border-cc-border-subtle bg-cc-surface p-5 shadow-card">
       <div className="mb-4 flex items-center justify-between">
         <SectionLabel>My tasks</SectionLabel>
         <button
           type="button"
-          onClick={() => navigate('/tasks')}
+          onClick={() => navigate(tasksHref)}
           className="inline-flex items-center gap-1 text-sm text-cc-text-secondary transition-colors hover:text-cc-text-primary"
         >
           View all
@@ -117,7 +124,7 @@ function MyTasksModule() {
           </p>
           <Button
             variant="outline"
-            onClick={() => navigate('/tasks')}
+            onClick={() => navigate(tasksHref)}
             className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
           >
             Go to tasks
@@ -132,7 +139,7 @@ function MyTasksModule() {
               <button
                 key={task.id}
                 type="button"
-                onClick={() => navigate('/tasks')}
+                onClick={() => navigate(tasksHref)}
                 className="flex w-full items-center justify-between gap-4 rounded-cc-md px-2 py-2.5 text-left transition-colors hover:bg-cc-surface-raised"
               >
                 <div className="min-w-0">
@@ -178,7 +185,7 @@ function RenewalsModule() {
         <SectionLabel>Renewals this month</SectionLabel>
         <button
           type="button"
-          onClick={() => navigate('/policies')}
+          onClick={() => navigate('/policies?cohort=expiring_30d')}
           className="inline-flex items-center gap-1 text-sm text-cc-text-secondary transition-colors hover:text-cc-text-primary"
         >
           View all
@@ -205,7 +212,7 @@ function RenewalsModule() {
           </p>
           <Button
             variant="outline"
-            onClick={() => navigate('/policies')}
+            onClick={() => navigate('/policies?cohort=expiring_30d')}
             className="rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-primary hover:bg-cc-surface-overlay"
           >
             Go to policies
@@ -273,7 +280,7 @@ export default function ProducerDashboard() {
           {hasNextAction && (
             <Button
               data-primary
-              onClick={() => navigate('/policies')}
+              onClick={() => navigate('/policies?cohort=expiring_30d')}
               className="gap-2 rounded-cc-md font-semibold transition-shadow duration-base ease-glide hover:shadow-glow"
             >
               Work renewals
@@ -307,21 +314,21 @@ export default function ProducerDashboard() {
                 count={counts.renewals_due}
                 sub="Next 30 days"
                 tone="warning"
-                onClick={() => navigate('/policies')}
+                onClick={() => navigate('/policies?cohort=expiring_30d')}
               />
               <TriageTile
                 label="Overdue tasks"
                 count={counts.overdue_tasks}
                 sub={counts.overdue_tasks > 0 ? 'Past due, act' : 'All clear'}
                 tone={counts.overdue_tasks > 0 ? 'danger' : 'neutral'}
-                onClick={() => navigate('/tasks')}
+                onClick={() => navigate('/tasks?cohort=overdue')}
               />
               <TriageTile
                 label="New leads"
                 count={counts.new_leads}
                 sub="Reach out"
                 tone="info"
-                onClick={() => navigate('/leads')}
+                onClick={() => navigate('/leads?cohort=new')}
               />
             </>
           )}

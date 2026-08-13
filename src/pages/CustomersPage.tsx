@@ -14,9 +14,18 @@ import { useTags } from '@/hooks/useTags';
 import { StatusPill, Chip, SectionLabel, NextRenewal, SkeletonRow } from '@/components/cc';
 import { humanizeAccountType } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
 type Cohort = 'all' | 'renewals_30d' | 'overdue' | 'no_active_policy' | 'new_30d';
+
+const CUSTOMER_COHORTS = [
+  'all',
+  'renewals_30d',
+  'overdue',
+  'no_active_policy',
+  'new_30d',
+] as const satisfies readonly Cohort[];
 type TypeFilter = 'all' | 'household' | 'business';
 
 // Dense table column template (md+). Renewal replaces the structurally-null
@@ -104,7 +113,7 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
-  const [cohort, setCohort] = useState<Cohort>('all');
+  const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(CUSTOMER_COHORTS);
 
   // Global chrome (header "New customer" / Cmd-K) opens the add-customer modal here.
   useChromeAction('new-customer', useCallback(() => setAddCustomerOpen(true), []));
@@ -131,6 +140,9 @@ export default function CustomersPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      if (cohort !== 'all') {
+        fetchCustomers(searchQuery, 'updated_at_desc', cohort, serverType);
+      }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);

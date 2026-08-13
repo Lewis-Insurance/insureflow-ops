@@ -47,9 +47,9 @@ interface TodayRow {
 
 function todayRows(counts: NeedsMeToday): TodayRow[] {
   return [
-    { label: 'Renewals due', icon: RefreshCw, count: counts.renewals_due, to: '/renewals' },
-    { label: 'Overdue tasks', icon: CheckSquare, count: counts.overdue_tasks, to: '/tasks' },
-    { label: 'New leads', icon: TrendingUp, count: counts.new_leads, to: '/leads' },
+    { label: 'Renewals due', icon: RefreshCw, count: counts.renewals_due, to: '/policies?cohort=expiring_30d' },
+    { label: 'Overdue tasks', icon: CheckSquare, count: counts.overdue_tasks, to: '/tasks?cohort=overdue' },
+    { label: 'New leads', icon: TrendingUp, count: counts.new_leads, to: '/leads?cohort=new' },
   ];
 }
 
