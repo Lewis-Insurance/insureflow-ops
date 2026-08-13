@@ -40,7 +40,12 @@ async function validateTwilioSignature(
   );
 
   const expectedSignature = encodeBase64(new Uint8Array(signatureBytes));
-  return signature === expectedSignature;
+  if (signature.length !== expectedSignature.length) return false;
+  let result = 0;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 serve(async (req) => {
