@@ -21,10 +21,10 @@ AS $function$
          AND status IN ('pending','in_progress')
          AND due_at IS NOT NULL AND due_at < now()
          AND (assignee_id = auth.uid() OR assignee_id IS NULL)),
-    -- New leads explicitly assigned to me only (unassigned leads stay in the agency pool).
+    -- New leads assigned to me or unassigned (matches search_leads scope=mine).
     (SELECT count(*)::int FROM public.leads
        WHERE deleted_at IS NULL AND status = 'new'
-         AND assigned_to = auth.uid())
+         AND (assigned_to = auth.uid() OR assigned_to IS NULL))
   WHERE public.is_staff();
 $function$;
 
