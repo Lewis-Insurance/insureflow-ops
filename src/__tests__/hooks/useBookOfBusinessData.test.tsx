@@ -45,9 +45,9 @@ function mockBookOfBusinessSupabase({
   const selectCalls: SelectCall[] = [];
 
   const personalOr =
-    'type.eq.household,type.eq.individual,type.eq.personal,account_type.eq.individual,account_type.eq.personal';
+    'type.eq.household,account_type.eq.individual,account_type.eq.household';
   const commercialOr =
-    'type.eq.business,type.eq.commercial,type.eq.commercial_business,type.eq.corporate,account_type.eq.business,account_type.eq.commercial,account_type.eq.corporate';
+    'type.eq.commercial_business,account_type.eq.business';
 
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === 'accounts') {

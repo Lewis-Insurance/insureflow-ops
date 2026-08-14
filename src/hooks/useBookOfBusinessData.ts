@@ -13,10 +13,10 @@ interface BookOfBusinessData {
 }
 
 const PERSONAL_OR_FILTER =
-  'type.eq.household,type.eq.individual,type.eq.personal,account_type.eq.individual,account_type.eq.personal';
+  'type.eq.household,account_type.eq.individual,account_type.eq.household';
 
 const COMMERCIAL_OR_FILTER =
-  'type.eq.business,type.eq.commercial,type.eq.commercial_business,type.eq.corporate,account_type.eq.business,account_type.eq.commercial,account_type.eq.corporate';
+  'type.eq.commercial_business,account_type.eq.business';
 
 async function countAccounts(orFilter: string, withPolicies = false): Promise<number> {
   const selectColumns = withPolicies ? 'id, policies!inner(id)' : 'id';
