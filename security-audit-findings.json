@@ -1,0 +1,123 @@
+{
+  "audit_date": "2026-08-14",
+  "auditor": "Automated Security Audit",
+  "scope": "Webhook signature verification, hardcoded secrets, injection vulnerabilities",
+  "findings": [
+    {
+      "severity": "high",
+      "location": "supabase/functions/esign-webhook/index.ts",
+      "title": "eSign webhook processes requests without enforcing signature verification",
+      "description": "The esign-webhook handler has signature verification code (verifyWebhookSignature) but treats it as advisory rather than mandatory. When the API key is set but the signature header is missing, the request still proceeds. When the signature is present but invalid, only a warning is logged and processing continues. The code comments explicitly state 'For now, we log a warning but continue' (line 345). This means any attacker can send forged Dropbox Sign webhook events that will be processed.",
+      "impact": "An attacker can forge webhook payloads to: (1) update signature request statuses in the database (mark documents as signed/declined/cancelled), (2) trigger download and storage of attacker-controlled PDFs via the processSignedDocument flow which fetches from Dropbox Sign API using the stored signature_request_id, (3) update ACORD form signed_pdf_url and signature_status, effectively injecting malicious document links into the system.",
+      "attack_path": [
+        "1. Attacker discovers the Supabase edge function URL for esign-webhook (public endpoint)",
+        "2. Attacker sends a POST request with a crafted DropboxSignEvent JSON payload",
+        "3. No x-hellosign-signature header is required (line 346: signature check is inside an `if (signature)` block)",
+        "4. Even if a signature is provided and fails verification, only a warning is logged (line 349), processing continues",
+        "5. The handler looks up the signature_request_id in the database and updates its status",
+        "6. If the forged event says 'all_signed', the function downloads a PDF from Dropbox Sign API and stores it"
+      ],
+      "evidence": [
+        "supabase/functions/esign-webhook/index.ts:341-352",
+        "supabase/functions/esign-webhook/index.ts:344 (comment: 'Note: In production, you should fail if signature doesn't match')",
+        "supabase/functions/esign-webhook/index.ts:417-428 (database update proceeds regardless)"
+      ],
+      "remediation": "Change signature verification from advisory to mandatory. When DROPBOX_ACCESS_TOKEN is set, require the x-hellosign-signature header and reject requests where verification fails with a 401 response. When the API key is not set, reject the request entirely (fail closed). Remove the 'continue on failure' pattern."
+    },
+    {
+      "severity": "medium",
+      "location": "supabase/functions/parseur-webhook/index.ts",
+      "title": "PostgREST filter injection via unsanitized webhook payload values in .or() clause",
+      "description": "The parseur-webhook interpolates values from the parsed webhook payload (parseurId, workspaceId, fileName) directly into a PostgREST .or() filter string at line 64 without any sanitization. While the webhook itself is protected by API key auth (PARSEUR_WEBHOOK_API_KEY), the values come from the external Parseur service. If Parseur is compromised or sends unexpected data containing PostgREST operators (e.g., commas, parentheses, or additional filter conditions), the query can be manipulated.",
+      "impact": "An attacker who compromises Parseur (or intercepts/replays its requests with a valid API key) could inject additional PostgREST filter conditions to query arbitrary workspace_documents records, potentially accessing documents from other workspaces. The fileName field is especially dangerous as it's a free-text string that could contain PostgREST filter operators.",
+      "attack_path": [
+        "1. Attacker compromises Parseur or obtains the PARSEUR_WEBHOOK_API_KEY",
+        "2. Sends a webhook payload with fileName containing PostgREST filter injection: e.g., 'test),workspace_id.neq.null'",
+        "3. The .or() filter becomes: 'parseur_document_id.eq.X,and(workspace_id.eq.Y,file_name.eq.test),workspace_id.neq.null)'",
+        "4. This alters the query logic, potentially returning documents from other workspaces"
+      ],
+      "evidence": [
+        "supabase/functions/parseur-webhook/index.ts:64"
+      ],
+      "remediation": "Use parameterized PostgREST filters instead of string interpolation. Replace the .or() template literal with separate chained .eq() calls, or use the PostgREST filter builder's proper escaping. For example, use two separate queries (one by parseurId, one by workspace+fileName) and merge results."
+    },
+    {
+      "severity": "medium",
+      "location": "supabase/functions/email-inbound/index.ts",
+      "title": "PostgREST filter injection via unsanitized email 'from' address in .or() clause",
+      "description": "The email-inbound function interpolates the 'from' field from the inbound email payload directly into a PostgREST .or() filter at line 47. The 'from' field comes from the parsed inbound email, which is externally controlled. The value is used to check the allowlist: `.or(`value.eq.${from},value.eq.${from.split('@')[1]}`)`. A crafted sender address containing PostgREST operators could bypass the allowlist check or alter the query.",
+      "impact": "An attacker could craft an email with a sender address containing PostgREST filter operators to bypass the inbound_allowlist check and get their email processed, potentially creating support tickets from unauthorized senders. The function uses service_role key to interact with the database.",
+      "attack_path": [
+        "1. Attacker sends an email to the inbound parse endpoint (mail provider forwards to Supabase function)",
+        "2. The 'from' address is crafted to contain PostgREST operators, e.g., 'attacker@evil.com),is_active.eq.true,value.neq.null--'",
+        "3. The .or() filter is injected, potentially matching any allowlist record",
+        "4. The email bypasses the allowlist and is processed into a support ticket",
+        "5. Ticket content/attachments are stored in the database and Supabase storage"
+      ],
+      "evidence": [
+        "supabase/functions/email-inbound/index.ts:47"
+      ],
+      "remediation": "Replace the .or() template literal with parameterized queries. Use separate .eq() calls or the PostgREST filter builder's safe escaping. Additionally, validate and sanitize the 'from' email address format before using it in queries."
+    },
+    {
+      "severity": "medium",
+      "location": "supabase/functions/create_workspace/index.ts",
+      "title": "SSRF via user-supplied file_url in workspace document creation",
+      "description": "The create_workspace function accepts a documents array from the authenticated user's request body. Each document has a file_url field. When the URL is not a Supabase Storage URL, the function fetches it directly via `fetch(d.file_url)` at line 227 with no URL validation, no domain allowlisting, and no protection against internal network access. An authenticated user can provide arbitrary URLs, including internal services, cloud metadata endpoints, or localhost addresses.",
+      "impact": "An authenticated attacker can use the server as a proxy to scan internal networks, access cloud metadata endpoints (e.g., http://169.254.169.254/latest/meta-data/ on AWS), or reach other internal services. The response content is uploaded to Parseur, but errors and response sizes are logged, enabling blind SSRF reconnaissance.",
+      "attack_path": [
+        "1. Authenticated user calls create_workspace with a document containing file_url pointing to an internal service",
+        "2. The function fetches the URL server-side (line 227): `const response = await fetch(d.file_url)`",
+        "3. The response body is read as a blob and forwarded to Parseur for parsing",
+        "4. Error messages reveal whether internal hosts are reachable and response sizes"
+      ],
+      "evidence": [
+        "supabase/functions/create_workspace/index.ts:224-234"
+      ],
+      "remediation": "Add URL validation: (1) parse the URL and reject private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x, ::1, fc00::/7), (2) enforce HTTPS-only, (3) maintain an allowlist of permitted external domains, (4) set a reasonable timeout and response size limit."
+    },
+    {
+      "severity": "medium",
+      "location": "scripts/phase3-dev-soak.sh",
+      "title": "Hardcoded default CRON_SECRET in committed soak test scripts usable against dev environment",
+      "description": "Nine soak test scripts in the scripts/ directory contain a hardcoded default CRON_SECRET value 'floor-dev-soak-cron-20260701' (via ${CRON_SECRET:-floor-dev-soak-cron-20260701}). These scripts also contain a hardcoded dev Supabase project reference ('klnygbbmognbslgobmzc'), agency workspace IDs, account IDs, and staff email addresses. While these are development/staging values, the CRON_SECRET default is committed to a (potentially public) repository and could be used to invoke CRON-authenticated edge functions on the dev environment.",
+      "impact": "If the dev/staging environment uses this default CRON_SECRET (which is likely since it's the default value these scripts use), anyone with access to the repository can invoke all CRON_SECRET-protected edge functions (weekly-ceo-digest, run-retention-scoring, run-coverage-gap-detection, process-document-tasks, dispatch-outbox, etc.) on the dev environment. These functions have service_role access and can read/modify all data.",
+      "attack_path": [
+        "1. Attacker reads the default CRON_SECRET from any of the 9 soak test scripts in the repo",
+        "2. The dev Supabase URL is also hardcoded: https://klnygbbmognbslgobmzc.supabase.co",
+        "3. Attacker calls any CRON_SECRET-protected edge function with header X-Cron-Secret: floor-dev-soak-cron-20260701",
+        "4. Functions like weekly-ceo-digest, dispatch-outbox, etc. execute with service_role privileges"
+      ],
+      "evidence": [
+        "scripts/phase3-dev-soak.sh:22",
+        "scripts/phase3-g4-soak.sh:22",
+        "scripts/phase3-slice7-kill-hold-soak.sh:21",
+        "scripts/phase4-gap-roundout-soak.sh:20",
+        "scripts/phase4-nonpay-watch-soak.sh:23",
+        "scripts/phase4-open-item-nudge-soak.sh:20",
+        "scripts/phase5-heartbeat-soak.sh:18",
+        "scripts/phase5-morning-tray-soak.sh:18",
+        "scripts/phase5-retention-save-soak.sh:22"
+      ],
+      "remediation": "Remove the hardcoded default CRON_SECRET from all soak scripts. Require CRON_SECRET to be set as an environment variable with no fallback default. Ensure the dev/staging CRON_SECRET is rotated to a value not present in the repository. Consider adding these scripts to .gitignore or moving credentials to a secrets manager."
+    },
+    {
+      "severity": "medium",
+      "location": "supabase/functions/automation-gateway/index.ts",
+      "title": "PostgREST filter injection via unsanitized email/phone in lead dedup .or() clause",
+      "description": "The automation-gateway function's lead.dedupe.check action interpolates email and phone values from the automation payload directly into PostgREST .or() filters at lines 198 and 201. These values originate from n8n automation workflows or other external triggers. If the automation payload contains crafted email/phone values with PostgREST operators, the query can be manipulated to return arbitrary lead records.",
+      "impact": "An attacker who can trigger or manipulate automation payloads (e.g., via a compromised n8n instance, or by creating a lead with a crafted email/phone that flows into an automation) could inject PostgREST filter operators to query arbitrary lead records across the system, potentially leaking PII (email, phone, status) from leads they shouldn't have access to.",
+      "attack_path": [
+        "1. Attacker creates or modifies a lead with email containing PostgREST operators, e.g., 'test@evil.com,status.neq.null'",
+        "2. An automation flow triggers the lead.dedupe.check action with this crafted email",
+        "3. The .or() filter becomes: 'email.eq.test@evil.com,status.neq.null' which matches all leads with any status",
+        "4. Up to 10 lead records are returned, leaking PII"
+      ],
+      "evidence": [
+        "supabase/functions/automation-gateway/index.ts:198",
+        "supabase/functions/automation-gateway/index.ts:201"
+      ],
+      "remediation": "Replace string interpolation in .or() with parameterized PostgREST filters. Use .eq('email', email) directly rather than constructing filter strings with template literals."
+    }
+  ]
+}
