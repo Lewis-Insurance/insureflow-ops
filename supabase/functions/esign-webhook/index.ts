@@ -338,17 +338,31 @@ Deno.serve(async (req: Request) => {
     // Get API key for signature verification
     const apiKey = Deno.env.get('DROPBOX_ACCESS_TOKEN');
 
-    // Verify webhook signature (optional but recommended)
-    if (apiKey) {
-      const signature = req.headers.get('x-hellosign-signature');
-      // Note: In production, you should fail if signature doesn't match
-      // For now, we log a warning but continue
-      if (signature) {
-        const isValid = await verifyWebhookSignature(rawBody, signature, apiKey);
-        if (!isValid) {
-          logger.warn('Webhook signature verification failed');
-        }
-      }
+    // Verify webhook signature
+    if (!apiKey) {
+      logger.error('DROPBOX_ACCESS_TOKEN not configured - rejecting webhook');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers }
+      );
+    }
+
+    const signature = req.headers.get('x-hellosign-signature');
+    if (!signature) {
+      logger.error('Missing x-hellosign-signature header - rejecting request');
+      return new Response(
+        JSON.stringify({ error: 'Missing signature' }),
+        { status: 401, headers }
+      );
+    }
+
+    const isValid = await verifyWebhookSignature(rawBody, signature, apiKey);
+    if (!isValid) {
+      logger.error('Webhook signature verification failed - rejecting request');
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { status: 401, headers }
+      );
     }
 
     // Initialize Supabase client

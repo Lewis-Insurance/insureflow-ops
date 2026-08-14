@@ -34,14 +34,19 @@ Deno.serve(async (req: Request) => {
 
   // Scheduled job: gate on the cron secret (no public access).
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (cronSecret) {
-    const provided = req.headers.get('X-Cron-Secret');
-    if (!provided || !timingSafeEqual(provided, cronSecret)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...CORS, 'Content-Type': 'application/json' },
-      });
-    }
+  if (!cronSecret) {
+    console.error('[suggest-account-links] CRON_SECRET not configured - rejecting request');
+    return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      status: 500,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+  const provided = req.headers.get('X-Cron-Secret');
+  if (!provided || !timingSafeEqual(provided, cronSecret)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

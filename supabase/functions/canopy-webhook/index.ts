@@ -355,9 +355,11 @@ serve(async (req) => {
 
       logger.info('Signature verified successfully');
     } else {
-      // No secret configured - warn but allow (for initial setup/testing)
-      logger.warn('CANOPY_WEBHOOK_SECRET not configured - signature verification disabled. Configure secret for production!');
-      signatureValid = true; // Mark as valid since we can't verify
+      logger.error('CANOPY_WEBHOOK_SECRET not configured - rejecting request');
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Parse payload
