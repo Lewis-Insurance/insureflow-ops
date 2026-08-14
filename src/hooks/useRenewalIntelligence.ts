@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  EMPTY_RENEWAL_INTELLIGENCE_SUMMARY,
+  fetchAllSupabaseRows,
+  mapRenewalIntelligenceSummaryRow,
+  type RenewalIntelligenceSummaryRow,
+} from '@/lib/renewalIntelligenceSummary';
 
 export interface AtRiskRenewal {
   id: string;
@@ -47,25 +53,23 @@ export interface RenewalIntelligenceSummary {
   active_campaigns: number;
 }
 
-// Fetch at-risk renewals
+// Fetch at-risk renewals (paginated to exceed PostgREST max_rows)
 export const useAtRiskRenewals = () => {
   return useQuery({
     queryKey: ['at-risk-renewals'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('renewals')
-          .select('*')
-          .not('risk_score', 'is', null)
-          .gte('risk_score', 50)
-          .in('status', ['upcoming', 'in_progress'])
-          .order('risk_score', { ascending: false });
-
-        if (error) {
-          console.warn('Error fetching at-risk renewals:', error.message);
-          return [] as AtRiskRenewal[];
-        }
-        return (data || []) as AtRiskRenewal[];
+        const rows = await fetchAllSupabaseRows<AtRiskRenewal>(({ from, to }) =>
+          supabase
+            .from('renewals')
+            .select('*')
+            .not('risk_score', 'is', null)
+            .gte('risk_score', 50)
+            .in('status', ['upcoming', 'in_progress'])
+            .order('risk_score', { ascending: false })
+            .range(from, to)
+        );
+        return rows;
       } catch (err) {
         console.error('Error in at-risk renewals:', err);
         return [] as AtRiskRenewal[];
@@ -74,84 +78,24 @@ export const useAtRiskRenewals = () => {
   });
 };
 
-// Get renewal intelligence summary
+// Get renewal intelligence summary (server-side counts via RPC)
 export const useRenewalIntelligenceSummary = () => {
   return useQuery({
     queryKey: ['renewal-intelligence-summary'],
     queryFn: async () => {
       try {
-        // Fetch all upcoming/in-progress renewals
-        const { data: renewals, error } = await supabase
-          .from('renewals')
-          .select('risk_level, risk_score, renewal_date')
-          .in('status', ['upcoming', 'in_progress']);
+        const { data, error } = await supabase.rpc('get_renewal_intelligence_summary');
 
-        // If table doesn't exist or error, return empty summary
         if (error) {
-          console.warn('Error fetching renewals for intelligence:', error.message);
-          return {
-            total_renewals: 0,
-            renewals_next_30_days: 0,
-            critical_risk: 0,
-            high_risk: 0,
-            medium_risk: 0,
-            low_risk: 0,
-            avg_risk_score: 0,
-            active_campaigns: 0,
-          } as RenewalIntelligenceSummary;
+          console.warn('Error fetching renewal intelligence summary:', error.message);
+          return { ...EMPTY_RENEWAL_INTELLIGENCE_SUMMARY };
         }
 
-        const allRenewals = (renewals || []);
-        const now = new Date();
-        const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-        // Count renewals in next 30 days
-        const renewalsNext30Days = allRenewals.filter(r => {
-          if (!r.renewal_date) return false;
-          const renewalDate = new Date(r.renewal_date);
-          return renewalDate >= now && renewalDate <= thirtyDaysFromNow;
-        }).length;
-
-        // Count active campaigns - wrap in try/catch in case table doesn't exist
-        let activeCampaigns = 0;
-        try {
-          const { data: campaigns } = await supabase
-            .from('renewal_campaigns')
-            .select('id', { count: 'exact' })
-            .eq('status', 'active');
-          activeCampaigns = campaigns?.length || 0;
-        } catch {
-          // renewal_campaigns table may not exist
-          console.warn('renewal_campaigns table not found');
-        }
-
-        const summary: RenewalIntelligenceSummary = {
-          total_renewals: allRenewals.length,
-          renewals_next_30_days: renewalsNext30Days,
-          critical_risk: allRenewals.filter(r => r.risk_level === 'critical').length,
-          high_risk: allRenewals.filter(r => r.risk_level === 'high').length,
-          medium_risk: allRenewals.filter(r => r.risk_level === 'medium').length,
-          low_risk: allRenewals.filter(r => r.risk_level === 'low').length,
-          avg_risk_score: allRenewals.length > 0
-            ? Math.round(allRenewals.reduce((sum: number, r: any) => sum + (r.risk_score || 0), 0) / allRenewals.length)
-            : 0,
-          active_campaigns: activeCampaigns,
-        };
-
-        return summary;
+        const row = (data?.[0] ?? null) as RenewalIntelligenceSummaryRow | null;
+        return mapRenewalIntelligenceSummaryRow(row);
       } catch (err) {
         console.error('Error in renewal intelligence summary:', err);
-        // Return empty summary on error
-        return {
-          total_renewals: 0,
-          renewals_next_30_days: 0,
-          critical_risk: 0,
-          high_risk: 0,
-          medium_risk: 0,
-          low_risk: 0,
-          avg_risk_score: 0,
-          active_campaigns: 0,
-        } as RenewalIntelligenceSummary;
+        return { ...EMPTY_RENEWAL_INTELLIGENCE_SUMMARY };
       }
     },
   });
