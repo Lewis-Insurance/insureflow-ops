@@ -204,7 +204,7 @@ export function TaskKanbanBoard({ accountId, scope }: TaskKanbanBoardProps) {
         onOpenChange={setEditModalOpen}
         task={editingTask}
         onTaskUpdate={() => {
-          fetchTasks();
+          fetchTasks({ scope });
           setEditModalOpen(false);
         }}
       />

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('@/components/tasks/TaskEditModal', () => ({ TaskEditModal: () => null }));
 
@@ -63,5 +63,20 @@ describe('TaskKanbanBoard assignee display', () => {
     render(<TaskKanbanBoard />);
 
     expect(screen.getByText('Unclaimed')).toBeInTheDocument();
+  });
+
+  it('fetches with the active scope from TasksPage', async () => {
+    vi.mocked(useTasks).mockReturnValue({
+      tasks: [],
+      loading: false,
+      fetchTasks,
+      updateTask: vi.fn(),
+    } as ReturnType<typeof useTasks>);
+
+    render(<TaskKanbanBoard scope="unclaimed" />);
+
+    await waitFor(() => {
+      expect(fetchTasks).toHaveBeenCalledWith({ scope: 'unclaimed' });
+    });
   });
 });

@@ -124,8 +124,8 @@ export default function TasksPage() {
   // Completed tasks sort newest-completed first; everything else by due date.
   const sort = cohort === 'completed' ? 'created_desc' : 'due_asc';
 
-  // Single server-side fetch path for search + cohort + scope. Search is debounced;
-  // cohort and scope changes refetch immediately.
+  // Single server-side fetch path for search + cohort + scope. useTaskSearch does not
+  // auto-fetch on mount; TasksPage owns the first scoped request. Search is debounced.
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;

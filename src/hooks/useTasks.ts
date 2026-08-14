@@ -66,25 +66,25 @@ export interface TaskAttachment {
   };
 }
 
+export interface TaskFetchFilters {
+  status?: TaskStatus;
+  category?: TaskCategory;
+  assignedTo?: string;
+  scope?: TaskScope;
+}
+
 export function useTasks(accountId?: string) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
-  const lastFiltersRef = useRef<{
-    status?: TaskStatus;
-    category?: TaskCategory;
-    assignedTo?: string;
-    scope?: TaskScope;
-  } | undefined>(undefined);
+  const lastFiltersRef = useRef<TaskFetchFilters | undefined>(undefined);
+  const requestSeqRef = useRef(0);
 
-  const fetchTasks = useCallback(async (filters?: {
-    status?: TaskStatus;
-    category?: TaskCategory;
-    assignedTo?: string;
-    scope?: TaskScope;
-  }) => {
+  const fetchTasks = useCallback(async (filters?: TaskFetchFilters) => {
+    const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
       lastFiltersRef.current = filters;
+
       let query = supabase
         .from('tasks')
         .select(`
@@ -92,6 +92,7 @@ export function useTasks(accountId?: string) {
           account:accounts(id, name),
           policy:policies(id, policy_number, carrier, line_of_business)
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (accountId) {
@@ -113,9 +114,11 @@ export function useTasks(accountId?: string) {
       if (filters?.scope === 'unclaimed') {
         query = query.is('assignee_id', null);
       } else if (filters?.scope === 'mine') {
-        const { data: user } = await supabase.auth.getUser();
-        if (user.user?.id) {
-          query = query.or(`assignee_id.eq.${user.user.id},assignee_id.is.null`);
+        const { data: authData } = await supabase.auth.getUser();
+        if (seq !== requestSeqRef.current) return [];
+        const userId = authData.user?.id;
+        if (userId) {
+          query = query.or(`assignee_id.eq.${userId},assignee_id.is.null`);
         } else {
           query = query.is('assignee_id', null);
         }
@@ -123,6 +126,7 @@ export function useTasks(accountId?: string) {
 
       const { data, error } = await query;
 
+      if (seq !== requestSeqRef.current) return [];
       if (error) throw error;
 
       const rows = (data as Task[]) || [];
@@ -137,6 +141,8 @@ export function useTasks(accountId?: string) {
           .select('id, full_name')
           .in('id', assigneeIds);
 
+        if (seq !== requestSeqRef.current) return [];
+
         for (const profile of profiles || []) {
           profileById.set(profile.id, profile);
         }
@@ -147,9 +153,11 @@ export function useTasks(accountId?: string) {
         assignee: task.assignee_id ? profileById.get(task.assignee_id) ?? null : null,
       }));
 
+      if (seq !== requestSeqRef.current) return [];
       setTasks(enriched);
       return enriched;
     } catch (error) {
+      if (seq !== requestSeqRef.current) return [];
       logger.error('Error fetching tasks:', error);
       toast({
         title: 'Error',
@@ -158,7 +166,7 @@ export function useTasks(accountId?: string) {
       });
       return [];
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   }, [accountId]);
 

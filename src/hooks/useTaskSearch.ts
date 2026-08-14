@@ -43,7 +43,7 @@ export function useTaskSearch() {
 
   // Active filters + how many rows are loaded, so fetchNextPage pages from the
   // right offset without re-running the whole query.
-  const filtersRef = useRef<TaskFilters>({ q: '', sort: 'due_asc' });
+  const filtersRef = useRef<TaskFilters>({ q: '', sort: 'due_asc', scope: 'mine' });
   const requestSeqRef = useRef(0);
   const loadedRef = useRef(0);
 
@@ -58,7 +58,7 @@ export function useTaskSearch() {
 
   // Load the FIRST page for a given filter set, replacing the current rows.
   // Cohort is applied server-side so the rendered rows match the triage tile.
-  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope?: string) => {
+  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope = 'mine') => {
     const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
@@ -138,7 +138,7 @@ export function useTaskSearch() {
         filtersRef.current.q,
         filtersRef.current.sort ?? 'due_asc',
         filtersRef.current.cohort,
-        filtersRef.current.scope,
+        filtersRef.current.scope ?? 'mine',
       ),
   };
 }
