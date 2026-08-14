@@ -337,6 +337,8 @@ serve(async (req) => {
     let analysisResult = normalizeExtractSnapshot({});
     let chunkCount = 1;
     let chunksAnalyzed = 0;
+    let chunksFailed = 0;
+    const failedChunkDetails: string[] = [];
 
     if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY) {
       console.log('----------------------------------------');
@@ -391,20 +393,34 @@ serve(async (req) => {
             partialSnapshots.push(normalizeExtractSnapshot(parsed));
             chunksAnalyzed++;
           } catch (chunkError) {
-            console.error(`Chunk ${i + 1} extraction failed:`, chunkError);
+            chunksFailed++;
+            const detail = `Chunk ${i + 1}/${chunks.length} (pages ${chunk.startPage}-${chunk.endPage})`;
+            failedChunkDetails.push(detail);
+            console.error(`${detail} extraction failed:`, chunkError);
           }
         }
 
         if (partialSnapshots.length > 0) {
           analysisResult = mergeExtractSnapshots(partialSnapshots);
+          if (chunksFailed > 0) {
+            const warning = `Partial extraction: ${chunksFailed} of ${chunkCount} chunks failed (${failedChunkDetails.join('; ')}). Review fees, endorsements, and tail pages.`;
+            analysisResult = {
+              ...analysisResult,
+              key_details: [warning, ...analysisResult.key_details],
+            };
+          }
           console.log(
-            `✅ AI Analysis complete (merged ${partialSnapshots.length} chunk snapshots)`,
+            `✅ AI Analysis complete (merged ${partialSnapshots.length}/${chunkCount} chunk snapshots${chunksFailed > 0 ? `, ${chunksFailed} failed` : ''})`,
           );
         } else {
-          console.error('All chunk extractions failed');
+          throw new Error(
+            `All ${chunkCount} chunk extractions failed (${failedChunkDetails.join('; ')})`,
+          );
         }
       }
     }
+
+    const partialExtraction = chunksFailed > 0;
 
     // TODO(Phase 0c): reload-by-id for re-analysis without re-OCR
 
@@ -435,6 +451,8 @@ serve(async (req) => {
         total_chars: charCount,
         chunk_count: chunkCount,
         chunks_analyzed: chunksAnalyzed,
+        chunks_failed: chunksFailed,
+        partial_extraction: partialExtraction,
         ocr_text: fullText,
         analysis: analysisResult
       }),
