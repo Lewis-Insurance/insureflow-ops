@@ -14,6 +14,7 @@ import { useTaskSearch } from '@/hooks/useTaskSearch';
 import { useTaskTriageCounts } from '@/hooks/useTaskTriageCounts';
 import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
+import { taskAssigneeLabel } from '@/lib/taskAssignee';
 import { cn } from '@/lib/utils';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
@@ -333,7 +334,7 @@ export default function TasksPage() {
                 tasks.map((task) => {
                   const title = task.title || 'Untitled task';
                   const account = task.account_name || humanizeEnum(task.entity_type) || 'No account';
-                  const assigneeLabel = task.assignee_name ?? 'Unclaimed';
+                  const assigneeLabel = taskAssigneeLabel(task.assignee_name);
                   const band = dueBand(task.due_at, task.completed_at);
                   return (
                     <div

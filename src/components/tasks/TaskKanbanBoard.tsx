@@ -6,6 +6,7 @@ import { useTasks, Task, TaskStatus } from '@/hooks/useTasks';
 import { Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { TaskEditModal } from './TaskEditModal';
+import { taskAssigneeLabel } from '@/lib/taskAssignee';
 
 interface TaskKanbanBoardProps {
   accountId?: string;
@@ -172,7 +173,7 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                       )}
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3" />
-                        {task.assignee?.full_name ?? 'Unclaimed'}
+                        {taskAssigneeLabel(null, task.assignee)}
                       </div>
                       {task.status === 'cancelled' && (
                         <div className="flex items-center gap-1 text-muted-foreground">

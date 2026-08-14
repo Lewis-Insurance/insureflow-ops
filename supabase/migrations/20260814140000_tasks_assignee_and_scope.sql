@@ -1,10 +1,13 @@
 -- Tasks assignee column in search + scope filters (mine / unclaimed / office).
--- Rollback-safe: CREATE OR REPLACE functions; GRANT/REVOKE matches 20260813000000.
+-- search_tasks return type changes require DROP + CREATE (CREATE OR REPLACE cannot add columns).
+-- Rollback-safe: DROP IF EXISTS guards; GRANT/REVOKE matches 20260813000000.
 
 -- ---------------------------------------------------------------------------
 -- search_tasks: assignee columns + extended scope filter
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.search_tasks(p_filters jsonb DEFAULT '{}'::jsonb, p_limit integer DEFAULT 250, p_offset integer DEFAULT 0, p_sort text DEFAULT 'due_asc'::text)
+DROP FUNCTION IF EXISTS public.search_tasks(jsonb, integer, integer, text);
+
+CREATE FUNCTION public.search_tasks(p_filters jsonb DEFAULT '{}'::jsonb, p_limit integer DEFAULT 250, p_offset integer DEFAULT 0, p_sort text DEFAULT 'due_asc'::text)
  RETURNS TABLE(id uuid, title text, status text, priority text, due_at timestamp with time zone, entity_type text, account_id uuid, account_name text, created_at timestamp with time zone, completed_at timestamp with time zone, assignee_id uuid, assignee_name text)
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -36,7 +39,7 @@ BEGIN
     t.created_at,
     t.completed_at,
     t.assignee_id,
-    p.full_name AS assignee_name
+    NULLIF(TRIM(p.full_name), '') AS assignee_name
   FROM public.tasks t
   LEFT JOIN public.accounts a ON a.id = COALESCE(t.account_id, t.customer_id)
   LEFT JOIN public.profiles p ON p.id = t.assignee_id

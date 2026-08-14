@@ -106,8 +106,31 @@ export function useTasks(accountId?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTasks(data as Task[] || []);
-      return (data as Task[]) || [];
+
+      const rows = (data as Task[]) || [];
+      const assigneeIds = [
+        ...new Set(rows.map((t) => t.assignee_id).filter((id): id is string => Boolean(id))),
+      ];
+
+      let profileById = new Map<string, { id: string; full_name: string }>();
+      if (assigneeIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', assigneeIds);
+
+        for (const profile of profiles || []) {
+          profileById.set(profile.id, profile);
+        }
+      }
+
+      const enriched = rows.map((task) => ({
+        ...task,
+        assignee: task.assignee_id ? profileById.get(task.assignee_id) ?? null : null,
+      }));
+
+      setTasks(enriched);
+      return enriched;
     } catch (error) {
       logger.error('Error fetching tasks:', error);
       toast({

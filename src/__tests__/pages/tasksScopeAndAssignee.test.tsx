@@ -103,6 +103,27 @@ describe('TasksPage scope and assignee', () => {
     expect(screen.getAllByText('Unclaimed').length).toBeGreaterThan(0);
   });
 
+  it('renders Unclaimed when assignee_name is blank', () => {
+    renderWithTasks([
+      {
+        id: 'task-1b',
+        title: 'Empty assignee name',
+        status: 'pending',
+        priority: 'low',
+        due_at: null,
+        entity_type: 'account',
+        account_id: 'acct-1',
+        account_name: 'Acme LLC',
+        created_at: '2026-08-01T00:00:00Z',
+        completed_at: null,
+        assignee_id: 'user-1',
+        assignee_name: '   ',
+      },
+    ]);
+
+    expect(screen.getAllByText('Unclaimed').length).toBeGreaterThan(0);
+  });
+
   it('renders assignee name when present', () => {
     renderWithTasks([
       {

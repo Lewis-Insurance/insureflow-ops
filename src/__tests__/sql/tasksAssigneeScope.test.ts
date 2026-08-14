@@ -4,15 +4,31 @@ import { resolve } from 'node:path';
 
 const migrationPath = resolve(
   import.meta.dirname,
-  '../../../supabase/migrations/20260814120000_tasks_assignee_and_scope.sql',
+  '../../../supabase/migrations/20260814140000_tasks_assignee_and_scope.sql',
 );
 const sql = readFileSync(migrationPath, 'utf8');
 
 describe('tasks assignee and scope migration', () => {
+  it('uses the unique migration filename (no collision with renewal_intelligence on main)', () => {
+    expect(migrationPath).toMatch(/20260814140000_tasks_assignee_and_scope\.sql$/);
+  });
+
+  it('drops search_tasks before create because return columns cannot be added via OR REPLACE', () => {
+    expect(sql).toMatch(
+      /DROP FUNCTION IF EXISTS public\.search_tasks\(jsonb, integer, integer, text\);/,
+    );
+    expect(sql).toMatch(
+      /CREATE FUNCTION public\.search_tasks\(p_filters jsonb/,
+    );
+    expect(sql).not.toMatch(
+      /CREATE OR REPLACE FUNCTION public\.search_tasks/,
+    );
+  });
+
   it('adds assignee columns to search_tasks return type', () => {
     expect(sql).toMatch(/assignee_id uuid,\s*assignee_name text/);
     expect(sql).toMatch(/LEFT JOIN public\.profiles p ON p\.id = t\.assignee_id/);
-    expect(sql).toMatch(/p\.full_name AS assignee_name/);
+    expect(sql).toMatch(/NULLIF\(TRIM\(p\.full_name\), ''\) AS assignee_name/);
   });
 
   it('implements mine, unclaimed, and office scope filters in search_tasks', () => {
@@ -22,6 +38,7 @@ describe('tasks assignee and scope migration', () => {
   });
 
   it('adds p_scope param to get_task_triage_counts with matching CTE filter', () => {
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.get_task_triage_counts\(\);/);
     expect(sql).toMatch(/get_task_triage_counts\(p_scope text DEFAULT 'office'\)/);
     expect(sql).toMatch(/p_scope = 'mine' AND \(assignee_id = auth\.uid\(\) OR assignee_id IS NULL\)/);
     expect(sql).toMatch(/p_scope = 'unclaimed' AND assignee_id IS NULL/);
