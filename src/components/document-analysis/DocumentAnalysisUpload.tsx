@@ -107,8 +107,11 @@ export function DocumentAnalysisUpload({ hideWhenAnalysisId }: DocumentAnalysisU
       setAnalyzing(false);
 
       toast({
-        title: 'Analysis Complete',
-        description: `Analyzed all ${analysisData.page_count} pages`,
+        title: analysisData.partial_extraction ? 'Partial Analysis' : 'Analysis Complete',
+        description: analysisData.partial_extraction
+          ? `Analyzed ${analysisData.chunks_analyzed ?? analysisData.page_count} of ${analysisData.chunk_count ?? analysisData.page_count} chunks. Some pages may be missing from the extract.`
+          : `Analyzed all ${analysisData.page_count} pages`,
+        variant: analysisData.partial_extraction ? 'destructive' : 'default',
       });
 
       const analysisId = analysisData.analysis_id;
