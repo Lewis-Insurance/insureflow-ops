@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -44,6 +44,7 @@ export function useTaskSearch() {
   // Active filters + how many rows are loaded, so fetchNextPage pages from the
   // right offset without re-running the whole query.
   const filtersRef = useRef<TaskFilters>({ q: '', sort: 'due_asc' });
+  const requestSeqRef = useRef(0);
   const loadedRef = useRef(0);
 
   const buildFilters = (f: TaskFilters): Record<string, string> => {
@@ -58,6 +59,7 @@ export function useTaskSearch() {
   // Load the FIRST page for a given filter set, replacing the current rows.
   // Cohort is applied server-side so the rendered rows match the triage tile.
   const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope?: string) => {
+    const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
       filtersRef.current = { q, sort, cohort, scope };
@@ -69,6 +71,7 @@ export function useTaskSearch() {
         p_sort: sort,
       });
 
+      if (seq !== requestSeqRef.current) return;
       if (error) throw error;
 
       const rows = (data || []) as TaskRow[];
@@ -78,6 +81,7 @@ export function useTaskSearch() {
       setTotalCount(rows.length);
       setError(null);
     } catch (err) {
+      if (seq !== requestSeqRef.current) return;
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
       toast({
@@ -86,7 +90,7 @@ export function useTaskSearch() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   };
 
@@ -119,10 +123,6 @@ export function useTaskSearch() {
       setLoadingMore(false);
     }
   };
-
-  useEffect(() => {
-    fetchTasks();
-  }, []);
 
   return {
     tasks,

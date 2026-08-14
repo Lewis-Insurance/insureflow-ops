@@ -124,14 +124,11 @@ export default function TasksPage() {
   // Completed tasks sort newest-completed first; everything else by due date.
   const sort = cohort === 'completed' ? 'created_desc' : 'due_asc';
 
-  // Single server-side fetch path for search + cohort. The hook loads the first
-  // page on mount, so skip the first run here (a second concurrent fetch would
-  // race it). Search is debounced; cohort changes refetch too.
+  // Single server-side fetch path for search + cohort + scope. Search is debounced;
+  // cohort and scope changes refetch immediately.
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      // Always apply scope on first paint (default Mine). useTaskSearch also fetches on
-      // mount without scope; this call replaces that with the honest scoped list.
       fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
       return;
     }
@@ -334,7 +331,7 @@ export default function TasksPage() {
                 tasks.map((task) => {
                   const title = task.title || 'Untitled task';
                   const account = task.account_name || humanizeEnum(task.entity_type) || 'No account';
-                  const assigneeLabel = taskAssigneeLabel(task.assignee_name);
+                  const assigneeLabel = taskAssigneeLabel(task.assignee_name, null, task.assignee_id);
                   const band = dueBand(task.due_at, task.completed_at);
                   return (
                     <div
@@ -399,11 +396,11 @@ export default function TasksPage() {
             )}
           </>
         ) : view === 'kanban' ? (
-          <TaskKanbanBoard />
+          <TaskKanbanBoard scope={scope} />
         ) : view === 'calendar' ? (
-          <TaskCalendarView />
+          <TaskCalendarView scope={scope} />
         ) : (
-          <TaskAnalyticsDashboard />
+          <TaskAnalyticsDashboard scope={scope} />
         )}
 
         <TaskForm

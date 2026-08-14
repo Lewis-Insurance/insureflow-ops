@@ -103,7 +103,7 @@ describe('TasksPage scope and assignee', () => {
     expect(screen.getAllByText('Unclaimed').length).toBeGreaterThan(0);
   });
 
-  it('renders Unclaimed when assignee_name is blank', () => {
+  it('renders Assigned when assignee_id is set but assignee_name is blank', () => {
     renderWithTasks([
       {
         id: 'task-1b',
@@ -121,7 +121,7 @@ describe('TasksPage scope and assignee', () => {
       },
     ]);
 
-    expect(screen.getAllByText('Unclaimed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Assigned').length).toBeGreaterThan(0);
   });
 
   it('renders assignee name when present', () => {

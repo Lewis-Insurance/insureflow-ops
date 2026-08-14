@@ -3,20 +3,22 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTasks, Task } from '@/hooks/useTasks';
+import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 import { isSameDay, format, startOfMonth, endOfMonth } from 'date-fns';
 
 interface TaskCalendarViewProps {
   accountId?: string;
+  scope?: TaskScope;
 }
 
-export function TaskCalendarView({ accountId }: TaskCalendarViewProps) {
+export function TaskCalendarView({ accountId, scope }: TaskCalendarViewProps) {
   const { tasks, loading, fetchTasks } = useTasks(accountId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    fetchTasks({ scope });
+  }, [fetchTasks, scope]);
 
   const getTasksForDate = (date: Date) => {
     return tasks.filter(task => 

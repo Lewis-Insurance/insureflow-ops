@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { fromZonedTime } from 'date-fns-tz';
 import { logger } from '@/lib/logger';
+import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -68,12 +69,18 @@ export interface TaskAttachment {
 export function useTasks(accountId?: string) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
-  const lastFiltersRef = useRef<{ status?: TaskStatus; category?: TaskCategory; assignedTo?: string } | undefined>(undefined);
+  const lastFiltersRef = useRef<{
+    status?: TaskStatus;
+    category?: TaskCategory;
+    assignedTo?: string;
+    scope?: TaskScope;
+  } | undefined>(undefined);
 
   const fetchTasks = useCallback(async (filters?: {
     status?: TaskStatus;
     category?: TaskCategory;
     assignedTo?: string;
+    scope?: TaskScope;
   }) => {
     try {
       setLoading(true);
@@ -101,6 +108,17 @@ export function useTasks(accountId?: string) {
 
       if (filters?.assignedTo) {
         query = query.eq('assignee_id', filters.assignedTo);
+      }
+
+      if (filters?.scope === 'unclaimed') {
+        query = query.is('assignee_id', null);
+      } else if (filters?.scope === 'mine') {
+        const { data: user } = await supabase.auth.getUser();
+        if (user.user?.id) {
+          query = query.or(`assignee_id.eq.${user.user.id},assignee_id.is.null`);
+        } else {
+          query = query.is('assignee_id', null);
+        }
       }
 
       const { data, error } = await query;

@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
+import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { TrendingUp, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 
-export function TaskAnalyticsDashboard() {
+interface TaskAnalyticsDashboardProps {
+  scope?: TaskScope;
+}
+
+export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
   const { tasks, loading, fetchTasks } = useTasks();
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    fetchTasks({ scope });
+  }, [fetchTasks, scope]);
 
   const getStatusStats = () => {
     return [
