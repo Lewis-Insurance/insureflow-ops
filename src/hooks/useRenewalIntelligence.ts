@@ -67,6 +67,7 @@ export const useAtRiskRenewals = () => {
             .gte('risk_score', 50)
             .in('status', ['upcoming', 'in_progress'])
             .order('risk_score', { ascending: false })
+            .order('id', { ascending: true })
             .range(from, to)
         );
         return rows;

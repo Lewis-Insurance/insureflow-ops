@@ -20,9 +20,12 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
   WITH open_renewals AS (
-    SELECT risk_level, risk_score, renewal_date
-    FROM public.renewals
-    WHERE status IN ('upcoming', 'in_progress')
+    SELECT r.risk_level, r.risk_score, r.renewal_date
+    FROM public.renewals r
+    JOIN public.accounts a ON a.id = r.account_id
+    WHERE r.status IN ('upcoming', 'in_progress')
+      AND a.deleted_at IS NULL
+      AND public.is_agency_member(a.agency_workspace_id)
   )
   SELECT
     (SELECT count(*)::int FROM open_renewals),
@@ -34,7 +37,13 @@ AS $function$
     (SELECT count(*)::int FROM open_renewals WHERE risk_level = 'medium'),
     (SELECT count(*)::int FROM open_renewals WHERE risk_level = 'low'),
     (SELECT COALESCE(round(avg(risk_score))::int, 0) FROM open_renewals),
-    (SELECT count(*)::int FROM public.renewal_campaigns WHERE status = 'active')
+    (SELECT count(*)::int
+       FROM public.renewal_campaigns rc
+       JOIN public.renewals r ON r.id = rc.renewal_id
+       JOIN public.accounts a ON a.id = r.account_id
+       WHERE rc.status = 'active'
+         AND a.deleted_at IS NULL
+         AND public.is_agency_member(a.agency_workspace_id))
   WHERE public.is_staff();
 $function$;
 
