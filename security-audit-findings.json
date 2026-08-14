@@ -1,123 +1,162 @@
 {
-  "audit_date": "2026-08-14",
-  "auditor": "Automated Security Audit",
-  "scope": "Webhook signature verification, hardcoded secrets, injection vulnerabilities",
   "findings": [
     {
+      "severity": "critical",
+      "location": "supabase/migrations/20251229100000_bulk_import_enhancements.sql",
+      "title": "rollback_import_batch SECURITY DEFINER has no auth check — any authenticated user can mass-delete accounts/policies across all tenants",
+      "description": "The function `rollback_import_batch(UUID)` is SECURITY DEFINER (bypasses RLS) and is granted EXECUTE to `authenticated`. It contains zero authorization checks — no is_staff(), no is_agency_member(), no workspace validation. It soft-deletes all accounts, contacts, and policies matching a batch_id across the entire database regardless of workspace boundaries.",
+      "impact": "Any authenticated user (including customer portal users with account_memberships) can soft-delete entire import batches belonging to any workspace. This is a destructive cross-tenant data loss vulnerability. An attacker who enumerates or guesses batch UUIDs can systematically wipe agency data.",
+      "attack_path": [
+        "1. Attacker authenticates as any user (including a customer portal user via account_memberships)",
+        "2. Attacker enumerates import_batches.id values (import_batches RLS uses is_staff() but the RPC bypasses RLS as SECURITY DEFINER)",
+        "3. Attacker calls: SELECT rollback_import_batch('target-batch-uuid')",
+        "4. All accounts, contacts, and policies in that batch are soft-deleted across all tenants",
+        "5. import_batches.status is set to 'rolled_back' confirming success"
+      ],
+      "evidence": [
+        "supabase/migrations/20251229100000_bulk_import_enhancements.sql:28-73"
+      ],
+      "remediation": "Add `IF NOT public.is_staff() THEN RAISE EXCEPTION 'permission denied'; END IF;` at the top of the function body. Additionally verify workspace ownership of the batch: check that the batch belongs to a workspace the caller is a member of via agency_workspace_memberships."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251228600000_automation_platform_foundation.sql",
+      "title": "enqueue_outbox_event SECURITY DEFINER has no auth check — any authenticated user can inject automation events into any workspace",
+      "description": "The function `enqueue_outbox_event(UUID, TEXT, TEXT, UUID, JSONB, TEXT)` is SECURITY DEFINER and granted EXECUTE to `authenticated`. It accepts an arbitrary `p_workspace_id` parameter and inserts automation events into `automation_event_outbox` for that workspace with no verification that the caller is a member of that workspace or is staff.",
+      "impact": "Any authenticated user can inject forged automation events into any workspace's outbox. Depending on how downstream automation consumers process these events, this could trigger unauthorized actions (email sends, workflow executions, data modifications) in victim workspaces.",
+      "attack_path": [
+        "1. Attacker authenticates as any user",
+        "2. Attacker calls: SELECT enqueue_outbox_event('victim-workspace-id', 'policy_created', 'policy', 'any-uuid', '{\"malicious\": true}')",
+        "3. Event is inserted into automation_event_outbox for the victim workspace",
+        "4. Downstream automation consumers process the event, potentially triggering emails, workflows, or data mutations in the victim's context"
+      ],
+      "evidence": [
+        "supabase/migrations/20251228600000_automation_platform_foundation.sql:415-455",
+        "supabase/migrations/20251228600000_automation_platform_foundation.sql:916"
+      ],
+      "remediation": "Add an auth guard: `IF NOT public.is_agency_member(p_workspace_id) THEN RAISE EXCEPTION 'permission denied'; END IF;` at the top of the function. Alternatively restrict EXECUTE to service_role only if the function is only intended for server-side use."
+    },
+    {
+      "severity": "critical",
+      "location": "supabase/migrations/20251228600000_automation_platform_foundation.sql",
+      "title": "cancel_outbox_events SECURITY DEFINER has no auth check — any authenticated user can cancel all pending automation events across all workspaces",
+      "description": "The function `cancel_outbox_events(UUID, TEXT, TEXT)` is SECURITY DEFINER, granted EXECUTE to `authenticated`, and has no auth check. When called with `p_workspace_id = NULL` (the default), it cancels ALL pending/failed events across ALL workspaces in `automation_event_outbox`. Even with a workspace_id provided, there is no verification the caller belongs to that workspace.",
+      "impact": "Any authenticated user can disable all pending automations across the entire platform (denial of service for all tenants), or selectively sabotage a specific workspace's automations. This is both a cross-tenant integrity violation and a platform-wide availability attack.",
+      "attack_path": [
+        "1. Attacker authenticates as any user",
+        "2. Attacker calls: SELECT cancel_outbox_events(NULL, NULL, 'pwned')",
+        "3. ALL pending and failed automation events across ALL workspaces are set to 'cancelled'",
+        "4. Downstream automation processing stops for all tenants"
+      ],
+      "evidence": [
+        "supabase/migrations/20251228600000_automation_platform_foundation.sql:827-847",
+        "supabase/migrations/20251228600000_automation_platform_foundation.sql:921"
+      ],
+      "remediation": "Add auth guard: require is_staff() AND if p_workspace_id is provided, require is_agency_member(p_workspace_id). If p_workspace_id is NULL (cancel-all), require a higher privilege (admin role check or restrict to service_role only)."
+    },
+    {
       "severity": "high",
-      "location": "supabase/functions/esign-webhook/index.ts",
-      "title": "eSign webhook processes requests without enforcing signature verification",
-      "description": "The esign-webhook handler has signature verification code (verifyWebhookSignature) but treats it as advisory rather than mandatory. When the API key is set but the signature header is missing, the request still proceeds. When the signature is present but invalid, only a warning is logged and processing continues. The code comments explicitly state 'For now, we log a warning but continue' (line 345). This means any attacker can send forged Dropbox Sign webhook events that will be processed.",
-      "impact": "An attacker can forge webhook payloads to: (1) update signature request statuses in the database (mark documents as signed/declined/cancelled), (2) trigger download and storage of attacker-controlled PDFs via the processSignedDocument flow which fetches from Dropbox Sign API using the stored signature_request_id, (3) update ACORD form signed_pdf_url and signature_status, effectively injecting malicious document links into the system.",
+      "location": "supabase/migrations/20260628202000_relgraph_phase2_link_suggestions.sql",
+      "title": "account_relationship_suggestions table has no RLS — any authenticated user can read/write all relationship suggestions cross-tenant",
+      "description": "The table `account_relationship_suggestions` is created without `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. In Supabase, the `authenticated` role has default DML privileges on public schema tables. Without RLS, any authenticated user can SELECT, INSERT, UPDATE, and DELETE all rows in this table regardless of workspace boundaries. The table contains from_account/to_account UUIDs, relationship types, signals (shared_phone, shared_address), and reasoning — which reveals customer relationships and PII-adjacent signals.",
+      "impact": "Any authenticated user (including portal customers) can: (1) enumerate all pending relationship suggestions to discover customer connections across tenants, (2) insert fake suggestions to mislead staff into creating incorrect relationships, (3) dismiss legitimate suggestions to prevent proper dedup, (4) confirm suggestions to create unauthorized relationship edges.",
       "attack_path": [
-        "1. Attacker discovers the Supabase edge function URL for esign-webhook (public endpoint)",
-        "2. Attacker sends a POST request with a crafted DropboxSignEvent JSON payload",
-        "3. No x-hellosign-signature header is required (line 346: signature check is inside an `if (signature)` block)",
-        "4. Even if a signature is provided and fails verification, only a warning is logged (line 349), processing continues",
-        "5. The handler looks up the signature_request_id in the database and updates its status",
-        "6. If the forged event says 'all_signed', the function downloads a PDF from Dropbox Sign API and stores it"
+        "1. Attacker authenticates as any user (even a portal customer)",
+        "2. Attacker queries: SELECT * FROM account_relationship_suggestions",
+        "3. All cross-tenant suggestions are returned, revealing account IDs, relationship signals, and reasoning",
+        "4. Attacker can also: UPDATE account_relationship_suggestions SET status = 'dismissed' to suppress legitimate dedup"
       ],
       "evidence": [
-        "supabase/functions/esign-webhook/index.ts:341-352",
-        "supabase/functions/esign-webhook/index.ts:344 (comment: 'Note: In production, you should fail if signature doesn't match')",
-        "supabase/functions/esign-webhook/index.ts:417-428 (database update proceeds regardless)"
+        "supabase/migrations/20260628202000_relgraph_phase2_link_suggestions.sql:7-33"
       ],
-      "remediation": "Change signature verification from advisory to mandatory. When DROPBOX_ACCESS_TOKEN is set, require the x-hellosign-signature header and reject requests where verification fails with a 401 response. When the API key is not set, reject the request entirely (fail closed). Remove the 'continue on failure' pattern."
+      "remediation": "Add: `ALTER TABLE public.account_relationship_suggestions ENABLE ROW LEVEL SECURITY;` and create a policy restricting access to staff within the workspace of the referenced accounts: `CREATE POLICY ars_staff ON public.account_relationship_suggestions FOR ALL USING (public.is_staff()) WITH CHECK (public.is_staff());`"
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20260628200000_relgraph_phase0_aliases_and_search.sql",
+      "title": "account_aliases table has no RLS — any authenticated user can read/write all account aliases cross-tenant",
+      "description": "The table `account_aliases` is created without `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. No RLS is ever enabled on this table in any subsequent migration. The table stores nicknames, maiden names, DBAs, former names, and misspellings for accounts — all of which are identity data that should be tenant-scoped. In Supabase default configuration, `authenticated` has full DML access to public schema tables without RLS.",
+      "impact": "Any authenticated user can read all aliases across all tenants (information disclosure of identity data), insert fake aliases to poison search results and enable social engineering, or delete aliases to disrupt identity resolution.",
+      "attack_path": [
+        "1. Attacker authenticates as any user",
+        "2. Attacker queries: SELECT aa.*, a.name, a.email FROM account_aliases aa JOIN accounts a ON a.id = aa.account_id",
+        "3. All aliases across all tenants are returned (bypasses accounts RLS because the join fetches alias data first)",
+        "4. Attacker can INSERT aliases for accounts in other workspaces to manipulate search/identity resolution"
+      ],
+      "evidence": [
+        "supabase/migrations/20260628200000_relgraph_phase0_aliases_and_search.sql:18-36"
+      ],
+      "remediation": "Add: `ALTER TABLE public.account_aliases ENABLE ROW LEVEL SECURITY;` and create a workspace-scoped policy: `CREATE POLICY aliases_staff ON public.account_aliases FOR ALL USING (EXISTS (SELECT 1 FROM accounts a JOIN agency_workspace_memberships m ON m.agency_workspace_id = a.agency_workspace_id WHERE a.id = account_aliases.account_id AND m.user_id = auth.uid() AND m.status = 'active')) WITH CHECK (...same...);`"
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20260628201000_relgraph_phase1_account_relationships.sql",
+      "title": "account_relationships RLS checks 'any active membership' not 'same workspace' — allows cross-tenant relationship data access",
+      "description": "The RLS policies on `account_relationships` (SELECT/INSERT/UPDATE/DELETE) only check `EXISTS (SELECT 1 FROM agency_workspace_memberships m WHERE m.user_id = auth.uid() AND m.status = 'active')` — meaning any user who is a staff member of ANY workspace can read and mutate ALL relationship edges across ALL workspaces. The policy does not verify that the accounts in the relationship belong to the caller's workspace.",
+      "impact": "In a multi-tenant deployment, staff in Workspace A can read all account relationships in Workspace B, revealing the ownership structure, family connections, and business affiliations of another agency's entire book. They can also insert/delete edges to corrupt another agency's relationship graph.",
+      "attack_path": [
+        "1. Staff user authenticates (member of Workspace A)",
+        "2. Staff queries: SELECT * FROM account_relationships (no workspace filter in RLS)",
+        "3. ALL relationship edges across ALL workspaces are returned",
+        "4. Staff can also INSERT edges linking accounts in Workspace B, corrupting their graph",
+        "5. The SECURITY DEFINER functions get_account_relationships() and get_account_cluster() compound this by bypassing even this weak RLS"
+      ],
+      "evidence": [
+        "supabase/migrations/20260628201000_relgraph_phase1_account_relationships.sql:103-126"
+      ],
+      "remediation": "Change the RLS policies to verify workspace membership for the specific accounts: `USING (EXISTS (SELECT 1 FROM accounts a JOIN agency_workspace_memberships m ON m.agency_workspace_id = a.agency_workspace_id WHERE a.id IN (account_relationships.from_account, account_relationships.to_account) AND m.user_id = auth.uid() AND m.status = 'active'))`. This ensures edges are only visible to members of the accounts' workspace."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/migrations/20260629220000_relgraph_v2_get_account_cluster.sql",
+      "title": "get_account_cluster SECURITY DEFINER has no workspace check — any staff user can traverse any account's full relationship cluster cross-tenant",
+      "description": "The function `get_account_cluster(uuid)` is SECURITY DEFINER, granted to `authenticated`, and only checks `is_staff()` without verifying the caller has workspace access to the target account. It performs a recursive 5-hop traversal returning account names, types, policy counts, premium amounts, and expiration dates — all bypassing RLS.",
+      "impact": "Any staff user in any workspace can call this function with an account_id from another workspace and receive the full cluster: every related account, their business/household structure, policy counts, premium totals, and next expiration dates. This is a complete cross-tenant book-of-business disclosure.",
+      "attack_path": [
+        "1. Staff user in Workspace A authenticates",
+        "2. Staff calls: SELECT * FROM get_account_cluster('account-id-in-workspace-b')",
+        "3. Function returns up to 5 hops of relationship graph with enriched data (names, premiums, policy counts)",
+        "4. Staff learns the full organizational structure and premium values of Workspace B's customers"
+      ],
+      "evidence": [
+        "supabase/migrations/20260629220000_relgraph_v2_get_account_cluster.sql:20-136"
+      ],
+      "remediation": "After the is_staff() check, verify workspace membership: look up the target account's agency_workspace_id and call is_agency_member(). Additionally, the recursive traversal should be bounded to accounts within the same workspace to prevent cross-tenant cluster walks."
     },
     {
       "severity": "medium",
-      "location": "supabase/functions/parseur-webhook/index.ts",
-      "title": "PostgREST filter injection via unsanitized webhook payload values in .or() clause",
-      "description": "The parseur-webhook interpolates values from the parsed webhook payload (parseurId, workspaceId, fileName) directly into a PostgREST .or() filter string at line 64 without any sanitization. While the webhook itself is protected by API key auth (PARSEUR_WEBHOOK_API_KEY), the values come from the external Parseur service. If Parseur is compromised or sends unexpected data containing PostgREST operators (e.g., commas, parentheses, or additional filter conditions), the query can be manipulated.",
-      "impact": "An attacker who compromises Parseur (or intercepts/replays its requests with a valid API key) could inject additional PostgREST filter conditions to query arbitrary workspace_documents records, potentially accessing documents from other workspaces. The fileName field is especially dangerous as it's a free-text string that could contain PostgREST filter operators.",
+      "location": "supabase/migrations/20260628201000_relgraph_phase1_account_relationships.sql",
+      "title": "get_account_relationships SECURITY DEFINER has no workspace or staff check — leaks cross-tenant relationship data",
+      "description": "The function `get_account_relationships(uuid)` is SECURITY DEFINER with `SET search_path` but contains NO auth checks in its body. It directly queries account_relationships (bypassing RLS due to DEFINER) and joins accounts to return names, types, premium summaries for any account_id passed. Granted to `authenticated`.",
+      "impact": "Any authenticated user (including portal customers) can call this function with any account_id and receive all relationship edges and connected account details (names, goes_by, type, policy count, premium) — a cross-tenant information disclosure.",
       "attack_path": [
-        "1. Attacker compromises Parseur or obtains the PARSEUR_WEBHOOK_API_KEY",
-        "2. Sends a webhook payload with fileName containing PostgREST filter injection: e.g., 'test),workspace_id.neq.null'",
-        "3. The .or() filter becomes: 'parseur_document_id.eq.X,and(workspace_id.eq.Y,file_name.eq.test),workspace_id.neq.null)'",
-        "4. This alters the query logic, potentially returning documents from other workspaces"
+        "1. Any authenticated user (including portal customer) calls: SELECT * FROM get_account_relationships('any-account-uuid')",
+        "2. Function executes as postgres owner, bypassing RLS on both account_relationships and accounts",
+        "3. Returns all relationship edges with enriched data for the target account"
       ],
       "evidence": [
-        "supabase/functions/parseur-webhook/index.ts:64"
+        "supabase/migrations/20260628201000_relgraph_phase1_account_relationships.sql:38-97"
       ],
-      "remediation": "Use parameterized PostgREST filters instead of string interpolation. Replace the .or() template literal with separate chained .eq() calls, or use the PostgREST filter builder's proper escaping. For example, use two separate queries (one by parseurId, one by workspace+fileName) and merge results."
+      "remediation": "Add `IF NOT public.is_staff() THEN RETURN; END IF;` (convert to plpgsql) and add workspace verification: verify the target account's workspace matches the caller's active membership via is_agency_member()."
     },
     {
       "severity": "medium",
-      "location": "supabase/functions/email-inbound/index.ts",
-      "title": "PostgREST filter injection via unsanitized email 'from' address in .or() clause",
-      "description": "The email-inbound function interpolates the 'from' field from the inbound email payload directly into a PostgREST .or() filter at line 47. The 'from' field comes from the parsed inbound email, which is externally controlled. The value is used to check the allowlist: `.or(`value.eq.${from},value.eq.${from.split('@')[1]}`)`. A crafted sender address containing PostgREST operators could bypass the allowlist check or alter the query.",
-      "impact": "An attacker could craft an email with a sender address containing PostgREST filter operators to bypass the inbound_allowlist check and get their email processed, potentially creating support tickets from unauthorized senders. The function uses service_role key to interact with the database.",
+      "location": "supabase/migrations/20260702100000_renewals_sync_and_terminal_rpc_hardening.sql",
+      "title": "renewal_mark_renewed/renewal_mark_lost/renewal_reopen check is_staff() but not workspace — cross-tenant policy/renewal mutation",
+      "description": "The renewal terminal RPCs (renewal_mark_renewed, renewal_mark_lost, renewal_reopen) are SECURITY DEFINER functions that check is_staff() but never verify the caller has workspace access to the specific renewal/policy/account being modified. Any staff user from any workspace can mark renewals as renewed/lost/reopened and mutate policies in other workspaces.",
+      "impact": "Staff from Workspace A can close, reopen, or modify renewals and policies belonging to Workspace B. renewal_mark_renewed writes new policy terms (premium, dates, policy_number). renewal_mark_moved creates new policies. renewal_reopen reactivates cancelled policies. All are cross-tenant mutations.",
       "attack_path": [
-        "1. Attacker sends an email to the inbound parse endpoint (mail provider forwards to Supabase function)",
-        "2. The 'from' address is crafted to contain PostgREST operators, e.g., 'attacker@evil.com),is_active.eq.true,value.neq.null--'",
-        "3. The .or() filter is injected, potentially matching any allowlist record",
-        "4. The email bypasses the allowlist and is processed into a support ticket",
-        "5. Ticket content/attachments are stored in the database and Supabase storage"
+        "1. Staff in Workspace A authenticates",
+        "2. Staff calls: SELECT renewal_mark_renewed('renewal-in-workspace-b', 'policy-in-workspace-b', 'account-in-workspace-b', 'POL-123', 50000, 'annual', '2027-01-01', '2028-01-01', null)",
+        "3. Workspace B's renewal is marked renewed, policy terms are overwritten with attacker-supplied values",
+        "4. A note is inserted on Workspace B's account"
       ],
       "evidence": [
-        "supabase/functions/email-inbound/index.ts:47"
+        "supabase/migrations/20260702100000_renewals_sync_and_terminal_rpc_hardening.sql:213-281",
+        "supabase/migrations/20260702100000_renewals_sync_and_terminal_rpc_hardening.sql:288-371",
+        "supabase/migrations/20260701130000_renewal_reopen_rpc.sql:13-65"
       ],
-      "remediation": "Replace the .or() template literal with parameterized queries. Use separate .eq() calls or the PostgREST filter builder's safe escaping. Additionally, validate and sanitize the 'from' email address format before using it in queries."
-    },
-    {
-      "severity": "medium",
-      "location": "supabase/functions/create_workspace/index.ts",
-      "title": "SSRF via user-supplied file_url in workspace document creation",
-      "description": "The create_workspace function accepts a documents array from the authenticated user's request body. Each document has a file_url field. When the URL is not a Supabase Storage URL, the function fetches it directly via `fetch(d.file_url)` at line 227 with no URL validation, no domain allowlisting, and no protection against internal network access. An authenticated user can provide arbitrary URLs, including internal services, cloud metadata endpoints, or localhost addresses.",
-      "impact": "An authenticated attacker can use the server as a proxy to scan internal networks, access cloud metadata endpoints (e.g., http://169.254.169.254/latest/meta-data/ on AWS), or reach other internal services. The response content is uploaded to Parseur, but errors and response sizes are logged, enabling blind SSRF reconnaissance.",
-      "attack_path": [
-        "1. Authenticated user calls create_workspace with a document containing file_url pointing to an internal service",
-        "2. The function fetches the URL server-side (line 227): `const response = await fetch(d.file_url)`",
-        "3. The response body is read as a blob and forwarded to Parseur for parsing",
-        "4. Error messages reveal whether internal hosts are reachable and response sizes"
-      ],
-      "evidence": [
-        "supabase/functions/create_workspace/index.ts:224-234"
-      ],
-      "remediation": "Add URL validation: (1) parse the URL and reject private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x, ::1, fc00::/7), (2) enforce HTTPS-only, (3) maintain an allowlist of permitted external domains, (4) set a reasonable timeout and response size limit."
-    },
-    {
-      "severity": "medium",
-      "location": "scripts/phase3-dev-soak.sh",
-      "title": "Hardcoded default CRON_SECRET in committed soak test scripts usable against dev environment",
-      "description": "Nine soak test scripts in the scripts/ directory contain a hardcoded default CRON_SECRET value 'floor-dev-soak-cron-20260701' (via ${CRON_SECRET:-floor-dev-soak-cron-20260701}). These scripts also contain a hardcoded dev Supabase project reference ('klnygbbmognbslgobmzc'), agency workspace IDs, account IDs, and staff email addresses. While these are development/staging values, the CRON_SECRET default is committed to a (potentially public) repository and could be used to invoke CRON-authenticated edge functions on the dev environment.",
-      "impact": "If the dev/staging environment uses this default CRON_SECRET (which is likely since it's the default value these scripts use), anyone with access to the repository can invoke all CRON_SECRET-protected edge functions (weekly-ceo-digest, run-retention-scoring, run-coverage-gap-detection, process-document-tasks, dispatch-outbox, etc.) on the dev environment. These functions have service_role access and can read/modify all data.",
-      "attack_path": [
-        "1. Attacker reads the default CRON_SECRET from any of the 9 soak test scripts in the repo",
-        "2. The dev Supabase URL is also hardcoded: https://klnygbbmognbslgobmzc.supabase.co",
-        "3. Attacker calls any CRON_SECRET-protected edge function with header X-Cron-Secret: floor-dev-soak-cron-20260701",
-        "4. Functions like weekly-ceo-digest, dispatch-outbox, etc. execute with service_role privileges"
-      ],
-      "evidence": [
-        "scripts/phase3-dev-soak.sh:22",
-        "scripts/phase3-g4-soak.sh:22",
-        "scripts/phase3-slice7-kill-hold-soak.sh:21",
-        "scripts/phase4-gap-roundout-soak.sh:20",
-        "scripts/phase4-nonpay-watch-soak.sh:23",
-        "scripts/phase4-open-item-nudge-soak.sh:20",
-        "scripts/phase5-heartbeat-soak.sh:18",
-        "scripts/phase5-morning-tray-soak.sh:18",
-        "scripts/phase5-retention-save-soak.sh:22"
-      ],
-      "remediation": "Remove the hardcoded default CRON_SECRET from all soak scripts. Require CRON_SECRET to be set as an environment variable with no fallback default. Ensure the dev/staging CRON_SECRET is rotated to a value not present in the repository. Consider adding these scripts to .gitignore or moving credentials to a secrets manager."
-    },
-    {
-      "severity": "medium",
-      "location": "supabase/functions/automation-gateway/index.ts",
-      "title": "PostgREST filter injection via unsanitized email/phone in lead dedup .or() clause",
-      "description": "The automation-gateway function's lead.dedupe.check action interpolates email and phone values from the automation payload directly into PostgREST .or() filters at lines 198 and 201. These values originate from n8n automation workflows or other external triggers. If the automation payload contains crafted email/phone values with PostgREST operators, the query can be manipulated to return arbitrary lead records.",
-      "impact": "An attacker who can trigger or manipulate automation payloads (e.g., via a compromised n8n instance, or by creating a lead with a crafted email/phone that flows into an automation) could inject PostgREST filter operators to query arbitrary lead records across the system, potentially leaking PII (email, phone, status) from leads they shouldn't have access to.",
-      "attack_path": [
-        "1. Attacker creates or modifies a lead with email containing PostgREST operators, e.g., 'test@evil.com,status.neq.null'",
-        "2. An automation flow triggers the lead.dedupe.check action with this crafted email",
-        "3. The .or() filter becomes: 'email.eq.test@evil.com,status.neq.null' which matches all leads with any status",
-        "4. Up to 10 lead records are returned, leaking PII"
-      ],
-      "evidence": [
-        "supabase/functions/automation-gateway/index.ts:198",
-        "supabase/functions/automation-gateway/index.ts:201"
-      ],
-      "remediation": "Replace string interpolation in .or() with parameterized PostgREST filters. Use .eq('email', email) directly rather than constructing filter strings with template literals."
+      "remediation": "After is_staff() check, look up the account's agency_workspace_id (join through renewal -> policy -> account or renewal -> account) and verify is_agency_member(workspace_id). Apply the same pattern used in void_certificate: `IF NOT (public.is_staff() AND public.is_agency_member(v_workspace)) THEN RAISE EXCEPTION 'staff only'; END IF;`"
     }
   ]
 }
