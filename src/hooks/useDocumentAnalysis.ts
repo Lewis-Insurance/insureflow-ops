@@ -513,8 +513,8 @@ export const useDocumentAnalysisQuery = (analysisId: string | null) => {
     },
     enabled: !!analysisId,
     refetchInterval: (query) => {
-      // Poll every 2 seconds while processing
-      if (query.state.data?.processing_status === 'pending') {
+      const status = query.state.data?.processing_status;
+      if (status === 'pending' || status === 'processing') {
         return 2000;
       }
       return false;
