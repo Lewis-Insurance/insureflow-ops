@@ -7,6 +7,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
+import { normalizeExtractSnapshot } from '../_shared/extractSnapshot.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -210,32 +211,53 @@ serve(async (req) => {
       .eq('document_id', document_id);
 
     // STEP 3: AI Analysis with Azure OpenAI
-    let analysisResult: any = {};
+    let analysisResult = normalizeExtractSnapshot({});
 
     if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY) {
       console.log('----------------------------------------');
       console.log('STEP 3: AI Analysis with Azure OpenAI');
       console.log('----------------------------------------');
 
-      const analysisPrompt = `Analyze this ${totalPages}-page insurance document and extract ALL relevant information as JSON.
+      const analysisPrompt = `Analyze this ${totalPages}-page insurance document and extract ALL relevant information as ExtractSnapshotV1 JSON.
 
 DOCUMENT TEXT (ALL ${totalPages} PAGES):
 ${fullText.substring(0, 100000)}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON matching ExtractSnapshotV1 (schema_version: 1):
 {
+  "schema_version": 1,
   "policy_number": "",
   "insured_name": "",
-  "carrier": "",
-  "document_type": "auto_policy|home_policy|commercial_policy|life_policy|umbrella_policy",
+  "carriers": ["Carrier A", "Carrier B"],
+  "document_type": "auto_policy|home_policy|commercial_policy|life_policy|umbrella_policy|commercial_quote",
   "effective_date": "YYYY-MM-DD or null",
   "expiration_date": "YYYY-MM-DD or null",
-  "coverages": [{"name": "", "limit": "", "deductible": "", "premium": ""}],
+  "claims_made": true or false or null,
+  "defense_inside_limits": true or false or null,
+  "premium": {"total": 0, "frequency": "annual|monthly|quarterly or null"},
+  "fees": [{"type": "tax|broker|surplus_lines|nima|other", "amount": 0, "label": "optional label"}],
+  "commission": {"percent": 0, "amount": 0},
+  "coverages": [
+    {
+      "name": "",
+      "limit": "",
+      "deductible": "",
+      "premium": 0,
+      "parent_coverage": "parent coverage name when included in another line, else null"
+    }
+  ],
+  "locations": [{"address": "", "occupancy": "building type or use"}],
   "vehicles": [{"year": "", "make": "", "model": "", "vin": ""}],
-  "property": {"type": "", "address": ""},
-  "premium": {"total": "", "frequency": ""},
-  "key_details": []
-}`;
+  "drivers": [{"name": "", "date_of_birth": "YYYY-MM-DD", "license_number": "", "license_state": ""}],
+  "key_details": ["overflow detail strings only"]
+}
+
+Rules:
+- Use carriers array (not a single carrier string).
+- Use locations array (not a single property object).
+- Set parent_coverage when a sublimit is included in another coverage (e.g. "Products-Completed Ops included in GL").
+- Include fees and commission when present on the document.
+- Use null for unknown scalar fields; use empty arrays when none found.`;
 
       const aiResponse = await modelBoundaryFetch(
         `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
@@ -262,11 +284,12 @@ Return ONLY valid JSON:
 
         try {
           const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-          analysisResult = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
-          console.log('✅ AI Analysis complete');
+          const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
+          analysisResult = normalizeExtractSnapshot(parsed);
+          console.log('✅ AI Analysis complete (ExtractSnapshotV1 normalized)');
         } catch (parseError) {
           console.error('Failed to parse AI response');
-          analysisResult = { raw_response: aiContent };
+          analysisResult = normalizeExtractSnapshot({ raw_response: aiContent });
         }
       } else {
         console.error('Azure OpenAI failed, returning OCR only');

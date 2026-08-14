@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lewisinsurance.ai/schemas/extract-snapshot-v1.json",
+  "title": "ExtractSnapshotV1",
+  "description": "Versioned extraction snapshot for insurance document analysis",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "insured_name",
+    "carriers",
+    "effective_date",
+    "expiration_date",
+    "claims_made",
+    "defense_inside_limits",
+    "premium",
+    "fees",
+    "coverages",
+    "locations",
+    "vehicles",
+    "drivers",
+    "document_type",
+    "policy_number",
+    "key_details"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "insured_name": {
+      "type": ["string", "null"]
+    },
+    "carriers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "effective_date": {
+      "type": ["string", "null"]
+    },
+    "expiration_date": {
+      "type": ["string", "null"]
+    },
+    "claims_made": {
+      "type": ["boolean", "null"]
+    },
+    "defense_inside_limits": {
+      "type": ["boolean", "null"]
+    },
+    "premium": {
+      "type": "object",
+      "required": ["total", "frequency"],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": ["number", "null"] },
+        "frequency": { "type": ["string", "null"] }
+      }
+    },
+    "fees": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "amount"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tax", "broker", "surplus_lines", "nima", "other"]
+          },
+          "amount": { "type": ["number", "null"] },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "commission": {
+      "type": ["object", "null"],
+      "required": ["percent", "amount"],
+      "additionalProperties": false,
+      "properties": {
+        "percent": { "type": ["number", "null"] },
+        "amount": { "type": ["number", "null"] }
+      }
+    },
+    "coverages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "limit", "deductible", "premium", "parent_coverage"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "limit": { "type": ["string", "null"] },
+          "deductible": { "type": ["string", "null"] },
+          "premium": {
+            "type": ["number", "string", "null"]
+          },
+          "parent_coverage": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["address", "occupancy"],
+        "additionalProperties": false,
+        "properties": {
+          "address": { "type": ["string", "null"] },
+          "occupancy": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "vehicles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "year": { "type": ["string", "number", "null"] },
+          "make": { "type": ["string", "null"] },
+          "model": { "type": ["string", "null"] },
+          "vin": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "drivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": ["string", "null"] },
+          "date_of_birth": { "type": ["string", "null"] },
+          "license_number": { "type": ["string", "null"] },
+          "license_state": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "document_type": {
+      "type": ["string", "null"]
+    },
+    "policy_number": {
+      "type": ["string", "null"]
+    },
+    "key_details": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "overflow": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
