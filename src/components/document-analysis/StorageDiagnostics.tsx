@@ -71,13 +71,12 @@ export function StorageDiagnostics() {
 
       setResult(diagnostic);
 
-      if (downloadError) {
-        throw downloadError;
-      }
-
       toast({
-        title: 'Diagnostics complete',
-        description: `DB size: ${formatSizeKb(doc.file_size)}, storage size: ${formatSizeKb(storageSize)}`,
+        title: downloadFailed ? 'Diagnostics complete with warning' : 'Diagnostics complete',
+        description: downloadFailed
+          ? match.label
+          : `DB size: ${formatSizeKb(doc.file_size)}, storage size: ${formatSizeKb(storageSize)}`,
+        variant: downloadFailed ? 'destructive' : 'default',
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
