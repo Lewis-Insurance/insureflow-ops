@@ -129,6 +129,7 @@ export default function TasksPage() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didMountRef = useRef(false);
+  const rowClickSeqRef = useRef(0);
 
   // Completed tasks sort newest-completed first; everything else by due date.
   const sort = cohort === 'completed' ? 'created_desc' : 'due_asc';
@@ -196,9 +197,11 @@ export default function TasksPage() {
   };
 
   const handleRowClick = async (row: TaskRow) => {
+    const seq = ++rowClickSeqRef.current;
     setLoadingTaskId(row.id);
     try {
       const full = await fetchFullTask(row.id);
+      if (seq !== rowClickSeqRef.current) return;
       if (!full) {
         toast({
           title: 'Error',
@@ -216,7 +219,7 @@ export default function TasksPage() {
       setSelectedTask(enriched);
       setEditModalOpen(true);
     } finally {
-      setLoadingTaskId(null);
+      if (seq === rowClickSeqRef.current) setLoadingTaskId(null);
     }
   };
 
