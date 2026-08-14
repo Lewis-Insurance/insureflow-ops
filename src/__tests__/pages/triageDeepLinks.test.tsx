@@ -162,6 +162,20 @@ describe('triage deep-links from ?cohort=', () => {
     });
   });
 
+  it('TasksPage defaults to scope=mine when no scope is in the URL', async () => {
+    const fetchTasks = stubSearchHook(useTaskSearch, 'fetchTasks');
+
+    render(
+      <MemoryRouter initialEntries={['/tasks']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'mine');
+    });
+  });
+
   it('TasksPage fetches with overdue when cohort is in the URL', async () => {
     const fetchTasks = stubSearchHook(useTaskSearch, 'fetchTasks');
 

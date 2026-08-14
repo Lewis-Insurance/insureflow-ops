@@ -66,7 +66,10 @@ $function$;
 
 -- ---------------------------------------------------------------------------
 -- get_task_triage_counts: optional scope param with same filter logic
+-- Drop the zero-arg overload so callers cannot hit agency-wide counts by accident.
 -- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_task_triage_counts();
+
 CREATE OR REPLACE FUNCTION public.get_task_triage_counts(p_scope text DEFAULT 'office')
  RETURNS TABLE(open_total integer, overdue integer, due_this_week integer, high_priority integer, completed integer)
  LANGUAGE sql

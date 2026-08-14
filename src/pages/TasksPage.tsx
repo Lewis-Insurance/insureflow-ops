@@ -129,9 +129,9 @@ export default function TasksPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      if (cohort !== 'all' || scope !== 'mine') {
-        fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
-      }
+      // Always apply scope on first paint (default Mine). useTaskSearch also fetches on
+      // mount without scope; this call replaces that with the honest scoped list.
+      fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);

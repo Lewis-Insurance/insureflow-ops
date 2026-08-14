@@ -133,6 +133,12 @@ export function useTaskSearch() {
     error,
     fetchTasks,
     fetchNextPage,
-    refetch: () => fetchTasks(),
+    refetch: () =>
+      fetchTasks(
+        filtersRef.current.q,
+        filtersRef.current.sort ?? 'due_asc',
+        filtersRef.current.cohort,
+        filtersRef.current.scope,
+      ),
   };
 }
