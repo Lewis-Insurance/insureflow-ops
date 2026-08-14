@@ -112,8 +112,8 @@ describe('AnalyzeDocumentsPage', () => {
 
     expect(screen.getByText('Carrier Alpha')).toBeTruthy();
     expect(screen.getByText('Carrier Beta')).toBeTruthy();
-    expect(screen.getByText('••/••/2026')).toBeTruthy();
-    expect(screen.getByText('••/••/2027')).toBeTruthy();
+    expect(screen.getByText('2026-01-01')).toBeTruthy();
+    expect(screen.getByText('2027-01-01')).toBeTruthy();
     expect(screen.getByText('State tax')).toBeTruthy();
     expect(screen.getByText('General Liability')).toBeTruthy();
     expect(screen.getByText('Claims-made')).toBeTruthy();
