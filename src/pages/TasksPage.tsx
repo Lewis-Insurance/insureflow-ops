@@ -44,8 +44,9 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'analytics', label: 'Analytics' },
 ];
 
-// Dense table column template (md+): Title | Account | Assigned | Status | Priority | Due.
-const COLS = 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_110px_100px_140px]';
+// Dense table column template (md+): Title | Account | Assigned | Status | Priority | Due | Action.
+const DATA_COLS = 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_110px_100px_140px]';
+const COLS = 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_110px_100px_140px_110px]';
 
 const SCOPES: { value: TaskScope; label: string }[] = [
   { value: 'mine', label: 'Mine' },
@@ -198,7 +199,14 @@ export default function TasksPage() {
     setLoadingTaskId(row.id);
     try {
       const full = await fetchFullTask(row.id);
-      if (!full) return;
+      if (!full) {
+        toast({
+          title: 'Error',
+          description: 'Could not open this task.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       const enriched =
         !full.account && row.account_name && row.account_id
@@ -400,6 +408,7 @@ export default function TasksPage() {
                 <SectionLabel>Status</SectionLabel>
                 <SectionLabel>Priority</SectionLabel>
                 <SectionLabel>Due</SectionLabel>
+                <span className="sr-only">Action</span>
               </div>
 
               {loading ? (
@@ -432,18 +441,22 @@ export default function TasksPage() {
                   return (
                     <div
                       key={task.id}
-                      className="flex items-stretch border-b border-cc-border-subtle last:border-b-0"
+                      className={cn(
+                        'border-b border-cc-border-subtle px-4 py-3 last:border-b-0',
+                        'flex flex-col gap-2 md:grid md:items-center md:gap-4',
+                        COLS,
+                      )}
                     >
                       <button
                         type="button"
                         onClick={() => handleRowClick(task)}
                         disabled={loadingTaskId === task.id}
                         className={cn(
-                          'flex min-w-0 flex-1 flex-col gap-2 px-4 py-3 text-left transition-colors duration-fast hover:bg-cc-surface-raised',
+                          'flex min-w-0 flex-col gap-2 text-left transition-colors duration-fast hover:bg-cc-surface-raised',
                           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-inset',
-                          'md:grid md:items-center md:gap-4',
+                          'md:col-span-6 md:grid md:items-center md:gap-4',
                           loadingTaskId === task.id && 'opacity-60',
-                          COLS,
+                          DATA_COLS,
                         )}
                       >
                         {/* Title (carries status + priority inline on mobile) */}
@@ -482,8 +495,8 @@ export default function TasksPage() {
                         </div>
                       </button>
 
-                      {isOpenTask(task.status) && (
-                        <div className="flex shrink-0 items-center border-l border-cc-border-subtle px-3">
+                      <div className="flex items-center justify-end md:justify-end">
+                        {isOpenTask(task.status) ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -495,8 +508,8 @@ export default function TasksPage() {
                             <CheckCircle2 className="h-4 w-4" />
                             Mark done
                           </Button>
-                        </div>
-                      )}
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })

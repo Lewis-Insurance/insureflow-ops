@@ -78,6 +78,7 @@ import TasksPage from '@/pages/TasksPage';
 import { useTaskSearch } from '@/hooks/useTaskSearch';
 import { useTaskTriageCounts } from '@/hooks/useTaskTriageCounts';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 function mockTaskFetch() {
   const tasksSingle = vi.fn().mockResolvedValue({
@@ -380,5 +381,53 @@ describe('TasksPage scope and assignee', () => {
     ]);
 
     expect(screen.queryByRole('button', { name: /Mark done/i })).not.toBeInTheDocument();
+  });
+
+  it('toasts when full task fetch fails and does not open the modal', async () => {
+    const user = userEvent.setup();
+    const tasksChain: Record<string, unknown> = {};
+    const chain = () => tasksChain;
+    tasksChain.select = vi.fn(chain);
+    tasksChain.eq = vi.fn(chain);
+    tasksChain.is = vi.fn(chain);
+    tasksChain.single = vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === 'tasks') {
+        return { select: vi.fn().mockReturnValue(tasksChain) } as never;
+      }
+      return {} as never;
+    });
+
+    renderWithTasks([
+      {
+        id: 'task-missing',
+        title: 'Missing task row',
+        status: 'pending',
+        priority: 'medium',
+        due_at: null,
+        entity_type: 'account',
+        account_id: 'acct-1',
+        account_name: 'Acme LLC',
+        created_at: '2026-08-01T00:00:00Z',
+        completed_at: null,
+        assignee_id: null,
+        assignee_name: null,
+      },
+    ]);
+
+    await user.click(screen.getByRole('button', { name: /Missing task row/i }));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Error',
+          description: 'Could not open this task.',
+          variant: 'destructive',
+        }),
+      );
+    });
+
+    expect(screen.queryByTestId('task-edit-modal')).not.toBeInTheDocument();
   });
 });
