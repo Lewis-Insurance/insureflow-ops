@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useTriageCohortFromUrl, parseScopeFromUrl } from '@/hooks/useTriageCohortFromUrl';
+import { useTriageCohortFromUrl, parseScopeFromUrl, type TaskScope } from '@/hooks/useTriageCohortFromUrl';
 import { Search, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { useTaskSearch } from '@/hooks/useTaskSearch';
 import { useTaskTriageCounts } from '@/hooks/useTaskTriageCounts';
 import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
+import { taskAssigneeLabel } from '@/lib/taskAssignee';
 import { cn } from '@/lib/utils';
 
 // Cohorts are computed server-side; clicking a tile filters the rows to it.
@@ -39,9 +40,25 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'analytics', label: 'Analytics' },
 ];
 
-// Dense table column template (md+): Title | Account | Status | Priority | Due.
-// Due is wide enough for the banded "Overdue" / date value.
-const COLS = 'md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_120px_110px_150px]';
+// Dense table column template (md+): Title | Account | Assigned | Status | Priority | Due.
+const COLS = 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_110px_100px_140px]';
+
+const SCOPES: { value: TaskScope; label: string }[] = [
+  { value: 'mine', label: 'Mine' },
+  { value: 'unclaimed', label: 'Unclaimed' },
+  { value: 'office', label: 'Whole office' },
+];
+
+function scopeSubtitle(scope: TaskScope): string {
+  switch (scope) {
+    case 'mine':
+      return 'Yours and unclaimed.';
+    case 'unclaimed':
+      return 'Unclaimed work in the office.';
+    case 'office':
+      return 'Whole office.';
+  }
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -80,13 +97,25 @@ function dueBand(dueAt: string | null, completedAt: string | null): DueBand | nu
 export default function TasksPage() {
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchParams] = useSearchParams();
-  const scope = parseScopeFromUrl(searchParams.get('scope'));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const scope = parseScopeFromUrl(searchParams.get('scope')) ?? 'mine';
   const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(TASK_COHORTS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
+  const setScope = (next: TaskScope) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === 'mine') {
+        params.delete('scope');
+      } else {
+        params.set('scope', next);
+      }
+      return params;
+    });
+  };
+
   const { tasks, loading, loadingMore, hasMore, fetchTasks, fetchNextPage, refetch } = useTaskSearch();
-  const { counts, refetch: refetchCounts } = useTaskTriageCounts();
+  const { counts, refetch: refetchCounts } = useTaskTriageCounts(scope);
   const { createTask } = useTasks();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,15 +124,12 @@ export default function TasksPage() {
   // Completed tasks sort newest-completed first; everything else by due date.
   const sort = cohort === 'completed' ? 'created_desc' : 'due_asc';
 
-  // Single server-side fetch path for search + cohort. The hook loads the first
-  // page on mount, so skip the first run here (a second concurrent fetch would
-  // race it). Search is debounced; cohort changes refetch too.
+  // Single server-side fetch path for search + cohort + scope. useTaskSearch does not
+  // auto-fetch on mount; TasksPage owns the first scoped request. Search is debounced.
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      if (cohort !== 'all' || scope) {
-        fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
-      }
+      fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -140,7 +166,7 @@ export default function TasksPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">Tasks</h1>
             <p className="mt-1 text-sm text-cc-text-muted">
-              <span className="cc-num">{counts.open_total}</span> open. Clear the ones that need you first.
+              <span className="cc-num">{counts.open_total}</span> open. {scopeSubtitle(scope)}
             </p>
           </div>
           <Button
@@ -187,6 +213,30 @@ export default function TasksPage() {
             active={cohort === 'completed'}
             onClick={() => toggleCohort('completed')}
           />
+        </div>
+
+        {/* Scope: whose tasks are in view */}
+        <div
+          role="group"
+          aria-label="Task scope"
+          className="inline-flex flex-wrap rounded-cc-md bg-cc-surface-raised p-0.5"
+        >
+          {SCOPES.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => setScope(s.value)}
+              aria-pressed={scope === s.value}
+              className={cn(
+                'rounded-[10px] px-3 py-1.5 text-sm transition-colors duration-fast',
+                scope === s.value
+                  ? 'bg-cc-surface-overlay text-cc-text-primary'
+                  : 'text-cc-text-muted hover:text-cc-text-secondary',
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* View switch: List is the Calm Command index; the rest are preserved views */}
@@ -250,6 +300,7 @@ export default function TasksPage() {
               <div className={cn('hidden gap-4 border-b border-cc-border-subtle px-4 py-2.5 md:grid', COLS)}>
                 <SectionLabel>Task</SectionLabel>
                 <SectionLabel>Account</SectionLabel>
+                <SectionLabel>Assigned</SectionLabel>
                 <SectionLabel>Status</SectionLabel>
                 <SectionLabel>Priority</SectionLabel>
                 <SectionLabel>Due</SectionLabel>
@@ -280,6 +331,7 @@ export default function TasksPage() {
                 tasks.map((task) => {
                   const title = task.title || 'Untitled task';
                   const account = task.account_name || humanizeEnum(task.entity_type) || 'No account';
+                  const assigneeLabel = taskAssigneeLabel(task.assignee_name, null, task.assignee_id);
                   const band = dueBand(task.due_at, task.completed_at);
                   return (
                     <div
@@ -293,14 +345,17 @@ export default function TasksPage() {
                       {/* Title (carries status + priority inline on mobile) */}
                       <div className="min-w-0">
                         <div className="font-semibold text-cc-text-primary break-words">{title}</div>
-                        <div className="mt-1.5 flex items-center gap-2 md:hidden">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 md:hidden">
                           <StatusPill status={task.status} />
                           <Chip>{humanizeEnum(task.priority)}</Chip>
+                          <span className="text-xs text-cc-text-muted">{assigneeLabel}</span>
                         </div>
                       </div>
 
                       {/* Account / entity */}
                       <div className="truncate text-sm text-cc-text-muted">{account}</div>
+
+                      <div className="truncate text-sm text-cc-text-secondary">{assigneeLabel}</div>
 
                       <div className="hidden md:block">
                         <StatusPill status={task.status} />
@@ -341,11 +396,11 @@ export default function TasksPage() {
             )}
           </>
         ) : view === 'kanban' ? (
-          <TaskKanbanBoard />
+          <TaskKanbanBoard scope={scope} />
         ) : view === 'calendar' ? (
-          <TaskCalendarView />
+          <TaskCalendarView scope={scope} />
         ) : (
-          <TaskAnalyticsDashboard />
+          <TaskAnalyticsDashboard scope={scope} />
         )}
 
         <TaskForm

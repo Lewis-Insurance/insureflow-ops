@@ -3,12 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTasks, Task, TaskStatus } from '@/hooks/useTasks';
+import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 import { Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { TaskEditModal } from './TaskEditModal';
+import { taskAssigneeLabel } from '@/lib/taskAssignee';
 
 interface TaskKanbanBoardProps {
   accountId?: string;
+  scope?: TaskScope;
 }
 
 const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
@@ -18,14 +21,14 @@ const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
   { status: 'cancelled', label: 'Cancelled', color: 'bg-red-100' },
 ];
 
-export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
+export function TaskKanbanBoard({ accountId, scope }: TaskKanbanBoardProps) {
   const { tasks, loading, fetchTasks, updateTask } = useTasks(accountId);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    fetchTasks({ scope });
+  }, [fetchTasks, scope]);
 
   const getTasksByStatus = (status: TaskStatus) => {
     return tasks.filter(task => task.status === status);
@@ -170,12 +173,10 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                           {format(new Date(task.due_at), 'MMM d')}
                         </div>
                       )}
-                      {task.assignee_id && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Assigned
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {taskAssigneeLabel(null, task.assignee, task.assignee_id)}
+                      </div>
                       {task.status === 'cancelled' && (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <AlertCircle className="h-3 w-3" />
@@ -203,7 +204,7 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
         onOpenChange={setEditModalOpen}
         task={editingTask}
         onTaskUpdate={() => {
-          fetchTasks();
+          fetchTasks({ scope });
           setEditModalOpen(false);
         }}
       />

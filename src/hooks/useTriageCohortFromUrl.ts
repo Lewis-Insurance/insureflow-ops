@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-/** Parse scope=mine from the URL; returns undefined for any other value. */
-export function parseScopeFromUrl(value: string | null): 'mine' | undefined {
-  return value === 'mine' ? 'mine' : undefined;
+export type TaskScope = 'mine' | 'unclaimed' | 'office';
+
+/** Parse scope from the URL; returns undefined for unrecognized values. */
+export function parseScopeFromUrl(value: string | null): TaskScope | undefined {
+  if (value === 'mine' || value === 'unclaimed' || value === 'office') {
+    return value;
+  }
+  return undefined;
 }
 
 /** Parse a cohort query param against an allowlist; fall back to defaultCohort. */

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -20,6 +20,8 @@ export interface TaskRow {
   account_name: string | null;
   created_at: string;
   completed_at: string | null;
+  assignee_id: string | null;
+  assignee_name: string | null;
 }
 
 const PAGE_SIZE = 250;
@@ -41,19 +43,23 @@ export function useTaskSearch() {
 
   // Active filters + how many rows are loaded, so fetchNextPage pages from the
   // right offset without re-running the whole query.
-  const filtersRef = useRef<TaskFilters>({ q: '', sort: 'due_asc' });
+  const filtersRef = useRef<TaskFilters>({ q: '', sort: 'due_asc', scope: 'mine' });
+  const requestSeqRef = useRef(0);
   const loadedRef = useRef(0);
 
   const buildFilters = (f: TaskFilters): Record<string, string> => {
     const out: Record<string, string> = { q: f.q ?? '' };
     if (f.cohort && f.cohort !== 'all') out.cohort = f.cohort;
-    if (f.scope === 'mine') out.scope = 'mine';
+    if (f.scope === 'mine' || f.scope === 'unclaimed' || f.scope === 'office') {
+      out.scope = f.scope;
+    }
     return out;
   };
 
   // Load the FIRST page for a given filter set, replacing the current rows.
   // Cohort is applied server-side so the rendered rows match the triage tile.
-  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope?: string) => {
+  const fetchTasks = async (q = '', sort = 'due_asc', cohort?: string, scope = 'mine') => {
+    const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
       filtersRef.current = { q, sort, cohort, scope };
@@ -65,6 +71,7 @@ export function useTaskSearch() {
         p_sort: sort,
       });
 
+      if (seq !== requestSeqRef.current) return;
       if (error) throw error;
 
       const rows = (data || []) as TaskRow[];
@@ -74,6 +81,7 @@ export function useTaskSearch() {
       setTotalCount(rows.length);
       setError(null);
     } catch (err) {
+      if (seq !== requestSeqRef.current) return;
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
       toast({
@@ -82,7 +90,7 @@ export function useTaskSearch() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   };
 
@@ -116,10 +124,6 @@ export function useTaskSearch() {
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
   return {
     tasks,
     totalCount,
@@ -129,6 +133,12 @@ export function useTaskSearch() {
     error,
     fetchTasks,
     fetchNextPage,
-    refetch: () => fetchTasks(),
+    refetch: () =>
+      fetchTasks(
+        filtersRef.current.q,
+        filtersRef.current.sort ?? 'due_asc',
+        filtersRef.current.cohort,
+        filtersRef.current.scope ?? 'mine',
+      ),
   };
 }
