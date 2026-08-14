@@ -3,62 +3,87 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  storageSizeMatchLabel,
+  type StorageSizeMatchResult,
+} from '@/lib/storageSizeMatchLabel';
+import { cn } from '@/lib/utils';
+
+interface DiagnosticResult {
+  fileName: string;
+  storagePath: string;
+  dbSize: number | null;
+  storageSize: number | null;
+  match: StorageSizeMatchResult;
+  mimeType: string | null;
+}
+
+const toneClassName: Record<StorageSizeMatchResult['tone'], string> = {
+  success: 'text-success',
+  warning: 'text-warning',
+  destructive: 'text-destructive',
+};
+
+function formatSizeKb(bytes: number | null | undefined): string {
+  if (bytes == null) return 'Unknown';
+  return `${(bytes / 1024).toFixed(2)} KB`;
+}
 
 export function StorageDiagnostics() {
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DiagnosticResult | null>(null);
 
   const checkLastUpload = async () => {
     setChecking(true);
     try {
-      // Get the most recent document
-      const { data: docs, error } = await supabase
+      const { data: doc, error } = await supabase
         .from('documents')
-        .select('*')
+        .select('filename, storage_path, file_size, mime_type')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
       if (error) throw error;
 
-      // Get file info from storage
-      const { data: fileList, error: listError } = await supabase.storage
-        .from('documents')
-        .list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+      if (!doc.storage_path) {
+        throw new Error('Latest document has no storage path');
+      }
 
-      if (listError) throw listError;
-
-      const fileInfo = fileList.find(f => f.name === docs.storage_path);
-
-      // Try to download and check size
       const { data: downloadData, error: downloadError } = await supabase.storage
         .from('documents')
-        .download(docs.storage_path);
+        .download(doc.storage_path);
 
-      if (downloadError) throw downloadError;
-
-      const fileSizeInStorage = downloadData.size;
-      const fileSizeInDB = docs.file_size;
-
-      setResult({
-        fileName: docs.filename,
-        dbSize: fileSizeInDB,
-        storageSize: fileSizeInStorage,
-        match: fileSizeInDB === fileSizeInStorage,
-        storageMetadata: fileInfo,
+      const downloadFailed = Boolean(downloadError) || !downloadData;
+      const storageSize = downloadData?.size ?? null;
+      const match = storageSizeMatchLabel(doc.file_size, storageSize, {
+        downloadFailed,
       });
 
-      toast({
-        title: 'Diagnostics Complete',
-        description: `DB Size: ${(fileSizeInDB / 1024).toFixed(2)} KB, Storage Size: ${(fileSizeInStorage / 1024).toFixed(2)} KB`,
-      });
+      const diagnostic: DiagnosticResult = {
+        fileName: doc.filename,
+        storagePath: doc.storage_path,
+        dbSize: doc.file_size,
+        storageSize,
+        match,
+        mimeType: downloadData?.type ?? doc.mime_type,
+      };
 
-    } catch (error: any) {
-      console.error('Diagnostic Error:', error);
+      setResult(diagnostic);
+
       toast({
-        title: 'Diagnostic Failed',
-        description: error.message,
+        title: downloadFailed ? 'Diagnostics complete with warning' : 'Diagnostics complete',
+        description: downloadFailed
+          ? match.label
+          : `DB size: ${formatSizeKb(doc.file_size)}, storage size: ${formatSizeKb(storageSize)}`,
+        variant: downloadFailed ? 'destructive' : 'default',
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Diagnostic error:', error);
+      toast({
+        title: 'Diagnostic failed',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -78,15 +103,26 @@ export function StorageDiagnostics() {
 
         {result && (
           <div className="space-y-2 text-sm">
-            <p><strong>File:</strong> {result.fileName}</p>
-            <p><strong>DB Size:</strong> {(result.dbSize / 1024).toFixed(2)} KB</p>
-            <p><strong>Storage Size:</strong> {(result.storageSize / 1024).toFixed(2)} KB</p>
-            <p className={result.match ? 'text-green-600' : 'text-red-600'}>
-              <strong>Match:</strong> {result.match ? '✓ Yes' : '✗ No - File corrupted!'}
+            <p>
+              <strong>File:</strong> {result.fileName}
             </p>
-            <pre className="text-xs bg-muted p-2 rounded overflow-auto">
-              {JSON.stringify(result.storageMetadata, null, 2)}
-            </pre>
+            <p>
+              <strong>Storage path:</strong> {result.storagePath}
+            </p>
+            <p>
+              <strong>DB size:</strong> {formatSizeKb(result.dbSize)}
+            </p>
+            <p>
+              <strong>Storage size:</strong> {formatSizeKb(result.storageSize)}
+            </p>
+            {result.mimeType && (
+              <p>
+                <strong>Content type:</strong> {result.mimeType}
+              </p>
+            )}
+            <p className={cn('font-medium', toneClassName[result.match.tone])}>
+              {result.match.label}
+            </p>
           </div>
         )}
       </CardContent>
