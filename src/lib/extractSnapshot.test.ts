@@ -11,8 +11,10 @@ import {
   isExtractSnapshotComplete,
   maskSnapshotForDisplay,
   maskStringForDisplay,
+  mergeExtractSnapshots,
   type ExtractSnapshotV1,
 } from '@/lib/extractSnapshot';
+import { buildOcrChunks, pageTextsFromFullText } from '@/lib/ocrChunks';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const schema = JSON.parse(
@@ -278,6 +280,151 @@ describe('extractSnapshot', () => {
         extra_field: 'not allowed',
       };
       expect(validate(invalid)).toBe(false);
+    });
+  });
+
+  describe('mergeExtractSnapshots', () => {
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(schema);
+
+    const chunkA = normalizeExtractSnapshot({
+      insured_name: 'Synthetic Industries LLC',
+      carriers: ['Carrier Alpha', 'carrier alpha'],
+      policy_number: 'POL-100',
+      premium: { total: 25000, frequency: 'annual' },
+      coverages: [
+        {
+          name: 'General Liability',
+          limit: '$1,000,000',
+          deductible: '$500',
+          premium: 12000,
+          parent_coverage: null,
+        },
+      ],
+      key_details: ['Named insured on declarations'],
+    });
+
+    const chunkB = normalizeExtractSnapshot({
+      fees: [
+        { type: 'tax', amount: 350, label: 'State tax' },
+        { type: 'broker', amount: 200 },
+      ],
+      coverages: [
+        {
+          name: 'general liability',
+          limit: '$1,000,000 per occurrence',
+          deductible: '$500',
+          premium: 12000,
+          parent_coverage: null,
+        },
+        {
+          name: 'Commercial Auto',
+          limit: '$500,000 CSL',
+          deductible: null,
+          premium: 8000,
+          parent_coverage: null,
+        },
+      ],
+      key_details: ['named insured on declarations', 'Fleet schedule attached'],
+    });
+
+    it('merges two-chunk fixture keeping parties from A and fees/coverage from B', () => {
+      const merged = mergeExtractSnapshots([chunkA, chunkB]);
+
+      expect(merged.insured_name).toBe('Synthetic Industries LLC');
+      expect(merged.carriers).toEqual(['Carrier Alpha']);
+      expect(merged.premium.total).toBe(25000);
+      expect(merged.fees).toHaveLength(2);
+      expect(merged.fees[0].type).toBe('tax');
+      expect(merged.coverages).toHaveLength(2);
+      expect(merged.coverages.some((c) => c.name === 'Commercial Auto')).toBe(true);
+      expect(merged.key_details).toContain('Fleet schedule attached');
+    });
+
+    it('returns normalized input for single-chunk merge', () => {
+      const single = normalizeExtractSnapshot({
+        insured_name: 'Solo Corp',
+        carriers: ['Solo Carrier'],
+      });
+      const merged = mergeExtractSnapshots([single]);
+      expect(merged).toEqual(single);
+    });
+
+    it('keeps first policy_number on scalar conflict and records key_details note', () => {
+      const first = normalizeExtractSnapshot({ policy_number: 'POL-FIRST' });
+      const second = normalizeExtractSnapshot({ policy_number: 'POL-SECOND' });
+      const merged = mergeExtractSnapshots([first, second]);
+
+      expect(merged.policy_number).toBe('POL-FIRST');
+      expect(
+        merged.key_details.some((d) =>
+          d.includes('Conflict on policy_number') && d.includes('POL-FIRST') && d.includes('POL-SECOND'),
+        ),
+      ).toBe(true);
+    });
+
+    it('dedupes coverages by name keeping entry with more populated fields', () => {
+      const sparse = normalizeExtractSnapshot({
+        coverages: [
+          {
+            name: 'Umbrella',
+            limit: '$2M',
+            deductible: null,
+            premium: null,
+            parent_coverage: null,
+          },
+        ],
+      });
+      const rich = normalizeExtractSnapshot({
+        coverages: [
+          {
+            name: 'umbrella',
+            limit: '$2,000,000',
+            deductible: '$1,000',
+            premium: 1500,
+            parent_coverage: null,
+          },
+        ],
+      });
+
+      const merged = mergeExtractSnapshots([sparse, rich]);
+      expect(merged.coverages).toHaveLength(1);
+      expect(merged.coverages[0].deductible).toBe('$1,000');
+      expect(merged.coverages[0].premium).toBe(1500);
+    });
+
+    it('merged output passes Ajv schema validation', () => {
+      const merged = mergeExtractSnapshots([chunkA, chunkB]);
+      const valid = validate(merged);
+      expect(valid, JSON.stringify(validate.errors, null, 2)).toBe(true);
+    });
+  });
+
+  describe('ocrChunks', () => {
+    it('groups pages into chunks under maxChars', () => {
+      const pageTexts = [
+        { page: 1, text: 'a'.repeat(15_000) },
+        { page: 2, text: 'b'.repeat(15_000) },
+        { page: 3, text: 'c'.repeat(5_000) },
+      ];
+      const { chunks, totalChars } = buildOcrChunks(pageTexts, { maxChars: 28_000 });
+      expect(totalChars).toBe(35_000);
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(chunks[0].startPage).toBe(1);
+    });
+
+    it('splits oversized single page with overlap windows', () => {
+      const pageTexts = [{ page: 1, text: 'x'.repeat(60_000) }];
+      const { chunks } = buildOcrChunks(pageTexts, { maxChars: 28_000 });
+      expect(chunks.length).toBeGreaterThan(2);
+      expect(chunks.every((c) => c.startPage === 1 && c.endPage === 1)).toBe(true);
+    });
+
+    it('parses PAGE BREAK markers from full text fallback', () => {
+      const fullText = 'page one\n\n--- PAGE BREAK ---\n\npage two';
+      const pages = pageTextsFromFullText(fullText);
+      expect(pages).toHaveLength(2);
+      expect(pages[1].text).toBe('page two');
     });
   });
 });
