@@ -36,6 +36,7 @@ interface LeadFilters {
   sort?: string;
   cohort?: string;
   status?: string;
+  scope?: string;
 }
 
 export function useLeadSearch() {
@@ -56,19 +57,26 @@ export function useLeadSearch() {
     const out: Record<string, string> = { q: f.q ?? '' };
     if (f.cohort && f.cohort !== 'all') out.cohort = f.cohort;
     if (f.status) out.status = f.status;
+    if (f.scope === 'mine') out.scope = 'mine';
     return out;
   };
 
   // Load the FIRST page for a given filter set, replacing the current rows.
   // Cohort and status are applied server-side so the rendered rows match the
   // triage tile / status filter.
-  const fetchLeads = async (q = '', sort = 'score_desc', cohort?: string, status?: string) => {
+  const fetchLeads = async (
+    q = '',
+    sort = 'score_desc',
+    cohort?: string,
+    status?: string,
+    scope?: string,
+  ) => {
     // Monotonic guard: a slow response for an older filter set (e.g. a search
     // keystroke racing a cohort-tile click) must not overwrite the newer rows.
     const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
-      filtersRef.current = { q, sort, cohort, status };
+      filtersRef.current = { q, sort, cohort, status, scope };
 
       const { data, error } = await supabase.rpc('search_leads', {
         p_filters: buildFilters(filtersRef.current),

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useTriageCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
+import { useSearchParams } from 'react-router-dom';
+import { useTriageCohortFromUrl, parseScopeFromUrl } from '@/hooks/useTriageCohortFromUrl';
 import { Search, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,6 +80,8 @@ function dueBand(dueAt: string | null, completedAt: string | null): DueBand | nu
 export default function TasksPage() {
   const [view, setView] = useState<View>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const scope = parseScopeFromUrl(searchParams.get('scope'));
   const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(TASK_COHORTS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
@@ -98,18 +101,21 @@ export default function TasksPage() {
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
-      if (cohort !== 'all') {
-        fetchTasks(searchQuery, sort, cohort);
+      if (cohort !== 'all' || scope) {
+        fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope);
       }
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchTasks(searchQuery, sort, cohort), 250);
+    debounceRef.current = setTimeout(
+      () => fetchTasks(searchQuery, sort, cohort !== 'all' ? cohort : undefined, scope),
+      250,
+    );
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, cohort]);
+  }, [searchQuery, cohort, scope]);
 
   const toggleCohort = (c: Cohort) => setCohort((cur) => (cur === c ? 'all' : c));
   const filtersActive = cohort !== 'all' || searchQuery.length > 0;

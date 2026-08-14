@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+/** Parse scope=mine from the URL; returns undefined for any other value. */
+export function parseScopeFromUrl(value: string | null): 'mine' | undefined {
+  return value === 'mine' ? 'mine' : undefined;
+}
+
 /** Parse a cohort query param against an allowlist; fall back to defaultCohort. */
 export function parseCohortFromUrl<T extends string>(
   value: string | null,

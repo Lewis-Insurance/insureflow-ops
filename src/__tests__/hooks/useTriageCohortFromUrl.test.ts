@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCohortFromUrl } from '@/hooks/useTriageCohortFromUrl';
+import { parseCohortFromUrl, parseScopeFromUrl } from '@/hooks/useTriageCohortFromUrl';
 
 const POLICY_COHORTS = [
   'all',
@@ -39,5 +39,17 @@ describe('parseCohortFromUrl', () => {
       'new_30d',
     ] as const;
     expect(parseCohortFromUrl('renewals_30d', customerCohorts, 'all')).toBe('renewals_30d');
+  });
+});
+
+describe('parseScopeFromUrl', () => {
+  it('returns mine when scope=mine', () => {
+    expect(parseScopeFromUrl('mine')).toBe('mine');
+  });
+
+  it('returns undefined for other or null values', () => {
+    expect(parseScopeFromUrl(null)).toBeUndefined();
+    expect(parseScopeFromUrl('all')).toBeUndefined();
+    expect(parseScopeFromUrl('')).toBeUndefined();
   });
 });
