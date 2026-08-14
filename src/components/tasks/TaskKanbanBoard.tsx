@@ -170,12 +170,10 @@ export function TaskKanbanBoard({ accountId }: TaskKanbanBoardProps) {
                           {format(new Date(task.due_at), 'MMM d')}
                         </div>
                       )}
-                      {task.assignee_id && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Assigned
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {task.assignee?.full_name ?? 'Unclaimed'}
+                      </div>
                       {task.status === 'cancelled' && (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <AlertCircle className="h-3 w-3" />

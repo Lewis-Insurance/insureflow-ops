@@ -97,12 +97,13 @@ beforeEach(() => {
 
   vi.mocked(useTaskTriageCounts).mockReturnValue({
     counts: {
-      total: 0,
+      open_total: 0,
       overdue: 0,
       due_this_week: 0,
       high_priority: 0,
       completed: 0,
     },
+    loading: false,
     refetch: vi.fn(),
   } as ReturnType<typeof useTaskTriageCounts>);
 
@@ -171,7 +172,7 @@ describe('triage deep-links from ?cohort=', () => {
     );
 
     await waitFor(() => {
-      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', undefined);
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine');
     });
   });
 
@@ -186,6 +187,20 @@ describe('triage deep-links from ?cohort=', () => {
 
     await waitFor(() => {
       expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', 'overdue', 'mine');
+    });
+  });
+
+  it('TasksPage fetches with scope=unclaimed when scope is in the URL', async () => {
+    const fetchTasks = stubSearchHook(useTaskSearch, 'fetchTasks');
+
+    render(
+      <MemoryRouter initialEntries={['/tasks?scope=unclaimed']}>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(fetchTasks).toHaveBeenCalledWith('', 'due_asc', undefined, 'unclaimed');
     });
   });
 

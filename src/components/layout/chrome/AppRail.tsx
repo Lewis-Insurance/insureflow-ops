@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { RAIL_GROUPS, SYSTEM_ADMIN, type NavGroupDef, type NavDest } from './navConfig';
 import { useChrome } from './ChromeContext';
-import { useNeedsMeToday, type NeedsMeToday } from '@/hooks/useNeedsMeToday';
+import { useMyNeedsMeToday } from '@/hooks/useMyNeedsMeToday';
+import type { NeedsMeToday } from '@/hooks/useNeedsMeToday';
 import { useAuth } from '@/hooks/useAuth';
 import { AccentSpine } from '@/components/cc';
 import {
@@ -48,8 +49,8 @@ interface TodayRow {
 function todayRows(counts: NeedsMeToday): TodayRow[] {
   return [
     { label: 'Renewals due', icon: RefreshCw, count: counts.renewals_due, to: '/policies?cohort=expiring_30d' },
-    { label: 'Overdue tasks', icon: CheckSquare, count: counts.overdue_tasks, to: '/tasks?cohort=overdue' },
-    { label: 'New leads', icon: TrendingUp, count: counts.new_leads, to: '/leads?cohort=new' },
+    { label: 'Overdue tasks', icon: CheckSquare, count: counts.overdue_tasks, to: '/tasks?cohort=overdue&scope=mine' },
+    { label: 'New leads', icon: TrendingUp, count: counts.new_leads, to: '/leads?cohort=new&scope=mine' },
   ];
 }
 
@@ -173,7 +174,7 @@ function NavSection({
 function RailFull() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { counts } = useNeedsMeToday();
+  const { counts } = useMyNeedsMeToday();
   const { profile, signOut } = useAuth();
 
   const rows = todayRows(counts);
@@ -407,7 +408,7 @@ function CollapsedGroup({ group, pathname }: { group: NavGroupDef; pathname: str
 function RailCollapsed() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { counts, total } = useNeedsMeToday();
+  const { counts, total } = useMyNeedsMeToday();
   const { profile } = useAuth();
   const rows = todayRows(counts);
   const adminActive = isActivePath(pathname, SYSTEM_ADMIN.to);

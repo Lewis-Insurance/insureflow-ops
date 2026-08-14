@@ -20,6 +20,8 @@ export interface TaskRow {
   account_name: string | null;
   created_at: string;
   completed_at: string | null;
+  assignee_id: string | null;
+  assignee_name: string | null;
 }
 
 const PAGE_SIZE = 250;
@@ -47,7 +49,9 @@ export function useTaskSearch() {
   const buildFilters = (f: TaskFilters): Record<string, string> => {
     const out: Record<string, string> = { q: f.q ?? '' };
     if (f.cohort && f.cohort !== 'all') out.cohort = f.cohort;
-    if (f.scope === 'mine') out.scope = 'mine';
+    if (f.scope === 'mine' || f.scope === 'unclaimed' || f.scope === 'office') {
+      out.scope = f.scope;
+    }
     return out;
   };
 

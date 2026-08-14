@@ -42839,7 +42839,9 @@ export type Database = {
       }
       get_renewal_intelligence_summary: { Args: never; Returns: Json }
       get_task_triage_counts: {
-        Args: never
+        Args: {
+          p_scope?: string
+        }
         Returns: {
           completed: number
           due_this_week: number
@@ -43854,6 +43856,8 @@ export type Database = {
         Returns: {
           account_id: string
           account_name: string
+          assignee_id: string
+          assignee_name: string
           completed_at: string
           created_at: string
           due_at: string

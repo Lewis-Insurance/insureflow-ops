@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 
 /**
  * Whole-book task triage counts computed server-side (get_task_triage_counts RPC).
@@ -29,18 +30,20 @@ const EMPTY: TaskTriageCounts = {
   completed: 0,
 };
 
-export function useTaskTriageCounts() {
+export function useTaskTriageCounts(scope: TaskScope = 'office') {
   const [counts, setCounts] = useState<TaskTriageCounts>(EMPTY);
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('get_task_triage_counts');
+    const { data, error } = await supabase.rpc('get_task_triage_counts', {
+      p_scope: scope,
+    });
     if (!error && data && data.length > 0) {
       setCounts(data[0] as TaskTriageCounts);
     }
     setLoading(false);
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     refetch();

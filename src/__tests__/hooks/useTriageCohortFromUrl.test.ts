@@ -47,6 +47,14 @@ describe('parseScopeFromUrl', () => {
     expect(parseScopeFromUrl('mine')).toBe('mine');
   });
 
+  it('returns unclaimed when scope=unclaimed', () => {
+    expect(parseScopeFromUrl('unclaimed')).toBe('unclaimed');
+  });
+
+  it('returns office when scope=office', () => {
+    expect(parseScopeFromUrl('office')).toBe('office');
+  });
+
   it('returns undefined for other or null values', () => {
     expect(parseScopeFromUrl(null)).toBeUndefined();
     expect(parseScopeFromUrl('all')).toBeUndefined();
