@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTriageCohortFromUrl, parseScopeFromUrl, type TaskScope } from '@/hooks/useTriageCohortFromUrl';
-import { Search, X, Plus } from 'lucide-react';
+import { Search, X, Plus, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -9,9 +9,13 @@ import { TaskKanbanBoard } from '@/components/tasks/TaskKanbanBoard';
 import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
 import { TaskAnalyticsDashboard } from '@/components/tasks/TaskAnalyticsDashboard';
 import { TaskForm } from '@/components/tasks/TaskForm';
+import { TaskEditModal } from '@/components/tasks/TaskEditModal';
 import { useTasks, Task } from '@/hooks/useTasks';
+import type { TaskRow } from '@/hooks/useTaskSearch';
+import { toast } from '@/hooks/use-toast';
 import { useTaskSearch } from '@/hooks/useTaskSearch';
 import { useTaskTriageCounts } from '@/hooks/useTaskTriageCounts';
+import { supabase } from '@/integrations/supabase/client';
 import { StatusPill, Chip, SectionLabel, TriageTile, SkeletonRow } from '@/components/cc';
 import { humanizeEnum } from '@/lib/format';
 import { taskAssigneeLabel } from '@/lib/taskAssignee';
@@ -101,6 +105,10 @@ export default function TasksPage() {
   const scope = parseScopeFromUrl(searchParams.get('scope')) ?? 'mine';
   const [cohort, setCohort] = useTriageCohortFromUrl<Cohort>(TASK_COHORTS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
+  const [markingDoneId, setMarkingDoneId] = useState<string | null>(null);
 
   const setScope = (next: TaskScope) => {
     setSearchParams((prev) => {
@@ -158,6 +166,91 @@ export default function TasksPage() {
     refetchCounts();
   };
 
+  const fetchFullTask = async (taskId: string): Promise<Task | null> => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(
+        `
+          *,
+          account:accounts(id, name),
+          policy:policies(id, policy_number, carrier, line_of_business)
+        `,
+      )
+      .eq('id', taskId)
+      .is('deleted_at', null)
+      .single();
+
+    if (error || !data) return null;
+
+    const row = data as Task;
+    if (!row.assignee_id) return row;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', row.assignee_id)
+      .single();
+
+    return profile ? { ...row, assignee: profile } : row;
+  };
+
+  const handleRowClick = async (row: TaskRow) => {
+    setLoadingTaskId(row.id);
+    try {
+      const full = await fetchFullTask(row.id);
+      if (!full) return;
+
+      const enriched =
+        !full.account && row.account_name && row.account_id
+          ? { ...full, account: { id: row.account_id, name: row.account_name } }
+          : full;
+
+      setSelectedTask(enriched);
+      setEditModalOpen(true);
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
+
+  const isOpenTask = (status: string | null) => status === 'pending' || status === 'in_progress';
+
+  const handleMarkDone = async (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    setMarkingDoneId(taskId);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Task completed',
+        description: 'Marked as done.',
+      });
+
+      window.dispatchEvent(new CustomEvent('tasks:updated'));
+      refetch();
+      refetchCounts();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Could not mark task as done.',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingDoneId(null);
+    }
+  };
+
+  const handleTaskUpdate = () => {
+    window.dispatchEvent(new CustomEvent('tasks:updated'));
+    refetch();
+    refetchCounts();
+    setEditModalOpen(false);
+  };
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1200px] space-y-6 p-6">
@@ -165,7 +258,10 @@ export default function TasksPage() {
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-tight text-cc-text-primary">Tasks</h1>
-            <p className="mt-1 text-sm text-cc-text-muted">
+            <p className="mt-1 text-sm text-cc-text-secondary">
+              Work queue. Click a row to open it.
+            </p>
+            <p className="mt-0.5 text-sm text-cc-text-muted">
               <span className="cc-num">{counts.open_total}</span> open. {scopeSubtitle(scope)}
             </p>
           </div>
@@ -336,46 +432,71 @@ export default function TasksPage() {
                   return (
                     <div
                       key={task.id}
-                      className={cn(
-                        'flex flex-col gap-2 border-b border-cc-border-subtle px-4 py-3 transition-colors duration-fast last:border-b-0 hover:bg-cc-surface-raised',
-                        'md:grid md:items-center md:gap-4',
-                        COLS,
-                      )}
+                      className="flex items-stretch border-b border-cc-border-subtle last:border-b-0"
                     >
-                      {/* Title (carries status + priority inline on mobile) */}
-                      <div className="min-w-0">
-                        <div className="font-semibold text-cc-text-primary break-words">{title}</div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2 md:hidden">
-                          <StatusPill status={task.status} />
-                          <Chip>{humanizeEnum(task.priority)}</Chip>
-                          <span className="text-xs text-cc-text-muted">{assigneeLabel}</span>
-                        </div>
-                      </div>
-
-                      {/* Account / entity */}
-                      <div className="truncate text-sm text-cc-text-muted">{account}</div>
-
-                      <div className="truncate text-sm text-cc-text-secondary">{assigneeLabel}</div>
-
-                      <div className="hidden md:block">
-                        <StatusPill status={task.status} />
-                      </div>
-
-                      {/* Priority is a neutral chip: the word carries the level, not color */}
-                      <div className="hidden md:block">
-                        {task.priority ? <Chip>{humanizeEnum(task.priority)}</Chip> : null}
-                      </div>
-
-                      {/* Due: banded date. Overdue is danger + the word "Overdue" */}
-                      <div className="cc-num hidden text-sm md:flex md:items-center md:gap-1.5">
-                        {band ? (
-                          <span style={{ color: band.color }} className={band.overdue ? 'font-semibold' : undefined}>
-                            {band.label}
-                          </span>
-                        ) : (
-                          <span className="text-cc-text-muted">No due date</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRowClick(task)}
+                        disabled={loadingTaskId === task.id}
+                        className={cn(
+                          'flex min-w-0 flex-1 flex-col gap-2 px-4 py-3 text-left transition-colors duration-fast hover:bg-cc-surface-raised',
+                          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cc-focus-ring focus-visible:ring-inset',
+                          'md:grid md:items-center md:gap-4',
+                          loadingTaskId === task.id && 'opacity-60',
+                          COLS,
                         )}
-                      </div>
+                      >
+                        {/* Title (carries status + priority inline on mobile) */}
+                        <div className="min-w-0">
+                          <div className="font-semibold text-cc-text-primary break-words">{title}</div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 md:hidden">
+                            <StatusPill status={task.status} />
+                            <Chip>{humanizeEnum(task.priority)}</Chip>
+                            <span className="text-xs text-cc-text-muted">{assigneeLabel}</span>
+                          </div>
+                        </div>
+
+                        {/* Account / entity */}
+                        <div className="truncate text-sm text-cc-text-muted">{account}</div>
+
+                        <div className="truncate text-sm text-cc-text-secondary">{assigneeLabel}</div>
+
+                        <div className="hidden md:block">
+                          <StatusPill status={task.status} />
+                        </div>
+
+                        {/* Priority is a neutral chip: the word carries the level, not color */}
+                        <div className="hidden md:block">
+                          {task.priority ? <Chip>{humanizeEnum(task.priority)}</Chip> : null}
+                        </div>
+
+                        {/* Due: banded date. Overdue is danger + the word "Overdue" */}
+                        <div className="cc-num hidden text-sm md:flex md:items-center md:gap-1.5">
+                          {band ? (
+                            <span style={{ color: band.color }} className={band.overdue ? 'font-semibold' : undefined}>
+                              {band.label}
+                            </span>
+                          ) : (
+                            <span className="text-cc-text-muted">No due date</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {isOpenTask(task.status) && (
+                        <div className="flex shrink-0 items-center border-l border-cc-border-subtle px-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleMarkDone(e, task.id)}
+                            disabled={markingDoneId === task.id}
+                            className="gap-1.5 rounded-cc-md border-cc-border-interactive bg-transparent text-cc-text-secondary hover:bg-cc-surface-overlay hover:text-cc-text-primary"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Mark done
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -407,6 +528,13 @@ export default function TasksPage() {
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onSubmit={handleCreateTask}
+        />
+
+        <TaskEditModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          task={selectedTask}
+          onTaskUpdate={handleTaskUpdate}
         />
       </div>
     </AppLayout>

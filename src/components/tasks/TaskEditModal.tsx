@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, FileText, Save, X } from 'lucide-react';
+import { Calendar, Clock, User, FileText, Save, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -138,21 +138,26 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
     }
   };
 
+  const buildUpdateData = (overrides: Partial<typeof formData> & { completed_at?: string | null } = {}) => ({
+    ...formData,
+    ...overrides,
+    due_at: formData.due_at ? fromZonedTime(`${formData.due_at} 12:00:00`, TZ).toISOString() : null,
+    assignee_id:
+      formData.assignee_id && formData.assignee_id !== 'unassigned'
+        ? formData.assignee_id
+        : currentUserId || null,
+    updated_at: new Date().toISOString(),
+  });
+
   const handleSave = async () => {
     if (!task || !validateForm()) return;
 
     try {
       setLoading(true);
-      
-      const updateData = {
-        ...formData,
-        due_at: formData.due_at ? fromZonedTime(`${formData.due_at} 12:00:00`, TZ).toISOString() : null,
-        assignee_id: (formData.assignee_id && formData.assignee_id !== 'unassigned') ? formData.assignee_id : (currentUserId || null),
-        updated_at: new Date().toISOString()
-      };
+
       const { error } = await supabase
         .from('tasks')
-        .update(updateData)
+        .update(buildUpdateData())
         .eq('id', task.id);
 
       if (error) throw error;
@@ -175,6 +180,45 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
       setLoading(false);
     }
   };
+
+  const handleComplete = async () => {
+    if (!task || !validateForm()) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from('tasks')
+        .update(
+          buildUpdateData({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          }),
+        )
+        .eq('id', task.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Task marked complete.',
+      });
+
+      onTaskUpdate();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error completing task:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to mark task complete',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canMarkComplete = formData.status !== 'completed' && formData.status !== 'cancelled';
 
   const getStatusBadge = (status: Task['status']) => {
     switch (status) {
@@ -387,12 +431,19 @@ export function TaskEditModal({ open, onOpenChange, task, onTaskUpdate }: TaskEd
               Cancel
             </Button>
             <Button
+              variant="outline"
               onClick={handleSave}
               disabled={loading}
             >
               <Save className="h-4 w-4 mr-2" />
               {loading ? 'Saving...' : 'Save Changes'}
             </Button>
+            {canMarkComplete && (
+              <Button data-primary onClick={handleComplete} disabled={loading}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {loading ? 'Saving...' : 'Mark complete'}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
