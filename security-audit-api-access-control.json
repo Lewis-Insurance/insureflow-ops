@@ -1,0 +1,173 @@
+{
+  "findings": [
+    {
+      "severity": "critical",
+      "location": "supabase/functions/client-context-api/index.ts",
+      "title": "BOLA: verifyAccountAccess always returns true, allowing any authenticated user to read any account's full data across tenants",
+      "description": "The verifyAccountAccess function (lines 297-323) fetches the account by ID but unconditionally returns true on line 322 with a TODO comment 'Add team/role-based access control'. The function uses a service role client that bypasses RLS. This means any authenticated user (including customer-role users) can access any account's complete context pack: policies, claims, contacts, quotes, active tasks, and communications history from any agency workspace.",
+      "impact": "Full cross-tenant data exposure. An attacker with any valid JWT (even a customer account) can enumerate and read the complete client dossier for every account in the system, including policy details, claim histories, contact information, premium amounts, and internal task notes.",
+      "attack_path": [
+        "1. Authenticate as any user (customer, agent, or admin) to obtain a valid JWT",
+        "2. Call GET /functions/v1/client-context-api/context/{target_account_id} with Authorization header",
+        "3. verifyAccountAccess is called but returns true for any existing account_id",
+        "4. buildContextPack fetches full data using service role client (bypasses RLS): account details, contacts, policies with carrier info, claims, active tasks, calls, SMS messages, events, quotes",
+        "5. All data is returned to the attacker in a single structured JSON response",
+        "6. Repeat with POST /functions/v1/client-context-api/analyze to also get AI-powered analysis of the victim's data"
+      ],
+      "evidence": [
+        "supabase/functions/client-context-api/index.ts:315",
+        "supabase/functions/client-context-api/index.ts:322",
+        "supabase/functions/client-context-api/index.ts:155",
+        "supabase/functions/client-context-api/index.ts:363-473"
+      ],
+      "remediation": "Replace the stub verifyAccountAccess with a real authorization check that validates the user has an active agency_workspace_membership in the same workspace as the account. Use: SELECT 1 FROM agency_workspace_memberships awm JOIN accounts a ON a.agency_workspace_id = awm.agency_workspace_id WHERE awm.user_id = userId AND awm.status = 'active' AND a.id = accountId AND a.deleted_at IS NULL."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/admin-update-password/index.ts",
+      "title": "Weak admin authorization allows soft-deleted, disabled, or deprovisioned admins to reset any user's password",
+      "description": "admin-update-password checks authorization with only `profile?.role !== 'admin'` (line 40) using a service role query. It does not verify: (1) profile.status is 'active', (2) profile.deleted_at is null, (3) profile.is_staff is true, (4) the admin has an active workspace membership. The other admin functions (admin-create-user, admin-update-user, admin-list-users) use the stricter requireActiveProvisionedAdmin which checks all of these. This inconsistency means a soft-deleted, disabled, or deprovisioned admin retains the ability to change any user's password.",
+      "impact": "Account takeover. A deprovisioned or terminated admin whose profile still has role='admin' in the database can change any user's password (including other admins), gaining full access to their account.",
+      "attack_path": [
+        "1. An admin is terminated: their profile is soft-deleted (deleted_at set) or status set to 'disabled', and their workspace membership is removed",
+        "2. The terminated admin's JWT is still valid (not expired) or they log in again (soft-delete doesn't prevent auth login)",
+        "3. They call admin-update-password with {userId: '<target>', newPassword: '<attacker-controlled>'}",
+        "4. The function checks profile.role which is still 'admin' — passes",
+        "5. The function calls supabaseAdmin.auth.admin.updateUserById to change the target's password",
+        "6. The attacker logs in as the target user with the new password"
+      ],
+      "evidence": [
+        "supabase/functions/admin-update-password/index.ts:34-45",
+        "supabase/functions/admin-update-password/index.ts:66-68",
+        "supabase/functions/_shared/admin-provisioning.ts:106-163"
+      ],
+      "remediation": "Replace the manual role check with requireActiveProvisionedAdmin, matching the pattern used by admin-create-user and admin-update-user. This ensures the admin is active, not soft-deleted, has is_staff=true, and has an active workspace membership."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/admin-approvals/index.ts",
+      "title": "Weak admin authorization allows deprovisioned admins to approve role changes and email changes",
+      "description": "admin-approvals checks authorization with only `profile.role !== 'admin'` (line 47), identical to the admin-update-password weakness. A soft-deleted, disabled, or deprovisioned admin can approve pending role change requests (which updates the target user's role in the profiles table via service role) and email change requests. The function also uses the service role client, so database operations bypass RLS.",
+      "impact": "Privilege escalation. A deprovisioned admin can approve pending role change requests to elevate any user to admin, or approve email change requests to take over accounts.",
+      "attack_path": [
+        "1. A pending role_change_request exists in the system (e.g., a user requested admin role)",
+        "2. A deprovisioned admin (role still 'admin' but soft-deleted/disabled) calls admin-approvals",
+        "3. Body: {action: 'approve', request_type: 'role', request_id: '<request_uuid>'}",
+        "4. The weak role check passes (profile.role is still 'admin')",
+        "5. The function updates the user's role in profiles table via service role client (line 196-197)",
+        "6. The target user now has the requested role (potentially admin)"
+      ],
+      "evidence": [
+        "supabase/functions/admin-approvals/index.ts:41-52",
+        "supabase/functions/admin-approvals/index.ts:193-206"
+      ],
+      "remediation": "Replace the manual role check with requireActiveProvisionedAdmin, matching the pattern used by admin-create-user and admin-update-user."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/analyze-workspace/index.ts",
+      "title": "BOLA: Any authenticated user can trigger analysis and read documents from any workspace across tenants",
+      "description": "The analyze-workspace function authenticates the caller via requireAuth (line 40-44) but never checks whether the authenticated user owns or has membership in the workspace identified by workspace_id. The function uses a service role client (line 32-37) to fetch the workspace and all its documents (including parsed data) and then triggers AI analysis. Any authenticated user can provide any workspace_id to read workspace documents from other tenants.",
+      "impact": "Cross-tenant document exposure. An attacker can read parsed insurance documents (policy data, coverage details, client information) from any workspace in the system by providing its UUID.",
+      "attack_path": [
+        "1. Authenticate as any user to obtain a valid JWT",
+        "2. Enumerate or guess workspace UUIDs (e.g., from other API responses or sequential patterns)",
+        "3. Call POST /functions/v1/analyze-workspace with {workspace_id: '<target_uuid>'}",
+        "4. The function fetches the workspace and all workspace_documents with parsed_documents using service role (bypasses RLS)",
+        "5. All document data including parsed policy details is returned in the analysis_output",
+        "6. Even if the AI analysis step fails, the error handler re-creates a service role client and writes to the workspace"
+      ],
+      "evidence": [
+        "supabase/functions/analyze-workspace/index.ts:32-37",
+        "supabase/functions/analyze-workspace/index.ts:40-44",
+        "supabase/functions/analyze-workspace/index.ts:47-68"
+      ],
+      "remediation": "After authentication, verify the user owns or has workspace membership for the requested workspace_id. Query agency_workspace_memberships to confirm the user has an active membership in the workspace's agency. Consider using the anon key with the user's JWT for the workspace fetch so RLS applies."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/calculate-quote-score/index.ts",
+      "title": "Cross-tenant data access via rescore_all flag: any authenticated user can read and modify all quotes in the system",
+      "description": "The calculate-quote-score function accepts a rescore_all flag (line 586) that, when true, fetches ALL quotes from the database with no tenant or account filter (lines 612-618). The function uses a service role client, bypassing RLS. It reads quote details (premiums, coverages, carrier info) and writes updated scores back. Any authenticated user can trigger this cross-tenant operation.",
+      "impact": "Cross-tenant data exposure and data modification. An attacker can read premium amounts, carrier information, coverage details, and scoring metadata for all quotes across all agencies. They can also trigger score recalculation, modifying quote_score and ai_recommendation fields on all quotes.",
+      "attack_path": [
+        "1. Authenticate as any user (including customer role)",
+        "2. Call POST /functions/v1/calculate-quote-score with {rescore_all: true}",
+        "3. The function queries all quotes with no filter using service role client",
+        "4. For each quote, it reads carrier ratings, coverage details, and account average premiums",
+        "5. All scoring results (including premiums, carrier names, coverage details) are returned in the response",
+        "6. All quotes across all tenants have their scores and AI recommendations overwritten"
+      ],
+      "evidence": [
+        "supabase/functions/calculate-quote-score/index.ts:586-591",
+        "supabase/functions/calculate-quote-score/index.ts:612-618",
+        "supabase/functions/calculate-quote-score/index.ts:574-577",
+        "supabase/functions/calculate-quote-score/index.ts:703-733"
+      ],
+      "remediation": "Remove or restrict the rescore_all flag to admin-only access (use requireActiveProvisionedAdmin). When rescore_all is used, scope the query to the admin's agency workspace by joining through accounts.agency_workspace_id. For non-admin callers, always require accountId or quoteIds and verify the caller has workspace membership for the related account."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/setup-mfa/index.ts",
+      "title": "Broken TOTP implementation: verification uses hardcoded zero-key instead of user's secret, making MFA bypassable",
+      "description": "The generateTOTP function (line 175-206) creates a fixed zero-filled Uint8Array (line 177: `const secretBytes = new Uint8Array(32)`) instead of decoding the actual base32 secret parameter. The comment acknowledges this: 'Simplified - would need proper base32 decode'. This means the HMAC key is always 32 zero bytes regardless of the user's MFA secret. All users share the same effective TOTP validation. An attacker who computes the TOTP for the zero key can bypass MFA for any user. Additionally, the MFA secret is stored in plaintext in the profiles table (line 100).",
+      "impact": "MFA bypass for all users. Since all users' TOTP validation uses the same zero key, an attacker can compute the expected 6-digit code for any time window and bypass MFA for any user. The plaintext MFA secret storage in profiles also means anyone with database read access (or via other BOLA vulnerabilities) can extract MFA secrets.",
+      "attack_path": [
+        "1. Compute TOTP using HMAC-SHA1 with a 32-byte zero key for the current 30-second window",
+        "2. The same 6-digit code is valid for ALL users who have MFA enabled",
+        "3. Use this code to pass the verify_setup action for any authenticated user's MFA enrollment",
+        "4. Or if MFA is used for login verification (not shown in this function), bypass login MFA with the zero-key code"
+      ],
+      "evidence": [
+        "supabase/functions/setup-mfa/index.ts:177",
+        "supabase/functions/setup-mfa/index.ts:160-171",
+        "supabase/functions/setup-mfa/index.ts:98-101"
+      ],
+      "remediation": "Implement proper base32 decoding of the secret parameter in generateTOTP. Use a well-tested TOTP library (e.g., otpauth) instead of a custom implementation. Store the MFA secret encrypted at rest (use a separate encrypted column or a secrets vault). Never return the raw secret in API responses after initial setup."
+    },
+    {
+      "severity": "high",
+      "location": "supabase/functions/client-send-approval-create/index.ts",
+      "title": "Missing role check allows any authenticated user (including customers) to create send approvals for emails, SMS, and eSign requests",
+      "description": "The client-send-approval-create function (the gatekeeper for email-send, send-sms, send-coi-email, and esign-create-request) only requires JWT authentication via requireAuth (line 43). It has no staff/role check. Any authenticated user, including customer-role users, can create send approval tokens. Combined with the equally ungated email-send and send-sms functions, this means any authenticated user can send emails and SMS from the organization's communication channels (Postmark/SendGrid/Twilio).",
+      "impact": "Abuse of organization's email and SMS infrastructure. A customer-role user can send arbitrary emails from the agency's email address and SMS from the agency's Twilio number. This enables phishing attacks appearing to come from the insurance agency, spam campaigns, and reputational damage.",
+      "attack_path": [
+        "1. Authenticate as any user (including a self-registered customer)",
+        "2. Call POST /functions/v1/client-send-approval-create with {surface: 'email-send', payload: {to: 'victim@example.com', subject: 'Urgent: Policy Update', body: '<phishing content>'}}",
+        "3. Receive the approval_ref token in the response",
+        "4. Call POST /functions/v1/email-send with the payload including the approval_ref and approved_by_human_id",
+        "5. The email is sent from the organization's configured FROM address via Postmark/SendGrid",
+        "6. Repeat for send-sms to send SMS via Twilio, or esign-create-request for eSignature requests"
+      ],
+      "evidence": [
+        "supabase/functions/client-send-approval-create/index.ts:43-44",
+        "supabase/functions/client-send-approval-create/index.ts:7-12",
+        "supabase/functions/email-send/index.ts:31-34",
+        "supabase/functions/email-send/index.ts:47-66"
+      ],
+      "remediation": "Add a staff/role check to client-send-approval-create. After requireAuth, verify the user has is_staff=true or a staff role via a profiles query or the is_staff() RPC. This single fix gates all four send surfaces (email, SMS, COI, eSign) since they all require an approval token."
+    },
+    {
+      "severity": "medium",
+      "location": "supabase/functions/admin-list-users/index.ts",
+      "title": "Cross-tenant data exposure: admin-list-users returns all users across all agency workspaces",
+      "description": "The admin-list-users function properly validates the caller is a provisioned admin via requireActiveProvisionedAdmin, but then fetches ALL auth users (line 52-67 via supabaseAdmin.auth.admin.listUsers), ALL profiles (line 70-73), ALL workspace memberships (line 80-83), and ALL agency workspaces (line 88-93) with no workspace scoping. In a multi-tenant system, Agency A's admin can see the full user roster of Agency B, including email addresses, names, roles, staff status, and workspace membership details.",
+      "impact": "Cross-tenant user enumeration. An admin from one agency can enumerate all users in the system, exposing email addresses, full names, roles, login timestamps, and workspace membership details of users from other agencies. This information could be used for social engineering, competitive intelligence, or targeted attacks.",
+      "attack_path": [
+        "1. Authenticate as an admin with an active workspace membership",
+        "2. Call the admin-list-users edge function",
+        "3. The function passes requireActiveProvisionedAdmin (caller is a legitimate admin in their workspace)",
+        "4. The function lists ALL auth.users and ALL profiles using service role, with no workspace filter",
+        "5. The response contains the complete user directory across all tenants: emails, names, roles, staff status, workspace memberships, last login timestamps"
+      ],
+      "evidence": [
+        "supabase/functions/admin-list-users/index.ts:48-67",
+        "supabase/functions/admin-list-users/index.ts:70-73",
+        "supabase/functions/admin-list-users/index.ts:80-83",
+        "supabase/functions/admin-list-users/index.ts:88-93",
+        "supabase/functions/admin-list-users/index.ts:107-157"
+      ],
+      "remediation": "After validating the admin, filter the results to only include users who have memberships in the same agency_workspace_id as the admin's default workspace. Query memberships with a workspace filter first, then only return profiles and auth users that match. Platform-level super-admins (if needed) should be a separate, explicitly gated path."
+    }
+  ]
+}
