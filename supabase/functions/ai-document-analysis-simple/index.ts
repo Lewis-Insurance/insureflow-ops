@@ -199,7 +199,9 @@ serve(async (req) => {
         account_id: account_id || null,
         processing_status: 'processing',
         created_by: user_id
-      }, { onConflict: 'document_id' });
+      }, { onConflict: 'document_id' })
+      .select('id')
+      .single();
 
     // STEP 1: Get document URL
     console.log('----------------------------------------');
@@ -422,6 +424,12 @@ serve(async (req) => {
       })
       .eq('document_id', document_id);
 
+    const { data: analysisRecord } = await supabase
+      .from('document_analysis')
+      .select('id')
+      .eq('document_id', document_id)
+      .single();
+
     console.log('========================================');
     console.log('SUCCESS - Analysis Complete');
     console.log('========================================');
@@ -429,6 +437,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        analysis_id: analysisRecord?.id,
         document_id,
         page_count: totalPages,
         text_length: charCount,
