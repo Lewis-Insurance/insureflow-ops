@@ -7,7 +7,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAuth } from '../_shared/auth.ts';
 import { modelBoundaryFetch } from '../_shared/modelBoundaryFetch.ts';
-import { normalizeExtractSnapshot } from '../_shared/extractSnapshot.ts';
+import { normalizeExtractSnapshot, mergeExtractSnapshots } from '../_shared/extractSnapshot.ts';
+import {
+  buildOcrChunks,
+  pageTextsFromAzurePages,
+  PAGE_BREAK_MARKER,
+} from '../_shared/ocrChunks.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +20,130 @@ const corsHeaders = {
 };
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Leave room for prompt overhead under legacy 100k cap. */
+const SINGLE_CHUNK_CHAR_THRESHOLD = 90_000;
+const LLM_MAX_TOKENS = 4000;
+
+const EXTRACT_SNAPSHOT_V1_SCHEMA = `{
+  "schema_version": 1,
+  "policy_number": "",
+  "insured_name": "",
+  "carriers": ["Carrier A", "Carrier B"],
+  "document_type": "auto_policy|home_policy|commercial_policy|life_policy|umbrella_policy|commercial_quote",
+  "effective_date": "YYYY-MM-DD or null",
+  "expiration_date": "YYYY-MM-DD or null",
+  "claims_made": true or false or null,
+  "defense_inside_limits": true or false or null,
+  "premium": {"total": 0, "frequency": "annual|monthly|quarterly or null"},
+  "fees": [{"type": "tax|broker|surplus_lines|nima|other", "amount": 0, "label": "optional label"}],
+  "commission": {"percent": 0, "amount": 0},
+  "coverages": [
+    {
+      "name": "",
+      "limit": "",
+      "deductible": "",
+      "premium": 0,
+      "parent_coverage": "parent coverage name when included in another line, else null"
+    }
+  ],
+  "locations": [{"address": "", "occupancy": "building type or use"}],
+  "vehicles": [{"year": "", "make": "", "model": "", "vin": ""}],
+  "drivers": [{"name": "", "date_of_birth": "YYYY-MM-DD", "license_number": "", "license_state": ""}],
+  "key_details": ["overflow detail strings only"]
+}`;
+
+function buildFullTextFromPageTexts(
+  pageTexts: Array<{ page: number; text: string }>,
+): string {
+  return pageTexts
+    .map((p) => p.text)
+    .join(PAGE_BREAK_MARKER);
+}
+
+function buildFullExtractionPrompt(totalPages: number, documentText: string): string {
+  return `Analyze this ${totalPages}-page insurance document and extract ALL relevant information as ExtractSnapshotV1 JSON.
+
+DOCUMENT TEXT (ALL ${totalPages} PAGES):
+${documentText}
+
+Return ONLY valid JSON matching ExtractSnapshotV1 (schema_version: 1):
+${EXTRACT_SNAPSHOT_V1_SCHEMA}
+
+Rules:
+- Use carriers array (not a single carrier string).
+- Use locations array (not a single property object).
+- Set parent_coverage when a sublimit is included in another coverage (e.g. "Products-Completed Ops included in GL").
+- Include fees and commission when present on the document.
+- Use null for unknown scalar fields; use empty arrays when none found.`;
+}
+
+function buildPartialExtractionPrompt(
+  startPage: number,
+  endPage: number,
+  totalPages: number,
+  chunkText: string,
+): string {
+  const pageLabel = startPage === endPage
+    ? `page ${startPage}`
+    : `pages ${startPage}-${endPage}`;
+
+  return `Extract fields present in THIS SECTION ONLY (${pageLabel} of ${totalPages} total pages) as ExtractSnapshotV1 JSON. Leave scalar fields null and arrays empty if not in this section.
+
+DOCUMENT SECTION (${pageLabel}):
+${chunkText}
+
+Return ONLY valid JSON matching ExtractSnapshotV1 (schema_version: 1):
+${EXTRACT_SNAPSHOT_V1_SCHEMA}
+
+Rules:
+- Extract ONLY what appears in this section.
+- Use carriers array (not a single carrier string).
+- Use locations array (not a single property object).
+- Set parent_coverage when a sublimit is included in another coverage.
+- Use null for unknown scalar fields; use empty arrays when none found.`;
+}
+
+async function callAzureOpenAIExtraction(
+  endpoint: string,
+  apiKey: string,
+  deployment: string,
+  prompt: string,
+): Promise<unknown> {
+  const aiResponse = await modelBoundaryFetch(
+    `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-15-preview`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: 'Extract insurance data as JSON. Be thorough and accurate.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: LLM_MAX_TOKENS,
+      }),
+    },
+  );
+
+  if (!aiResponse.ok) {
+    const errText = await aiResponse.text();
+    throw new Error(`Azure OpenAI failed: ${aiResponse.status} - ${errText}`);
+  }
+
+  const aiData = await aiResponse.json();
+  const aiContent = aiData.choices?.[0]?.message?.content || '';
+
+  try {
+    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
+  } catch {
+    return { raw_response: aiContent };
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -178,19 +307,13 @@ serve(async (req) => {
       throw new Error('Azure OCR failed - could not extract text from document');
     }
 
-    // Extract text from all pages
+    // Extract text from all pages (preserve per-page data for chunking)
     const allPages = ocrResult.analyzeResult?.pages || [];
     const totalPages = allPages.length;
     console.log(`Document has ${totalPages} pages`);
 
-    let fullText = '';
-    for (const page of allPages) {
-      if (page.lines) {
-        const pageText = page.lines.map((line: any) => line.content || '').join('\n');
-        fullText += pageText + '\n\n--- PAGE BREAK ---\n\n';
-      }
-    }
-
+    const pageTexts = pageTextsFromAzurePages(allPages);
+    const fullText = buildFullTextFromPageTexts(pageTexts);
     const charCount = fullText.length;
     console.log(`✅ Extracted ${charCount} characters from ${totalPages} pages`);
 
@@ -212,89 +335,78 @@ serve(async (req) => {
 
     // STEP 3: AI Analysis with Azure OpenAI
     let analysisResult = normalizeExtractSnapshot({});
+    let chunkCount = 1;
+    let chunksAnalyzed = 0;
 
     if (AZURE_OPENAI_ENDPOINT && AZURE_OPENAI_KEY) {
       console.log('----------------------------------------');
       console.log('STEP 3: AI Analysis with Azure OpenAI');
       console.log('----------------------------------------');
 
-      const analysisPrompt = `Analyze this ${totalPages}-page insurance document and extract ALL relevant information as ExtractSnapshotV1 JSON.
+      if (charCount <= SINGLE_CHUNK_CHAR_THRESHOLD) {
+        console.log(`Single-chunk extraction (${charCount} chars <= ${SINGLE_CHUNK_CHAR_THRESHOLD})`);
 
-DOCUMENT TEXT (ALL ${totalPages} PAGES):
-${fullText.substring(0, 100000)}
-
-Return ONLY valid JSON matching ExtractSnapshotV1 (schema_version: 1):
-{
-  "schema_version": 1,
-  "policy_number": "",
-  "insured_name": "",
-  "carriers": ["Carrier A", "Carrier B"],
-  "document_type": "auto_policy|home_policy|commercial_policy|life_policy|umbrella_policy|commercial_quote",
-  "effective_date": "YYYY-MM-DD or null",
-  "expiration_date": "YYYY-MM-DD or null",
-  "claims_made": true or false or null,
-  "defense_inside_limits": true or false or null,
-  "premium": {"total": 0, "frequency": "annual|monthly|quarterly or null"},
-  "fees": [{"type": "tax|broker|surplus_lines|nima|other", "amount": 0, "label": "optional label"}],
-  "commission": {"percent": 0, "amount": 0},
-  "coverages": [
-    {
-      "name": "",
-      "limit": "",
-      "deductible": "",
-      "premium": 0,
-      "parent_coverage": "parent coverage name when included in another line, else null"
-    }
-  ],
-  "locations": [{"address": "", "occupancy": "building type or use"}],
-  "vehicles": [{"year": "", "make": "", "model": "", "vin": ""}],
-  "drivers": [{"name": "", "date_of_birth": "YYYY-MM-DD", "license_number": "", "license_state": ""}],
-  "key_details": ["overflow detail strings only"]
-}
-
-Rules:
-- Use carriers array (not a single carrier string).
-- Use locations array (not a single property object).
-- Set parent_coverage when a sublimit is included in another coverage (e.g. "Products-Completed Ops included in GL").
-- Include fees and commission when present on the document.
-- Use null for unknown scalar fields; use empty arrays when none found.`;
-
-      const aiResponse = await modelBoundaryFetch(
-        `${AZURE_OPENAI_ENDPOINT}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'api-key': AZURE_OPENAI_KEY,
-          },
-          body: JSON.stringify({
-            messages: [
-              { role: 'system', content: 'Extract insurance data as JSON. Be thorough and accurate.' },
-              { role: 'user', content: analysisPrompt }
-            ],
-            temperature: 0.1,
-            max_tokens: 4000
-          })
-        }
-      );
-
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        const aiContent = aiData.choices?.[0]?.message?.content || '';
+        const analysisPrompt = buildFullExtractionPrompt(totalPages, fullText);
 
         try {
-          const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-          const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
+          const parsed = await callAzureOpenAIExtraction(
+            AZURE_OPENAI_ENDPOINT,
+            AZURE_OPENAI_KEY,
+            AZURE_OPENAI_DEPLOYMENT,
+            analysisPrompt,
+          );
           analysisResult = normalizeExtractSnapshot(parsed);
-          console.log('✅ AI Analysis complete (ExtractSnapshotV1 normalized)');
+          chunksAnalyzed = 1;
+          console.log('✅ AI Analysis complete (ExtractSnapshotV1 normalized, single chunk)');
         } catch (parseError) {
-          console.error('Failed to parse AI response');
-          analysisResult = normalizeExtractSnapshot({ raw_response: aiContent });
+          console.error('Failed to parse AI response:', parseError);
+          analysisResult = normalizeExtractSnapshot({});
         }
       } else {
-        console.error('Azure OpenAI failed, returning OCR only');
+        const { chunks, totalChars } = buildOcrChunks(pageTexts);
+        chunkCount = chunks.length;
+        console.log(`Chunked extraction: ${totalChars} chars across ${chunkCount} chunks`);
+
+        const partialSnapshots = [];
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          console.log(
+            `Analyzing chunk ${i + 1}/${chunks.length} (pages ${chunk.startPage}-${chunk.endPage})`,
+          );
+
+          const partialPrompt = buildPartialExtractionPrompt(
+            chunk.startPage,
+            chunk.endPage,
+            totalPages,
+            chunk.text,
+          );
+
+          try {
+            const parsed = await callAzureOpenAIExtraction(
+              AZURE_OPENAI_ENDPOINT,
+              AZURE_OPENAI_KEY,
+              AZURE_OPENAI_DEPLOYMENT,
+              partialPrompt,
+            );
+            partialSnapshots.push(normalizeExtractSnapshot(parsed));
+            chunksAnalyzed++;
+          } catch (chunkError) {
+            console.error(`Chunk ${i + 1} extraction failed:`, chunkError);
+          }
+        }
+
+        if (partialSnapshots.length > 0) {
+          analysisResult = mergeExtractSnapshots(partialSnapshots);
+          console.log(
+            `✅ AI Analysis complete (merged ${partialSnapshots.length} chunk snapshots)`,
+          );
+        } else {
+          console.error('All chunk extractions failed');
+        }
       }
     }
+
+    // TODO(Phase 0c): reload-by-id for re-analysis without re-OCR
 
     // STEP 4: Save final results
     console.log('----------------------------------------');
@@ -320,6 +432,9 @@ Rules:
         document_id,
         page_count: totalPages,
         text_length: charCount,
+        total_chars: charCount,
+        chunk_count: chunkCount,
+        chunks_analyzed: chunksAnalyzed,
         ocr_text: fullText,
         analysis: analysisResult
       }),

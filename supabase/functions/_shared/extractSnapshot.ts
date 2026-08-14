@@ -365,3 +365,298 @@ export function normalizeExtractSnapshot(raw: unknown): ExtractSnapshotV1 {
 export function readExtractSnapshot(raw: unknown): ExtractSnapshotV1 {
   return normalizeExtractSnapshot(raw);
 }
+
+// ---------------------------------------------------------------------------
+// Merge partial chunk extractions
+// ---------------------------------------------------------------------------
+
+function isNonemptyScalar(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return true;
+}
+
+function mergeScalarField<T>(
+  field: string,
+  kept: T | null,
+  incoming: T | null,
+  notes: string[],
+): T | null {
+  if (!isNonemptyScalar(incoming)) return kept;
+  if (!isNonemptyScalar(kept)) return incoming;
+  if (String(kept) !== String(incoming)) {
+    notes.push(`Conflict on ${field}: kept ${kept}, also saw ${incoming}`);
+  }
+  return kept;
+}
+
+function carrierKey(carrier: string): string {
+  return carrier.toLowerCase().trim();
+}
+
+function locationKey(loc: ExtractSnapshotLocation): string {
+  return (loc.address ?? '').toLowerCase().trim();
+}
+
+function vehicleKey(v: ExtractSnapshotVehicle): string {
+  if (v.vin) return `vin:${v.vin.toLowerCase().trim()}`;
+  return `ymm:${v.year ?? ''}:${(v.make ?? '').toLowerCase().trim()}:${(v.model ?? '').toLowerCase().trim()}`;
+}
+
+function driverKey(d: ExtractSnapshotDriver): string {
+  return (d.name ?? '').toLowerCase().trim();
+}
+
+function feeKey(fee: ExtractSnapshotFee): string {
+  if (fee.amount !== null) return `${fee.type}:${fee.amount}`;
+  return `${fee.type}:${(fee.label ?? '').toLowerCase().trim()}`;
+}
+
+function coverageKey(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+function coverageFieldCount(cov: ExtractSnapshotCoverage): number {
+  let count = 0;
+  if (cov.limit !== null) count++;
+  if (cov.deductible !== null) count++;
+  if (cov.premium !== null) count++;
+  if (cov.parent_coverage !== null) count++;
+  return count;
+}
+
+function pickBetterCoverage(
+  existing: ExtractSnapshotCoverage,
+  incoming: ExtractSnapshotCoverage,
+): ExtractSnapshotCoverage {
+  return coverageFieldCount(incoming) > coverageFieldCount(existing)
+    ? incoming
+    : existing;
+}
+
+function mergePremium(
+  kept: ExtractSnapshotPremium,
+  incoming: ExtractSnapshotPremium,
+  notes: string[],
+): ExtractSnapshotPremium {
+  return {
+    total: mergeScalarField('premium.total', kept.total, incoming.total, notes),
+    frequency: mergeScalarField(
+      'premium.frequency',
+      kept.frequency,
+      incoming.frequency,
+      notes,
+    ),
+  };
+}
+
+function mergeCommission(
+  kept: ExtractSnapshotCommission | null,
+  incoming: ExtractSnapshotCommission | null,
+): ExtractSnapshotCommission | null {
+  if (!kept && !incoming) return null;
+  if (!kept) return incoming;
+  if (!incoming) return kept;
+  return {
+    percent: kept.percent ?? incoming.percent,
+    amount: kept.amount ?? incoming.amount,
+  };
+}
+
+function dedupeKeyDetails(details: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const detail of details) {
+    const key = detail.toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(detail);
+  }
+  return result;
+}
+
+function mergeOverflow(
+  kept: Record<string, unknown> | undefined,
+  incoming: Record<string, unknown> | undefined,
+  notes: string[],
+): Record<string, unknown> | undefined {
+  const result: Record<string, unknown> = { ...kept };
+  for (const [key, value] of Object.entries(incoming ?? {})) {
+    if (!(key in result)) {
+      result[key] = value;
+    } else if (JSON.stringify(result[key]) !== JSON.stringify(value)) {
+      notes.push(
+        `Conflict on overflow.${key}: kept first value, also saw different value`,
+      );
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Merge multiple partial ExtractSnapshotV1 chunk results into one snapshot.
+ * Each input is normalized first; output is normalized once more.
+ */
+export function mergeExtractSnapshots(
+  snapshots: ExtractSnapshotV1[],
+): ExtractSnapshotV1 {
+  if (snapshots.length === 0) {
+    return normalizeExtractSnapshot({});
+  }
+
+  const normalized = snapshots.map((s) => normalizeExtractSnapshot(s));
+  const notes: string[] = [];
+
+  const carrierSeen = new Set<string>();
+  const carriers: string[] = [];
+  for (const snap of normalized) {
+    for (const carrier of snap.carriers) {
+      const key = carrierKey(carrier);
+      if (!key || carrierSeen.has(key)) continue;
+      carrierSeen.add(key);
+      carriers.push(carrier);
+    }
+  }
+
+  const locationSeen = new Set<string>();
+  const locations: ExtractSnapshotLocation[] = [];
+  for (const snap of normalized) {
+    for (const loc of snap.locations) {
+      const key = locationKey(loc);
+      if (!key || locationSeen.has(key)) continue;
+      locationSeen.add(key);
+      locations.push(loc);
+    }
+  }
+
+  const vehicleSeen = new Set<string>();
+  const vehicles: ExtractSnapshotVehicle[] = [];
+  for (const snap of normalized) {
+    for (const vehicle of snap.vehicles) {
+      const key = vehicleKey(vehicle);
+      if (!key || key === 'ymm:::' || vehicleSeen.has(key)) continue;
+      vehicleSeen.add(key);
+      vehicles.push(vehicle);
+    }
+  }
+
+  const driverSeen = new Set<string>();
+  const drivers: ExtractSnapshotDriver[] = [];
+  for (const snap of normalized) {
+    for (const driver of snap.drivers) {
+      const key = driverKey(driver);
+      if (!key || driverSeen.has(key)) continue;
+      driverSeen.add(key);
+      drivers.push(driver);
+    }
+  }
+
+  const feeSeen = new Set<string>();
+  const fees: ExtractSnapshotFee[] = [];
+  for (const snap of normalized) {
+    for (const fee of snap.fees) {
+      const key = feeKey(fee);
+      if (feeSeen.has(key)) continue;
+      feeSeen.add(key);
+      fees.push(fee);
+    }
+  }
+
+  const coverageMap = new Map<string, ExtractSnapshotCoverage>();
+  for (const snap of normalized) {
+    for (const cov of snap.coverages) {
+      const key = coverageKey(cov.name);
+      const existing = coverageMap.get(key);
+      coverageMap.set(
+        key,
+        existing ? pickBetterCoverage(existing, cov) : cov,
+      );
+    }
+  }
+
+  let insured_name: string | null = null;
+  let effective_date: string | null = null;
+  let expiration_date: string | null = null;
+  let claims_made: boolean | null = null;
+  let defense_inside_limits: boolean | null = null;
+  let document_type: string | null = null;
+  let policy_number: string | null = null;
+  let premium: ExtractSnapshotPremium = { total: null, frequency: null };
+  let commission: ExtractSnapshotCommission | null = null;
+  let overflow: Record<string, unknown> | undefined;
+  const key_details: string[] = [];
+
+  for (const snap of normalized) {
+    insured_name = mergeScalarField(
+      'insured_name',
+      insured_name,
+      snap.insured_name,
+      notes,
+    );
+    effective_date = mergeScalarField(
+      'effective_date',
+      effective_date,
+      snap.effective_date,
+      notes,
+    );
+    expiration_date = mergeScalarField(
+      'expiration_date',
+      expiration_date,
+      snap.expiration_date,
+      notes,
+    );
+    claims_made = mergeScalarField(
+      'claims_made',
+      claims_made,
+      snap.claims_made,
+      notes,
+    );
+    defense_inside_limits = mergeScalarField(
+      'defense_inside_limits',
+      defense_inside_limits,
+      snap.defense_inside_limits,
+      notes,
+    );
+    document_type = mergeScalarField(
+      'document_type',
+      document_type,
+      snap.document_type,
+      notes,
+    );
+    policy_number = mergeScalarField(
+      'policy_number',
+      policy_number,
+      snap.policy_number,
+      notes,
+    );
+    premium = mergePremium(premium, snap.premium, notes);
+    commission = mergeCommission(commission, snap.commission);
+    overflow = mergeOverflow(overflow, snap.overflow, notes);
+    key_details.push(...snap.key_details);
+  }
+
+  key_details.push(...notes);
+
+  const merged: ExtractSnapshotV1 = {
+    schema_version: EXTRACT_SNAPSHOT_SCHEMA_VERSION,
+    insured_name,
+    carriers,
+    effective_date,
+    expiration_date,
+    claims_made,
+    defense_inside_limits,
+    premium,
+    fees,
+    commission,
+    coverages: [...coverageMap.values()],
+    locations,
+    vehicles,
+    drivers,
+    document_type,
+    policy_number,
+    key_details: dedupeKeyDetails(key_details),
+    ...(overflow ? { overflow } : {}),
+  };
+
+  return normalizeExtractSnapshot(merged);
+}
