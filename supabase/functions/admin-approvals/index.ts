@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { requireAuth } from '../_shared/auth.ts'
 import { getCorsHeaders, handleCors } from '../_shared/cors.ts'
+import { requireActiveProvisionedAdmin } from '../_shared/admin-provisioning.ts'
 
 interface ApprovalRequest {
   action: 'approve' | 'deny'
@@ -37,18 +38,16 @@ serve(async (req) => {
     }
     const authenticatedUser = authResult
 
-    // Check if user is admin
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('role')
-      .eq('id', authenticatedUser.id)
-      .single()
-
-    if (!profile || profile.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    // Check if user is an active, provisioned admin. These functions run with
+    // service-role privileges after this point, so the actor check must fail closed.
+    try {
+      await requireActiveProvisionedAdmin(supabaseClient, authenticatedUser.id)
+    } catch (adminError) {
+      console.warn('Admin authorization failed:', adminError)
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - Active provisioned admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const { action, request_type, request_id, reason }: ApprovalRequest = await req.json()

@@ -295,30 +295,33 @@ serve(async (req) => {
 // =============================================================================
 
 async function verifyAccountAccess(
-  supabase: any, 
-  userId: string, 
+  supabase: any,
+  userId: string,
   accountId: string
 ): Promise<boolean> {
-  // Check if account exists and user has access
-  // This could be expanded to check team membership, roles, etc.
   const { data: account, error } = await supabase
     .from('accounts')
-    .select('id, owner_agent_id, team_id')
+    .select('id, agency_workspace_id')
     .eq('id', accountId)
     .is('deleted_at', null)
     .single();
 
-  if (error || !account) {
+  if (error || !account?.agency_workspace_id) {
     return false;
   }
 
-  // For now, allow access if account exists
-  // TODO: Add team/role-based access control
-  // Example:
-  // - Check if user is owner_agent_id
-  // - Check if user is in the same team
-  // - Check if user has admin role
-  
+  const { data: membership, error: membershipError } = await supabase
+    .from('agency_workspace_memberships')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('agency_workspace_id', account.agency_workspace_id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (membershipError || !membership) {
+    return false;
+  }
+
   return true;
 }
 
