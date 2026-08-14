@@ -10,6 +10,11 @@
 # Run this from the Mac (release side) AFTER the PR is merged and Netlify has
 # started building. Requires the supabase CLI to be logged in.
 #
+# Before polling Netlify, confirm CI ran on the merge commit:
+#   gh run list --commit <merge-sha>
+# If empty, trigger workflow_dispatch on .github/workflows/deploy.yml (main)
+# or open a deploy-trigger PR — do not assume merge = shipped.
+#
 # Usage:
 #   scripts/release-coi.sh [edge-function-name]
 # Defaults to generate-certificate.
