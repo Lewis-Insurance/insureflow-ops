@@ -191,7 +191,7 @@ serve(async (req) => {
     }
 
     // Update status to processing
-    await supabase
+    const { data: analysisRow, error: analysisUpsertError } = await supabase
       .from('document_analysis')
       .upsert({
         document_id,
@@ -202,6 +202,12 @@ serve(async (req) => {
       }, { onConflict: 'document_id' })
       .select('id')
       .single();
+
+    if (analysisUpsertError || !analysisRow?.id) {
+      throw new Error(`Failed to create analysis record: ${analysisUpsertError?.message ?? 'missing id'}`);
+    }
+
+    const analysisId = analysisRow.id;
 
     // STEP 1: Get document URL
     console.log('----------------------------------------');
@@ -438,13 +444,7 @@ serve(async (req) => {
         analysis_result: analysisResult,
         processed_at: new Date().toISOString()
       })
-      .eq('document_id', document_id);
-
-    const { data: analysisRecord } = await supabase
-      .from('document_analysis')
-      .select('id')
-      .eq('document_id', document_id)
-      .single();
+      .eq('id', analysisId);
 
     console.log('========================================');
     console.log('SUCCESS - Analysis Complete');
@@ -453,7 +453,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        analysis_id: analysisRecord?.id,
+        analysis_id: analysisId,
         document_id,
         page_count: totalPages,
         text_length: charCount,

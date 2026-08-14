@@ -31,12 +31,23 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 const PROCESSING_STATUSES = new Set(['pending', 'processing', 'ocr_complete']);
+const FAILED_STATUSES = new Set(['failed', 'error']);
+const COMPLETED_STATUSES = new Set(['completed', 'complete']);
+
+function normalizeProcessingStatus(status: string | null | undefined): 'processing' | 'failed' | 'completed' | 'unknown' {
+  if (!status) return 'unknown';
+  if (PROCESSING_STATUSES.has(status)) return 'processing';
+  if (FAILED_STATUSES.has(status)) return 'failed';
+  if (COMPLETED_STATUSES.has(status)) return 'completed';
+  return 'unknown';
+}
 
 export default function AnalyzeDocumentsPage() {
   const { analysisId } = useParams<{ analysisId?: string }>();
   const { data, isLoading, isFetching, error, refetch } = useDocumentAnalysisQuery(
     analysisId ?? null,
   );
+  const normalizedStatus = normalizeProcessingStatus(data?.processing_status);
 
   const showUpload = !analysisId;
 
@@ -98,7 +109,7 @@ export default function AnalyzeDocumentsPage() {
             </Alert>
           )}
 
-          {analysisId && !isLoading && !error && data && PROCESSING_STATUSES.has(data.processing_status ?? '') && (
+          {analysisId && !isLoading && !error && data && normalizedStatus === 'processing' && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-6 rounded-cc-xl border border-cc-border bg-cc-surface">
                 <Loader2 className="h-6 w-6 animate-spin text-cc-accent" />
@@ -113,7 +124,7 @@ export default function AnalyzeDocumentsPage() {
             </div>
           )}
 
-          {analysisId && !isLoading && !error && data && data.processing_status === 'failed' && (
+          {analysisId && !isLoading && !error && data && normalizedStatus === 'failed' && (
             <Alert variant="destructive" className="border-cc-border bg-cc-surface">
               <AlertTitle className="text-cc-text">Analysis failed</AlertTitle>
               <AlertDescription className="text-cc-text-muted">
@@ -131,11 +142,28 @@ export default function AnalyzeDocumentsPage() {
             !isLoading &&
             !error &&
             data &&
-            data.processing_status === 'completed' && (
+            normalizedStatus === 'completed' && (
               <DocumentAnalysisResults
                 result={documentAnalysisRecordToDisplayResult(data)}
               />
             )}
+
+          {analysisId && !isLoading && !error && data && normalizedStatus === 'unknown' && (
+            <Alert variant="destructive" className="border-cc-border bg-cc-surface">
+              <AlertTitle className="text-cc-text">Unknown analysis status</AlertTitle>
+              <AlertDescription className="text-cc-text-muted">
+                This analysis has status &quot;{data.processing_status}&quot;, which is not recognized. Try refreshing or upload again.
+              </AlertDescription>
+              <div className="mt-4 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Refresh
+                </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/analyze-documents">Back to upload</Link>
+                </Button>
+              </div>
+            </Alert>
+          )}
 
           {showUpload && <StorageDiagnostics />}
         </div>
