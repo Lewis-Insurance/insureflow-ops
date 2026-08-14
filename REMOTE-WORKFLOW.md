@@ -14,7 +14,29 @@
    - preview link
    - what to check
 9. After approval, Swain merges to `main`.
-10. Netlify deploys production from `main`.
+10. **Post-merge verification** (see below) — merge alone is not shipped.
+11. Netlify deploys production from `main` (only after CI ran on the merge commit).
+
+## Post-merge verification
+
+A merge is **not** shipped until **both** are true:
+
+1. **CI ran on the merge commit SHA** — `gh run list --commit <merge-sha>` must be non-empty.
+2. **Production reflects the change** — the live site bundle contains the change, or the Netlify production deploy for that SHA succeeded.
+
+If CI is missing on the merge SHA (GitHub sometimes skips push events on bot merges):
+
+- Trigger **workflow_dispatch** on the **CI** workflow (`.github/workflows/deploy.yml`) against `main`, **or**
+- Open a one-line deploy-trigger PR.
+
+**Never** tell Landen it is live from merge alone.
+
+**Incident reference:** PR #115 (squash-merged 2026-08-14) had zero CI runs on merge SHA `3c83d201`; the site stayed unchanged until empty-commit PR #116. Use `workflow_dispatch` or a deploy-trigger PR instead of empty commits.
+
+### Post-merge checklist
+
+- [ ] `gh run list --commit <merge-sha>` is non-empty
+- [ ] Netlify production deploy for that SHA succeeded (or live bundle contains the change)
 
 ## Default rules
 - Do not work on `main` unless Landen explicitly says to ship direct.

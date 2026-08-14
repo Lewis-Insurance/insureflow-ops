@@ -86,6 +86,15 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
+## Release verification
+
+After merging to `main`, confirm the change actually shipped:
+
+- [ ] `gh run list --commit <merge-sha>` is non-empty (CI ran on the merge commit)
+- [ ] Netlify production deploy for that SHA succeeded, or the live bundle contains the change
+
+If CI is missing on the merge SHA, trigger **workflow_dispatch** on `.github/workflows/deploy.yml` against `main`. See `REMOTE-WORKFLOW.md` (Post-merge verification).
+
 ## Notes
 
 - These scripts require a Supabase connection with service role key
