@@ -12,7 +12,6 @@ import {
   Activity, 
   AlertTriangle,
   CheckCircle,
-  Settings,
   TestTube,
   Users,
   PhoneOff
@@ -62,23 +61,21 @@ export function TelephonyDashboard() {
       setLoading(true);
 
       // Fetch stats and settings from actual tables
-      const [callsResult, smsResult, settingsResult] = await Promise.all([
-        supabase.from('call_sessions').select('id').limit(1000),
-        supabase.from('sms_messages').select('id').limit(1000),
-        supabase.from('telephony_settings').select('*').maybeSingle()
+      const [callsResult, smsResult, settingsResult, optOutResult] = await Promise.all([
+        supabase.from('call_sessions').select('id', { count: 'exact', head: true }),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }),
+        supabase.from('telephony_settings').select('*').maybeSingle(),
+        supabase
+          .from('consents')
+          .select('id', { count: 'exact', head: true })
+          .eq('granted', false)
+          .eq('type', 'sms_consent'),
       ]);
 
-      // Check for consent opt-outs
-      const optOutResult = await supabase
-        .from('consents')
-        .select('id')
-        .eq('granted', false)
-        .eq('type', 'sms_consent');
-
       setStats({
-        totalCalls: callsResult.data?.length || 0,
-        totalSMS: smsResult.data?.length || 0,
-        optOutCount: optOutResult.data?.length || 0,
+        totalCalls: callsResult.count ?? 0,
+        totalSMS: smsResult.count ?? 0,
+        optOutCount: optOutResult.count ?? 0,
         webhookHealth: settingsResult.data?.webhook_status === 'ok' ? 'healthy' : 
                       settingsResult.data?.last_webhook_error ? 'error' : 'unknown',
         lastError: settingsResult.data?.last_webhook_error,
@@ -216,10 +213,6 @@ export function TelephonyDashboard() {
             Monitor call & SMS activity, webhook health, and compliance
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
-        </Button>
       </div>
 
       {/* Stats Cards */}
