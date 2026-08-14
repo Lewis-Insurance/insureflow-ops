@@ -334,7 +334,11 @@ export function normalizeExtractSnapshot(raw: unknown): ExtractSnapshotV1 {
   }
 
   const priorOverflow = isRecord(raw.overflow) ? { ...raw.overflow } : undefined;
-  const overflow = collectOverflow(raw, priorOverflow);
+  let overflow = collectOverflow(raw, priorOverflow);
+
+  if (raw.raw_response !== undefined && raw.raw_response !== null) {
+    overflow = { ...(overflow ?? {}), raw_response: raw.raw_response };
+  }
 
   return {
     schema_version: EXTRACT_SNAPSHOT_SCHEMA_VERSION,

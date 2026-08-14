@@ -137,6 +137,13 @@ describe('extractSnapshot', () => {
         another: 42,
       });
     });
+
+    it('preserves raw_response in overflow when parse fails', () => {
+      const rawContent = 'not valid json { broken';
+      const snapshot = normalizeExtractSnapshot({ raw_response: rawContent });
+
+      expect(snapshot.overflow).toEqual({ raw_response: rawContent });
+    });
   });
 
   describe('readExtractSnapshot', () => {
@@ -200,6 +207,44 @@ describe('extractSnapshot', () => {
 
     it('masks inline PII via maskStringForDisplay', () => {
       expect(maskStringForDisplay('SSN 987-65-4321')).toContain('XXX-XX-4321');
+    });
+
+    it('does not mask policy effective or expiration dates', () => {
+      const snapshot = normalizeExtractSnapshot({
+        effective_date: '2026-03-01',
+        expiration_date: '2027-03-01',
+      });
+
+      const masked = maskSnapshotForDisplay(snapshot);
+      expect(masked.effective_date).toBe('2026-03-01');
+      expect(masked.expiration_date).toBe('2027-03-01');
+    });
+
+    it('recursively masks PII in overflow values', () => {
+      const snapshot = normalizeExtractSnapshot({
+        insured_name: 'Test',
+        unknown_field: 'SSN 123-45-6789',
+      });
+
+      const masked = maskSnapshotForDisplay(snapshot);
+      expect(masked.overflow?.unknown_field).toContain('XXX-XX-6789');
+    });
+
+    it('recursively masks nested overflow PII', () => {
+      const snapshot: ExtractSnapshotV1 = {
+        ...normalizeExtractSnapshot({}),
+        overflow: {
+          nested: {
+            dob: 'DOB 1990-05-15',
+            items: ['DL A1234567'],
+          },
+        },
+      };
+
+      const masked = maskSnapshotForDisplay(snapshot);
+      const nested = masked.overflow?.nested as Record<string, unknown>;
+      expect(String(nested.dob)).toContain('••/••/1990');
+      expect(String((nested.items as string[])[0])).toContain('DL');
     });
   });
 

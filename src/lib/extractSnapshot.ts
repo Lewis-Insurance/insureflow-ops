@@ -372,6 +372,21 @@ function maskNullableString(value: string | null): string | null {
   return maskStringForDisplay(value);
 }
 
+/** Recursively mask PII in unknown overflow values for safe display. */
+function maskUnknownForDisplay(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return maskStringForDisplay(value);
+  if (Array.isArray(value)) return value.map(maskUnknownForDisplay);
+  if (isRecord(value)) {
+    const masked: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      masked[key] = maskUnknownForDisplay(val);
+    }
+    return masked;
+  }
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -386,7 +401,11 @@ export function normalizeExtractSnapshot(raw: unknown): ExtractSnapshotV1 {
   }
 
   const priorOverflow = isRecord(raw.overflow) ? { ...raw.overflow } : undefined;
-  const overflow = collectOverflow(raw, priorOverflow);
+  let overflow = collectOverflow(raw, priorOverflow);
+
+  if (raw.raw_response !== undefined && raw.raw_response !== null) {
+    overflow = { ...(overflow ?? {}), raw_response: raw.raw_response };
+  }
 
   return {
     schema_version: EXTRACT_SNAPSHOT_SCHEMA_VERSION,
@@ -432,8 +451,8 @@ export function maskSnapshotForDisplay(snapshot: ExtractSnapshotV1): ExtractSnap
     ...snapshot,
     insured_name: maskNullableString(snapshot.insured_name),
     carriers: snapshot.carriers.map((c) => maskStringForDisplay(c)),
-    effective_date: maskNullableString(snapshot.effective_date),
-    expiration_date: maskNullableString(snapshot.expiration_date),
+    effective_date: snapshot.effective_date,
+    expiration_date: snapshot.expiration_date,
     premium: {
       ...snapshot.premium,
       frequency: maskNullableString(snapshot.premium.frequency),
@@ -473,5 +492,8 @@ export function maskSnapshotForDisplay(snapshot: ExtractSnapshotV1): ExtractSnap
     document_type: maskNullableString(snapshot.document_type),
     policy_number: maskNullableString(snapshot.policy_number),
     key_details: snapshot.key_details.map((d) => maskStringForDisplay(d)),
+    ...(snapshot.overflow
+      ? { overflow: maskUnknownForDisplay(snapshot.overflow) as Record<string, unknown> }
+      : {}),
   };
 }
