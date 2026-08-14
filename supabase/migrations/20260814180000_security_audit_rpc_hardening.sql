@@ -29,11 +29,33 @@ BEGIN
     RAISE EXCEPTION 'Import batch not found' USING ERRCODE = 'P0002';
   END IF;
 
-  SELECT DISTINCT agency_workspace_id
+  SELECT workspace_id
   INTO v_workspace_id
-  FROM accounts
-  WHERE import_batch_id = p_batch_id
-    AND deleted_at IS NULL
+  FROM (
+    SELECT a.agency_workspace_id AS workspace_id
+    FROM accounts a
+    WHERE a.import_batch_id = p_batch_id
+      AND a.deleted_at IS NULL
+
+    UNION
+
+    SELECT a.agency_workspace_id
+    FROM contacts c
+    JOIN accounts a ON a.id = c.account_id
+    WHERE c.import_batch_id = p_batch_id
+      AND c.deleted_at IS NULL
+      AND a.deleted_at IS NULL
+
+    UNION
+
+    SELECT a.agency_workspace_id
+    FROM policies p
+    JOIN accounts a ON a.id = p.account_id
+    WHERE p.import_batch_id = p_batch_id
+      AND p.deleted_at IS NULL
+      AND a.deleted_at IS NULL
+  ) batch_workspaces
+  WHERE workspace_id IS NOT NULL
   LIMIT 1;
 
   IF v_workspace_id IS NOT NULL AND NOT public.is_agency_member(v_workspace_id) THEN
@@ -104,7 +126,7 @@ DECLARE
     v_event_id BIGINT;
 BEGIN
     IF auth.role() IS DISTINCT FROM 'service_role'
-       AND NOT public.is_agency_member(p_workspace_id) THEN
+       AND NOT (public.is_agency_member(p_workspace_id) OR public.is_staff()) THEN
         RAISE EXCEPTION 'Forbidden - workspace membership required' USING ERRCODE = '42501';
     END IF;
 

@@ -19,7 +19,7 @@ describe('security audit RPC hardening migration', () => {
     expect(sql).toMatch(/RAISE EXCEPTION 'Staff access required' USING ERRCODE = '42501'/);
     expect(sql).toMatch(/SELECT EXISTS \(\s*SELECT 1 FROM import_batches WHERE id = p_batch_id/s);
     expect(sql).toMatch(
-      /SELECT DISTINCT agency_workspace_id[\s\S]*FROM accounts[\s\S]*WHERE import_batch_id = p_batch_id[\s\S]*AND deleted_at IS NULL/s,
+      /FROM accounts a[\s\S]*WHERE a\.import_batch_id = p_batch_id[\s\S]*FROM contacts c[\s\S]*FROM policies p/s,
     );
     expect(sql).toMatch(
       /IF v_workspace_id IS NOT NULL AND NOT public\.is_agency_member\(v_workspace_id\) THEN/,
@@ -31,7 +31,7 @@ describe('security audit RPC hardening migration', () => {
   it('hardens enqueue_outbox_event with agency membership guard and service_role-only execute', () => {
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION enqueue_outbox_event\(/);
     expect(sql).toMatch(
-      /IF auth\.role\(\) IS DISTINCT FROM 'service_role'[\s\S]*AND NOT public\.is_agency_member\(p_workspace_id\) THEN/s,
+      /IF auth\.role\(\) IS DISTINCT FROM 'service_role'[\s\S]*AND NOT \(public\.is_agency_member\(p_workspace_id\) OR public\.is_staff\(\)\) THEN/s,
     );
     expect(sql).toMatch(
       /REVOKE EXECUTE ON FUNCTION enqueue_outbox_event\(UUID, TEXT, TEXT, UUID, JSONB, TEXT\) FROM PUBLIC, anon, authenticated/,
