@@ -514,7 +514,7 @@ export const useDocumentAnalysisQuery = (analysisId: string | null) => {
     enabled: !!analysisId,
     refetchInterval: (query) => {
       const status = query.state.data?.processing_status;
-      if (status === 'pending' || status === 'processing') {
+      if (status === 'pending' || status === 'processing' || status === 'ocr_complete') {
         return 2000;
       }
       return false;
@@ -544,7 +544,7 @@ export const useDocumentAnalysisByDocumentId = (documentId: string | null) => {
     refetchInterval: (query) => {
       const data = query.state.data;
       // If no data yet or still processing, poll every 3 seconds
-      if (!data || data.processing_status === 'pending' || data.processing_status === 'processing') {
+      if (!data || data.processing_status === 'pending' || data.processing_status === 'processing' || data.processing_status === 'ocr_complete') {
         return 3000;
       }
       // Stop polling once complete or errored
