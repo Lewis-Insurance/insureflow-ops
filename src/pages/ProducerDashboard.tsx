@@ -10,6 +10,7 @@ import { useCustomerTriageCounts } from '@/hooks/useCustomerTriageCounts';
 import { usePolicySearch } from '@/hooks/usePolicySearch';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskEditModal } from '@/components/tasks/TaskEditModal';
+import { BookOfBusinessTab } from '@/components/dashboard/BookOfBusinessTab';
 import {
   TriageTile,
   StatusPill,
@@ -371,6 +372,10 @@ export default function ProducerDashboard() {
             onClick={() => navigate('/customers')}
           />
         </div>
+
+        <section aria-label="Book of business">
+          <BookOfBusinessTab />
+        </section>
 
         {/* Focused modules: real tasks + real renewals, each a path to the work */}
         <div className="grid gap-6 lg:grid-cols-2">
