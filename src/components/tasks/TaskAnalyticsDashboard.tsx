@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTasks } from '@/hooks/useTasks';
+import { useTaskAnalyticsCounts } from '@/hooks/useTaskAnalyticsCounts';
 import type { TaskScope } from '@/hooks/useTriageCohortFromUrl';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { TrendingUp, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
@@ -10,66 +10,34 @@ interface TaskAnalyticsDashboardProps {
 }
 
 export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
-  const { tasks, loading, fetchTasks } = useTasks();
+  const { data: counts, isLoading } = useTaskAnalyticsCounts(scope);
 
-  useEffect(() => {
-    fetchTasks({ scope });
-  }, [fetchTasks, scope]);
-
-  const getStatusStats = () => {
-    return [
-      { name: 'Pending', value: tasks.filter(t => t.status === 'pending').length, color: '#f59e0b' },
-      { name: 'In Progress', value: tasks.filter(t => t.status === 'in_progress').length, color: '#3b82f6' },
-      { name: 'Completed', value: tasks.filter(t => t.status === 'completed').length, color: '#10b981' },
-      { name: 'Cancelled', value: tasks.filter(t => t.status === 'cancelled').length, color: '#6b7280' },
-    ];
-  };
-
-  const getPriorityStats = () => {
-    return [
-      { name: 'Low', count: tasks.filter(t => t.priority === 'low').length },
-      { name: 'Medium', count: tasks.filter(t => t.priority === 'medium').length },
-      { name: 'High', count: tasks.filter(t => t.priority === 'high').length },
-      { name: 'Urgent', count: tasks.filter(t => t.priority === 'urgent').length },
-    ];
-  };
-
-  const getCategoryStats = () => {
-    return [
-      { name: 'Quote', count: tasks.filter(t => t.category === 'quote').length },
-      { name: 'Policy', count: tasks.filter(t => t.category === 'policy').length },
-      { name: 'Claim', count: tasks.filter(t => t.category === 'claim').length },
-      { name: 'Renewal', count: tasks.filter(t => t.category === 'renewal').length },
-      { name: 'Service', count: tasks.filter(t => t.category === 'service').length },
-      { name: 'General', count: tasks.filter(t => t.category === 'general').length },
-    ].filter(s => s.count > 0);
-  };
-
-  const getCompletionRate = () => {
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const total = tasks.length;
-    return total > 0 ? Math.round((completed / total) * 100) : 0;
-  };
-
-  const getOverdueTasks = () => {
-    const now = new Date();
-    return tasks.filter(t => 
-      t.due_at && 
-      new Date(t.due_at) < now && 
-      t.status !== 'completed' && 
-      t.status !== 'cancelled'
-    ).length;
-  };
-
-  if (loading) {
+  if (isLoading || !counts) {
     return <div className="text-center py-8">Loading analytics...</div>;
   }
 
-  const statusStats = getStatusStats();
-  const priorityStats = getPriorityStats();
-  const categoryStats = getCategoryStats();
-  const completionRate = getCompletionRate();
-  const overdueTasks = getOverdueTasks();
+  const statusStats = [
+    { name: 'Pending', value: counts.byStatus.pending, color: '#f59e0b' },
+    { name: 'In Progress', value: counts.byStatus.in_progress, color: '#3b82f6' },
+    { name: 'Completed', value: counts.byStatus.completed, color: '#10b981' },
+    { name: 'Cancelled', value: counts.byStatus.cancelled, color: '#6b7280' },
+  ];
+
+  const priorityStats = [
+    { name: 'Low', count: counts.byPriority.low },
+    { name: 'Medium', count: counts.byPriority.medium },
+    { name: 'High', count: counts.byPriority.high },
+    { name: 'Urgent', count: counts.byPriority.urgent },
+  ];
+
+  const categoryStats = [
+    { name: 'Quote', count: counts.byCategory.quote },
+    { name: 'Policy', count: counts.byCategory.policy },
+    { name: 'Claim', count: counts.byCategory.claim },
+    { name: 'Renewal', count: counts.byCategory.renewal },
+    { name: 'Service', count: counts.byCategory.service },
+    { name: 'General', count: counts.byCategory.general },
+  ].filter((s) => s.count > 0);
 
   return (
     <div className="space-y-6">
@@ -83,7 +51,7 @@ export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tasks.length}</div>
+            <div className="text-2xl font-bold">{counts.total}</div>
           </CardContent>
         </Card>
 
@@ -95,7 +63,7 @@ export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{completionRate}%</div>
+            <div className="text-2xl font-bold">{counts.completionRate}%</div>
           </CardContent>
         </Card>
 
@@ -107,9 +75,7 @@ export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {tasks.filter(t => t.status === 'in_progress').length}
-            </div>
+            <div className="text-2xl font-bold">{counts.byStatus.in_progress}</div>
           </CardContent>
         </Card>
 
@@ -121,7 +87,7 @@ export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overdueTasks}</div>
+            <div className="text-2xl font-bold">{counts.overdue}</div>
           </CardContent>
         </Card>
       </div>
