@@ -12,10 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveAgency } from '@/hooks/useAgencyWorkspace';
+import { useCanopyImportStats } from '@/hooks/useCanopyImportStats';
 import { CanopyDataDisplayRedesign } from '@/components/canopy/CanopyDataDisplayRedesign';
 import {
   Shield,
@@ -37,9 +38,11 @@ import {
 
 export default function CanopyImportPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { activeAgency } = useActiveAgency();
   const [copied, setCopied] = useState(false);
+  const { data: importStats } = useCanopyImportStats();
 
   // The shareable Canopy link
   const canopyLink = 'https://app.usecanopy.com/c/lewis-insurance';
@@ -281,6 +284,8 @@ export default function CanopyImportPage() {
 
       // Refresh the data
       refetchPulls();
+      queryClient.invalidateQueries({ queryKey: ['canopy-import-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['canopy-leads'] });
       navigate(`/leads/${newLead.id}`);
     } catch (error) {
       toast({
@@ -546,21 +551,22 @@ export default function CanopyImportPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Import Stats</CardTitle>
+                <CardDescription>Full history. Not the last 20.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total Imports</span>
-                  <span className="font-bold text-lg">{recentPulls?.length || 0}</span>
+                  <span className="font-bold text-lg tabular-nums">{importStats?.totalImports ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Completed</span>
-                  <span className="font-bold text-lg text-success">
-                    {recentPulls?.filter(p => p.status === 'complete').length || 0}
+                  <span className="font-bold text-lg text-success tabular-nums">
+                    {importStats?.completedImports ?? 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Leads Created</span>
-                  <span className="font-bold text-lg">{canopyLeads?.length || 0}</span>
+                  <span className="font-bold text-lg tabular-nums">{importStats?.leadsCreated ?? 0}</span>
                 </div>
               </CardContent>
             </Card>
