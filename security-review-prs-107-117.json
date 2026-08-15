@@ -1,0 +1,115 @@
+{
+  "fixed_findings": [
+    "canopy-webhook fail-open",
+    "esign-webhook non-blocking sig verification",
+    "suggest-additional-insured-duplicates fail-open",
+    "rollback_import_batch no auth"
+  ],
+  "incomplete_fixes": [
+    {
+      "title": "admin-update-password cross-tenant",
+      "gap_description": "PR #117 added requireActiveProvisionedAdmin which properly validates the caller is a provisioned admin in their own workspace. However, the cross-tenant gap remains: after passing the admin check, the function accepts an arbitrary userId from the request body and calls supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword }) with no verification that the target user belongs to the admin's workspace. An admin in Workspace A can reset the password of any user in Workspace B.",
+      "evidence": "supabase/functions/admin-update-password/index.ts lines 47-68: after requireActiveProvisionedAdmin passes, userId is taken directly from req.json() and passed to updateUserById without workspace-scoping the target."
+    },
+    {
+      "title": "admin-approvals cross-tenant",
+      "gap_description": "PR #117 added requireActiveProvisionedAdmin which validates the caller is an admin. However, the cross-tenant gap remains in both handleEmailChangeApproval and handleRoleChangeApproval: the supabaseClient is created with SUPABASE_SERVICE_ROLE_KEY, and request_id is fetched globally with .eq('id', requestId) without any workspace filter. An admin in Workspace A can approve/deny email change and role change requests belonging to users in Workspace B. The role change approval path (line 195) even performs a direct profiles.update on the target user without workspace scoping.",
+      "evidence": "supabase/functions/admin-approvals/index.ts lines 83-88: email_change_requests are fetched by id only, no workspace filter. Lines 157-162: role_change_requests same pattern. Lines 193-205: role approval writes directly to profiles table for any user."
+    },
+    {
+      "title": "cron-auth.ts fail-open",
+      "gap_description": "The cron-auth.ts shared utility still has a development-mode bypass. When CRON_SECRET is not configured, it checks ENVIRONMENT !== 'production' and returns null (allow) if the environment is not explicitly set to production. Since edge functions may not have ENVIRONMENT set at all, this defaults to allowing unauthenticated access. The fix in PR #107 only addressed suggest-account-links (which has its own inline check) and canopy-webhook, but the shared verifyCronSecret() utility used by other cron functions still fails open in non-production environments.",
+      "evidence": "supabase/functions/_shared/cron-auth.ts lines 29-34: if (!cronSecret) checks isDev = Deno.env.get('ENVIRONMENT') !== 'production', and if isDev is true (which it is when ENVIRONMENT is unset), returns null allowing the request."
+    }
+  ],
+  "new_findings": [
+    {
+      "severity": "MEDIUM",
+      "location": "supabase/functions/email-inbound-lite/index.ts:484",
+      "title": "email-inbound-lite parse secret comparison not timing-safe",
+      "description": "PR #107 hardened email-inbound-lite to reject requests when INBOUND_PARSE_SECRET is not configured (fail-closed). However, the actual secret comparison on line 484 uses JavaScript strict equality (provided !== PARSE_SECRET) which is not constant-time. This is susceptible to timing attacks that could allow an attacker to recover the parse secret byte-by-byte. All Twilio webhooks in the same PR were upgraded to constant-time comparison, but this function was missed.",
+      "impact": "An attacker with network-level timing capabilities could theoretically recover the INBOUND_PARSE_SECRET through repeated timing measurements, then forge inbound email webhooks to inject communications into the system.",
+      "attack_path": "1. Attacker sends requests to email-inbound-lite with varying x-parse-secret values. 2. Measures response time differences to infer correct bytes. 3. After recovering the secret, forges valid webhook payloads to inject fake inbound emails.",
+      "evidence": "Line 484: `if (provided !== PARSE_SECRET) return new Response('Unauthorized', ...)` uses non-constant-time comparison, while twilio-sms-webhook/twilio-voice-webhook/twilio-recording-webhook all received constant-time comparison in the same PR #107.",
+      "remediation": "Replace the strict equality check with a constant-time comparison function (timingSafeEqual) matching the pattern used in the Twilio webhook functions.",
+      "poc_video_notes": "Compare response times for secrets with varying prefix-match lengths to demonstrate timing side-channel."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "supabase/functions/canopy-document-proxy/index.ts",
+      "title": "canopy-document-proxy has no authentication (known finding still unfixed)",
+      "description": "The canopy-document-proxy function has zero authentication. It does not call requireAuth, does not check JWT, and does not verify any secret. Any caller with the Supabase anon key can request any Canopy document by its database ID or Canopy document ID. PR #107 did not address this function despite it being listed as a known finding. The function uses service-role credentials to look up documents and then proxies them using Canopy API credentials.",
+      "impact": "Unauthenticated access to insurance documents stored in Canopy (policy dec pages, ID cards, certificates). These documents contain full PII. Any user with the public anon key can enumerate and download documents.",
+      "attack_path": "1. Call /functions/v1/canopy-document-proxy?id=<uuid> with only the public anon key. 2. The function looks up the document in canopy_documents table using service-role. 3. Fetches and returns the full document content from Canopy API. 4. Enumerate document IDs to exfiltrate all synced documents.",
+      "evidence": "supabase/functions/canopy-document-proxy/index.ts: entire serve() handler has no auth check. No requireAuth import, no JWT verification, no secret check. Lines 29-83 go straight from CORS to parsing documentId from query params.",
+      "remediation": "Add requireAuth() call and verify the authenticated user has workspace membership for the account that owns the document. Add is('deleted_at', null) to the canopy_documents lookup.",
+      "poc_video_notes": "Send unauthenticated GET request with only anon key Authorization header and a valid document ID."
+    },
+    {
+      "severity": "LOW",
+      "location": "supabase/functions/setup-mfa/index.ts:177",
+      "title": "setup-mfa TOTP verification uses hardcoded zero key (known finding confirmed still present)",
+      "description": "The generateTOTP function at line 177 creates a fixed 32-byte Uint8Array filled with zeros (new Uint8Array(32)) instead of decoding the actual base32 secret. This means TOTP verification always uses a constant key regardless of the user's secret. Any code generated with the hardcoded zero key will validate for any user's MFA setup. PR #107 and #117 did not address this.",
+      "impact": "MFA is effectively broken. An attacker who knows the zero-key pattern can compute valid TOTP codes for any user's MFA challenge, completely defeating the second factor.",
+      "attack_path": "1. Generate TOTP code using all-zero key with standard HMAC-SHA1. 2. This code will validate for ANY user's verify_setup action since the actual secret is never decoded.",
+      "evidence": "supabase/functions/setup-mfa/index.ts line 177: `const secretBytes = new Uint8Array(32)` — comment says 'Simplified - would need proper base32 decode'. The secret parameter is ignored.",
+      "remediation": "Implement proper base32 decoding of the secret parameter. Use the Deno standard library's decodeBase32 or an equivalent.",
+      "poc_video_notes": "Compute TOTP with zero key, use it to verify MFA setup for any account."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "supabase/functions/twilio-sms-webhook/index.ts:124",
+      "title": "twilio-sms-webhook PostgREST injection via phone number (known finding confirmed still present)",
+      "description": "PR #107 added constant-time signature comparison to the Twilio webhooks, but did not address the PostgREST injection finding. Line 124 interpolates the Twilio-provided 'From' phone number directly into a PostgREST .or() filter string without sanitization: .or(`phone.eq.${from},mobile_phone.eq.${from}`). While Twilio signature verification is now enforced, if the Twilio auth token is compromised, an attacker could craft a forged webhook with a malicious 'From' value containing PostgREST filter operators to extract data from the contacts table.",
+      "impact": "With a compromised Twilio auth token, the attacker can inject PostgREST filter syntax into the contacts query to extract arbitrary contact data across all tenants (since this uses service-role client).",
+      "attack_path": "1. Obtain or compromise TWILIO_AUTH_TOKEN. 2. Forge a webhook request with From set to a value containing PostgREST operators (e.g., 'anything,id.not.is.null)--'). 3. The .or() filter executes the injected filter against the contacts table with service-role privileges.",
+      "evidence": "supabase/functions/twilio-sms-webhook/index.ts line 124: `.or(`phone.eq.${from},mobile_phone.eq.${from}`)` where `from` is `formData.get('From')` from the Twilio webhook payload.",
+      "remediation": "Use parameterized PostgREST queries instead of string interpolation. Replace .or() with separate .eq() checks, or sanitize the phone number input to only allow digits and +.",
+      "poc_video_notes": "Forge Twilio webhook with From containing PostgREST filter injection payload."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "supabase/functions/lead-scoring-engine/index.ts:109-136",
+      "title": "lead-scoring-engine cross-tenant data access (known finding confirmed still present)",
+      "description": "The lead-scoring-engine uses service-role client to query leads. Authentication is checked via requireAuth, but the workspace/tenant scoping is based on authenticatedUser.accountId which comes from account_memberships (portal path, not staff path). When accountId is undefined (which is common for staff users who don't have account_memberships), the scoreLeads function at line 128 does NOT add any account filter, causing it to query ALL leads across ALL tenants. The rescore_all=true path explicitly skips leadIds filtering, fetching every lead in the database.",
+      "impact": "A staff user without an account_membership entry can trigger scoring of all leads across all workspaces. The response includes lead IDs and scores, providing cross-tenant data leakage.",
+      "attack_path": "1. Authenticate as any staff user. 2. POST to /functions/v1/lead-scoring-engine with {rescore_all: true}. 3. The function queries all leads globally (no workspace filter) and returns all lead IDs and scores.",
+      "evidence": "supabase/functions/lead-scoring-engine/index.ts lines 128-131: `if (accountId) { query = query.eq('account_id', accountId); }` — when accountId is undefined, no filter is applied. Line 232-236: `scoreLeads(supabaseClient, authenticatedUser.accountId, rescore_all ? undefined : leadIds)` passes potentially undefined accountId.",
+      "remediation": "Replace accountId-based filtering with agency_workspace_id-based filtering. Look up the user's workspace membership and filter leads by workspace. Reject rescore_all if user is not a workspace admin.",
+      "poc_video_notes": "Call as staff user without account_membership, observe all-tenant lead scores returned."
+    },
+    {
+      "severity": "HIGH",
+      "location": "supabase/functions/phone-verification/index.ts:77,98-105",
+      "title": "phone-verification OTP leak + Math.random (known finding confirmed still present)",
+      "description": "Two issues remain unfixed: (1) Line 77 uses Math.random() to generate the 6-digit verification code, which is not cryptographically secure and is predictable. (2) Lines 101-105 return the verification code in the API response body as debug_code, making the OTP trivially extractable by any caller. The verification code is also stored in plaintext in the database. PRs #107 and #117 did not address this function.",
+      "impact": "Any authenticated user can obtain any other user's phone verification code by simply reading the API response. Combined with the insecure Math.random() PRNG, the codes could also be predicted without the response leak.",
+      "attack_path": "1. Call /functions/v1/phone-verification with {action: 'send_code', phone_number: '+1...'} for the target. 2. The response body contains {debug_code: '123456'}. 3. Call verify_code with the leaked code to take over the phone number on the target's profile.",
+      "evidence": "Line 77: `Math.floor(100000 + Math.random() * 900000).toString()`. Lines 101-105: response includes `debug_code: verificationCode` with comment 'Remove this in production'.",
+      "remediation": "Replace Math.random() with crypto.getRandomValues(). Remove debug_code from the response. Hash the verification code before storing in the database.",
+      "poc_video_notes": "Call send_code endpoint, observe OTP in response body."
+    },
+    {
+      "severity": "HIGH",
+      "location": "supabase/migrations (latest: 20250908232935) — update_account_secure",
+      "title": "update_account_secure anon EXECUTE (known finding confirmed still present)",
+      "description": "The update_account_secure SECURITY DEFINER function is still granted EXECUTE to anon. While the function has an internal permission check (account_memberships or is_staff), the anon grant means unauthenticated callers can invoke the function. The auth checks inside rely on auth.uid() and auth.jwt() which return NULL for anon callers — but the is_staff_jwt check uses COALESCE(..., false) and is_staff_tbl/is_staff_profiles use fallback false, so unauthenticated calls should fail. However, granting EXECUTE to anon on a SECURITY DEFINER function is a defense-in-depth violation. PR #117 hardened rollback_import_batch and outbox functions but missed update_account_secure.",
+      "impact": "Unnecessary attack surface. While the internal checks should block anon access, SECURITY DEFINER + anon EXECUTE is a violation of the project's invariant that service-role RPCs should not be callable by anon. Any future regression in the auth checks would become directly exploitable.",
+      "attack_path": "1. Call update_account_secure via PostgREST REST API with only the anon key. 2. Currently blocked by internal auth checks, but any bypass (e.g., JWT claim manipulation) would allow unauthenticated account modification.",
+      "evidence": "supabase/migrations/20250908232935_*.sql line 119: `grant execute on function public.update_account_secure(uuid, jsonb) to anon, authenticated;`",
+      "remediation": "REVOKE EXECUTE ON FUNCTION public.update_account_secure(uuid, jsonb) FROM anon, PUBLIC; GRANT EXECUTE ... TO authenticated, service_role;",
+      "poc_video_notes": "Demonstrate that the function is callable with only the anon key (currently returns access denied, but the invocation itself succeeds)."
+    },
+    {
+      "severity": "LOW",
+      "location": "supabase/migrations/20250930183833 — profiles_update_self RLS policy",
+      "title": "profiles_update_self allows privilege escalation columns (known finding confirmed still present)",
+      "description": "The profiles_update_self RLS policy allows any authenticated user to UPDATE their own profile row with no column restrictions. This means a user can SET role='admin', is_staff=true, mfa_enabled=false, or status='active' on their own profile. The policy at migration 20250930183833 is: CREATE POLICY profiles_update_self ON profiles FOR UPDATE USING (id = auth.uid()) WITH CHECK (id = auth.uid()). No column-level grant restriction or trigger to prevent escalation-sensitive column writes.",
+      "impact": "Any authenticated user can escalate their own privileges to admin/staff, bypassing all role-based access controls throughout the application.",
+      "attack_path": "1. Authenticate as any user (including 'customer' role). 2. UPDATE profiles SET role='admin', is_staff=true WHERE id=auth.uid(). 3. The profiles_update_self policy allows this since id=auth.uid() passes. 4. User now has admin access to all admin functions.",
+      "evidence": "supabase/migrations/20250930183833 lines 34-37: policy has no column restriction. Combined with the new requireActiveProvisionedAdmin check in PR #117 (which reads role, is_staff from profiles), a self-escalated user could pass the admin check.",
+      "remediation": "Add a BEFORE UPDATE trigger on profiles that prevents non-admin users from modifying role, is_staff, status, mfa_secret, backup_codes, and default_agency_workspace_id columns. Or use column-level GRANT to restrict which columns authenticated users can update.",
+      "poc_video_notes": "As a customer-role user, run UPDATE profiles SET role='admin', is_staff=true WHERE id=<own-id>, then access admin endpoints."
+    }
+  ]
+}
