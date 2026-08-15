@@ -41,14 +41,14 @@ function createCountChain(count: number) {
   return chain;
 }
 
-function createAggregateChain(data: Record<string, number>) {
+function createDataChain(rows: Record<string, number | null>[]) {
   const chain: Record<string, unknown> = {};
   chain.is = vi.fn(() => chain);
   chain.gte = vi.fn(() => chain);
   chain.lte = vi.fn(() => chain);
   chain.in = vi.fn(() => chain);
-  chain.then = (resolve: (value: { data: Record<string, number>[]; error: null }) => void) =>
-    Promise.resolve({ data: [data], error: null }).then(resolve);
+  chain.then = (resolve: (value: { data: Record<string, number | null>[]; error: null }) => void) =>
+    Promise.resolve({ data: rows, error: null }).then(resolve);
   return chain;
 }
 
@@ -94,12 +94,12 @@ function mockLeadMetricsSupabase({
           const call: SelectCall = { table, columns, options };
           selectCalls.push(call);
 
-          if (columns === 'lead_score.avg()') {
-            return createAggregateChain({ avg: averageScore });
+          if (columns === 'lead_score') {
+            return createDataChain([{ lead_score: averageScore }]);
           }
 
-          if (columns === 'current_premium.sum()') {
-            return createAggregateChain({ sum: pipelineValue });
+          if (columns === 'current_premium') {
+            return createDataChain([{ current_premium: pipelineValue }]);
           }
 
           const chain = createCountChain(total);
@@ -185,8 +185,8 @@ describe('useLeadMetrics', () => {
       expect(call.table).toBe('leads');
     });
 
-    expect(selectCalls.some((call) => call.columns === 'lead_score.avg()')).toBe(true);
-    expect(selectCalls.some((call) => call.columns === 'current_premium.sum()')).toBe(true);
+    expect(selectCalls.some((call) => call.columns === 'lead_score')).toBe(true);
+    expect(selectCalls.some((call) => call.columns === 'current_premium')).toBe(true);
 
     const nonHeadCalls = selectCalls.filter(
       (call) => call.columns === 'id' && call.options?.head !== true

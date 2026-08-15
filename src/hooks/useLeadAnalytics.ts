@@ -50,7 +50,7 @@ async function countLeads(
 async function getAverageLeadScore(dateRange?: { start: string; end: string }): Promise<number> {
   let query = supabase
     .from('leads')
-    .select('lead_score.avg()')
+    .select('lead_score')
     .is('deleted_at', null);
 
   if (dateRange) {
@@ -65,14 +65,18 @@ async function getAverageLeadScore(dateRange?: { start: string; end: string }): 
     throw error;
   }
 
-  const avg = data?.[0]?.avg;
-  return avg != null ? Number(avg) : 0;
+  if (!data || data.length === 0) {
+    return 0;
+  }
+
+  const totalScore = data.reduce((sum, lead) => sum + (lead.lead_score ?? 0), 0);
+  return totalScore / data.length;
 }
 
 async function getTotalPipelineValue(dateRange?: { start: string; end: string }): Promise<number> {
   let query = supabase
     .from('leads')
-    .select('current_premium.sum()')
+    .select('current_premium')
     .is('deleted_at', null)
     .in('status', [...PIPELINE_VALUE_STATUSES]);
 
@@ -88,8 +92,7 @@ async function getTotalPipelineValue(dateRange?: { start: string; end: string })
     throw error;
   }
 
-  const sum = data?.[0]?.sum;
-  return sum != null ? Number(sum) : 0;
+  return (data ?? []).reduce((sum, lead) => sum + (lead.current_premium ?? 0), 0);
 }
 
 export function useLeadMetrics(dateRange?: { start: string; end: string }) {
