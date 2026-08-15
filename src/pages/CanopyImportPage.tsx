@@ -373,7 +373,14 @@ export default function CanopyImportPage() {
                     Insurance data imported via Canopy Connect
                   </CardDescription>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => refetchPulls()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    refetchPulls();
+                    queryClient.invalidateQueries({ queryKey: ['canopy-import-stats'] });
+                  }}
+                >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
                 </Button>
