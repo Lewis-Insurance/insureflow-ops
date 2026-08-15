@@ -285,7 +285,7 @@ export const PipelineKanban = ({ filters }: { filters?: any }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Pipeline</p>
-                <h3 className="text-2xl font-bold">{leads?.length || 0}</h3>
+                <h3 className="text-2xl font-bold">{leadsResponse?.total ?? 0}</h3>
               </div>
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
