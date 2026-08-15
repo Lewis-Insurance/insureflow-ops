@@ -10,10 +10,18 @@ interface TaskAnalyticsDashboardProps {
 }
 
 export function TaskAnalyticsDashboard({ scope }: TaskAnalyticsDashboardProps) {
-  const { data: counts, isLoading } = useTaskAnalyticsCounts(scope);
+  const { data: counts, isLoading, isError } = useTaskAnalyticsCounts(scope);
 
-  if (isLoading || !counts) {
+  if (isLoading) {
     return <div className="text-center py-8">Loading analytics...</div>;
+  }
+
+  if (isError || !counts) {
+    return (
+      <div className="text-center py-8 text-destructive">
+        Failed to load analytics. Please try again.
+      </div>
+    );
   }
 
   const statusStats = [
