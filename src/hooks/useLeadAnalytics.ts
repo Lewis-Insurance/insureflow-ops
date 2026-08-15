@@ -17,46 +17,121 @@ export interface LeadMetrics {
   total_pipeline_value: number;
 }
 
+const PIPELINE_VALUE_STATUSES = ['qualified', 'quoted', 'nurturing'] as const;
+
+async function countLeads(
+  dateRange?: { start: string; end: string },
+  status?: string
+): Promise<number> {
+  let query = supabase
+    .from('leads')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null);
+
+  if (dateRange) {
+    query = query
+      .gte('created_at', dateRange.start)
+      .lte('created_at', dateRange.end);
+  }
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
+async function getAverageLeadScore(dateRange?: { start: string; end: string }): Promise<number> {
+  let query = supabase
+    .from('leads')
+    .select('lead_score.avg()')
+    .is('deleted_at', null);
+
+  if (dateRange) {
+    query = query
+      .gte('created_at', dateRange.start)
+      .lte('created_at', dateRange.end);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  const avg = data?.[0]?.avg;
+  return avg != null ? Number(avg) : 0;
+}
+
+async function getTotalPipelineValue(dateRange?: { start: string; end: string }): Promise<number> {
+  let query = supabase
+    .from('leads')
+    .select('current_premium.sum()')
+    .is('deleted_at', null)
+    .in('status', [...PIPELINE_VALUE_STATUSES]);
+
+  if (dateRange) {
+    query = query
+      .gte('created_at', dateRange.start)
+      .lte('created_at', dateRange.end);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  const sum = data?.[0]?.sum;
+  return sum != null ? Number(sum) : 0;
+}
+
 export function useLeadMetrics(dateRange?: { start: string; end: string }) {
   return useQuery({
     queryKey: ['lead-metrics', dateRange],
     queryFn: async () => {
-      let query = supabase
-        .from('leads')
-        .select('*', { count: 'exact' })
-        .is('deleted_at', null); // Exclude soft-deleted leads
-
-      if (dateRange) {
-        query = query
-          .gte('created_at', dateRange.start)
-          .lte('created_at', dateRange.end);
-      }
-
-      const { data: allLeads, error } = await query;
-
-      if (error) {
-        logger.error('Error fetching lead metrics:', error);
-        throw error;
-      }
+      const [
+        total_leads,
+        new_leads,
+        contacted_leads,
+        qualified_leads,
+        quoted_leads,
+        won_leads,
+        lost_leads,
+        nurturing_leads,
+        average_score,
+        total_pipeline_value,
+      ] = await Promise.all([
+        countLeads(dateRange),
+        countLeads(dateRange, 'new'),
+        countLeads(dateRange, 'contacted'),
+        countLeads(dateRange, 'qualified'),
+        countLeads(dateRange, 'quoted'),
+        countLeads(dateRange, 'won'),
+        countLeads(dateRange, 'lost'),
+        countLeads(dateRange, 'nurturing'),
+        getAverageLeadScore(dateRange),
+        getTotalPipelineValue(dateRange),
+      ]);
 
       const metrics: LeadMetrics = {
-        total_leads: allLeads.length,
-        new_leads: allLeads.filter(l => l.status === 'new').length,
-        contacted_leads: allLeads.filter(l => l.status === 'contacted').length,
-        qualified_leads: allLeads.filter(l => l.status === 'qualified').length,
-        quoted_leads: allLeads.filter(l => l.status === 'quoted').length,
-        won_leads: allLeads.filter(l => l.status === 'won').length,
-        lost_leads: allLeads.filter(l => l.status === 'lost').length,
-        nurturing_leads: allLeads.filter(l => l.status === 'nurturing').length,
-        conversion_rate: allLeads.length > 0 
-          ? (allLeads.filter(l => l.status === 'won').length / allLeads.length) * 100 
-          : 0,
-        average_score: allLeads.length > 0
-          ? allLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / allLeads.length
-          : 0,
-        total_pipeline_value: allLeads
-          .filter(l => ['qualified', 'quoted', 'nurturing'].includes(l.status))
-          .reduce((sum, l) => sum + (l.current_premium || 0), 0),
+        total_leads,
+        new_leads,
+        contacted_leads,
+        qualified_leads,
+        quoted_leads,
+        won_leads,
+        lost_leads,
+        nurturing_leads,
+        conversion_rate: total_leads > 0 ? (won_leads / total_leads) * 100 : 0,
+        average_score,
+        total_pipeline_value,
       };
 
       return metrics;
