@@ -811,17 +811,21 @@ const App = () => (
                 <Route
                   path="/analyze-documents"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <DocumentAnalysisPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <DocumentAnalysisPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/analyze-documents/:analysisId"
                   element={
-                    <ErrorBoundary level="page" resetOnPropsChange>
-                      <DocumentAnalysisPage />
-                    </ErrorBoundary>
+                    <ProtectedRoute requireStaff>
+                      <ErrorBoundary level="page" resetOnPropsChange>
+                        <DocumentAnalysisPage />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
                   }
                 />
                 <Route

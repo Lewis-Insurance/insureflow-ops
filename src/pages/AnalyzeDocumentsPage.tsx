@@ -6,6 +6,7 @@ import {
   DocumentAnalysisResults,
   documentAnalysisRecordToDisplayResult,
 } from '@/components/document-analysis/DocumentAnalysisResults';
+import { ExtractAccountMatchPanel } from '@/components/document-analysis/ExtractAccountMatchPanel';
 import { StorageDiagnostics } from '@/components/document-analysis/StorageDiagnostics';
 import { useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
 import { Skeleton } from '@/components/cc';
@@ -143,9 +144,12 @@ export default function AnalyzeDocumentsPage() {
             !error &&
             data &&
             normalizedStatus === 'completed' && (
-              <DocumentAnalysisResults
-                result={documentAnalysisRecordToDisplayResult(data)}
-              />
+              <>
+                <ExtractAccountMatchPanel analysis={data} />
+                <DocumentAnalysisResults
+                  result={documentAnalysisRecordToDisplayResult(data)}
+                />
+              </>
             )}
 
           {analysisId && !isLoading && !error && data && normalizedStatus === 'unknown' && (

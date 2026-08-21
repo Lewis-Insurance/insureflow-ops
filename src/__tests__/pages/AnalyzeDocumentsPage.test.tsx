@@ -25,6 +25,10 @@ vi.mock('@/hooks/useDocumentAnalysis', () => ({
   useDocumentAnalysisQuery: vi.fn(),
 }));
 
+vi.mock('@/components/document-analysis/ExtractAccountMatchPanel', () => ({
+  ExtractAccountMatchPanel: () => <div data-testid="account-match-panel">Account match panel</div>,
+}));
+
 import AnalyzeDocumentsPage from '@/pages/AnalyzeDocumentsPage';
 import { useDocumentAnalysisQuery } from '@/hooks/useDocumentAnalysis';
 
@@ -117,6 +121,7 @@ describe('AnalyzeDocumentsPage', () => {
     expect(screen.getByText('State tax')).toBeTruthy();
     expect(screen.getByText('General Liability')).toBeTruthy();
     expect(screen.getByText('Claims-made')).toBeTruthy();
+    expect(screen.getByTestId('account-match-panel')).toBeTruthy();
     expect(screen.queryByTestId('upload-form')).toBeNull();
   });
 
