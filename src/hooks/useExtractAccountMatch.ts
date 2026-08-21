@@ -45,6 +45,7 @@ export function useExtractAccountMatch({
   const [candidates, setCandidates] = useState<AccountMatchCandidate[]>([]);
   const [proposing, setProposing] = useState(false);
   const [proposeError, setProposeError] = useState<string | null>(null);
+  const [proposeWarning, setProposeWarning] = useState<string | null>(null);
 
   const booking = useMemo(
     () => readBookingFromExtractedData(extractedData, snapshot),
@@ -69,55 +70,69 @@ export function useExtractAccountMatch({
   const proposeMatches = useCallback(async () => {
     const seq = ++proposeSeq.current;
     const insuredName = snapshot.insured_name?.trim();
-    if (!insuredName) {
+    const policyNumber = snapshot.policy_number?.trim();
+
+    if (!insuredName && !policyNumber) {
       setCandidates([]);
       setProposeError(null);
+      setProposeWarning(null);
       return;
     }
 
     setProposing(true);
     setProposeError(null);
+    setProposeWarning(null);
 
     try {
       const accountType = inferAccountType(snapshot);
       const rawCandidates: AccountMatchCandidate[] = [];
+      let attemptedLookups = 0;
+      let failedLookups = 0;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: duplicateData, error: duplicateError } = await (supabase.rpc as any)(
-        'find_duplicate_accounts',
-        {
-          p_name: insuredName,
-          p_type: accountType,
-          p_email: null,
-          p_phone: null,
-          p_dob: null,
-          p_limit: 5,
-        },
-      );
+      const trackLookup = (error: unknown) => {
+        attemptedLookups += 1;
+        if (error) failedLookups += 1;
+      };
 
-      if (duplicateError) {
-        logger.error('find_duplicate_accounts error', duplicateError);
-      } else {
-        (duplicateData as DuplicateAccount[] | null)?.forEach((dup, index) => {
-          rawCandidates.push(mapDuplicateToCandidate(dup, index));
+      if (insuredName) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: duplicateData, error: duplicateError } = await (supabase.rpc as any)(
+          'find_duplicate_accounts',
+          {
+            p_name: insuredName,
+            p_type: accountType,
+            p_email: null,
+            p_phone: null,
+            p_dob: null,
+            p_limit: 5,
+          },
+        );
+
+        trackLookup(duplicateError);
+        if (duplicateError) {
+          logger.error('find_duplicate_accounts error', duplicateError);
+        } else {
+          (duplicateData as DuplicateAccount[] | null)?.forEach((dup, index) => {
+            rawCandidates.push(mapDuplicateToCandidate(dup, index));
+          });
+        }
+
+        const { data: nameSearchData, error: nameSearchError } = await supabase.rpc('global_search_v1', {
+          p_search_term: insuredName,
+          p_limit: NAME_SEARCH_LIMIT,
         });
+
+        trackLookup(nameSearchError);
+        if (nameSearchError) {
+          logger.error('global_search_v1 name error', nameSearchError);
+        } else {
+          (nameSearchData as GlobalSearchRow[] | null)?.forEach((row, index) => {
+            const mapped = mapNameSearchToCandidate(row, index);
+            if (mapped) rawCandidates.push(mapped);
+          });
+        }
       }
 
-      const { data: nameSearchData, error: nameSearchError } = await supabase.rpc('global_search_v1', {
-        p_search_term: insuredName,
-        p_limit: NAME_SEARCH_LIMIT,
-      });
-
-      if (nameSearchError) {
-        logger.error('global_search_v1 name error', nameSearchError);
-      } else {
-        (nameSearchData as GlobalSearchRow[] | null)?.forEach((row, index) => {
-          const mapped = mapNameSearchToCandidate(row, index);
-          if (mapped) rawCandidates.push(mapped);
-        });
-      }
-
-      const policyNumber = snapshot.policy_number?.trim();
       if (policyNumber) {
         const { data: policySearchData, error: policySearchError } = await supabase.rpc(
           'global_search_v1',
@@ -127,6 +142,7 @@ export function useExtractAccountMatch({
           },
         );
 
+        trackLookup(policySearchError);
         if (policySearchError) {
           logger.error('global_search_v1 policy error', policySearchError);
         } else {
@@ -142,6 +158,7 @@ export function useExtractAccountMatch({
               .in('id', policyIds)
               .is('deleted_at', null);
 
+            trackLookup(policyAccountsError);
             if (policyAccountsError) {
               logger.error('policy account lookup error', policyAccountsError);
             } else {
@@ -165,11 +182,27 @@ export function useExtractAccountMatch({
       }
 
       if (seq !== proposeSeq.current) return;
-      setCandidates(rankAccountMatches(rawCandidates));
+
+      const ranked = rankAccountMatches(rawCandidates);
+
+      if (failedLookups > 0 && failedLookups === attemptedLookups && ranked.length === 0) {
+        setProposeError('Account search failed. Try again in a moment.');
+        setProposeWarning(null);
+        setCandidates([]);
+      } else if (failedLookups > 0 && ranked.length > 0) {
+        setProposeWarning('Some account searches did not complete. Results may be incomplete.');
+        setProposeError(null);
+        setCandidates(ranked);
+      } else {
+        setProposeError(null);
+        setProposeWarning(null);
+        setCandidates(ranked);
+      }
     } catch (err) {
       if (seq !== proposeSeq.current) return;
       logger.error('propose account matches error', err);
       setProposeError(err instanceof Error ? err.message : 'Failed to propose account matches');
+      setProposeWarning(null);
       setCandidates([]);
     } finally {
       if (seq === proposeSeq.current) {
@@ -182,6 +215,7 @@ export function useExtractAccountMatch({
     if (accountId) {
       setCandidates([]);
       setProposeError(null);
+      setProposeWarning(null);
       return;
     }
     void proposeMatches();
@@ -204,24 +238,14 @@ export function useExtractAccountMatch({
 
       const mergedExtractedData = mergeBookingIntoExtractedData(extractedData, bookingMeta);
 
-      const { error: analysisError } = await supabase
-        .from('document_analysis')
-        .update({
-          account_id: chosenAccountId,
-          extracted_data: mergedExtractedData,
-        })
-        .eq('id', analysisId);
+      const { error } = await supabase.rpc('persist_extract_account_link', {
+        p_analysis_id: analysisId,
+        p_account_id: chosenAccountId,
+        p_document_id: documentId ?? null,
+        p_extracted_data: mergedExtractedData,
+      });
 
-      if (analysisError) throw analysisError;
-
-      if (documentId) {
-        const { error: documentError } = await supabase
-          .from('documents')
-          .update({ account_id: chosenAccountId })
-          .eq('id', documentId);
-
-        if (documentError) throw documentError;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['document-analysis', analysisId] });
@@ -250,6 +274,7 @@ export function useExtractAccountMatch({
     candidates,
     proposing,
     proposeError,
+    proposeWarning,
     proposeMatches,
     booking,
     defaultLineCategory: classifyLineCategory(snapshot),

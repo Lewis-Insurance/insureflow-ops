@@ -36,6 +36,7 @@ export function ExtractAccountMatchPanel({ analysis }: ExtractAccountMatchPanelP
     candidates,
     proposing,
     proposeError,
+    proposeWarning,
     booking,
     defaultLineCategory,
     linkedAccount,
@@ -171,6 +172,10 @@ export function ExtractAccountMatchPanel({ analysis }: ExtractAccountMatchPanelP
 
           {proposeError && (
             <p className="text-sm text-destructive">{proposeError}</p>
+          )}
+
+          {proposeWarning && (
+            <p className="text-sm text-warning">{proposeWarning}</p>
           )}
 
           {!proposing && !proposeError && candidates.length === 0 && (
