@@ -180,13 +180,15 @@ export function useExtractWritebackProposals({
     void (async () => {
       try {
         const snapshotHash = await hashExtractSnapshot(snapshot);
+        if (cancelled) return;
+
         const key = `${analysisId}:${accountId}:${snapshotHash}:${lineCategory}`;
         if (lastEnsuredKey.current === key) return;
 
         await ensureProposalsAsync();
-        if (!cancelled) {
-          lastEnsuredKey.current = key;
-        }
+        if (cancelled) return;
+
+        lastEnsuredKey.current = key;
       } catch {
         // onError toast handles user feedback
       }
