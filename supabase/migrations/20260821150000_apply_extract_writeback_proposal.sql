@@ -1,6 +1,54 @@
 -- Phase 1c: staff confirm applies a pending extract write-back proposal as a real quote.
 -- Fail closed, idempotent on re-confirm, no email, no account creation.
 
+create or replace function public.parse_extract_limit_amount(p_text text)
+returns numeric
+language plpgsql
+immutable
+set search_path to 'public'
+as $$
+declare
+  v_segment text;
+  v_cleaned text;
+  v_match text[];
+  v_value numeric;
+  v_suffix text;
+begin
+  if p_text is null or btrim(p_text) = '' then
+    return null;
+  end if;
+
+  v_segment := btrim(split_part(p_text, '/', 1));
+  if v_segment = '' then
+    return null;
+  end if;
+
+  v_cleaned := regexp_replace(v_segment, '[$,\s]', '', 'g');
+  v_match := regexp_match(v_cleaned, '^(\d+(?:\.\d+)?)([kKmM])?$');
+  if v_match is not null then
+    v_value := v_match[1]::numeric;
+    v_suffix := lower(v_match[2]);
+    if v_suffix = 'k' then
+      return v_value * 1000;
+    elsif v_suffix = 'm' then
+      return v_value * 1000000;
+    end if;
+    return v_value;
+  end if;
+
+  v_match := regexp_match(v_segment, '(\d[\d,]*(?:\.\d+)?)');
+  if v_match is not null then
+    v_cleaned := regexp_replace(v_match[1], ',', '', 'g');
+    return v_cleaned::numeric;
+  end if;
+
+  return null;
+end;
+$$;
+
+revoke all on function public.parse_extract_limit_amount(text) from anon, public;
+grant execute on function public.parse_extract_limit_amount(text) to authenticated;
+
 alter table public.extract_writeback_proposals
   add column if not exists quote_id uuid references public.quotes(id),
   add column if not exists applied_at timestamptz,
@@ -36,6 +84,7 @@ declare
   v_auto_csl numeric;
   v_cov jsonb;
   v_cov_type text;
+  v_limit_text text;
   v_limit numeric;
 begin
   if not public.is_staff() then
@@ -135,6 +184,7 @@ begin
     v_line := case v_lob
       when 'workers_comp' then 'wc'
       when 'commercial_auto' then 'auto'
+      when 'auto' then 'auto'
       when 'bop' then 'gl'
       when 'property' then 'property'
       when 'umbrella' then 'umbrella'
@@ -145,10 +195,8 @@ begin
     for v_cov in select value from jsonb_array_elements(v_coverages)
     loop
       v_cov_type := lower(coalesce(v_cov->>'coverage_type', ''));
-      v_limit := nullif(
-        regexp_replace(coalesce(nullif(btrim(v_cov->>'limit_amount'), ''), ''), '[^0-9.-]', '', 'g'),
-        ''
-      )::numeric;
+      v_limit_text := lower(coalesce(v_cov->>'limit_amount', ''));
+      v_limit := public.parse_extract_limit_amount(v_cov->>'limit_amount');
 
       if v_limit is null then
         continue;
@@ -156,16 +204,20 @@ begin
 
       if v_cov_type ~ '(^|_)gl_each_occurrence($|_)'
         or v_cov_type ~ 'each_occurrence'
-        or (v_cov_type ~ 'general_liability' and v_cov_type !~ 'aggregate') then
+        or (v_cov_type ~ 'general_liability' and v_cov_type !~ 'aggregate')
+        or (v_cov_type ~ 'general_liability' and v_limit_text ~ 'per occurrence') then
         v_each_occurrence := coalesce(v_each_occurrence, v_limit);
       elsif v_cov_type ~ '(^|_)gl_general_aggregate($|_)'
         or v_cov_type ~ 'general_aggregate'
-        or (v_cov_type ~ 'general_liability' and v_cov_type ~ 'aggregate') then
+        or (v_cov_type ~ 'general_liability' and v_cov_type ~ 'aggregate')
+        or (v_cov_type ~ 'general_liability' and v_limit_text ~ 'aggregate') then
         v_general_aggregate := coalesce(v_general_aggregate, v_limit);
       elsif v_cov_type ~ '(^|_)property_limit($|_)'
-        or (v_line = 'property' and v_cov_type ~ 'property') then
+        or v_cov_type ~ '(^|_)(property|building|contents)($|_)'
+        or (v_line = 'property' and v_cov_type ~ '(property|building|contents)') then
         v_property_limit := coalesce(v_property_limit, v_limit);
       elsif v_cov_type ~ '(^|_)wc_el_each_accident($|_)'
+        or v_cov_type ~ '(^|_)(workers_comp|employers_liability)($|_)'
         or (v_line = 'wc' and v_cov_type ~ 'each_accident') then
         v_el_each_accident := coalesce(v_el_each_accident, v_limit);
       elsif v_cov_type ~ '(^|_)wc_el_disease_each_employee($|_)'
@@ -175,13 +227,18 @@ begin
         or (v_line = 'wc' and v_cov_type ~ 'disease_policy') then
         v_el_disease_policy_limit := coalesce(v_el_disease_policy_limit, v_limit);
       elsif v_cov_type ~ '(^|_)umbrella_per_occurrence($|_)'
-        or (v_line = 'umbrella' and v_cov_type ~ 'per_occurrence') then
+        or v_cov_type ~ '(^|_)(umbrella_liability|umbrella)($|_)'
+        or (v_line = 'umbrella' and v_cov_type ~ 'per_occurrence')
+        or (v_cov_type ~ 'umbrella' and v_limit_text !~ 'aggregate') then
         v_umb_per_occurrence := coalesce(v_umb_per_occurrence, v_limit);
       elsif v_cov_type ~ '(^|_)umbrella_aggregate($|_)'
-        or (v_line = 'umbrella' and v_cov_type ~ 'aggregate') then
+        or (v_line = 'umbrella' and v_cov_type ~ 'aggregate')
+        or (v_cov_type ~ 'umbrella' and v_limit_text ~ 'aggregate') then
         v_umb_aggregate := coalesce(v_umb_aggregate, v_limit);
       elsif v_cov_type ~ '(^|_)auto_csl($|_)'
-        or (v_line = 'auto' and v_cov_type ~ 'csl') then
+        or v_cov_type ~ '(^|_)(commercial_auto|commercial_auto_liability|business_auto)($|_)'
+        or (v_line = 'auto' and v_cov_type ~ 'csl')
+        or (v_cov_type ~ '(auto|commercial_auto|business_auto)' and v_limit_text ~ 'csl') then
         v_auto_csl := coalesce(v_auto_csl, v_limit);
       end if;
     end loop;

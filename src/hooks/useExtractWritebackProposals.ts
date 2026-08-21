@@ -189,6 +189,9 @@ export function useExtractWritebackProposals({
         });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         queryClient.invalidateQueries({ queryKey: ['quotes', 'account', accountId] });
+        queryClient.invalidateQueries({ queryKey: ['submission-quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['commercial-submissions', accountId] });
+        queryClient.invalidateQueries({ queryKey: ['commercial-pipeline'] });
       }
       toast({
         title: 'Quote booked',
