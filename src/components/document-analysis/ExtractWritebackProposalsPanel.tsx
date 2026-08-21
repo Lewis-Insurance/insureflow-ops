@@ -1,4 +1,4 @@
-import { Loader2, XCircle } from 'lucide-react';
+import { CheckCircle, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Chip, Skeleton, StatusPill } from '@/components/cc';
@@ -56,7 +56,9 @@ export function ExtractWritebackProposalsPanel({
     proposalsError,
     ensuring,
     rejecting,
+    confirming,
     rejectProposal,
+    confirmProposal,
   } = useExtractWritebackProposals({
     analysisId,
     accountId,
@@ -76,7 +78,7 @@ export function ExtractWritebackProposalsPanel({
         <CardTitle className="text-cc-text">Write-back proposals</CardTitle>
         <p className="text-sm text-cc-text-muted">
           Review extracted quote data before it is written to the account. Reject dismisses a
-          proposal; confirm is not available in this phase.
+          proposal. Confirm books a real quote on the linked account.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -127,7 +129,7 @@ export function ExtractWritebackProposalsPanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={rejecting}
+                  disabled={rejecting || confirming || proposal.status !== 'pending'}
                   onClick={() => rejectProposal(proposal.id)}
                 >
                   {rejecting ? (
@@ -142,8 +144,24 @@ export function ExtractWritebackProposalsPanel({
                     </>
                   )}
                 </Button>
-                <Button type="button" size="sm" disabled title="Confirm writes quotes next.">
-                  Confirm writes quotes next.
+                <Button
+                  type="button"
+                  size="sm"
+                  data-primary
+                  disabled={rejecting || confirming || proposal.status !== 'pending'}
+                  onClick={() => confirmProposal(proposal.id)}
+                >
+                  {confirming ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Booking...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Confirm to book
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
