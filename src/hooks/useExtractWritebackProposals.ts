@@ -37,8 +37,12 @@ export interface UseExtractWritebackProposalsInput {
 
 const PROPOSALS_QUERY_KEY = 'extract-writeback-proposals';
 
-function proposalsQueryKey(analysisId: string, accountId: string) {
-  return [PROPOSALS_QUERY_KEY, analysisId, accountId] as const;
+function proposalsQueryKey(
+  analysisId: string,
+  accountId: string,
+  snapshot: ExtractSnapshotV1,
+) {
+  return [PROPOSALS_QUERY_KEY, analysisId, accountId, snapshot] as const;
 }
 
 export function useExtractWritebackProposals({
@@ -55,10 +59,11 @@ export function useExtractWritebackProposals({
   const isActive = enabled && !!accountId;
 
   const proposalsQuery = useQuery({
-    queryKey: proposalsQueryKey(analysisId, accountId ?? ''),
+    queryKey: proposalsQueryKey(analysisId, accountId ?? '', snapshot),
     queryFn: async () => {
       if (!accountId) return [] as ExtractWritebackProposalRow[];
 
+      const snapshotHash = await hashExtractSnapshot(snapshot);
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('extract_writeback_proposals' as any)
@@ -66,6 +71,7 @@ export function useExtractWritebackProposals({
         .eq('document_analysis_id', analysisId)
         .eq('account_id', accountId)
         .eq('status', 'pending')
+        .eq('snapshot_hash', snapshotHash)
         .order('carrier_name', { ascending: true });
 
       if (error) throw error;
@@ -97,6 +103,17 @@ export function useExtractWritebackProposals({
 
       if (rows.length === 0) return { inserted: 0 };
 
+      const { error: supersedeError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('extract_writeback_proposals' as any)
+        .update({ status: 'rejected' })
+        .eq('document_analysis_id', analysisId)
+        .eq('account_id', accountId)
+        .eq('status', 'pending')
+        .neq('snapshot_hash', snapshotHash);
+
+      if (supersedeError) throw supersedeError;
+
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('extract_writeback_proposals' as any)
@@ -112,7 +129,7 @@ export function useExtractWritebackProposals({
     onSuccess: () => {
       if (accountId) {
         queryClient.invalidateQueries({
-          queryKey: proposalsQueryKey(analysisId, accountId),
+          queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
         });
       }
     },
@@ -139,7 +156,7 @@ export function useExtractWritebackProposals({
     onSuccess: () => {
       if (accountId) {
         queryClient.invalidateQueries({
-          queryKey: proposalsQueryKey(analysisId, accountId),
+          queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
         });
       }
       toast({

@@ -142,7 +142,10 @@ export function inferLineOfBusiness(
   if (/home|homeowners|dwelling|renters/.test(docType)) {
     return lineCategory === 'commercial' ? 'property' : 'home';
   }
-  if (/general[_\s-]?liability|^gl[_\s]|commercial[_\s-]?quote/.test(docType)) {
+  if (/life[_\s-]?policy/.test(docType)) {
+    return 'life';
+  }
+  if (/general[_\s-]?liability|^gl[_\s]/.test(docType)) {
     return 'gl';
   }
 
@@ -161,6 +164,9 @@ export function inferLineOfBusiness(
   if (hasCoveragePattern(snapshot, /^property|building|contents/)) {
     return 'property';
   }
+  if (hasCoveragePattern(snapshot, /term life|whole life|death benefit|life insurance/)) {
+    return 'life';
+  }
   if (/commercial[_\s-]?policy/.test(docType)) {
     return 'gl';
   }
@@ -169,6 +175,9 @@ export function inferLineOfBusiness(
   }
   if (snapshot.locations.length > 0) {
     return lineCategory === 'commercial' ? 'property' : 'home';
+  }
+  if (/commercial[_\s-]?quote/.test(docType)) {
+    return lineCategory === 'commercial' ? 'gl' : 'auto';
   }
 
   return lineCategory === 'commercial' ? 'gl' : 'auto';

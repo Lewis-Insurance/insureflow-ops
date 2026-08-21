@@ -93,6 +93,35 @@ describe('extractWritebackProposal', () => {
       });
       expect(inferLineOfBusiness(snapshot, 'commercial')).toBe('umbrella');
     });
+
+    it('maps commercial_quote with only commercial auto coverages to commercial_auto', () => {
+      const snapshot = normalizeExtractSnapshot({
+        document_type: 'commercial_quote',
+        coverages: [
+          {
+            name: 'Commercial Auto Liability',
+            limit: '$1,000,000 CSL',
+            deductible: '$500',
+            premium: 8750,
+          },
+          {
+            name: 'Fleet Comprehensive',
+            limit: 'ACV',
+            deductible: '$1,000',
+            premium: 3200,
+          },
+        ],
+      });
+      expect(inferLineOfBusiness(snapshot, 'commercial')).toBe('commercial_auto');
+    });
+
+    it('maps life_policy document type to life', () => {
+      const snapshot = normalizeExtractSnapshot({
+        document_type: 'life_policy',
+        vehicles: [{ year: 2020, make: 'Toyota', model: 'Camry' }],
+      });
+      expect(inferLineOfBusiness(snapshot, 'personal')).toBe('life');
+    });
   });
 
   describe('buildProposedQuotesFromSnapshot', () => {
