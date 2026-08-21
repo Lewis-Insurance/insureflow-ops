@@ -11,7 +11,7 @@ import { StatusPill, Chip, AccentSpine } from '@/components/cc';
 import { usePolicies, type PolicyWithAccount } from '@/hooks/usePolicies';
 import { useQuotesByAccount } from '@/hooks/useQuotes';
 import { Shield, Calendar, Building, Plus, Eye, Pencil, FileText, CheckSquare, FolderOpen, Quote, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatLocalDateDisplay } from '@/lib/date/localDate';
 import { humanizeLine, humanizeCarrier } from '@/lib/format';
 import { AddPolicyModal } from './AddPolicyModal';
@@ -45,6 +45,8 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
   const { data: allPolicies = [], isLoading: policiesLoading, refetch: refetchPolicies } = usePolicies({ accountId });
   const { data: quotes = [], isLoading: quotesLoading, refetch: refetchQuotes } = useQuotesByAccount(accountId);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialPoliciesTab = searchParams.get('policiesTab') === 'quotes' ? 'quotes' : 'policies';
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
@@ -323,7 +325,7 @@ export function CustomerPoliciesSection({ accountId, customerName }: CustomerPol
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="policies" className="w-full">
+        <Tabs defaultValue={initialPoliciesTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="policies">
               <Shield className="h-4 w-4 mr-2" />

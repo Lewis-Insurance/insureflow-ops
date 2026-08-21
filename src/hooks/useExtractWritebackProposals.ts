@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +55,7 @@ export function useExtractWritebackProposals({
 }: UseExtractWritebackProposalsInput) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const lastEnsuredKey = useRef<string | null>(null);
 
   const isActive = enabled && !!accountId;
@@ -194,6 +196,9 @@ export function useExtractWritebackProposals({
         title: 'Quote booked',
         description: 'The extracted quote was added to the account.',
       });
+      if (accountId) {
+        navigate(`/customers/${accountId}?tab=policies&policiesTab=quotes`);
+      }
     },
     onError: (err: Error) => {
       toast({
