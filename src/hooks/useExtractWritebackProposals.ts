@@ -55,6 +55,7 @@ export function useExtractWritebackProposals({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const lastEnsuredKey = useRef<string | null>(null);
+  const ensureGenerationRef = useRef(0);
 
   const isActive = enabled && !!accountId;
 
@@ -81,8 +82,9 @@ export function useExtractWritebackProposals({
   });
 
   const ensureProposalsMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (generation: number) => {
       if (!accountId) return { inserted: 0 };
+      if (generation !== ensureGenerationRef.current) return { inserted: 0 };
 
       const snapshotHash = await hashExtractSnapshot(snapshot);
       const payloads = buildProposedQuotesFromSnapshot(snapshot, accountId, lineCategory);
@@ -102,6 +104,7 @@ export function useExtractWritebackProposals({
       }));
 
       if (rows.length === 0) return { inserted: 0 };
+      if (generation !== ensureGenerationRef.current) return { inserted: 0 };
 
       const { error: supersedeError } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,6 +116,7 @@ export function useExtractWritebackProposals({
         .neq('snapshot_hash', snapshotHash);
 
       if (supersedeError) throw supersedeError;
+      if (generation !== ensureGenerationRef.current) return { inserted: 0 };
 
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +181,7 @@ export function useExtractWritebackProposals({
 
   const ensureProposals = useCallback(() => {
     if (!isActive) return;
-    void ensureProposalsAsync();
+    void ensureProposalsAsync(ensureGenerationRef.current);
   }, [isActive, ensureProposalsAsync]);
 
   const rejectProposal = useCallback(
@@ -193,6 +197,7 @@ export function useExtractWritebackProposals({
       return;
     }
 
+    const generation = ensureGenerationRef.current;
     let cancelled = false;
     void (async () => {
       try {
@@ -202,7 +207,7 @@ export function useExtractWritebackProposals({
         const key = `${analysisId}:${accountId}:${snapshotHash}:${lineCategory}`;
         if (lastEnsuredKey.current === key) return;
 
-        await ensureProposalsAsync();
+        await ensureProposalsAsync(generation);
         if (cancelled) return;
 
         lastEnsuredKey.current = key;
@@ -213,12 +218,14 @@ export function useExtractWritebackProposals({
 
     return () => {
       cancelled = true;
+      ensureGenerationRef.current += 1;
     };
   }, [analysisId, accountId, lineCategory, snapshot, isActive, ensureProposalsAsync]);
 
   return {
     proposals: proposalsQuery.data ?? [],
     proposalsLoading: proposalsQuery.isLoading,
+    proposalsFetching: proposalsQuery.isFetching,
     proposalsError: proposalsQuery.error,
     ensuring,
     rejecting: rejectProposalMutation.isPending,
