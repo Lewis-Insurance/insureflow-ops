@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Chip, StatusPill } from '@/components/cc';
 import { AddCustomerModal } from '@/components/customers/AddCustomerModal';
+import { ExtractWritebackProposalsPanel } from '@/components/document-analysis/ExtractWritebackProposalsPanel';
 import { useExtractAccountMatch } from '@/hooks/useExtractAccountMatch';
 import { readExtractSnapshot, type ExtractSnapshotV1 } from '@/lib/extractSnapshot';
 import {
@@ -75,37 +76,46 @@ export function ExtractAccountMatchPanel({ analysis }: ExtractAccountMatchPanelP
 
   if (analysis.account_id) {
     return (
-      <Card className="border-cc-border bg-cc-surface">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-cc-text">
-            <Check className="h-5 w-5 text-success" />
-            Linked account
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {linkedAccountLoading ? (
-            <div className="flex items-center gap-2 text-sm text-cc-text-muted">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading linked account...
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 rounded-cc-lg border border-cc-border p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-medium text-cc-text">
-                  {linkedAccount?.name ?? 'Linked account'}
-                </p>
-                <p className="text-sm text-cc-text-muted">
-                  Line: {lineCategoryLabel(booking.line_category)}
-                  {booking.line_category_source === 'override' ? ' (overridden)' : ' (from snapshot)'}
-                </p>
+      <div className="space-y-4">
+        <Card className="border-cc-border bg-cc-surface">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-cc-text">
+              <Check className="h-5 w-5 text-success" />
+              Linked account
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {linkedAccountLoading ? (
+              <div className="flex items-center gap-2 text-sm text-cc-text-muted">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading linked account...
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link to={`/customers/${analysis.account_id}`}>Open customer record</Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <div className="flex flex-col gap-3 rounded-cc-lg border border-cc-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-cc-text">
+                    {linkedAccount?.name ?? 'Linked account'}
+                  </p>
+                  <p className="text-sm text-cc-text-muted">
+                    Line: {lineCategoryLabel(booking.line_category)}
+                    {booking.line_category_source === 'override' ? ' (overridden)' : ' (from snapshot)'}
+                  </p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/customers/${analysis.account_id}`}>Open customer record</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <ExtractWritebackProposalsPanel
+          analysisId={analysis.id}
+          accountId={analysis.account_id}
+          snapshot={snapshot}
+          lineCategory={booking.line_category}
+        />
+      </div>
     );
   }
 
