@@ -86,24 +86,28 @@ function mockProposalsTableWithWorkingReject() {
     }
 
     return {
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            eq: () => ({
-              eq: (_col: string, snapshotHash: unknown) => ({
-                order: async () => ({
-                  data: pendingRows.filter(
-                    (row) =>
-                      row.status === 'pending' &&
-                      (row.snapshot_hash === undefined || row.snapshot_hash === snapshotHash),
-                  ),
-                  error: null,
-                }),
-              }),
-            }),
+      select: () => {
+        let eqCall = 0;
+        let snapshotHash: unknown;
+
+        const chain = {
+          eq: (_col: string, val: unknown) => {
+            eqCall += 1;
+            if (eqCall === 4) snapshotHash = val;
+            return chain;
+          },
+          order: async () => ({
+            data: pendingRows.filter(
+              (row) =>
+                row.status === 'pending' &&
+                (row.snapshot_hash === undefined || row.snapshot_hash === snapshotHash),
+            ),
+            error: null,
           }),
-        }),
-      }),
+        };
+
+        return chain;
+      },
       upsert: (_rows: unknown[], _opts: unknown) => ({
         select: async () => {
           upsertCalls += 1;
@@ -286,6 +290,44 @@ describe('useExtractWritebackProposals', () => {
 
     expect(upsertCalls).toBe(0);
     expect(result.current.proposals).toEqual([]);
+  });
+
+  it('loads only pending rows matching current snapshot_hash', async () => {
+    const currentHash = await hashExtractSnapshot(SNAPSHOT);
+    pendingRows = [
+      {
+        id: 'current-1',
+        carrier_name: 'Hartford',
+        status: 'pending',
+        snapshot_hash: currentHash,
+        proposed_quote: {},
+      },
+      {
+        id: 'stale-1',
+        carrier_name: 'Old Carrier',
+        status: 'pending',
+        snapshot_hash: 'stale-hash-different-from-current',
+        proposed_quote: {},
+      },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    expect(result.current.proposals.map((p) => p.id)).toEqual(['current-1']);
+    expect(result.current.proposals.map((p) => p.carrier_name)).toEqual(['Hartford']);
   });
 
   it('supersedes stale pending rows with a different snapshot_hash before upsert', async () => {

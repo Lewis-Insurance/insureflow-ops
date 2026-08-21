@@ -219,6 +219,7 @@ export function useExtractWritebackProposals({
   return {
     proposals: proposalsQuery.data ?? [],
     proposalsLoading: proposalsQuery.isLoading,
+    proposalsFetching: proposalsQuery.isFetching,
     proposalsError: proposalsQuery.error,
     ensuring,
     rejecting: rejectProposalMutation.isPending,
