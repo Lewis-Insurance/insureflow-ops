@@ -173,6 +173,37 @@ export function useExtractWritebackProposals({
     },
   });
 
+  const confirmProposalMutation = useMutation({
+    mutationFn: async (proposalId: string) => {
+      const { data, error } = await supabase.rpc('apply_extract_writeback_proposal', {
+        p_proposal_id: proposalId,
+      });
+
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      if (accountId) {
+        queryClient.invalidateQueries({
+          queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
+        });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['quotes', 'account', accountId] });
+      }
+      toast({
+        title: 'Quote booked',
+        description: 'The extracted quote was added to the account.',
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: 'Could not book quote',
+        description: err.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const { mutateAsync: ensureProposalsAsync, isPending: ensuring } = ensureProposalsMutation;
 
   const ensureProposals = useCallback(() => {
@@ -185,6 +216,13 @@ export function useExtractWritebackProposals({
       rejectProposalMutation.mutate(proposalId);
     },
     [rejectProposalMutation],
+  );
+
+  const confirmProposal = useCallback(
+    (proposalId: string) => {
+      confirmProposalMutation.mutate(proposalId);
+    },
+    [confirmProposalMutation],
   );
 
   useEffect(() => {
@@ -223,7 +261,9 @@ export function useExtractWritebackProposals({
     proposalsError: proposalsQuery.error,
     ensuring,
     rejecting: rejectProposalMutation.isPending,
+    confirming: confirmProposalMutation.isPending,
     ensureProposals,
     rejectProposal,
+    confirmProposal,
   };
 }

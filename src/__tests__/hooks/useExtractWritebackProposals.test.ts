@@ -7,12 +7,14 @@ import { hashExtractSnapshot } from '@/lib/extractWritebackProposal';
 import { useExtractWritebackProposals } from '@/hooks/useExtractWritebackProposals';
 
 const from = vi.fn();
+const rpc = vi.fn();
 const authGetUser = vi.fn();
 const toast = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => from(...args),
+    rpc: (...args: unknown[]) => rpc(...args),
     auth: {
       getUser: () => authGetUser(),
     },
@@ -78,6 +80,27 @@ let upsertCalls = 0;
 let supersedeCalls = 0;
 let supersededSnapshotHashes: string[] = [];
 let supersededRowIds: string[] = [];
+let applyRpcCalls: string[] = [];
+const bookedQuoteIds = new Map<string, string>();
+
+function mockApplyRpc() {
+  rpc.mockImplementation((fn: string, args: { p_proposal_id?: string }) => {
+    if (fn !== 'apply_extract_writeback_proposal') {
+      throw new Error(`Unexpected RPC: ${fn}`);
+    }
+    const proposalId = args.p_proposal_id as string;
+    applyRpcCalls.push(proposalId);
+
+    if (bookedQuoteIds.has(proposalId)) {
+      return Promise.resolve({ data: bookedQuoteIds.get(proposalId), error: null });
+    }
+
+    const quoteId = `quote-for-${proposalId}`;
+    bookedQuoteIds.set(proposalId, quoteId);
+    pendingRows = pendingRows.filter((row) => row.id !== proposalId);
+    return Promise.resolve({ data: quoteId, error: null });
+  });
+}
 
 function mockProposalsTableWithWorkingReject() {
   from.mockImplementation((table: string) => {
@@ -179,6 +202,7 @@ function mockProposalsTableWithWorkingReject() {
 
 beforeEach(() => {
   from.mockReset();
+  rpc.mockReset();
   authGetUser.mockReset();
   toast.mockReset();
   pendingRows = [];
@@ -186,8 +210,11 @@ beforeEach(() => {
   supersedeCalls = 0;
   supersededSnapshotHashes = [];
   supersededRowIds = [];
+  applyRpcCalls = [];
+  bookedQuoteIds.clear();
   authGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
   mockProposalsTableWithWorkingReject();
+  mockApplyRpc();
 });
 
 describe('useExtractWritebackProposals', () => {
@@ -363,5 +390,117 @@ describe('useExtractWritebackProposals', () => {
     await waitFor(() => {
       expect(upsertCalls).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  it('confirms a proposal via RPC and removes it from pending list', async () => {
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+      { id: 'proposal-2', carrier_name: 'Travelers', status: 'pending', proposed_quote: {} },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(2);
+    });
+
+    await act(async () => {
+      result.current.confirmProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    expect(applyRpcCalls).toEqual(['proposal-1']);
+    expect(result.current.proposals[0].carrier_name).toBe('Travelers');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Quote booked' }),
+    );
+  });
+
+  it('second confirm is a no-op when RPC returns the same quote id', async () => {
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+    ];
+    bookedQuoteIds.set('proposal-1', 'quote-stable-id');
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    await act(async () => {
+      result.current.confirmProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(applyRpcCalls).toHaveLength(1);
+    });
+
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+    ];
+
+    await act(async () => {
+      result.current.confirmProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(applyRpcCalls).toHaveLength(2);
+    });
+
+    expect(bookedQuoteIds.get('proposal-1')).toBe('quote-stable-id');
+  });
+
+  it('reject leaves no RPC call for apply', async () => {
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    await act(async () => {
+      result.current.rejectProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(0);
+    });
+
+    expect(applyRpcCalls).toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
