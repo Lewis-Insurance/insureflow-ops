@@ -67,6 +67,14 @@ describe('apply extract writeback proposal migration', () => {
     expect(sql).toMatch(/'extract_writeback_applied'/i);
   });
 
+  it('fail closed: applied status is set only after quote insert paths', () => {
+    const appliedUpdatePos = sql.indexOf('update public.extract_writeback_proposals');
+    const personalInsertPos = sql.indexOf('insert into public.quotes');
+    const commercialRpcPos = sql.indexOf('public.add_submission_quote(');
+    expect(appliedUpdatePos).toBeGreaterThan(personalInsertPos);
+    expect(appliedUpdatePos).toBeGreaterThan(commercialRpcPos);
+  });
+
   it('revokes anon/public and grants execute to authenticated', () => {
     expect(sql).toMatch(
       /revoke all on function public\.apply_extract_writeback_proposal\(uuid\) from anon, public/i,
