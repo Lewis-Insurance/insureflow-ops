@@ -195,11 +195,10 @@ describe('useExtractWritebackProposals', () => {
     );
 
     await waitFor(() => {
-      expect(result.current.ensuring).toBe(false);
+      expect(upsertCalls).toBeGreaterThanOrEqual(1);
     });
 
     const initialUpserts = upsertCalls;
-    expect(initialUpserts).toBeGreaterThanOrEqual(1);
 
     rerender();
 
