@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +55,7 @@ export function useExtractWritebackProposals({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const lastEnsuredKey = useRef<string | null>(null);
+  const [awaitingProposalsRefetch, setAwaitingProposalsRefetch] = useState(false);
 
   const isActive = enabled && !!accountId;
 
@@ -126,12 +127,18 @@ export function useExtractWritebackProposals({
       if (error) throw error;
       return { inserted: data?.length ?? 0 };
     },
-    onSuccess: () => {
+    onMutate: () => {
+      setAwaitingProposalsRefetch(true);
+    },
+    onSuccess: async () => {
       if (accountId) {
-        queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: proposalsQueryKey(analysisId, accountId, snapshot),
         });
       }
+    },
+    onSettled: () => {
+      setAwaitingProposalsRefetch(false);
     },
     onError: (err: Error) => {
       logger.error('ensure extract writeback proposals error', err);
@@ -173,7 +180,9 @@ export function useExtractWritebackProposals({
     },
   });
 
-  const { mutateAsync: ensureProposalsAsync, isPending: ensuring } = ensureProposalsMutation;
+  const { mutateAsync: ensureProposalsAsync, isPending: ensureMutationPending } =
+    ensureProposalsMutation;
+  const ensuring = ensureMutationPending || awaitingProposalsRefetch;
 
   const ensureProposals = useCallback(() => {
     if (!isActive) return;
@@ -219,7 +228,6 @@ export function useExtractWritebackProposals({
   return {
     proposals: proposalsQuery.data ?? [],
     proposalsLoading: proposalsQuery.isLoading,
-    proposalsFetching: proposalsQuery.isFetching,
     proposalsError: proposalsQuery.error,
     ensuring,
     rejecting: rejectProposalMutation.isPending,

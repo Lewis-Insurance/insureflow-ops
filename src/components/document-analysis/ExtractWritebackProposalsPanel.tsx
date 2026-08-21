@@ -53,7 +53,6 @@ export function ExtractWritebackProposalsPanel({
   const {
     proposals,
     proposalsLoading,
-    proposalsFetching,
     proposalsError,
     ensuring,
     rejecting,
@@ -65,16 +64,9 @@ export function ExtractWritebackProposalsPanel({
     lineCategory,
   });
 
-  const isLoadingEmpty =
-    (proposalsLoading || proposalsFetching || ensuring) && proposals.length === 0;
+  const isLoadingEmpty = (proposalsLoading || ensuring) && proposals.length === 0;
 
-  if (
-    !proposalsLoading &&
-    !proposalsFetching &&
-    !ensuring &&
-    proposals.length === 0 &&
-    !proposalsError
-  ) {
+  if (!proposalsLoading && !ensuring && proposals.length === 0 && !proposalsError) {
     return null;
   }
 

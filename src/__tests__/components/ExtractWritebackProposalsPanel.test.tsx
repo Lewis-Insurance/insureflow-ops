@@ -56,7 +56,6 @@ beforeEach(() => {
   useExtractWritebackProposals.mockReturnValue({
     proposals: [],
     proposalsLoading: false,
-    proposalsFetching: false,
     proposalsError: null,
     ensuring: false,
     rejecting: false,
@@ -70,9 +69,8 @@ describe('ExtractWritebackProposalsPanel ensure→refetch visibility', () => {
     useExtractWritebackProposals.mockReturnValue({
       proposals: [],
       proposalsLoading: false,
-      proposalsFetching: true,
       proposalsError: null,
-      ensuring: false,
+      ensuring: true,
       rejecting: false,
       ensureProposals: vi.fn(),
       rejectProposal: vi.fn(),
@@ -88,7 +86,6 @@ describe('ExtractWritebackProposalsPanel ensure→refetch visibility', () => {
     useExtractWritebackProposals.mockReturnValue({
       proposals: [],
       proposalsLoading: false,
-      proposalsFetching: false,
       proposalsError: null,
       ensuring: true,
       rejecting: false,
