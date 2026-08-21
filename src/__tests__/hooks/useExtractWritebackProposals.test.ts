@@ -10,6 +10,15 @@ const from = vi.fn();
 const rpc = vi.fn();
 const authGetUser = vi.fn();
 const toast = vi.fn();
+const navigate = vi.fn();
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => navigate,
+  };
+});
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -205,6 +214,7 @@ beforeEach(() => {
   rpc.mockReset();
   authGetUser.mockReset();
   toast.mockReset();
+  navigate.mockReset();
   pendingRows = [];
   upsertCalls = 0;
   supersedeCalls = 0;
@@ -426,6 +436,78 @@ describe('useExtractWritebackProposals', () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Quote booked' }),
     );
+    expect(navigate).toHaveBeenCalledWith('/customers/acct-1?tab=policies&policiesTab=quotes');
+  });
+
+  it('does not navigate after reject', async () => {
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    await act(async () => {
+      result.current.rejectProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(0);
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate when confirm RPC fails', async () => {
+    pendingRows = [
+      { id: 'proposal-1', carrier_name: 'Hartford', status: 'pending', proposed_quote: {} },
+    ];
+
+    rpc.mockImplementation((fn: string) => {
+      if (fn === 'apply_extract_writeback_proposal') {
+        return Promise.resolve({ data: null, error: new Error('RPC failed') });
+      }
+      throw new Error(`Unexpected RPC: ${fn}`);
+    });
+
+    const { result } = renderHook(
+      () =>
+        useExtractWritebackProposals({
+          analysisId: 'analysis-1',
+          accountId: 'acct-1',
+          snapshot: SNAPSHOT,
+          lineCategory: 'commercial',
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.proposals).toHaveLength(1);
+    });
+
+    await act(async () => {
+      result.current.confirmProposal('proposal-1');
+    });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Could not book quote' }),
+      );
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('second confirm is a no-op when RPC returns the same quote id', async () => {
