@@ -74,7 +74,7 @@ const customerSchema = z.object({
 interface AddCustomerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (accountId?: string) => void;
 }
 
 const US_STATES = [
@@ -629,7 +629,7 @@ export function AddCustomerModal({ open, onOpenChange, onSuccess }: AddCustomerM
       setParseStatus('idle');
       setErrors({});
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(newCustomer.id);
     } catch (error) {
       toast({
         title: 'Error',
