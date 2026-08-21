@@ -94,6 +94,27 @@ describe('extractWritebackProposal', () => {
       expect(inferLineOfBusiness(snapshot, 'commercial')).toBe('umbrella');
     });
 
+    it('maps commercial_quote with only property/building coverages to property', () => {
+      const snapshot = normalizeExtractSnapshot({
+        document_type: 'commercial_quote',
+        coverages: [
+          {
+            name: 'Building',
+            limit: '$1,500,000',
+            deductible: '$2,500',
+            premium: 12000,
+          },
+          {
+            name: 'Business Personal Property',
+            limit: '$500,000',
+            deductible: '$1,000',
+            premium: 4500,
+          },
+        ],
+      });
+      expect(inferLineOfBusiness(snapshot, 'commercial')).toBe('property');
+    });
+
     it('maps commercial_quote with only commercial auto coverages to commercial_auto', () => {
       const snapshot = normalizeExtractSnapshot({
         document_type: 'commercial_quote',
