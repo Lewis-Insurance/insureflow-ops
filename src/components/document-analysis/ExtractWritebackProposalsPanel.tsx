@@ -1,7 +1,7 @@
 import { Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Chip, StatusPill } from '@/components/cc';
+import { Chip, Skeleton, StatusPill } from '@/components/cc';
 import { useExtractWritebackProposals } from '@/hooks/useExtractWritebackProposals';
 import {
   proposalCoverageCount,
@@ -25,6 +25,25 @@ function formatPremium(payload: ProposedQuotePayload): string {
   return formatCurrency(premium);
 }
 
+function ProposalRowSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 rounded-cc-lg border border-cc-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-5 w-16 rounded-pill" />
+          <Skeleton className="h-5 w-20 rounded-pill" />
+        </div>
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Skeleton className="h-9 w-20 rounded-cc-md" />
+        <Skeleton className="h-9 w-36 rounded-cc-md" />
+      </div>
+    </div>
+  );
+}
+
 export function ExtractWritebackProposalsPanel({
   analysisId,
   accountId,
@@ -45,32 +64,9 @@ export function ExtractWritebackProposalsPanel({
     lineCategory,
   });
 
-  if (proposalsLoading || ensuring) {
-    return (
-      <Card className="border-cc-border bg-cc-surface">
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-cc-text-muted">
-          <Loader2 className="h-4 w-4 animate-spin text-cc-accent" />
-          Building write-back proposals...
-        </CardContent>
-      </Card>
-    );
-  }
+  const isLoadingEmpty = (proposalsLoading || ensuring) && proposals.length === 0;
 
-  if (proposalsError) {
-    return (
-      <Card className="border-cc-border bg-cc-surface">
-        <CardContent className="py-6">
-          <p className="text-sm text-destructive">
-            {proposalsError instanceof Error
-              ? proposalsError.message
-              : 'Could not load write-back proposals.'}
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (proposals.length === 0) {
+  if (!proposalsLoading && !ensuring && proposals.length === 0 && !proposalsError) {
     return null;
   }
 
@@ -84,6 +80,21 @@ export function ExtractWritebackProposalsPanel({
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {proposalsError ? (
+          <p className="text-sm text-destructive">
+            {proposalsError instanceof Error
+              ? proposalsError.message
+              : 'Could not load write-back proposals.'}
+          </p>
+        ) : null}
+
+        {isLoadingEmpty ? (
+          <>
+            <ProposalRowSkeleton />
+            <ProposalRowSkeleton />
+          </>
+        ) : null}
+
         {proposals.map((proposal) => {
           const payload = proposal.proposed_quote;
           const coverageCount = proposalCoverageCount(payload);
